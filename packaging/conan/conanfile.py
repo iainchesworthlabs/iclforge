@@ -92,6 +92,11 @@ class IclforgeConan(ConanFile):
         # so a linked fmt would have left the static package with undefined
         # fmt:: symbols for the consumer's link to find.
         self.requires("fmt/12.2.0", visible=False)
+        # nlohmann/json - tokenises an object scene file (libs/objects/src/scene_json.cpp).
+        # Header-only and private on the same terms as fmt above: used in one source file of
+        # iclforge::objects, linked through $<BUILD_INTERFACE:iclforge::json> so no export names
+        # it. 3.12.0 is the floor (JSON_DIAGNOSTIC_POSITIONS; cmake/NlohmannJson.cmake).
+        self.requires("nlohmann_json/3.12.0", visible=False)
 
     def layout(self):
         cmake_layout(self)

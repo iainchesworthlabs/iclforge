@@ -42,6 +42,7 @@ KaraokeFile backing() { return part(KaraokePart::kBacking, "backing.wav", 2); }
 KaraokeFile melody() { return part(KaraokePart::kMelody, "melody.wav", 1); }
 KaraokeFile lead() { return part(KaraokePart::kVocal1, "lead.wav", 1); }
 KaraokeFile harmony() { return part(KaraokePart::kVocal2, "harmony.wav", 1); }
+KaraokeFile effects() { return part(KaraokePart::kLfe, "effects.wav", 1); }
 
 KaraokePlan plan_of(const std::vector<KaraokeFile>& files) {
     return forge_gui::plan_karaoke_parts(files);
@@ -242,13 +243,105 @@ TEST_CASE("karaoke authoring: one file's own speakers name its parts",
     CHECK(wide.channels[4].channel == 4);  // Rs
 }
 
+TEST_CASE("karaoke authoring: an LFE part is the stream's LFE and chooses no mode",
+          "[forge-gui][karaoke]") {
+    // After the full-bandwidth channels of every mode that can be made.
+    struct Row {
+        std::vector<KaraokeFile> files;
+        Acmod acmod;
+        const char* positions;
+        const char* parts;
+    };
+    const std::vector<Row> rows = {
+        {{backing(), melody(), effects()}, Acmod::k3_0, "L C R LFE", "L M R LFE"},
+        {{backing(), lead(), effects()}, Acmod::k2_1, "L R Cs LFE", "L R V1 LFE"},
+        {{backing(), melody(), lead(), effects()}, Acmod::k3_1, "L C R Cs LFE", "L M R V1 LFE"},
+        {{backing(), lead(), harmony(), effects()}, Acmod::k2_2, "L R Ls Rs LFE", "L R V1 V2 LFE"},
+        {{backing(), melody(), lead(), harmony(), effects()}, Acmod::k3_2, "L C R Ls Rs LFE",
+         "L M R V1 V2 LFE"},
+    };
+    for (const Row& row : rows) {
+        const KaraokePlan plan = plan_of(row.files);
+        INFO(row.positions);
+        CHECK(plan.buildable);
+        CHECK(plan.acmod == row.acmod);
+        CHECK(plan.lfe);
+        CHECK(positions(plan) == row.positions);
+        CHECK(parts(plan) == row.parts);
+        // The LFE's file is the effects file, wherever it was listed.
+        REQUIRE_FALSE(plan.channels.empty());
+        CHECK(plan.channels.back().file == row.files.size() - 1);
+        CHECK(plan.channels.back().channel == 0);
+        CHECK(check_of(plan, "lfe-part").args == std::vector<std::string>{"effects.wav"});
+    }
+
+    // A stream without one has none, and says nothing of it.
+    const KaraokePlan plain = plan_of({backing(), melody(), lead()});
+    CHECK_FALSE(plain.lfe);
+    CHECK(find(plain, "lfe-part") == nullptr);
+
+    // It chooses no mode: a backing and an LFE are nothing to sing along to.
+    const KaraokePlan alone = plan_of({backing(), effects()});
+    CHECK_FALSE(alone.buildable);
+    CHECK(alone.mode.empty());
+    CHECK(find(alone, "nothing-to-sing") != nullptr);
+}
+
+TEST_CASE("karaoke authoring: an LFE part is checked like the other mono parts",
+          "[forge-gui][karaoke]") {
+    KaraokePlan plan = plan_of({backing(), melody(), part(KaraokePart::kLfe, "bass.wav", 2)});
+    CHECK_FALSE(plan.buildable);
+    CHECK(check_of(plan, "part-not-mono").args == std::vector<std::string>{"bass.wav", "2", "lfe"});
+
+    plan = plan_of({backing(), melody(), part(KaraokePart::kLfe, "bass.wav", 1, 44100, 222.0)});
+    CHECK(plan.buildable);
+    CHECK(check_of(plan, "rate-differs").args == std::vector<std::string>{"bass.wav", "44.1", "48"});
+    CHECK(find(plan, "parts-aligned") == nullptr);
+
+    plan = plan_of({backing(), melody(), part(KaraokePart::kLfe, "bass.wav", 1, 48000, 200.0)});
+    CHECK(plan.buildable);
+    CHECK(check_of(plan, "length-differs").args == std::vector<std::string>{"bass.wav", "3:20", "3:42"});
+}
+
+TEST_CASE("karaoke authoring: a speaker file's own LFE is the stream's LFE",
+          "[forge-gui][karaoke]") {
+    // WAVEFORMATEXTENSIBLE order: L R C LFE Ls Rs.
+    const KaraokePlan plan =
+        forge_gui::plan_karaoke_speakers(speakers_of({"L", "R", "C", "LFE", "Ls", "Rs"}));
+    CHECK(plan.buildable);
+    CHECK(plan.mode == "3/2");
+    CHECK(plan.lfe);
+    CHECK(positions(plan) == "L C R Ls Rs LFE");
+    REQUIRE(plan.channels.size() == 6);
+    CHECK(plan.channels.back().channel == 3);  // where the file keeps it
+    CHECK(check_of(plan, "lfe-part").args == std::vector<std::string>{"song.wav"});
+    CHECK(find(plan, "lfe-present") == nullptr);
+
+    // The same file without one has none.
+    const KaraokePlan without = forge_gui::plan_karaoke_speakers(speakers_of({"L", "R", "C", "Ls", "Rs"}));
+    CHECK_FALSE(without.lfe);
+    CHECK(find(without, "lfe-part") == nullptr);
+}
+
+TEST_CASE("karaoke authoring: the room's LFE plays the stream's LFE under every listening",
+          "[forge-gui][karaoke]") {
+    using forge_gui::KaraokeListening;
+    using forge_gui::KaraokeVocalsChoice;
+    for (const KaraokeListening how :
+         {KaraokeListening::kAsCoded, KaraokeListening::kAware, KaraokeListening::kCapable}) {
+        const auto with = forge_gui::karaoke_outputs(true, 2, how, KaraokeVocalsChoice::kBoth, false, true);
+        CHECK(with.lfe == std::vector<std::string>{"LFE"});
+        const auto without = forge_gui::karaoke_outputs(true, 2, how, KaraokeVocalsChoice::kBoth, false, false);
+        CHECK(without.lfe.empty());
+        // A stereo fold leaves it out, which the page does not ask it not to.
+        const auto folded = forge_gui::karaoke_outputs(true, 2, how, KaraokeVocalsChoice::kBoth, true, true);
+        CHECK(folded.lfe.empty());
+    }
+}
+
 TEST_CASE("karaoke authoring: a file that does not fit says why",
           "[forge-gui][karaoke]") {
-    // An LFE is named, not dropped.
-    KaraokePlan plan = forge_gui::plan_karaoke_speakers(speakers_of({"L", "R", "C", "LFE", "Ls", "Rs"}));
-    CHECK_FALSE(plan.buildable);
-    CHECK(plan.mode == "3/2");
-    REQUIRE(find(plan, "lfe-present") != nullptr);
+    KaraokePlan plan;
 
     // Speakers that are not stated: three channels are 3/0 or 2/1.
     KaraokeSpeakerFile unnamed;

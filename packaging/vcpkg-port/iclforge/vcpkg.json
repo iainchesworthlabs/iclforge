@@ -14,7 +14,8 @@
       "name": "vcpkg-cmake-config",
       "host": true
     },
-    "fmt"
+    "fmt",
+    "nlohmann-json"
   ],
   "features": {
     "matroska": {

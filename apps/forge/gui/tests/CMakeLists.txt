@@ -17,10 +17,14 @@ iclforge_add_test_binary(iclforge-forge-gui-tests PROJECT forge-gui SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_presentations.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/karaoke_authoring.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_encode_core.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_objects_core.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_objects_core.cpp"
+    # The table of a karaoke stream's parts, which karaoke_authoring.cpp and `forge project` share
+    # (it has no dependency, so this binary stays free of the project file's JSON).
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/project/src/karaoke_parts.cpp")
 target_include_directories(iclforge-forge-gui-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../src"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/project/src")
 target_link_libraries(iclforge-forge-gui-tests
     PRIVATE
         iclforge::ac3

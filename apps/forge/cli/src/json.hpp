@@ -19,6 +19,10 @@
 // still-open containers, which is what decides indentation and where the
 // separating commas go.
 //
+// That is also why it is not nlohmann/json, which the rest of the programs read and write JSON
+// with (cmake/NlohmannJson.cmake): a value type and a dump, with no way to write a document as it
+// is produced, so the whole tree would have to exist before the first byte did.
+//
 // It is also not a general-purpose library. There is no reader, no value type
 // and no schema validation, because the only consumer is one command emitting
 // one documented shape - see docs/forge/cli/commands.md for that shape, which is the

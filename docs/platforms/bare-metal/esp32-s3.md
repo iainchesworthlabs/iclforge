@@ -205,6 +205,12 @@ they produce:
   over the same network onto 7.1.4 in twelve slots, one `POST /play` a stream, each slot's level
   held to `www/streams.json` (`tools/checks/check_stream_set.py`); a stream the manifest marks
   refused has to fail for the reason it names.
+- `sdkconfig.ci-http` with `sdkconfig.ci-http714` and `sdkconfig.ci-lane`: the same set's boot play
+  and eight of its streams (`--only`), with QEMU's emulated quad PSRAM (`-m 8M`, the board's size)
+  and the decode lane asked for: the one shape CI runs with a second thread working on a decode.
+  The console has to say the lane started, and the least free internal RAM is held to 12,288
+  bytes: 63,000 or more on every stream but `714-tpn`, whose end-of-play sample is of a decoder
+  still holding a second PCM set and read 20,103 in CI.
 
 Another step, *Build every sink and source combination*, builds `i2s`, `sd`, `http` and `null`,
 one build each, and runs none of them. The `i2s` sink drives the I2S peripheral and `sd` the SDMMC
@@ -1307,8 +1313,12 @@ What changed, in the order it was found:
   PSRAM: without it the task's stack comes out of the internal RAM the player and the decoder
   share, and the 7.1.4 shapes CI runs under QEMU, which has none, do not have 12 KB to give (the
   object render's lowest free internal RAM is 10 KB, and the stream set is held to 20,480 bytes
-  with 28 KB measured). It can be set to 1 on a part with no PSRAM that has the room, and a part
-  with one core (the C6) never makes it.
+  with 24 KB measured). It can be set to 1 on a part with no PSRAM that has the room, and a part
+  with one core (the C6) never makes it. CI runs the lane in one shape of its own, over QEMU's
+  emulated quad PSRAM (`sdkconfig.ci-lane`): the streams that reach its second thread, enhanced
+  coupling's and transient pre-noise's among them, held to the host's levels with the lane's
+  stack and scratch in PSRAM and 20 KB of internal RAM left at the least (63 KB on every stream
+  but `714-tpn`).
 
 **What is still over 1.0.** The three object streams above 1.0 and enhanced coupling at 7.1.4.
 The second core takes a fifth off the JOC reconstruction on this part (22.4 to 17.9 ms of

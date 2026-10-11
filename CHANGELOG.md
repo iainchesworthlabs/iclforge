@@ -83,6 +83,31 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **A sink that decodes a karaoke stream itself applies the part levels.** The Sendspin
+  extension's decoder settings take three more keys, `karaoke_melody_db`, `karaoke_vocal1_db` and
+  `karaoke_vocal2_db` (-24.0, which is off, to 12.0 dB against Table C.2.3), which a sink lists
+  when it has them. Hearth tells a sink that lists them the levels that change what is heard,
+  with the choice, before the stream starts and when they change while the item plays; a sink
+  that has the reproduction and not a level's key is sent PCM decoded in Hearth as soon as that
+  level is moved, so a group plays one set of levels. The ESP32 sink firmware applies them. The
+  dB span and its conversion to the library's linear gains are one pair of functions in
+  `iclforge/ac3/decoder/output.hpp` (`karaoke_gain_from_db()`), used by Hearth, the wire and the
+  firmware (planning/karaoke-phase2.md, W10).
+- **Hearth's Karaoke page sets the level of the melody and of each vocal.** Under the capable
+  reproduction, three sliders move M, V1 and V2 from 24 dB below Table C.2.3 (off) to 12 dB above
+  it, with **Reset levels**; a part that is off is listed as muted and a vocal the stream lacks or
+  the Vocals choice leaves out has its slider closed. The levels are kept across starts with the
+  choice, and show in the diagnostics only when they are not 0 dB. `DecoderSettings` carries them
+  as `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db`, which become the library's
+  linear gains where the settings meet the decoder (planning/karaoke-phase2.md, W10).
+- **The karaoke-capable decoder can re-level the melody and the vocals.** `OutputConfig` gains
+  `karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, linear and 1.0 by
+  default, which multiply the Table C.2.3 coefficients of M, V1 and V2 (Annex C.2.3's "additional
+  flexibility") at the 3/0 and the 2/0 reproductions, before the scale-down that holds an output's
+  sum to 1. They are read under `KaraokeReproduction::kCapable` alone: the aware column ignores
+  them, and at 1.0 every output is the table's, bit for bit. A gain that is not a finite number of
+  0 or more is a mute (planning/karaoke-phase2.md, W10).
+
 - **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
   outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
   M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at
@@ -140,7 +165,7 @@ The sections below contain the complete change list and fixes.
   karaoke AC-3 stream, its coding mode and which of M, V1 and V2 it carries - and chooses how it is
   reproduced: as coded, aware or capable, with none, V1, V2 or both vocals. It shows which part each
   speaker carries, and says in words when the choice cannot apply: a stream that is not karaoke, a
-  bitstream output, a network group, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
+  bitstream output, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
   is kept across starts, the one decoder setting that is. The Decoder page shows it in a line with
   a button to the page.
 - **Hearth shows lyrics, word by word.** The Karaoke page has a Lyrics card for the `.lrc` file
@@ -151,6 +176,89 @@ The sections below contain the complete change list and fixes.
   said in words. `F11` opens the lyrics full screen (`Esc` leaves) with the transport and the
   vocals chooser kept at the bottom, and Settings has a lyric delay of -1,000 to +1,000 ms that is
   kept across starts.
+- **A karaoke stream is one reproduction across a network group.** `_iclforge_player@v1` takes
+  two more decoder settings, `karaoke` (`off`, `aware`, `capable`) and `karaoke_vocals` (`none`,
+  `v1`, `v2`, `both`), which a sink lists when it has them. Hearth sends a karaoke AC-3 stream as
+  it is to a sink that lists them, and tells it the singer's choice before the stream starts and
+  when it changes while the item plays; the sink's decoder reproduces it (L, C, R and the LFE, so
+  its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
+  firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
+  reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The timing window sets who sings a line.** In **Time the lyrics...** a chosen line takes a
+  **Singer** (not marked, V1, V2 or both) and each row shows its marker; two **Name** fields set
+  what the file calls the singers (`[v1:]` and `[v2:]`, kept with the file, unlike the names typed on
+  the Karaoke page), with brackets and control characters taken out since a tag ends at the first
+  `]`. **Save** writes the markers and the names, so a duet's file is made in one pass
+  (planning/karaoke-phase2.md, W11c).
+- **Hearth shows a duet.** Where a lyrics file marks its lines (`V1:`, `V2:`, `V1+V2:`), the
+  Karaoke page has two name fields for the two singers (typed for the run, never kept for a song,
+  before the file's `[v1:]` and `[v2:]`, before "V1" and "V2"), and each line of the lyric view says
+  who sings it by name, by side (the second singer's lines are indented) and by colour. On a karaoke
+  stream a line is also tagged **guide** (the vocal that is playing sings it) or **you** (it does
+  not), with a sentence on the page for what the Vocals choice leaves you to sing; a plain file
+  shows each marked line with its singer's name (planning/karaoke-phase2.md, W11b).
+- **A lyrics file can say who sings a line.** The reader (`libs/lyrics`) takes a duet's singer from
+  a `V1:`, `V2:` or `V1+V2:` marker at the start of a line (after its time tags, or after its first
+  word tag; either case; not part of the line's text), and the two singers' names from `[v1:name]`
+  and `[v2:name]` id tags. A line with no marker is for nobody in particular, and `V3:` is text.
+  The writer puts the markers and the names back, a plain file may carry the markers before it is
+  timed, and `set_line_singer()` is what an editor calls (planning/karaoke-phase2.md, W11a).
+- **Crucible imports SubRip, ASS and MIDI karaoke lyrics too.** The strip's import takes a `.srt`,
+  an `.ass` or a `.kar` as well as an `.lrc`, told apart by what is in the file (the same
+  `parse_timed_text` Hearth reads with); the file dialog lists them, and the catalogues are filled
+  (planning/karaoke-phase2.md, W13b).
+- **Crucible shows the lyrics of an application.** The Room page has a sixth block, **06 LYRICS**:
+  import an `.lrc` (UTF-8 or UTF-16) against the selected application, press **Start** as the song
+  begins and the strip shows the line being sung with the lines around it, a word at a time where the
+  file times its words. The position is start-and-nudge (Start, Start again, and 0.1 s nudges up to
+  10 s either way), because Crucible taps an application's sound and has no way to read its media
+  position; a media-session source is a later change. Lyrics go with the application when it
+  leaves the list. The reader is `libs/lyrics`, the one Hearth reads with
+  (planning/karaoke-phase2.md, W13b).
+- **MIDI karaoke files are lyrics, with word times.** The lyric reader takes a `.kar` (a Standard
+  MIDI File) for its words: the Text or Lyric events (the track called `Words` where there is one),
+  each syllable at its tick turned into milliseconds through the file's tempo map, so the fill moves
+  by syllable; `@T` lines are the title and the artist, a `/` or a backslash begins a line, and the
+  music in the file is not read. The words must be UTF-8 (a MIDI file declares no encoding, and
+  code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
+  `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
+  (planning/karaoke-phase2.md, W13e).
+- **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
+  `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
+  (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
+  blocks, drawings and comments are dropped and the columns are the script's own `Format:` line.
+  A file is recognised by what it holds, and Hearth finds `name.ass` beside an item when there is
+  no `.lrc` or `.srt` (planning/karaoke-phase2.md, W13d).
+- **SubRip files are lyrics.** The lyric reader takes a `.srt` as lines that end where their cue
+  does (so the gap between cues is nothing being sung), with the cue's text lines joined, its styling
+  and `{...}` override blocks dropped, and no word times invented. A file is read as SubRip or as LRC
+  by what it holds, and Hearth finds `name.srt` beside an item when there is no `name.lrc`
+  (planning/karaoke-phase2.md, W13c).
+- **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
+  was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
+  the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
+  An `.lrc` saved as UTF-16 with a byte-order mark, in either order, is read as the UTF-8 it
+  becomes, which is how an editor saves a Hebrew or a Yiddish file as "Unicode"; UTF-32 and an
+  8-bit code page such as Windows-1255 are still refused by name and not guessed at. White space
+  is ASCII white space whatever the locale, so a line that ends in a letter whose UTF-8 ends in
+  `0xA0` (nun, among others) keeps it. The namespace is `iclforge::lyrics`; nothing else changes.
+- **Hearth times lyrics.** **Time the lyrics...** on the Karaoke page's Lyrics card opens a window
+  over the item as it plays: `Space` stamps each line as it starts and then each word, the words
+  of a stamped line begin as an estimate by their letters (drawn slanted and muted, never as
+  sung) and a press replaces one, and every press has a reaction time (120 ms to start with, kept)
+  taken off it so that the stored time is the sound's. **Save** writes the item's `.lrc` with
+  enhanced word tags and keeps the first file there once as `.lrc.bak`; an item with no words
+  takes a text file in UTF-8 or UTF-16. The writer, the estimate and the edits are in
+  `iclforge::lyrics` (planning/karaoke-phase2.md, W6).
+- **A karaoke disc's picture is shown beside a stream.** A `name.cdg` (CD+G, the subcode of a
+  karaoke disc ripped on its own: 24-byte packets, 300 a second, a 300 by 216 picture in 16
+  colours) with no lyrics file beside the item is drawn on the Karaoke page and in the singer
+  view, against the position of what is heard and moved by the lyric delay. `iclforge::lyrics`
+  (`cdg.hpp`) decodes the memory and border presets, the tile blocks and their XOR form, the
+  scrolls by a tile and the 12-bit colour table; the picture at a position is what the packets up
+  to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
+  read as text, and the page says so; a lyrics file beside the stream is shown in its place
+  (planning/karaoke-phase2.md, W13f).
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the
@@ -165,6 +273,42 @@ The sections below contain the complete change list and fixes.
   nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
   by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
+- **The Karaoke flow takes an LFE part.** An optional mono file, the stream's low-frequency
+  channel: it chooses no mode, is coded after the full-bandwidth channels (a 3/2 stream with one is
+  a 5.1 bed), is band-limited by the window as any channel assigned to the LFE is, and comes out of
+  a karaoke reproduction as L, C, R and the LFE. A multichannel file's own LFE is the stream's, where
+  it was a named problem. A project keeps the part as `lfe` (planning/karaoke-phase2.md, W9).
+- **A project holds the AC-4 tab and AC-4 objects, and a karaoke project's parts lay themselves
+  out.** `encode.options` of an AC-4 project is `ac4-encode`'s own words (`frame-rate`, `codec-mode`,
+  `dialnorm`, `drc`, `cmixlev`, `dialogue-channels`, ... and `coding` for objects), and
+  `forge project` runs an AC-4 object session as `atmos-encode ... codec=ac4` with its scene, its
+  `src=`, `map=` and offsets, and AC-4 into an MP4 file as the one command that writes it. Sources
+  that each name a `part` (backing, melody, vocal1, vocal2) and a project with no `bed` and no
+  `assignments` are laid out where Annex C's Table C.2.1 puts them, by the Karaoke flow and by
+  `forge project` from one table, so the example's four parts alone are its stream byte for byte.
+  Fixed: the window's LFE mix and preferred downmix were written to the command line (and so to a
+  project) when E-AC-3's mixing metadata, or AC-3's Annex D, was off and the stream had neither, so
+  the line and the project were a different stream than the window encoded; they are now written
+  with their group, and a project that names either asks for it, as `forge` reads it.
+- **The browser decode demo reproduces karaoke streams.** `PushDecoder` and the npm package's
+  `FoldOptions` take `karaoke` (as coded, aware, capable) and `karaokeVocals` (none, V1, V2, both),
+  and every push says whether the unit is Annex C karaoke type. The demo page shows a control for
+  the vocals when the stream is one and decodes it again with the choice. The WebAssembly build of
+  the decoder was run in Node against `forge decode` of the karaoke example below: all eight cases
+  match sample for sample. An AC-3 stream's fold levels now come from its own `cmixlev` and
+  `surmixlev` (they were the E-AC-3 defaults) (planning/karaoke-phase2.md, W8).
+- **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
+  traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
+  which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
+  the other sings, so "V1 only", "V2 only" and "both" each leave a different part to sing. Its
+  `.forgeproj` names the four parts and nothing of how they are laid out, which the Karaoke flow
+  and `forge project` work out, and its lyrics mark each line with its singer (`V1:` and `V2:`)
+  and name the two (`[v1:Shantyman]`, `[v2:Crew]`). Generated like the first example, by
+  `tools/generators/gen_karaoke_duet_example.py` over the voices both now share
+  (`karaoke_synth.py`; the first example's files are unchanged byte for byte), and held by a
+  generator test (the committed files, the pitches the page prints, and the two vocals silent in
+  each other's lines), the CLI tests (the stream, by hand and from the project), Hearth's reader
+  and the Forge GUI's Qt Quick suite.
 - **A karaoke example, "Auld Lang Syne"** (`examples/karaoke/auld-lang-syne/`): four parts, the
   `.forgeproj` that opens them in the Karaoke flow, the 3/2 `bsmod` 7 stream they make and a
   `.lrc` timed to the syllable, all generated by `tools/generators/gen_karaoke_example.py` with
@@ -2605,6 +2749,25 @@ The sections below contain the complete change list and fixes.
   take the new strings.
 
 ### Changed
+
+**JSON**
+
+- **An object scene file is read with nlohmann/json, not a hand-written tokenizer.** `iclforge::objects`
+  compiles the header-only library in privately - through `$<BUILD_INTERFACE:...>`, as it does {fmt}, so
+  no package, export or consumer names it - and checks the schema in its own code, as before:
+  an unknown member is still an error, a malformed file still comes back as a `SceneError` and
+  never throws, and an error still names its line. What a file may contain follows RFC 8259 more
+  closely now, in four ways: a key an object names twice is an error (a parsed document would keep one
+  and say nothing), a surrogate pair in a `\u` escape reads as the one character it names, and a lone
+  surrogate, a raw control character in a name, or bytes that are not UTF-8 are refused where they were
+  let through. The messages for a malformed file are the tokenizer's own. nlohmann/json is now a
+  dependency of every build of `iclforge::objects` (the vcpkg port and the Conan recipe name it),
+  at 3.12.0 or newer, and its notice is in Hearth's and Crucible's, as it was in Forge's.
+- **Two JSON implementations remain, and each now says why in its header.** Sendspin's reader and
+  writer (`libs/sendspin`) run inside the ESP32 firmware, where they were measured against nlohmann/json
+  on a C6 and an S3: 6x the flash, 3-4.6x the time, over twice the stack, and no bound on what a
+  4 KB hostile message costs (70 KB and 51-61 ms, against a refusal at the depth limit). The forge
+  command line's `probe` writer streams a document of any length, which nlohmann/json has no way to.
 
 **AC-4 decoder**
 

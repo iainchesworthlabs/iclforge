@@ -1257,6 +1257,12 @@ public:
     // Variable bit rate from `text` (plan::parse_vbr). False, with nothing set, for a token that
     // is not one, and for one the window has no controls for: an average-rate target.
     Q_INVOKABLE bool setVbrFromToken(const QString& text);
+    // One option of the AC-4 tab from the word `forge ac4-encode` (or `atmos-encode ... codec=
+    // ac4`) takes it by: `key` and `value` as the command's parser reads them
+    // (ac4_apply_option). 0 where it is set, 1 for a value the command would refuse, 2 for a key the
+    // tab has no control for; nothing is set for 1 and 2, and a run that is busy sets nothing and
+    // answers 1.
+    Q_INVOKABLE int setAc4Option(const QString& key, const QString& value);
     Q_INVOKABLE void encodeTo(const QUrl& url);
     // The same encode, for a file the person did not ask for: the Karaoke flow's Hear step builds
     // the stream to play it. It opens no run, so the run strip lists what was saved and not the

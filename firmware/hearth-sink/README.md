@@ -1155,7 +1155,8 @@ substreams, two programmes, dual mono, each Annex E coding tool, short frames,
 VBR, DRC words, other encoders' streams and objects. `www/streams.json` says
 what each one is and the level each slot of a 7.1.4 output should get from it,
 and CI plays the set under QEMU onto 7.1.4 (`sdkconfig.ci-http714`) and holds
-every slot to it.
+every slot to it, and again on two cores with PSRAM (`sdkconfig.ci-lane`) for the
+streams that reach the decode lane's second thread, the psram-marked ones among them.
 [`planning/esp32-stream-set.md`](../../planning/esp32-stream-set.md) has
 what was measured - which streams a network shape without PSRAM can play, and
 which need a board with it.

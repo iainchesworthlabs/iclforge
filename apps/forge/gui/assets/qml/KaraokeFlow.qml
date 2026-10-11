@@ -62,16 +62,18 @@ ColumnLayout {
     property string melodyUrl: ""
     property string vocal1Url: ""
     property string vocal2Url: ""
+    // The optional LFE part: one mono file, the stream's low-frequency channel.
+    property string lfeUrl: ""
     property string singleUrl: ""
     // The parts that did load, in sourceModel order, and the ones that did not
     // with what the controller said of them.
     property var loadedParts: []
     property var failedParts: []
     // KaraokeAuthoring's plan for them.
-    property var plan: ({ buildable: false, mode: "", melody: false, vocals: 0, hasProblem: false,
-                          channels: [], checks: [] })
+    property var plan: ({ buildable: false, mode: "", melody: false, vocals: 0, lfe: false,
+                          hasProblem: false, channels: [], checks: [] })
 
-    readonly property var partOrder: ["backing", "melody", "vocal1", "vocal2"]
+    readonly property var partOrder: ["backing", "melody", "vocal1", "vocal2", "lfe"]
 
     function urlOf(part) {
         switch (part) {
@@ -79,6 +81,7 @@ ColumnLayout {
         case "melody": return flow.melodyUrl;
         case "vocal1": return flow.vocal1Url;
         case "vocal2": return flow.vocal2Url;
+        case "lfe": return flow.lfeUrl;
         case "file": return flow.singleUrl;
         }
         return "";
@@ -90,6 +93,7 @@ ColumnLayout {
         case "melody": flow.melodyUrl = url; break;
         case "vocal1": flow.vocal1Url = url; break;
         case "vocal2": flow.vocal2Url = url; break;
+        case "lfe": flow.lfeUrl = url; break;
         case "file": flow.singleUrl = url; break;
         }
         flow.rebuild();
@@ -191,8 +195,8 @@ ColumnLayout {
         let result;
         if (rows.length === 0 && flow.failedParts.length === 0) {
             // Nothing chosen yet is not a list of problems.
-            result = { buildable: false, mode: "", melody: false, vocals: 0, hasProblem: false,
-                       channels: [], checks: [] };
+            result = { buildable: false, mode: "", melody: false, vocals: 0, lfe: false,
+                       hasProblem: false, channels: [], checks: [] };
         } else if (flow.inputKind === "file") {
             result = rows.length > 0
                 ? KaraokeAuthoring.planSpeakers({ name: rows[0].label, channels: rows[0].channels,
@@ -214,10 +218,11 @@ ColumnLayout {
         }
     }
 
-    // The plan, written into the draft: the bed, bsmod 7, and one assignment
-    // for each coded channel. Everything else stays where the author left it.
+    // The plan, written into the draft: the bed (with its LFE when there is an LFE part), bsmod
+    // 7, and one assignment for each coded channel. Everything else stays where the author left
+    // it.
     function apply(result) {
-        EncoderController.bedLfe = false;
+        EncoderController.bedLfe = result.lfe === true;
         const beds = EncoderController.bedChoices;
         for (let i = 0; i < beds.length; ++i) {
             if (beds[i].id === result.mode) {
@@ -317,6 +322,7 @@ ColumnLayout {
         flow.melodyUrl = parts.melody || "";
         flow.vocal1Url = parts.vocal1 || "";
         flow.vocal2Url = parts.vocal2 || "";
+        flow.lfeUrl = parts.lfe || "";
         flow.singleUrl = parts.file || "";
         flow.currentStepKey = "parts";
         flow.rebuild();
@@ -335,6 +341,7 @@ ColumnLayout {
         case "melody": return qsTr("Melody guide");
         case "vocal1": return qsTr("Vocal 1");
         case "vocal2": return qsTr("Vocal 2");
+        case "lfe": return qsTr("LFE");
         }
         return qsTr("File");
     }
@@ -369,6 +376,9 @@ ColumnLayout {
             return qsTr("All parts are %1 at %2 kHz.").arg(a[0]).arg(a[1]);
         case "each-part-one-place":
             return qsTr("Each part is one place in the stream.");
+        case "lfe-part":
+            return qsTr("%1 is the LFE channel: the encoder band-limits it as it does any LFE.")
+                .arg(a[0]);
         case "no-file":
             return qsTr("Choose a file.");
         case "speakers-unnamed":
@@ -378,9 +388,6 @@ ColumnLayout {
         case "speakers-not-karaoke":
             return qsTr("The speakers (%1) are not one of Annex C's five layouts: L C R, L R S, "
                         + "L C R S, L R Ls Rs or L C R Ls Rs.").arg(a[0]);
-        case "lfe-present":
-            return qsTr("%1 has an LFE channel. Karaoke streams made here carry none: use a file without it.")
-                .arg(a[0]);
         }
         return check.code;
     }
@@ -502,7 +509,8 @@ ColumnLayout {
 
     // What each speaker plays under the choice made.
     readonly property var outputs: KaraokeAuthoring.outputs(flow.plan.melody, flow.plan.vocals,
-                                                           flow.listening, flow.vocalsChoice, false)
+                                                           flow.listening, flow.vocalsChoice, false,
+                                                           flow.plan.lfe === true)
 
     function joinedParts(parts) {
         return parts.length > 0 ? parts.join(" + ") : qsTr("silent");
@@ -696,7 +704,8 @@ ColumnLayout {
                                    { part: "backing", what: qsTr("stereo · L R"), optional: false },
                                    { part: "melody", what: qsTr("mono · M"), optional: true },
                                    { part: "vocal1", what: qsTr("mono · V1"), optional: true },
-                                   { part: "vocal2", what: qsTr("mono · V2"), optional: true }
+                                   { part: "vocal2", what: qsTr("mono · V2"), optional: true },
+                                   { part: "lfe", what: qsTr("mono · LFE"), optional: true }
                                  ]
                                : []
                         delegate: Rectangle {
@@ -811,7 +820,7 @@ ColumnLayout {
                                     text: flow.singleUrl.length > 0
                                           ? flow.fileNameOf(flow.singleUrl)
                                           : qsTr("A WAV whose speakers are already named L C R Ls Rs "
-                                                 + "(or L R S, L C R S, L R Ls Rs).")
+                                                 + "(or L R S, L C R S, L R Ls Rs), with an LFE if it has one.")
                                     wrapMode: Text.WordWrap
                                     font.pixelSize: Theme.fontSmall
                                     color: Theme.neutral700
@@ -1076,6 +1085,9 @@ ColumnLayout {
                                         if (flow.listening === "asCoded") {
                                             rows.push({ speaker: "Ls", parts: flow.outputs.ls });
                                             rows.push({ speaker: "Rs", parts: flow.outputs.rs });
+                                        }
+                                        if (flow.plan.lfe === true) {
+                                            rows.push({ speaker: "LFE", parts: flow.outputs.lfe });
                                         }
                                         return rows;
                                     }
@@ -1359,8 +1371,9 @@ ColumnLayout {
                     }
                 }
                 Text {
+                    visible: flow.plan.lfe !== true
                     width: Math.min(implicitWidth, parent ? parent.width : implicitWidth)
-                    text: qsTr("No LFE: karaoke streams made here carry none.")
+                    text: qsTr("No LFE part: the stream carries none. An LFE part is optional.")
                     wrapMode: Text.WordWrap
                     font.pixelSize: Theme.fontSmall
                     color: Theme.textMuted

@@ -102,12 +102,28 @@ public:
         return planner_ ? planner_(request) : std::vector<iclforge::render::OutputLayout>{};
     }
 
+    // What tells a group's members that decode for themselves how to reproduce a karaoke stream,
+    // for a choice the singer makes while it plays (NetworkSinks::apply_karaoke()), handed across
+    // as the planner is and for the same reason: set once the NetworkSinks exists, and cleared
+    // before it goes, which waits for a call in flight.
+    void set_karaoke_applier(iclforge::hearth::KaraokeApplier applier) {
+        const std::lock_guard lock(mutex_);
+        karaoke_applier_ = std::move(applier);
+    }
+    void apply_karaoke(const std::string& group_id, const iclforge::hearth::KaraokeChoice& choice) const {
+        const std::lock_guard lock(mutex_);
+        if (karaoke_applier_) {
+            karaoke_applier_(group_id, choice);
+        }
+    }
+
 private:
     NetworkOutputStatus() = default;
 
     mutable std::mutex mutex_;
     std::map<std::string, Entry> groups_;
     iclforge::hearth::MemberPlanner planner_;
+    iclforge::hearth::KaraokeApplier karaoke_applier_;
 };
 
 }  // namespace iclforge::hearth::ui

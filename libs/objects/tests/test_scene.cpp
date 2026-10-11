@@ -729,13 +729,14 @@ TEST_CASE("every string escape and every empty form reads as JSON defines it",
     CHECK(back->objects()[0].name == awkward_name);
 
     // The reader's side: every escape RFC 8259 §7 lists, \u in each UTF-8
-    // width this format writes, and a lone surrogate replaced rather than
-    // passed through as ill-formed UTF-8.
+    // width (2 and 3 bytes, here as escapes and as raw characters) and a
+    // surrogate pair decoded to the one code point it names.
     const auto read = iclforge::objects::oba::scene_from_json(
-        R"({"iclforge_scene":1,"orientation":{},"objects":[{"name":"\/\b\f\rAé€\ud800",)"
+        R"({"iclforge_scene":1,"orientation":{},"objects":[{"name":"\/\b\f\rAé€ é€😀",)"
         R"("bed":[],"automation":[{"t":0,"x":0.5,"y":0.5,"z":0}]}]})");
     REQUIRE(read.has_value());
-    CHECK(read->objects()[0].name == "/\b\f\rA\xc3\xa9\xe2\x82\xac\xef\xbf\xbd");
+    CHECK(read->objects()[0].name ==
+          "/\b\f\rA\xc3\xa9\xe2\x82\xac \xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80");
     CHECK(read->objects()[0].bed == 0);
     CHECK(read->orientation().yaw_rad == 0.0);
 
@@ -758,20 +759,37 @@ TEST_CASE("the JSON reader refuses malformed escapes, numbers and empty members"
         CHECK(scene.error().kind == kind);
         CHECK(scene.error().message.find(message) != std::string::npos);
     };
+    // Text the JSON grammar itself refuses is described by the tokenizer, in its own words, so
+    // only that it is a syntax error with something to say is part of the contract.
+    const auto malformed = [](std::string_view text) {
+        const auto scene = iclforge::objects::oba::scene_from_json(text);
+        REQUIRE_FALSE(scene.has_value());
+        INFO(scene.error().message);
+        CHECK(scene.error().kind == iclforge::objects::oba::SceneErrorKind::kSyntax);
+        CHECK_FALSE(scene.error().message.empty());
+    };
     using iclforge::objects::oba::SceneErrorKind;
     const std::string head = R"({"iclforge_scene":1,"objects":[{"name":)";
     const std::string tail = R"(,"automation":[{"t":0,"x":0,"y":0,"z":0}]}]})";
 
-    refuses(head + R"("\q")" + tail, SceneErrorKind::kSyntax, "unknown string escape");
-    refuses(head + R"("\u00zz")" + tail, SceneErrorKind::kSyntax, "malformed \\u escape");
-    refuses(R"({"iclforge_scene":1,"objects":[{"name":"\u00)", SceneErrorKind::kSyntax,
-            "truncated \\u escape");
-    refuses(R"({"iclforge_scene":1,"objects":[{"name":"\)", SceneErrorKind::kSyntax,
-            "unterminated string");
+    malformed(head + R"("\q")" + tail);
+    malformed(head + R"("\u00zz")" + tail);
+    malformed(R"({"iclforge_scene":1,"objects":[{"name":"\u00)");
+    malformed(R"({"iclforge_scene":1,"objects":[{"name":"\)");
+    // What RFC 8259 forbids and the reader before this one let through: a raw control character
+    // inside a string, a lone surrogate (no UTF-8 can carry one), bytes that are not UTF-8, a
+    // leading zero, a bare sign and a trailing comma.
+    malformed(head + "\"line\nbreak\"" + tail);
+    malformed(head + R"("\ud800")" + tail);
+    malformed(head + "\"\xff\xfe\"" + tail);
+    malformed(R"({"iclforge_scene":01,"objects":[]})");
+    malformed(R"({"iclforge_scene":+1,"objects":[]})");
+    malformed(R"({"iclforge_scene":1,"objects":[],})");
     // A number too large for a double is not a number this format carries:
-    // it is refused where it stands rather than read as infinity.
+    // it is refused where it stands rather than read as infinity, and the
+    // message names the number.
     refuses(R"({"iclforge_scene":1,"objects":[{"automation":[{"t":1e999,"x":0,"y":0,"z":0}]}]})",
-            SceneErrorKind::kSyntax, "expected a number");
+            SceneErrorKind::kSyntax, "1e999");
     refuses(R"({"iclforge_scene":"1","objects":[]})", SceneErrorKind::kSyntax, "expected a number");
     // Empty braces where members are required are diagnosed as the missing
     // member, not as a syntax error somewhere after them.
@@ -780,27 +798,32 @@ TEST_CASE("the JSON reader refuses malformed escapes, numbers and empty members"
     refuses(R"({"iclforge_scene":1,"objects":[{"automation":[{}]}]})", SceneErrorKind::kBadField,
             "needs at least 't', 'x', 'y' and 'z'");
     refuses(R"({"iclforge_scene":1,"objects":[{"automation":{}}]})", SceneErrorKind::kSyntax,
-            "expected '['");
-    refuses(R"({"iclforge_scene":1,"objects":{}})", SceneErrorKind::kSyntax, "expected '['");
+            "expected an array");
+    refuses(R"({"iclforge_scene":1,"objects":{}})", SceneErrorKind::kSyntax, "expected an array");
     refuses(R"({"iclforge_scene":1,"objects":[{"bed":"lr","automation":[]}]})",
-            SceneErrorKind::kSyntax, "expected '['");
+            SceneErrorKind::kSyntax, "expected an array");
     refuses(R"({"iclforge_scene":1,"orientation":[],"objects":[]})", SceneErrorKind::kSyntax,
-            "expected '{'");
-    refuses(R"({"iclforge_scene":1,"orientation":{"roll_rad":1,"roll_rad":2},"objects":[]})",
-            SceneErrorKind::kBadField, "twice");
-    refuses(R"({"iclforge_scene" 1,"objects":[]})", SceneErrorKind::kSyntax, "expected ':'");
-    refuses(R"({"iclforge_scene":1,"objects":[{"automation":[{"t":0,"x":0,"y":0,"z":0} {}]}]})",
-            SceneErrorKind::kSyntax, "expected ']'");
-    refuses(R"({"iclforge_scene":1,"objects":[{"automation":[{"t":0 "x":0}]}]})",
-            SceneErrorKind::kSyntax, "expected '}'");
-    refuses(R"({"iclforge_scene":1,"objects":[{"name":"a" "automation":[]}]})",
-            SceneErrorKind::kSyntax, "expected '}'");
-    refuses(R"({"iclforge_scene":1,"objects":[{"automation":[{"t":0,"x":0,"y":0,"z":0}]} {}]})",
-            SceneErrorKind::kSyntax, "expected ']'");
+            "expected an object");
     refuses(R"({"iclforge_scene":1,"objects":[{"name":7,"automation":[]}]})",
-            SceneErrorKind::kSyntax, "expected '\"'");
-    refuses(R"({"iclforge_scene":1,"orientation":{"yaw_rad":x},"objects":[]})",
-            SceneErrorKind::kSyntax, "expected a number");
+            SceneErrorKind::kSyntax, "expected a string");
+    // A key one object names twice: a parsed document would keep one and say nothing.
+    refuses(R"({"iclforge_scene":1,"orientation":{"roll_rad":1,"roll_rad":2},"objects":[]})",
+            SceneErrorKind::kBadField, "'roll_rad' appears twice");
+    refuses(R"({"iclforge_scene":1,"iclforge_scene":1,"objects":[]})", SceneErrorKind::kBadField,
+            "'iclforge_scene' appears twice");
+    refuses(R"({"iclforge_scene":1,"objects":[{"name":"a","name":"b","automation":[]}]})",
+            SceneErrorKind::kBadField, "'name' appears twice");
+    // Not a repeat: the same key in two different objects.
+    CHECK(iclforge::objects::oba::scene_from_json(
+              R"({"iclforge_scene":1,"objects":[{"name":"a","automation":[{"t":0,"x":0,"y":0,"z":0}]},)"
+              R"({"name":"b","automation":[{"t":0,"x":0,"y":0,"z":0}]}]})")
+              .has_value());
+    malformed(R"({"iclforge_scene" 1,"objects":[]})");
+    malformed(R"({"iclforge_scene":1,"objects":[{"automation":[{"t":0,"x":0,"y":0,"z":0} {}]}]})");
+    malformed(R"({"iclforge_scene":1,"objects":[{"automation":[{"t":0 "x":0}]}]})");
+    malformed(R"({"iclforge_scene":1,"objects":[{"name":"a" "automation":[]}]})");
+    malformed(R"({"iclforge_scene":1,"objects":[{"automation":[{"t":0,"x":0,"y":0,"z":0}]} {}]})");
+    malformed(R"({"iclforge_scene":1,"orientation":{"yaw_rad":x},"objects":[]})");
 }
 
 TEST_CASE("the JSON reader refuses what it should", "[oba][scene]") {
@@ -848,6 +871,34 @@ TEST_CASE("the JSON reader refuses what it should", "[oba][scene]") {
         const auto scene = iclforge::objects::oba::scene_from_json(
             "{\n  \"iclforge_scene\": 1,\n  \"objects\": [\n    { \"wrong\": 1 }\n  ]\n}\n");
         REQUIRE_FALSE(scene.has_value());
+        CHECK(scene.error().line == 4);
+    }
+
+    SECTION("so does a syntax error") {
+        const auto scene = iclforge::objects::oba::scene_from_json(
+            "{\n  \"iclforge_scene\": 1,\n  \"objects\": [\n  ]\n  oops\n}\n");
+        REQUIRE_FALSE(scene.has_value());
+        CHECK(scene.error().kind == iclforge::objects::oba::SceneErrorKind::kSyntax);
+        CHECK(scene.error().line == 5);
+    }
+
+    SECTION("and a repeated key, at the repeat") {
+        const auto scene = iclforge::objects::oba::scene_from_json(
+            "{\n  \"iclforge_scene\": 1,\n  \"objects\": [\n    {\n      \"name\": \"a\",\n"
+            "      \"name\": \"b\",\n      \"automation\": []\n    }\n  ]\n}\n");
+        REQUIRE_FALSE(scene.has_value());
+        CHECK(scene.error().kind == iclforge::objects::oba::SceneErrorKind::kBadField);
+        CHECK(scene.error().line == 6);
+    }
+
+    SECTION("a problem later in the file does not hide the first one") {
+        // Members are visited in the order the file wrote them.
+        const auto scene = iclforge::objects::oba::scene_from_json(
+            "{\n  \"iclforge_scene\": 1,\n  \"objects\": [\n"
+            "    { \"gian\": 1, \"automation\": [] },\n"
+            "    { \"interp\": 1 }\n  ]\n}\n");
+        REQUIRE_FALSE(scene.has_value());
+        CHECK(scene.error().message.find("'gian'") != std::string::npos);
         CHECK(scene.error().line == 4);
     }
 }

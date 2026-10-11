@@ -2837,6 +2837,89 @@ jobs:
           python3 "$console" --title "ESP32-S3 stream set" --min-heap-free 20480 qemu-set.txt
           kill "$qemu" 2>/dev/null || true
 
+      # The decode lane, on two cores, under QEMU. Every step above runs with no PSRAM, where
+      # CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE defaults off (its stack would come out of the internal
+      # RAM those shapes have no room to spare), so none of them has a second thread working on a
+      # decode. This is the one that does: sdkconfig.ci-lane adds QEMU's emulated quad PSRAM and asks
+      # for the lane, over the stream set's HTTP shape, and tools/checks/check_stream_set.py plays
+      # the streams that reach the lane's second thread - enhanced coupling's spectrum made a block
+      # ahead (714-ecpl, 51-ecpl), transient pre-noise (714-tpn), the adaptive hybrid transform
+      # (714-aht, 714-all) and the JOC streams - and holds each to the host's levels, as the step
+      # above does. The lane's PCM is the one core's bit for bit, so they are the same levels. The
+      # console must say the lane started, and the part holds a heap floor with the lane's stack
+      # and its 23 KB of enhanced coupling scratch in PSRAM.
+      - name: Play the decode lane's streams on two cores with PSRAM over QEMU's Ethernet
+        env:
+          SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-http714;sdkconfig.ci-lane"
+        run: |
+          set -eu
+          . "$IDF_PATH/export.sh"
+          www="$GITHUB_WORKSPACE/firmware/hearth-sink/www"
+          python3 -m http.server 8000 --bind 0.0.0.0 --directory "$www" >/dev/null 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          cd firmware/hearth-sink
+          rm -rf build sdkconfig
+          idf.py set-target esp32s3
+          idf.py build
+          (cd build && esptool --chip esp32s3 merge-bin --output qemu_flash.bin --pad-to-size 16MB @flash_args >/dev/null)
+          PYTHONPATH="$IDF_PATH/tools" python3 -c "from idf_py_actions.qemu_ext import QEMU_TARGETS; open('build/qemu_efuse.bin','wb').write(QEMU_TARGETS['esp32s3'].default_efuse)"
+          qemu_bin=$(find "${IDF_TOOLS_PATH:-$HOME/.espressif}/tools/qemu-xtensa" -name qemu-system-xtensa -type f | head -1)
+          : > qemu-lane.txt
+          # -m is the PSRAM's size: the 8 MB the board has. The 32 MB the other steps pass, where
+          # there is no PSRAM to size, would take the S3's whole external address window and leave
+          # the partition table's flash mapping none ("esp_mmu_map_virt: no such vaddr range").
+          "$qemu_bin" -M esp32s3 -m 8M \
+            -drive file=build/qemu_flash.bin,if=mtd,format=raw \
+            -drive file=build/qemu_efuse.bin,if=none,format=raw,id=efuse \
+            -global driver=nvram.esp32s3.efuse,property=drive,value=efuse \
+            -global driver=timer.esp32s3.timg,property=wdt_disable,value=true \
+            -nic user,model=open_eth,hostfwd=tcp::8080-:80 \
+            -nographic -monitor none -serial file:qemu-lane.txt &
+          qemu=$!
+          trap 'kill "$qemu" 2>/dev/null || true; kill "$server" 2>/dev/null || true' EXIT
+
+          console="$GITHUB_WORKSPACE/tools/checks/check_esp_console.py"
+          checker="$GITHUB_WORKSPACE/tools/checks/check_stream_set.py"
+          fail() { python3 "$console" --title "ESP32-S3 decode lane" qemu-lane.txt || true; echo "::error title=ESP32-S3 decode lane::$1" >&2; grep -E 'result=|error|source:|player:|stream:|heap:' qemu-lane.txt >&2 || true; exit 1; }
+
+          # The boot play: the walk, one speaker at a time, on two cores.
+          for _ in $(seq 1 60); do
+            if grep -q '^result=' qemu-lane.txt; then break; fi
+            sleep 5
+          done
+          grep -q '^result=pass' qemu-lane.txt || fail "the boot play did not report result=pass"
+          python3 "$checker" check "$www/streams.json" qemu-lane.txt || fail "the boot play's levels were not the host's"
+
+          # The lane has to have started, in the play that just ran and in the ones below: a
+          # shape that quietly ran on one core would pass every level check and prove nothing.
+          grep -q 'player: decode stages on cores 1 and 0' qemu-lane.txt || fail "the player did not start the decode lane"
+          if grep -q 'no second lane for the decode' qemu-lane.txt; then
+            fail "the decode lane's task could not be made"
+          fi
+
+          streams=714-ecpl.ec3,51-ecpl.ec3,714-tpn.ec3,714-aht.ec3,714-all.ec3,objects-mdct.ec3,514-joc-dee.ec3,demo.ec3
+          python3 "$checker" play "$www/streams.json" qemu-lane.txt \
+            --device http://127.0.0.1:8080 --base http://10.0.2.2:8000 --only "$streams" \
+            || fail "a play on two cores was not the host's (the lines above say which)"
+
+          settled=
+          for _ in $(seq 1 30); do
+            if curl -s -m 10 http://127.0.0.1:8080/status | grep -qE '"state":"(finished|failed|stopped)"'; then settled=1; break; fi
+            sleep 1
+          done
+          [ -n "$settled" ] || fail "/status did not report the play as ended"
+          # The lane's stack (16 KB) and its enhanced coupling scratch (23 KB) are in PSRAM. The
+          # figure is the least heap_free of the plays' progress and lap lines, which the player
+          # samples while the decoder may still hold its working set, and 714-tpn's holds a second
+          # full PCM set at 7.1.4 (a stream the set's step cannot play): its lap line read 47,507
+          # locally on 2026-10-11 and 20,103 in CI's first run, and every other stream's 63,000 or
+          # more. So this is not a margin to the byte. 12,288 is under the worst sample seen, and
+          # a lane that moved its stack or scratch back into internal RAM would fail a play on a
+          # failed allocation long before it reached the floor.
+          python3 "$console" --title "ESP32-S3 decode lane" --min-heap-free 12288 qemu-lane.txt
+          kill "$qemu" 2>/dev/null || true
+
       # BUILD ONLY, for the four combinations no step above runs: i2s, sd,
       # http and null. Each entry sets one choice over sdkconfig.defaults and
       # leaves the others at their Kconfig defaults: the I2S sink, the
@@ -3065,6 +3148,7 @@ jobs:
             firmware/hearth-sink/qemu-render.txt
             firmware/hearth-sink/qemu-http.txt
             firmware/hearth-sink/qemu-set.txt
+            firmware/hearth-sink/qemu-lane.txt
           # error, not warn: this artifact is the only way to read what the
           # probe measured without re-running the leg, and it silently uploaded
           # just the map the first time. A missing file here should say so.

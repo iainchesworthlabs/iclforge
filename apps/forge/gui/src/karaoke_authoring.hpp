@@ -24,7 +24,10 @@
 //
 // The author's files are the backing (two channels, L and R), an optional
 // melody guide (M, one channel) and one or two vocals (V1, V2, one channel
-// each); the coding mode follows from which of them there are. Nothing is
+// each); the coding mode follows from which of them there are. An optional
+// LFE part (one channel) is the stream's low-frequency effects channel: it
+// does not choose the mode, and the encoder band-limits it as it does any LFE.
+// Nothing is
 // fixed silently: a part that cannot be used, or that is not what its place
 // asks, is a named problem, and a mismatch the encoder will absorb (a rate to
 // resample, a length to pad) is a named warning.
@@ -64,7 +67,7 @@ enum class KaraokeLyricsCopy : std::uint8_t {
 [[nodiscard]] KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path,
                                                     const std::string& stream_path);
 
-enum class KaraokePart : std::uint8_t { kBacking, kMelody, kVocal1, kVocal2 };
+enum class KaraokePart : std::uint8_t { kBacking, kMelody, kVocal1, kVocal2, kLfe };
 
 // One file the author supplied, for one part.
 struct KaraokeFile {
@@ -92,8 +95,8 @@ enum class KaraokeCheckLevel : std::uint8_t { kOk, kWarning, kProblem };
 
 // "no-backing", "backing-not-stereo", "backing-is-a-bed", "part-not-mono",
 // "vocal2-needs-vocal1", "nothing-to-sing", "length-differs", "rate-differs",
-// "parts-aligned", "each-part-one-place", "no-file", "speakers-unnamed",
-// "speakers-not-karaoke", "lfe-present". `args` are what the sentence names:
+// "parts-aligned", "each-part-one-place", "lfe-part", "no-file",
+// "speakers-unnamed", "speakers-not-karaoke". `args` are what the sentence names:
 // file names, counts, durations as m:ss and rates as kHz.
 struct KaraokeCheck {
     KaraokeCheckLevel level = KaraokeCheckLevel::kOk;
@@ -105,9 +108,10 @@ struct KaraokeCheck {
 struct KaraokeChannel {
     // The bed position the channel takes - the token EncoderController::
     // setAssignment takes: "L", "C", "R", "Cs" (the one surround of 2/1 and
-    // 3/1), "Ls" or "Rs".
+    // 3/1), "Ls", "Rs" or "LFE".
     std::string position;
-    // Table C.2.1's name for what it carries: "L", "M", "R", "V1" or "V2".
+    // Table C.2.1's name for what it carries: "L", "M", "R", "V1" or "V2", and
+    // "LFE" for the low-frequency channel, which is no part of the table.
     std::string part;
     // The index into the files the plan was made from (always 0 for a
     // multichannel file) and the channel within it.
@@ -125,8 +129,10 @@ struct KaraokePlan {
     // What the mode was chosen from.
     bool melody = false;
     int vocals = 0;
+    // Whether the stream carries an LFE channel (an optional part of its own).
+    bool lfe = false;
     // The coded channels in coded order (L, C, R, then the surround or
-    // surrounds); empty when no mode was found.
+    // surrounds, then the LFE); empty when no mode was found.
     std::vector<KaraokeChannel> channels;
     std::vector<KaraokeCheck> checks;
 
@@ -162,9 +168,14 @@ struct KaraokeOutputs {
     std::vector<std::string> r;
     std::vector<std::string> ls;
     std::vector<std::string> rs;
+    // The room's LFE: the stream's LFE channel, which every listening passes
+    // (a karaoke reproduction is L, C, R and then the LFE) and a stereo fold
+    // leaves out unless it is asked to mix it, which the page does not.
+    std::vector<std::string> lfe;
 };
 
 [[nodiscard]] KaraokeOutputs karaoke_outputs(bool melody, int vocals, KaraokeListening listening,
-                                             KaraokeVocalsChoice choice, bool folded = false);
+                                             KaraokeVocalsChoice choice, bool folded = false,
+                                             bool lfe = false);
 
 }  // namespace forge_gui

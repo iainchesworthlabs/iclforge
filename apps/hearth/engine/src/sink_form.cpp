@@ -2,6 +2,8 @@
 
 #include <fmt/format.h>
 
+#include "iclforge/ac3/decoder/output.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -72,6 +74,70 @@ namespace sp = sendspin::player;
     if (limit != 0 && stream.coded_channels > limit) {
         return fmt::format("This sink decodes {} up to {} channels, and this stream has {}",
                            type_text(type), limit, stream.coded_channels);
+    }
+    return std::nullopt;
+}
+
+// The wire's span of a part's level is the library's: one conversion on every side.
+static_assert(sp::kKaraokeLevelMinDb == ac3::kKaraokeMinLevelDb &&
+                  sp::kKaraokeLevelMaxDb == ac3::kKaraokeMaxLevelDb,
+              "the Sendspin extension's karaoke levels and libs/ac3's span must be the same");
+
+// Whether the sink lists `key` among the decoder settings it takes.
+[[nodiscard]] bool takes_setting(const sp::Support& support, std::string_view key) {
+    return std::ranges::find(support.decoder_settings, key) != support.decoder_settings.end();
+}
+
+// Why a karaoke stream whose reproduction is wanted is not to be left to this sink's own decoder:
+// it has not been told how, so it would play the coded channels, and a group would play two
+// things. Nothing for a stream that is not to be reproduced, and for a sink that takes the
+// settings (the settings command is among the commands it supports, which is how a server
+// learns it can send one).
+struct KaraokeRefusal {
+    std::string why;
+    // The sink reproduces the karaoke all the same and only misses a level, so a stream that is
+    // sent to it as it is plays at the table's levels, not as coded.
+    bool reproduces = false;
+};
+
+[[nodiscard]] std::optional<KaraokeRefusal> karaoke_refusal(const StreamNeeds& stream,
+                                                            const SinkFacts& sink) {
+    if (!stream.karaoke || !sink.iclforge_support) {
+        return std::nullopt;
+    }
+    const sp::Support& support = *sink.iclforge_support;
+    if (!takes_setting(support, "karaoke")) {
+        return KaraokeRefusal{
+            .why = "This sink does not reproduce karaoke: it does not take the setting"};
+    }
+    if (stream.karaoke->reproduction == sp::Karaoke::kCapable &&
+        !takes_setting(support, "karaoke_vocals")) {
+        return KaraokeRefusal{
+            .why = "This sink does not choose which vocals to play: it does not take "
+                   "karaoke_vocals"};
+    }
+    const bool settings_command =
+        sink.iclforge_state &&
+        std::ranges::find(sink.iclforge_state->supported_commands, sp::Command::kSettings) !=
+            sink.iclforge_state->supported_commands.end();
+    if (!settings_command) {
+        return KaraokeRefusal{
+            .why = "This sink takes no settings from this app, so it cannot be told"};
+    }
+    // A level that moves a part (planning/karaoke-phase2.md, W10) is for the sink to apply, or
+    // for this app to apply in the PCM it sends: a sink that would play the table instead of it
+    // would put a group's members at different levels.
+    constexpr std::array<std::string_view, 3> kLevelKeys{"karaoke_melody_db", "karaoke_vocal1_db",
+                                                         "karaoke_vocal2_db"};
+    constexpr std::array<std::string_view, 3> kLevelParts{"melody", "vocal 1", "vocal 2"};
+    const std::array<double, 3> levels = stream.karaoke->heard_levels_db();
+    for (std::size_t part = 0; part < levels.size(); ++part) {
+        if (levels[part] != 0.0 && !takes_setting(support, kLevelKeys[part])) {
+            return KaraokeRefusal{
+                .why = fmt::format("This sink does not set the level of the {}: it does not take {}",
+                                   kLevelParts[part], kLevelKeys[part]),
+                .reproduces = true};
+        }
     }
     return std::nullopt;
 }
@@ -224,6 +290,16 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
 
 }  // namespace
 
+std::array<double, 3> KaraokeChoice::heard_levels_db() const {
+    if (reproduction != sp::Karaoke::kCapable) {
+        return {0.0, 0.0, 0.0};
+    }
+    const bool vocal1 = vocals == sp::KaraokeVocals::kV1 || vocals == sp::KaraokeVocals::kBoth;
+    const bool vocal2 = vocals == sp::KaraokeVocals::kV2 || vocals == sp::KaraokeVocals::kBoth;
+    return {ac3::karaoke_level_db(melody_db), vocal1 ? ac3::karaoke_level_db(vocal1_db) : 0.0,
+            vocal2 ? ac3::karaoke_level_db(vocal2_db) : 0.0};
+}
+
 bool sink_lists_opus(const SinkFacts& sink) {
     return std::ranges::find(sink.codecs, "opus") != sink.codecs.end();
 }
@@ -249,11 +325,27 @@ SinkChoice choose_sink_form(const StreamNeeds& stream, const SinkFacts& sink,
     }
     const std::string coded =
         fmt::format("Sending {} as it is", audio::format_name(*stream.stream));
-    const std::optional<std::string> objects = object_refusal(stream, sink);
-    if (!objects) {
+    // A karaoke stream is sent as it is only to a sink that reproduces it: decoded here for one
+    // that does not, so that a group hears one reproduction. Where this app cannot send it PCM,
+    // the stream still plays, as coded, and the reason says so.
+    if (const std::optional<KaraokeRefusal> karaoke = karaoke_refusal(stream, sink)) {
+        const SinkChoice pcm = pcm_choice(karaoke->why, stream, sink, policy);
+        if (pcm.form == SinkForm::kPcm) {
+            return pcm;
+        }
         return {.form = SinkForm::kCoded,
                 .layout = std::nullopt,
-                .reason = coded + ": the sink decodes it for its own speakers."};
+                .reason = fmt::format("{}. {}, so the karaoke is played {}.", coded, karaoke->why,
+                                      karaoke->reproduces ? "at the table's levels" : "as coded")};
+    }
+    const std::optional<std::string> objects = object_refusal(stream, sink);
+    if (!objects) {
+        const std::string_view reproduced =
+            stream.karaoke ? " and reproduces the karaoke as asked" : "";
+        return {.form = SinkForm::kCoded,
+                .layout = std::nullopt,
+                .reason = fmt::format("{}: the sink decodes it for its own speakers{}.", coded,
+                                      reproduced)};
     }
     // The sink decodes the stream but would play its bed alone, past the objects it places.
     // Decoded here, the objects are placed; where that is not possible it plays the bed.

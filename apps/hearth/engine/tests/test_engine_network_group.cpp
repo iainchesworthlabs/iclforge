@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -25,6 +26,8 @@
 #include "engine_thread.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
+#include "iclforge/ac3/encoder/encoder.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
@@ -1274,4 +1277,551 @@ TEST_CASE("engine: an AC-4 presentation a sink would not choose reaches a group 
     CHECK(sinks.pcm_sink->totals().frames == expected);
     CHECK(sinks.burst_sink->totals().burst_streams == 0U);
     CHECK(sinks.burst_sink->totals().bursts == 0U);
+}
+
+// ---- karaoke (planning/karaoke-phase2.md, W7: a sink that can decode, decodes) ------------------
+//
+// A karaoke AC-3 stream (bsmod 7, 3/2 and the LFE) played to a group of two boards: one takes the
+// karaoke keys, so it is sent the stream as it is and told how to reproduce it; the other does not,
+// so it is sent PCM decoded here with the reproduction applied. Both put the vocals where Annex C
+// does (L, C, R and the LFE, the surrounds silent), which is what makes a group one reproduction.
+
+namespace {
+
+// `count` AC-3 syncframes of a karaoke 3/2+LFE stream: a tone in each channel, each its own pitch
+// and level, so that a reproduction has something to move.
+struct KaraokeProgramme {
+    std::vector<std::vector<std::byte>> units;
+    std::vector<std::byte> bytes;
+};
+
+KaraokeProgramme karaoke_programme(int count) {
+    iclforge::ac3::EncoderConfig config;
+    config.sample_rate = iclforge::ac3::SampleRate::k48000;
+    config.bitrate_kbps = 448;
+    config.acmod = iclforge::ac3::Acmod::k3_2;
+    config.lfe = true;
+    config.info.bsmod = iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke;
+    iclforge::ac3::FrameEncoder encoder{config};
+    // Coded order: L, C, R, Ls, Rs, then the LFE.
+    constexpr std::array<double, 6> kHz = {440.0, 800.0, 620.0, 1030.0, 1270.0, 90.0};
+    constexpr std::array<double, 6> kLevel = {0.20, 0.10, 0.20, 0.25, 0.15, 0.10};
+    KaraokeProgramme out;
+    for (int f = 0; f < count; ++f) {
+        std::vector<std::vector<float>> by_channel;
+        for (int channel = 0; channel < encoder.channel_count(); ++channel) {
+            std::vector<float> samples(iclforge::ac3::kSamplesPerFrame);
+            for (std::size_t n = 0; n < samples.size(); ++n) {
+                const double t = static_cast<double>(n + (static_cast<std::size_t>(f) * 1536)) / 48000.0;
+                samples[n] = static_cast<float>(
+                    kLevel[static_cast<std::size_t>(channel)] *
+                    std::sin(2.0 * std::numbers::pi * kHz[static_cast<std::size_t>(channel)] * t));
+            }
+            by_channel.push_back(std::move(samples));
+        }
+        const std::vector<std::span<const float>> views(by_channel.begin(), by_channel.end());
+        const auto frame = encoder.encode_frame(views);
+        REQUIRE(frame.has_value());
+        out.units.push_back(*frame);
+        out.bytes.insert(out.bytes.end(), frame->begin(), frame->end());
+    }
+    return out;
+}
+
+// A sink's log: its pairing code, and every line, in order.
+class RecordingLog final : public testsink::SinkLog {
+   public:
+    void line(std::string_view text) override {
+        const std::lock_guard lock(mutex_);
+        lines_.emplace_back(text);
+        const std::size_t at = text.find("PAIRING CODE ");
+        if (at == std::string_view::npos) {
+            return;
+        }
+        std::string digits;
+        for (const char c : text.substr(at + 13)) {
+            if (c >= '0' && c <= '9') {
+                digits.push_back(c);
+            }
+        }
+        code_ = digits;
+    }
+    std::optional<std::string> code() {
+        const std::lock_guard lock(mutex_);
+        return code_;
+    }
+    [[nodiscard]] bool has(std::string_view needle) { return count(needle) > 0; }
+    [[nodiscard]] std::size_t count(std::string_view needle) {
+        const std::lock_guard lock(mutex_);
+        return static_cast<std::size_t>(std::ranges::count_if(lines_, [&](const std::string& line) {
+            return line.find(needle) != std::string::npos;
+        }));
+    }
+
+   private:
+    std::mutex mutex_;
+    std::vector<std::string> lines_;
+    std::optional<std::string> code_;
+};
+
+void pair_through(iclforge::hearth::NetworkSinks& sinks, const std::string& id, RecordingLog& log) {
+    REQUIRE(eventually([&] {
+        const auto facts = find_sink(sinks, id);
+        return facts && facts->link == iclforge::hearth::SinkLink::kConnected &&
+               facts->iclforge_support;
+    }));
+    sinks.pair_sink(id);
+    REQUIRE(eventually([&] { return log.code().has_value(); }));
+    sinks.submit_pairing_code(id, *log.code());
+    REQUIRE(eventually([&] {
+        const auto facts = find_sink(sinks, id);
+        return facts && facts->pair_state == iclforge::hearth::PairState::kPaired &&
+               facts->link == iclforge::hearth::SinkLink::kConnected && facts->iclforge_state &&
+               facts->clock_converged;
+    }));
+}
+
+// Mean square of the slot of `layout` named `name` in `channels`, or -1 for a name it has not.
+double slot_energy(const std::vector<std::vector<float>>& channels,
+                   const iclforge::render::OutputLayout& layout, std::string_view name) {
+    for (std::size_t slot = 0; slot < layout.slots() && slot < channels.size(); ++slot) {
+        std::array<char, 32> text{};
+        layout.slot_name(slot, text);
+        if (name != text.data()) {
+            continue;
+        }
+        double sum = 0.0;
+        for (const float sample : channels[slot]) {
+            sum += static_cast<double>(sample) * static_cast<double>(sample);
+        }
+        return channels[slot].empty() ? 0.0 : sum / static_cast<double>(channels[slot].size());
+    }
+    return -1.0;
+}
+
+}  // namespace
+
+// The two boards, the group, the Engine and the programme of the tests below: "decodes" takes the
+// karaoke keys (and lists PCM too, as a board does), "legacy" does not and takes PCM at 5.1.
+struct KaraokeGroup {
+    fs::path scratch;
+    KaraokeProgramme made;
+    RecordingLog decodes_log;
+    RecordingLog legacy_log;
+    std::unique_ptr<testsink::Sink> decodes;
+    std::unique_ptr<testsink::Sink> legacy;
+    iclforge::hearth::MemorySettingsStore settings;
+    std::unique_ptr<iclforge::hearth::PairingStore> store;
+    std::unique_ptr<iclforge::hearth::NetworkSinks> sinks;
+    std::string group_id;
+    std::shared_ptr<iclforge::sendspin::Group> group;
+    std::unique_ptr<Engine> engine;
+    iclforge::render::OutputLayout master = iclforge::render::OutputLayout::stereo();
+
+    KaraokeGroup(const std::string& name, int frames, const iclforge::hearth::DecoderSettings& wanted,
+                 bool decodes_takes_levels = true)
+        : scratch(fs::path{ICLFORGE_TEST_SCRATCH_DIR} / (name + "_" + scratch_pid_suffix())),
+          made(karaoke_programme(frames)) {
+        namespace ss = iclforge::sendspin;
+        fs::remove_all(scratch);
+        const auto make_sink = [&](const std::string& id, bool karaoke, RecordingLog& log,
+                                   std::vector<std::int32_t> widths, bool levels = true) {
+            testsink::SinkOptions options;
+            options.name = id;
+            options.address = "127.0.0.1";
+            options.port = 0;
+            options.state_directory = scratch / id / "state";
+            options.output_directory = scratch / id / "out";
+            options.advertise = false;
+            options.codecs = {m::Codec::kPcm};
+            options.layout = "5.1";
+            options.karaoke = karaoke;
+            options.karaoke_levels = levels;
+            options.pcm_channels = std::move(widths);
+            auto started = testsink::Sink::start(options, log);
+            REQUIRE(started.has_value());
+            return std::move(*started);
+        };
+        decodes = make_sink("decodes", true, decodes_log, {2, 6}, decodes_takes_levels);
+        legacy = make_sink("legacy", false, legacy_log, {6});
+
+        store = std::make_unique<iclforge::hearth::PairingStore>(
+            settings, [] { return std::string("2026-10-11"); });
+        const std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+        REQUIRE(identity.has_value());
+        sinks = std::make_unique<iclforge::hearth::NetworkSinks>(
+            *identity, "Test Hearth", *store, iclforge::hearth::NetworkSinksOptions{.browse = false});
+        REQUIRE(sinks->started());
+        for (const testsink::Sink* sink : {decodes.get(), legacy.get()}) {
+            sinks->on_found(
+                ss::discovery::Service{.instance = sink == decodes.get() ? "decodes" : "legacy",
+                                       .host = "127.0.0.1",
+                                       .addresses = {"127.0.0.1"},
+                                       .port = sink->port(),
+                                       .txt = {{.key = "path", .value = "/sendspin"}}});
+        }
+        pair_through(*sinks, "decodes", decodes_log);
+        pair_through(*sinks, "legacy", legacy_log);
+
+        group_id = sinks->create_group("Karaoke");
+        REQUIRE_FALSE(group_id.empty());
+        sinks->add_group_member(group_id, "decodes");
+        sinks->add_group_member(group_id, "legacy");
+        group = sinks->group(group_id);
+        REQUIRE(group != nullptr);
+
+        const std::vector<std::byte>* programme = &made.bytes;
+        const ItemLoader loader =
+            [programme](const std::string& path) -> std::expected<LoadedItem, std::string> {
+            if (path != "programme") {
+                return std::unexpected("no such file: " + path);
+            }
+            return LoadedItem{.bytes = *programme};
+        };
+        const auto layout = iclforge::render::OutputLayout::parse("5.1");
+        REQUIRE(layout.has_value());
+        master = *layout;
+        iclforge::hearth::NetworkSinks* const planner = sinks.get();
+        EngineOutputs outputs{
+            .group = iclforge::hearth::make_group_sink(
+                [held = group](const std::string&) { return held; },
+                [planner](const iclforge::hearth::GroupPlanRequest& request) {
+                    return planner->plan_group(request);
+                },
+                [planner](const std::string& id, const iclforge::hearth::KaraokeChoice& choice) {
+                    planner->apply_karaoke(id, choice);
+                })};
+        engine = std::make_unique<Engine>(std::move(outputs), loader, master, wanted,
+                                          EngineTiming{.period = 5ms, .budget = 4800});
+        engine->set_output_preferences(OutputPreferences{.pinned = OutputMode::kNetworkGroup,
+                                                         .follow_sink = true,
+                                                         .group_name = group_id,
+                                                         .group_ready = true});
+        engine->add({QueueItem{.path = "programme", .title = "Karaoke programme"}});
+    }
+    KaraokeGroup(const KaraokeGroup&) = delete;
+    KaraokeGroup& operator=(const KaraokeGroup&) = delete;
+
+    ~KaraokeGroup() {
+        // The engine holds the group, and a group must not outlive its host.
+        engine.reset();
+        group.reset();
+    }
+
+    // The programme to its end, the `plays`th time.
+    void play_through(std::size_t plays = 1) {
+        engine->play();
+        REQUIRE(eventually([&] {
+            const EngineStatus status = engine->status();
+            return status.state == TransportState::kStopped && status.history.size() >= plays;
+        }));
+        const EngineStatus finished = engine->status();
+        INFO("output_reason: " << finished.output_reason << " / note: " << finished.note
+                               << " / error: " << finished.error);
+        REQUIRE(finished.history.size() == plays);
+    }
+};
+
+TEST_CASE("engine: a karaoke stream is one reproduction on a board that decodes it and one sent PCM",
+          "[hearth][group][websocket][iclforge][karaoke]") {
+    constexpr int kFrameCount = 30;
+    // The singer's default: Annex C's aware reproduction, which a karaoke player gives.
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    KaraokeGroup rig("hearth_engine_group_karaoke", kFrameCount, wanted);
+    rig.play_through();
+
+    const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
+    REQUIRE(eventually([&] {
+        return rig.legacy->totals().frames >= expected_frames &&
+               rig.decodes->totals().bursts >= static_cast<std::uint64_t>(kFrameCount);
+    }));
+    // The board that takes the keys is sent the stream as it is, and no PCM; the other is sent PCM
+    // and no burst.
+    CHECK(rig.decodes->totals().bursts == static_cast<std::uint64_t>(kFrameCount));
+    CHECK(rig.decodes->totals().frames == 0);
+    CHECK(rig.legacy->totals().bursts == 0);
+    CHECK(rig.legacy->totals().frames == expected_frames);
+    // It was told, before the stream, as the singer asked.
+    CHECK(rig.decodes_log.has("applied (karaoke aware, vocals both)"));
+    // (Its log names the scratch folder, which has the word in it: the line has the choice.)
+    CHECK_FALSE(rig.legacy_log.has("(karaoke "));
+
+    // What each played: the host's own decode of the programme as asked, and as coded.
+    const iclforge::render::OutputLayout& master = rig.master;
+    const auto decode_with = [&](iclforge::ac3::KaraokeReproduction reproduction) {
+        iclforge::hearth::DecoderSettings reference_settings;
+        reference_settings.karaoke = reproduction;
+        iclforge::hearth::StreamDecoder reference{master, 48000, reference_settings};
+        std::vector<std::vector<float>> got(master.slots());
+        const auto deliver = [&got](std::span<const std::span<const float>> slots, std::size_t frames) {
+            for (std::size_t slot = 0; slot < slots.size(); ++slot) {
+                got[slot].insert(got[slot].end(), slots[slot].begin(),
+                                 slots[slot].begin() + static_cast<std::ptrdiff_t>(frames));
+            }
+        };
+        for (const auto& unit : rig.made.units) {
+            REQUIRE(reference.decode(unit, deliver).has_value());
+        }
+        reference.finish(deliver);
+        return got;
+    };
+    const auto want = decode_with(iclforge::ac3::KaraokeReproduction::kAware);
+    const auto coded = decode_with(iclforge::ac3::KaraokeReproduction::kOff);
+    REQUIRE(want[0].size() >= expected_frames - 1536);
+
+    // The board that decodes writes its own decode as bursts-*.wav; the other's PCM is stream-*.wav.
+    const auto decoded_wav = read_wav_holding(
+        only_file(rig.scratch / "decodes" / "out", "bursts-", ".wav").string(), want[0].size());
+    const auto pcm_wav = read_wav_holding(
+        only_file(rig.scratch / "legacy" / "out", "stream-", ".wav").string(), want[0].size());
+    REQUIRE(decoded_wav.has_value());
+    REQUIRE(pcm_wav.has_value());
+    REQUIRE(decoded_wav->channels.size() == 6);
+    REQUIRE(pcm_wav->channels.size() == 6);
+
+    for (const auto* wav : {&*decoded_wav, &*pcm_wav}) {
+        double worst = 0.0;
+        for (std::size_t slot = 0; slot < 6; ++slot) {
+            REQUIRE(wav->channels[slot].size() >= want[slot].size());
+            for (std::size_t frame = 0; frame < want[slot].size(); ++frame) {
+                worst = std::max(worst, std::abs(static_cast<double>(wav->channels[slot][frame]) -
+                                                 static_cast<double>(want[slot][frame])));
+            }
+        }
+        // Each is the aware reproduction, within a 16-bit step of the host's own.
+        CHECK(worst < 2.0 / 32768.0);
+        // The vocals moved off the surrounds, which as coded carry them.
+        CHECK(slot_energy(wav->channels, master, "Ls") < 1e-9);
+        CHECK(slot_energy(wav->channels, master, "Rs") < 1e-9);
+        CHECK(slot_energy(wav->channels, master, "C") > 1e-5);
+    }
+    // That is not what the stream plays as coded, which is what the test would see without it.
+    CHECK(slot_energy(coded, master, "Ls") > 1e-4);
+}
+
+TEST_CASE("engine: a board that has applied the karaoke settings is not told them again",
+          "[hearth][group][websocket][iclforge][karaoke]") {
+    constexpr int kFrameCount = 10;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    KaraokeGroup rig("hearth_engine_group_karaoke_twice", kFrameCount, wanted);
+    rig.play_through(1);
+    REQUIRE(eventually([&] { return rig.decodes_log.has("applied (karaoke aware, vocals both)"); }));
+    CHECK(rig.decodes_log.count("applied (karaoke") == 1);
+    // The board has reported the revision it applied by the time the item ends.
+    REQUIRE(eventually([&] {
+        const auto facts = find_sink(*rig.sinks, "decodes");
+        return facts && facts->iclforge_state && facts->intended_settings &&
+               facts->iclforge_state->settings_revision == facts->intended_settings->revision;
+    }));
+
+    // The same item again opens the group again and plans it again, and the board is not sent
+    // another revision for what it already runs.
+    rig.play_through(2);
+    CHECK(rig.decodes_log.count("applied (karaoke") == 1);
+
+    // Another choice is told.
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kV2;
+    rig.engine->set_decoder_settings(wanted);
+    rig.play_through(3);
+    REQUIRE(eventually([&] { return rig.decodes_log.has("applied (karaoke capable, vocals v2)"); }));
+    CHECK(rig.decodes_log.count("applied (karaoke") == 2);
+}
+
+TEST_CASE("engine: a karaoke stream played as coded asks nothing of the board that decodes it",
+          "[hearth][group][websocket][iclforge][karaoke]") {
+    constexpr int kFrameCount = 20;
+    iclforge::hearth::DecoderSettings as_coded;
+    as_coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+    KaraokeGroup rig("hearth_engine_group_karaoke_coded", kFrameCount, as_coded);
+    rig.play_through();
+    REQUIRE(eventually([&] {
+        return rig.decodes->totals().bursts >= static_cast<std::uint64_t>(kFrameCount) &&
+               rig.legacy->totals().bursts >= static_cast<std::uint64_t>(kFrameCount);
+    }));
+    // The stream is as every board plays it without a word, so both are sent it as it is, and
+    // neither is told anything: nothing is decoded here for one of them.
+    CHECK(rig.decodes->totals().frames == 0);
+    CHECK(rig.legacy->totals().frames == 0);
+    CHECK_FALSE(rig.decodes_log.has("(karaoke "));
+    CHECK_FALSE(rig.legacy_log.has("(karaoke "));
+}
+
+// The host's own decode of the programme under `settings`, as the layout `master` plays it.
+static std::vector<std::vector<float>> host_decode(const KaraokeGroup& rig,
+                                                   const iclforge::hearth::DecoderSettings& settings) {
+    iclforge::hearth::StreamDecoder reference{rig.master, 48000, settings};
+    std::vector<std::vector<float>> got(rig.master.slots());
+    const auto deliver = [&got](std::span<const std::span<const float>> slots, std::size_t frames) {
+        for (std::size_t slot = 0; slot < slots.size(); ++slot) {
+            got[slot].insert(got[slot].end(), slots[slot].begin(),
+                             slots[slot].begin() + static_cast<std::ptrdiff_t>(frames));
+        }
+    };
+    for (const auto& unit : rig.made.units) {
+        REQUIRE(reference.decode(unit, deliver).has_value());
+    }
+    reference.finish(deliver);
+    return got;
+}
+
+// The worst sample distance between a wav's slots and `want`'s.
+static double worst_distance(const std::vector<std::vector<float>>& channels,
+                             const std::vector<std::vector<float>>& want) {
+    double worst = 0.0;
+    for (std::size_t slot = 0; slot < want.size(); ++slot) {
+        REQUIRE(channels[slot].size() >= want[slot].size());
+        for (std::size_t frame = 0; frame < want[slot].size(); ++frame) {
+            worst = std::max(worst, std::abs(static_cast<double>(channels[slot][frame]) -
+                                             static_cast<double>(want[slot][frame])));
+        }
+    }
+    return worst;
+}
+
+TEST_CASE("engine: a part level is one level on the board that decodes it and on the one sent PCM",
+          "[hearth][group][websocket][iclforge][karaoke]") {
+    constexpr int kFrameCount = 30;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
+    wanted.karaoke_melody_db = -12.0;
+    wanted.karaoke_vocal1_db = 4.0;
+    KaraokeGroup rig("hearth_engine_group_karaoke_levels", kFrameCount, wanted);
+    rig.play_through();
+
+    const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
+    REQUIRE(eventually([&] {
+        return rig.legacy->totals().frames >= expected_frames &&
+               rig.decodes->totals().bursts >= static_cast<std::uint64_t>(kFrameCount);
+    }));
+    // The board that takes the keys is sent the stream as it is and told the levels with the
+    // choice; the other is sent PCM that has them applied.
+    CHECK(rig.decodes->totals().bursts == static_cast<std::uint64_t>(kFrameCount));
+    CHECK(rig.decodes->totals().frames == 0);
+    CHECK(rig.legacy->totals().bursts == 0);
+    CHECK(rig.decodes_log.has("applied (karaoke capable, vocals both, melody -12 dB, vocal 1 +4 dB)"));
+    CHECK_FALSE(rig.legacy_log.has("(karaoke "));
+
+    const auto want = host_decode(rig, wanted);
+    iclforge::hearth::DecoderSettings table = wanted;
+    table.karaoke_melody_db = 0.0;
+    table.karaoke_vocal1_db = 0.0;
+    const auto at_table = host_decode(rig, table);
+    REQUIRE(want[0].size() >= expected_frames - 1536);
+
+    const auto decoded_wav = read_wav_holding(
+        only_file(rig.scratch / "decodes" / "out", "bursts-", ".wav").string(), want[0].size());
+    const auto pcm_wav = read_wav_holding(
+        only_file(rig.scratch / "legacy" / "out", "stream-", ".wav").string(), want[0].size());
+    REQUIRE(decoded_wav.has_value());
+    REQUIRE(pcm_wav.has_value());
+    REQUIRE(decoded_wav->channels.size() == 6);
+    REQUIRE(pcm_wav->channels.size() == 6);
+    // Each is the host's own decode with the levels, within a 16-bit step.
+    CHECK(worst_distance(decoded_wav->channels, want) < 2.0 / 32768.0);
+    CHECK(worst_distance(pcm_wav->channels, want) < 2.0 / 32768.0);
+    // And that is not the table, which is what the test would see if the levels went nowhere:
+    // the melody's centre is 12 dB down.
+    const double centre = slot_energy(decoded_wav->channels, rig.master, "C");
+    const double centre_at_table = slot_energy(at_table, rig.master, "C");
+    REQUIRE(centre > 0.0);
+    CHECK(centre < centre_at_table * 0.5);
+}
+
+TEST_CASE("engine: a board that takes the karaoke keys and not the levels is sent PCM when one is moved",
+          "[hearth][group][websocket][iclforge][karaoke]") {
+    constexpr int kFrameCount = 30;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
+    wanted.karaoke_melody_db = -6.0;
+    KaraokeGroup rig("hearth_engine_group_karaoke_levels_old", kFrameCount, wanted,
+                     /*decodes_takes_levels=*/false);
+    rig.play_through();
+    const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
+    REQUIRE(eventually([&] {
+        return rig.legacy->totals().frames >= expected_frames &&
+               rig.decodes->totals().frames >= expected_frames;
+    }));
+    // Both are sent PCM: the board that would have played the table is not sent the stream.
+    CHECK(rig.decodes->totals().bursts == 0);
+    CHECK(rig.legacy->totals().bursts == 0);
+    CHECK_FALSE(rig.decodes_log.has("(karaoke "));
+
+    const auto want = host_decode(rig, wanted);
+    const auto first = read_wav_holding(
+        only_file(rig.scratch / "decodes" / "out", "stream-", ".wav").string(), want[0].size());
+    const auto second = read_wav_holding(
+        only_file(rig.scratch / "legacy" / "out", "stream-", ".wav").string(), want[0].size());
+    REQUIRE(first.has_value());
+    REQUIRE(second.has_value());
+    CHECK(worst_distance(first->channels, want) < 2.0 / 32768.0);
+    CHECK(worst_distance(second->channels, want) < 2.0 / 32768.0);
+}
+
+TEST_CASE("engine: a part level changed while a karaoke item plays reaches the board that decodes it",
+          "[hearth][group][websocket][iclforge][karaoke]") {
+    constexpr int kFrameCount = 150;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
+    KaraokeGroup rig("hearth_engine_group_karaoke_levels_change", kFrameCount, wanted);
+    rig.engine->play();
+    REQUIRE(eventually([&] { return rig.decodes->totals().bursts >= 20; }));
+    CHECK(rig.decodes_log.has("applied (karaoke capable, vocals both)"));
+    CHECK_FALSE(rig.decodes_log.has("melody"));
+
+    // The singer pulls the melody down: told to the board, not by starting the item again.
+    wanted.karaoke_melody_db = -9.0;
+    rig.engine->set_decoder_settings(wanted);
+    REQUIRE(eventually([&] {
+        return rig.decodes_log.has("applied (karaoke capable, vocals both, melody -9 dB)");
+    }));
+    // Taking it back to the table clears it: settings replace the board's whole.
+    wanted.karaoke_melody_db = 0.0;
+    rig.engine->set_decoder_settings(wanted);
+    REQUIRE(eventually([&] { return rig.decodes_log.count("applied (karaoke capable, vocals both)") >= 2; }));
+    // A level of a vocal the choice leaves out is not sent.
+    wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kV1;
+    wanted.karaoke_vocal2_db = -6.0;
+    rig.engine->set_decoder_settings(wanted);
+    REQUIRE(eventually([&] { return rig.decodes_log.has("applied (karaoke capable, vocals v1)"); }));
+    CHECK_FALSE(rig.decodes_log.has("vocal 2"));
+    CHECK_FALSE(rig.legacy_log.has("(karaoke "));
+    REQUIRE(eventually([&] {
+        const EngineStatus status = rig.engine->status();
+        return status.state == TransportState::kStopped && !status.history.empty();
+    }));
+}
+
+TEST_CASE("engine: a change of vocals while a karaoke item plays reaches the board that decodes it",
+          "[hearth][group][websocket][iclforge][karaoke]") {
+    // Long enough to change the choice in the middle of: a programme plays in real time.
+    constexpr int kFrameCount = 150;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
+    KaraokeGroup rig("hearth_engine_group_karaoke_change", kFrameCount, wanted);
+    rig.engine->play();
+    REQUIRE(eventually([&] { return rig.decodes->totals().bursts >= 20; }));
+    CHECK(rig.decodes_log.has("applied (karaoke capable, vocals both)"));
+    CHECK_FALSE(rig.decodes_log.has("vocals v1"));
+
+    // The singer picks the first vocal: told to the board, not by starting the item again.
+    wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kV1;
+    rig.engine->set_decoder_settings(wanted);
+    REQUIRE(eventually([&] { return rig.decodes_log.has("applied (karaoke capable, vocals v1)"); }));
+    // And going back to "as coded" tells it to play the coded channels.
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+    rig.engine->set_decoder_settings(wanted);
+    REQUIRE(eventually([&] { return rig.decodes_log.has("applied (karaoke off, vocals v1)"); }));
+    // It went to the board that decodes and not to the one sent PCM.
+    CHECK_FALSE(rig.legacy_log.has("(karaoke "));
+    REQUIRE(eventually([&] {
+        const EngineStatus status = rig.engine->status();
+        return status.state == TransportState::kStopped && !status.history.empty();
+    }));
 }

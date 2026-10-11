@@ -1364,11 +1364,18 @@ same refusals, the same bytes. The project's `encode` settings are the command l
 and a key `forge` knows that the window has no control for is passed through as it was written.
 A project says what to encode, not where: its paths are relative to its own folder.
 
-What it needs of the file that the window works out for itself is the channel plan: with more
-than one source, the project has to say where each channel goes (`bed` and `assignments`, which
-the window writes when it saves), because the commands refuse a channel nobody placed. A file
-that is not a project, or is a newer version than this `forge` reads, is refused with its reason
-and exit code 2; a project with nothing to encode, or something `forge` cannot run, exits 1.
+AC-4 is `ac4-encode` with the project's own words (`frame-rate=`, `codec-mode=`, `dialnorm=`, ...),
+and into an MP4 file it is the one command, which writes the file itself, as the window's line does.
+An AC-4 object session is `atmos-encode ... codec=ac4` with its scene, `src=`, `map=` and offsets.
+
+With more than one source the project says where each channel goes (`bed` and `assignments`, which
+the window writes when it saves), because the commands refuse a channel nobody placed. A karaoke
+project that names its sources' `part`s (`backing`, `melody`, `vocal1`, `vocal2`) and says nothing
+else of the layout does not have to: the parts are laid out where Annex C's Table C.2.1 puts them,
+with the service set to `bsmod` 7 unless it names one, which is what the window's Karaoke flow
+does for the same parts. A file that is not a project, or is a newer version than this `forge`
+reads, is refused with its reason and exit code 2; a project with nothing to encode, or something
+`forge` cannot run, exits 1.
 
 ### Containers
 

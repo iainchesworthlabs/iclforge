@@ -62,6 +62,20 @@ Item {
     }
     onSelectedAppChanged: page.syncListRow()
 
+    // Lyrics belong to an application of this session: when one leaves, so do its lyrics, so that a
+    // later session given the same id does not inherit them (CrucibleLyrics, W13b).
+    Connections {
+        target: CrucibleController
+        function onAppsChanged() {
+            const live = [];
+            const apps = CrucibleController.apps;
+            for (let i = 0; i < apps.length; ++i) {
+                live.push(apps[i].app);
+            }
+            CrucibleLyrics.prune(live);
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -603,6 +617,11 @@ Item {
                 RailBlock { ordinal: "05"; label: qsTr("SIGNING"); Layout.fillWidth: true; Layout.fillHeight: false }
                 Text { Layout.fillWidth: true; text: CrucibleController.objectsEnabled ? qsTr("key loaded · objects on") : qsTr("no key · 5.1 bed only"); color: Theme.text; font.pixelSize: Theme.fontBody; elide: Text.ElideRight }
                 Text { Layout.fillWidth: true; text: CrucibleController.keyPath.length ? CrucibleController.keyPath : qsTr("load one in Settings"); color: Theme.textMuted; font.family: Theme.monoFamily; font.pixelSize: Theme.fontMono; elide: Text.ElideMiddle }
+                RailBlock { ordinal: "06"; label: qsTr("LYRICS"); Layout.fillWidth: true; Layout.fillHeight: false }
+                LyricStrip {
+                    Layout.fillWidth: true
+                    app: page.selected
+                }
                 Item { Layout.fillHeight: true }
             }
         }

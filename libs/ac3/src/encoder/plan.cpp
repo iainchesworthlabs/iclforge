@@ -24,7 +24,6 @@
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
-#include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
@@ -479,9 +478,9 @@ std::optional<SourceLayout> source_layout(Codec codec, std::span<const Location>
         return std::nullopt;
     }
     if (const auto id = layout_for_locations(*mask)) {
-        return SourceLayout{.layout = *id, .custom_locations = std::nullopt};
+        return SourceLayout{.layout = id, .custom_locations = std::nullopt};
     }
-    return SourceLayout{.layout = std::nullopt, .custom_locations = *mask};
+    return SourceLayout{.layout = std::nullopt, .custom_locations = mask};
 }
 
 std::string layout_names(Codec codec) {

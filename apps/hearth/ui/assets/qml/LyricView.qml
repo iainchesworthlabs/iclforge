@@ -17,6 +17,10 @@ import Hearth
 // (muted); a file that times lines and not words emphasises the whole line, and
 // no word times are invented for it.
 //
+// A `.cdg` beside the item with no lyrics file is the picture of a karaoke disc
+// (planning/karaoke-phase2.md, W13f): it has no text to follow, so it is shown as
+// the picture it is, against the same position and the same delay.
+//
 // Nothing here owns a clock or reads a file: `positionMs` is the reading of a
 // LyricClock, and the words come from KaraokeController. The item playing is
 // told to the controller from here (`follow`), so that whichever view is shown
@@ -40,6 +44,75 @@ Item {
     // --- what the controller holds -----------------------------------------
     readonly property string status: KaraokeController.status
     readonly property var lines: KaraokeController.lines
+
+    // --- a duet (planning/karaoke-phase2.md, W11b) --------------------------
+    // A line that has a singer says it in words, and sits on a side: the first vocal's lines
+    // at the left, the second's indented, both together across. Colour is the third cue, never
+    // the only one (L4). The guide is the vocal that is playing: where the stream is karaoke,
+    // a line is the guide's when its singer's vocal plays, and yours when it does not.
+    readonly property bool duet: KaraokeController.hasSingers
+    readonly property bool karaokeStream: {
+        const programmes = HearthController.currentMedia.programmes;
+        return programmes !== undefined && programmes.length > 0 && programmes[0].karaoke === true;
+    }
+    readonly property string reproduction: HearthController.decoderSettings.karaoke ?? "aware"
+    readonly property string vocals: HearthController.decoderSettings.karaokeVocals ?? "both"
+
+    function singerOf(index) {
+        return (root.duet && index >= 0 && index < root.lines.length) ? (root.lines[index].singer ?? "") : "";
+    }
+    function singerName(singer) {
+        switch (singer) {
+        case "v1": return KaraokeController.firstSingerLabel;
+        case "v2": return KaraokeController.secondSingerLabel;
+        case "both": return qsTr("%1 + %2").arg(KaraokeController.firstSingerLabel)
+                                          .arg(KaraokeController.secondSingerLabel);
+        }
+        return "";
+    }
+    // "guide" (the vocal that is playing sings it), "you" (it does not play, so you do), "shared"
+    // (one of two that sing it plays), or "" where there is no guide to speak of.
+    function cueOf(singer) {
+        if (singer === "" || !root.karaokeStream) {
+            return "";
+        }
+        if (root.reproduction !== "capable") {
+            return "guide";  // as coded and aware both play every vocal the stream has
+        }
+        const first = root.vocals === "v1" || root.vocals === "both";
+        const second = root.vocals === "v2" || root.vocals === "both";
+        if (singer === "v1") {
+            return first ? "guide" : "you";
+        }
+        if (singer === "v2") {
+            return second ? "guide" : "you";
+        }
+        return (first && second) ? "guide" : ((!first && !second) ? "you" : "shared");
+    }
+    function cueText(cue) {
+        switch (cue) {
+        case "guide": return qsTr("guide");
+        case "you": return qsTr("you");
+        case "shared": return qsTr("shared");
+        }
+        return "";
+    }
+    // The tag of a row: the name, and whose line it is for the singer at the screen.
+    function tagOf(index) {
+        const singer = root.singerOf(index);
+        if (singer === "") {
+            return "";
+        }
+        const cue = root.cueText(root.cueOf(singer));
+        return cue.length > 0 ? qsTr("%1 · %2").arg(root.singerName(singer)).arg(cue)
+                              : root.singerName(singer);
+    }
+    function indentOf(index) {
+        return root.singerOf(index) === "v2" ? Math.round(root.width * 0.18) : 0;
+    }
+    function tagColor(index) {
+        return root.singerOf(index) === "v2" ? root.currentColor : root.sungColor;
+    }
 
     // Where the position is in the lines, with the delay taken off
     // (KaraokeController.cursor()). Set by updateCursor(), which runs when the
@@ -149,15 +222,31 @@ Item {
             spacing: root.unit * 0.5
             Repeater {
                 model: root.pastRows
-                delegate: Text {
+                delegate: Column {
+                    id: pastRow
                     required property int modelData
-                    objectName: "lyricPast"
                     width: pastColumn.width
-                    text: root.lines[modelData].text
-                    color: root.sungColor
-                    opacity: 0.55
-                    font.pixelSize: root.unit
-                    wrapMode: Text.WordWrap
+                    spacing: 0
+                    Text {
+                        objectName: "lyricPastSinger"
+                        visible: text.length > 0
+                        x: root.indentOf(pastRow.modelData)
+                        text: root.tagOf(pastRow.modelData)
+                        color: root.tagColor(pastRow.modelData)
+                        opacity: 0.55
+                        font.pixelSize: Math.round(root.unit * 0.7)
+                        font.bold: true
+                    }
+                    Text {
+                        objectName: "lyricPast"
+                        x: root.indentOf(pastRow.modelData)
+                        width: pastColumn.width - x
+                        text: root.lines[pastRow.modelData].text
+                        color: root.sungColor
+                        opacity: 0.55
+                        font.pixelSize: root.unit
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
         }
@@ -167,15 +256,31 @@ Item {
             objectName: "lyricCurrent"
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width
+            // The line's own tag (a duet), above it and on its side.
+            readonly property real tagHeight: currentTag.visible ? currentTag.implicitHeight : 0
+            readonly property real indent: root.indentOf(root.currentRow)
             height: root.currentRow < 0 ? 0
-                    : (root.currentWordTimed ? wordFlow.implicitHeight : wholeLine.implicitHeight)
+                    : tagHeight + (root.currentWordTimed ? wordFlow.implicitHeight : wholeLine.implicitHeight)
+
+            Text {
+                id: currentTag
+                objectName: "lyricCurrentSinger"
+                visible: root.currentRow >= 0 && text.length > 0
+                x: currentBox.indent
+                text: root.currentRow >= 0 ? root.tagOf(root.currentRow) : ""
+                color: root.tagColor(root.currentRow)
+                font.pixelSize: Math.round(root.unit * 0.75)
+                font.bold: true
+            }
 
             // A line with times and no word times: the whole line, emphasised.
             Text {
                 id: wholeLine
                 objectName: "lyricCurrentLine"
                 visible: root.currentRow >= 0 && !root.currentWordTimed
-                width: parent.width
+                x: currentBox.indent
+                y: currentBox.tagHeight
+                width: parent.width - currentBox.indent
                 text: root.currentRow >= 0
                       ? (root.lines[root.currentRow].text.length > 0 ? root.lines[root.currentRow].text
                                                                       : "♪")
@@ -190,7 +295,9 @@ Item {
                 id: wordFlow
                 objectName: "lyricWords"
                 visible: root.currentWordTimed
-                width: parent.width
+                x: currentBox.indent
+                y: currentBox.tagHeight
+                width: parent.width - currentBox.indent
                 spacing: 0
 
                 Repeater {
@@ -249,14 +356,29 @@ Item {
             spacing: root.unit * 0.5
             Repeater {
                 model: root.nextRows
-                delegate: Text {
+                delegate: Column {
+                    id: nextRow
                     required property int modelData
-                    objectName: "lyricNext"
                     width: nextColumn.width
-                    text: root.lines[modelData].text
-                    color: root.restColor
-                    font.pixelSize: root.unit
-                    wrapMode: Text.WordWrap
+                    spacing: 0
+                    Text {
+                        objectName: "lyricNextSinger"
+                        visible: text.length > 0
+                        x: root.indentOf(nextRow.modelData)
+                        text: root.tagOf(nextRow.modelData)
+                        color: root.tagColor(nextRow.modelData)
+                        font.pixelSize: Math.round(root.unit * 0.7)
+                        font.bold: true
+                    }
+                    Text {
+                        objectName: "lyricNext"
+                        x: root.indentOf(nextRow.modelData)
+                        width: nextColumn.width - x
+                        text: root.lines[nextRow.modelData].text
+                        color: root.restColor
+                        font.pixelSize: root.unit
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
         }
@@ -276,12 +398,29 @@ Item {
 
         Text {
             id: plainText
+            objectName: "lyricPlainText"
             width: plain.width - 12
-            text: root.lines.map(function(line) { return line.text; }).join("\n")
+            // A duet's marked lines say who sings them, as the marker did.
+            text: root.lines.map(function(line) {
+                const name = root.duet ? root.singerName(line.singer ?? "") : "";
+                return name.length > 0 ? name + ": " + line.text : line.text;
+            }).join("\n")
             color: root.textColor
             font.pixelSize: root.unit
             wrapMode: Text.WordWrap
         }
+    }
+
+    // --- the picture of a CD+G disc: no text, so there are no words to follow --
+    CdgPicture {
+        id: picture
+        objectName: "lyricPicture"
+        anchors.fill: parent
+        visible: root.status === "picture"
+        controller: KaraokeController
+        positionMs: root.positionMs
+        Accessible.role: Accessible.Graphic
+        Accessible.name: qsTr("CD+G picture")
     }
 
     // --- no file, or one that could not be read ------------------------------

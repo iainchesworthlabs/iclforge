@@ -202,6 +202,15 @@ in place. Everything the OLD whole-file Embind `Decoder` class used to accumulat
 channel/energy buffers, object position/audio bookkeeping, the stereo fold) now lives in
 `bindings/js/src/decode-file.ts`, built on top of `PushDecoder` rather than duplicating it.
 
+The same side fold carries Annex C's karaoke reproduction: `PushDecoder` takes two more constructor
+arguments (the `OutputConfig::karaoke` and `karaoke_vocals` numbers, a three-argument form that asks
+for none being kept), reads whether the unit is karaoke from its own syncframe header (a lone AC-3
+syncframe flagged `bsmod` 7 above 1/0 - the decoded unit does not carry an AC-3 core's `bsmod`),
+resolves an AC-3 core's fold levels from its own `cmixlev`/`surmixlev` as the decoder's own fold does
+(an E-AC-3 bed's from `mixmdate`), and reports `karaoke` in each result. At `AsCoded` the reproduction
+is three channels (four with an LFE) in `foldPcm`; at a stereo target it is Annex C's own 2/0
+reproduction. The demo page shows a vocals control for a stream that is karaoke.
+
 `bindings/js/` is the package itself (not published — see [Publishing](#publishing) below):
 `push-decoder.ts` (the typed wrapper over the Embind class above), `decode-file.ts` (the
 whole-file convenience helper the demo's scrub/solo experience needs),
@@ -270,8 +279,9 @@ once.
 ## Toolchain
 
 No vcpkg. Every other platform preset in `CMakePresets.json` chainloads through vcpkg for
-consistency, but the one third-party library `iclforge::ac3` takes in this build is {fmt}, which
-`cmake/Fmt.cmake` builds from source with `FetchContent`, so `config-wasm-emscripten`'s toolchain
+consistency, but the third-party libraries `iclforge::ac3` takes in this build are {fmt} and
+nlohmann/json (the scene file's reader), both header-only, which `cmake/Fmt.cmake` and
+`cmake/NlohmannJson.cmake` fetch from source with `FetchContent`, so `config-wasm-emscripten`'s toolchain
 file goes straight to Emscripten's own `Emscripten.cmake` — see that toolchain file's own header for
 why going through vcpkg's community `wasm32-emscripten` triplet would be pure cost for nothing this
 preset needs.

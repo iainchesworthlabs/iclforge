@@ -79,6 +79,13 @@ A shared library takes a linked {fmt} in at its own link step, but an archive is
 all: one that had linked {fmt} would leave every consumer an unresolved `fmt::v12::vprint`, which
 only the same major version of {fmt} can supply.
 
+`iclforge::objects` takes in a second header-only library the same way: nlohmann/json
+(`cmake/NlohmannJson.cmake`), which tokenises an object scene file. It is linked through
+`$<BUILD_INTERFACE:iclforge::json>`, used in one source file and named by no header, so it too
+leaves the export graph with nothing to declare, and a consumer needs none of its own. Its type
+carries nlohmann's own ABI tag (`json_abi_v3_12_0_dp`), so a program that has the library of its
+own, of any version, cannot meet this copy.
+
 What a static variant does leave to the consumer's link is the C++ runtime. A CMake project links
 an installed static `iclforge::` target with the C++ driver when it enables the CXX language, so a C
 program using `iclforge::c_static` needs `project(your_project LANGUAGES C CXX)`; that driver
