@@ -17,6 +17,7 @@
 #include "iclforge/ac3/encoder/assignment.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/wav.hpp"
+#include "source_frame.hpp"
 #include "support.hpp"
 
 namespace forge_cli {
@@ -133,20 +134,11 @@ void gather_frame(const LoadedSources& sources, std::size_t start,
     std::size_t flat = 0;
     for (std::size_t s = 0; s < sources.wavs.size(); ++s) {
         const auto& wav = sources.wavs[s];
-        const std::size_t total = wav.frame_count();
         const std::size_t offset = sources.offset_samples[s];
         for (const auto& channel : wav.channels) {
-            const float hold = total > 0 ? channel[total - 1] : 0.0f;
-            auto& out = dest[flat];
-            for (int i = 0; i < samples_per_frame; ++i) {
-                const std::size_t at = start + static_cast<std::size_t>(i);
-                if (at < offset) {
-                    out[static_cast<std::size_t>(i)] = 0.0f;
-                    continue;
-                }
-                const std::size_t shifted = at - offset;
-                out[static_cast<std::size_t>(i)] = shifted < total ? channel[shifted] : hold;
-            }
+            iclforge::apps::fill_source_frame(
+                channel, offset, start,
+                std::span<float>{dest[flat]}.first(static_cast<std::size_t>(samples_per_frame)));
             ++flat;
         }
     }

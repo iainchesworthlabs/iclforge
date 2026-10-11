@@ -40,10 +40,20 @@ TestCase {
     property int defaultCmix: 0
     property int defaultSurmix: 0
 
-    // 1.024 s at 48 kHz is exactly 32 AC-3 frames: the window and forge write the
-    // same bytes for whole frames, which is what the byte comparison below needs
-    // (they differ in how a final partial frame is padded).
+    // 1.024 s at 48 kHz is exactly 32 AC-3 frames, and 2.0 s is 62.5: the second
+    // ends in a partial frame, which both the window and forge pad by holding each
+    // channel's last sample (source_frame.hpp), and the byte comparisons below hold
+    // them to it for both.
+    property url longBacking
+    property url longMelody
+    property url longLead
+
     function initTestCase() {
+        longBacking = audioFixtures.writeTones("kb-long-backing.wav", 48000, 2.0, [440, 620]);
+        longMelody = audioFixtures.writeTones("kb-long-melody.wav", 48000, 2.0, [800]);
+        longLead = audioFixtures.writeTones("kb-long-lead.wav", 48000, 2.0, [1030]);
+        verify(longBacking.toString().length > 0 && longLead.toString().length > 0,
+               "the long parts could not be written");
         backing = audioFixtures.writeTones("kb-backing.wav", 48000, 1.024, [440, 620]);
         monoBacking = audioFixtures.writeTones("kb-mono.wav", 48000, 1.024, [440]);
         melody = audioFixtures.writeTones("kb-melody.wav", 48000, 1.024, [800]);
@@ -490,5 +500,38 @@ TestCase {
         verify(audioFixtures.remove(out2) && audioFixtures.remove(beside2));
         saveTo(ctx, out2);
         compare(cliRunner.size(beside2), 0, "a lyrics file the author removed was put beside the stream");
+    }
+
+    // Parts of 2.0 s end in half a frame. The window once wrote silence into the
+    // rest of that frame where forge held the last sample, so the two files
+    // differed in their last frame (610 of 48,384 bytes) for the same plan.
+    function test_aPartialLastFrameIsWrittenAsTheCommandLineWritesIt() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: longBacking, melody: longMelody, vocal1: longLead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        ctx.flow.currentStepKey = "save";
+        const line = findByName(ctx.win, "karaokeCommandLine").text;
+        verify(line.indexOf("forge encode") === 0, line);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_flow_long.ac3");
+        press(ctx, "karaokeNextButton");
+        const dialog = findByName(ctx.win, "saveDialog");
+        tryCompare(dialog, "visible", true, 5000);
+        dialog.selectedFile = out;
+        dialog.accepted();
+        dialog.close();
+        tryCompare(EncoderController, "busy", false, 60000);
+        // 63 frames: 62.5 rounded up, which is the case the test is about.
+        compare(cliRunner.size(out) % 63, 0, "the stream is not a whole number of 63 frames");
+
+        if (cliRunner.available()) {
+            const folder = Qt.resolvedUrl("_test_output/tst_karaoke_flow_long_cli");
+            verify(cliRunner.prepare(folder, longBacking));
+            verify(cliRunner.copyInto(folder, longMelody));
+            verify(cliRunner.copyInto(folder, longLead));
+            compare(cliRunner.run(line, folder), 0, line);
+            verify(cliRunner.sameBytes(out, Qt.resolvedUrl("_test_output/tst_karaoke_flow_long_cli/out.ac3")),
+                   "the command line wrote different bytes than the window did for a partial last frame");
+        }
     }
 }
