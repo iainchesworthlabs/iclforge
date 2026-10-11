@@ -28,6 +28,13 @@ is a karaoke stream with everything it is made of, so that nothing has to be bui
 
 The example's own README gives each step, and the `forge encode` line that writes the same stream.
 
+A second example is built for **duets**:
+[`examples/karaoke/leave-her-johnny/`](https://github.com/iainchesworthlabs/iclforge/tree/main/examples/karaoke/leave-her-johnny)
+is a traditional capstan shanty, one verse, 19.2 s, in which the shantyman and the crew sing
+*different* lines and each is silent while the other sings, so that "V1 only", "V2 only" and
+"both" each sound different and leave a different part for you to sing. Its project names the four
+parts and nothing of how they are laid out; the Karaoke flow and `forge project` work that out.
+
 ## What a karaoke stream is
 
 It is a main service with `bsmod` 7 and a coding mode above 1/0. L and R carry the backing; the

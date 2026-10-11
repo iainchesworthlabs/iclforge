@@ -80,3 +80,85 @@ TEST_CASE("lyrics: the karaoke example's words are read and every word is inside
     }
     CHECK(texts == 4);
 }
+
+// The duet example's words (examples/karaoke/leave-her-johnny/, made by
+// tools/generators/gen_karaoke_duet_example.py), read the same way. The format has no marker for
+// which singer has a line, so what is held is what any lyric file is: found by the stream's name,
+// timed to the syllable, every word inside the stream, four lines. Which singer has which is the
+// example's README, and that the singers do alternate is tools/checks/test_gen_karaoke_duet_example.py.
+TEST_CASE("lyrics: the duet example's words are read and every word is inside its stream",
+          "[hearth][lyrics][example]") {
+    const fs::path stream = fs::path{ICLFORGE_KARAOKE_DUET_EXAMPLE_DIR} / "leave-her-johnny.ac3";
+    const auto loaded = iclforge::hearth::ui::make_file_item_loader()(stream.string());
+    REQUIRE(loaded.has_value());
+    const auto info = iclforge::hearth::describe_media(stream.string(), *loaded);
+    REQUIRE(info.sample_rate == 48000);
+    const auto duration_ms =
+        static_cast<std::int64_t>(info.played_samples() * 1000 / info.sample_rate);
+    REQUIRE(duration_ms == 19200);
+
+    const auto found = iclforge::lyrics::find_lyrics_file(stream.string());
+    REQUIRE(found.has_value());
+    CHECK(found->filename().string() == "leave-her-johnny.lrc");
+    const auto lyrics = iclforge::lyrics::read_lyrics(*found, duration_ms);
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->title == "Leave Her, Johnny");
+    CHECK(lyrics->timed);
+
+    std::size_t sung = 0;
+    std::size_t syllables = 0;
+    std::int64_t previous = -1;
+    for (const auto& line : lyrics->lines) {
+        CHECK(line.start_ms >= previous);
+        previous = line.start_ms;
+        if (line.text.empty()) {
+            // The time that ends the last line. Here it is the stream's own length, to the
+            // sample, and a line that starts at the end is given the reader's default length
+            // (kLastLineMs) past it: nothing is sung in it, so it is not held to the stream.
+            CHECK(line.start_ms == duration_ms);
+            continue;
+        }
+        ++sung;
+        CHECK(line.end_ms <= duration_ms);
+        CHECK(line.word_timed());
+        for (const auto& word : line.words) {
+            CHECK(word.start_ms >= line.start_ms);
+            CHECK(word.end_ms >= word.start_ms);
+            CHECK(word.end_ms <= duration_ms);
+            ++syllables;
+        }
+    }
+    CHECK(sung == 4);
+    CHECK(syllables == 30);
+    CHECK(lyrics->lines.front().words.front().start_ms == 0);
+    // The crew answers on the second line, which starts 5.4 s in: the verse's pick-up and
+    // two bars, 18 eighths of 0.3 s. The last sung line ends with the music and the stream.
+    CHECK(lyrics->lines[1].start_ms == 5400);
+    CHECK(lyrics->lines[3].end_ms == duration_ms);
+
+    // A duet: each line says which singer has it, in its marker, and the two singers have the
+    // names the id tags give. The marker is not part of what is shown.
+    using iclforge::lyrics::Singer;
+    CHECK(iclforge::lyrics::has_singers(*lyrics));
+    CHECK(lyrics->first_singer_name == "Shantyman");
+    CHECK(lyrics->second_singer_name == "Crew");
+    CHECK(lyrics->lines[0].singer == Singer::kFirst);
+    CHECK(lyrics->lines[1].singer == Singer::kSecond);
+    CHECK(lyrics->lines[2].singer == Singer::kFirst);
+    CHECK(lyrics->lines[3].singer == Singer::kSecond);
+    CHECK(lyrics->lines[0].text == "I thought I heard the Old Man say,");
+    CHECK(lyrics->lines[1].text == "Leave her, Johnny, leave her!");
+    // The row that ends the last line has no singer.
+    CHECK(lyrics->lines[4].singer == Singer::kUnmarked);
+
+    // The lines-only file says the same of each line.
+    const auto lines_only = iclforge::lyrics::read_lyrics(
+        fs::path{ICLFORGE_KARAOKE_DUET_EXAMPLE_DIR} / "leave-her-johnny-lines-only.lrc",
+        duration_ms);
+    REQUIRE(lines_only.has_value());
+    CHECK(lines_only->lines[0].singer == Singer::kFirst);
+    CHECK(lines_only->lines[1].singer == Singer::kSecond);
+    CHECK(lines_only->lines[2].singer == Singer::kFirst);
+    CHECK(lines_only->lines[3].singer == Singer::kSecond);
+    CHECK_FALSE(lines_only->lines[0].word_timed());
+}
