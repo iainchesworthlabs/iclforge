@@ -79,6 +79,10 @@ struct SinkOptions {
     // applies them (W10), as a board with the part levels does. Off, it is a board from before
     // them: it reproduces karaoke and has no way to be told a level.
     bool karaoke_levels = true;
+    // The most bytes of lyric document the sink says it holds, and lists the `lyrics` and
+    // `lyrics_position` commands (W7d, planning/karaoke-phase2.md); 0 lists neither, as a board
+    // from before them, or one with no heap to spare. What it receives is kept (Sink::roles()).
+    std::uint32_t lyrics_max_bytes = 0;
     // The speaker layout the extension role's streams are rendered to, in iclforge::render::OutputLayout's
     // grammar.
     std::string layout = "7.1.4";
@@ -170,6 +174,8 @@ class Sink {
         std::map<std::size_t, std::vector<std::uint8_t>> images;
         std::optional<sendspin::visualizer::StreamStart> visualizer;
         std::uint64_t visualizer_frames = 0;
+        // The extension role's lyric commands, in the order they came, over every connection.
+        std::vector<sendspin::player::CommandMessage> lyric_commands;
     };
     [[nodiscard]] Roles roles() const;
     // A controller@v1 command, sent on every connection where the role is active.

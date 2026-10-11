@@ -266,6 +266,15 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // keys have nothing to be told. Nothing for an id this class does not know.
     void apply_karaoke(const std::string& group_id, const KaraokeChoice& choice);
 
+    // Tells the members of group `group_id` that hold lyrics (a sink that lists the `lyrics` and
+    // `lyrics_position` commands and states a size) what the item playing says and where the sound
+    // is: an update with a document is the item's, and replaces what each member holds (an empty one
+    // is an item with none); one with only an anchor is sent after the document, and the document is
+    // sent first to a member that does not hold it, which is one that joined or came back. A document
+    // that does not fit what a member states is sent as none. Nothing for an id this class does not
+    // know, and no sink is made to wait: the commands are sent as they are.
+    void apply_lyrics(const std::string& group_id, const LyricsUpdate& update);
+
     // The host's own trail (ServerHostEvents::on_log()) since the last call,
     // oldest first: what was dialled, what each sink was given, and why a
     // connection ended. At most kLogLines are kept between calls; older ones
@@ -368,6 +377,10 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
             std::string reason{};
         };
         std::map<std::string, Planned> planned{};
+        // The lyrics last given for the group's item, kept to send a member that does not hold
+        // them: one that joined while the item played, or reconnected.
+        std::int64_t lyrics_item = 0;
+        std::string lyrics_text{};
     };
 
     // A dial to make once mutex_ is released: to pair, or not.

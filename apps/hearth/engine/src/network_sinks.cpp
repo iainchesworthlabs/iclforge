@@ -9,6 +9,7 @@
 #include <string_view>
 #include <utility>
 
+#include "iclforge/sendspin/json.hpp"
 #include "iclforge/sendspin/mdns.hpp"
 #include "sink_form.hpp"
 
@@ -945,6 +946,98 @@ void NetworkSinks::apply_karaoke(const std::string& group_id, const KaraokeChoic
     for (const Member& member : members) {
         if (member.coded) {
             (void)tell_karaoke(member.sink_id, member.facts, choice);
+        }
+    }
+}
+
+namespace {
+
+// Whether a sink holds lyrics: the support object states a size, and the state lists both commands.
+[[nodiscard]] bool holds_lyrics(const SinkFacts& facts) {
+    namespace sp = sendspin::player;
+    if (!facts.iclforge_support || facts.iclforge_support->lyrics_max_bytes == 0 || !facts.iclforge_state) {
+        return false;
+    }
+    const std::vector<sp::Command>& commands = facts.iclforge_state->supported_commands;
+    return std::ranges::find(commands, sp::Command::kLyrics) != commands.end() &&
+           std::ranges::find(commands, sp::Command::kLyricsPosition) != commands.end();
+}
+
+// Whether a document goes to a sink as one message: within the size it states, and the message
+// within the chunk size it states (65,000 where it states none: a Noise message holds 65,518).
+[[nodiscard]] bool document_fits(const sendspin::player::Support& support,
+                                 const sendspin::player::CommandMessage& message) {
+    if (message.lyrics.text.size() > support.lyrics_max_bytes) {
+        return false;
+    }
+    std::string json;
+    sendspin::json::Writer writer(json);
+    sendspin::player::write_command(writer, message);
+    const std::size_t limit = support.max_chunk_bytes != 0 ? support.max_chunk_bytes : 65'000;
+    // The message's envelope (its type and the role's key) is about sixty bytes.
+    return json.size() + 64 <= limit;
+}
+
+}  // namespace
+
+void NetworkSinks::apply_lyrics(const std::string& group_id, const LyricsUpdate& update) {
+    namespace sp = sendspin::player;
+    struct Member {
+        std::string client_id;
+        SinkFacts facts;
+    };
+    std::vector<Member> members;
+    std::string text;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto found = groups_.find(group_id);
+        if (found == groups_.end()) {
+            return;
+        }
+        GroupEntry& entry = found->second;
+        if (update.document) {
+            entry.lyrics_item = update.item;
+            entry.lyrics_text = *update.document;
+        } else if (update.item != entry.lyrics_item) {
+            // An anchor of an item the group was given no document for: nothing to hold it by.
+            return;
+        }
+        text = entry.lyrics_text;
+        for (const std::string& sink_id : entry.member_sink_ids) {
+            const auto sink = sinks_.find(sink_id);
+            if (sink == sinks_.end() || !sink->second.client.has_value() || sink->second.client_id.empty()) {
+                continue;
+            }
+            members.push_back({.client_id = sink->second.client_id, .facts = facts_locked(sink_id, sink->second)});
+        }
+    }
+    if (!host_) {
+        return;
+    }
+    for (const Member& member : members) {
+        const SinkFacts& facts = member.facts;
+        if (!holds_lyrics(facts)) {
+            continue;
+        }
+        const bool holds_item = facts.iclforge_state->lyrics.has_value() && facts.iclforge_state->lyrics->item == update.item;
+        if (update.document.has_value() || (!holds_item && !text.empty())) {
+            sp::CommandMessage message;
+            message.command = sp::Command::kLyrics;
+            message.lyrics = sp::LyricsDocument{.item = update.item, .text = text};
+            if (!document_fits(*facts.iclforge_support, message)) {
+                // Too much for this sink: it is told the item has none, so that it drops the last.
+                message.lyrics.text.clear();
+            }
+            (void)host_->iclforge_command(member.client_id, message);
+        }
+        if (update.anchor) {
+            sp::CommandMessage message;
+            message.command = sp::Command::kLyricsPosition;
+            message.lyrics_position = sp::LyricsAnchor{.item = update.item,
+                                                       .position_ms = update.anchor->position_ms,
+                                                       .at_us = update.anchor->at_us,
+                                                       .speed = update.anchor->speed};
+            (void)host_->iclforge_command(member.client_id, message);
         }
     }
 }

@@ -10,6 +10,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <expected>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <numbers>
@@ -693,4 +695,191 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
         moved = std::max(moved, std::abs(board_results[0][slot] - board_results[1][slot]));
     }
     CHECK(moved > 1.0);
+}
+
+// ---- the lyrics of an item on a board that holds them --------------------------------------------
+//
+// planning/karaoke-phase2.md, W7d: a board that lists the lyric commands is sent the item's document
+// and where the sound is in it, follows them on its own playout clock and reports the line. This is
+// that against a real board, hidden: it pairs the one sink named, plays a karaoke programme with a
+// lyrics file beside it (lines at 2, 5 and 8 seconds), and watches the line the board reports against
+// the moment its outputs first carry sound.
+//
+//   ICLFORGE_HEARTH_LIVE_LYRICS_SINK  the board's mDNS instance name; the case is skipped without it
+//   ICLFORGE_HEARTH_LIVE_SECONDS      how long the programme plays (default 14)
+
+TEST_CASE("network sinks live: a board that holds lyrics follows them with the sound",
+          "[.][hearth-network-live]") {
+    const std::optional<std::string> named = environment("ICLFORGE_HEARTH_LIVE_LYRICS_SINK");
+    if (!named) {
+        SKIP("ICLFORGE_HEARTH_LIVE_LYRICS_SINK names no sink");
+    }
+    const std::string id = *named;
+    const int seconds = environment("ICLFORGE_HEARTH_LIVE_SECONDS")
+                            ? std::atoi(environment("ICLFORGE_HEARTH_LIVE_SECONDS")->c_str())
+                            : 14;
+    REQUIRE(seconds >= 11);
+
+    iclforge::hearth::MemorySettingsStore settings;
+    iclforge::hearth::PairingStore store{settings, [] { return std::string("live"); }};
+    const auto identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    iclforge::hearth::NetworkSinks sinks{*identity, "Hearth live test", store, {.request_firewall_exception = false}};
+    REQUIRE(sinks.started());
+
+    REQUIRE(drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const iclforge::hearth::SinkFacts* facts = row(status, id);
+            return facts != nullptr && !facts->roles.empty();
+        },
+        60s));
+
+    Unpair unpair(sinks);
+    {
+        const iclforge::hearth::NetworkStatus listed = sinks.status();
+        const iclforge::hearth::SinkFacts* const found = row(listed, id);
+        REQUIRE(found != nullptr);
+        const std::string address = found->address;
+        const std::optional<std::string> before = board_status(address);
+        const std::string stale = before ? sendspin_field(*before, "pairing_code").value_or("") : "";
+        sinks.select_sink(id);
+        sinks.pair_sink(id);
+        std::optional<std::string> code;
+        REQUIRE(drive(
+            sinks,
+            [&](const iclforge::hearth::NetworkStatus& status) {
+                const iclforge::hearth::SinkFacts* facts = row(status, id);
+                if (facts == nullptr || !facts->wants_code) {
+                    return false;
+                }
+                if (const std::optional<std::string> text = board_status(address)) {
+                    code = sendspin_field(*text, "pairing_code");
+                }
+                return code.has_value() && code->size() == 6 && *code != stale;
+            },
+            45s));
+        sinks.submit_pairing_code(id, *code);
+        unpair.paired(id);
+        REQUIRE(drive(
+            sinks,
+            [&](const iclforge::hearth::NetworkStatus& status) {
+                const iclforge::hearth::SinkFacts* facts = row(status, id);
+                return facts != nullptr && facts->pair_state == iclforge::hearth::PairState::kPaired &&
+                       facts->link == iclforge::hearth::SinkLink::kConnected &&
+                       facts->iclforge_support.has_value() && facts->clock_converged;
+            },
+            45s));
+    }
+
+    // The board says it holds lyrics, and lists the two commands.
+    const iclforge::hearth::SinkFacts support_facts = *row(sinks.status(), id);
+    REQUIRE(support_facts.iclforge_support.has_value());
+    REQUIRE(support_facts.iclforge_support->lyrics_max_bytes > 0);
+    REQUIRE(support_facts.iclforge_state.has_value());
+    const auto& commands = support_facts.iclforge_state->supported_commands;
+    REQUIRE(std::find(commands.begin(), commands.end(), ss::player::Command::kLyrics) != commands.end());
+    REQUIRE(std::find(commands.begin(), commands.end(), ss::player::Command::kLyricsPosition) != commands.end());
+
+    const std::string group_id = sinks.create_group("Live lyrics");
+    REQUIRE_FALSE(group_id.empty());
+    sinks.add_group_member(group_id, id);
+
+    // The item is a file under the temp folder, with its lyrics beside it.
+    namespace fs = std::filesystem;
+    const fs::path folder = fs::temp_directory_path() / "iclforge_live_lyrics";
+    fs::create_directories(folder);
+    const fs::path item = folder / "song.ac3";
+    {
+        std::ofstream lrc(fs::path(item).replace_extension(".lrc"), std::ios::binary);
+        lrc << "[00:02.00]First line\n[00:05.00]Second line\n[00:08.00]Third line\n";
+    }
+
+    const int frames = seconds * 48000 / 1536;
+    const std::vector<std::vector<std::byte>> units = karaoke_units(frames);
+    std::vector<std::byte> programme;
+    for (const auto& unit : units) {
+        programme.insert(programme.end(), unit.begin(), unit.end());
+    }
+    const std::string item_path = item.string();
+    const iclforge::hearth::ItemLoader loader =
+        [&programme, item_path](const std::string& path) -> std::expected<iclforge::hearth::LoadedItem, std::string> {
+        if (path != item_path) {
+            return std::unexpected("no such item: " + path);
+        }
+        return iclforge::hearth::LoadedItem{.bytes = programme};
+    };
+    const auto layout = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(layout.has_value());
+    iclforge::hearth::NetworkSinks* const planner = &sinks;
+    iclforge::hearth::EngineOutputs outputs_for_engine{
+        .group = iclforge::hearth::make_group_sink(
+            [planner](const std::string& group) { return planner->group(group); },
+            [planner](const iclforge::hearth::GroupPlanRequest& request) { return planner->plan_group(request); },
+            [planner](const std::string& group, const iclforge::hearth::KaraokeChoice& choice) {
+                planner->apply_karaoke(group, choice);
+            },
+            [planner](const std::string& group, const iclforge::hearth::LyricsUpdate& update) {
+                planner->apply_lyrics(group, update);
+            })};
+    iclforge::hearth::Engine engine(std::move(outputs_for_engine), loader, *layout,
+                                    iclforge::hearth::DecoderSettings{}, iclforge::hearth::EngineTiming{});
+    engine.set_output_preferences(
+        iclforge::hearth::OutputPreferences{.pinned = iclforge::hearth::OutputMode::kNetworkGroup,
+                                            .follow_sink = true,
+                                            .group_name = group_id,
+                                            .group_ready = true});
+    engine.add({iclforge::hearth::QueueItem{.path = item_path, .title = "Live lyrics"}});
+    engine.play_item(0);
+    std::printf("playing %d s, lyrics at 2, 5 and 8 s\n", seconds);
+
+    // What the board reports, against the clock of this test: when its outputs first carry sound, and
+    // when each line first came.
+    using Clock = std::chrono::steady_clock;
+    std::optional<Clock::time_point> sound;
+    std::map<int, Clock::time_point> line_at;
+    std::optional<std::int64_t> reported_item;
+    REQUIRE(drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const Clock::time_point now = Clock::now();
+            if (const iclforge::hearth::SinkFacts* facts = row(status, id);
+                facts != nullptr && facts->iclforge_state) {
+                const auto& state = *facts->iclforge_state;
+                if (!sound && state.levels) {
+                    for (const ss::player::Level& level : *state.levels) {
+                        if (level.rms_db > -70.0) {
+                            sound = now;
+                        }
+                    }
+                }
+                if (state.lyrics) {
+                    reported_item = state.lyrics->item;
+                    line_at.emplace(state.lyrics->line, now);
+                }
+            }
+            const iclforge::hearth::EngineStatus status_now = engine.status();
+            return status_now.state == iclforge::hearth::TransportState::kStopped && !status_now.history.empty();
+        },
+        std::chrono::seconds(seconds + 60)));
+
+    REQUIRE(reported_item.has_value());
+    REQUIRE(sound.has_value());
+    // The three lines came, in order, at the times the file gives them: against when the sound began,
+    // within what polling and the state's own cadence allow.
+    REQUIRE(line_at.count(0) == 1);
+    REQUIRE(line_at.count(1) == 1);
+    REQUIRE(line_at.count(2) == 1);
+    const auto seconds_between = [](Clock::time_point from, Clock::time_point to) {
+        return std::chrono::duration<double>(to - from).count();
+    };
+    const double first = seconds_between(*sound, line_at.at(0));
+    const double second = seconds_between(line_at.at(0), line_at.at(1));
+    const double third = seconds_between(line_at.at(1), line_at.at(2));
+    std::printf("  sound -> line 0: %.2f s (2.00), line 0 -> 1: %.2f s (3.00), line 1 -> 2: %.2f s (3.00)\n",
+                first, second, third);
+    std::fflush(stdout);
+    CHECK(std::abs(first - 2.0) < 0.6);
+    CHECK(std::abs(second - 3.0) < 0.5);
+    CHECK(std::abs(third - 3.0) < 0.5);
 }
