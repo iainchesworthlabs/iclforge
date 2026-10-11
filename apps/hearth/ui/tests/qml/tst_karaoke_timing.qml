@@ -114,6 +114,50 @@ TestCase {
         verify(TestServices.keyClick(win, Qt.Key_Space));
     }
 
+    // --- a duet ----------------------------------------------------------------------------------
+
+    function test_theSingerOfALineAndTheNamesAreSetOnTheDialogAndSaved() {
+        const open = openDialog(item, 0);
+        const dialog = open.dialog;
+        const choice = named(open.win, "timingSingerChoice");
+        // Nothing is selected: the choice is not offered.
+        verify(!choice.enabled);
+
+        dialog.selectLine(1);
+        tryVerify(function() { return choice.enabled; }, 5000);
+        compare(choice.currentValue, "");
+        choice.selected("v2");
+        compare(line(1).singer, "v2");
+        compare(choice.currentValue, "v2");
+        // The row says so (its delegate is made on the next frame).
+        const tagOf = function(index) {
+            const row = H.find(dialog.contentItem, function(it) { return it.objectName === "timingLine-" + index; });
+            return row === null ? null
+                   : H.find(row, function(it) { return it.objectName === "timingLineSinger"; });
+        };
+        tryVerify(function() { return tagOf(1) !== null && tagOf(1).visible && tagOf(1).text === "V2"; }, 5000);
+        tryVerify(function() { return tagOf(0) !== null && !tagOf(0).visible; }, 5000);
+
+        // Names are the file's: typed, taken at the end of the edit, and saved with it.
+        const firstName = named(open.win, "timingFirstName");
+        firstName.text = "Ann";
+        firstName.editingFinished();
+        compare(KaraokeController.timingFirstName, "Ann");
+        named(open.win, "timingSecondName").text = "Bob";
+        named(open.win, "timingSecondName").editingFinished();
+        compare(KaraokeController.timingSecondName, "Bob");
+
+        choice.selected("");
+        compare(line(1).singer, "");
+        choice.selected("both");
+        compare(line(1).singer, "both");
+        dialog.save();
+        const saved = TestServices.readTextFile(plain);
+        verify(saved.indexOf("[v1:Ann]") >= 0, saved);
+        verify(saved.indexOf("[v2:Bob]") >= 0, saved);
+        verify(saved.indexOf("V1+V2: Be forgot") >= 0, saved);
+    }
+
     // --- the line pass ------------------------------------------------------------------------
 
     function test_aPlainFileOpensWithNoLineStampedAndTheFirstNamed() {

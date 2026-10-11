@@ -121,6 +121,11 @@ are for lines and not words. It opens a window over the page, and the item plays
    muted: a guess. Play, and press `Space` as each word starts; a word that was pressed turns solid
    and keeps its time. A line's words are guessed again only where no press has set them.
 
+3. **A duet.** Choose a line and set its **Singer** (not marked, V1, V2 or both); the row shows the
+   marker as it is written. The two **Name** fields are what the file calls the singers (`[v1:]`
+   and `[v2:]`), kept with the file, unlike the names typed on the Karaoke page for a run. A name
+   has no brackets or line breaks, since a tag ends at the first `]`.
+
 **Save** writes the item's `.lrc`, or makes one beside the item, and keeps the first file that was
 there once, as `.lrc.bak`. Nothing is shown as sung from the window's guesses until it is saved, and
 `Esc` does not close the window while there are edits that were not saved (**Discard and close**

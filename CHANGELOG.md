@@ -159,6 +159,12 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The timing window sets who sings a line.** In **Time the lyrics...** a chosen line takes a
+  **Singer** (not marked, V1, V2 or both) and each row shows its marker; two **Name** fields set
+  what the file calls the singers (`[v1:]` and `[v2:]`, kept with the file, unlike the names typed on
+  the Karaoke page), with brackets and control characters taken out since a tag ends at the first
+  `]`. **Save** writes the markers and the names, so a duet's file is made in one pass
+  (planning/karaoke-phase2.md, W11c).
 - **Hearth shows a duet.** Where a lyrics file marks its lines (`V1:`, `V2:`, `V1+V2:`), the
   Karaoke page has two name fields for the two singers (typed for the run, never kept for a song,
   before the file's `[v1:]` and `[v2:]`, before "V1" and "V2"), and each line of the lyric view says

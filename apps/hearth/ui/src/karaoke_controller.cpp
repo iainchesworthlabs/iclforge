@@ -97,6 +97,36 @@ constexpr auto kReactionKey = "karaoke/reactionMs";
     return map;
 }
 
+// A singer as the model names it: "" for none, else "v1", "v2" or "both"; nothing for another word.
+[[nodiscard]] std::optional<iclforge::lyrics::Singer> singer_from_key(const QString& key) {
+    using iclforge::lyrics::Singer;
+    if (key.isEmpty()) {
+        return Singer::kUnmarked;
+    }
+    if (key == QLatin1String("v1")) {
+        return Singer::kFirst;
+    }
+    if (key == QLatin1String("v2")) {
+        return Singer::kSecond;
+    }
+    if (key == QLatin1String("both")) {
+        return Singer::kBoth;
+    }
+    return std::nullopt;
+}
+
+// A name for an id tag: one line, with no bracket (a tag ends at the first `]`), and no run of
+// spaces.
+[[nodiscard]] std::string tag_value(const QString& name) {
+    QString cleaned = name;
+    for (QChar& c : cleaned) {
+        if (c.unicode() < 0x20 || c == QLatin1Char('[') || c == QLatin1Char(']')) {
+            c = QLatin1Char(' ');
+        }
+    }
+    return cleaned.simplified().toStdString();
+}
+
 }  // namespace
 
 struct KaraokeController::State {
@@ -446,6 +476,52 @@ bool KaraokeController::nudge(int line, int word, int deltaMs) {
         return false;
     }
     state_->tapped[static_cast<std::size_t>(line)][static_cast<std::size_t>(word)] = 1;
+    timing_dirty_ = true;
+    refresh_timing();
+    emit timingChanged();
+    return true;
+}
+
+QString KaraokeController::timingFirstName() const {
+    return timing_ ? from_utf8(state_->editing.first_singer_name) : QString();
+}
+
+QString KaraokeController::timingSecondName() const {
+    return timing_ ? from_utf8(state_->editing.second_singer_name) : QString();
+}
+
+void KaraokeController::setTimingFirstName(const QString& name) {
+    const std::string value = tag_value(name);
+    if (!timing_ || value == state_->editing.first_singer_name) {
+        return;
+    }
+    state_->editing.first_singer_name = value;
+    timing_dirty_ = true;
+    emit timingChanged();
+}
+
+void KaraokeController::setTimingSecondName(const QString& name) {
+    const std::string value = tag_value(name);
+    if (!timing_ || value == state_->editing.second_singer_name) {
+        return;
+    }
+    state_->editing.second_singer_name = value;
+    timing_dirty_ = true;
+    emit timingChanged();
+}
+
+bool KaraokeController::setLineSinger(int line, const QString& singer) {
+    const std::optional<iclforge::lyrics::Singer> value = singer_from_key(singer);
+    if (!timing_ || !value || line < 0 ||
+        static_cast<std::size_t>(line) >= state_->editing.lines.size()) {
+        return false;
+    }
+    if (state_->editing.lines[static_cast<std::size_t>(line)].singer == *value) {
+        return true;
+    }
+    if (!iclforge::lyrics::set_line_singer(state_->editing, static_cast<std::size_t>(line), *value)) {
+        return false;
+    }
     timing_dirty_ = true;
     refresh_timing();
     emit timingChanged();

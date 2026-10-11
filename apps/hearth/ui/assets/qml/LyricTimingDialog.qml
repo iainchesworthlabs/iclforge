@@ -61,6 +61,11 @@ Dialog {
         return minutes + ":" + (seconds < 10 ? "0" : "") + seconds.toFixed(2);
     }
 
+    // What a line's singer is called on its row, as the file writes it.
+    function singerTag(key) {
+        return key === "v1" ? "V1" : (key === "v2" ? "V2" : (key === "both" ? "V1+V2" : ""));
+    }
+
     // The stamped line the position is in: the last stamped line that has started.
     function lineAt(ms) {
         let at = -1;
@@ -394,6 +399,19 @@ Dialog {
                                 font.pixelSize: Theme.fontSmall
                             }
 
+                            // Who sings it, when the file says: the marker as it is written.
+                            Text {
+                                objectName: "timingLineSinger"
+                                visible: row.modelData.singer.length > 0
+                                Layout.preferredWidth: Math.round(46 * Theme.fontScale)
+                                Layout.alignment: Qt.AlignTop
+                                text: root.singerTag(row.modelData.singer)
+                                color: Theme.accent
+                                font.family: Theme.monoFamily
+                                font.pixelSize: Theme.fontSmall
+                                font.weight: Font.DemiBold
+                            }
+
                             ColumnLayout {
                                 id: lineColumn
                                 Layout.fillWidth: true
@@ -461,6 +479,49 @@ Dialog {
                     enabled: root.selectedStamped
                     text: qsTr("+10 ms")
                     onClicked: KaraokeController.nudge(root.selectedLine, -1, 10)
+                }
+            }
+
+            // A duet: who sings the selected line, and what the two are called in the file.
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.space3
+                Text {
+                    text: qsTr("Singer")
+                    color: Theme.text
+                    font.pixelSize: Theme.fontSmall
+                }
+                SegmentedControl {
+                    objectName: "timingSingerChoice"
+                    enabled: root.selectedLine >= 0 && root.selectedLine < root.rows.length
+                    accessibleName: qsTr("Who sings the selected line")
+                    model: [
+                        { value: "", label: qsTr("Not marked") },
+                        { value: "v1", label: "V1" },
+                        { value: "v2", label: "V2" },
+                        { value: "both", label: qsTr("Both") }
+                    ]
+                    currentValue: (root.selectedLine >= 0 && root.selectedLine < root.rows.length)
+                                  ? root.rows[root.selectedLine].singer : ""
+                    onSelected: (value) => KaraokeController.setLineSinger(root.selectedLine, value)
+                }
+                AppTextField {
+                    id: firstNameField
+                    objectName: "timingFirstName"
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Name of V1")
+                    text: KaraokeController.timingFirstName
+                    Accessible.name: qsTr("Name of the first singer, saved in the file")
+                    onEditingFinished: KaraokeController.timingFirstName = text
+                }
+                AppTextField {
+                    id: secondNameField
+                    objectName: "timingSecondName"
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Name of V2")
+                    text: KaraokeController.timingSecondName
+                    Accessible.name: qsTr("Name of the second singer, saved in the file")
+                    onEditingFinished: KaraokeController.timingSecondName = text
                 }
             }
 

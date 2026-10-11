@@ -126,7 +126,8 @@ A karaoke stream has two vocals, and a duet's lines can say which sings each:
 The marker is the first thing after the time (before any `<mm:ss.xx>` word tag), in either case,
 with spaces allowed round the `+` and after the colon. A line with no marker is for nobody in
 particular. A plain file with no times may carry the markers too, so that a duet's text can be
-marked before it is timed.
+marked before it is timed. Hearth's timing window sets each line's singer and the two names as the
+file is timed, and saves them in the file (see [Timing the lyrics](../hearth/index.md#timing-the-lyrics)).
 
 Where a file marks its lines, the Karaoke page has two name fields. A name typed there is for this
 run of Hearth only, never kept for a song, and comes before the file's `[v1:]` and `[v2:]`, which

@@ -535,3 +535,87 @@ TEST_CASE("KaraokeController timing: ending a session discards what was not save
     CHECK_FALSE(controller.saveTiming().isEmpty());
     CHECK(read_all(room.path("song.lrc")) == kPlain);
 }
+
+TEST_CASE("KaraokeController: timing sets who sings a line and what the singers are called",
+          "[hearth][hearth-controller][karaoke][lyrics][timing][duet]") {
+    Room room;
+    room.write("duet.lrc",
+               "[00:01.00]Should auld acquaintance\n[00:03.00]Be forgot\n[00:05.00]And never brought to mind\n");
+    KaraokeController controller;
+    controller.load(room.path("duet.ac3"), 10000);
+
+    // Nothing is set outside a session.
+    CHECK_FALSE(controller.setLineSinger(0, "v1"));
+    controller.setTimingFirstName("Ann");
+    CHECK(controller.timingFirstName().isEmpty());
+
+    REQUIRE(controller.beginTiming());
+    CHECK(controller.timingFirstName().isEmpty());
+    CHECK(controller.timingLines().at(0).toMap().value("singer").toString().isEmpty());
+
+    // Setting what is already there is not an edit.
+    CHECK(controller.setLineSinger(0, ""));
+    CHECK_FALSE(controller.timingDirty());
+
+    CHECK(controller.setLineSinger(0, "v1"));
+    CHECK(controller.timingDirty());
+    CHECK(controller.setLineSinger(1, "v2"));
+    CHECK(controller.setLineSinger(2, "both"));
+    CHECK(controller.timingLines().at(1).toMap().value("singer").toString().toStdString() == "v2");
+    // The line's time and words are not touched.
+    CHECK(controller.timingLines().at(1).toMap().value("startMs").toLongLong() == 3000);
+
+    // Another word, and a line that is not there, change nothing.
+    CHECK_FALSE(controller.setLineSinger(0, "soprano"));
+    CHECK_FALSE(controller.setLineSinger(3, "v1"));
+    CHECK_FALSE(controller.setLineSinger(-1, "v1"));
+    CHECK(controller.timingLines().at(0).toMap().value("singer").toString().toStdString() == "v1");
+
+    // A name is one line with no bracket, since a tag ends at the first one.
+    controller.setTimingFirstName("  Ann [lead]\n");
+    CHECK(controller.timingFirstName().toStdString() == "Ann lead");
+    controller.setTimingSecondName("Bob");
+    CHECK(controller.timingSecondName().toStdString() == "Bob");
+
+    const QString first_save = controller.saveTiming();
+    INFO(first_save.toStdString());
+    REQUIRE(first_save.isEmpty());
+    // Read and closed: Windows will not replace a file that is open, and the next save does.
+    QString written;
+    {
+        QFile file(room.path("duet.lrc"));
+        REQUIRE(file.open(QIODevice::ReadOnly));
+        written = QString::fromUtf8(file.readAll());
+    }
+    CHECK(written.contains("[v1:Ann lead]"));
+    CHECK(written.contains("[v2:Bob]"));
+    CHECK(written.contains("[00:01.00]V1: Should auld acquaintance"));
+    CHECK(written.contains("[00:03.00]V2: Be forgot"));
+    CHECK(written.contains("[00:05.00]V1+V2: And never brought to mind"));
+
+    // What was written is what is loaded now, as any file.
+    CHECK(controller.hasSingers());
+    CHECK(controller.fileFirstSingerName().toStdString() == "Ann lead");
+    CHECK(controller.fileSecondSingerName().toStdString() == "Bob");
+    CHECK(line_at(controller, 2).value("singer").toString().toStdString() == "both");
+    // A line taken back to no one is written without a marker.
+    REQUIRE(controller.beginTiming());
+    CHECK(controller.timingFirstName().toStdString() == "Ann lead");
+    // A name is an edit like any other, and the same name again is not.
+    CHECK_FALSE(controller.timingDirty());
+    controller.setTimingFirstName("Ann lead");
+    controller.setTimingSecondName("Bob");
+    CHECK_FALSE(controller.timingDirty());
+    controller.setTimingFirstName("Ann");
+    CHECK(controller.timingDirty());
+    controller.endTiming();
+    REQUIRE(controller.beginTiming());
+    CHECK_FALSE(controller.timingDirty());
+    controller.setTimingSecondName("Bobby");
+    CHECK(controller.timingDirty());
+    CHECK(controller.setLineSinger(0, ""));
+    const QString second_save = controller.saveTiming();
+    INFO(second_save.toStdString());
+    REQUIRE(second_save.isEmpty());
+    CHECK(line_at(controller, 0).value("singer").toString().isEmpty());
+}

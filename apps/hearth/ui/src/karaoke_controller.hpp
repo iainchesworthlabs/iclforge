@@ -92,6 +92,13 @@ class KaraokeController : public QObject {
     // the stored time is the sound's. Kept across starts, 0 to maxReactionMs.
     Q_PROPERTY(int reactionMs READ reactionMs WRITE setReactionMs NOTIFY reactionChanged)
     Q_PROPERTY(int maxReactionMs READ maxReactionMs CONSTANT)
+    // The singers' names as the file being timed will carry them (`[v1:]` and `[v2:]`, planning/
+    // karaoke-phase2.md, W11c): what the file said, then what was typed. They are the file's, so
+    // they are saved with it; the names typed on the Karaoke page are for the run and are not.
+    // Brackets and control characters are taken out, since a tag ends at the first `]`. Empty
+    // while nothing is being timed.
+    Q_PROPERTY(QString timingFirstName READ timingFirstName WRITE setTimingFirstName NOTIFY timingChanged)
+    Q_PROPERTY(QString timingSecondName READ timingSecondName WRITE setTimingSecondName NOTIFY timingChanged)
 
 public:
     static constexpr int kMaxDelayMs = 1000;
@@ -135,6 +142,10 @@ public:
     [[nodiscard]] int reactionMs() const { return reaction_ms_; }
     [[nodiscard]] int maxReactionMs() const { return kMaxReactionMs; }
     void setReactionMs(int reaction_ms);
+    [[nodiscard]] QString timingFirstName() const;
+    [[nodiscard]] QString timingSecondName() const;
+    void setTimingFirstName(const QString& name);
+    void setTimingSecondName(const QString& name);
 
     // Reads the lyrics of the item at `itemPath` (the queue's path), whose
     // length is `durationMs` (0 while it is not known). The same item and
@@ -169,6 +180,10 @@ public:
     Q_INVOKABLE bool tapWord(int line, int word, qlonglong positionMs);
     // Moves a line (`word` < 0) or a word by `deltaMs`, as a nudge.
     Q_INVOKABLE bool nudge(int line, int word, int deltaMs);
+    // Who sings line `line` of the file being timed (a duet, W11): "" for no one, "v1", "v2" or
+    // "both". The line's time and words are not touched. False, changing nothing, when nothing is
+    // being timed, the line does not exist or the singer is another word.
+    Q_INVOKABLE bool setLineSinger(int line, const QString& singer);
     // Writes the item's `.lrc` (an existing one is kept once as `.lrc.bak`) and
     // reloads it as the lyrics. An empty string, or why not.
     Q_INVOKABLE QString saveTiming();
