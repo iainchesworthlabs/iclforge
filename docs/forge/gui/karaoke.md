@@ -1,5 +1,8 @@
 # Karaoke
 
+*This page is the Forge GUI's side. The [Karaoke guide](../../karaoke/index.md) covers playing a
+stream in Hearth, its lyrics, and the command line as well.*
+
 **Karaoke** is the fourth entry of the **Controls** switch, beside Guided, Advanced and Expert. It
 builds a karaoke AC-3 stream — ETSI TS 102 366 Annex C — from the recordings a backing track is
 made of, and lets you hear it the way a singer's player will decode it before you save it.

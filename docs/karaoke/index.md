@@ -1,0 +1,204 @@
+# Karaoke
+
+A karaoke stream is an ordinary AC-3 programme whose channels are **parts**, not speakers: the
+backing music, a guide melody, and one or two vocals. ETSI TS 102 366 Annex C defines it. iclforge
+handles it end to end, in three places:
+
+| You want to | Use |
+|---|---|
+| **Play** one, choose which vocals you hear, and sing along to its words | [Hearth](#play-it-in-hearth) |
+| **Make** one from a backing track, a guide melody and one or two vocals | [The Forge GUI](#make-one-in-the-forge-gui) |
+| Encode, probe and decode one in a script | [`forge`](#from-the-command-line) |
+
+There is no separate karaoke program: Hearth has a Karaoke page, and the Forge GUI has a Karaoke
+entry in its Controls switch.
+
+## What a karaoke stream is
+
+It is a main service with `bsmod` 7 and a coding mode above 1/0. L and R carry the backing; the
+slot a programme would use for its centre carries a **guide melody** (M), and the slots it would
+use for its surrounds carry **one or two vocals** (V1 and V2):
+
+| Mode | Parts, in coded order |
+|---|---|
+| 3/0 | L M R |
+| 2/1 | L R V1 |
+| 3/1 | L M R V1 |
+| 2/2 | L R V1 V2 |
+| 3/2 | L M R V1 V2 |
+
+A player that knows nothing about karaoke plays the channels where they are coded, so the vocals
+come out of the rear speakers. Annex C defines two kinds of decoder that do better:
+
+- A **karaoke-aware** decoder (Table C.2.2) plays L, C and R: the backing, the melody guide in the
+  centre, and the vocals mixed in at the surround level the stream carries.
+- A **karaoke-capable** decoder (Table C.2.3) does the same and lets the listener choose which
+  vocals play: none, V1, V2 or both. With none, what is left is the backing and the guide melody,
+  for singing along to.
+
+E-AC-3 and AC-4 have no karaoke mode in their specifications; this is AC-3 only.
+
+## Play it in Hearth
+
+Open a karaoke stream in Hearth (a raw `.ac3`, or an MP4, Matroska or MPEG-TS file with an AC-3
+track) and choose the **Karaoke** page (`Ctrl+7`).
+
+![Hearth's Karaoke page: the stream, its reproduction, the words, and what each speaker plays](screenshots/hearth-karaoke-page.png)
+
+*A generated karaoke stream and its lyrics on a test output, paused part-way through a word.*
+
+**Reproduction** is the decoder's choice, kept across starts:
+
+| Choice | What you hear |
+|---|---|
+| **As coded** | The channels as the stream codes them: the vocals come from the surround speakers. |
+| **Aware** (the default) | L, C and R, with the vocals at the stream's own level. On two speakers this is the ordinary Lo/Ro fold, which Annex C says is the same thing. |
+| **Capable** | As aware, with **Vocals** set to None, V1, V2 or Both. A single vocal plays in the centre with the melody; Both is V1 on the left and V2 on the right, so a stream with only V1 plays it on the left. |
+
+The page says which part each speaker plays under the choice made, and says in words when the
+choice does not apply:
+
+- The stream is **not karaoke** (it may be an ordinary 5.1 AC-3 stream, or E-AC-3 or AC-4).
+- The output is a **bitstream** to a receiver. The receiver decodes it, so the choice is not
+  applied; unless it is karaoke-capable, V1 and V2 play from its surround speakers. The page has a
+  button to choose another output.
+- The output is a **network group**: a sink that is sent PCM plays the reproduction, and one that
+  is sent coded AC-3 decodes and plays it as coded.
+- The stereo fold is **Lt/Rt**, for which Annex C defines no reproduction. The page has a button to
+  use Lo/Ro, which does.
+
+## Lyrics
+
+Hearth shows the words of the stream playing from a **`.lrc` file with the same name** in the same
+folder: `Auld Lang Syne.ac3` is read with `Auld Lang Syne.lrc` (the extension in any case).
+
+### The file
+
+LRC is an informal format; what Hearth reads is:
+
+```text
+[ti:Auld Lang Syne]
+[ar:Traditional]
+[offset:0]
+[00:12.00]<00:12.00>Should <00:12.60>auld <00:13.10>acquaintance <00:14.20>be <00:14.60>forgot,
+[00:16.00]And never brought to mind?
+```
+
+| Part | Meaning |
+|---|---|
+| `[mm:ss.xx]` | A line, shown from that time. `.xx` is hundredths, `.x` tenths and `.xxx` milliseconds. Several tags give one text at several times (a repeated chorus). |
+| `<mm:ss.xx>` before a word | The **word-timed** form: the word starts at that time and runs to the next word's tag, and a line's last word runs to the next line. |
+| `[offset:+/-ms]` | Shifts every time. A positive value makes the lyrics appear sooner. |
+| `[ti:]` `[ar:]` `[al:]` `[by:]` `[length:mm:ss]` | Kept for display. |
+
+The text is **UTF-8**, with or without a byte-order mark. A file in another encoding is not shown,
+and the page says so; playback is not affected.
+
+### What is shown
+
+- In a **word-timed** file, a word that has been **sung** is in the accent colour, a word **not yet
+  sung** is muted, and the word **being sung** is underlined and fills in the accent from left to
+  right as it is sung.
+- In a file that times **lines but not words**, the whole line is emphasised as it is sung. No word
+  times are invented for it.
+- A file with **no times at all** is shown whole and is not followed.
+- With **no file**, the page says which name it looks for.
+
+The words follow the position of what is *heard*: the output device's own clock less its path's
+delay, so they stay with the sound on a Bluetooth speaker or a receiver with a long path.
+
+### Keeping the words in sync
+
+**Settings, Playback, Lyric delay** moves the words later (positive) or sooner (negative) by up to a
+second in steps of 10 ms, on top of the file's own `[offset:]`. It is kept across starts. A file's
+times are rarely right to the frame against a particular output.
+
+### The singer view
+
+`F11`, or **Full screen** on the Karaoke page's lyrics, opens the words alone, large, on a dark
+screen. `Esc` leaves it, and `Space` pauses.
+
+![The singer view: the line being sung large, with the lines around it and the controls at the bottom](screenshots/hearth-singer-view.png)
+
+Previous, Play/Pause, Next and the **Vocals** chooser stay at the bottom, so a singer can pause,
+skip, or change which vocals play without leaving. Choosing a vocal there chooses the capable
+reproduction with it.
+
+## Make one in the Forge GUI
+
+Choose **Karaoke** in the Controls switch. Four steps build the stream from the recordings it is
+made of:
+
+![The Forge GUI's Karaoke flow at the Parts step: a backing, a melody guide and two vocals, each its own file](screenshots/forge-karaoke-parts.png)
+
+1. **Parts.** Give each part its own file: a **stereo backing**, and optionally a **mono melody
+   guide**, **Vocal 1** and **Vocal 2**. Or give **one multichannel file** whose WAV speakers are
+   already named. The page shows the coding mode the parts make, why, and what is wrong with
+   anything that cannot be used.
+2. **Levels.** The centre level (the melody guide in a stereo fold) and the surround level (the
+   vocals), which an aware decoder applies.
+3. **Hear.** The stream is encoded and played back the way a karaoke player decodes it: as coded,
+   aware, or capable with the vocals you choose. It plays the encoded stream, not your source
+   files.
+4. **Save.** The file type (the raw stream, or Matroska, MP4 or MPEG-TS), the bit rate, the
+   equivalent `forge encode` command, and the encode.
+
+![The Hear step: the stream built, played as an aware decoder plays it, with which part reaches which speaker](screenshots/forge-karaoke-hear.png)
+
+Each coded channel is written into the same draft the other tiers edit, so switching to Expert
+afterwards shows the same bed, `bsmod` and assignments. The Forge GUI guide has the details of each
+step and of what a part may be: [Forge GUI, Karaoke](../forge/gui/karaoke.md).
+
+## From the command line
+
+Encode: a stereo backing and a melody guide and two vocals as five coded channels, with `bsmod`
+set to 7 (the token is `voiceover`, which at a layout above 1/0 is the karaoke main service). The
+sources are mapped to bed positions with `src=` and `map=`:
+
+```text
+forge encode backing.wav out.ac3 384 L,C,R,Ls,Rs src=melody.wav src=lead.wav src=harmony.wav \
+      map=0.0:L,0.1:R,1.0:C,2.0:Ls,3.0:Rs bsmod=voiceover
+```
+
+A single multichannel WAV whose speakers are named needs no `map=`.
+
+Probe:
+
+```text
+$ forge probe out.ac3
+...
+bsmod           7 (karaoke)
+layout          3/2 (acmod 7, lfeon 0)
+renders         5 channel(s): L C R Ls Rs
+```
+
+Decode, as an aware decoder (`karaoke`) or a capable one with a choice of vocals
+(`karaoke=none`, `karaoke=v1`, `karaoke=v2` or `karaoke=v1+v2`), to L, C and R:
+
+```text
+forge decode out.ac3 aware.wav karaoke
+forge decode out.ac3 melody-and-v1.wav karaoke=v1
+```
+
+`channels=2` or `channels=1` gives the 2/0 or 1/0 reproduction. `downmix=ltrt` is refused with
+`karaoke`, as Annex C defines no Lt/Rt reproduction. A stream that is not karaoke is decoded as
+coded, and the report says so. The library form is `OutputConfig::karaoke` and
+`OutputConfig::karaoke_vocals`; see [Decoding](../library/decoding.md).
+
+## What it does not do
+
+- **An LFE channel in a karaoke stream** made here: the flow carries none, and a file that has one
+  is named, not dropped.
+- **Re-levelling the melody or the vocals** (Annex C's optional extra flexibility): the library
+  offers none.
+- **Making or timing a lyrics file.** Hearth reads `.lrc` files; nothing here writes one or times
+  the words of one that has only lines. A file in an encoding other than UTF-8 is not read.
+- **Karaoke in E-AC-3 or AC-4**, and **a microphone, scoring or recording**.
+
+## How it is checked
+
+No other decoder implements Annex C's karaoke reproduction and there is no karaoke stream from
+anyone else, so there is nothing outside to compare with. It is held to the annex's own tables,
+transcribed independently of the code: every mode is encoded with a tone in each part and decoded
+under each reproduction and each choice of vocals, and the tones on each output are what the table
+says. See [Verification](../verification.md).
