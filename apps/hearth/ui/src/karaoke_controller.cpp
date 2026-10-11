@@ -1,15 +1,18 @@
 #include "karaoke_controller.hpp"
 
+#include <QImage>
 #include <QSettings>
 
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <QFileInfo>
 #include <QUrl>
@@ -18,6 +21,7 @@
 #include <system_error>
 #include <vector>
 
+#include "iclforge/lyrics/cdg.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/timing.hpp"
 
@@ -25,12 +29,18 @@ namespace iclforge::hearth::ui {
 
 // The reader and the cursor are libs/lyrics' (planning/karaoke-phase2.md, W13a), which Hearth's
 // window shares with the other programs that read lyrics.
+using iclforge::lyrics::CdgFile;
+using iclforge::lyrics::CdgScreen;
+using iclforge::lyrics::find_cdg_file;
 using iclforge::lyrics::find_lyrics_file;
+using iclforge::lyrics::kCdgHeight;
+using iclforge::lyrics::kCdgWidth;
 using iclforge::lyrics::LyricLine;
 using iclforge::lyrics::LyricPosition;
 using iclforge::lyrics::Lyrics;
 using iclforge::lyrics::LyricWord;
 using iclforge::lyrics::lyric_position;
+using iclforge::lyrics::read_cdg;
 using iclforge::lyrics::read_lyrics;
 using iclforge::lyrics::word_state;
 using iclforge::lyrics::WordState;
@@ -136,6 +146,10 @@ struct KaraokeController::State {
     Lyrics editing;
     std::vector<char> stamped;
     std::vector<std::vector<char>> tapped;
+    // The picture of a CD+G file and the screen that follows it. The screen holds a pointer to the
+    // file, which is never moved once it is in here, and goes before it.
+    std::optional<CdgFile> picture;
+    std::unique_ptr<CdgScreen> screen;
 };
 
 KaraokeController::KaraokeController(QObject* parent) : QObject(parent), state_(std::make_unique<State>()) {
@@ -174,6 +188,10 @@ void KaraokeController::setReactionMs(int reaction_ms) {
 
 void KaraokeController::clear_lyrics() {
     state_->lyrics = Lyrics{};
+    state_->screen.reset();
+    state_->picture.reset();
+    frame_ = QImage{};
+    frame_applied_ = 0;
     status_ = QStringLiteral("none");
     file_name_.clear();
     error_text_.clear();
@@ -250,10 +268,43 @@ void KaraokeController::load(const QString& itemPath, qlonglong durationMs) {
                 status_ = QStringLiteral("error");
                 error_text_ = from_utf8(read.error());
             }
+        } else if (const std::optional<std::filesystem::path> disc = find_cdg_file(path)) {
+            // No lyrics file, and the picture of a disc: its words are pixels, so what is shown
+            // is the picture, against the position. A lyrics file beside the item wins, because
+            // it is what a word-by-word fill and a nudge can follow.
+            file_name_ = from_utf8(disc->filename().string());
+            if (auto read = read_cdg(*disc)) {
+                state_->picture.emplace(std::move(*read));
+                state_->screen = std::make_unique<CdgScreen>(*state_->picture);
+                status_ = QStringLiteral("picture");
+            } else {
+                status_ = QStringLiteral("error");
+                error_text_ = from_utf8(read.error());
+            }
         }
     }
     emit lyricsChanged();
     emit singerNamesChanged();
+}
+
+QImage KaraokeController::pictureFrame(qlonglong positionMs) {
+    if (!state_->screen) {
+        return {};
+    }
+    CdgScreen& screen = *state_->screen;
+    screen.seek(positionMs - delay_ms_);
+    if (!frame_.isNull() && screen.applied() == frame_applied_) {
+        return frame_;
+    }
+    const std::vector<std::uint32_t> pixels = screen.pixels();
+    QImage image(kCdgWidth, kCdgHeight, QImage::Format_ARGB32);
+    for (int y = 0; y < kCdgHeight; ++y) {
+        std::memcpy(image.scanLine(y), pixels.data() + static_cast<std::size_t>(y) * static_cast<std::size_t>(kCdgWidth),
+                    static_cast<std::size_t>(kCdgWidth) * sizeof(std::uint32_t));
+    }
+    frame_ = image;
+    frame_applied_ = screen.applied();
+    return frame_;
 }
 
 QVariantMap KaraokeController::cursor(qlonglong positionMs) const {

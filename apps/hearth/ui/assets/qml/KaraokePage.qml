@@ -584,10 +584,13 @@ ScrollView {
                         visible: text.length > 0
                         text: KaraokeController.status === "plain"
                               ? qsTr("These lyrics have no times, so they are shown whole and not followed.")
-                              : (KaraokeController.status === "timed" && !KaraokeController.wordTimed
-                                 ? qsTr("This file times lines, not words: a whole line is emphasised as it "
-                                        + "is sung.")
-                                 : "")
+                              : (KaraokeController.status === "picture"
+                                 ? qsTr("This is the picture of a CD+G disc. Its words are part of the "
+                                        + "picture, so there is no text to follow.")
+                                 : (KaraokeController.status === "timed" && !KaraokeController.wordTimed
+                                    ? qsTr("This file times lines, not words: a whole line is emphasised "
+                                           + "as it is sung.")
+                                    : ""))
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
                         wrapMode: Text.WordWrap

@@ -1,11 +1,13 @@
 #pragma once
 
+#include <QImage>
 #include <QObject>
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQmlIntegration>
 
+#include <cstddef>
 #include <memory>
 
 // The lyrics of the item playing (planning/karaoke-design.md, K5): a third QML
@@ -28,7 +30,10 @@ class KaraokeController : public QObject {
 
     // "none": no `name.lrc` beside the item (or nothing playing); "timed": a
     // file whose lines have times; "plain": a file with no times, shown whole
-    // and not followed; "error": a file that could not be read, with errorText.
+    // and not followed; "picture": no lyrics file, and a `name.cdg` beside the
+    // item, the picture of a CD+G disc (planning/karaoke-phase2.md, W13f; it
+    // carries no text, so it is shown and not read); "error": a file that could
+    // not be read, with errorText.
     Q_PROPERTY(QString status READ status NOTIFY lyricsChanged)
     // The file's name, and for "error" the reason as the reader wrote it. Empty
     // while there is no file.
@@ -187,6 +192,11 @@ public:
     // Writes the item's `.lrc` (an existing one is kept once as `.lrc.bak`) and
     // reloads it as the lyrics. An empty string, or why not.
     Q_INVOKABLE QString saveTiming();
+    // The picture of a "picture" status at `positionMs`, with the delay taken off: 300 by 216, the
+    // border drawn, 0xAARRGGBB. A null image when there is no picture. CdgPicture asks for it each
+    // time the position moves; only the position decides what it is, so a seek and a pause are
+    // only another position, and the screen replays from the start when it goes back.
+    [[nodiscard]] QImage pictureFrame(qlonglong positionMs);
 
 signals:
     void lyricsChanged();
@@ -227,6 +237,10 @@ private:
     int stamped_lines_ = 0;
     QString timing_error_;
     int reaction_ms_ = kDefaultReactionMs;
+    // The last frame handed out and how many packets it had applied: a position that has not
+    // reached the next packet (they come 300 a second, the view asks 60) is the same picture.
+    QImage frame_;
+    std::size_t frame_applied_ = 0;
 };
 
 }  // namespace iclforge::hearth::ui

@@ -227,6 +227,26 @@ most are.
 The words follow the position of what is *heard*: the output device's own clock less its path's
 delay, so they stay with the sound on a Bluetooth speaker or a receiver with a long path.
 
+### A CD+G disc
+
+A **`.cdg` file with the same name** is the picture of a karaoke disc that was ripped on its own,
+the other half of an "MP3+G" pair: `Song.mp3` and `Song.cdg`. When there is **no lyrics file**,
+Hearth shows that picture where the words would be, with the proportions of the disc's 300 by 216
+and as large as fits (in whole steps, so the small type stays crisp), drawn against the position of
+what is *heard* and moved by the lyric delay as the words are.
+
+The words of a disc are **part of the picture**. Nothing is read from it as text, so there is no
+fill, no line to follow and nothing to translate or copy, and the page says so. A lyrics file beside
+the stream is shown in its place, since it is what a word-by-word fill and the delay can follow.
+
+What is drawn is what the disc's own player draws: the screen preset and the border preset, the
+tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form
+brings back what left), and the 12-bit colour table of 16 colours. The smooth scrolling offsets
+within a tile and the transparent colour are read and not drawn. A packet that is not CD+G is skipped
+and keeps its place in time, and a file that is not a whole number of 24-byte packets, or has no
+CD+G packet in it, is refused with the reason (playback is not affected). The packets are not checked
+for parity: a rip has already been through the drive's error correction.
+
 ### Keeping the words in sync
 
 **Settings, Playback, Lyric delay** moves the words later (positive) or sooner (negative) by up to a

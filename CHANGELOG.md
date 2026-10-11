@@ -250,6 +250,15 @@ The sections below contain the complete change list and fixes.
   enhanced word tags and keeps the first file there once as `.lrc.bak`; an item with no words
   takes a text file in UTF-8 or UTF-16. The writer, the estimate and the edits are in
   `iclforge::lyrics` (planning/karaoke-phase2.md, W6).
+- **A karaoke disc's picture is shown beside a stream.** A `name.cdg` (CD+G, the subcode of a
+  karaoke disc ripped on its own: 24-byte packets, 300 a second, a 300 by 216 picture in 16
+  colours) with no lyrics file beside the item is drawn on the Karaoke page and in the singer
+  view, against the position of what is heard and moved by the lyric delay. `iclforge::lyrics`
+  (`cdg.hpp`) decodes the memory and border presets, the tile blocks and their XOR form, the
+  scrolls by a tile and the 12-bit colour table; the picture at a position is what the packets up
+  to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
+  read as text, and the page says so; a lyrics file beside the stream is shown in its place
+  (planning/karaoke-phase2.md, W13f).
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the
