@@ -1,6 +1,8 @@
 // @ts-check
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const { test, expect } = require('@playwright/test');
 
 // Closes WASM/mobile headless coverage(a): docs/platforms/wasm.md records channel count,
@@ -86,5 +88,101 @@ test('decodes the bundled Atmos-in-DD+ fixture with real, moving object position
     const moved = Math.hypot(x1 - x0, y1 - y0, z1 - z0);
     expect(moved).toBeGreaterThan(0.01);
 
+    expect(pageErrors).toEqual([]);
+});
+
+// The karaoke example (examples/karaoke/auld-lang-syne/): a 3/2 AC-3 stream flagged bsmod 7, which
+// the library's output stage reproduces (Annex C of ETSI TS 102 366). The same stream that
+// iclforge-forge-cli-tests probes as karaoke and `forge decode karaoke` reproduces, so what the
+// page does here is what the command line writes: a native decode of each of these is held against
+// this module's by hand (planning/karaoke-phase2.md, W8), and a mismatch would show as a frame
+// that is not the library's.
+const KARAOKE_EXAMPLE = path.resolve(
+    __dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.ac3');
+
+test('a karaoke AC-3 stream is said to be one, and which vocals are heard is a choice', async ({
+    page,
+}) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(String(error)));
+    await page.goto('index.html');
+
+    const bytes = Array.from(fs.readFileSync(KARAOKE_EXAMPLE));
+    const result = await page.evaluate(async (data) => {
+        // @ts-ignore - see the first test's own comment on ./package/.
+        const { decodeFile, DownmixTarget, KaraokeReproduction, KaraokeVocals } =
+            await import('./package/index.js');
+        // @ts-ignore
+        const moduleInstance = await window.createIclForgeModule();
+        const input = Uint8Array.from(data);
+        const decode = (fold) => decodeFile(moduleInstance, input, { fold });
+        const energy = (program, channel) => {
+            const pcm = program.fold[channel];
+            let sum = 0;
+            for (const sample of pcm) sum += sample * sample;
+            return sum / pcm.length;
+        };
+        const lo = DownmixTarget.LoRo;
+        const capable = KaraokeReproduction.Capable;
+        const coded = decode({ target: DownmixTarget.AsCoded });
+        const aware = decode({ target: DownmixTarget.AsCoded, karaoke: KaraokeReproduction.Aware });
+        const stereo = decode({ target: lo });
+        const choice = (vocals) => energy(decode({ target: lo, karaoke: capable, karaokeVocals: vocals }), 0);
+        return {
+            karaoke: coded.karaoke,
+            codedFold: coded.fold.length,
+            codedChannels: coded.channelCount,
+            awareFold: aware.fold.length,
+            stereoFold: stereo.fold.length,
+            stereo: energy(stereo, 0),
+            v1: choice(KaraokeVocals.V1),
+            v2: choice(KaraokeVocals.V2),
+            both: choice(KaraokeVocals.Both),
+            none: choice(KaraokeVocals.None),
+        };
+    }, bytes);
+
+    expect(result.karaoke).toBe(true);
+    // No fold asked for and no reproduction: the coded channels only, which are five.
+    expect(result.codedFold).toBe(0);
+    expect(result.codedChannels).toBe(5);
+    // The reproduction at the coded layout is L, C and R; the stereo fold is two.
+    expect(result.awareFold).toBe(3);
+    expect(result.stereoFold).toBe(2);
+    // Each choice of vocals is a different mix, none of them the stream's own.
+    const differs = (a, b) => Math.abs(a - b) > 0.01 * Math.max(a, b);
+    expect(differs(result.v1, result.v2)).toBe(true);
+    expect(differs(result.v1, result.stereo)).toBe(true);
+    expect(differs(result.none, result.both)).toBe(true);
+    expect(pageErrors).toEqual([]);
+});
+
+test('the page offers the vocals of a karaoke stream and of no other, and decodes again on a choice', async ({
+    page,
+}) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(String(error)));
+    await page.goto('index.html');
+
+    // The bundled Atmos-in-DD+ stream is not karaoke: no control.
+    await page.click('#loadDemo');
+    await expect(page.locator('#status')).toContainText('Decoded the bundled demo stream');
+    await expect(page.locator('#karaokePanel')).toBeHidden();
+
+    await page.setInputFiles('#fileInput', KARAOKE_EXAMPLE);
+    await expect(page.locator('#status')).toContainText('Decoded auld-lang-syne.ac3');
+    await expect(page.locator('#streamInfo')).toContainText('AC-3');
+    await expect(page.locator('#karaokePanel')).toBeVisible();
+
+    // A choice decodes the stream again with it.
+    await page.selectOption('#karaokeChoice', 'v1');
+    await expect(page.locator('#status')).toContainText('Decoded auld-lang-syne.ac3');
+    await expect(page.locator('#karaokePanel')).toBeVisible();
+    await expect(page.locator('#karaokeChoice')).toHaveValue('v1');
+
+    // And a stream that is not karaoke takes it away again.
+    await page.click('#loadDemo');
+    await expect(page.locator('#status')).toContainText('Decoded the bundled demo stream');
+    await expect(page.locator('#karaokePanel')).toBeHidden();
     expect(pageErrors).toEqual([]);
 });
