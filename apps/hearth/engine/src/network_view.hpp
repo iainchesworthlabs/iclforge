@@ -268,6 +268,13 @@ struct GroupMemberFacts {
     // to_group_detail() can report the largest any member asks for without
     // reaching back into NetworkSinks' own bookkeeping.
     std::optional<std::uint32_t> required_lead_time_ms{};
+    // What the group last sent this member (NetworkSinks::plan_group(), as
+    // the last programme opened): "coded" | "pcm" | "held", and empty before
+    // any has. `form_label` is it in a few words ("AC-3 as it is", "PCM ·
+    // 2.0"), `form_reason` the sentence that says why.
+    std::string form{};
+    std::string form_label{};
+    std::string form_reason{};
 };
 
 // One group NetworkSinks has made (iclforge::sendspin::ServerHost::make_group()),
@@ -304,13 +311,15 @@ struct GroupRow {
 struct GroupMemberRow {
     std::string sink_id{};
     std::string name{};
-    // "Hearth sink · up to 8 channels" or "FLAC · stereo" - what kind of
-    // sink it is and, in general terms, what it is fed (planning/
-    // hearth-reference-player.md, Groups: a Hearth sink renders the
-    // programme to its own layout, a standard player always gets stereo).
-    // Not the sink's own CONFIGURED layout ("renders 5.1") - that needs a
-    // sink settings page (issue #875) this class has no way to read yet.
+    // What the member is sent: once a programme has opened, what the group
+    // decided for it ("E-AC-3 as it is", "PCM · 2.0", "Nothing · held back");
+    // before, in general terms what kind of sink it is and how it is fed. A
+    // member that is not connected says so, as it is sent nothing now.
     std::string gets_text{};
+    // GroupMemberFacts::form, as the page switches on it (never translated),
+    // and the sentence that says why - empty until a programme has opened.
+    std::string form{};
+    std::string reason_text{};
     std::int32_t volume = 100;
     bool muted = false;
     bool volume_supported = false;
