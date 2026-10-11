@@ -1,6 +1,6 @@
 # Karaoke: playback in Hearth, creation in the Forge GUI
 
-!!! note "Status as of 2026-10-11: Phase 0 (scoping) answered; the specification is next"
+!!! note "Status as of 2026-10-11: scoping answered; the specification is drafted and waits for sign-off"
     Scoped on 2026-10-11 in one round of questions and answers, recorded under
     [Decisions](#decisions). Nothing in this plan is built. The live status board is
     [ROADMAP.md](../ROADMAP.md); each phase below carries its own status line.
@@ -8,7 +8,7 @@
     | Phase | What | State |
     |---|---|---|
     | 0 | Scoping decisions | Answered 2026-10-11 |
-    | 1 | Specification (in this page) | Not started; needs the owner's sign-off |
+    | 1 | Specification (in this page) | Drafted 2026-10-11; needs the owner's sign-off |
     | 2 | Design: architecture, UX sheet, work breakdown into stacked PRs | Not started; needs the owner's sign-off |
     | 3 | Build, as small PRs | Not started; each wave of agents is asked about first |
 
@@ -91,33 +91,205 @@ These follow from decision 2 and are open to correction at the specification's s
   #1253 and the PRs stacked on it). That decision matters for karaoke over Sendspin; see
   [Later](#later-not-v1).
 
-## v1 scope
+## Specification
 
-Stated here as the scope the specification will make precise; nothing below is a requirement yet.
+Phase 1. Draft of 2026-10-11, for the owner's sign-off; nothing below is built. Section
+[Decisions for the owner](#decisions-for-the-owner) lists what the draft needs answered before
+Phase 2.
 
-### Playback (Hearth, desktop)
+### Users and scenarios
 
-- Open a karaoke AC-3 stream: raw `.ac3`, and AC-3 in MP4 or Matroska.
-- Show that the stream is karaoke (`bsmod` 7, the coding mode, which of M, V1, V2 it carries).
-- Reproduction: off (as coded), aware, or capable with the singer's choice of none / V1 / V2 /
-  both, at 3/0, stereo or mono, taking the library's levels as they are.
-- Timed lyrics from a sidecar `.lrc` file next to the stream, shown in step with playback.
-- A reference-grade view of what the decoder did, in the manner of Hearth's Media and Decoder
-  pages, and a singer-facing view with large lyrics.
+Three kinds of user, in the order the answers to question 5 give them:
 
-### Creation (Forge GUI)
+- **The evaluator** is a codec user or developer checking what an Annex C decoder does with a
+  stream, and wants every step visible: what the stream is, which reproduction ran, what each
+  output carries.
+- **The singer** is at a TV or a laptop and wants the words, the backing without the lead vocal,
+  and few controls.
+- **The author** makes karaoke streams from separate recordings and wants to hear the result under
+  each reproduction before giving it to anyone.
 
-- A Karaoke page that builds a `bsmod=7` stream from separate parts (backing L and R, the guide
-  melody, one or two vocals) through the existing encoder, with the level and the layout the
-  annex gives, and a preview that plays it back through the same reproduction.
-- What the page takes as input, how parts are mapped to L M R V1 V2, and how the result is
-  checked are specification work (Phase 1).
+| # | Scenario | Who |
+|---|---|---|
+| S1 | Opens a karaoke `.ac3`. The app says it is a karaoke stream, its coding mode, and which of M, V1 and V2 it carries. Switches between as coded, aware, and capable with none / V1 / V2 / both; the output meters show which channel carries what. | Evaluator |
+| S2 | Opens `song.ac3` with `song.lrc` beside it. The words follow the audio. Chooses "no vocals" and sings. | Singer |
+| S3 | A duet: hears V1 only, or V2 only, while the other singer takes the other part. | Singer |
+| S4 | Builds a stream from a stereo backing, a mono melody guide and one or two vocal files. Hears it under each reproduction, then saves the stream; a `.lrc` goes beside it by hand. | Author |
+| S5 | Opens an ordinary 5.1 stream, or an E-AC-3 or AC-4 file. The karaoke controls say they do not apply and why, and playback is unchanged. | Anyone |
+| S6 | Sends a karaoke stream by passthrough to a receiver, or as coded AC-3 to a network sink. The page says the reproduction is the receiver's or the sink's, not Hearth's. | Evaluator |
+| S7 | Plays a karaoke stream to a stereo pair, a mono speaker or a 3.0 / 5.1 layout and hears the matching Annex C reproduction. | Singer, evaluator |
+
+### Requirements
+
+Each requirement is a single statement a test or a recorded check can pass or fail. The IDs are
+used by the verification table below.
+
+**Playback (Hearth)**
+
+- **P1 Identify.** For an AC-3 item, Hearth states whether it is a karaoke stream
+  (`meta::is_karaoke`: `bsmod` 7 with an `acmod` above 1/0), its coding mode, and which of M, V1
+  and V2 it carries (Table C.2.1).
+- **P2 Choose.** The listener chooses the reproduction: *as coded* (the library's `kOff`), *aware*
+  (`kAware`, Table C.2.2), or *capable* (`kCapable`, Table C.2.3) with the vocals *none*, *V1*,
+  *V2* or *both*.
+- **P3 Apply.** The choice reaches the decoder through `DecoderSettings` and `decoder_setup()`,
+  the one place Hearth's decoder options become a library configuration, and nowhere else.
+- **P4 Layout.** The reproduction's outputs reach the speakers through Hearth's existing
+  routing: 3/0 (L C R, then the LFE if the stream has one) to a layout that has them, the 2/0
+  reproduction to a stereo pair, mono to one speaker.
+- **P5 Live.** Changing P2 while an item plays applies to that item without restarting it, as the
+  other decoder settings do: `Player::set_decoder_settings` reaches the playing item at its next
+  unit, and audio already decoded plays out as it was. How long the singer waits to hear the
+  change is therefore the queued audio; the design measures it and says whether to shorten it.
+- **P6 Not karaoke.** For a stream that is not karaoke, and for E-AC-3 and AC-4 (which the
+  decoder never flags), the controls are shown disabled with the reason, and playback is as
+  without them.
+- **P7 Coded outputs.** When the output is passthrough or a network sink that takes the coded
+  stream, the page says the reproduction is not applied by Hearth and what will play.
+- **P8 Stereo fold.** Annex C defines no Lt/Rt reproduction. With the stereo fold set to Lt/Rt the
+  page says so (the library leaves the Lt/Rt fold as it is) and offers Lo/Ro.
+- **P9 Persist.** The choice is kept with the other decoder settings and restored on the next
+  start; it applies to every item, as the decoder settings do, not per item.
+- **P10 Report.** The signal path and the diagnostics say which reproduction ran and, for
+  capable, which vocals (`describe(DecoderSettings)` names it).
+- **P11 Carriage.** A karaoke AC-3 plays from a raw `.ac3`, from MP4 and from Matroska. *Finding:*
+  Hearth's file loader reads only raw `.ac3`, `.ec3` and `.ac4` today
+  (`apps/hearth/ui/src/item_loader.cpp` answers "not yet playable" for a container), although
+  `app-media`'s container input reads them for Forge. P11 therefore includes the loader change,
+  which also serves every other stream in a container; it is the programme's first PR.
+
+**Lyrics (Hearth)**
+
+- **L1 Find.** For an item `name.ext`, a file `name.lrc` in the same folder (extension matched
+  without regard to case) is its lyrics.
+- **L2 Read.** Time-tagged lines `[mm:ss.xx]text`, several tags on one line, `[offset:±ms]`, and
+  the id tags `ti`, `ar`, `al`, `by` and `length` (shown or kept for display). Word-level tags in
+  the enhanced form `<mm:ss.xx>` are not used for timing in v1; their text is shown without the
+  tags.
+- **L3 Encoding.** UTF-8, with or without a byte-order mark. A file that is not valid UTF-8 is
+  reported as unreadable; it is not guessed at.
+- **L4 Show.** The current line is emphasised, with the previous and the next lines in view. It
+  follows the playing position, and a seek moves it. A file with no time tags is shown as plain
+  text and is not followed.
+- **L5 Fail soft.** A missing, empty or unreadable lyrics file shows "no lyrics" (with the reason
+  where there is one) and never stops or delays playback.
+- **L6 Time.** A line changes within 50 ms of the audio it belongs to being heard on a local
+  output (the engine's heard position, not the decoded position). For a network sink the lyrics
+  follow the same clock the sink is synchronised to (checked in design; see
+  [Later](#later-not-v1)).
+
+**Creation (Forge GUI)**
+
+- **A1 Page.** A Karaoke page of `forge-gui` builds a karaoke AC-3 from parts.
+- **A2 Parts.** The parts are a backing (L and R), a guide melody M, and one or two vocals V1 and
+  V2, each from its own file, or all from one multichannel WAV whose speaker mask names the
+  channels (PR #1263 makes that mask the source of the layout).
+- **A3 Mode.** The coding mode follows what is supplied, as Table C.2.1: L M R is 3/0, L R V1 is
+  2/1, L M R V1 is 3/1, L R V1 V2 is 2/2, L M R V1 V2 is 3/2. The page shows the mode it chose and
+  why.
+- **A4 Stream.** The encoder is called with `bsmod=7` and the mode above; the page shows the
+  equivalent `forge encode` command, as the Forge GUI does for its other plans.
+- **A5 Levels.** The centre level (`cmixlev`, which the aware decoder applies to M at 2/0) and the
+  surround level (`surmixlev`, which it applies to the vocals) are set on the page with Annex C's
+  meaning stated beside them; the defaults are the encoder's.
+- **A6 Hear.** The page plays the encoded stream back through the library's decoder under each
+  reproduction of P2, so the author hears what a singer would. The preview is of the encoded
+  stream, not of the source files.
+- **A7 Save.** The output is a raw `.ac3`, or MP4 or Matroska where the encoder page offers
+  them today.
+- **A8 Check.** Parts of different lengths or rates, an LFE part (not in v1), a source that is
+  already a 5.1 bed, and a vocal supplied without the mode that carries it are named, not
+  silently fixed.
+
+**Library and shared code**
+
+- **D1** Neither program changes the decoder's arithmetic. If the design finds a gap in
+  `libs/ac3` (for example, no way to ask which of M, V1 and V2 a frame carries without
+  re-deriving it from `acmod`), the fix is a separate library PR, reviewed with the AC-3
+  session that owns the decoder.
+- **D2** The probe JSON and Hearth's media information name a karaoke stream's service as
+  `karaoke` (`bsmod_label` already does) and need no new field unless the design shows one is
+  missing.
 
 ### Not in v1
 
-Stem files as a playback source, microphone input, scoring and recording; Annex C's optional
-re-levelling controls; karaoke in E-AC-3 or AC-4 (their specifications give it no mode, and the
-decoder never sets the flag for them).
+Stem files as a playback source, microphone input, scoring and recording; an LFE part in
+authoring; Annex C's optional re-levelling of V1, V2 and M; a lyrics editor; word-level lyric
+timing; karaoke in E-AC-3 or AC-4 (the specifications give them no mode and the decoder never sets
+the flag); video playback of a karaoke MP4's picture; Android, a browser page and an ESP32 sink
+(see [Later](#later-not-v1)).
+
+### Quality targets
+
+- **Q1 Cost.** Decoding a karaoke stream under any reproduction takes no more than 5% longer than
+  decoding the same stream as coded, measured on one generated 3/2 fixture on the existing
+  `[hearth]` test engine.
+- **Q2 Sync.** L6.
+- **Q3 Accessible.** Every control reachable and operable from the keyboard and given an
+  `accessibleName`, as Hearth's other controls are and as each page's own QML test checks; the
+  lyric view's text scales with the window's text-size setting.
+- **Q4 Localised.** Every new user-visible string goes through `qsTr()`/`tr()`, the catalogues
+  are regenerated in the same PR, and the lupdate location gate passes.
+- **Q5 CI.** No new lane or workflow; tests run under the existing `hearth`, `forge` and `ac3`
+  labels.
+
+### Verification
+
+There is no outside oracle: no other decoder reproduces karaoke, so a misreading of an Annex C
+table would be invisible to any comparison with another program. What stands in for it:
+
+| Checked | How | Requirements |
+|---|---|---|
+| The reproductions' coefficients | The library's existing tests, which transcribe Tables C.2.2 and C.2.3 independently of the code (the table pages were read as images) | D1 |
+| Hearth plays what the library decodes | An engine test pushes a generated karaoke stream through `Player` on a fake device under each reproduction and compares the PCM with the library decode of the same stream, sample for sample | P2 to P5, P10 |
+| What each output carries | Generated streams whose parts are tones at distinct frequencies, so an output's spectrum names the parts in it and their gains | P1, P4, S1 |
+| Not karaoke, and coded outputs | Engine tests: an ordinary 3/2 stream with the controls set decodes as without them; passthrough and a coded sink leave the stream's bytes alone | P6, P7 |
+| Fold and settings | `tst_decoder_settings`-style QML and controller tests for the disabled states, the Lt/Rt notice and persistence | P6 to P9 |
+| Containers | The loader test opens the same stream raw, in MP4 and in Matroska and compares the decode | P11 |
+| Lyrics | Unit tests of the reader over a file of cases (tags, offsets, several tags, no tags, bad encoding, enhanced tags) and an engine test of the line at a given position | L1 to L6 |
+| Authoring | Build a stream from generated parts through the page's controller, probe it (`bsmod`, mode, levels), decode under each reproduction and check each part's place and gain against Annex C's tables | A1 to A8 |
+| Pages | `qml.exe` or offscreen QML tests for each state, and screenshots re-cropped from the running app, not recalled | Design sheet |
+| A listening pass | The owner on a desktop, recorded in the PR | S2, S3, S7 |
+
+**Content.** No recording is bundled. Test and sample streams are generated (tones for the
+parts, a synthetic `.lrc`), so there is no licence question and the generator is the record of
+what is in them.
+
+### Decisions for the owner
+
+The draft needs these before the design starts. Each has the answer the draft assumes.
+
+1. **Default reproduction for a karaoke stream.** The library defaults to *off* so that nothing
+   re-routes a programme unasked. With *off*, V1 and V2 play from the surround speakers, which is
+   wrong for a karaoke stream on a 5.1 layout. *Assumed:* Hearth starts a karaoke stream in
+   **aware** (what the programme provider intended: the vocals at the level they set), and the
+   singer's chooser moves it to capable.
+2. **One page or a section.** A seventh Hearth page ("Karaoke", Ctrl+7) beside Play, Media,
+   Speakers, Decoder, Network and Settings, or a section of the Play page. *Assumed:* a page,
+   with the lyric view also reachable full-screen from Play; the design sheet settles it.
+3. **Lyrics: line-level timing only in v1** (L2). Word-level highlight is a later increment.
+4. **Lyrics: UTF-8 only** (L3), no encoding guessing.
+5. **Authoring input: separate part files first, one multichannel WAV second** (A2).
+6. **No LFE part in v1** (A8).
+7. **The first PR is the container loader (P11), not karaoke.** It helps every Hearth user, and
+   it can merge before #1263 and #1267 do.
+
+### Risks
+
+- **Hearth cannot open MP4 or Matroska today** (P11). Small in code, but it is a change to the
+  loader every item goes through.
+- **#1263 and #1267 are not merged.** Hearth and the Forge GUI need the library's karaoke fields;
+  stacking on #1267's branch works, and the first PR does not need them.
+- **Hot files.** `hearth_controller.cpp` (about 2,200 lines), Hearth's `Main.qml`, and the Forge
+  GUI's `Main.qml` (about 7,700 lines) and `encoder_controller.cpp` are edited by many sessions;
+  the Forge GUI's translation catalogues carry a line-number gate that restamps on unrelated
+  edits. Each karaoke PR is small and rebased on a fresh `main`.
+- **No oracle.** A shared misreading of an annex table would pass every test here. The table pages
+  were read as images when the library was written; the tests were transcribed from them again.
+- **Passthrough surprises.** A singer who sends the stream to a receiver hears the vocals from
+  the rear speakers unless the receiver is karaoke-capable. P7 states it rather than hiding it.
+- **Stereo fold.** Hearth's Lt/Rt fold has no Annex C reproduction (P8); a user with it set
+  will find karaoke "not working" unless the page says why.
 
 ## Later, not v1
 
@@ -136,31 +308,20 @@ Recorded so a later phase starts from the owner's words and the open questions, 
 
 ## Open questions
 
+Research, not specification: none of these is a v1 requirement.
+
 1. **Microphone.** "How we deal with the microphone input is a question we need to understand."
    Two things to start the note from: a synchronised Sendspin group plays each chunk at a time
    after it is sent, so a singer monitoring their own voice would have to hear it locally and not
    through the group; and `libs/audio` has a live capture path, built for capturing a programme,
    whose fit for a microphone (latency, echo, where the voice is mixed) is part of the
-   question. This is a research note in the specification, not v1 work.
-2. **What the screen shows for MP4 / MKV.** v1 shows lyrics from a `.lrc` file. A karaoke MP4 may
-   carry a video track; whether Hearth should play it is not decided and is not in v1.
-3. **The reference view and the singer view: one page or two** (and how the Karaoke page relates
-   to the Decoder page's controls). Design question for Phase 2.
-4. **Default reproduction.** Annex C leaves a decoder free to be aware or capable. Which Hearth
-   starts in, and whether a non-karaoke stream ever shows the controls, are specification
-   questions.
-5. **Authoring input.** What the Forge page takes: one multichannel file whose speakers are
-   already L M R V1 V2 (the WAV speaker mask in #1263 makes that unambiguous), or separate mono
-   and stereo files.
-6. **Lyrics format limits.** LRC is informal: enhanced (word-level) tags, several time stamps per
-   line, offsets, encodings. The specification names what v1 reads and what it ignores.
-
-## Verification
-
-There is no outside oracle. Checks are against Annex C's tables as transcribed independently in
-the tests, the library's round trip through `forge encode ... bsmod=7` and `forge decode ...
-karaoke`, QML tests of the pages, and a recorded manual pass of the player with a generated
-stream. The specification states which requirement is checked how.
+   question.
+2. **The picture of a karaoke MP4.** A karaoke MP4 may carry a video track; whether Hearth should
+   play it is not decided and is not in v1.
+3. **Lyrics inside the container.** A timed-text track in MP4 or Matroska is another source of
+   lyrics; v1 reads the sidecar only.
+4. **The ESP32 display.** Which interface, which board, and whether the screen shows generated
+   lyrics or a video, once the owner has chosen the hardware.
 
 ## Working rules for this programme
 
