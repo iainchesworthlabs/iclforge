@@ -81,12 +81,14 @@ words:
 - a file that times lines and not words has each whole line emphasised as it is sung, and no word
   times are invented;
 - a file with no times is shown whole and is not followed;
-- with no file, the page says which name it looks for; a file that is not UTF-8 is not shown, and
-  playback is not affected.
+- with no file, the page says which name it looks for; a file that is not UTF-8 or UTF-16 is not shown,
+  and playback is not affected.
 
 The format is LRC: `[mm:ss.xx]` for a line, the enhanced `<mm:ss.xx>` tag before a word, and
 `[offset:]`, `[ti:]`, `[ar:]`, `[al:]`, `[by:]` and `[length:]`. The text is UTF-8, with or
-without a byte-order mark.
+without a byte-order mark, or UTF-16 with one, in either byte order (what an editor saves as
+"Unicode"), so Hebrew and Yiddish files read as they are. A file in an 8-bit code page such as
+Windows-1255 is not read: save it as UTF-8 or UTF-16.
 
 **Lyric delay** in Settings (Playback), from -1,000 to +1,000 ms in steps of 10, is added to the
 file's own timing; a positive value shows the words later. A bluetooth speaker or a receiver with

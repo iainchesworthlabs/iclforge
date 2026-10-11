@@ -159,6 +159,14 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
+  was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
+  the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
+  An `.lrc` saved as UTF-16 with a byte-order mark, in either order, is read as the UTF-8 it
+  becomes, which is how an editor saves a Hebrew or a Yiddish file as "Unicode"; UTF-32 and an
+  8-bit code page such as Windows-1255 are still refused by name and not guessed at. White space
+  is ASCII white space whatever the locale, so a line that ends in a letter whose UTF-8 ends in
+  `0xA0` (nun, among others) keeps it. The namespace is `iclforge::lyrics`; nothing else changes.
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the

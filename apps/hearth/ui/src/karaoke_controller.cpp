@@ -11,9 +11,21 @@
 #include <string>
 #include <utility>
 
-#include "lyrics.hpp"
+#include "iclforge/lyrics/lyrics.hpp"
 
 namespace iclforge::hearth::ui {
+
+// The reader and the cursor are libs/lyrics' (planning/karaoke-phase2.md, W13a), which Hearth's
+// window shares with the other programs that read lyrics.
+using iclforge::lyrics::find_lyrics_file;
+using iclforge::lyrics::LyricLine;
+using iclforge::lyrics::LyricPosition;
+using iclforge::lyrics::Lyrics;
+using iclforge::lyrics::LyricWord;
+using iclforge::lyrics::lyric_position;
+using iclforge::lyrics::read_lyrics;
+using iclforge::lyrics::word_state;
+using iclforge::lyrics::WordState;
 
 namespace {
 

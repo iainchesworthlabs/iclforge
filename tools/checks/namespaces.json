@@ -9,6 +9,7 @@
     "containers": ["containers"],
     "dsp": ["dsp", "internal"],
     "iab": ["iab"],
+    "lyrics": ["lyrics"],
     "objects": ["objects"],
     "render": ["render", "spatial"],
     "sendspin": ["sendspin"]

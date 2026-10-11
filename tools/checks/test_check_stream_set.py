@@ -340,6 +340,29 @@ class PlayCommandTest(unittest.TestCase):
                                        "http://h/ac3-51-44k.ac3"])
         self.assertNotIn("714-aht", out)
 
+    def test_only_plays_the_named_streams_a_psram_one_included(self):
+        lines = {"714-aht.ec3": play_lines("714-aht.ec3", LEVELS_51, units=16),
+                 "51-tpn.ec3": play_lines("51-tpn.ec3", LEVELS_51, units=15, held=1)}
+        code, out = self.run_play(self.device(lines), "--only", "714-aht.ec3, 51-tpn.ec3")
+        self.assertEqual(code, 0, out)
+        # In the manifest's order, and nothing else: not layout-51 and not the refused one.
+        self.assertEqual(self.posted, ["http://h/51-tpn.ec3", "http://h/714-aht.ec3"])
+        self.assertIn("714-aht.ec3: ok", out)
+
+    def test_only_checks_a_psram_stream_like_any_other(self):
+        lines = {"714-aht.ec3": play_lines("714-aht.ec3", LEVELS_51, units=12)}
+        code, out = self.run_play(self.device(lines), "--only", "714-aht.ec3")
+        self.assertEqual(code, 1)
+        self.assertIn("12 access units decoded, the stream has 16", out)
+
+    def test_only_with_a_name_the_manifest_lacks_is_a_usage_error(self):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as raised:
+            self.run_play(self.device({}), "--only", "layout-51.ec3,nope.ec3")
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("nope.ec3", err.getvalue())
+        self.assertEqual(self.posted, [])
+
     def test_status_disagreement_and_bad_status_fail(self):
         status = {"layout-51.ec3": {"stream": {"layout": "5.1"}}, "51-tpn.ec3": "garbage"}
         code, out = self.run_play(self.device(self.GOOD, status))

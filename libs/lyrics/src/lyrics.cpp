@@ -1,13 +1,14 @@
-#include "lyrics.hpp"
+#include "iclforge/lyrics/lyrics.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <system_error>
 #include <utility>
 
-namespace iclforge::hearth {
+namespace iclforge::lyrics {
 
 namespace {
 
@@ -16,8 +17,12 @@ namespace {
 constexpr std::int64_t kLastLineMs = 5000;
 constexpr std::uintmax_t kMaxFileBytes = 4U * 1024U * 1024U;
 
+// ASCII white space only, whatever the locale: a byte of a UTF-8 sequence is not
+// white space in any locale's table that matters here, but a Latin-1 locale
+// calls 0xA0 one, and 0xA0 ends U+05E0 (nun) and a hundred other Hebrew and
+// Yiddish letters. The line's trailing letter must survive being trimmed.
 [[nodiscard]] bool is_space(char c) {
-    return std::isspace(static_cast<unsigned char>(c)) != 0;
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
 }
 
 [[nodiscard]] std::string_view trim(std::string_view s) {
@@ -34,6 +39,58 @@ constexpr std::uintmax_t kMaxFileBytes = 4U * 1024U * 1024U;
     std::string out(s);
     for (char& c : out) {
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return out;
+}
+
+// UTF-16, the bytes after a byte-order mark, as UTF-8; nothing for an odd
+// length or a surrogate that is not paired. A noncharacter is as valid as any
+// other code point here, as it is in UTF-8's own check below.
+[[nodiscard]] std::optional<std::string> utf16_to_utf8(std::string_view bytes, bool big_endian) {
+    if (bytes.size() % 2 != 0) {
+        return std::nullopt;
+    }
+    const auto unit_at = [&](std::size_t i) {
+        const auto first = static_cast<std::uint32_t>(static_cast<unsigned char>(bytes[i]));
+        const auto second = static_cast<std::uint32_t>(static_cast<unsigned char>(bytes[i + 1]));
+        return big_endian ? (first << 8) | second : (second << 8) | first;
+    };
+    std::string out;
+    out.reserve(bytes.size());
+    const auto append = [&out](std::uint32_t code) {
+        if (code < 0x80) {
+            out += static_cast<char>(code);
+        } else if (code < 0x800) {
+            out += static_cast<char>(0xC0 | (code >> 6));
+            out += static_cast<char>(0x80 | (code & 0x3F));
+        } else if (code < 0x10000) {
+            out += static_cast<char>(0xE0 | (code >> 12));
+            out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+            out += static_cast<char>(0x80 | (code & 0x3F));
+        } else {
+            out += static_cast<char>(0xF0 | (code >> 18));
+            out += static_cast<char>(0x80 | ((code >> 12) & 0x3F));
+            out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+            out += static_cast<char>(0x80 | (code & 0x3F));
+        }
+    };
+    for (std::size_t i = 0; i < bytes.size(); i += 2) {
+        const std::uint32_t unit = unit_at(i);
+        if (unit >= 0xD800 && unit <= 0xDBFF) {
+            if (i + 3 >= bytes.size()) {
+                return std::nullopt;
+            }
+            const std::uint32_t low = unit_at(i + 2);
+            if (low < 0xDC00 || low > 0xDFFF) {
+                return std::nullopt;
+            }
+            append(0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00));
+            i += 2;
+        } else if (unit >= 0xDC00 && unit <= 0xDFFF) {
+            return std::nullopt;
+        } else {
+            append(unit);
+        }
     }
     return out;
 }
@@ -260,11 +317,27 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
 
 std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
                                                 std::optional<std::int64_t> duration_ms) {
+    // UTF-32 would begin with the same two bytes as UTF-16's little-endian mark,
+    // then two zero bytes; no lyrics file starts with a NUL character.
+    if (text.starts_with(std::string_view{"\xFF\xFE\x00\x00", 4}) ||
+        text.starts_with(std::string_view{"\x00\x00\xFE\xFF", 4})) {
+        return std::unexpected(std::string{"The lyrics file is UTF-32, which is not read. Save it as UTF-8 or UTF-16."});
+    }
+    std::string converted;
+    if (text.starts_with("\xFF\xFE") || text.starts_with("\xFE\xFF")) {
+        const bool big_endian = static_cast<unsigned char>(text[0]) == 0xFE;
+        auto utf8 = utf16_to_utf8(text.substr(2), big_endian);
+        if (!utf8) {
+            return std::unexpected(std::string{"The lyrics file is not valid UTF-16."});
+        }
+        converted = std::move(*utf8);
+        text = converted;
+    }
     if (text.starts_with("\xEF\xBB\xBF")) {
         text.remove_prefix(3);
     }
     if (!valid_utf8(text)) {
-        return std::unexpected(std::string{"The lyrics file is not UTF-8."});
+        return std::unexpected(std::string{"The lyrics file is not UTF-8 or UTF-16."});
     }
     if (trim(text).empty()) {
         return std::unexpected(std::string{"The lyrics file is empty."});
@@ -514,4 +587,4 @@ WordState word_state(const LyricWord& word, std::int64_t position_ms) {
     return position_ms >= word.start_ms ? WordState::kBeingSung : WordState::kNotYetSung;
 }
 
-}  // namespace iclforge::hearth
+}  // namespace iclforge::lyrics

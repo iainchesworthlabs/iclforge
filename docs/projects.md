@@ -31,6 +31,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `device` (internal) | `libs/device/` | The device-side logic of the ESP32 sinks and players that needs no SDK, so that the host tests it: the interleave and the slot conversion, the playout and DAC queue models, the sink planner, the Improv provisioning protocol, the pairing records and the firmware image rules. Header-only. Internal; never installed. | nothing | `esp-idf`, `hearth`, `hearth-sink` | core |
 | `dsp` | `libs/dsp/` | The signal processing more than one library uses: the FFT, the QMF bank, the offline sample-rate converter and filter sections, and the tiered (float and fixed-point) kernels AC-4 builds at its decode tier. | `base` | `ac3`, `ac4`, `baremetal`, `esp-idf`, `forge`, `objects`, `tests` | core |
 | `iab` | `libs/iab/` | SMPTE ST 2098-2 Immersive Audio Bitstream reading and writing, as bare bitstreams and in MXF. | `base` | `adm`, `examples`, `forge` | core |
+| `lyrics` (internal) | `libs/lyrics/` | Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words, the file's place beside a media item, and the stateless cursor that says which line and word a playing position is in. Standard library only, so that Hearth, Crucible, the sink firmware and the browser can all link it. Internal; never installed. | nothing | `hearth` | core |
 | `objects` | `libs/objects/` | The object-audio model: an object's position and path over time, the placement an encoder is handed each frame, and the Object Audio Metadata payload of ETSI TS 103 420 with the EMDF container it travels in. | `base`, `dsp` | `ac3`, `ac4`, `adm`, `app-media`, `audio`, `baremetal`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `render` | core |
 | `render` | `libs/render/` | From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it. | `base`, `objects` | `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink` | core |
 | `sendspin` (internal) | `libs/sendspin/` | The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed. | `time-filter` | `esp-idf`, `hearth`, `hearth-sink` | core |
@@ -58,7 +59,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `demo-android` | `apps/demos/android/` | The Android (Shield) demo application. | `ac3`, `audio`, `base`, `containers` | nothing | android |
 | `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `objects` | nothing | wasm |
 | `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `objects`, `render`, `app-media`, `app-preferences`, `app-project`, `app-theme` | nothing | windows, linux, macos |
-| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `objects`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
+| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 
 ## Bindings
 
@@ -108,6 +109,7 @@ flowchart LR
     device(["device"])
     dsp["dsp"]
     iab["iab"]
+    lyrics(["lyrics"])
     objects["objects"]
     render["render"]
     sendspin(["sendspin"])
