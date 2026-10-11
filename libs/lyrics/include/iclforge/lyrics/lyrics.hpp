@@ -109,12 +109,71 @@ struct Lyrics {
 [[nodiscard]] std::expected<Lyrics, std::string> parse_lyrics(
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
 
-// A file's lyrics. A file over four MiB is refused, which no lyric file is.
+// A SubRip (`.srt`) file read as lyrics (planning/karaoke-phase2.md, W13c): the cues of
+//
+//   1
+//   00:00:12,000 --> 00:00:15,500
+//   Should auld acquaintance
+//   be forgot
+//
+// as lines. A cue is a start and an END, which a SubRip file really has and an LRC file does not,
+// so a line ends where its cue does and there is a gap between lines where the cues leave one:
+// nothing is being sung then, and the view says so. A cue's text lines are joined with a space, the
+// styling a subtitle carries (`<i>`, `<b>`, `<u>`, `<font ...>`, and the `{...}` override blocks
+// some tools write) is dropped, and the position tags after an end time are ignored. The number
+// above a cue is not needed (a file without them reads), `.` is taken for `,` in a time, and cues out
+// of order are put in order of their start. A cue with no text is a time that marks nothing and is
+// kept as an empty line, as the LRC reader keeps one. There are no words in a SubRip file, so no
+// word times are invented: a view emphasises the whole line.
+//
+// The same encodings as parse_lyrics (UTF-8 with or without a byte-order mark, or UTF-16 with one),
+// and the same errors, with "no cues" for a file that has none.
+[[nodiscard]] std::expected<Lyrics, std::string> parse_subrip(
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+
+// An Advanced SubStation Alpha (`.ass`) file read as lyrics (planning/karaoke-phase2.md, W13d). Its
+// `Dialogue:` events are lines, with the start and the end the event has (so, as in SubRip, a gap
+// between events is nothing being sung), and the karaoke override tags are word times:
+//
+//   Dialogue: 0,0:00:12.00,0:00:15.50,Default,,0,0,0,,{\k50}Should {\k30}auld {\k80}acquaint{\k20}ance
+//
+// Each `{\k<cs>}` (and `\kf`, `\K`, `\ko`, the same duration drawn differently) begins a
+// syllable that lasts that many hundredths of a second after the one before, from the event's start;
+// a syllable is a word of the line, with its own start and end, so the fill moves by syllable. The
+// text before the first tag is a word of no length. Everything else in an override block is
+// dropped, `{\N}` is a space, an event that draws (`{\p1}`) and a `Comment:` are not lyrics, and
+// the column order is the file's own `Format:` line (the v4+ order where it has none). An event
+// with no karaoke tags is a line without words. Encodings and errors are parse_lyrics's.
+[[nodiscard]] std::expected<Lyrics, std::string> parse_ass(
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+
+// The words of a MIDI karaoke file (`.kar`, a Standard MIDI File; planning/karaoke-phase2.md, W13e),
+// whose BYTES are given: syllables as Text (or Lyric) meta events, each at its tick, turned into
+// milliseconds through the file's tempo map. The words are taken from the track named "Words" where
+// there is one, else from the Lyric events, else from the Text events; the `@T` lines are the title
+// and the artist (the first and the second) and the other `@` lines are not words. A `/` begins a new
+// line and a `\` a new verse (a line too, here), and a syllable that begins with a space is
+// joined to the one before it, so a word is a syllable, with its own start and end, and the fill
+// moves by syllable. A line ends where the next begins. Only the words are read: the music in the
+// file is not, and a file with SMPTE time, no words, or words that are not UTF-8 (a MIDI file
+// carries no word of its encoding; Latin-1 and code pages are not guessed at) says so.
+[[nodiscard]] std::expected<Lyrics, std::string> parse_midi_karaoke(
+    std::string_view bytes, std::optional<std::int64_t> duration_ms = std::nullopt);
+
+// Any of the above, by what the file is: MIDI karaoke where it begins `MThd`, ASS where it has a
+// `Dialogue:` event, SubRip where it has a cue's `-->` line between two times, LRC otherwise. What a
+// program that is handed a timed-text file by a person, whose extension may be anything, calls.
+[[nodiscard]] std::expected<Lyrics, std::string> parse_timed_text(
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+
+// A file's lyrics (parse_timed_text of its bytes). A file over four MiB is refused, which no lyric
+// file is.
 [[nodiscard]] std::expected<Lyrics, std::string> read_lyrics(
     const std::filesystem::path& file, std::optional<std::int64_t> duration_ms = std::nullopt);
 
 // The lyrics file of a media item (L1): `name.lrc` in the item's folder, the
-// extension in any case. `item_path` is the item's path as the queue holds it.
+// extension in any case, and where there is none `name.srt`, then `name.ass`, then `name.kar`.
+// `item_path` is the item's path as the queue holds it.
 [[nodiscard]] std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path);
 
 // Whether any line has a singer: the file is a duet and a view shows who sings what.

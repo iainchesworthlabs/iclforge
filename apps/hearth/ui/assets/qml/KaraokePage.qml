@@ -38,6 +38,16 @@ ScrollView {
     readonly property string codec: root.media.codec ?? ""
     readonly property string reproduction: root.settings.karaoke ?? "aware"
     readonly property string vocals: root.settings.karaokeVocals ?? "both"
+    // The level of each part against Table C.2.3, in dB (capable only), and the
+    // span of the controls: the bottom is off (ac3::kKaraokeMinLevelDb and
+    // kKaraokeMaxLevelDb, iclforge/ac3/decoder/output.hpp).
+    readonly property real minLevelDb: -24
+    readonly property real maxLevelDb: 12
+    readonly property real melodyDb: root.settings.karaokeMelodyDb ?? 0
+    readonly property real vocal1Db: root.settings.karaokeVocal1Db ?? 0
+    readonly property real vocal2Db: root.settings.karaokeVocal2Db ?? 0
+    readonly property bool anyLevelMoved: root.melodyDb !== 0 || root.vocal1Db !== 0
+                                          || root.vocal2Db !== 0
     // The output's mode, bound to the engine's. A suite may set it, to show the
     // notice a bitstream output earns without a receiver to take one.
     property string outputMode: HearthController.outputFormat.mode ?? "none"
@@ -64,6 +74,25 @@ ScrollView {
         HearthController.setDecoderSettings(next);
     }
 
+    // A duet (planning/karaoke-phase2.md, W11b): which lines the vocal that is playing sings,
+    // and so which are left for you.
+    function duetSummary() {
+        const first = KaraokeController.firstSingerLabel;
+        const second = KaraokeController.secondSingerLabel;
+        if (!root.isKaraoke) {
+            return qsTr("The lines are marked for %1 and for %2.").arg(first).arg(second);
+        }
+        if (root.reproduction !== "capable" || root.vocals === "both") {
+            return qsTr("Both vocals play, so %1 and %2 are both in the mix.").arg(first).arg(second);
+        }
+        if (root.vocals === "none") {
+            return qsTr("No vocal plays: you sing the lines of %1 and of %2.").arg(first).arg(second);
+        }
+        return root.vocals === "v1"
+            ? qsTr("The vocal of %1 plays: you sing the lines of %2.").arg(first).arg(second)
+            : qsTr("The vocal of %1 plays: you sing the lines of %2.").arg(second).arg(first);
+    }
+
     function clock(ms) {
         const seconds = Math.max(0, Math.floor(ms / 1000));
         return Math.floor(seconds / 60) + ":" + ("0" + (seconds % 60)).slice(-2);
@@ -77,21 +106,60 @@ ScrollView {
         return cut >= 0 ? path.substring(cut + 1) : path;
     }
 
+    // A part pulled to the bottom of its control is off. Only the capable
+    // decoder has levels: the aware and as-coded columns play the stream's own.
+    function off(part) {
+        if (root.reproduction !== "capable") {
+            return false;
+        }
+        const db = part === "M" ? root.melodyDb : (part === "V1" ? root.vocal1Db : root.vocal2Db);
+        return db <= root.minLevelDb;
+    }
+
+    // Whether a level control has anything to act on: the stream has the part
+    // and the vocals chosen include it. With no stream loaded they are open,
+    // as the vocals' own choice is.
+    function levelApplies(part) {
+        if (!root.isKaraoke) {
+            return true;
+        }
+        if (root.parts.indexOf(part) < 0) {
+            return false;
+        }
+        if (part === "V1") {
+            return root.vocals === "v1" || root.vocals === "both";
+        }
+        if (part === "V2") {
+            return root.vocals === "v2" || root.vocals === "both";
+        }
+        return true;
+    }
+
+    function levelText(db) {
+        if (db <= root.minLevelDb) {
+            return qsTr("off");
+        }
+        return qsTr("%1 dB").arg((db > 0 ? "+" : "") + Math.round(db));
+    }
+
     // Whether a part of the stream is heard under the current choice.
     function heard(part) {
         if (!root.isKaraoke || root.parts.indexOf(part) < 0) {
             return false;
         }
-        if (part === "L" || part === "R" || part === "M") {
+        if (part === "L" || part === "R") {
             return true;
+        }
+        if (part === "M") {
+            return !root.off("M");
         }
         if (root.reproduction !== "capable") {
             return true;  // as coded and aware both play the vocals
         }
         if (part === "V1") {
-            return root.vocals === "v1" || root.vocals === "both";
+            return !root.off("V1") && (root.vocals === "v1" || root.vocals === "both");
         }
-        return root.vocals === "v2" || root.vocals === "both";
+        return !root.off("V2") && (root.vocals === "v2" || root.vocals === "both");
     }
 
     // Which parts reach which speaker (Annex C, Tables C.2.2 and C.2.3), as
@@ -103,9 +171,10 @@ ScrollView {
         if (!root.isKaraoke) {
             return out;
         }
-        const v1 = root.hasVocal1;
-        const v2 = root.hasVocal2;
-        const melody = root.hasMelody;
+        // A part pulled to off is not where it would be.
+        const v1 = root.hasVocal1 && !root.off("V1");
+        const v2 = root.hasVocal2 && !root.off("V2");
+        const melody = root.hasMelody && !root.off("M");
         // Played as coded to a layout that is not folded, each part is where
         // its coded position puts it: the melody in the centre, and the
         // vocals in the surrounds (a single surround sounds from both).
@@ -313,6 +382,76 @@ ScrollView {
                         }
                     }
 
+                    // The level of each part (Annex C.2.3's "additional
+                    // flexibility", the capable decoder's).
+                    Repeater {
+                        model: [
+                            { part: "M", key: "karaokeMelodyDb", label: qsTr("Melody") },
+                            { part: "V1", key: "karaokeVocal1Db", label: qsTr("Vocal 1") },
+                            { part: "V2", key: "karaokeVocal2Db", label: qsTr("Vocal 2") }
+                        ]
+                        delegate: RowLayout {
+                            id: levelRow
+                            required property var modelData
+                            readonly property real db: root.settings[levelRow.modelData.key] ?? 0
+                            Layout.fillWidth: true
+                            spacing: Theme.gap
+                            Text { text: levelRow.modelData.label; color: Theme.text; font.pixelSize: Theme.fontNormal
+                                   elide: Text.ElideRight; Layout.preferredWidth: Math.round(108 * Theme.fontScale) }
+                            AppSlider {
+                                id: levelSlider
+                                objectName: "level-" + levelRow.modelData.part
+                                Layout.preferredWidth: Math.round(200 * Theme.fontScale)
+                                enabled: root.applicable && root.reproduction === "capable"
+                                         && root.levelApplies(levelRow.modelData.part)
+                                from: root.minLevelDb; to: root.maxLevelDb; stepSize: 1
+                                snapMode: Slider.SnapAlways
+                                value: levelRow.db
+                                Accessible.name: qsTr("%1 level, dB").arg(levelRow.modelData.label)
+                                onMoved: root.set(levelRow.modelData.key, value)
+                                // A drag writes `value` directly and the binding
+                                // above is gone, so it is resynced from the
+                                // controller - DecoderAc4.qml's sliders' shape.
+                                Connections {
+                                    target: HearthController
+                                    function onDecoderSettingsChanged() {
+                                        levelSlider.value = levelRow.db;
+                                    }
+                                }
+                            }
+                            Text {
+                                objectName: "levelText-" + levelRow.modelData.part
+                                text: root.levelText(levelRow.db)
+                                color: Theme.textMuted
+                                font.family: Theme.monoFamily
+                                font.pixelSize: Theme.fontNormal
+                            }
+                            Item { Layout.fillWidth: true }
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.gap
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTr("Each part's level against Table C.2.3: 0 dB is the table, and "
+                                       + "the bottom of the control is off. Raising one part far enough "
+                                       + "lowers the others, so that no speaker is driven past full scale. "
+                                       + "The capable decoder only.")
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSmall
+                            wrapMode: Text.WordWrap
+                        }
+                        Button {
+                            objectName: "resetLevelsButton"
+                            text: qsTr("Reset levels")
+                            enabled: root.anyLevelMoved
+                            onClicked: HearthController.setDecoderSettings({
+                                karaokeMelodyDb: 0, karaokeVocal1Db: 0, karaokeVocal2Db: 0
+                            })
+                        }
+                    }
+
                     // The reasons a choice does not apply, in words, each with
                     // the one thing that fixes it.
                     Text {
@@ -416,11 +555,20 @@ ScrollView {
                             elide: Text.ElideMiddle
                         }
                         AppButton {
+                            objectName: "timeLyricsButton"
+                            enabled: root.loaded
+                            text: qsTr("Time the lyrics…")
+                            onClicked: timingDialog.open()
+                        }
+                        AppButton {
                             objectName: "lyricsFullScreenButton"
                             text: qsTr("Full screen · F11")
                             onClicked: root.lyricsFullScreenRequested()
                         }
                     }
+
+                    // Stamps the words of the item as it plays (planning/karaoke-phase2.md, W6).
+                    LyricTimingDialog { id: timingDialog }
 
                     LyricView {
                         id: lyricView
@@ -436,13 +584,76 @@ ScrollView {
                         visible: text.length > 0
                         text: KaraokeController.status === "plain"
                               ? qsTr("These lyrics have no times, so they are shown whole and not followed.")
-                              : (KaraokeController.status === "timed" && !KaraokeController.wordTimed
-                                 ? qsTr("This file times lines, not words: a whole line is emphasised as it "
-                                        + "is sung.")
-                                 : "")
+                              : (KaraokeController.status === "picture"
+                                 ? qsTr("This is the picture of a CD+G disc. Its words are part of the "
+                                        + "picture, so there is no text to follow.")
+                                 : (KaraokeController.status === "timed" && !KaraokeController.wordTimed
+                                    ? qsTr("This file times lines, not words: a whole line is emphasised "
+                                           + "as it is sung.")
+                                    : ""))
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
                         wrapMode: Text.WordWrap
+                    }
+
+                    // A duet: the file marks who sings which line. Two names, typed for this
+                    // run of the app and never kept for a song, say who V1 and V2 are, and one
+                    // sentence says which lines the vocal that is playing sings.
+                    ColumnLayout {
+                        objectName: "duetBlock"
+                        Layout.fillWidth: true
+                        visible: KaraokeController.hasSingers
+                        spacing: Theme.gap
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.gap
+                            Text { text: qsTr("First singer"); color: Theme.text; font.pixelSize: Theme.fontNormal
+                                   elide: Text.ElideRight; Layout.preferredWidth: Math.round(108 * Theme.fontScale) }
+                            AppTextField {
+                                id: firstSingerField
+                                objectName: "firstSingerField"
+                                Layout.fillWidth: true
+                                placeholderText: KaraokeController.fileFirstSingerName.length > 0
+                                                 ? KaraokeController.fileFirstSingerName : "V1"
+                                text: KaraokeController.firstSingerName
+                                Accessible.name: qsTr("Name of the first singer (V1)")
+                                onEditingFinished: KaraokeController.firstSingerName = text
+                            }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.gap
+                            Text { text: qsTr("Second singer"); color: Theme.text; font.pixelSize: Theme.fontNormal
+                                   elide: Text.ElideRight; Layout.preferredWidth: Math.round(108 * Theme.fontScale) }
+                            AppTextField {
+                                id: secondSingerField
+                                objectName: "secondSingerField"
+                                Layout.fillWidth: true
+                                placeholderText: KaraokeController.fileSecondSingerName.length > 0
+                                                 ? KaraokeController.fileSecondSingerName : "V2"
+                                text: KaraokeController.secondSingerName
+                                Accessible.name: qsTr("Name of the second singer (V2)")
+                                onEditingFinished: KaraokeController.secondSingerName = text
+                            }
+                        }
+                        Text {
+                            objectName: "duetSummary"
+                            Layout.fillWidth: true
+                            text: root.duetSummary()
+                            color: Theme.text
+                            font.pixelSize: Theme.fontSmall
+                            wrapMode: Text.WordWrap
+                        }
+                        // A drag or a keystroke broke the bindings above: the controller is the
+                        // one place the names are held.
+                        Connections {
+                            target: KaraokeController
+                            function onSingerNamesChanged() {
+                                firstSingerField.text = KaraokeController.firstSingerName;
+                                secondSingerField.text = KaraokeController.secondSingerName;
+                            }
+                        }
                     }
                 }
             }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -224,6 +226,28 @@ struct OutputConfig {
     double karaoke_vocal1_gain = 1.0;
     double karaoke_vocal2_gain = 1.0;
 };
+
+// What a person-facing level control for a karaoke part spans, in dB against Table C.2.3
+// (OutputConfig::karaoke_*_gain are the same levels in linear terms). The bottom of the span
+// is off - a singer who pulls the melody all the way down wants it gone, not 24 dB quieter -
+// and the top is 12 dB over the table. Hearth's Karaoke page, its settings, the wire's
+// karaoke_*_db keys and a sink's decoder all use this one span and this one conversion, so a
+// level means the same on every one of them.
+inline constexpr double kKaraokeMinLevelDb = -24.0;
+inline constexpr double kKaraokeMaxLevelDb = 12.0;
+
+// A level in dB held to that span. A value that is not a number is 0 dB, the table's: the
+// gains above mute one, and a stray NaN from a settings file must not silence the melody.
+[[nodiscard]] inline double karaoke_level_db(double db) {
+    return std::isnan(db) ? 0.0 : std::clamp(db, kKaraokeMinLevelDb, kKaraokeMaxLevelDb);
+}
+
+// That level as the linear gain OutputConfig takes: 0.0 (off) at the bottom of the span, and
+// exactly 1.0 for 0 dB.
+[[nodiscard]] inline double karaoke_gain_from_db(double db) {
+    const double held = karaoke_level_db(db);
+    return held <= kKaraokeMinLevelDb ? 0.0 : std::pow(10.0, held / 20.0);
+}
 
 // What the stream itself says about folding down, resolved from whichever
 // syntax carried it. AC-3 carries two coarse levels in bsi and nothing about

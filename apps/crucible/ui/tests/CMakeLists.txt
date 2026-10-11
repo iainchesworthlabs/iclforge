@@ -17,6 +17,8 @@ qt_add_executable(crucible_qmltests
     ui/tests/qml_test_main.cpp
     ui/src/crucible_controller.cpp
     ui/src/crucible_controller.hpp
+    ui/src/lyrics_controller.cpp
+    ui/src/lyrics_controller.hpp
     ui/src/app_entry.hpp
     ui/src/app_icon_provider.hpp
     ui/src/tray_support.hpp
@@ -87,6 +89,7 @@ target_compile_definitions(crucible_qmltests PRIVATE WIN32_LEAN_AND_MEAN NOMINMA
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/ui/tests/qml")
 target_link_libraries(crucible_qmltests PRIVATE
     iclforge::crucible_engine
+    iclforge::lyrics
     iclforge::coverage
     Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::QuickTest Qt6::Widgets
     ${ICLFORGE_CRUCIBLE_QUICK3D_LIB})

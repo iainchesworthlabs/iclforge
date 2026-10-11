@@ -1849,6 +1849,30 @@ std::vector<double> response(const ac3::OutputConfig& config, ac3::Acmod acmod, 
 
 }  // namespace
 
+TEST_CASE("karaoke levels: the span and the dB conversion every control and the wire share",
+          "[decoder][output][karaoke][releveling]") {
+    using Catch::Approx;
+    // 0 dB is the table, exactly, so the default settings change no output.
+    CHECK(ac3::karaoke_gain_from_db(0.0) == 1.0);
+    CHECK(ac3::karaoke_gain_from_db(-6.0) == Approx(0.5011872336272722));
+    CHECK(ac3::karaoke_gain_from_db(12.0) == Approx(3.981071705534972));
+    // The bottom of the span is off, and a step above it is a level.
+    CHECK(ac3::karaoke_gain_from_db(ac3::kKaraokeMinLevelDb) == 0.0);
+    CHECK(ac3::karaoke_gain_from_db(ac3::kKaraokeMinLevelDb + 1.0) > 0.0);
+    CHECK(ac3::karaoke_gain_from_db(-90.0) == 0.0);
+    CHECK(ac3::karaoke_gain_from_db(-std::numeric_limits<double>::infinity()) == 0.0);
+    // The top holds, a value that is not a number is the table's, and infinity is the top.
+    CHECK(ac3::karaoke_gain_from_db(40.0) == ac3::karaoke_gain_from_db(12.0));
+    CHECK(ac3::karaoke_gain_from_db(std::numeric_limits<double>::infinity()) ==
+          ac3::karaoke_gain_from_db(12.0));
+    CHECK(ac3::karaoke_gain_from_db(std::numeric_limits<double>::quiet_NaN()) == 1.0);
+    // The held level is what a settings message carries.
+    CHECK(ac3::karaoke_level_db(40.0) == 12.0);
+    CHECK(ac3::karaoke_level_db(-90.0) == -24.0);
+    CHECK(ac3::karaoke_level_db(std::numeric_limits<double>::quiet_NaN()) == 0.0);
+    CHECK(ac3::karaoke_level_db(-6.5) == -6.5);
+}
+
 TEST_CASE("karaoke re-levelling: a gain of 1.0 is the table as it was, for every mode and choice",
           "[decoder][output][karaoke][capable][releveling]") {
     for (const auto acmod : {ac3::Acmod::k2_1, ac3::Acmod::k3_1, ac3::Acmod::k2_2, ac3::Acmod::k3_2}) {

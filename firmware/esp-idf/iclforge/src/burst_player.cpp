@@ -453,6 +453,17 @@ struct BurstPlayer::Impl {
                                             : *d.karaoke_vocals == ac::KaraokeVocals::kV2 ? iclforge::ac3::KaraokeVocals::kV2
                                                                                           : iclforge::ac3::KaraokeVocals::kBoth;
         }
+        // The capable reproduction's part levels, in dB against Table C.2.3; the library's own
+        // span and conversion, so a level is what Hearth's page and its decode mean by it.
+        if (d.karaoke_melody_db) {
+            decoder.output.karaoke_melody_gain = iclforge::ac3::karaoke_gain_from_db(*d.karaoke_melody_db);
+        }
+        if (d.karaoke_vocal1_db) {
+            decoder.output.karaoke_vocal1_gain = iclforge::ac3::karaoke_gain_from_db(*d.karaoke_vocal1_db);
+        }
+        if (d.karaoke_vocal2_db) {
+            decoder.output.karaoke_vocal2_gain = iclforge::ac3::karaoke_gain_from_db(*d.karaoke_vocal2_db);
+        }
         iclforge::ac3::DownmixTarget fold = config.stereo_fold;
         if (d.downmix) {
             fold = *d.downmix == ac::Downmix::kLtRt ? iclforge::ac3::DownmixTarget::kLtRt : iclforge::ac3::DownmixTarget::kLoRo;

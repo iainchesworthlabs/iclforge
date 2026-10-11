@@ -83,6 +83,23 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **A sink that decodes a karaoke stream itself applies the part levels.** The Sendspin
+  extension's decoder settings take three more keys, `karaoke_melody_db`, `karaoke_vocal1_db` and
+  `karaoke_vocal2_db` (-24.0, which is off, to 12.0 dB against Table C.2.3), which a sink lists
+  when it has them. Hearth tells a sink that lists them the levels that change what is heard,
+  with the choice, before the stream starts and when they change while the item plays; a sink
+  that has the reproduction and not a level's key is sent PCM decoded in Hearth as soon as that
+  level is moved, so a group plays one set of levels. The ESP32 sink firmware applies them. The
+  dB span and its conversion to the library's linear gains are one pair of functions in
+  `iclforge/ac3/decoder/output.hpp` (`karaoke_gain_from_db()`), used by Hearth, the wire and the
+  firmware (planning/karaoke-phase2.md, W10).
+- **Hearth's Karaoke page sets the level of the melody and of each vocal.** Under the capable
+  reproduction, three sliders move M, V1 and V2 from 24 dB below Table C.2.3 (off) to 12 dB above
+  it, with **Reset levels**; a part that is off is listed as muted and a vocal the stream lacks or
+  the Vocals choice leaves out has its slider closed. The levels are kept across starts with the
+  choice, and show in the diagnostics only when they are not 0 dB. `DecoderSettings` carries them
+  as `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db`, which become the library's
+  linear gains where the settings meet the decoder (planning/karaoke-phase2.md, W10).
 - **The karaoke-capable decoder can re-level the melody and the vocals.** `OutputConfig` gains
   `karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, linear and 1.0 by
   default, which multiply the Table C.2.3 coefficients of M, V1 and V2 (Annex C.2.3's "additional
@@ -167,13 +184,56 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The timing window sets who sings a line.** In **Time the lyrics...** a chosen line takes a
+  **Singer** (not marked, V1, V2 or both) and each row shows its marker; two **Name** fields set
+  what the file calls the singers (`[v1:]` and `[v2:]`, kept with the file, unlike the names typed on
+  the Karaoke page), with brackets and control characters taken out since a tag ends at the first
+  `]`. **Save** writes the markers and the names, so a duet's file is made in one pass
+  (planning/karaoke-phase2.md, W11c).
+- **Hearth shows a duet.** Where a lyrics file marks its lines (`V1:`, `V2:`, `V1+V2:`), the
+  Karaoke page has two name fields for the two singers (typed for the run, never kept for a song,
+  before the file's `[v1:]` and `[v2:]`, before "V1" and "V2"), and each line of the lyric view says
+  who sings it by name, by side (the second singer's lines are indented) and by colour. On a karaoke
+  stream a line is also tagged **guide** (the vocal that is playing sings it) or **you** (it does
+  not), with a sentence on the page for what the Vocals choice leaves you to sing; a plain file
+  shows each marked line with its singer's name (planning/karaoke-phase2.md, W11b).
 - **A lyrics file can say who sings a line.** The reader (`libs/lyrics`) takes a duet's singer from
   a `V1:`, `V2:` or `V1+V2:` marker at the start of a line (after its time tags, or after its first
   word tag; either case; not part of the line's text), and the two singers' names from `[v1:name]`
   and `[v2:name]` id tags. A line with no marker is for nobody in particular, and `V3:` is text.
   The writer puts the markers and the names back, a plain file may carry the markers before it is
-  timed, and `set_line_singer()` is what an editor calls. Nothing in Hearth uses it yet: the duet
-  view and the editor are the next two changes (planning/karaoke-phase2.md, W11a).
+  timed, and `set_line_singer()` is what an editor calls (planning/karaoke-phase2.md, W11a).
+- **Crucible imports SubRip, ASS and MIDI karaoke lyrics too.** The strip's import takes a `.srt`,
+  an `.ass` or a `.kar` as well as an `.lrc`, told apart by what is in the file (the same
+  `parse_timed_text` Hearth reads with); the file dialog lists them, and the catalogues are filled
+  (planning/karaoke-phase2.md, W13b).
+- **Crucible shows the lyrics of an application.** The Room page has a sixth block, **06 LYRICS**:
+  import an `.lrc` (UTF-8 or UTF-16) against the selected application, press **Start** as the song
+  begins and the strip shows the line being sung with the lines around it, a word at a time where the
+  file times its words. The position is start-and-nudge (Start, Start again, and 0.1 s nudges up to
+  10 s either way), because Crucible taps an application's sound and has no way to read its media
+  position; a media-session source is a later change. Lyrics go with the application when it
+  leaves the list. The reader is `libs/lyrics`, the one Hearth reads with
+  (planning/karaoke-phase2.md, W13b).
+- **MIDI karaoke files are lyrics, with word times.** The lyric reader takes a `.kar` (a Standard
+  MIDI File) for its words: the Text or Lyric events (the track called `Words` where there is one),
+  each syllable at its tick turned into milliseconds through the file's tempo map, so the fill moves
+  by syllable; `@T` lines are the title and the artist, a `/` or a backslash begins a line, and the
+  music in the file is not read. The words must be UTF-8 (a MIDI file declares no encoding, and
+  code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
+  `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
+  (planning/karaoke-phase2.md, W13e).
+- **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
+  `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
+  (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
+  blocks, drawings and comments are dropped and the columns are the script's own `Format:` line.
+  A file is recognised by what it holds, and Hearth finds `name.ass` beside an item when there is
+  no `.lrc` or `.srt` (planning/karaoke-phase2.md, W13d).
+- **SubRip files are lyrics.** The lyric reader takes a `.srt` as lines that end where their cue
+  does (so the gap between cues is nothing being sung), with the cue's text lines joined, its styling
+  and `{...}` override blocks dropped, and no word times invented. A file is read as SubRip or as LRC
+  by what it holds, and Hearth finds `name.srt` beside an item when there is no `name.lrc`
+  (planning/karaoke-phase2.md, W13c).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
@@ -182,6 +242,23 @@ The sections below contain the complete change list and fixes.
   8-bit code page such as Windows-1255 are still refused by name and not guessed at. White space
   is ASCII white space whatever the locale, so a line that ends in a letter whose UTF-8 ends in
   `0xA0` (nun, among others) keeps it. The namespace is `iclforge::lyrics`; nothing else changes.
+- **Hearth times lyrics.** **Time the lyrics...** on the Karaoke page's Lyrics card opens a window
+  over the item as it plays: `Space` stamps each line as it starts and then each word, the words
+  of a stamped line begin as an estimate by their letters (drawn slanted and muted, never as
+  sung) and a press replaces one, and every press has a reaction time (120 ms to start with, kept)
+  taken off it so that the stored time is the sound's. **Save** writes the item's `.lrc` with
+  enhanced word tags and keeps the first file there once as `.lrc.bak`; an item with no words
+  takes a text file in UTF-8 or UTF-16. The writer, the estimate and the edits are in
+  `iclforge::lyrics` (planning/karaoke-phase2.md, W6).
+- **A karaoke disc's picture is shown beside a stream.** A `name.cdg` (CD+G, the subcode of a
+  karaoke disc ripped on its own: 24-byte packets, 300 a second, a 300 by 216 picture in 16
+  colours) with no lyrics file beside the item is drawn on the Karaoke page and in the singer
+  view, against the position of what is heard and moved by the lyric delay. `iclforge::lyrics`
+  (`cdg.hpp`) decodes the memory and border presets, the tile blocks and their XOR form, the
+  scrolls by a tile and the 12-bit colour table; the picture at a position is what the packets up
+  to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
+  read as text, and the page says so; a lyrics file beside the stream is shown in its place
+  (planning/karaoke-phase2.md, W13f).
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the

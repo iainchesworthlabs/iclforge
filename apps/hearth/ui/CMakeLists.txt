@@ -73,6 +73,8 @@ else()
 
     qt_add_executable(hearth
         src/main.cpp
+        src/cdg_picture.cpp
+        src/cdg_picture.hpp
         src/hearth_controller.cpp
         src/hearth_controller.hpp
         src/item_loader.cpp
@@ -123,6 +125,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/KaraokePage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricClock.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricScreen.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricTimingDialog.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricView.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Network.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkList.qml"

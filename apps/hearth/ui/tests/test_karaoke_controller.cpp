@@ -7,6 +7,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QImage>
 #include <QSettings>
 #include <QString>
 #include <QTemporaryDir>
@@ -15,6 +16,7 @@
 #include <QVariantMap>
 
 #include <string>
+#include <array>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -56,6 +58,45 @@ const QByteArray kEnhanced =
 
 QVariantMap line_at(const KaraokeController& controller, int index) {
     return controller.lines().at(index).toMap();
+}
+
+using CdgData = std::array<unsigned char, 16>;
+
+// One 24-byte CD+G packet: command 9, the instruction, two parity bytes, sixteen data bytes, four
+// parity bytes. The format is held to its arithmetic in libs/lyrics/tests/test_cdg.cpp; here a disc
+// only has to be a disc.
+QByteArray cdg_packet(int instruction, const CdgData& data = {}) {
+    QByteArray out(24, '\0');
+    out[0] = static_cast<char>(9);
+    out[1] = static_cast<char>(instruction);
+    for (std::size_t i = 0; i < data.size(); ++i) {
+        out[static_cast<qsizetype>(4 + i)] = static_cast<char>(data[i]);
+    }
+    return out;
+}
+
+CdgData first_byte(int value) {
+    CdgData data{};
+    data[0] = static_cast<unsigned char>(value);
+    return data;
+}
+
+// A disc whose colour 1 is red and colour 2 green: the picture is `first` from the first packets
+// and `second` from the packet at one second (300 packets in).
+QByteArray cdg_disc(int first = 1, int second = 2) {
+    CdgData colours{};
+    // Colour 1 is 0xF00 and colour 2 is 0x0F0, as two six-bit bytes each.
+    colours[2] = 0x3C;
+    colours[3] = 0x00;
+    colours[4] = 0x03;
+    colours[5] = 0x30;
+    QByteArray bytes = cdg_packet(30, colours);
+    bytes += cdg_packet(1, first_byte(first));
+    for (int i = 2; i < 300; ++i) {
+        bytes += cdg_packet(0);
+    }
+    bytes += cdg_packet(1, first_byte(second));
+    return bytes;
 }
 
 }  // namespace
@@ -218,6 +259,55 @@ TEST_CASE("KaraokeController: no file, a plain file and an unreadable one each s
     room.write("loud.LRC", "[00:01.00]LOUD\n");
     controller.load(room.path("loud.ac3"), 5000);
     CHECK(controller.status().toStdString() == "timed");
+}
+
+TEST_CASE("KaraokeController: a duet's lines carry their singer, and the names come typed, then filed, then V1 and V2",
+          "[hearth][hearth-controller][karaoke][lyrics][duet]") {
+    Room room;
+    room.write("duet.lrc",
+               "[ti:Leave Her, Johnny]\n[v1:Shantyman]\n[v2:Crew]\n"
+               "[00:01.00]V1: Oh the times are hard\n"
+               "[00:04.00]V2: Leave her, Johnny\n"
+               "[00:07.00]V1+V2: Leave her\n"
+               "[00:09.00]For nobody in particular\n");
+    KaraokeController controller;
+    CHECK_FALSE(controller.hasSingers());
+    controller.load(room.path("duet.ac3"), 12000);
+    REQUIRE(controller.status().toStdString() == "timed");
+    CHECK(controller.hasSingers());
+    REQUIRE(controller.lineCount() == 4);
+    CHECK(line_at(controller, 0).value("singer").toString().toStdString() == "v1");
+    CHECK(line_at(controller, 0).value("text").toString().toStdString() == "Oh the times are hard");
+    CHECK(line_at(controller, 1).value("singer").toString().toStdString() == "v2");
+    CHECK(line_at(controller, 2).value("singer").toString().toStdString() == "both");
+    CHECK(line_at(controller, 3).value("singer").toString().toStdString().empty());
+
+    // The file's names, until a person types one: typed comes first, per singer.
+    CHECK(controller.fileFirstSingerName().toStdString() == "Shantyman");
+    CHECK(controller.firstSingerLabel().toStdString() == "Shantyman");
+    CHECK(controller.secondSingerLabel().toStdString() == "Crew");
+    int changes = 0;
+    QObject::connect(&controller, &KaraokeController::singerNamesChanged, [&changes] { ++changes; });
+    controller.setFirstSingerName(QStringLiteral("  Anna "));
+    CHECK(controller.firstSingerName().toStdString() == "Anna");
+    CHECK(controller.firstSingerLabel().toStdString() == "Anna");
+    CHECK(controller.secondSingerLabel().toStdString() == "Crew");
+    CHECK(changes == 1);
+    // The same name again is not a change, and an empty one gives the file's back.
+    controller.setFirstSingerName(QStringLiteral("Anna"));
+    CHECK(changes == 1);
+    controller.setFirstSingerName(QString());
+    CHECK(controller.firstSingerLabel().toStdString() == "Shantyman");
+
+    // A typed name is for the run, not for the song: the next item's lyrics keep it, and a file
+    // without names falls to V1 and V2.
+    controller.setSecondSingerName(QStringLiteral("Ben"));
+    room.write("solo.lrc", "[00:01.00]Should auld acquaintance\n");
+    controller.load(room.path("solo.ac3"), 12000);
+    CHECK_FALSE(controller.hasSingers());
+    CHECK(controller.secondSingerLabel().toStdString() == "Ben");
+    CHECK(controller.firstSingerLabel().toStdString() == "V1");
+    CHECK(line_at(controller, 0).value("singer").toString().isEmpty());
 }
 
 TEST_CASE("KaraokeController: the same item and length again is not read again",
@@ -485,4 +575,175 @@ TEST_CASE("KaraokeController timing: ending a session discards what was not save
     // A save with no session is refused and writes nothing.
     CHECK_FALSE(controller.saveTiming().isEmpty());
     CHECK(read_all(room.path("song.lrc")) == kPlain);
+}
+
+TEST_CASE("KaraokeController: timing sets who sings a line and what the singers are called",
+          "[hearth][hearth-controller][karaoke][lyrics][timing][duet]") {
+    Room room;
+    room.write("duet.lrc",
+               "[00:01.00]Should auld acquaintance\n[00:03.00]Be forgot\n[00:05.00]And never brought to mind\n");
+    KaraokeController controller;
+    controller.load(room.path("duet.ac3"), 10000);
+
+    // Nothing is set outside a session.
+    CHECK_FALSE(controller.setLineSinger(0, "v1"));
+    controller.setTimingFirstName("Ann");
+    CHECK(controller.timingFirstName().isEmpty());
+
+    REQUIRE(controller.beginTiming());
+    CHECK(controller.timingFirstName().isEmpty());
+    CHECK(controller.timingLines().at(0).toMap().value("singer").toString().isEmpty());
+
+    // Setting what is already there is not an edit.
+    CHECK(controller.setLineSinger(0, ""));
+    CHECK_FALSE(controller.timingDirty());
+
+    CHECK(controller.setLineSinger(0, "v1"));
+    CHECK(controller.timingDirty());
+    CHECK(controller.setLineSinger(1, "v2"));
+    CHECK(controller.setLineSinger(2, "both"));
+    CHECK(controller.timingLines().at(1).toMap().value("singer").toString().toStdString() == "v2");
+    // The line's time and words are not touched.
+    CHECK(controller.timingLines().at(1).toMap().value("startMs").toLongLong() == 3000);
+
+    // Another word, and a line that is not there, change nothing.
+    CHECK_FALSE(controller.setLineSinger(0, "soprano"));
+    CHECK_FALSE(controller.setLineSinger(3, "v1"));
+    CHECK_FALSE(controller.setLineSinger(-1, "v1"));
+    CHECK(controller.timingLines().at(0).toMap().value("singer").toString().toStdString() == "v1");
+
+    // A name is one line with no bracket, since a tag ends at the first one.
+    controller.setTimingFirstName("  Ann [lead]\n");
+    CHECK(controller.timingFirstName().toStdString() == "Ann lead");
+    controller.setTimingSecondName("Bob");
+    CHECK(controller.timingSecondName().toStdString() == "Bob");
+
+    const QString first_save = controller.saveTiming();
+    INFO(first_save.toStdString());
+    REQUIRE(first_save.isEmpty());
+    // Read and closed: Windows will not replace a file that is open, and the next save does.
+    QString written;
+    {
+        QFile file(room.path("duet.lrc"));
+        REQUIRE(file.open(QIODevice::ReadOnly));
+        written = QString::fromUtf8(file.readAll());
+    }
+    CHECK(written.contains("[v1:Ann lead]"));
+    CHECK(written.contains("[v2:Bob]"));
+    CHECK(written.contains("[00:01.00]V1: Should auld acquaintance"));
+    CHECK(written.contains("[00:03.00]V2: Be forgot"));
+    CHECK(written.contains("[00:05.00]V1+V2: And never brought to mind"));
+
+    // What was written is what is loaded now, as any file.
+    CHECK(controller.hasSingers());
+    CHECK(controller.fileFirstSingerName().toStdString() == "Ann lead");
+    CHECK(controller.fileSecondSingerName().toStdString() == "Bob");
+    CHECK(line_at(controller, 2).value("singer").toString().toStdString() == "both");
+    // A line taken back to no one is written without a marker.
+    REQUIRE(controller.beginTiming());
+    CHECK(controller.timingFirstName().toStdString() == "Ann lead");
+    // A name is an edit like any other, and the same name again is not.
+    CHECK_FALSE(controller.timingDirty());
+    controller.setTimingFirstName("Ann lead");
+    controller.setTimingSecondName("Bob");
+    CHECK_FALSE(controller.timingDirty());
+    controller.setTimingFirstName("Ann");
+    CHECK(controller.timingDirty());
+    controller.endTiming();
+    REQUIRE(controller.beginTiming());
+    CHECK_FALSE(controller.timingDirty());
+    controller.setTimingSecondName("Bobby");
+    CHECK(controller.timingDirty());
+    CHECK(controller.setLineSinger(0, ""));
+    const QString second_save = controller.saveTiming();
+    INFO(second_save.toStdString());
+    REQUIRE(second_save.isEmpty());
+    CHECK(line_at(controller, 0).value("singer").toString().isEmpty());
+}
+
+TEST_CASE("KaraokeController: a CD+G file with no lyrics file is a picture that follows the position",
+          "[hearth][hearth-controller][karaoke][lyrics][cdg]") {
+    Room room;
+    room.write("disc.cdg", cdg_disc());
+    KaraokeController controller;
+    // Nothing loaded is no picture.
+    CHECK(controller.pictureFrame(500).isNull());
+
+    controller.load(room.path("disc.ac3"), 10000);
+    REQUIRE(controller.status().toStdString() == "picture");
+    CHECK(controller.fileName().toStdString() == "disc.cdg");
+    CHECK(controller.errorText().isEmpty());
+    // No text is extracted: there are no lines to show or to follow.
+    CHECK(controller.lines().isEmpty());
+    CHECK(controller.lineCount() == 0);
+    CHECK(controller.cursor(1000).value("line").toInt() == -1);
+
+    // Before the first packet the screen is black; by 500 ms the colours are loaded and it is red.
+    const QImage start = controller.pictureFrame(0);
+    REQUIRE_FALSE(start.isNull());
+    CHECK(start.width() == 300);
+    CHECK(start.height() == 216);
+    CHECK(start.pixel(100, 100) == 0xFF000000U);
+    const QImage red = controller.pictureFrame(500);
+    CHECK(red.pixel(100, 100) == 0xFFFF0000U);
+    // A position between two packets is the same picture, not a new one.
+    const QImage same = controller.pictureFrame(502);
+    CHECK(same.constBits() == red.constBits());
+    // The packet at one second (sent by 1004 ms) turns it green, and going back is going back.
+    const QImage green = controller.pictureFrame(1100);
+    CHECK(green.pixel(100, 100) == 0xFF00FF00U);
+    CHECK(green.constBits() != red.constBits());
+    CHECK(controller.pictureFrame(500).pixel(100, 100) == 0xFFFF0000U);
+    // Past the end is the last picture.
+    CHECK(controller.pictureFrame(600000).pixel(100, 100) == 0xFF00FF00U);
+
+    // The delay shows the picture later, as it does the words: 200 ms of delay at 1100 ms is the
+    // picture of 900 ms, and it is green again by 1204 ms.
+    controller.setDelayMs(200);
+    CHECK(controller.pictureFrame(1100).pixel(100, 100) == 0xFFFF0000U);
+    CHECK(controller.pictureFrame(1250).pixel(100, 100) == 0xFF00FF00U);
+
+    // Another disc at a position with the same number of packets is its own picture, not the
+    // last one: this one is green first.
+    controller.setDelayMs(0);
+    CHECK(controller.pictureFrame(500).pixel(100, 100) == 0xFFFF0000U);
+    room.write("swap.cdg", cdg_disc(2, 1));
+    controller.load(room.path("swap.ac3"), 10000);
+    CHECK(controller.pictureFrame(500).pixel(100, 100) == 0xFF00FF00U);
+
+    // Another item with nothing beside it takes the picture away.
+    controller.load(room.path("other.ac3"), 10000);
+    CHECK(controller.status().toStdString() == "none");
+    CHECK(controller.pictureFrame(500).isNull());
+}
+
+TEST_CASE("KaraokeController: a lyrics file beside the item is shown in place of a picture",
+          "[hearth][hearth-controller][karaoke][lyrics][cdg]") {
+    Room room;
+    room.write("song.cdg", cdg_disc());
+    room.write("song.lrc", kEnhanced);
+    KaraokeController controller;
+    controller.load(room.path("song.ac3"), 10000);
+    CHECK(controller.status().toStdString() == "timed");
+    CHECK(controller.fileName().toStdString() == "song.lrc");
+    CHECK(controller.pictureFrame(500).isNull());
+}
+
+TEST_CASE("KaraokeController: a CD+G file in any case, and one that is not CD+G says why",
+          "[hearth][hearth-controller][karaoke][lyrics][cdg]") {
+    Room room;
+    room.write("shout.CDG", cdg_disc());
+    room.write("bad.cdg", QByteArray(25, 'x'));
+    KaraokeController controller;
+
+    controller.load(room.path("shout.ac3"), 10000);
+    CHECK(controller.status().toStdString() == "picture");
+    CHECK(controller.fileName().toLower().toStdString() == "shout.cdg");
+
+    controller.load(room.path("bad.ac3"), 10000);
+    CHECK(controller.status().toStdString() == "error");
+    CHECK(controller.fileName().toStdString() == "bad.cdg");
+    CHECK(controller.errorText().toStdString() ==
+          "The file is not CD+G: its length is not a whole number of packets.");
+    CHECK(controller.pictureFrame(500).isNull());
 }

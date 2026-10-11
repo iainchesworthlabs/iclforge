@@ -51,13 +51,14 @@ how the decoder reproduces it:
 - **Aware** (the default) reproduces L, C and R, with the vocals at the level the programme set
   (Table C.2.2). On two speakers it is the Lo/Ro fold, which Annex C says is the same thing.
 - **Capable** lets you choose the vocals: none, V1, V2 or both (Table C.2.3). A single vocal joins
-  the melody in the centre; a pair goes to the left and the right.
+  the melody in the centre; a pair goes to the left and the right. It also takes a **level** for
+  the melody and for each vocal, from 24 dB below the table (off) to 12 dB above it.
 
 The page says in words when the choice cannot apply: a stream that is not karaoke (E-AC-3 and
 AC-4 have no karaoke mode), a bitstream output, where the receiver decodes the stream and the
 reproduction is its to make, and a stereo fold of Lt/Rt, for which Annex C defines no reproduction.
-The choice is kept across starts, the only decoder setting that is. The Decoder page shows it in
-one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
+The choice and the levels are kept across starts, the only decoder settings that are. The Decoder
+page shows the choice in one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
 Annex C's own tables.
 
 **To a network group**, the reproduction is the same on every member. A sink that lists the
@@ -70,9 +71,20 @@ things. Where such a sink takes no PCM either, the stream plays as coded on it a
 page says so. The Karaoke page's choice reaches a sink as settings, which replace that sink's
 settings whole: what the sink's own page set is not kept.
 
+The levels of the melody and the vocals (Capable only) travel the same way, as `karaoke_melody_db`,
+`karaoke_vocal1_db` and `karaoke_vocal2_db`, and only the ones that change what is heard: a level
+of 0 dB is left out, and so is the level of a vocal the Vocals choice leaves out. A sink that has
+the reproduction but does not list a level's key (a board on firmware from before them) is sent PCM
+as soon as that level is moved, so no member plays the table while another plays the level. A level
+changed while an item plays reaches the sinks that are decoding for themselves; a sink that was
+started on the item without its key keeps the table until the item is played again.
+
 #### Lyrics
 
-Beside a stream, `name.lrc` (the extension in any case) is its lyrics. The Karaoke page shows the
+Beside a stream, `name.lrc` (the extension in any case) is its lyrics, and where there is none
+`name.srt`, a SubRip file, whose cues are lines with no words in them, and then `name.ass`, an
+Advanced SubStation Alpha script, whose karaoke tags give each syllable its time, and then
+`name.kar`, a MIDI karaoke file, whose syllables are timed through its tempo map. The Karaoke page shows the
 line being sung, the lines before it and after it, and a word at a time where the file times its
 words:
 
@@ -84,11 +96,25 @@ words:
 - with no file, the page says which name it looks for; a file that is not UTF-8 or UTF-16 is not shown,
   and playback is not affected.
 
+With no lyrics file, a `name.cdg` beside the stream, the picture of a karaoke disc ripped on its
+own, is shown instead: its words are part of the picture, so nothing in it is read as text, and
+it moves with the same position and the same lyric delay (see [A CD+G
+disc](../karaoke/index.md#a-cdg-disc)).
+
 The format is LRC: `[mm:ss.xx]` for a line, the enhanced `<mm:ss.xx>` tag before a word, and
 `[offset:]`, `[ti:]`, `[ar:]`, `[al:]`, `[by:]` and `[length:]`. The text is UTF-8, with or
 without a byte-order mark, or UTF-16 with one, in either byte order (what an editor saves as
 "Unicode"), so Hebrew and Yiddish files read as they are. A file in an 8-bit code page such as
 Windows-1255 is not read: save it as UTF-8 or UTF-16.
+
+**Duets.** A line that starts `V1:`, `V2:` or `V1+V2:` (after its time) is sung by the first
+vocal of the stream, the second, or both together; the marker is not shown as text. The two singers'
+names are `[v1:Shantyman]` and `[v2:Crew]` in the file. Where the file marks its lines the Karaoke
+page shows two name fields (typed for this run of Hearth, never kept for a song; a typed name comes
+before the file's, which comes before "V1" and "V2"), and each line says who sings it: by name, by
+side (the second singer's lines are indented) and by colour, which is never the only cue. On a
+karaoke stream it also says **guide** where the vocal that is playing sings the line, and **you**
+where it does not, with a sentence under the names for what the Vocals choice leaves you to sing.
 
 **Lyric delay** in Settings (Playback), from -1,000 to +1,000 ms in steps of 10, is added to the
 file's own timing; a positive value shows the words later. A bluetooth speaker or a receiver with
@@ -98,6 +124,32 @@ position, and a file's times are rarely right to the frame.
 **Full screen** (`F11`, or the button on the page; `Esc` leaves) is the singer view: dark, with
 larger type and more lines, and Previous, Play/Pause, Next and the vocals chooser kept at the
 bottom. `Space` pauses. Choosing a vocal there chooses the capable reproduction with it.
+
+#### Timing the lyrics
+
+**Time the lyrics...** on the Lyrics card is for an item whose words have no times, or whose times
+are for lines and not words. It opens a window over the page, and the item plays as usual:
+
+1. **Lines.** Press `Space`, or the button, as each line starts. A press is taken to be the
+   **reaction time** late (120 ms to start with, set in the window, kept across starts), and that is
+   taken off, so that what is stored is where the sound was and not where the finger came down.
+   Choose a line to play from it, to stamp it again, or to nudge it 10 ms at a time.
+2. **Words.** Each stamped line has its words spread over it by their letters, drawn slanted and
+   muted: a guess. Play, and press `Space` as each word starts; a word that was pressed turns solid
+   and keeps its time. A line's words are guessed again only where no press has set them.
+
+3. **A duet.** Choose a line and set its **Singer** (not marked, V1, V2 or both); the row shows the
+   marker as it is written. The two **Name** fields are what the file calls the singers (`[v1:]`
+   and `[v2:]`), kept with the file, unlike the names typed on the Karaoke page for a run. A name
+   has no brackets or line breaks, since a tag ends at the first `]`.
+
+**Save** writes the item's `.lrc`, or makes one beside the item, and keeps the first file that was
+there once, as `.lrc.bak`. Nothing is shown as sung from the window's guesses until it is saved, and
+`Esc` does not close the window while there are edits that were not saved (**Discard and close**
+does). Times are kept to a hundredth of a second, which is what the format has.
+
+An item with no words says so, and takes a text file with a line of the words to a line, saved as
+UTF-8 or UTF-16 (an `.lrc` with no times will do), and times that.
 
 ### AC-4
 
@@ -228,8 +280,9 @@ Raspberry Pi 4B without an underrun. See
 - **Play every track of a container.** An MP4, Matroska or MPEG-TS file plays its first AC-3,
   E-AC-3 or AC-4 track; the others are not offered, and a Matroska file's codec delay is not
   trimmed.
-- **Make or time a lyrics file.** Hearth reads `.lrc` files beside a stream; it does not write
-  them, fetch them, or time the words of one that has only lines.
+- **Fetch lyrics, or time them from the recording.** Hearth reads `.lrc` files beside a stream, and
+  times the words of one by hand ([Timing the lyrics](#timing-the-lyrics)); it does not find or
+  download them, or work the times out from the sound.
 - **List AC-4 objects on the Play page.** The Objects card shows the positions of E-AC-3 objects.
   An AC-4 item's objects are rendered into the speaker layout, and the Media page says an A-JOC
   stream carries object metadata without listing it.

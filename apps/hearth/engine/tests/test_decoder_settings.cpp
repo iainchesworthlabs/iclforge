@@ -1,6 +1,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -284,4 +286,76 @@ TEST_CASE("decoder settings: Annex C's karaoke reproduction reaches the output s
 
     // Two settings that differ only here are different settings.
     CHECK_FALSE(DecoderSettings{} == coded);
+}
+
+TEST_CASE("decoder settings: the karaoke part levels become the output stage's linear gains",
+          "[hearth][decoder-settings][karaoke]") {
+    using Catch::Approx;
+    // Untouched, every part is the table's: 1.0, and the diagnostics say nothing of levels.
+    const auto untouched = decoder_setup(DecoderSettings{}, layout("5.1"));
+    CHECK(untouched.config.output.karaoke_melody_gain == 1.0);
+    CHECK(untouched.config.output.karaoke_vocal1_gain == 1.0);
+    CHECK(untouched.config.output.karaoke_vocal2_gain == 1.0);
+
+    DecoderSettings chosen;
+    chosen.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    chosen.karaoke_melody_db = -6.0;
+    chosen.karaoke_vocal1_db = 6.0;
+    chosen.karaoke_vocal2_db = -12.0;
+    for (const char* name : {"5.1", "2.0"}) {
+        const auto setup = decoder_setup(chosen, layout(name));
+        CHECK(setup.config.output.karaoke_melody_gain == Approx(std::pow(10.0, -6.0 / 20.0)));
+        CHECK(setup.config.output.karaoke_vocal1_gain == Approx(std::pow(10.0, 6.0 / 20.0)));
+        CHECK(setup.config.output.karaoke_vocal2_gain == Approx(std::pow(10.0, -12.0 / 20.0)));
+    }
+
+    // The span of the controls: the top holds, the bottom is off, and so is anything below it.
+    DecoderSettings extreme;
+    extreme.karaoke_melody_db = 40.0;
+    extreme.karaoke_vocal1_db = iclforge::ac3::kKaraokeMinLevelDb;
+    extreme.karaoke_vocal2_db = -90.0;
+    const auto held = decoder_setup(extreme, layout("5.1"));
+    CHECK(held.config.output.karaoke_melody_gain ==
+          Approx(std::pow(10.0, iclforge::ac3::kKaraokeMaxLevelDb / 20.0)));
+    CHECK(held.config.output.karaoke_vocal1_gain == 0.0);
+    CHECK(held.config.output.karaoke_vocal2_gain == 0.0);
+    // One step above the bottom is a level, not off.
+    DecoderSettings quiet;
+    quiet.karaoke_melody_db = iclforge::ac3::kKaraokeMinLevelDb + 1.0;
+    CHECK(decoder_setup(quiet, layout("5.1")).config.output.karaoke_melody_gain > 0.0);
+
+    // A value that is not a number is the table's, not a mute (the library mutes a gain it is
+    // handed that is not a number, so this is where that is decided).
+    DecoderSettings broken;
+    broken.karaoke_melody_db = std::numeric_limits<double>::quiet_NaN();
+    broken.karaoke_vocal1_db = std::numeric_limits<double>::infinity();
+    broken.karaoke_vocal2_db = -std::numeric_limits<double>::infinity();
+    const auto not_numbers = decoder_setup(broken, layout("5.1"));
+    CHECK(not_numbers.config.output.karaoke_melody_gain == 1.0);
+    CHECK(not_numbers.config.output.karaoke_vocal1_gain ==
+          Approx(std::pow(10.0, iclforge::ac3::kKaraokeMaxLevelDb / 20.0)));
+    CHECK(not_numbers.config.output.karaoke_vocal2_gain == 0.0);
+
+    // The diagnostics name only the levels that are not the table's, and only for the
+    // decoder that has them.
+    CHECK(iclforge::hearth::describe(chosen).find(
+              "karaoke: capable, both vocals, melody -6 dB, vocal 1 +6 dB, vocal 2 -12 dB") !=
+          std::string::npos);
+    extreme.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    CHECK(iclforge::hearth::describe(extreme).find(
+              "karaoke: capable, both vocals, melody +12 dB, vocal 1 off, vocal 2 off") !=
+          std::string::npos);
+    DecoderSettings plain;
+    plain.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    CHECK(iclforge::hearth::describe(plain).find("karaoke: capable, both vocals, the first programme") !=
+          std::string::npos);
+    chosen.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    CHECK(iclforge::hearth::describe(chosen).find("melody") == std::string::npos);
+
+    // Settings that differ only in a level are different settings, and the re-encoding
+    // decode is the neutral one whatever the listener chose.
+    CHECK_FALSE(DecoderSettings{} == quiet);
+    const auto transcode = decoder_setup(iclforge::hearth::transcode_settings(extreme), layout("5.1"));
+    CHECK(transcode.config.output.karaoke_melody_gain == 1.0);
+    CHECK(transcode.config.output.karaoke_vocal1_gain == 1.0);
 }

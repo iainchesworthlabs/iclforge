@@ -10,7 +10,7 @@ reader is told are [Keyboard and screen readers](accessibility.md).
 
 ## The shape of the page
 
-The page is five numbered blocks, in the order the window numbers them.
+The page is six numbered blocks, in the order the window numbers them.
 
 | Block | Where | What it holds |
 |---|---|---|
@@ -19,6 +19,7 @@ The page is five numbered blocks, in the order the window numbers them.
 | **03 BED** | centre, below | a chip for every application that is not placed |
 | **04 SIGNAL PATH** | right rail | the three stations in short, with the button that moves the default output |
 | **05 SIGNING** | right rail | whether a key is loaded, and which file it came from |
+| **06 LYRICS** | right rail, below | an `.lrc` imported against the selected application, and the line being sung |
 
 `Ctrl+1` comes back to this page from anywhere in the window. The header above it carries the
 path as one line and the status strip below it carries the counters and the Start/Stop button;
@@ -252,3 +253,36 @@ instead of the second undoing the first.
 
 The rest of the map — the pages, the segmented controls, what is announced and in what order the
 window is walked — is [Keyboard and screen readers](accessibility.md).
+
+## 06 Lyrics
+
+An `.lrc` file (UTF-8, or UTF-16 with a byte-order mark: what an editor saves as "Unicode", and so
+what a Hebrew or Yiddish file often is) can be imported against the selected application, and the
+right rail then shows the line being sung with the lines around it. The format is the one
+[Hearth reads](../karaoke/index.md#lyrics): `[mm:ss.xx]` for a line, `<mm:ss.xx>` before a word
+for a word-timed file, in which a word is **sung**, **being sung** (underlined and filled left to
+right) or **not yet sung**.
+
+A **SubRip** `.srt`, an **Advanced SubStation Alpha** `.ass` script and a **MIDI karaoke** `.kar`
+file are imported the same way, and told apart by what is in them and not by their name, as Hearth
+does: a `.kar` carries no word of its encoding, so its words must be UTF-8. A **CD+G** `.cdg` is a
+picture with no text and is not imported here.
+
+**Where the position comes from.** Crucible taps what an application plays and knows nothing of
+its track, so it has no way to read where a song is. The position is **start-and-nudge**:
+
+- press **Start** as the song begins, and the strip runs from there on this window's own clock;
+- **Start again** begins it again, which is what a restart in the player needs;
+- the **-0.1 s** and **+0.1 s** buttons show the words earlier or later (up to ten seconds either
+  way), which is what a slow player or a sluggish output needs;
+- **Stop** stops following and keeps the lyrics, and **Clear** drops them.
+
+It does not see a pause or a seek in the player, and the page says so beside the buttons. Reading
+the position from the application's own media session, where it publishes one (the transport
+controls on Windows, MPRIS on Linux, the now-playing information on macOS), is a separate change
+that would replace the Start press and keep everything else.
+
+Lyrics belong to the application of this session: they go when it leaves the list. An `.lrc` that
+cannot be read says why on the page (not UTF-8 or UTF-16, empty, no lyrics in it), and a file with
+no times is shown as imported and is not followed, because there is nothing to follow.
+

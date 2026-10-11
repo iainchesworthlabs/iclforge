@@ -93,6 +93,9 @@ template <class T, class Write>
     decoder.concealment = ac::Concealment::kRepeatFade;
     decoder.karaoke = ac::Karaoke::kCapable;
     decoder.karaoke_vocals = ac::KaraokeVocals::kV2;
+    decoder.karaoke_melody_db = -6.0;
+    decoder.karaoke_vocal1_db = 3.0;
+    decoder.karaoke_vocal2_db = -24.0;
     return command;
 }
 
@@ -131,7 +134,8 @@ TEST_CASE("iclforge_player: the support object", "[sendspin][iclforge]") {
                   R"("outputs":{"count":6,"bit_depth":32,"bit_depths":[16,24,32]},"layout_grammar":1,)"
                   R"("management":{"routing":true,"trim_db":[-12,12],"delay_ms":[0,50],"crossover_hz":[40,250],"identify":true},)"
                   R"("decoder_settings":["mode","drc_cut","drc_boost","heavy_compression","dialnorm","downmix",)"
-                  R"("ltrt_phase_shift","mix_lfe","programme","objects","concealment","karaoke","karaoke_vocals"],)"
+                  R"("ltrt_phase_shift","mix_lfe","programme","objects","concealment","karaoke","karaoke_vocals",)"
+                  R"("karaoke_melody_db","karaoke_vocal1_db","karaoke_vocal2_db"],)"
                   R"("buffer_capacity":1048576})");
 
     const Parsed parsed(text);
@@ -507,7 +511,8 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
                   R"("routing":"0,1,2,3,4,5","trim_db":[0,-1.5,0,-3,-3,2],"delay_ms":[0,0,0,12.5,12.5,0],"crossover_hz":80,)"
                   R"("decoder":{"mode":"rf","drc_cut":0.25,"drc_boost":1,"heavy_compression":false,"dialnorm":true,)"
                   R"("downmix":"ltrt","ltrt_phase_shift":true,"mix_lfe":false,"programme":null,"objects":"never",)"
-                  R"("concealment":"repeat_fade","karaoke":"capable","karaoke_vocals":"v2"}}})");
+                  R"("concealment":"repeat_fade","karaoke":"capable","karaoke_vocals":"v2",)"
+                  R"("karaoke_melody_db":-6,"karaoke_vocal1_db":3,"karaoke_vocal2_db":-24}}})");
 
     const Parsed parsed(text);
     const auto read = ac::read_command(parsed.root());
@@ -533,6 +538,9 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
     CHECK(settings.decoder.concealment == ac::Concealment::kRepeatFade);
     CHECK(settings.decoder.karaoke == ac::Karaoke::kCapable);
     CHECK(settings.decoder.karaoke_vocals == ac::KaraokeVocals::kV2);
+    CHECK(settings.decoder.karaoke_melody_db == -6.0);
+    CHECK(settings.decoder.karaoke_vocal1_db == 3.0);
+    CHECK(settings.decoder.karaoke_vocal2_db == -24.0);
 
     const auto read_settings = [](const std::string& object) {
         return ac::read_command(Parsed(R"({"command":"settings","settings":)" + object + "}").root());
@@ -546,6 +554,9 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
     // A sink is told nothing about karaoke unless it is told, and then takes its own default.
     CHECK_FALSE(sparse->settings.decoder.karaoke.has_value());
     CHECK_FALSE(sparse->settings.decoder.karaoke_vocals.has_value());
+    CHECK_FALSE(sparse->settings.decoder.karaoke_melody_db.has_value());
+    CHECK_FALSE(sparse->settings.decoder.karaoke_vocal1_db.has_value());
+    CHECK_FALSE(sparse->settings.decoder.karaoke_vocal2_db.has_value());
     CHECK(sparse->settings.decoder.has_programme);
     CHECK(sparse->settings.decoder.programme == 1);
     const auto bare = read_settings(R"({"revision":3})");
@@ -573,6 +584,17 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
     CHECK(refused(R"({"revision":23,"decoder":{"karaoke":true}})") == 23);
     CHECK(refused(R"({"revision":24,"decoder":{"karaoke_vocals":"all"}})") == 24);
     CHECK(refused(R"({"revision":25,"decoder":{"karaoke":"aware","karaoke_vocals":1}})") == 25);
+    // The levels are numbers from -24 to 12 dB, and each of the three is held to it.
+    CHECK(refused(R"({"revision":26,"decoder":{"karaoke_melody_db":12.5}})") == 26);
+    CHECK(refused(R"({"revision":27,"decoder":{"karaoke_vocal1_db":-24.5}})") == 27);
+    CHECK(refused(R"({"revision":28,"decoder":{"karaoke_vocal2_db":"loud"}})") == 28);
+    CHECK(refused(R"({"revision":29,"decoder":{"karaoke_melody_db":null}})") == 29);
+    const auto edges = read_settings(
+        R"({"revision":30,"decoder":{"karaoke_melody_db":12,"karaoke_vocal1_db":-24,"karaoke_vocal2_db":0}})");
+    REQUIRE(edges.has_value());
+    CHECK(edges->settings.decoder.karaoke_melody_db == 12.0);
+    CHECK(edges->settings.decoder.karaoke_vocal1_db == -24.0);
+    CHECK(edges->settings.decoder.karaoke_vocal2_db == 0.0);
     // A number the writer could not write back, and a crossover that its tenth of a hertz rounds to
     // nothing (libs/sendspin/fuzz/regressions/fuzz_sendspin_messages).
     CHECK(refused(R"({"revision":19,"trim_db":[7.7e62,0]})") == 19);
@@ -609,7 +631,8 @@ TEST_CASE("iclforge_player: settings checked against the support object", "[send
     ac::Support simple = board_support();
     simple.decoder_settings = {"mode", "drc_cut", "drc_boost", "heavy_compression", "dialnorm", "downmix",
                                "ltrt_phase_shift", "mix_lfe", "objects", "concealment", "karaoke",
-                               "karaoke_vocals"};
+                               "karaoke_vocals", "karaoke_melody_db", "karaoke_vocal1_db",
+                               "karaoke_vocal2_db"};
     CHECK(why([](ac::Settings&) {}, simple) == "decoder.programme is not a setting this sink takes");
     CHECK(why([](ac::Settings& s) { s.decoder.has_programme = false; }, simple).empty());
 
@@ -630,5 +653,27 @@ TEST_CASE("iclforge_player: settings checked against the support object", "[send
                s.decoder.karaoke_vocals.reset();
            },
               before_karaoke)
+              .empty());
+
+    // A sink that has the reproduction and not the levels (a board from before them) is refused
+    // each level by name, which is how a server learns to decode for it when one is moved.
+    ac::Support before_levels = board_support();
+    for (const std::string_view key : {"karaoke_melody_db", "karaoke_vocal1_db", "karaoke_vocal2_db"}) {
+        before_levels.decoder_settings.erase(std::remove(before_levels.decoder_settings.begin(),
+                                                         before_levels.decoder_settings.end(), key),
+                                             before_levels.decoder_settings.end());
+    }
+    CHECK(why([](ac::Settings&) {}, before_levels) ==
+          "decoder.karaoke_melody_db is not a setting this sink takes");
+    CHECK(why([](ac::Settings& s) { s.decoder.karaoke_melody_db.reset(); }, before_levels) ==
+          "decoder.karaoke_vocal1_db is not a setting this sink takes");
+    CHECK(why([](ac::Settings& s) { s.decoder.karaoke_vocal1_db.reset(); s.decoder.karaoke_melody_db.reset(); },
+              before_levels) == "decoder.karaoke_vocal2_db is not a setting this sink takes");
+    CHECK(why([](ac::Settings& s) {
+               s.decoder.karaoke_melody_db.reset();
+               s.decoder.karaoke_vocal1_db.reset();
+               s.decoder.karaoke_vocal2_db.reset();
+           },
+              before_levels)
               .empty());
 }
