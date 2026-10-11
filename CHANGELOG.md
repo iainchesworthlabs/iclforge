@@ -29,6 +29,21 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**E-AC-3: an associated service mixed into the main**
+
+- **`iclforge::ac3::AssociatedServiceMixer` and `forge decode associated=`.** A description or a
+  commentary carried beside the main programme (§E2.3.1.2's second independent substream, labelled
+  by `bsmod`) is mixed into it with what Annex E §E3.10 gives the stream control of: `pgmscl` on
+  its own programme, `extpgmscl` and the per-channel `extpgm*scl` on the other (or `dmixscl`, when
+  the main was folded to two channels), and `panmean` for a mono service by Tables E3.15 to E3.17,
+  at stereo and at 5.1 as printed and by an extension for other layouts. Gain changes ramp over a
+  block. `premixcmp*`, the speech enhancement words and `blkmixcfginfo` are not applied, because
+  Annex E gives them no processing (§E2.3.1.21: "decoders are not required to use them").
+  `associated=1` or `associated=visually-impaired`, with `associated-gain=<dB>` as the listener's
+  own trim; `monitor`, `play` and Hearth do not mix yet. `meta::pgm_scale_gain()` and
+  `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
+  15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
+
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
 - **An AC-3 core with E-AC-3 dependents is carried in MP4, fMP4 and MPEG-TS.** ETSI TS 102 366

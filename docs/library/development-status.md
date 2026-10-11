@@ -89,7 +89,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Closed-loop `auto` tool selection | 🟢 | High | Essential | Spectrum-aware cpl / spx / aht only |
 | **Metadata** | `mixmdate` downmix levels | 🟢 | High | Essential | Tables D2.2–D2.6 |
 | | Programme-mix wire format (`pgmscl`, `mixdef`, pan, `blkmixcfg`, …) | 🟢 | Medium | Important | Written and decoded (§E2.3.1.12–61); the `blkmixcfginfo` desync at `numblkscod==0x0` is fixed and round-trip gaps are closed |
-| | Receiver-side programme mixer | 🔴 | Medium | Important | No runtime mix of main + AD / commentary / external programme |
+| | Receiver-side programme mixer | 🟢 | Medium | Important | `AssociatedServiceMixer` and `forge decode associated=` (§E3.10): `pgmscl`, `extpgmscl`, the per-channel scales and `dmixscl`, and `panmean` by Tables E3.15–E3.17 for a mono service (an extension for layouts they do not cover). Not applied because Annex E gives them no processing: `premixcmp*`, speech enhancement, `blkmixcfginfo`. No external oracle (FFmpeg decodes one programme); live `monitor`, `play` and Hearth do not mix yet |
 | | `infomdat` service / production | 🟢 | Medium | Important | Table E1.2 |
 | **Decoder** | Full E-AC-3 reconstruction | 🟢 | High | Essential | Every Annex E tool, alone or stacked |
 | | Dependent render (§E3.8.2) | 🟢 | High | Essential | Including 7.1.4 |

@@ -260,6 +260,27 @@ double dialnorm_gain(int dialnorm) {
 
 double lfe_mix_gain(double level_db) { return std::pow(10.0, level_db / 20.0); }
 
+double pgm_scale_gain(int code) {
+    if (code < kPgmScaleMute || code > kPgmScaleMax) {
+        return level::kUnity;
+    }
+    if (code == kPgmScaleMute) {
+        return level::kSilent;
+    }
+    return std::pow(10.0, pgm_scale_db(code) / 20.0);
+}
+
+double external_scale_gain(int code) {
+    constexpr int kMuteCode = 15;
+    if (code < 0 || code > kMuteCode) {
+        return level::kUnity;
+    }
+    if (code == kMuteCode) {
+        return level::kSilent;
+    }
+    return std::pow(10.0, kExternalScaleDb[static_cast<std::size_t>(code)] / 20.0);
+}
+
 namespace {
 
 bool in_range(const std::optional<int>& value, int high) {
