@@ -161,6 +161,25 @@ public:
         return QUrl::fromLocalFile(path);
     }
 
+    // A text file called `name` beside the tones, UTF-8: a lyrics file for the part it is named
+    // after. The file's URL, or an empty one where it could not be written.
+    [[nodiscard]] Q_INVOKABLE QUrl writeText(const QString& name, const QString& text) const {
+        const QString path = QDir(folder_).filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            return {};
+        }
+        const QByteArray bytes = text.toUtf8();
+        return file.write(bytes) == bytes.size() ? QUrl::fromLocalFile(path) : QUrl();
+    }
+
+    // Whether `file` is gone: a run's output removed before it is made again, so that a file
+    // left by an earlier run is not mistaken for this one's.
+    [[nodiscard]] Q_INVOKABLE bool remove(const QUrl& file) const {
+        const QString path = file.toLocalFile();
+        return !QFileInfo::exists(path) || QFile::remove(path);
+    }
+
 private:
     QString folder_;
 };

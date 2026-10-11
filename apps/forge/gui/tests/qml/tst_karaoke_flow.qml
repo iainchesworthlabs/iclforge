@@ -369,4 +369,126 @@ TestCase {
                    "the command line wrote different bytes than the window did");
         }
     }
+
+    // ---- Naming, the rate, edits, the preview and the lyrics ---------------------------
+    function test_aKaraokeDraftIsNamedForWhatItIs() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        // Five channels, which a room would call 5.0: a karaoke stream's are a backing and parts.
+        compare(EncoderController.planLabel, "Karaoke 3/2");
+        verify(ctx.win.planLine.indexOf("Karaoke 3/2") >= 0, ctx.win.planLine);
+        compare(EncoderController.channelShapeName, "5.0");
+        // The same five channels with another service are a 5.0 again.
+        EncoderController.bsmodIndex = 0;
+        compare(EncoderController.planLabel, "5.0");
+    }
+
+    function test_theRateStartsAtTheModesAndTheAuthorsChoiceIsKept() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        compare(EncoderController.bitrateKbps, 256);
+        useParts(ctx, { vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        compare(EncoderController.bitrateKbps, 384);
+
+        // Picked on the Save step, the rate is the author's: a part leaving does not move it.
+        ctx.flow.currentStepKey = "save";
+        const box = findByName(ctx.win, "karaokeBitrate");
+        const at = EncoderController.bitrates.indexOf(448);
+        verify(at >= 0);
+        box.currentIndex = at;
+        box.activated(at);
+        compare(EncoderController.bitrateKbps, 448);
+        ctx.flow.currentStepKey = "parts";
+        press(ctx, "karaokeRemove-vocal2");
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        compare(EncoderController.bitrateKbps, 448);
+    }
+
+    function test_whatTheAuthorSetOnThePartsSurvivesAPartChanging() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        // As the rail and Expert set them: a start offset on the lead, a trim on the backing's
+        // left channel and one on the lead.
+        EncoderController.setSourceOffset(2, 0.25);
+        EncoderController.setAssignmentTrim(0, 0, -3.0);
+        EncoderController.setAssignmentTrim(2, 0, 2.5);
+
+        // A second vocal arrives, which reloads every source.
+        useParts(ctx, { vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        const rows = EncoderController.sourceModel;
+        compare(rows.length, 4);
+        compare(rows[2].label, "kb-lead.wav");
+        compare(rows[2].offsetSeconds, 0.25);
+        compare(rows[0].offsetSeconds, 0);
+        const trims = {};
+        for (const row of EncoderController.assignmentRows) {
+            trims[row.source + ":" + row.channel] = row.trimDb;
+        }
+        compare(trims["0:0"], -3.0);
+        compare(trims["2:0"], 2.5);
+        compare(trims["1:0"], 0, "nobody trimmed the melody");
+    }
+
+    function saveTo(ctx, url) {
+        press(ctx, "karaokeNextButton");
+        const dialog = findByName(ctx.win, "saveDialog");
+        tryCompare(dialog, "visible", true, 5000);
+        dialog.selectedFile = url;
+        dialog.accepted();
+        dialog.close();
+        tryCompare(EncoderController, "busy", false, 60000);
+    }
+
+    function test_theHearPreviewIsNotARunAndASavedStreamIs() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        const before = EncoderController.runs.length;
+        ctx.flow.currentStepKey = "hear";
+        tryCompare(ctx.flow, "previewState", "ready", 60000);
+        compare(EncoderController.runs.length, before, "the preview was listed as a run");
+
+        ctx.flow.currentStepKey = "save";
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_polish_run.ac3");
+        verify(audioFixtures.remove(out));
+        saveTo(ctx, out);
+        compare(EncoderController.runs.length, before + 1);
+        compare(EncoderController.runs[0].filename, "tst_karaoke_polish_run.ac3");
+        compare(EncoderController.runs[0].status, "done");
+    }
+
+    function test_aLyricsFileBesideTheBackingGoesBesideTheStream() {
+        const song = audioFixtures.writeTones("kb-song.wav", 48000, 1.024, [440, 620]);
+        const words = audioFixtures.writeText("kb-song.lrc", "[ti:Test]\n[00:00.10]<00:00.10>La <00:00.50>la\n");
+        verify(song.toString().length > 0 && words.toString().length > 0);
+        const ctx = openFlow();
+        useParts(ctx, { backing: song, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        // Offered because a .lrc of the backing's name is beside it.
+        compare(ctx.flow.lyricsUrl, words.toString());
+        ctx.flow.currentStepKey = "save";
+        compare(findByName(ctx.win, "karaokeLyricsFile").text, "kb-song.lrc");
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_polish_lyrics.ac3");
+        const beside = Qt.resolvedUrl("_test_output/tst_karaoke_polish_lyrics.lrc");
+        verify(audioFixtures.remove(out) && audioFixtures.remove(beside));
+        saveTo(ctx, out);
+        // Under the stream's name, with the file's own bytes, where Hearth looks.
+        verify(cliRunner.sameBytes(words, beside), "the lyrics were not put beside the stream");
+        verify(ctx.flow.lyricsNote.indexOf("beside the stream") >= 0, ctx.flow.lyricsNote);
+
+        // Removed, none goes.
+        press(ctx, "karaokeRemoveLyrics");
+        compare(ctx.flow.lyricsUrl, "");
+        const out2 = Qt.resolvedUrl("_test_output/tst_karaoke_polish_nolyrics.ac3");
+        const beside2 = Qt.resolvedUrl("_test_output/tst_karaoke_polish_nolyrics.lrc");
+        verify(audioFixtures.remove(out2) && audioFixtures.remove(beside2));
+        saveTo(ctx, out2);
+        compare(cliRunner.size(beside2), 0, "a lyrics file the author removed was put beside the stream");
+    }
 }

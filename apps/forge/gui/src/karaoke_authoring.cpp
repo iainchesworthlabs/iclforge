@@ -2,9 +2,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 namespace forge_gui {
@@ -117,6 +120,60 @@ std::string join(const std::vector<std::string>& words) {
 bool KaraokePlan::has_problem() const {
     return std::any_of(checks.begin(), checks.end(),
                        [](const KaraokeCheck& c) { return c.level == KaraokeCheckLevel::kProblem; });
+}
+
+int karaoke_default_bitrate_kbps(const std::string& mode) {
+    // About 77 kbps a channel: 3/2's five is the sheet's 384.
+    if (mode == "3/2") return 384;
+    if (mode == "3/1" || mode == "2/2") return 320;
+    if (mode == "3/0" || mode == "2/1") return 256;
+    return 192;
+}
+
+namespace {
+
+bool is_lrc_extension(const std::filesystem::path& extension) {
+    const std::string text = extension.string();
+    return text.size() == 4 && text[0] == '.' &&
+           std::tolower(static_cast<unsigned char>(text[1])) == 'l' &&
+           std::tolower(static_cast<unsigned char>(text[2])) == 'r' &&
+           std::tolower(static_cast<unsigned char>(text[3])) == 'c';
+}
+
+}  // namespace
+
+std::string karaoke_lyrics_beside(const std::string& media_path) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const fs::path media(media_path);
+    const fs::path folder = media.has_parent_path() ? media.parent_path() : fs::path(".");
+    const std::string stem = media.stem().string();
+    for (fs::directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
+        const fs::path& candidate = it->path();
+        if (is_lrc_extension(candidate.extension()) && candidate.stem().string() == stem &&
+            it->is_regular_file(ec)) {
+            return candidate.string();
+        }
+    }
+    return {};
+}
+
+KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path, const std::string& stream_path) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const fs::path source(lyrics_path);
+    if (!fs::is_regular_file(source, ec)) {
+        return KaraokeLyricsCopy::kUnreadable;
+    }
+    fs::path target(stream_path);
+    target.replace_extension(".lrc");
+    if (fs::exists(target, ec)) {
+        return fs::equivalent(source, target, ec) ? KaraokeLyricsCopy::kAlreadyThere
+                                                  : KaraokeLyricsCopy::kExists;
+    }
+    return fs::copy_file(source, target, fs::copy_options::none, ec) && !ec
+               ? KaraokeLyricsCopy::kCopied
+               : KaraokeLyricsCopy::kFailed;
 }
 
 std::string karaoke_duration_text(double seconds) {

@@ -595,7 +595,7 @@ ApplicationWindow {
             return qsTr("%1 · %2 · %3").arg(codec).arg(shape).arg(window.planRateText);
         }
         return qsTr("%1 · %2 · %3")
-            .arg(codec).arg(EncoderController.channelShapeName).arg(window.planRateText);
+            .arg(codec).arg(EncoderController.planLabel).arg(window.planRateText);
     }
     // fMP4/CMAF has no single extension (outputIsFolder() is true there) -
     // ".{suffix}" would otherwise read as a bare trailing dot.

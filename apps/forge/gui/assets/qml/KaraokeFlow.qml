@@ -109,10 +109,33 @@ ColumnLayout {
         return cut >= 0 ? text.substring(cut + 1) : text;
     }
 
+    // What the author set on the parts as they are loaded: each part's start offset, and the
+    // trim on each of its channels. Replacing the sources takes both back to nothing, so they
+    // are read first and put back after, keyed by the part and not by the file (a part
+    // replaced by another take keeps what was set for its place).
+    property var keptTrims: ({})
+    function keptSettings() {
+        const kept = { offsets: {}, trims: {} };
+        const rows = EncoderController.sourceModel;
+        for (let i = 0; i < flow.loadedParts.length && i < rows.length; ++i) {
+            if (rows[i].offsetSeconds !== 0) {
+                kept.offsets[flow.loadedParts[i].part] = rows[i].offsetSeconds;
+            }
+        }
+        for (const row of EncoderController.assignmentRows) {
+            if (row.trimDb !== 0 && row.source < flow.loadedParts.length) {
+                kept.trims[flow.loadedParts[row.source].part + ":" + row.channel] = row.trimDb;
+            }
+        }
+        return kept;
+    }
+
     // The parts, loaded into the draft in a fixed order - the first is the
     // primary source, and loading it chooses a bed from its own layout, which
     // this then replaces with the coding mode the parts make.
     function rebuild() {
+        const kept = flow.keptSettings();
+        flow.keptTrims = kept.trims;
         while (EncoderController.sourceModel.length > 0) {
             EncoderController.removeSource(0);
         }
@@ -149,6 +172,17 @@ ColumnLayout {
         }
         flow.loadedParts = loaded;
         flow.failedParts = failed;
+        for (let i = 0; i < loaded.length; ++i) {
+            const offset = kept.offsets[loaded[i].part];
+            if (offset !== undefined) {
+                EncoderController.setSourceOffset(i, offset);
+            }
+        }
+        // A lyrics file of the first part's name beside it is offered, unless the author has
+        // chosen one (or none) by hand.
+        if (!flow.lyricsChosen) {
+            flow.lyricsUrl = loaded.length > 0 ? KaraokeAuthoring.lyricsBeside(loaded[0].url) : "";
+        }
         flow.refreshPlan();
     }
 
@@ -195,6 +229,53 @@ ColumnLayout {
         EncoderController.bsmodIndex = 7;
         for (const channel of result.channels) {
             EncoderController.setAssignment(channel.file, channel.channel, channel.position);
+            // A trim the author had set on this part's channel, put back.
+            const part = flow.loadedParts[channel.file] ? flow.loadedParts[channel.file].part : "";
+            const trim = flow.keptTrims[part + ":" + channel.channel];
+            if (trim !== undefined && trim !== 0) {
+                EncoderController.setAssignmentTrim(channel.file, channel.channel, trim);
+            }
+        }
+        // The rate a mode of this width starts at (the encoder's own 192 is stereo's), unless the
+        // author has picked one.
+        if (!flow.rateChosen) {
+            EncoderController.bitrateKbps = KaraokeAuthoring.defaultBitrateKbps(result.mode);
+        }
+    }
+
+    // Set when the author picks a rate on the Save step, after which the flow leaves it alone.
+    property bool rateChosen: false
+
+    // ---- the lyrics file that goes beside the stream --------------------------------
+    // A `.lrc` the player finds by the stream's name (Hearth's L1). Offered from beside the
+    // first part when one of its name is there; the author's own choice, or removal, wins.
+    property string lyricsUrl: ""
+    property bool lyricsChosen: false
+    // What became of the copy, as a sentence; empty until a stream has been saved.
+    property string lyricsNote: ""
+
+    function placeLyrics() {
+        flow.lyricsNote = "";
+        if (flow.lyricsUrl.length === 0 || EncoderController.outputIsFolder()) {
+            return;
+        }
+        const result = KaraokeAuthoring.copyLyrics(flow.lyricsUrl, EncoderController.outputPath);
+        switch (result) {
+        case "copied":
+            flow.lyricsNote = qsTr("The lyrics are beside the stream, as the same name with .lrc.");
+            break;
+        case "already-there":
+            flow.lyricsNote = qsTr("The lyrics are already beside the stream.");
+            break;
+        case "exists":
+            flow.lyricsNote = qsTr("A lyrics file of that name was already beside the stream, and "
+                                   + "was left as it is.");
+            break;
+        case "unreadable":
+            flow.lyricsNote = qsTr("The lyrics file could not be read, so none was put beside the stream.");
+            break;
+        default:
+            flow.lyricsNote = qsTr("The lyrics could not be written beside the stream.");
         }
     }
 
@@ -296,13 +377,17 @@ ColumnLayout {
         // The player reads an elementary stream, whatever the final container.
         flow.previewContainer = EncoderController.containerIndex;
         EncoderController.containerIndex = 0;
-        EncoderController.encodeTo(flow.previewUrl);
+        // The stream is built to be heard, not saved: it is not a run of its own.
+        EncoderController.encodePreviewTo(flow.previewUrl);
     }
 
     Connections {
         target: EncoderController
         function onEncodeFinished(ok, message) {
             if (flow.previewState !== "encoding") {
+                if (ok && flow.currentStepKey === "save") {
+                    flow.placeLyrics();
+                }
                 return;
             }
             EncoderController.containerIndex = flow.previewContainer;
@@ -690,94 +775,6 @@ ColumnLayout {
                             }
                         }
                     }
-
-                    // ---- the coding mode, and the checks ------------------------------
-                    Rectangle {
-                        objectName: "karaokeMode"
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: modeColumn.implicitHeight + Theme.space4 * 2
-                        color: "transparent"
-                        border.color: Theme.divider
-                        border.width: 1
-
-                        ColumnLayout {
-                            id: modeColumn
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: Theme.space4
-                            spacing: Theme.space2
-
-                            Text {
-                                text: qsTr("CODING MODE")
-                                font.pixelSize: Theme.fontMono
-                                font.letterSpacing: 1.2
-                                color: Theme.textMuted
-                            }
-                            Text {
-                                objectName: "karaokeModeLabel"
-                                text: flow.plan.mode.length > 0
-                                      ? qsTr("%1 · %2").arg(flow.plan.mode).arg(flow.partsText())
-                                      : qsTr("not yet")
-                                font.pixelSize: Theme.fontTitle
-                                font.family: Theme.monoFamily
-                                font.weight: Font.DemiBold
-                                color: Theme.text
-                            }
-                            Text {
-                                objectName: "karaokeModeReason"
-                                Layout.fillWidth: true
-                                visible: text.length > 0
-                                text: flow.reasonText()
-                                wrapMode: Text.WordWrap
-                                font.pixelSize: Theme.fontSmall
-                                color: Theme.neutral700
-                            }
-
-                            Text {
-                                Layout.topMargin: Theme.space2
-                                text: qsTr("CHECKS")
-                                font.pixelSize: Theme.fontMono
-                                font.letterSpacing: 1.2
-                                color: Theme.textMuted
-                            }
-                            // A file that would not load says why.
-                            Repeater {
-                                model: flow.failedParts
-                                delegate: Text {
-                                    required property var modelData
-                                    objectName: "karaokeCheck-load"
-                                    Layout.fillWidth: true
-                                    text: "✕ " + modelData.text
-                                    wrapMode: Text.WordWrap
-                                    font.pixelSize: Theme.fontSmall
-                                    color: Theme.text
-                                }
-                            }
-                            Repeater {
-                                model: flow.plan.checks
-                                delegate: Text {
-                                    required property var modelData
-                                    objectName: "karaokeCheck-" + modelData.code
-                                    Layout.fillWidth: true
-                                    text: (modelData.level === "ok" ? "✓ "
-                                           : modelData.level === "warning" ? "! " : "✕ ")
-                                          + flow.checkText(modelData)
-                                    wrapMode: Text.WordWrap
-                                    font.pixelSize: Theme.fontSmall
-                                    color: modelData.level === "problem" ? Theme.text : Theme.neutral700
-                                    font.weight: modelData.level === "problem" ? Font.DemiBold : Font.Normal
-                                }
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: qsTr("No LFE: karaoke streams made here carry none.")
-                                wrapMode: Text.WordWrap
-                                font.pixelSize: Theme.fontSmall
-                                color: Theme.textMuted
-                            }
-                        }
-                    }
                 }
 
                 // ================= 2 · Levels =================
@@ -1116,7 +1113,10 @@ ColumnLayout {
                             Layout.preferredWidth: Math.round(160 * Theme.fontScale)
                             model: EncoderController.bitrates
                             currentIndex: EncoderController.bitrates.indexOf(EncoderController.bitrateKbps)
-                            onActivated: (index) => EncoderController.bitrateKbps = EncoderController.bitrates[index]
+                            onActivated: (index) => {
+                                flow.rateChosen = true;
+                                EncoderController.bitrateKbps = EncoderController.bitrates[index];
+                            }
                             Accessible.name: qsTr("Bit rate")
                         }
                         Text {
@@ -1124,6 +1124,59 @@ ColumnLayout {
                             font.pixelSize: Theme.fontSmall
                             color: Theme.textMuted
                         }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.space3
+                        Text {
+                            Layout.preferredWidth: Math.round(110 * Theme.fontScale)
+                            text: qsTr("Lyrics")
+                            font.pixelSize: Theme.fontNormal
+                            color: Theme.text
+                        }
+                        Text {
+                            objectName: "karaokeLyricsFile"
+                            Layout.fillWidth: true
+                            text: flow.lyricsUrl.length > 0 ? flow.fileNameOf(flow.lyricsUrl)
+                                                            : qsTr("none")
+                            elide: Text.ElideMiddle
+                            font.pixelSize: Theme.fontNormal
+                            font.family: flow.lyricsUrl.length > 0 ? Theme.monoFamily
+                                                                   : Theme.headingFamily
+                            color: flow.lyricsUrl.length > 0 ? Theme.text : Theme.textMuted
+                        }
+                        Button {
+                            objectName: "karaokeChooseLyrics"
+                            text: flow.lyricsUrl.length > 0 ? qsTr("Change") : qsTr("Choose…")
+                            onClicked: lyricsDialog.open()
+                        }
+                        Button {
+                            objectName: "karaokeRemoveLyrics"
+                            visible: flow.lyricsUrl.length > 0
+                            text: qsTr("Remove")
+                            onClicked: {
+                                flow.lyricsChosen = true;
+                                flow.lyricsUrl = "";
+                            }
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: qsTr("An .lrc file is put beside the stream under the stream's name, where "
+                                   + "Hearth finds it. One of the backing's name beside it is offered.")
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        color: Theme.textMuted
+                    }
+                    Text {
+                        objectName: "karaokeLyricsNote"
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        text: flow.lyricsNote
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        color: Theme.neutral700
                     }
 
                     Rectangle {
@@ -1164,6 +1217,104 @@ ColumnLayout {
                         font.pixelSize: Theme.fontSmall
                         color: Theme.neutral700
                     }
+                }
+            }
+        }
+    }
+
+    // ---- the coding mode, and the checks ------------------------------
+    // Pinned under the step, not in its scroll: the mode is the answer to what was
+    // supplied, and at 900 px it sat below the fold.
+    Rectangle {
+        objectName: "karaokeMode"
+        visible: flow.currentStepKey === "parts"
+        Layout.fillWidth: true
+        Layout.leftMargin: 24
+        Layout.rightMargin: 24
+        Layout.bottomMargin: Theme.space3
+        Layout.preferredHeight: modeColumn.implicitHeight + Theme.space4 * 2
+        color: "transparent"
+        border.color: Theme.divider
+        border.width: 1
+
+        ColumnLayout {
+            id: modeColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: Theme.space4
+            spacing: Theme.space2
+
+            // The mode and what it was chosen from on one line; the checks run on beside one
+            // another, so the card is a few lines tall and the rows above it stay in view.
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.space3
+                Text {
+                    text: qsTr("CODING MODE")
+                    font.pixelSize: Theme.fontMono
+                    font.letterSpacing: 1.2
+                    color: Theme.textMuted
+                }
+                Text {
+                    objectName: "karaokeModeLabel"
+                    text: flow.plan.mode.length > 0
+                          ? qsTr("%1 · %2").arg(flow.plan.mode).arg(flow.partsText())
+                          : qsTr("not yet")
+                    font.pixelSize: Theme.fontHeading
+                    font.family: Theme.monoFamily
+                    font.weight: Font.DemiBold
+                    color: Theme.text
+                }
+                Text {
+                    objectName: "karaokeModeReason"
+                    Layout.fillWidth: true
+                    visible: text.length > 0
+                    text: flow.reasonText()
+                    elide: Text.ElideRight
+                    font.pixelSize: Theme.fontSmall
+                    color: Theme.neutral700
+                }
+            }
+
+            Flow {
+                Layout.fillWidth: true
+                spacing: Theme.space3
+
+                // A file that would not load says why.
+                Repeater {
+                    model: flow.failedParts
+                    delegate: Text {
+                        required property var modelData
+                        objectName: "karaokeCheck-load"
+                        width: Math.min(implicitWidth, parent ? parent.width : implicitWidth)
+                        text: "✕ " + modelData.text
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        color: Theme.text
+                    }
+                }
+                Repeater {
+                    model: flow.plan.checks
+                    delegate: Text {
+                        required property var modelData
+                        objectName: "karaokeCheck-" + modelData.code
+                        width: Math.min(implicitWidth, parent ? parent.width : implicitWidth)
+                        text: (modelData.level === "ok" ? "✓ "
+                               : modelData.level === "warning" ? "! " : "✕ ")
+                              + flow.checkText(modelData)
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        color: modelData.level === "problem" ? Theme.text : Theme.neutral700
+                        font.weight: modelData.level === "problem" ? Font.DemiBold : Font.Normal
+                    }
+                }
+                Text {
+                    width: Math.min(implicitWidth, parent ? parent.width : implicitWidth)
+                    text: qsTr("No LFE: karaoke streams made here carry none.")
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: Theme.fontSmall
+                    color: Theme.textMuted
                 }
             }
         }
@@ -1220,6 +1371,17 @@ ColumnLayout {
     function openPicker(part) {
         flow.pickerPart = part;
         partDialog.open();
+    }
+    FileDialog {
+        id: lyricsDialog
+        objectName: "karaokeLyricsDialog"
+        title: qsTr("Choose the lyrics")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [qsTr("Lyrics (*.lrc)"), qsTr("All files (*)")]
+        onAccepted: {
+            flow.lyricsChosen = true;
+            flow.lyricsUrl = selectedFile.toString();
+        }
     }
     FileDialog {
         id: partDialog

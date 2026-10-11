@@ -3270,6 +3270,16 @@ QString EncoderController::effectiveLabel() const {
     if (atmos_enabled_) {
         return QStringLiteral("5.1 bed");
     }
+    // Annex C's karaoke is AC-3's (E-AC-3 and AC-4 have no such mode, and the decoder never
+    // flags one). The five channels are a backing and parts: "5.0" says a surround room.
+    if (codec_ == plan::Codec::kAc3 &&
+        meta_.info.bsmod == iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke) {
+        const auto cp = effectiveChannelPlan();
+        if (iclforge::ac3::meta::is_karaoke(meta_.info.bsmod, cp.bed_acmod)) {
+            return QStringLiteral("Karaoke %1")
+                .arg(to_qstring(iclforge::ac3::analysis::layout_name(cp.bed_acmod, cp.bed_lfe)));
+        }
+    }
     return channelShapeName();
 }
 
@@ -3972,6 +3982,9 @@ void EncoderController::restoreRuns(const QVariantList& saved) {
 
 void EncoderController::finishRun(bool ok, const QString& message) {
     if (current_run_id_ < 0) {
+        // An encode that opened no run (encodePreviewTo) has no chip to put its rate on, and
+        // the next run must not be handed it.
+        pending_rate_text_.clear();
         return;
     }
     for (auto& variant : runs_) {
@@ -7318,6 +7331,17 @@ void EncoderController::cancel() {
     cancel_requested_.store(true, std::memory_order_relaxed);
 }
 
+void EncoderController::encodePreviewTo(const QUrl& url) {
+    if (busy_) {
+        return;
+    }
+    // Consumed by the encodeTo() just below, which is the only place it is read; an encode
+    // refused before it gets there must not leave it set for the next, real one.
+    next_encode_unrecorded_ = true;
+    encodeTo(url);
+    next_encode_unrecorded_ = false;
+}
+
 void EncoderController::encodeTo(const QUrl& url) {
     if (busy_ || !source_ready_ || !source_) {
         return;
@@ -7434,7 +7458,9 @@ void EncoderController::encodeTo(const QUrl& url) {
     emit outputChanged();
 
     cancel_requested_.store(false, std::memory_order_relaxed);
-    startRun(path);
+    if (!std::exchange(next_encode_unrecorded_, false)) {
+        startRun(path);
+    }
     setBusy(true);
     setProgress(0.0);
     setStatus(QStringLiteral("Encoding…"));
