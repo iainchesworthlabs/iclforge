@@ -58,6 +58,7 @@
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
 #include "ac4_encode_core.hpp"
+#include "source_frame.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "channel_geometry.hpp"
 #include "fmp4_folder_writer.hpp"
@@ -3108,11 +3109,9 @@ void EncoderController::startMotionPreview() {
             const auto valid =
                 std::min<std::size_t>(iclforge::ac3::kSamplesPerFrame, total - start);
             for (std::size_t ch = 0; ch < nobjects; ++ch) {
-                const auto len = planes[ch].size();
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    block[ch][static_cast<std::size_t>(i)] = at < len ? planes[ch][at] : 0.0f;
-                }
+                // Past its end a channel holds its last sample, as forge does:
+                // see source_frame.hpp for why not silence.
+                iclforge::apps::fill_source_frame(planes[ch], 0, start, block[ch]);
                 views[ch] = block[ch];
             }
             // The placement is the object's position at the END of the
@@ -4307,14 +4306,8 @@ void EncoderController::previewPlanMeters() {
             const auto valid =
                 std::min<std::size_t>(iclforge::ac3::kSamplesPerFrame, total - start);
             for (std::size_t ch = 0; ch < planes.size(); ++ch) {
-                const auto len = planes[ch].size();
                 const auto offset = ch < offsets.size() ? offsets[ch] : 0;
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    const std::size_t shifted = at >= offset ? at - offset : 0;
-                    source_block[ch][static_cast<std::size_t>(i)] =
-                        at >= offset && shifted < len ? planes[ch][shifted] : 0.0f;
-                }
+                iclforge::apps::fill_source_frame(planes[ch], offset, start, source_block[ch]);
                 auto& acc = source_summaries[flat_source[ch]];
                 for (std::size_t i = 0; i < valid; ++i) {
                     const double s = static_cast<double>(source_block[ch][i]);
@@ -7600,7 +7593,7 @@ void EncoderController::encodeChannels(const QString& path,
 
         // The longest loaded channel, not just channel 0's - a run with
         // several sources of different lengths covers all of them (each
-        // shorter one below simply pads with silence past its own end)
+        // shorter one below simply holds its last sample past its own end)
         // rather than truncating to whichever happens to be shortest.
         std::size_t total = 0;
         for (const auto& channel : planes) {
@@ -7639,19 +7632,16 @@ void EncoderController::encodeChannels(const QString& path,
                 cancelled = true;
                 break;
             }
-            // The tail frame is zero-padded to a full 1536 samples; the meter
+            // The tail frame is padded to a full 1536 samples, holding each
+            // channel's last sample as forge does; the meter
             // sees only the real ones, so padding cannot pull the RMS down.
             const auto valid =
                 std::min<std::size_t>(iclforge::ac3::kSamplesPerFrame, total - start);
             for (std::size_t ch = 0; ch < planes.size(); ++ch) {
                 // Each channel's OWN length, not the run's overall total: a
-                // shorter source among several pads with silence from where
-                // IT ends, not from wherever the longest one does.
-                const auto len = planes[ch].size();
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    source[ch][static_cast<std::size_t>(i)] = at < len ? planes[ch][at] : 0.0f;
-                }
+                // shorter source among several holds its last sample from
+                // where IT ends, not from wherever the longest one does.
+                iclforge::apps::fill_source_frame(planes[ch], 0, start, source[ch]);
             }
             plan::render(routing, in, out, iclforge::ac3::kSamplesPerFrame);
             for (std::size_t i = 0; i < lfe_indices.size(); ++i) {
@@ -8026,11 +8016,9 @@ void EncoderController::encodeObjects(const QString& path,
             const auto valid =
                 std::min<std::size_t>(iclforge::ac3::kSamplesPerFrame, total - start);
             for (std::size_t ch = 0; ch < nobjects; ++ch) {
-                const auto len = planes[ch].size();
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    block[ch][static_cast<std::size_t>(i)] = at < len ? planes[ch][at] : 0.0f;
-                }
+                // Past its end a channel holds its last sample, as forge does:
+                // see source_frame.hpp for why not silence.
+                iclforge::apps::fill_source_frame(planes[ch], 0, start, block[ch]);
                 views[ch] = block[ch];
             }
             // The placement is the object's position at the END of the
