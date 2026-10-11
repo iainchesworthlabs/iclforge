@@ -1,18 +1,20 @@
 # Karaoke, phase 2
 
-!!! note "Status as of 2026-10-11: drafted for the owner's sign-off; nothing in it is built yet"
+!!! note "Status as of 2026-10-11: signed off by the owner; W1 is merged, W2 is in review, the builds start with W13a"
     [Phase 1](karaoke.md) built Annex C karaoke as K0 to K6 (Hearth's Karaoke page, lyrics and
     singer view; the Forge GUI's Karaoke flow). This page is the plan for what phase 1 left, in
     the order the owner gave on 2026-10-11 ([Order](#order)). Each item below is a small pull
-    request or a written finding, never a big bang, and the builds after the first items wait for
-    the owner to sign the order off. The live status board is [ROADMAP.md](../ROADMAP.md).
+    request or a written finding, never a big bang. The owner signed the order off and answered
+    the decisions on 2026-10-11 ([Decisions](#decisions)); two answers changed the plan (D3, where
+    the sink decodes, and D8, UTF-16 for `.lrc`). The live status board is
+    [ROADMAP.md](../ROADMAP.md).
 
     | Step | What | State |
     |---|---|---|
-    | 0 | This page: scope, order, decisions | Drafted 2026-10-11, for sign-off |
-    | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1 fixed in PR #1290; W2 and W3 follow |
+    | 0 | This page: scope, order, decisions | Signed off 2026-10-11 |
+    | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1 merged (#1290); W2 in review (#1293); W3 designed in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes) |
     | 2 | Research W4 and W5 (lyrics for a network group; Android and a browser page) | Read from the code; written up in [the findings](karaoke-phase2-findings.md) |
-    | 3 | Builds W6 to W11 and W13, one pull request each | After sign-off |
+    | 3 | Builds in [the approved order](#order), one pull request each | Approved; W13a first |
     | 4 | W12, the ESP32-P4 with a panel | **Parked** until the board arrives; only its questions are kept |
 
 ## What this phase is
@@ -43,12 +45,13 @@ text/lyric meta data and events". That is W13.
    find, the flow's polish, and word timing as a design.
 2. **Research (W4, W5).** The two "understood" items. They are findings with sizes, not builds;
    what they recommend becomes a build (W7, W8) only on the owner's say.
-3. **Builds, in the owner's priority (W6 to W11, W13).** Word timing; then the karaoke choice
-   reaching a sink and a browser, if the findings are accepted; then the LFE part and the
-   re-levelling; duets only if asked. Timed-text import (W13) is the owner's addition and has no
-   place in that list yet; its first step, moving the lyric module out of Hearth's engine into a
-   library, belongs **before** word timing, so that the word-timing writer is written where it will
-   live ([W13](#w13-timed-text-import)).
+3. **Builds, in the order the owner approved on 2026-10-11:** W13a (the lyric module into a
+   library, reading UTF-8 and UTF-16); W6 (word timing, its writer written in that library); W7
+   (the sink decodes locally where it can); W8 (the browser demo); W9 (the LFE part); W10
+   (re-levelling, reviewed with the AC-3 owner session before it is built); W13b to W13f
+   (Crucible's import, then SubRip and ASS, MIDI karaoke and CD+G); W11 (duets) only if asked.
+   W13a is first because the writer, the sink firmware and Crucible all need the module where
+   they can reach it ([W13](#w13-timed-text-import)).
 4. **Parked (W12).** The ESP32-P4 with a panel.
 
 ## Work items
@@ -58,14 +61,14 @@ tests, **L** is two to four stacked PRs. "Needs" is what the item cannot start w
 
 | ID | Item | Size | Needs | State |
 |---|---|---|---|---|
-| W1 | **The last frame.** The Forge GUI and `forge encode` write a different last frame for a source that is not whole AC-3 frames; fix the side that is wrong | S | Nothing | **Fixed, PR #1290**: the GUI was the side that is wrong ([below](#w1-the-last-frame)) |
-| W2 | **Flow polish.** The header and rail say "5.0"; 192 kbps where the sheet showed 384; the mode card below the fold at 900 px; the Hear preview a run; Expert edits overwritten when a part changes; no `.lrc` beside a saved stream | M | Catalogue regeneration | Items read from `KaraokeFlow.qml`, `Main.qml` and `encoder_controller.cpp` ([below](#w2-flow-polish)) |
+| W1 | **The last frame.** The Forge GUI and `forge encode` write a different last frame for a source that is not whole AC-3 frames; fix the side that is wrong | S | Nothing | **Merged, PR #1290**: the GUI was the side that is wrong ([below](#w1-the-last-frame)) |
+| W2 | **Flow polish.** The header and rail say "5.0"; 192 kbps where the sheet showed 384; the mode card below the fold at 900 px; the Hear preview a run; Expert edits overwritten when a part changes; no `.lrc` beside a saved stream | M | Catalogue regeneration | **Built, PR #1293**, each item held by a test that fails without it ([below](#w2-flow-polish)) |
 | W3 | **Word timing, as a design.** Which of a tap editor, an estimate and an alignment, and where it lives | S | The owner's choice of shape | Evaluated in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes); recommendation [below](#w3-word-timing) |
 | W4 | **Findings: lyrics for a network group.** Which position the lyric clock follows for a group, how a sink with a screen would get the line and the word, and how the choice reaches a sink that decodes for itself | S | Nothing | Read from `NetworkGroupSink`, `choose_sink_form` and the Sendspin roles: [the findings](karaoke-phase2-findings.md#w4-lyrics-for-a-network-group) |
 | W5 | **Findings: Android and a browser page.** What the C API, the bindings and WebAssembly lack, and the smallest first slice | S | Nothing | Read from `libs/capi`, `bindings/*`, `apps/demos/*`: [the findings](karaoke-phase2-findings.md#w5-android-and-a-browser-page) |
-| W6 | **Word timing, built** (shape per W3) | L | W3 decided | After sign-off |
-| W7 | **The choice reaches a network sink** (the smallest slice W4 finds) | S to M | W4 accepted | After sign-off |
-| W8 | **Karaoke in the browser decode demo** (the smallest slice W5 finds) | S to M | W5 accepted | After sign-off |
+| W6 | **Word timing, built** (shape per W3, D2) | L | W13a | Approved; after W13a |
+| W7 | **The sink decodes locally where it can** (D3): the role's settings carry the karaoke choice, the board applies it and runs the lyrics itself; the host sends PCM only to a sink that cannot | M to L | W13a for the lyrics; D3 | Approved; scoped in [the findings](karaoke-phase2-findings.md#sink-local-decode-the-owners-requirement); the audio side can be verified on the S3 boards before the panel arrives |
+| W8 | **Karaoke in the browser decode demo** (the smallest slice W5 finds) | S to M | D4 | Approved |
 | W9 | **An LFE part in authoring** (phase 1's decision 6) | M | Nothing; the encoder and the output stage already carry an LFE | After sign-off |
 | W10 | **Annex C's re-levelling of M, V1 and V2** | M to L | A library change, reviewed with the AC-3 decoder's owner session | After sign-off |
 | W11 | **Duets** beyond the V1 and V2 choice that exists | M | The owner asking for it | Not planned; costed [below](#w11-duets) |
@@ -129,7 +132,7 @@ the build before. The tests that hold it, and why the earlier suites missed it:
 `test_source_frame.cpp` holds the function to its cases and fails with a zero hold; the karaoke flow
 suite compares the window's bytes with `forge`'s for 2.0 s parts and fails with the GUI's encode
 loop put back to zeros, while its 1.024 s parts pass either way. One decision for the owner
-([D1](#decisions-for-the-owner)): the GUI's files for such sources change by their last frame.
+([D1](#decisions)): the GUI's files for such sources change by their last frame.
 
 ### W2: flow polish
 
@@ -188,24 +191,27 @@ second user of it would justify.
   compare against; the tests hold the gains to the arithmetic and the table to the library's own
   decoder, as phase 1 did.
 
-## Decisions for the owner
+## Decisions
 
-The answer assumed is the one the plan is written to; each can be reversed before its item starts.
+Put to the owner on 2026-10-11 with the answer the plan assumed, and answered the same day:
+approved as assumed except **D3** (the sink decodes locally, with the server's PCM as the
+fallback) and **D8** (UTF-16 is adopted), and **D10** was confirmed. Each can still be reopened
+before its item starts.
 
-| # | Decision | Assumed | Alternatives |
+| # | Decision | Answer (2026-10-11) | Alternatives |
 |---|---|---|---|
-| D1 | The GUI pads a short last frame as `forge` does (holds the last sample), so the GUI's files for such a source change by their last frame (PR #1290, built; it is a fix, asked because it changes bytes) | **Yes**: one policy for both, with a measured reason | Leave the GUI alone and document the difference: two programs of one family write different bytes from one plan, and the window's last frame is lower on some material |
-| D2 | Word timing's shape: a Hearth tap editor, lines then words, with an estimate as the starting point; the aligner as a recipe | **Yes** | The editor in the Forge GUI (needs the lyrics module in `apps/shared` first); an estimate with no editor; nothing |
-| D3 | How the choice reaches a sink: Hearth decodes a karaoke stream for a sink and sends PCM, so the group hears one reproduction | **Yes, as the first slice**; the sink-side keys stay an option for the P4 | The role's decoder settings carry `karaoke` and `karaoke_vocals` now, so a sink that decodes coded AC-3 applies them itself |
-| D4 | Browser first, then nothing for Android until there is a player to put it in | **Yes**: the WebAssembly decoder demo gets the two fields and a panel; lyrics after | Skip the browser; or an Android player as a phase of its own |
-| D5 | LFE part: one optional mono part, low-passed as the encoder does today | **Yes** | An LFE from a 5.1 source's own LFE channel only |
-| D6 | Re-levelling: gains for M, V1 and V2 in the library's output stage and sliders on Hearth's Karaoke page | **Yes**, after the first items | Not built; Annex C calls it optional |
-| D7 | Duets: no per-song memory, and nothing beyond V1 and V2 until asked | **Yes** | The costed duet slice below |
-| D8 | UTF-16 with a byte-order mark for `.lrc` (carried over from phase 1's decision 4; the reader takes UTF-8 only) | **Not now** | Read it: small and unambiguous |
-| D9 | What Crucible does with imported lyrics, and where their position comes from | **A lyric strip in Crucible's window for the application it is attached to; the position from that application's operating-system media session where it publishes one, and a start-and-nudge where it does not** | Events out (OSC) instead of, or as well as, a strip; the strip only, with no position source |
-| D10 | "Mini karaoke" is read as **MIDI karaoke** (`.kar`, lyrics as MIDI meta events) | **Yes**; please confirm, since the words were dictated | Another format: say which |
-| D11 | CD+G is read as an already-ripped `.cdg` file and shown as its picture; no drive ripping and no text extracted | **Yes**: a CD+G carries a 300 by 216 picture, not text | OCR of the picture for text (a model and its runtime; not planned) |
-| D12 | The lyric reader and cursor move from `apps/hearth/engine` into a library before word timing's writer and Crucible's import are built | **Yes** | Leave them in Hearth and give Crucible its own parser: two readers of one format that cannot share a test |
+| D1 | The GUI pads a short last frame as `forge` does (holds the last sample), so the GUI's files for such a source change by their last frame (PR #1290, built; it is a fix, asked because it changes bytes) | **Approved**: one policy for both, with a measured reason | Leave the GUI alone and document the difference: two programs of one family write different bytes from one plan, and the window's last frame is lower on some material |
+| D2 | Word timing's shape: a Hearth tap editor, lines then words, with an estimate as the starting point; the aligner as a recipe | **Approved** | The editor in the Forge GUI (needs the lyrics module in `apps/shared` first); an estimate with no editor; nothing |
+| D3 | Where a karaoke stream is reproduced for a sink | **Changed by the owner: the sink decodes locally where it can.** The stream goes to it as coded with the singer's choice in the role's settings, and the lyrics go to the board, which runs its own cursor; the server converts to PCM only for a sink that cannot decode karaoke (an older board, or one that lists no karaoke setting) | The first draft: Hearth always decodes a karaoke stream and sends PCM, so the group hears one reproduction (it stays as the fallback, and keeps a mixed group consistent) |
+| D4 | Browser first, then nothing for Android until there is a player to put it in | **Approved**: the WebAssembly decoder demo gets the two fields and a panel; lyrics after | Skip the browser; or an Android player as a phase of its own |
+| D5 | LFE part: one optional mono part, low-passed as the encoder does today | **Approved** | An LFE from a 5.1 source's own LFE channel only |
+| D6 | Re-levelling: gains for M, V1 and V2 in the library's output stage and sliders on Hearth's Karaoke page | **Approved**, after the first items | Not built; Annex C calls it optional |
+| D7 | Duets: no per-song memory, and nothing beyond V1 and V2 until asked | **Approved** | The costed duet slice below |
+| D8 | UTF-16 with a byte-order mark, in either byte order, for `.lrc` beside UTF-8 (carried over from phase 1's decision 4; the reader took UTF-8 only) | **Changed by the owner: adopted**, so that Hebrew and Yiddish files saved as "Unicode" are read. Built in W13a, with Hebrew and Yiddish test files | UTF-8 only, as phase 1 built it |
+| D9 | What Crucible does with imported lyrics, and where their position comes from | **Approved: a lyric strip in Crucible's window for the application it is attached to; the position from that application's operating-system media session where it publishes one, and a start-and-nudge where it does not** | Events out (OSC) instead of, or as well as, a strip; the strip only, with no position source |
+| D10 | "Mini karaoke" is read as **MIDI karaoke** (`.kar`, lyrics as MIDI meta events) | **Confirmed: MIDI karaoke** | Another format: say which |
+| D11 | CD+G is read as an already-ripped `.cdg` file and shown as its picture; no drive ripping and no text extracted | **Approved**: a CD+G carries a 300 by 216 picture, not text | OCR of the picture for text (a model and its runtime; not planned) |
+| D12 | The lyric reader and cursor move from `apps/hearth/engine` into a library before word timing's writer and Crucible's import are built | **Approved** | Leave them in Hearth and give Crucible its own parser: two readers of one format that cannot share a test |
 
 ### W11: duets
 
@@ -245,15 +251,24 @@ candidates, the five formats (what each carries and how it is timed), and the si
 W13c to W13f are the owner's stretch goals and each is independent of the others, so any can be
 dropped; W13a is the only one the rest of the phase also wants.
 
+**Hebrew and Yiddish** (the owner's reason for D8). W13a reads UTF-8 and UTF-16 (with a byte-order
+mark, either order), and its tests carry generated Hebrew and Yiddish lines in both encodings, so
+there is no licence question. UTF-8 already carried those scripts; what UTF-16 adds is the files an
+editor saved as "Unicode". Two things are not covered by an encoding: an 8-bit legacy code page
+(Windows-1255 is the Hebrew one) is still refused rather than guessed at; and the lyric view has
+to draw right-to-left text with a word fill that runs right to left within a word, which is a
+check in the Hearth lyric view and the board's panel (a font with the glyphs, and a layout that
+shapes a right-to-left line), not a parser matter.
+
 ### W12: parked, the ESP32-P4 with a panel
 
 Only the questions are kept; no firmware is started. The board's panel is assumed to be on the P4's
 MIPI DSI interface, with I2S audio as the sinks have today (phase 1's [Later](karaoke.md#later-not-v1)).
 
-1. **Where the reproduction happens.** The host decodes and sends PCM (a karaoke stream can be
-   reproduced to 2.0 and a P4 sink takes it), or the sink decodes coded AC-3 and is sent the
-   singer's choice. The P4 sink outputs stereo today (TDM waits for a later board revision), so
-   the 2/0 reproduction fits it and the 3/0 one does not.
+1. **Where the reproduction happens: decided (D3).** The sink decodes coded AC-3 and applies
+   the singer's choice itself, with the server's PCM as the fallback for a sink that cannot. What
+   is left is the output: the P4 sink outputs stereo today (TDM waits for the v3.x board), so
+   the 2/0 reproduction fits it and the 3/0 one does not until that board is in.
 2. **How the words reach it.** The `_ac3forge_player@v1` role already carries the coded stream; it
    has no field for lyrics, and `metadata@v1`, the upstream role that carries the title and a
    progress anchor, has none either. The findings list the shapes.
