@@ -7,10 +7,18 @@ which docs/quality-trend.md's AC-4 section reads.
 
 The score script's pinned floors already fail CI; this adds the trailing-baseline
 tiers append_quality_history.py applies to the AC-3 gate. A soft drift warns.
-A hard one sets $GITHUB_OUTPUT's ac4_hard_regression, and _build.yml fails the
-job on it after the data is pushed, so a large regression is still recorded.
-Its own output name rather than hard_regression, which append_quality_history.py
-writes in the same step.
+A hard one sets $GITHUB_OUTPUT's ac4_hard_regression, and _ci-core.yml's
+persist-external-comparison-trend fails the job on it after the data is pushed,
+so a large regression is still recorded. Its own output name rather than
+hard_regression, which append_external_comparison_history.py writes in the same
+job.
+
+A stream already recorded for this commit is not recorded again. FFmpeg Validate
+runs in the nightly run, and a nightly on a tip that has not moved scores the same
+streams to the same numbers: the file carried each of them once per run, and the
+home page's "Lowest of N Dolby streams" counted every copy. Each stream is still
+judged, against its history from BEFORE this commit, so a repeated run says again
+what the first said and a hard regression keeps failing the job it is in.
 
 stdlib-only, like every tools/ci/append_*.py script.
 """
@@ -77,6 +85,8 @@ def main(argv=None) -> int:
 
     history_path = args.history_dir / f"ac4-quality-{args.branch}.jsonl"
     history = read_history(history_path)
+    recorded = {rec.get("leg") for rec in history if rec.get("commit") == args.commit}
+    earlier = [rec for rec in history if rec.get("commit") != args.commit]
     hard_regression = False
     lines = []
     for leg in legs:
@@ -94,7 +104,7 @@ def main(argv=None) -> int:
             ("LSD", "lsd_db", LSD_RISE_DB, LSD_HARD_RISE_DB, True, "above"),
         )
         for label, field, soft, hard, rising_is_worse, direction in checks:
-            baseline = trailing_mean(history, rec["leg"], field, REGRESSION_TRAILING_WINDOW)
+            baseline = trailing_mean(earlier, rec["leg"], field, REGRESSION_TRAILING_WINDOW)
             tier = verdict(rec[field], baseline, soft, hard, rising_is_worse)
             if tier is None:
                 continue
@@ -107,13 +117,16 @@ def main(argv=None) -> int:
                       "the run is failed separately.")
             else:
                 print(f"::warning title=AC-4 quality soft regression::{message}")
-        lines.append(json.dumps(rec))
+        if rec["leg"] not in recorded:
+            lines.append(json.dumps(rec))
 
     args.history_dir.mkdir(parents=True, exist_ok=True)
     with history_path.open("a") as out:
         for line in lines:
             out.write(line + "\n")
-    print(f"Appended {len(lines)} record(s) to {history_path}")
+    skipped = len(legs) - len(lines)
+    print(f"Appended {len(lines)} record(s) to {history_path}"
+          + (f" ({skipped} already recorded for {args.commit[:8]})" if skipped else ""))
     write_recent_window(history_path)
     emit_github_output("ac4_hard_regression", "true" if hard_regression else "false")
     return 0

@@ -422,6 +422,51 @@ TEST_CASE("network sinks rows: a group is planned by what each member takes",
     CHECK(line_for("C6").find("up to 2 channels") != std::string::npos);
     CHECK(line_for("C6").find("switched off") != std::string::npos);
 
+    // What the Network page shows: each member's form, in a few words, and why. The sink id is
+    // the key, and the labels are the planner's own.
+    const auto group_facts = [&]() -> std::optional<iclforge::hearth::GroupFacts> {
+        for (const iclforge::hearth::GroupFacts& each : rig.sinks->status().groups) {
+            if (each.id == group) {
+                return each;
+            }
+        }
+        return std::nullopt;
+    };
+    const auto member =
+        [&](std::string_view sink_id) -> std::optional<iclforge::hearth::GroupMemberFacts> {
+        const auto facts = group_facts();
+        if (!facts) {
+            return std::nullopt;
+        }
+        for (const iclforge::hearth::GroupMemberFacts& each : facts->members) {
+            if (each.sink_id == sink_id) {
+                return each;
+            }
+        }
+        return std::nullopt;
+    };
+    const auto stereo_member = member("stereo-player");
+    REQUIRE(stereo_member.has_value());
+    CHECK(stereo_member->form == "pcm");
+    CHECK(stereo_member->form_label == "PCM · 2.0");
+    CHECK(stereo_member->form_reason.find("folded to 2.0") != std::string::npos);
+    const auto board_member = member("hearth-board");
+    REQUIRE(board_member.has_value());
+    CHECK(board_member->form == "coded");
+    CHECK(board_member->form_label == "AC-3 as it is");
+    const auto c6_member = member("hearth-c6");
+    REQUIRE(c6_member.has_value());
+    CHECK(c6_member->form == "held");
+    CHECK(c6_member->form_label == "Nothing · held back");
+    CHECK(c6_member->form_reason.find("switched off") != std::string::npos);
+    // A member that leaves takes what was planned for it with it.
+    rig.sinks->remove_group_member(group, "hearth-c6");
+    CHECK_FALSE(member("hearth-c6").has_value());
+    rig.sinks->add_group_member(group, "hearth-c6");
+    const auto back = member("hearth-c6");
+    REQUIRE(back.has_value());
+    CHECK(back->form.empty());
+
     // A group this class does not know decides nothing.
     CHECK(rig.sinks
               ->plan_group({.group_name = "no-such-group",

@@ -29,6 +29,15 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth opens MP4, Matroska and MPEG-TS files**
+
+- **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
+  only raw `.ac3`, `.ec3` and `.ac4` streams and listed `.mp4`, `.mkv` and `.ts` files as not
+  playable. It now demuxes the first AC-3, E-AC-3 or AC-4 track through the same container input
+  `forge` uses, tells a container by its first bytes and not its name, applies an MP4 edit list's
+  priming and padding as `LoadedItem::skip_samples` and `play_samples`, and hands the container's
+  facts to the Media page. A file with no such track is unplayable with the demuxer's reason.
+
 **Atmos object signing: several keys, and the licensed gate**
 
 - **`verify-objects` takes a keyring.** `signing-key=` repeats, and a frame is valid when any of the
@@ -91,6 +100,12 @@ The sections below contain the complete change list and fixes.
   and right, mono the two summed. The library form is `KaraokeReproduction::kCapable` with
   `OutputConfig::karaoke_vocals` (`KaraokeVocals`). The table's cells were read from the
   specification's own pages and are transcribed into the tests.
+- **`output_mode()` says which layout the output stage's channels are in.** A frame's `acmod` and
+  `lfe` describe what was coded, and under the reproduction three or four channels come back for
+  the four to six coded, so a caller that lays channels out from `acmod` placed the vocals where
+  the coded surrounds were. `output_mode(config, acmod, lfe, karaoke)` returns an `OutputMode` (a
+  coding mode and an LFE flag): 3/0 with the LFE after R for the reproduction, 2/0 or 1/0 for a
+  fold, the coded mode otherwise. `output_channel_count()` is now its channel count, one rule.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
@@ -2264,8 +2279,10 @@ The sections below contain the complete change list and fixes.
   speed card rank a workload against its own. AC-4 decode quality, from
   `score_ac4_decode.py --json-out`, is appended to `ac4-quality-main.jsonl` on `quality-history`
   with its own `ac4_hard_regression` output and failing step, and charted at the end of the
-  Quality trend page. The encode side has floors in CI and a local race against DEE, and no
-  history.
+  Quality trend page. The encoder's programme legs have a series of their own:
+  `score_ac4_encode.py --json-out` is appended to `ac4-encode-quality-main.jsonl`, which is
+  AC-4's line on the Listening quality card and the Quality trend page's AC-4 encode section.
+  The race against DEE is local and keeps no history.
 - **Golden masters from Dolby's encoders for AC-3, E-AC-3, E-AC-3 JOC and TrueHD.** DEE's licence
   ends on 2026-11-06 and is not renewed, so `tools/generators/gen_dee_gold.py` makes, and keeps
   on a local disk, every stream a later piece of work could want from it: 1,111 legs (1,086

@@ -543,6 +543,12 @@ class SiteScriptsRenderTest(unittest.TestCase):
             {"codec": "eac3", "leg": "eac3-music-stereo-96", "variant": "none", "mos_lqo": 4.65},
             {"codec": "ac3", "leg": "ac3-music-stereo-192", "variant": "landscape",
              "mos_lqo": 4.71}])
+        # The AC-4 encoder's own series, a file of its own: no tool set, and legs named by the
+        # scorer's layout digits ("10" is mono, "514" is 5.1.4).
+        self.write("ac4-encode-quality-main", [
+            {"codec": "ac4", "leg": "ac4-10-speech-24", "mos_lqo": 4.27, "bitrate_kbps": 24},
+            {"codec": "ac4", "leg": "ac4-20-music-192", "mos_lqo": 4.71, "bitrate_kbps": 192},
+            {"codec": "ac4", "leg": "ac4-514-music-768", "mos_lqo": 4.68, "bitrate_kbps": 768}])
 
     def render(self, *flags):
         # UTF-8 explicitly: the harness prints a multiplication sign and en dashes, and a
@@ -618,7 +624,44 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.assertIn("allocator traffic, not memory in use", cards["Allocation per frame"]["note"])
         listening = {line["codec"]: line for line in cards["Listening quality"]["lines"]}
         self.assertEqual(listening["E-AC-3"]["figure"], f"2.38{EN_DASH}4.65 MOS-LQO")
-        self.assertIn("No series yet", listening["AC-4"]["what"])
+        self.assertEqual(listening["AC-4"]["figure"], f"4.27{EN_DASH}4.71 MOS-LQO")
+        self.assertIn("3 measurements on 3 legs", listening["AC-4"]["what"])
+        self.assertIn("Lowest: mono speech, 24 kbps", listening["AC-4"]["what"])
+        # The AC-4 encoder has no tool sets, so the line names none.
+        self.assertNotIn("tool set", listening["AC-4"]["what"])
+        self.assertIn("tool set spx", listening["E-AC-3"]["what"])
+
+    def test_an_ac4_leg_name_is_read_as_the_layout_it_spells(self):
+        """"ac4-514-music-768" is 5.1.4 music at 768 kbps, not "514 music"."""
+        self.fixture()
+        self.write("ac4-encode-quality-main", [
+            {"codec": "ac4", "leg": "ac4-514-music-768", "mos_lqo": 4.1},
+            {"codec": "ac4", "leg": "ac4-51-film-256", "mos_lqo": 4.7},
+            {"codec": "ac4", "leg": "ac4-50-music-320", "mos_lqo": 4.6}])
+        for flags, title in (((), "Listening quality"),
+                             (("--page",), "Predicted listening quality")):
+            with self.subTest(surface="page" if flags else "strip"):
+                what = {line["codec"]: line["what"] for line in self.render(*flags)[title]["lines"]}
+                self.assertIn("5.1.4 music, 768 kbps", what["AC-4"])
+                # The A/52 legs keep reading as they did.
+                self.assertIn("5.1, 256 kbps", what["E-AC-3"])
+
+    def test_ac4_has_no_listening_line_until_its_series_has_rows(self):
+        self.fixture()
+        (self.dir / "ac4-encode-quality-main.jsonl").unlink()
+        listening = {line["codec"]: line for line in self.render()["Listening quality"]["lines"]}
+        self.assertEqual(listening["AC-4"]["figure"], "—")
+        self.assertEqual(listening["AC-4"]["what"], "No measurement recorded.")
+        self.assertEqual(listening["E-AC-3"]["figure"], f"2.38{EN_DASH}4.65 MOS-LQO")
+
+    def test_the_decode_series_is_not_the_listening_quality_of_the_encoder(self):
+        """ac4-quality-main.jsonl rows carry a mos_lqo too: Dolby's streams, decoded here."""
+        self.fixture()
+        (self.dir / "ac4-encode-quality-main.jsonl").unlink()
+        self.write("ac4-quality-main", [{"leg": "ac4-20-music-192", "min_snr_db": 34.9,
+                                         "mos_lqo": 4.72, "codec": "ac4"}])
+        listening = {line["codec"]: line for line in self.render()["Listening quality"]["lines"]}
+        self.assertEqual(listening["AC-4"]["what"], "No measurement recorded.")
 
     def test_an_unclassified_workload_is_said_in_its_tile_and_the_others_still_render(self):
         """The site does not fail a build over data, and does not stay on "Loading"."""
@@ -628,6 +671,42 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.assertIn("iamf_51_encode", cards["Allocation per frame"]["note"])
         self.assertIn("is not classified", cards["Live growth"]["note"])
         self.assertEqual(self.figures(cards["Speed"])["AC-3"], "8x")
+
+    def test_a_measurement_repeated_on_the_newest_commit_is_counted_once(self):
+        """The nightly on a tip that has not moved recorded every row again, and the history
+        still holds the copies: the tile counted 335 measurements where there were 67. The
+        copies differ in the last digits of the MOS, so it is (leg, variant) that makes them one."""
+        self.fixture()
+
+        def copies(rows, times):
+            return [{**r, "mos_lqo": r["mos_lqo"] + 4e-14 * n}
+                    for n in range(times) for r in rows]
+
+        self.write("ac4-encode-quality-main", copies(
+            [{"codec": "ac4", "leg": "ac4-10-speech-24", "mos_lqo": 4.27},
+             {"codec": "ac4", "leg": "ac4-20-music-192", "mos_lqo": 4.71}], 5))
+        self.write("external-comparison-main", copies(
+            [{"codec": "eac3", "leg": "eac3-51-256", "variant": "spx", "mos_lqo": 2.38},
+             {"codec": "eac3", "leg": "eac3-51-256", "variant": "none", "mos_lqo": 4.1},
+             {"codec": "ac3", "leg": "ac3-music-stereo-192", "variant": "landscape",
+              "mos_lqo": 4.71}], 5))
+        self.write("ac4-quality-main", copies(
+            [{"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72}], 2))
+        for flags, title in (((), "Listening quality"),
+                             (("--page",), "Predicted listening quality")):
+            with self.subTest(surface="page" if flags else "strip"):
+                cards = self.render(*flags)
+                listening = {line["codec"]: line for line in cards[title]["lines"]}
+                # The strip says "2 measurements", the page "2 encoder measurements".
+                self.assertRegex(listening["AC-4"]["what"],
+                                 r"\b2 (encoder )?measurements on 2 legs")
+                self.assertRegex(listening["E-AC-3"]["what"],
+                                 r"\b2 (encoder )?measurements on 1 legs")
+                self.assertRegex(listening["AC-3"]["what"],
+                                 r"\b1 (encoder )?measurements on 1 legs")
+                accuracy = {line["codec"]: line["what"]
+                            for line in cards["Decode accuracy"]["lines"]}
+                self.assertRegex(accuracy["AC-4"], r"of 1 Dolby streams")
 
     def test_a_codec_with_no_rows_says_so_on_its_own_line(self):
         self.fixture()
@@ -659,6 +738,14 @@ class HistoryAndMainTest(unittest.TestCase):
         path.write_text("\n".join(json.dumps(r) for r in [
             {"commit": "a", "v": 1}, {"commit": "b", "v": 2}, {"commit": "b", "v": 3}]) + "\n")
         self.assertEqual([r["v"] for r in badges.newest_commit_rows(path)], [2, 3])
+
+    def test_a_stream_is_counted_once_however_often_its_run_was_repeated(self):
+        """The copies a repeated run leaves differ in the last digits of the MOS, so it is the
+        leg that makes them one stream."""
+        rows = [{"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72},
+                {"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72 + 4e-14},
+                {"leg": "ac4-20-speech-128", "min_snr_db": 38.1, "mos_lqo": 4.39}]
+        self.assertEqual(badges.ac4_quality(rows)["streams"], 2)
 
     def test_main_writes_four_badges(self):
         (self.dir / "performance-dev.jsonl").write_text(json.dumps(

@@ -53,6 +53,22 @@ class Trailing(unittest.TestCase):
             self.assertIsNone(aqh.trailing_mean(h, "l", "eac3", "eac3", 10))
             self.assertIsNone(aqh.trailing_channel_means(h, "l", "eac3", "eac3", 10))
 
+    def test_a_commit_can_be_left_out_of_the_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            h = Path(tmp) / "h.jsonl"
+            h.write_text("\n".join(json.dumps(r) for r in [
+                {"commit": "a", "leg": "l", "codec": "c", "check": "k", "worst_db": 50.0,
+                 "channels_db": [50.0]},
+                {"commit": "b", "leg": "l", "codec": "c", "check": "k", "worst_db": 30.0,
+                 "channels_db": [30.0]},
+            ]) + "\n")
+            self.assertEqual(aqh.trailing_mean(h, "l", "c", "k", 10), 40.0)
+            self.assertEqual(aqh.trailing_mean(h, "l", "c", "k", 10, exclude_commit="b"), 50.0)
+            self.assertEqual(
+                aqh.trailing_channel_means(h, "l", "c", "k", 10, exclude_commit="b"), [50.0])
+            self.assertEqual(aqh.recorded_keys(h, "b"), {("l", "c", "k")})
+            self.assertEqual(aqh.recorded_keys(h, "zzz"), set())
+
     def test_channel_means_drop_rows_of_another_layout(self):
         with tempfile.TemporaryDirectory() as tmp:
             h = Path(tmp) / "h.jsonl"
@@ -149,6 +165,30 @@ class Main(unittest.TestCase):
         self.assertNotIn("::warning", out)
         self.assertNotIn("::error", out)
         self.assertEqual(verdict, "hard_regression=false\n")
+
+    def test_a_repeated_run_on_a_commit_records_nothing_and_judges_again(self):
+        """The nightly on a tip that has not moved: rows once, the verdict every time."""
+        self.seed([self.history_row(50.0, [50.0, 60.0])] * 3)
+        self.write_result("ac3", result(35.0, [35.0, 60.0]))
+        _, _, first_verdict = self.run_main()
+        self.assertEqual(first_verdict, "hard_regression=true\n")
+        self.assertEqual(len(self.history.read_text().splitlines()), 4)
+        # The same commit again: nothing new in the file, and the regression is flagged again
+        # instead of going quiet because its own 35 dB is now in the trailing window.
+        self.output.unlink()
+        _, out, verdict = self.run_main()
+        self.assertEqual(len(self.history.read_text().splitlines()), 4)
+        self.assertEqual(verdict, "hard_regression=true\n")
+        self.assertIn("::error title=Quality trend hard regression::linux/ac3", out)
+        self.assertIn("1 already recorded for new", out)
+
+    def test_a_new_check_on_an_already_recorded_commit_is_added(self):
+        self.write_result("ac3", result(50.0, [50.0, 60.0]))
+        self.run_main()
+        self.write_result("ac3_ext", result(15.0, [15.0]))
+        self.run_main()
+        checks = [json.loads(line)["check"] for line in self.history.read_text().splitlines()]
+        self.assertEqual(sorted(checks), ["ac3", "ac3_ext"])
 
     def test_emit_output_noop_without_env(self):
         with mock.patch.dict(os.environ, {}, clear=True):

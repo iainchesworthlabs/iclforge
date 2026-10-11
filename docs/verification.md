@@ -725,13 +725,19 @@ give `invalid frame type` / `unable to determine channel mode`. So FFmpeg remain
 oracle on each programme's frames, but only after the stream has been demultiplexed by programme,
 which is what `iclforge::ac3::split_access_units(stream, programme)` does.
 
-That demultiplexing is what the container path already performs — a track carries one programme,
-so `forge mkv`/`mp4` write the first programme's access units (and warn about the rest) — and
-FFmpeg strict-decodes the *result* cleanly. `tools/ci/run_codec_matrix.sh` therefore skips the
-FFmpeg check on the raw two-programme stream, the same way it does for 7.1.4, but keeps it on the
-muxed file: that check is a direct guard on the access-unit boundaries, since a programme's unit
-has to end at the next independent substream of *any* programme rather than at its own next
-frame, or each span swallows the other programme's frame and FFmpeg refuses the container too.
+That demultiplexing is what a single-programme container does — a Matroska track carries one
+programme, so `forge mkv` writes the first programme's access units (and warns about the rest), and
+`forge mp4 programme=N` writes programme N alone — and FFmpeg strict-decodes the *result* cleanly.
+`tools/ci/run_codec_matrix.sh` therefore skips the FFmpeg check on the raw two-programme stream,
+the same way it does for 7.1.4, but keeps it on the Matroska file and on each programme's MP4:
+that check is a direct guard on the access-unit boundaries, since a programme's unit has to end at
+the next independent substream of *any* programme rather than at its own next frame, or each span
+swallows the other programme's frame and FFmpeg refuses the container too. An MP4 written without
+`programme=` carries every programme in each sample (TS 102 366 F.2), which FFmpeg refuses for the
+reason it refuses the raw stream, so the matrix does not hand it to FFmpeg: it holds that file to
+`forge demux` returning the stream byte for byte. The matrix did hand it to FFmpeg until
+2026-10-10, when `mp4` began to keep every programme, and the nightly FFmpeg Validate failed there
+until the row was split this way.
 
 **Enhanced coupling has no external oracle at all — not even the partial one 7.1.4 gets.**
 FFmpeg's own Annex E parser was never written to read its syntax, so it doesn't reject these
@@ -1778,7 +1784,12 @@ paragraph on the objects follows them:
   The A-CPL legs, 5.1 at 96 and 128 kbps, 5.0 at 112, 5.1 in ASPX_ACPL_1 at 160 and stereo in both
   modes, are scored as `score_ac4_decode.py` scores DEE's: the coded downmixes, recovered from the
   output, as waveforms below the crossover, each parameter band's level difference and correlation
-  against the source's, and on the tones the routing margin.
+  against the source's, and on the tones the routing margin. `--json-out` writes the scores of 24
+  of its 72 legs, the programme content at the options a rate alone gives, and FFmpeg Validate
+  uploads them: the job that publishes the external-encoder comparison appends them to
+  `ac4-encode-quality-main.jsonl`, which [AC-4 encode quality](quality-trend.md#ac-4-encode-quality)
+  charts and the Listening quality card reads. Its only tier is a warning, when a leg's MOS falls
+  0.1 under its own trailing mean; the pinned floors are what fail a run.
 - **Frame rates, rates and metadata** (phase E5). At every frame rate each frame decodes to the
   samples Part 2 clause 5.11 gives it, over a second in `test_frame_rates.cpp`, and over
   100 000 frames at every rate, across 98 wraps of `sequence_counter`, in a test run on demand; the

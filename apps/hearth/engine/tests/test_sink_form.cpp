@@ -284,6 +284,10 @@ TEST_CASE("sink form: a group's plan sends each member its own form and one rend
     REQUIRE(plan.members.size() == 4);
 
     CHECK(plan.members[0].action == MemberAction::kCoded);
+    CHECK(plan.members[0].label == "AC-3 as it is");
+    CHECK(plan.members[2].label == "PCM · 2.0");
+    CHECK(plan.members[3].label == "PCM · 5.1");
+    CHECK(plan.members[1].label == "Nothing · held back");
     // Past what it decodes, and not to be sent PCM: held back, and the reason says both.
     CHECK(plan.members[1].action == MemberAction::kHold);
     CHECK(mentions(plan.members[1].choice.reason, "up to 2 channels"));

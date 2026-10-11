@@ -347,6 +347,35 @@ struct MixLevels {
                                                                Acmod acmod, bool lfe,
                                                                bool karaoke);
 
+// The channels an output stage leaves behind, as Table 5.8 names them: a coding
+// mode, with the LFE after its full-bandwidth channels when `lfe` is set. It
+// is what DecodedFrame::channels holds once the stage has run, where
+// DecodedFrame::acmod and ::lfe say what was coded, and the two differ in
+// exactly the cases output_channel_count() reports a different count for.
+struct OutputMode {
+    Acmod acmod = Acmod::k3_2;
+    bool lfe = false;
+
+    friend bool operator==(const OutputMode&, const OutputMode&) = default;
+};
+
+// The mode the frames of a coded programme (`acmod`, `lfe`) come out in under
+// `config`; `karaoke` is as for output_channel_count().
+//
+//   - kAsCoded, or dual mono (1+1, which no fold touches): the coded mode.
+//   - Annex C's reproduction, where `config` asks for it, the frame is karaoke
+//     and there is something to reproduce (2/1, 3/1, 2/2 or 3/2): 3/0, with the
+//     LFE after R when the stream has one. Lk, Ck, Rk are L, C and R of that
+//     mode, so a caller that lays channels out from the coded acmod puts the
+//     vocals where the coded surrounds were, and gets three channels where it
+//     expects four to six.
+//   - A stereo or mono target: 2/0 or 1/0, and no LFE channel of its own (a
+//     fold takes the LFE in at its own level, or leaves it out).
+//
+// output_channel_count() is this mode's channel count; the two share one rule.
+[[nodiscard]] ICLFORGE_AC3_EXPORT OutputMode output_mode(const OutputConfig& config, Acmod acmod,
+                                                         bool lfe, bool karaoke);
+
 // The stage itself. Stateful: the Lt/Rt phase shift carries a filter tail
 // across frames and RF mode carries its protection gain, so one instance
 // belongs to one stream and frames go through it in order - the same
