@@ -64,6 +64,66 @@ TEST_CASE("timing: what is written reads back as what was written", "[lyrics][ti
     CHECK(iclforge::lyrics::write_lrc(second) == written);
 }
 
+TEST_CASE("timing: a duet's singers and their names are written and read back", "[lyrics][timing][duet]") {
+    using iclforge::lyrics::Singer;
+    const std::string source =
+        "[ti:Leave Her, Johnny]\n[v1:Shantyman]\n[v2:Crew]\n"
+        "[00:01.00]V1: <00:01.00>Oh <00:01.40>the times\n"
+        "[00:03.00]V2: Leave her, Johnny\n"
+        "[00:05.00]V1+V2: Leave her\n"
+        "[00:07.00]No one in particular\n";
+    const Lyrics first = parsed(source, 20000);
+    const std::string written = iclforge::lyrics::write_lrc(first);
+    // The marker is the first thing after the time, before any word tag, and the names are tags.
+    CHECK(written.find("[v1:Shantyman]\n[v2:Crew]\n") != std::string::npos);
+    CHECK(written.find("[00:01.00]V1: <00:01.00>Oh ") != std::string::npos);
+    CHECK(written.find("[00:03.00]V2: Leave her, Johnny\n") != std::string::npos);
+    CHECK(written.find("[00:05.00]V1+V2: Leave her\n") != std::string::npos);
+    CHECK(written.find("[00:07.00]No one in particular\n") != std::string::npos);
+
+    const Lyrics second = parsed(written, 20000);
+    REQUIRE(second.lines.size() == first.lines.size());
+    for (std::size_t i = 0; i < first.lines.size(); ++i) {
+        CHECK(second.lines[i].singer == first.lines[i].singer);
+        CHECK(second.lines[i].text == first.lines[i].text);
+        CHECK(second.lines[i].start_ms == first.lines[i].start_ms);
+    }
+    CHECK(second.first_singer_name == "Shantyman");
+    CHECK(second.second_singer_name == "Crew");
+    // And written once more it is the same text.
+    CHECK(iclforge::lyrics::write_lrc(second) == written);
+}
+
+TEST_CASE("timing: the singer of a line is set, and an untimed duet keeps its markers",
+          "[lyrics][timing][duet]") {
+    using iclforge::lyrics::Singer;
+    Lyrics lyrics = parsed("First line\nSecond line\nThird line\n");
+    CHECK_FALSE(iclforge::lyrics::has_singers(lyrics));
+    CHECK(iclforge::lyrics::set_line_singer(lyrics, 1, Singer::kSecond));
+    CHECK(iclforge::lyrics::set_line_singer(lyrics, 0, Singer::kBoth));
+    CHECK_FALSE(iclforge::lyrics::set_line_singer(lyrics, 3, Singer::kFirst));
+    CHECK(iclforge::lyrics::has_singers(lyrics));
+    // Untimed: the text with its markers, which is what a person marked up before timing it.
+    CHECK(iclforge::lyrics::write_lrc(lyrics) == "V1+V2: First line\nV2: Second line\nThird line\n");
+    // Timing the lines (the tap pass) leaves who sings each alone, and the file reads back so.
+    CHECK(iclforge::lyrics::set_line_start(lyrics, 0, 1000));
+    CHECK(iclforge::lyrics::set_line_start(lyrics, 1, 3000));
+    CHECK(iclforge::lyrics::set_line_start(lyrics, 2, 5000));
+    const Lyrics back = parsed(iclforge::lyrics::write_lrc(lyrics));
+    REQUIRE(back.lines.size() == 3);
+    CHECK(back.lines[0].singer == Singer::kBoth);
+    CHECK(back.lines[1].singer == Singer::kSecond);
+    CHECK(back.lines[2].singer == Singer::kUnmarked);
+    CHECK(back.lines[1].start_ms == 3000);
+    // Taking the marker off is setting kUnmarked.
+    CHECK(iclforge::lyrics::set_line_singer(lyrics, 1, Singer::kUnmarked));
+    const std::string cleared = iclforge::lyrics::write_lrc(lyrics);
+    CHECK(cleared.find("]V2:") == std::string::npos);
+    // (The first line is still both, whose marker has a V2 in it.)
+    CHECK(cleared.find("[00:01.00]V1+V2: First line\n") != std::string::npos);
+    CHECK(cleared.find("[00:03.00]Second line\n") != std::string::npos);
+}
+
 TEST_CASE("timing: a time is written to the nearest hundredth, and an untimed file is text",
           "[lyrics][timing]") {
     Lyrics lyrics = parsed("one\ntwo\nthree\n");

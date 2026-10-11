@@ -159,6 +159,13 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **A lyrics file can say who sings a line.** The reader (`libs/lyrics`) takes a duet's singer from
+  a `V1:`, `V2:` or `V1+V2:` marker at the start of a line (after its time tags, or after its first
+  word tag; either case; not part of the line's text), and the two singers' names from `[v1:name]`
+  and `[v2:name]` id tags. A line with no marker is for nobody in particular, and `V3:` is text.
+  The writer puts the markers and the names back, a plain file may carry the markers before it is
+  timed, and `set_line_singer()` is what an editor calls. Nothing in Hearth uses it yet: the duet
+  view and the editor are the next two changes (planning/karaoke-phase2.md, W11a).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
