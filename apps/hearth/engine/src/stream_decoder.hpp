@@ -154,6 +154,14 @@ struct UnitReport {
     std::optional<int> short_blocks = std::nullopt;
     // The fold levels the unit's own metadata gives, defaults included.
     ac3::MixLevels levels{};
+    // Annex C, AC-3 only: the unit belongs to a karaoke stream (bsmod 7 with an
+    // acmod above 1/0), and whether the settings reproduced it - asked for, and
+    // it codes a melody or vocals to reproduce (2/1, 3/1, 2/2 or 3/2), and not
+    // under an Lt/Rt fold, which Annex C defines no reproduction for. The
+    // channels that came out are then not the coded layout: 3/0 and the LFE,
+    // or the stereo or mono fold.
+    bool karaoke = false;
+    bool karaoke_reproduced = false;
     // How the decoder concealed the unit, when it did (§7.10).
     std::optional<ac3::Concealment> concealed = std::nullopt;
     // The program its object metadata describes, with every update block's

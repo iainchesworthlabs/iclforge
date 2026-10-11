@@ -46,6 +46,8 @@ qt_add_executable(forge-gui
     ../../shared/media/src/recording_sink.hpp
     ../../shared/media/src/container_input.cpp
     ../../shared/media/src/container_input.hpp
+    ../../shared/media/src/stream_playback.cpp
+    ../../shared/media/src/stream_playback.hpp
     ../../shared/media/src/ac4_encode_core.cpp
     ../../shared/media/src/ac4_encode_core.hpp
     ../../shared/media/src/ac4_objects_core.cpp
@@ -71,6 +73,9 @@ qt_add_executable(forge-gui
 # thing it wraps. container_input.cpp (container readers (mkv/mp4/ts)) joined it the same way,
 # for the QC/Inspect pickers below to accept a container in place of a bare
 # elementary stream the same way forge's decode/qc/levels/play/monitor do.
+# stream_playback.cpp is the same kind of thing: select_programme() is how the
+# stream player (stream_player_controller.cpp) plays ONE programme of an E-AC-3
+# stream that carries several, as forge's monitor/play do, and it is device-free.
 target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/preferences/src"

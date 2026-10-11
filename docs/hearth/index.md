@@ -165,6 +165,11 @@ Raspberry Pi 4B without an underrun. See
 - **Play every track of a container.** An MP4, Matroska or MPEG-TS file plays its first AC-3,
   E-AC-3 or AC-4 track; the others are not offered, and a Matroska file's codec delay is not
   trimmed.
+- **Offer the karaoke reproduction as a control.** An AC-3 stream flagged karaoke (`bsmod` 7 with
+  a layout wider than mono) is reproduced as Annex C's karaoke-aware decoder does, whatever the
+  layout: L, C, R and the LFE reach those speakers and the surrounds are silent. The window has no
+  page for choosing none, one or both vocals yet, and a bitstream output leaves the reproduction
+  to the receiver.
 - **List AC-4 objects on the Play page.** The Objects card shows the positions of E-AC-3 objects.
   An AC-4 item's objects are rendered into the speaker layout, and the Media page says an A-JOC
   stream carries object metadata without listing it.

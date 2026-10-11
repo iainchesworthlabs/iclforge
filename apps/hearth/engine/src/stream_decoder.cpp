@@ -10,6 +10,7 @@
 
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/decoder/config.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
@@ -178,9 +179,21 @@ namespace {
     return static_cast<int>(info->bsmod);
 }
 
-void report_frame(const ac3::DecodedFrame& frame, UnitReport& out) {
+// Whether Annex C's reproduction applied to a frame, under `output`.
+[[nodiscard]] bool karaoke_reproduced(const ac3::OutputConfig& output, ac3::Acmod acmod,
+                                      bool karaoke) {
+    const bool has_parts = acmod == ac3::Acmod::k2_1 || acmod == ac3::Acmod::k3_1 ||
+                           acmod == ac3::Acmod::k2_2 || acmod == ac3::Acmod::k3_2;
+    return karaoke && has_parts && output.karaoke != ac3::KaraokeReproduction::kOff &&
+           output.target != ac3::DownmixTarget::kLtRt;
+}
+
+void report_frame(const ac3::DecodedFrame& frame, const ac3::OutputConfig& output, UnitReport& out) {
     out.acmod = frame.acmod;
     out.lfe = frame.lfe;
+    out.karaoke = ac3::meta::is_karaoke(static_cast<ac3::meta::BitstreamMode>(frame.bsmod),
+                                        frame.acmod);
+    out.karaoke_reproduced = karaoke_reproduced(output, frame.acmod, out.karaoke);
     out.substreams = 1;
     out.layout =
         frame.acmod == ac3::Acmod::kDualMono
@@ -225,6 +238,9 @@ void report_unit(const ac3::DecodedAccessUnit& unit, UnitReport& out) {
     out.concealed = unit.concealed;
     out.objects = unit.object_metadata;
     out.ac4.reset();
+    // Karaoke is AC-3's: an E-AC-3 decoder never sets the flag.
+    out.karaoke = false;
+    out.karaoke_reproduced = false;
 }
 
 // What an AC-4 frame's concealment did, in the report's terms. Its error is
@@ -427,7 +443,24 @@ std::expected<std::size_t, std::string> StreamDecoder::decode_unit(std::span<con
         reset();
         return std::unexpected(std::string{"A unit's channel layout could not be read."});
     }
-    beds_.push_back(UnitBed{.layout = *bed, .dual_mono = header->acmod == ac3::Acmod::kDualMono});
+    // The bed is the layout the decoder's channels are in, which for an AC-3
+    // unit is the coded one except under Annex C's reproduction: a karaoke
+    // stream comes out as L, C, R and the LFE, three or four channels for the
+    // four to six coded, and laid out from the coded acmod the vocals would be
+    // placed where the surrounds were. (A fold has no bed; the renderer takes
+    // its channels as they come.)
+    ac3::eac3::chanmap::Layout unit_bed = *bed;
+    if (!serving_.fold && header->kind == ac3::io::StreamKind::kAc3 &&
+        header->bytes == unit.size()) {
+        const bool karaoke = ac3::meta::is_karaoke(
+            static_cast<ac3::meta::BitstreamMode>(header->bsmod), header->acmod);
+        const ac3::OutputMode mode =
+            ac3::output_mode(config_.output, header->acmod, header->lfe, karaoke);
+        if (mode.acmod != header->acmod) {
+            unit_bed = ac3::eac3::chanmap::expand(ac3::eac3::chanmap::acmod_map(mode.acmod, mode.lfe));
+        }
+    }
+    beds_.push_back(UnitBed{.layout = unit_bed, .dual_mono = header->acmod == ac3::Acmod::kDualMono});
     const auto sink = [this, &deliver](const ac3::PcmBlock& block) { place(block, deliver); };
 
     // A unit that is one AC-3 syncframe goes to the AC-3 decoder, which a fold
@@ -444,7 +477,7 @@ std::expected<std::size_t, std::string> StreamDecoder::decode_unit(std::span<con
                 fmt::format("An AC-3 frame could not be decoded: {}.", describe(decoded.error())));
         }
         if (reported) {
-            report_frame(*decoded, report_);
+            report_frame(*decoded, config_.output, report_);
             finish_report(report_, unit.size());
             reported(report_);
         }
@@ -800,6 +833,8 @@ void StreamDecoder::report_ac4(const iclforge::ac4::DecodedFrame& info, std::siz
                         ? std::optional<ac3::Concealment>{concealment_of(*info.concealed)}
                         : std::nullopt;
     out.objects.reset();
+    out.karaoke = false;
+    out.karaoke_reproduced = false;
     const iclforge::ac4::PresentationMetadata& metadata = ac4_decoder_->metadata();
     out.ac4 = Ac4UnitReport{.presentation = info.presentation,
                             .presentation_id = info.presentation_id,

@@ -125,6 +125,18 @@ struct DecoderSettings {
     // Levels to fold with in place of the stream's.
     ac3::MixLevelOverride mix_levels{};
     DualMonoChoice dual_mono = DualMonoChoice::kBoth;
+    // Annex C's karaoke reproduction (ETSI TS 102 366 Annex C, informative),
+    // for an AC-3 stream flagged bsmod 7 with a layout wider than 1/0. The
+    // library ignores it for any other stream, and E-AC-3 and AC-4 never set
+    // the flag, so it is on by default: a karaoke stream played as coded sends
+    // its vocals to the surround speakers. kAware reproduces L, C and R with
+    // the vocals at the stream's own level (Table C.2.2); kCapable lets the
+    // listener choose which vocals are heard (Table C.2.3), below; kOff plays
+    // the coded channels. Annex C defines no Lt/Rt reproduction, so a stereo
+    // fold of Lt/Rt is left as it is.
+    ac3::KaraokeReproduction karaoke = ac3::KaraokeReproduction::kAware;
+    // kCapable only: which of the stream's vocals V1 and V2 are heard.
+    ac3::KaraokeVocals karaoke_vocals = ac3::KaraokeVocals::kBoth;
     // The programme of a multi-programme E-AC-3 stream to play, by its
     // independent substream id; unset plays the first. A session applies it
     // when an item opens, by choosing that programme's units, so it is not

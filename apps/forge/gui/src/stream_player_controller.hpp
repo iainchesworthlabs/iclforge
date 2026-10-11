@@ -44,6 +44,10 @@ struct RawResult {
     bool lfe = false;
     std::uint64_t frame_count = 0;    // samples per channel, whole file
     std::uint64_t unit_count = 0;     // syncframes/access units decoded
+    // "programme 0 of 2 (0, 1)" for an E-AC-3 stream that carries more than one
+    // independent substream - the programme that was decoded and what else was
+    // there, as forge's own commands say it; empty for every other stream.
+    QString programme_note;
     double duration_seconds = 0.0;
     bool has_objects = false;
     int object_count = 0;

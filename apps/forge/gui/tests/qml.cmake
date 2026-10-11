@@ -46,6 +46,8 @@ qt_add_executable(forge_gui_qmltests
     ../../shared/media/src/recording_sink.hpp
     ../../shared/media/src/container_input.cpp
     ../../shared/media/src/container_input.hpp
+    ../../shared/media/src/stream_playback.cpp
+    ../../shared/media/src/stream_playback.hpp
     ../../shared/media/src/ac4_encode_core.cpp
     ../../shared/media/src/ac4_encode_core.hpp
     ../../shared/media/src/ac4_objects_core.cpp

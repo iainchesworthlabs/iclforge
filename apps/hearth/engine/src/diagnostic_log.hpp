@@ -38,7 +38,10 @@ namespace iclforge::hearth {
 // " ...", when longer.
 class DiagnosticLog {
 public:
-    static constexpr std::size_t kMaxLine = 512;
+    // The "engine started" note is the whole of describe(DecoderSettings), which
+    // each new control makes longer; a note cut there loses the end of it, which is
+    // the part a support request most needs.
+    static constexpr std::size_t kMaxLine = 768;
     static constexpr std::size_t kStampBytes = 10;  // "+ssss.mmm ", for the first 9999 s
     static constexpr std::size_t kDefaultCapacity = 512;
 
