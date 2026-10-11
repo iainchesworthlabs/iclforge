@@ -849,17 +849,23 @@ std::size_t output_channel_count(const OutputConfig& config, Acmod acmod, bool l
     return output_channel_count(config, acmod, lfe, false);
 }
 
-std::size_t output_channel_count(const OutputConfig& config, Acmod acmod, bool lfe,
-                                 bool karaoke) {
-    const auto coded = static_cast<std::size_t>(fullbw_channel_count(acmod)) + (lfe ? 1U : 0U);
+OutputMode output_mode(const OutputConfig& config, Acmod acmod, bool lfe, bool karaoke) {
     if (karaoke_reproduces(config, acmod, karaoke)) {
-        // Lk, Ck, Rk, then the LFE when there is one.
-        return 3U + (lfe ? 1U : 0U);
+        // Lk, Ck, Rk, then the LFE when there is one: a 3/0 layout.
+        return {.acmod = Acmod::k3_0, .lfe = lfe};
     }
     if (config.target == DownmixTarget::kAsCoded || acmod == Acmod::kDualMono) {
-        return coded;
+        return {.acmod = acmod, .lfe = lfe};
     }
-    return config.target == DownmixTarget::kMono ? 1U : 2U;
+    // A fold has put everything it keeps into its own channels.
+    return {.acmod = config.target == DownmixTarget::kMono ? Acmod::k1_0 : Acmod::k2_0,
+            .lfe = false};
+}
+
+std::size_t output_channel_count(const OutputConfig& config, Acmod acmod, bool lfe,
+                                 bool karaoke) {
+    const OutputMode mode = output_mode(config, acmod, lfe, karaoke);
+    return static_cast<std::size_t>(fullbw_channel_count(mode.acmod)) + (mode.lfe ? 1U : 0U);
 }
 
 int OutputStage::latency_samples() const {

@@ -356,15 +356,10 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     visible: queueList.count === 0
-                    // Names what item_loader.cpp actually reads today -
-                    // AC-3, E-AC-3 and AC-4 files, and a folder of them. Not
-                    // MP4/MKV/TS: list_folder_items() finds those too, but
-                    // make_file_item_loader() still can't open them, and
-                    // naming a format that always lands "not playable"
-                    // would overpromise (docs/hearth/design/screenshots/
-                    // first-run.png's own text names them, for the slice
-                    // that makes it true).
-                    text: qsTr("Nothing in the queue.\nDrop AC-3, E-AC-3 or AC-4 files or a folder here.")
+                    // Names what item_loader.cpp reads: AC-3, E-AC-3 and
+                    // AC-4, raw or in an MP4, Matroska or MPEG-TS file, and
+                    // a folder of them.
+                    text: qsTr("Nothing in the queue.\nDrop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here.")
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontBody
                     horizontalAlignment: Text.AlignHCenter

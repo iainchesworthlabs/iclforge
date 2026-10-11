@@ -36,7 +36,8 @@ struct TestOutputs;  // test_outputs.hpp
 //
 // This first slice owns the engine directly, with a device PCM sink
 // (apps/hearth/engine/src/pcm_sink.hpp) and a loader that reads raw
-// `.ac3`/`.ec3` files (item_loader.hpp). The engine is given every render
+// `.ac3`/`.ec3`/`.ac4` streams and MP4, Matroska and MPEG-TS files
+// (item_loader.hpp). The engine is given every render
 // endpoint to decide between (EngineOutputs::endpoints,
 // apps/hearth/engine/src/output_selector.hpp) rather than one fixed sink, so the
 // output picker's "Play here" can name an endpoint - no passthrough sink is
@@ -374,9 +375,9 @@ public:
     Q_INVOKABLE void addFiles(const QStringList& paths);
     // Every media file item_loader.hpp's list_folder_items() finds under
     // `path` (recursively), added the same way addFiles() adds a file
-    // picked directly - including a container list_folder_items() lists but
-    // make_file_item_loader() cannot yet open, which lands in the queue
-    // unplayable with a reason, same as addFiles() already does for one.
+    // picked directly - including one that turns out to hold no AC-3, E-AC-3
+    // or AC-4 track, which lands in the queue unplayable with a reason, same
+    // as addFiles() already does for one.
     Q_INVOKABLE void addFolder(const QString& path);
     Q_INVOKABLE void setVolumeDb(double db);
 

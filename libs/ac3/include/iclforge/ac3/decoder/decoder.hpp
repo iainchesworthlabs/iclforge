@@ -23,6 +23,7 @@
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 #include "iclforge/ac3/oba/joc.hpp"
+#include "iclforge/base/executor.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/render/pcm_block.hpp"
 #include "iclforge/ac3/verify/eac3_mirror.hpp"
@@ -315,6 +316,14 @@ struct DecoderConfig {
     // speaker layout rather than to positions - sets this and pays nothing for
     // the object layer it is not going to use.
     bool skip_object_reconstruction = false;
+    // --- a second lane (iclforge/base/executor.hpp) -------------------------
+    // Where Eac3Decoder may run its independent work on another thread: the inverse transform
+    // and overlap-add of a substream's channels, and a JOC reconstruction's bed analyses and
+    // objects. Null, the default, runs all of it on the calling thread, as it always did. The
+    // PCM is the same bit for bit with and without one (libs/ac3/tests/decoder/test_lanes.cpp).
+    // The executor is the caller's and must outlive the decoder; one decoder, one thread, one
+    // executor. Two lanes are used at most. FrameDecoder, the AC-3 decoder, has no use for it.
+    iclforge::base::Executor* executor = nullptr;
     // --- diagnostics (ac3/decoder/diagnostics.hpp) --------------------------
     // A recoverable, informational event the decode does not otherwise
     // surface - see DiagnosticEvent. Null by default, at the same
@@ -416,6 +425,15 @@ class ICLFORGE_AC3_EXPORT FrameDecoder {
     FrameDecoder& operator=(const FrameDecoder&) = delete;
     FrameDecoder(FrameDecoder&&) noexcept;
     FrameDecoder& operator=(FrameDecoder&&) noexcept;
+
+    // Back to the state a new decoder with this configuration is in: the overlap-add
+    // history, the dither sequence, the output stage's history and what concealment
+    // keeps are what a stream's start finds, so the next frame decodes to the bits a
+    // new decoder gives it. What the decoder has allocated stays allocated. A part
+    // with no spare heap starts a stream by calling this and not by making another
+    // decoder, whose allocations would have to be found again in whatever the heap
+    // has become since.
+    void reset();
 
     // Decodes exactly one syncframe (the span must be exactly one frame).
     //
@@ -733,6 +751,16 @@ class ICLFORGE_AC3_EXPORT Eac3Decoder {
     Eac3Decoder& operator=(const Eac3Decoder&) = delete;
     Eac3Decoder(Eac3Decoder&&) noexcept;
     Eac3Decoder& operator=(Eac3Decoder&&) noexcept;
+
+    // Back to the state a new decoder with this configuration is in, as
+    // FrameDecoder::reset(): every substream identity's overlap-add history, the
+    // object reconstruction's, the transient hold-back's and what concealment
+    // keeps are gone, the dither sequence and the output stage start again, and
+    // anything held back for the stream before is dropped (flush() it first for
+    // its last frames). The scratch the decoder has grown stays, which is the
+    // point of calling this at the start of a stream instead of making a new
+    // decoder.
+    void reset();
 
     // Decodes one syncframe. Overlap-add state is kept per substream identity,
     // so the substreams of successive access units stay independent of each

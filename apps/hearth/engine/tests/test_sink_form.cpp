@@ -284,6 +284,10 @@ TEST_CASE("sink form: a group's plan sends each member its own form and one rend
     REQUIRE(plan.members.size() == 4);
 
     CHECK(plan.members[0].action == MemberAction::kCoded);
+    CHECK(plan.members[0].label == "AC-3 as it is");
+    CHECK(plan.members[1].label == "PCM · 2.0");
+    CHECK(plan.members[2].label == "PCM · 2.0");
+    CHECK(plan.members[3].label == "PCM · 5.1");
     // Past what it decodes: sent PCM at 2.0, the stereo player's render, with the caveat.
     CHECK(plan.members[1].action == MemberAction::kPcm);
     CHECK(plan.members[1].channels == 2);

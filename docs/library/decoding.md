@@ -509,7 +509,11 @@ here) at `DownmixTarget::kAsCoded`: for a karaoke stream with something to repro
 Annex D's `lorosurmixlev` apply as they do to a fold), and every coefficient is scaled down by the
 largest output's sum when that exceeds 1 - §7.8.1's way, one factor for all three outputs, so the
 melody keeps its level against the music. `DecodedFrame::acmod` and `lfe` still describe what was
-coded; `output_channel_count(config, acmod, lfe, karaoke)` says how many channels come back.
+coded; `output_channel_count(config, acmod, lfe, karaoke)` says how many channels come back, and
+`output_mode(config, acmod, lfe, karaoke)` which layout they are in, as an `OutputMode` (a coding
+mode and whether the LFE follows): 3/0, with the LFE after R, for this reproduction, 2/0 or 1/0 for
+a fold, and the coded mode otherwise. A caller that lays the channels out from `acmod`, as a
+renderer does, asks it, so that the three channels are not placed as the coded 3/2.
 `MixLevels::karaoke` is how the decoder tells the stage, and is set from the frame's own `bsmod`
 by `FrameDecoder` alone: E-AC-3 never sets it, so `Eac3Decoder` ignores the option. 3/0 (L M R)
 and 2/0 are returned as coded, `kLtRt` is left as the Lt/Rt fold it is (Annex C defines none), and

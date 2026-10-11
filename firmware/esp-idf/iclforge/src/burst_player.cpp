@@ -1,6 +1,7 @@
 // The Sendspin player's audio. See ../include/iclforge/burst_player.hpp.
 
 #include "iclforge/burst_player.hpp"
+#include "lane_executor.hpp"
 
 #include <algorithm>
 #include <array>
@@ -191,6 +192,8 @@ struct BurstPlayer::Impl {
     ac::DataType data_type = ac::DataType::kEac3;
     m::AudioFormat pcm_format;
     std::optional<iclforge::ac3::FrameDecoder> ac3_decoder;
+    // The decode lane (BurstPlayerConfig::decode_lane): started by the task, given back by it.
+    std::optional<lanes::TaskExecutor> lane;
     std::optional<iclforge::ac3::Eac3Decoder> eac3_decoder;
     std::optional<int> programme;
     std::array<iclforge::ac3::eac3::chanmap::Layout, kMaxPendingBeds> beds{};
@@ -327,6 +330,7 @@ struct BurstPlayer::Impl {
         serving = iclforge::ac3::render::serve(layout, fold, objects);
         decoder_config = decoder;
         iclforge::ac3::render::configure_decoder(serving, decoder_config);
+        decoder_config.executor = lane.has_value() ? &*lane : nullptr;
         renderer = LayoutRenderer{layout, config.sample_rate, crossover_hz};
         renderer_bed.reset();
         if (new_routing) {
@@ -339,7 +343,14 @@ struct BurstPlayer::Impl {
         std::copy_n(trims.begin(), std::min(trims.size(), trims_db.size()), trims_db.begin());
         std::copy_n(delays.begin(), std::min(delays.size(), delays_ms.size()), delays_ms.begin());
         open_outputs(false);
+        drop_decoders();  // made with the settings these are
         reset_decoding();
+    }
+
+    // The decoders given back, for a change of the configuration they were made with.
+    void drop_decoders() {
+        ac3_decoder.reset();
+        eac3_decoder.reset();
     }
 
     // The sink opened for as many outputs as the routing and the identify
@@ -469,9 +480,19 @@ struct BurstPlayer::Impl {
 
     // --- decoding ---------------------------------------------------------------
 
+    // The decoders start the next stream where a new one would, and keep what they
+    // have allocated: made again, they ask a heap that Wi-Fi has cut up for the
+    // scratch they just gave back, and on a part with no PSRAM it is not there
+    // (an ESP32-C6 aborted on a 36 KB and then a 7 KB request, on a track change
+    // and on a late chunk). Only a change of what they are made for - the
+    // settings, or the other codec - drops them (drop_decoders).
     void reset_decoding() {
-        ac3_decoder.reset();
-        eac3_decoder.reset();
+        if (ac3_decoder) {
+            ac3_decoder->reset();
+        }
+        if (eac3_decoder) {
+            eac3_decoder->reset();
+        }
         programme.reset();
         bed_head = 0;
         bed_count = 0;
@@ -806,6 +827,8 @@ struct BurstPlayer::Impl {
         const auto deliver_block = [this](const iclforge::ac3::PcmBlock& block) { deliver(block); };
         if (header->kind == iclforge::ac3::io::StreamKind::kAc3 && header->bytes == unit.size()) {
             if (!ac3_decoder) {
+                // One codec's scratch at a time: an E-AC-3 decoder's is the larger.
+                eac3_decoder.reset();
                 ac3_decoder.emplace(decoder_config);
             }
             const auto decoded = ac3_decoder->decode_frame_by_block(unit, deliver_block);
@@ -826,6 +849,7 @@ struct BurstPlayer::Impl {
             return;
         }
         if (!eac3_decoder) {
+            ac3_decoder.reset();
             eac3_decoder.emplace(decoder_config);
         }
         const auto decoded = eac3_decoder->decode_access_unit_by_block(unit, deliver_block);
@@ -1079,6 +1103,20 @@ struct BurstPlayer::Impl {
     }
 
     void run() {
+#if SOC_CPU_CORES_NUM > 1
+        if (config.decode_lane && (config.core == 0 || config.core == 1)) {
+            lane.emplace();
+            const bool in_psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+            if (lane->start(1 - config.core, config.priority, in_psram ? 16384 : 12288, in_psram)) {
+                decoder_config.executor = &*lane;
+                std::printf("burst player: decode stages on cores %d and %d\n", static_cast<int>(config.core),
+                            static_cast<int>(1 - config.core));
+            } else {
+                std::printf("burst player: no second lane for the decode, one core\n");
+                lane.reset();
+            }
+        }
+#endif
         std::int64_t last_status = 0;
         while (!stopping.load()) {
             if (held.load()) {
@@ -1162,6 +1200,10 @@ struct BurstPlayer::Impl {
                     break;
             }
         }
+        // The decoders hold a pointer to the lane: they go before it does.
+        drop_decoders();
+        decoder_config.executor = nullptr;
+        lane.reset();
         xEventGroupSetBits(events, kExited);
         vTaskDelete(nullptr);
     }

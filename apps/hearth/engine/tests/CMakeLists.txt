@@ -15,6 +15,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_diagnostics.cpp
     test_engine.cpp
     test_engine_queue_commands.cpp
+    test_item_loader.cpp
     test_media_info.cpp
     test_media_info_json.cpp
     test_network_view.cpp
@@ -35,6 +36,12 @@ target_link_libraries(iclforge-hearth-tests PRIVATE hearth_engine)
 # the program, for what test_media_info.cpp and test_player.cpp call and media_info.cpp names.
 target_sources(iclforge-hearth-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/apps/shared/media/src/container_input.cpp")
+# The program's own file loader (apps/hearth/ui/src/item_loader.cpp). It has no Qt in it, so
+# test_item_loader.cpp runs it here against files on disk, not through the window's controller.
+target_sources(iclforge-hearth-tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.cpp")
+target_include_directories(iclforge-hearth-tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src")
 # -Wnull-dereference false positive, GNU only: GCC at -O3 inlines std::operator==(const string&,
 # const char*) into a CHECK that compares a title against a literal ("b"), follows it down to
 # traits_type::length on the literal's pointer, and reports a null dereference at

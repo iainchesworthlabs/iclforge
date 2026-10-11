@@ -29,6 +29,15 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth opens MP4, Matroska and MPEG-TS files**
+
+- **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
+  only raw `.ac3`, `.ec3` and `.ac4` streams and listed `.mp4`, `.mkv` and `.ts` files as not
+  playable. It now demuxes the first AC-3, E-AC-3 or AC-4 track through the same container input
+  `forge` uses, tells a container by its first bytes and not its name, applies an MP4 edit list's
+  priming and padding as `LoadedItem::skip_samples` and `play_samples`, and hands the container's
+  facts to the Media page. A file with no such track is unplayable with the demuxer's reason.
+
 **Atmos object signing: several keys, and the licensed gate**
 
 - **`verify-objects` takes a keyring.** `signing-key=` repeats, and a frame is valid when any of the
@@ -91,6 +100,12 @@ The sections below contain the complete change list and fixes.
   and right, mono the two summed. The library form is `KaraokeReproduction::kCapable` with
   `OutputConfig::karaoke_vocals` (`KaraokeVocals`). The table's cells were read from the
   specification's own pages and are transcribed into the tests.
+- **`output_mode()` says which layout the output stage's channels are in.** A frame's `acmod` and
+  `lfe` describe what was coded, and under the reproduction three or four channels come back for
+  the four to six coded, so a caller that lays channels out from `acmod` placed the vocals where
+  the coded surrounds were. `output_mode(config, acmod, lfe, karaoke)` returns an `OutputMode` (a
+  coding mode and an LFE flag): 3/0 with the LFE after R for the reproduction, 2/0 or 1/0 for a
+  fold, the coded mode otherwise. `output_channel_count()` is now its channel count, one rule.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
@@ -612,6 +627,36 @@ The sections below contain the complete change list and fixes.
       leave it.
     - **Tested.** An overnight soak of the four boards, with faults injected, found no board
       left stuck.
+- **E-AC-3 7.1.4 and Atmos JOC decode faster on the ESP32-S3 and ESP32-P4, and a track change
+  no longer re-makes the decoder on the ESP32-C6.** Measured on boards with Wi-Fi up, a null
+  sink and the HTTP player, a frame's decode, render and sink against its duration
+  ([ESP32-S3](docs/platforms/bare-metal/esp32-s3.md#ac-3-and-e-ac-3-in-the-hearth-player),
+  [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md#ac-3-and-e-ac-3-in-the-hearth-player)).
+    - **JOC reconstruction runs in single precision on the parts whose FPU is.**
+      `oba::joc::reconstruct` ran its 64-band QMF banks in `double`, a software routine per
+      operation there, at 12 to 28 times real time. `dsp::QmfAnalysisF` and `QmfSynthesisF` are the
+      same banks in `float` (140 dB against the double bank on programme material), run bank by
+      bank so a bank's state stays in the data cache, and a silent object is not run at all.
+      `ReconstructionState::qmf_single_precision` picks it, which the float tier sets.
+    - **The second core takes the independent work.** `DecoderConfig::executor` (an
+      `iclforge::base::Executor`, which `iclforge::ac4::Executor` now names) hands the E-AC-3
+      inverse transforms of a substream's channels, JOC's bed analyses and objects, and the next
+      enhanced coupling block's spectrum to the caller's second lane. The PCM and the object audio
+      are the same bit for bit with no executor, one that runs the tasks backwards and one that
+      runs them on two threads. `hearth_sink` and the Sendspin burst player make the lane on a
+      part with two cores (`CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE`, on by default there).
+    - **The decoders stopped zeroing what they were about to overwrite, and stopped being made
+      again.** An E-AC-3 substream no longer clears six 7 KB coefficient stores and its PCM at the
+      start of every frame (3.2 ms of 37 on the S3), and the AC-3 decoder's per-block scratch is
+      one buffer per channel it needs, not a 36,864 byte block. `FrameDecoder::reset()` and
+      `Eac3Decoder::reset()` put a decoder back to what a new one is with its scratch kept, and the
+      Sendspin burst player calls them at a track change: the C6 had aborted on an allocation
+      that the re-made decoder's scratch no longer fitted in.
+    - **Results.** ESP32-P4: every AC-3 and E-AC-3 stream measured is faster than real time,
+      7.1.4 with 4 to 12 objects at 0.42 to 0.79 (0.76 to 1.59 on one core). ESP32-S3, release
+      image: 7.1.4 with a coding tool 0.61 to 0.80 (1.10 to 1.34 on `main` before the image
+      change), 5.1 0.31 and 0.32, JOC with four objects 0.92 (12 to 28 on the double bank), five
+      1.02, six 1.15, twelve 1.95; enhanced coupling at 7.1.4 1.25.
 
 **Crucible desktop application**
 
