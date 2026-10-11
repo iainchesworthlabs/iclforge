@@ -1,17 +1,18 @@
 # Karaoke: playback in Hearth, creation in the Forge GUI
 
-!!! note "Status as of 2026-10-11: scoping and the specification are signed off; the design is next"
+!!! note "Status as of 2026-10-11: scoping and the specification are signed off; the design is drafted"
     Scoped on 2026-10-11 in one round of questions and answers, recorded under
     [Decisions](#decisions); the specification's seven decisions were answered the same day
-    ([Specification decisions](#specification-decisions)). Nothing in this plan is built. The live
-    status board is [ROADMAP.md](../ROADMAP.md); each phase below carries its own status line.
+    ([Specification decisions](#specification-decisions)). Only the first PR of the build is
+    written (#1274, Hearth opens MP4, Matroska and MPEG-TS). The live status board is
+    [ROADMAP.md](../ROADMAP.md); each phase below carries its own status line.
 
     | Phase | What | State |
     |---|---|---|
     | 0 | Scoping decisions | Answered 2026-10-11 |
     | 1 | Specification (in this page) | Signed off 2026-10-11 (decisions 1 to 7 answered) |
-    | 2 | Design: architecture, UX sheet, work breakdown into stacked PRs | Not started; needs the owner's sign-off |
-    | 3 | Build, as small PRs | Not started; each wave of agents is asked about first |
+    | 2 | Design: architecture, UX sheet, work breakdown into stacked PRs ([karaoke-design.md](karaoke-design.md)) | Architecture and breakdown drafted 2026-10-11; the UI sheet and the owner's sign-off are next |
+    | 3 | Build, as small PRs | Started with #1274; each wave of agents is asked about first |
 
 ## What this is
 
@@ -28,8 +29,8 @@ features in two existing programs, not a new program.
 
 ### What already exists
 
-- **Library** (PR #1267, stacked on #1263, which merged on 2026-10-11; #1267 was open that day,
-  see [Dependencies](#dependencies-and-state-on-2026-10-11)): `OutputConfig::karaoke`
+- **Library** (PR #1267, stacked on #1263; both merged on 2026-10-11, see
+  [Dependencies](#dependencies-and-state-on-2026-10-11)): `OutputConfig::karaoke`
   (`KaraokeReproduction::kOff`, `kAware`, `kCapable`) and `OutputConfig::karaoke_vocals`
   (`KaraokeVocals::kNone`, `kV1`, `kV2`, `kBoth`), `MixLevels::karaoke`, `meta::is_karaoke()` and
   the four-argument `output_channel_count()`, in `libs/ac3/src/decoder/output.cpp` and
@@ -79,11 +80,9 @@ These follow from decision 2; the specification's sign-off took them as drafted.
 ## Dependencies and state on 2026-10-11
 
 - **PR #1263** (`feature/ac3-coding-modes-follow-a-wavs-speakers`: a WAV's speaker mask decides
-  the coding mode) **merged** on 2026-10-11 at 03:40Z. **PR #1267**
+  the coding mode) **merged** on 2026-10-11 at 03:40Z, and **PR #1267**
   (`feature/ac3-karaoke-3-0-reproduction`, stacked on it: Annex C's aware and capable decoders)
-  was **open** two minutes later with `main` merged in, auto-merge on and its checks running.
-  Until it lands, `main`'s `docs/library/decoding.md` still says Annex C is not covered. Phase 3's
-  karaoke PRs wait for it or stack on its branch; the specification and the design do not need it.
+  at 04:14Z. The library side is on `main`; no karaoke PR needs stacking.
 - **Other sessions are editing near this** on 2026-10-11: the E-AC-3 Annex E mixer and decoder,
   the GUI stream player and `forge monitor` (one E-AC-3 programme, associated-service mixing),
   and Hearth's network code. Each file a karaoke PR touches in `apps/hearth`, `apps/forge/gui`
@@ -279,14 +278,15 @@ so any of them can be reopened.
 | 4 | Lyrics encoding (L3) | **UTF-8**, with or without a byte-order mark; anything else is reported as unreadable | *UTF-8, and UTF-16 only when it carries a byte-order mark*: unambiguous and cheap, since the mark states the encoding. *Legacy code pages guessed* (Windows-1252, GBK, Shift-JIS are common in older LRC files): often wrong, and a wrong guess shows as garbled text. *A per-file encoding picker* in the UI |
 | 5 | Authoring input (A2) | **Separate part files first**, one multichannel WAV second | The WAV first (it needs the speaker mask #1263 added, now merged); both together |
 | 6 | LFE part in authoring (A8) | **None in v1** | An optional LFE part: the encoder supports it, the page and its checks grow |
-| 7 | First PR | **The container loader (P11)**, not karaoke: it helps every Hearth user and needs no karaoke library code | Karaoke first, stacked on #1267's branch |
+| 7 | First PR | **The container loader (P11)**, not karaoke: it helps every Hearth user and needs no karaoke library code. It is PR #1274 | Karaoke first |
 
 ### Risks
 
 - **Hearth cannot open MP4 or Matroska today** (P11). Small in code, but it is a change to the
   loader every item goes through.
-- **#1267 was not merged on 2026-10-11** (#1263 was). Hearth and the Forge GUI need the library's
-  karaoke fields; stacking on #1267's branch works, and the first PR does not need them.
+- **The library's karaoke fields are new.** #1267 merged on 2026-10-11, and the reproduction in a
+  player has not been run end to end by anyone yet (the design's first finding, the reproduced
+  layout, is in [karaoke-design.md](karaoke-design.md#the-reproduced-layout-the-finding)).
 - **Hot files.** `hearth_controller.cpp` (about 2,200 lines), Hearth's `Main.qml`, and the Forge
   GUI's `Main.qml` (about 7,700 lines) and `encoder_controller.cpp` are edited by many sessions;
   the Forge GUI's translation catalogues carry a line-number gate that restamps on unrelated
