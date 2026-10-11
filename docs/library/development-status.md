@@ -65,7 +65,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | §7.8 / dialnorm output stage | 🟢 | High | Essential | Opt-in; Lo/Ro, Lt/Rt, mono, RF |
 | | §7.10 error concealment | 🟢 | Medium | Important | Opt-in repeat / mute |
 | | Consumer diagnostics sink | 🟢 | Low | Optional | CRC fail and unknown EMDF id |
-| | Karaoke mode (Annex C, informative) | 🟡🔵 | Low | Optional | `bsmod` 7 with `acmod` above 1/0 is read and reported as a karaoke main service by `probe`. A karaoke-aware 2/0 reproduction is §7.8's Lo/Ro downmix, which Annex C says any decoder gives, and the output stage does give it. Not done: the 3/0 reproduction (Table C.2.2's third column) and a karaoke-capable decoder's listener controls over V1 and V2 (Table C.2.3). Accepted: the annex is informative, nothing in this project writes or reads a karaoke stream to check an implementation against, and the controls are a player's interface rather than a decoder's |
+| | Karaoke mode (Annex C, informative) | 🟡🔵 | Low | Optional | `bsmod` 7 with `acmod` above 1/0 is read and reported as a karaoke main service by `probe`. Both of a karaoke-aware decoder's reproductions (C.2.3.1, Table C.2.2): the 2/0 one is §7.8's Lo/Ro downmix, which the output stage gives, and the 3/0 one - L, C, R from L M R V1 V2 with the vocals at the stream's surround level, melody in the centre - is `OutputConfig::karaoke` and `forge decode ... karaoke`, held to the annex's coefficients by impulse and over a coded stream, since no outside decoder reproduces karaoke. Not done: C.2.3.2's karaoke-capable decoder, whose listener picks none, one or both vocals (Table C.2.3). Accepted: it is a player's control rather than a decoder's, and Table C.2.3's cells did not survive the specification's text extraction (its two pages' columns interleave), so they were not guessed at |
 
 ---
 
@@ -325,7 +325,7 @@ this register is the checklist that those bounds appear here too.
 |---|---|---|
 | Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | No preset token names them (a Table E2.5 list or a stated-speaker WAV does); a WAV with no mask is read by its width | 🟡🔵 |
 | §5.4.2.31 `addbsi`, §5.4.4 `auxdata` | Read past and written clear; no user-data surface | 🔴🔵 |
-| Annex C karaoke | 3/0 reproduction and V1/V2 listener controls | 🟡🔵 |
+| Annex C karaoke | Karaoke-capable decoder's V1/V2 listener controls (C.2.3.2) | 🟡🔵 |
 | Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams | 🔴 |
 | Annex E §E2.3.1.2 I0–I7 | Associated-service labelling; receiver mixer | 🟡 / 🔴 |
 | Annex E §E3.5 / §3.7 | In `auto`; external oracle; TPN EOF hold-back | 🟢 tools / 🟡 policy |

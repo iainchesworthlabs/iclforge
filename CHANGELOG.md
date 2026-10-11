@@ -29,6 +29,20 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**AC-3 karaoke streams (Annex C)**
+
+- **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
+  outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
+  M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at
+  unity in the centre, a single V1 added to the centre and a pair added to the left and the right,
+  each vocal at the stream's own surround level and everything scaled down by the largest
+  output's sum (Table C.2.2). At `channels=2`/`1` it is the Lo/Ro downmix, which is Annex C's 2/0
+  reproduction, and `downmix=ltrt` is refused. A stream that is not karaoke is decoded as coded
+  and the report says so. The library form is `OutputConfig::karaoke`
+  (`KaraokeReproduction::kMultichannel`), `MixLevels::karaoke`, `meta::is_karaoke()` and a
+  four-argument `output_channel_count()`; E-AC-3 and AC-4 streams ignore it. The karaoke-capable
+  decoder's listener choice of vocals (C.2.3.2) is not offered.
+
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
 - **An AC-3 core with E-AC-3 dependents is carried in MP4, fMP4 and MPEG-TS.** ETSI TS 102 366

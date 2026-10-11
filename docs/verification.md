@@ -579,6 +579,14 @@ One more divergence was found and fixed rather than recorded:
   once the two decoders' channel orders agreed: channel 0 (L) at 48.93 dB, and a near-silent
   surround channel gated on absolute difference at a −46.0 dBFS floor (measured −55.31 dBFS).
 
+Annex C's karaoke reproduction has no outside oracle at all: it is informative, no decoder this
+project can run implements it, and there is no karaoke stream from anyone else. It is held to
+the annex's own tables instead - Table C.2.2's 3/0 columns coefficient by coefficient off an
+impulse in every karaoke `acmod` (and its 2/0 column against the Lo/Ro fold), then a coded 3/2
+stream flagged `bsmod` 7 decoded as coded and as Lk, Ck, Rk, sample for sample, and a 3/2 stream
+flagged as a main service shown to ignore the request. That checks the code against the reading
+of the table, not the reading against anyone's decoder.
+
 The four modes with no preset were measured the same way against FFmpeg's decode of this
 encoder's own streams (a tone per channel, 192 kbit/s): 3/0 at 98.7 to 101.1 dB, 2/1 at 98.7 to
 101.1, 3/1 at 86.6 to 94.8, 2/2 at 86.6 to 94.8 and 3/0 with an LFE at 97.5 to 140.4, per

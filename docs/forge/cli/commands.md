@@ -622,6 +622,28 @@ matrix comes from the stream's own `cmixlev`/`surmixlev` or `mixmdate` levels, a
 normalisation means the fold can never be louder than the loudest coded sample. `mix-lfe` folds
 the LFE in as well — §7.8 makes that optional and this decoder drops it by default.
 
+`karaoke` (or `karaoke=on`) decodes an AC-3 **karaoke** stream - `bsmod` 7 with an `acmod` above
+1/0 (Annex C, informative) - the way a karaoke-aware decoder with three outputs does. Such a
+stream carries L and R (the music), a guide melody M where a centre would be, and one or two
+vocal channels V1 and V2 where the surrounds would be (3/0 is L M R, 2/1 is L R V1, 3/1 is
+L M R V1, 2/2 is L R V1 V2, 3/2 is L M R V1 V2). The output is L, C, R and then the LFE when there
+is one: M at unity in the centre, a single V1 added to the centre, and a pair V1 and V2 added to
+the left and the right, each vocal at the stream's own surround level (`surmixlev`, §5.4.2.5 -
+under the programme provider's control, as Annex C intends) and the whole scaled down by the
+largest output's sum, §7.8.1's way (Table C.2.2's 3/0 columns). A 3/0 stream is already that,
+and a 2/0 one has nothing but L and R, so both decode as coded. At `channels=2` or `channels=1`
+the stereo or mono fold *is* Annex C's 2/0 reproduction - "any AC-3 decoder will produce the
+appropriate output if it is set to perform an Lo, Ro 2-channel downmix" - so `karaoke` changes
+nothing there, and `downmix=ltrt` is refused, since Annex C has no Lt/Rt. A stream that is not
+karaoke is decoded as coded and the report says so; E-AC-3 and AC-4 streams warn and ignore the
+option. The karaoke-*capable* decoder's listener controls over which vocals to hear (C.2.3.2)
+are not offered.
+
+```bash
+forge decode sing-along.ac3 karaoke.wav karaoke       # L C R: melody centre, vocals at surmixlev
+forge decode sing-along.ac3 stereo.wav channels=2     # the 2/0 reproduction, Lo/Ro
+```
+
 `downmix=auto` lets the stream choose between the two stereo folds, the third option A/52
 §D3.1.1 describes. The stream's preference is its `dmixmod` (Table D2.2): in AC-3's Annex D
 `xbsi1`, or in E-AC-3's `mixmdate`. It is read once, from the first `dmixmod` the programme's

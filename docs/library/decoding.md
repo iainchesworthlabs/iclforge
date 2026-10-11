@@ -486,9 +486,37 @@ no LFE mix level, so `mix_lfe` folds the LFE in at §7.8's +10 dB for either `bs
 folding a `DecodedFrame` itself gets the same levels from
 `iclforge::ac3::mix_levels(acmod, cmixlev, surmixlev, alternate_bsi)`.
 
-Not covered: Annex C's karaoke downmix rules for `bsmod` 7. The mode's `cmixlev`/`surmixlev` are
-re-purposed as vocal-channel levels there, so it is a different matrix rather than a variation on
-this one, and nothing in this project emits a karaoke stream to check it against.
+**Karaoke streams (Annex C, informative).** `bsmod` 7 with an `acmod` above 1/0 marks a karaoke
+programme (`iclforge::ac3::meta::is_karaoke`; `DecodedFrame::bsmod` and `acmod` say it). Its
+channels are L and R, a guide melody M where a centre would be, and one or two vocals V1 and V2
+where the surrounds would be (Table C.2.1), with `cmixlev`/`surmixlev` re-purposed as their levels.
+A karaoke-aware two-channel decoder is the Lo/Ro downmix, which this output stage is already -
+Table C.2.2's 2/0 column is §7.8.1's matrix cell for cell. The three-channel reproduction is
+`OutputConfig::karaoke = KaraokeReproduction::kMultichannel` (off by default, like everything
+here) at `DownmixTarget::kAsCoded`: for a karaoke stream with something to reproduce - 2/1, 3/1,
+2/2 or 3/2 - `FrameDecoder` returns L, C, R and then the LFE when there is one, where
+
+| coded | Lk | Ck | Rk |
+|---|---|---|---|
+| 3/2 (L M R V1 V2) | L + slev V1 | M | R + slev V2 |
+| 3/1 (L M R V1) | L | M + slev V1 | R |
+| 2/2 (L R V1 V2) | L + slev V1 | - | R + slev V2 |
+| 2/1 (L R V1) | L | slev V1 | R |
+
+`slev` is the stream's Lo/Ro surround level (`mix_levels().loro_slev`, so `MixLevelOverride` and
+Annex D's `lorosurmixlev` apply as they do to a fold), and every coefficient is scaled down by the
+largest output's sum when that exceeds 1 - §7.8.1's way, one factor for all three outputs, so the
+melody keeps its level against the music. `DecodedFrame::acmod` and `lfe` still describe what was
+coded; `output_channel_count(config, acmod, lfe, karaoke)` says how many channels come back.
+`MixLevels::karaoke` is how the decoder tells the stage, and is set from the frame's own `bsmod`
+by `FrameDecoder` alone: E-AC-3 never sets it, so `Eac3Decoder` ignores the option. 3/0 (L M R)
+and 2/0 are returned as coded, `kLtRt` is left as the Lt/Rt fold it is (Annex C defines none), and
+RF mode's ceiling holds over all three outputs. The `forge decode` form is `karaoke`.
+
+Not covered: C.2.3.2's karaoke-*capable* decoder, whose listener chooses none, one or both vocals
+and sets their levels (Table C.2.3). No stream from anyone else exists to check any of this
+against, so it is held to the annex's tables - by impulse for every coefficient, and over real
+coded streams sample for sample.
 
 **A §E2.3.1.2 legacy core inside `Eac3Decoder`.** An AC-3 syncframe (`bsid` <= 8) present in an
 E-AC-3 stream is processed as independent substream 0, and its channels become the bed §E3.8.2
