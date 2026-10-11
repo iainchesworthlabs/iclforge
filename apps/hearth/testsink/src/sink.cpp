@@ -567,6 +567,9 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
                                            render::LayoutRenderer::kMaxCrossoverHz};
         support.buffer_capacity = options_.buffer_capacity;
         support.max_chunk_bytes = options_.max_chunk_bytes;
+        if (options_.max_coded_channels != 0) {
+            support.max_coded_channels.fill(options_.max_coded_channels);
+        }
         config.iclforge_support = std::move(support);
         // What the sink's streams are rendered to, as its own page would say.
         config.iclforge_state.layout = options_.layout;

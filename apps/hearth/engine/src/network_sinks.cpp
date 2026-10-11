@@ -1,5 +1,7 @@
 #include "network_sinks.hpp"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -8,6 +10,7 @@
 #include <utility>
 
 #include "iclforge/sendspin/mdns.hpp"
+#include "sink_form.hpp"
 
 namespace iclforge::hearth {
 
@@ -740,6 +743,74 @@ SinkFacts NetworkSinks::facts_locked(const std::string& instance, const Entry& e
     facts.identify_slot = entry.identify_slot;
 
     return facts;
+}
+
+std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanRequest& request) {
+    if (host_ == nullptr) {
+        return {};
+    }
+    struct Member {
+        std::string client_id;
+        SinkFacts facts;
+    };
+    std::vector<Member> members;
+    std::shared_ptr<ss::Group> group;
+    std::string group_name;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto found = groups_.find(request.group_name);
+        if (found == groups_.end()) {
+            return {};
+        }
+        group = found->second.group;
+        group_name = found->second.name;
+        for (const std::string& sink_id : found->second.member_sink_ids) {
+            const auto sink = sinks_.find(sink_id);
+            // A member that is not connected is nothing to decide about: it is sent the
+            // programme when it comes back, by the plan of the next one.
+            if (sink == sinks_.end() || !sink->second.client.has_value() ||
+                sink->second.client_id.empty()) {
+                continue;
+            }
+            members.push_back({.client_id = sink->second.client_id,
+                               .facts = facts_locked(sink_id, sink->second)});
+        }
+    }
+    if (members.empty() || !group) {
+        return {};
+    }
+
+    std::vector<SinkFacts> facts;
+    facts.reserve(members.size());
+    for (const Member& member : members) {
+        facts.push_back(member.facts);
+    }
+    const StreamNeeds needs{.stream = request.stream,
+                            .sample_rate = request.sample_rate,
+                            .coded_channels = request.coded_channels};
+    const GroupFormPlan plan = plan_group_forms(needs, request.layout, facts);
+
+    for (std::size_t index = 0; index < members.size(); ++index) {
+        const std::string& client_id = members[index].client_id;
+        const MemberForm& form = plan.members[index];
+        switch (form.action) {
+            case MemberAction::kCoded:
+                (void)host_->use_pcm(client_id, false);
+                group->hold(client_id, false);
+                break;
+            case MemberAction::kPcm:
+                (void)host_->use_pcm(client_id, true, 0, form.channels);
+                group->hold(client_id, false);
+                break;
+            case MemberAction::kHold:
+                (void)host_->use_pcm(client_id, false);
+                group->hold(client_id, true);
+                break;
+        }
+        on_log(fmt::format("group \"{}\": {}: {}", group_name, members[index].facts.name,
+                           form.choice.reason));
+    }
+    return plan.variants;
 }
 
 std::string NetworkSinks::member_client_id_locked(const std::string& sink_id) const {

@@ -92,6 +92,9 @@ struct SinkOptions {
     // The most bytes one chunk to the sink may be, which the extension role's support object
     // states; 0 states none, as a sink from before the key does.
     std::uint32_t max_chunk_bytes = 0;
+    // The most channels the extension role's support object states it decodes, for every data
+    // type it lists; 0 states none, as a sink from before the key does.
+    std::uint8_t max_coded_channels = 0;
 };
 
 // What a sink reports, one line at a time, from any of its threads.

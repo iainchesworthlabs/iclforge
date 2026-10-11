@@ -1013,6 +1013,8 @@ struct Group::State {
         std::optional<visualizer::StreamStart> visualizer_started;
     };
     std::vector<Member> members;
+    // Clients held back from the programme (Group::hold()), by client_id.
+    std::set<std::string> held;
 
     // What the other roles show, each state with a version that changes whenever it is set.
     std::optional<metadata::State> metadata;
@@ -1360,7 +1362,7 @@ struct Group::State {
             return;
         }
         const ClientView client = connection->view();
-        if (!client.playing || !client.available) {
+        if (!client.playing || !client.available || held.contains(member.client_id)) {
             return;
         }
         if (client.bursts) {
@@ -1634,6 +1636,15 @@ void Group::add(const std::string& client_id) {
     }
 }
 
+void Group::hold(const std::string& client_id, bool held) {
+    const std::lock_guard lock(state_->mutex);
+    if (held) {
+        state_->held.insert(client_id);
+    } else {
+        state_->held.erase(client_id);
+    }
+}
+
 std::optional<controller::Player> Group::member_player(const std::string& client_id) const {
     const std::lock_guard lock(state_->mutex);
     if (state_->member_of(client_id) == nullptr) {
@@ -1728,6 +1739,7 @@ void Group::push_visualizer(const visualizer::Frame& frame) {
 
 void Group::remove(const std::string& client_id) {
     const std::lock_guard lock(state_->mutex);
+    state_->held.erase(client_id);
     const auto found = std::find_if(state_->members.begin(), state_->members.end(),
                                     [&](const State::Member& member) { return member.client_id == client_id; });
     if (found == state_->members.end()) {
