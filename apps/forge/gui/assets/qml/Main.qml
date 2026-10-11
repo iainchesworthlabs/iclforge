@@ -595,7 +595,7 @@ ApplicationWindow {
             return qsTr("%1 · %2 · %3").arg(codec).arg(shape).arg(window.planRateText);
         }
         return qsTr("%1 · %2 · %3")
-            .arg(codec).arg(EncoderController.channelShapeName).arg(window.planRateText);
+            .arg(codec).arg(EncoderController.planLabel).arg(window.planRateText);
     }
     // fMP4/CMAF has no single extension (outputIsFolder() is true there) -
     // ".{suffix}" would otherwise read as a bare trailing dot.
@@ -867,6 +867,79 @@ ApplicationWindow {
         onAccepted: EncoderController.addSourceFile(selectedFile)
     }
 
+    // The project pickers (objectNames for the Qt Quick Test suites, as the pickers above).
+    FileDialog {
+        id: openProjectDialog
+        objectName: "openProjectDialog"
+        title: qsTr("Open a project")
+        nameFilters: [qsTr("Forge projects (*.%1)").arg(ProjectFile.suffix), qsTr("All files (*)")]
+        onAccepted: window.openProjectFile(selectedFile)
+    }
+
+    FileDialog {
+        id: saveProjectDialog
+        objectName: "saveProjectDialog"
+        title: qsTr("Save the project")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: ProjectFile.suffix
+        nameFilters: [qsTr("Forge projects (*.%1)").arg(ProjectFile.suffix), qsTr("All files (*)")]
+        onAccepted: window.saveProjectFile(selectedFile)
+    }
+
+    // What opening or saving a project had to say: a file that is not a project, a source that
+    // was not there, a setting this version does not take. A person opening a project made
+    // elsewhere is told what was set aside, not left to find out.
+    Dialog {
+        id: projectNoticeDialog
+        objectName: "projectNoticeDialog"
+        modal: true
+        anchors.centerIn: parent
+        padding: Theme.space4
+        title: ""
+
+        background: Rectangle {
+            color: Theme.bg
+            border.color: Theme.text
+            border.width: 2
+        }
+
+        contentItem: ColumnLayout {
+            spacing: Theme.space3
+
+            Text {
+                Layout.preferredWidth: 440
+                Layout.fillWidth: true
+                text: window.projectNoticeTitle
+                wrapMode: Text.WordWrap
+                font.pixelSize: Theme.fontHeading
+                font.weight: Font.DemiBold
+                color: Theme.text
+            }
+            Repeater {
+                model: window.projectNotes
+                delegate: Text {
+                    required property var modelData
+                    objectName: "projectNote"
+                    Layout.fillWidth: true
+                    text: window.projectMessage(modelData)
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: Theme.fontSmall
+                    color: Theme.neutral700
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                Button {
+                    objectName: "projectNoticeClose"
+                    text: qsTr("Close")
+                    highlighted: true
+                    onClicked: projectNoticeDialog.close()
+                }
+            }
+        }
+    }
+
     // The suffix and the filter follow the plan rather than being typed, so a
     // .ac3 file can never end up holding E-AC-3. Both are set when the dialog
     // is opened: outputSuffix() is a method, and a binding to it would go
@@ -1073,12 +1146,281 @@ ApplicationWindow {
     // already exists" path Open stream…'s own header button reaches.
     function openDroppedFile(url) {
         const path = url.toString().toLowerCase();
-        if (path.endsWith(".ac3") || path.endsWith(".ec3")) {
+        if (path.endsWith("." + ProjectFile.suffix)) {
+            window.openProjectFile(url);
+        } else if (path.endsWith(".ac3") || path.endsWith(".ec3")) {
             streamPlayerDialog.open();
             StreamPlayerController.openFile(url);
         } else {
             EncoderController.addSourceFile(url);
         }
+    }
+
+    // ---- projects ---------------------------------------------------------------
+    // A project file (ProjectFile, docs/forge/gui/projects.md): the draft - the sources, the
+    // channel plan, the assignments and the encode settings in ProjectFile's table - and the
+    // flow it was made in, kept in a file that sets the window up the same way again. It holds
+    // what the session restore above holds, and more, so that it can be sent to someone else.
+    //
+    // It is meant to be added to. projectBase is what the file last opened or saved held, and a
+    // capture starts from it, so a key this version does not know (another version's) is
+    // written back rather than lost. A new setting is a row in ProjectFile's table, and a new
+    // thing the window keeps is a key here; neither needs the format to change.
+    property string projectUrl: ""
+    property var projectBase: ({})
+    // The notes the last open or save left: [{ code, args }].
+    property var projectNotes: []
+    property string projectNoticeTitle: ""
+
+    // A message from ProjectFile or from this section, worded for the window.
+    function projectMessage(m) {
+        const a = m.args || [];
+        switch (m.code) {
+        case "cannot-open":
+            return qsTr("%1 could not be opened.").arg(a[0]);
+        case "not-json":
+            return qsTr("%1 is not a Forge project: it is not a JSON document.").arg(a[0]);
+        case "not-a-project":
+            return qsTr("%1 is not a Forge project: it does not say it is one.").arg(a[0]);
+        case "no-version":
+            return qsTr("%1 does not say which version of the project format it is.").arg(a[0]);
+        case "newer-version":
+            return qsTr("%1 was saved by a newer Forge (project version %2). This one reads up to version %3.")
+                .arg(a[0]).arg(a[1]).arg(a[2]);
+        case "cannot-write":
+            return qsTr("%1 could not be written.").arg(a[0]);
+        case "source-no-path":
+            return qsTr("Source %1 has no path and was left out.").arg(a[0]);
+        case "source-missing":
+            return qsTr("%1 was not found, so it was not loaded.").arg(a[0]);
+        case "source-not-loaded":
+            return qsTr("%1 could not be loaded: %2").arg(a[0]).arg(a[1]);
+        case "setting-unknown-choice":
+            return qsTr("%1 \"%2\" is not one this Forge knows. It was left as it was.").arg(a[0]).arg(a[1]);
+        case "setting-out-of-range":
+            return qsTr("%1 %2 is out of range. It was left as it was.").arg(a[0]).arg(a[1]);
+        case "bitrate-not-offered":
+            return qsTr("%1 kbps is not a rate this codec offers. It was left as it was.").arg(a[0]);
+        case "setting-failed":
+            return qsTr("%1 could not be set.").arg(a[0]);
+        case "bed-unknown":
+            return qsTr("The channel layout \"%1\" is not one this Forge knows. It was left as it was.").arg(a[0]);
+        case "busy":
+            return qsTr("An encode is running. Open the project when it has finished.");
+        }
+        return m.code;
+    }
+
+    function showProjectNotice(title, notes) {
+        window.projectNoticeTitle = title;
+        window.projectNotes = notes;
+        projectNoticeDialog.open();
+    }
+
+    // The window as a project: the last file's own keys, then what is set now.
+    function captureProject() {
+        const project = JSON.parse(JSON.stringify(window.projectBase));
+        project.flow = window.tier;
+
+        // A source that was in the file keeps the keys it had there, whatever they are.
+        const before = {};
+        const prior = project.sources || [];
+        for (let i = 0; i < prior.length; i++) {
+            before[ProjectFile.localPath(prior[i].url || prior[i].path || "")] = prior[i];
+        }
+        const rows = EncoderController.sourceModel;
+        const roles = window.tier === "karaoke" ? karaokeFlow.loadedPartNames() : [];
+        const sources = [];
+        for (let i = 0; i < rows.length; i++) {
+            const known = before[ProjectFile.localPath(rows[i].path)];
+            const source = known !== undefined ? Object.assign({}, known) : {};
+            delete source.url;
+            delete source.exists;
+            source.path = rows[i].path;
+            if (roles.length === rows.length) {
+                source.part = roles[i];
+            }
+            if (rows[i].offsetSeconds !== 0) {
+                source.offsetSeconds = rows[i].offsetSeconds;
+            }
+            sources.push(source);
+        }
+        project.sources = sources;
+
+        delete project.bed;
+        delete project.lfe;
+        delete project.extras;
+        delete project.atmos;
+        delete project.assignments;
+        if (EncoderController.atmosEnabled) {
+            project.atmos = true;
+        } else if (rows.length > 0) {
+            const beds = EncoderController.bedChoices;
+            if (EncoderController.bedIndex >= 0 && EncoderController.bedIndex < beds.length) {
+                project.bed = beds[EncoderController.bedIndex].id;
+            }
+            project.lfe = EncoderController.bedLfe;
+            const on = [];
+            const model = EncoderController.extrasModel;
+            for (let i = 0; i < model.length; i++) {
+                if (model[i].checked) {
+                    on.push(model[i].id);
+                }
+            }
+            if (on.length > 0) {
+                project.extras = on;
+            }
+        }
+        const assignments = [];
+        const table = EncoderController.assignmentRows;
+        for (let i = 0; i < table.length; i++) {
+            if (table[i].touched === true || table[i].destToken !== "none") {
+                assignments.push({ source: table[i].source, channel: table[i].channel,
+                                   to: table[i].destToken });
+            }
+        }
+        if (assignments.length > 0) {
+            project.assignments = assignments;
+        }
+
+        project.encode = Object.assign({}, project.encode || {},
+                                       ProjectFile.captureEncode(EncoderController));
+        if (window.tier === "karaoke") {
+            project.karaoke = Object.assign({}, project.karaoke || {}, karaokeFlow.projectState());
+        }
+        return project;
+    }
+
+    // Puts a project read by ProjectFile.read() into the window. The sources are replaced, not
+    // added to. Returns the notes: what could not be used, each a { code, args }.
+    function applyProject(project) {
+        const notes = [];
+        const encode = project.encode || {};
+        // The codec and container first: the rest of the draft is shaped by them.
+        notes.push.apply(notes, ProjectFile.applyEncode(EncoderController, encode, 0));
+
+        const given = project.sources || [];
+        const flowName = project.flow || "";
+        const usable = [];
+        for (let i = 0; i < given.length; i++) {
+            if (given[i].exists === false) {
+                notes.push({ code: "source-missing", args: [given[i].path] });
+            } else {
+                usable.push(given[i]);
+            }
+        }
+        const fromParts = usable.some((source) => source.part !== undefined);
+        if (flowName === "karaoke" || fromParts) {
+            window.tier = "karaoke";
+            const parts = {};
+            for (let i = 0; i < usable.length; i++) {
+                if (usable[i].part !== undefined) {
+                    parts[usable[i].part] = usable[i].url;
+                }
+            }
+            const karaoke = project.karaoke || {};
+            karaokeFlow.applyProject(parts, karaoke.input, karaoke.listening, karaoke.vocals);
+            for (const failed of karaokeFlow.failedParts) {
+                notes.push({ code: "source-not-loaded", args: [failed.name, failed.text] });
+            }
+        } else {
+            while (EncoderController.sourceModel.length > 0) {
+                EncoderController.removeSource(0);
+            }
+            for (let i = 0; i < usable.length; i++) {
+                const before = EncoderController.sourceModel.length;
+                EncoderController.addSourceFile(usable[i].url);
+                if (EncoderController.sourceModel.length > before) {
+                    if (usable[i].offsetSeconds) {
+                        EncoderController.setSourceOffset(before, usable[i].offsetSeconds);
+                    }
+                } else {
+                    notes.push({ code: "source-not-loaded",
+                                 args: [usable[i].path, EncoderController.status] });
+                }
+            }
+            if (["guided", "advanced", "expert"].indexOf(flowName) >= 0) {
+                window.tier = flowName;
+            }
+        }
+
+        // The channel plan and the routing, when the project kept them: a flow that works them
+        // out from the parts has done it above, and these then say what was changed after.
+        if (project.atmos === true) {
+            EncoderController.atmosEnabled = true;
+        } else if (EncoderController.sourceModel.length > 0 && project.bed !== undefined) {
+            const beds = EncoderController.bedChoices;
+            let found = false;
+            for (let i = 0; i < beds.length; i++) {
+                if (beds[i].id === project.bed) {
+                    EncoderController.bedIndex = i;
+                    found = true;
+                }
+            }
+            if (!found) {
+                notes.push({ code: "bed-unknown", args: [String(project.bed)] });
+            }
+            EncoderController.bedLfe = project.lfe === true;
+            const wanted = project.extras || [];
+            const model = EncoderController.extrasModel;
+            for (let i = 0; i < model.length; i++) {
+                if (model[i].checked !== (wanted.indexOf(model[i].id) >= 0)) {
+                    EncoderController.toggleExtra(model[i].id);
+                }
+            }
+        }
+        const assignments = project.assignments || [];
+        for (let i = 0; i < assignments.length; i++) {
+            if (assignments[i].source < EncoderController.sourceModel.length) {
+                EncoderController.setAssignment(assignments[i].source, assignments[i].channel,
+                                                assignments[i].to);
+            }
+        }
+        notes.push.apply(notes, ProjectFile.applyEncode(EncoderController, encode, 1));
+        return notes;
+    }
+
+    function openProjectFile(url) {
+        if (EncoderController.busy) {
+            window.showProjectNotice(qsTr("The project was not opened"), [{ code: "busy", args: [] }]);
+            return false;
+        }
+        const result = ProjectFile.read(url);
+        if (!result.ok) {
+            window.showProjectNotice(qsTr("The project was not opened"), [result.error]);
+            return false;
+        }
+        const notes = result.warnings.slice();
+        notes.push.apply(notes, window.applyProject(result.project));
+        window.projectUrl = url.toString();
+        window.projectBase = result.project;
+        if (notes.length > 0) {
+            window.showProjectNotice(qsTr("The project was opened with notes"), notes);
+        }
+        return true;
+    }
+
+    function saveProjectFile(url) {
+        const project = window.captureProject();
+        const result = ProjectFile.write(url, project);
+        if (!result.ok) {
+            window.showProjectNotice(qsTr("The project was not saved"), [result.error]);
+            return false;
+        }
+        window.projectUrl = url.toString();
+        window.projectBase = project;
+        return true;
+    }
+
+    // The save picker's name: the project's own, or the first source's stem.
+    function suggestedProjectUrl() {
+        if (window.projectUrl.length > 0) {
+            return window.projectUrl;
+        }
+        const stem = EncoderController.sourcePath.length > 0
+                     ? baseName(EncoderController.sourcePath).replace(/\.[^.]*$/, "")
+                     : "project";
+        return outputFolderUrl() + "/" + stem + "." + ProjectFile.suffix;
     }
 
     // The folder actually created once folderDialog accepts - see
@@ -1520,6 +1862,37 @@ ApplicationWindow {
                     color: Theme.neutral700
                 }
                 Item { Layout.fillWidth: true }
+
+                // The project files' menu (docs/forge/gui/projects.md). Here and not in the
+                // header row below: that row is already as wide as the window allows (the
+                // comment on it says what a sixth action did), and this strip is empty.
+                Button {
+                    objectName: "projectMenuButton"
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.rightMargin: Theme.space2
+                    text: qsTr("Project…")
+                    flat: true
+                    onClicked: projectMenu.open()
+
+                    Menu {
+                        id: projectMenu
+                        y: parent.height
+
+                        MenuItem {
+                            objectName: "projectOpenItem"
+                            text: qsTr("Open project…")
+                            onTriggered: openProjectDialog.open()
+                        }
+                        MenuItem {
+                            objectName: "projectSaveItem"
+                            text: qsTr("Save project…")
+                            onTriggered: {
+                                saveProjectDialog.selectedFile = window.suggestedProjectUrl();
+                                saveProjectDialog.open();
+                            }
+                        }
+                    }
+                }
             }
         }
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.divider }

@@ -58,6 +58,7 @@
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
 #include "ac4_encode_core.hpp"
+#include "source_frame.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "channel_geometry.hpp"
 #include "fmp4_folder_writer.hpp"
@@ -3108,11 +3109,9 @@ void EncoderController::startMotionPreview() {
             const auto valid =
                 std::min<std::size_t>(iclforge::ac3::kSamplesPerFrame, total - start);
             for (std::size_t ch = 0; ch < nobjects; ++ch) {
-                const auto len = planes[ch].size();
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    block[ch][static_cast<std::size_t>(i)] = at < len ? planes[ch][at] : 0.0f;
-                }
+                // Past its end a channel holds its last sample, as forge does:
+                // see source_frame.hpp for why not silence.
+                iclforge::apps::fill_source_frame(planes[ch], 0, start, block[ch]);
                 views[ch] = block[ch];
             }
             // The placement is the object's position at the END of the
@@ -3269,6 +3268,16 @@ QString EncoderController::effectiveLabel() const {
     }
     if (atmos_enabled_) {
         return QStringLiteral("5.1 bed");
+    }
+    // Annex C's karaoke is AC-3's (E-AC-3 and AC-4 have no such mode, and the decoder never
+    // flags one). The five channels are a backing and parts: "5.0" says a surround room.
+    if (codec_ == plan::Codec::kAc3 &&
+        meta_.info.bsmod == iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke) {
+        const auto cp = effectiveChannelPlan();
+        if (iclforge::ac3::meta::is_karaoke(meta_.info.bsmod, cp.bed_acmod)) {
+            return QStringLiteral("Karaoke %1")
+                .arg(to_qstring(iclforge::ac3::analysis::layout_name(cp.bed_acmod, cp.bed_lfe)));
+        }
     }
     return channelShapeName();
 }
@@ -3972,6 +3981,9 @@ void EncoderController::restoreRuns(const QVariantList& saved) {
 
 void EncoderController::finishRun(bool ok, const QString& message) {
     if (current_run_id_ < 0) {
+        // An encode that opened no run (encodePreviewTo) has no chip to put its rate on, and
+        // the next run must not be handed it.
+        pending_rate_text_.clear();
         return;
     }
     for (auto& variant : runs_) {
@@ -4307,14 +4319,8 @@ void EncoderController::previewPlanMeters() {
             const auto valid =
                 std::min<std::size_t>(iclforge::ac3::kSamplesPerFrame, total - start);
             for (std::size_t ch = 0; ch < planes.size(); ++ch) {
-                const auto len = planes[ch].size();
                 const auto offset = ch < offsets.size() ? offsets[ch] : 0;
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    const std::size_t shifted = at >= offset ? at - offset : 0;
-                    source_block[ch][static_cast<std::size_t>(i)] =
-                        at >= offset && shifted < len ? planes[ch][shifted] : 0.0f;
-                }
+                iclforge::apps::fill_source_frame(planes[ch], offset, start, source_block[ch]);
                 auto& acc = source_summaries[flat_source[ch]];
                 for (std::size_t i = 0; i < valid; ++i) {
                     const double s = static_cast<double>(source_block[ch][i]);
@@ -7318,6 +7324,17 @@ void EncoderController::cancel() {
     cancel_requested_.store(true, std::memory_order_relaxed);
 }
 
+void EncoderController::encodePreviewTo(const QUrl& url) {
+    if (busy_) {
+        return;
+    }
+    // Consumed by the encodeTo() just below, which is the only place it is read; an encode
+    // refused before it gets there must not leave it set for the next, real one.
+    next_encode_unrecorded_ = true;
+    encodeTo(url);
+    next_encode_unrecorded_ = false;
+}
+
 void EncoderController::encodeTo(const QUrl& url) {
     if (busy_ || !source_ready_ || !source_) {
         return;
@@ -7434,7 +7451,9 @@ void EncoderController::encodeTo(const QUrl& url) {
     emit outputChanged();
 
     cancel_requested_.store(false, std::memory_order_relaxed);
-    startRun(path);
+    if (!std::exchange(next_encode_unrecorded_, false)) {
+        startRun(path);
+    }
     setBusy(true);
     setProgress(0.0);
     setStatus(QStringLiteral("Encoding…"));
@@ -7600,7 +7619,7 @@ void EncoderController::encodeChannels(const QString& path,
 
         // The longest loaded channel, not just channel 0's - a run with
         // several sources of different lengths covers all of them (each
-        // shorter one below simply pads with silence past its own end)
+        // shorter one below simply holds its last sample past its own end)
         // rather than truncating to whichever happens to be shortest.
         std::size_t total = 0;
         for (const auto& channel : planes) {
@@ -7639,19 +7658,16 @@ void EncoderController::encodeChannels(const QString& path,
                 cancelled = true;
                 break;
             }
-            // The tail frame is zero-padded to a full 1536 samples; the meter
+            // The tail frame is padded to a full 1536 samples, holding each
+            // channel's last sample as forge does; the meter
             // sees only the real ones, so padding cannot pull the RMS down.
             const auto valid =
                 std::min<std::size_t>(iclforge::ac3::kSamplesPerFrame, total - start);
             for (std::size_t ch = 0; ch < planes.size(); ++ch) {
                 // Each channel's OWN length, not the run's overall total: a
-                // shorter source among several pads with silence from where
-                // IT ends, not from wherever the longest one does.
-                const auto len = planes[ch].size();
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    source[ch][static_cast<std::size_t>(i)] = at < len ? planes[ch][at] : 0.0f;
-                }
+                // shorter source among several holds its last sample from
+                // where IT ends, not from wherever the longest one does.
+                iclforge::apps::fill_source_frame(planes[ch], 0, start, source[ch]);
             }
             plan::render(routing, in, out, iclforge::ac3::kSamplesPerFrame);
             for (std::size_t i = 0; i < lfe_indices.size(); ++i) {
@@ -8026,11 +8042,9 @@ void EncoderController::encodeObjects(const QString& path,
             const auto valid =
                 std::min<std::size_t>(iclforge::ac3::kSamplesPerFrame, total - start);
             for (std::size_t ch = 0; ch < nobjects; ++ch) {
-                const auto len = planes[ch].size();
-                for (int i = 0; i < iclforge::ac3::kSamplesPerFrame; ++i) {
-                    const std::size_t at = start + static_cast<std::size_t>(i);
-                    block[ch][static_cast<std::size_t>(i)] = at < len ? planes[ch][at] : 0.0f;
-                }
+                // Past its end a channel holds its last sample, as forge does:
+                // see source_frame.hpp for why not silence.
+                iclforge::apps::fill_source_frame(planes[ch], 0, start, block[ch]);
                 views[ch] = block[ch];
             }
             // The placement is the object's position at the END of the

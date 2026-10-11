@@ -32,6 +32,10 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_stream_decoder.cpp
     test_transport.cpp)
 target_link_libraries(iclforge-hearth-tests PRIVATE hearth_engine)
+# test_lyrics.cpp reads the karaoke example's words (examples/karaoke/auld-lang-syne/) where the
+# example ships them, beside the stream they go with.
+target_compile_definitions(iclforge-hearth-tests PRIVATE
+    "ICLFORGE_KARAOKE_EXAMPLE_DIR=\"${CMAKE_SOURCE_DIR}/examples/karaoke/auld-lang-syne\"")
 # hearth_engine does not compile container_input.cpp (apps/hearth/engine/src/session.hpp: the
 # application supplies the container readers), so it compiles into this binary, as it does into
 # the program, for what test_media_info.cpp and test_player.cpp call and media_info.cpp names.

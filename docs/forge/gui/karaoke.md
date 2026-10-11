@@ -61,7 +61,24 @@ sounds wrong, go back to Levels.
 
 **4 · Save.** Choose the file type (the raw `.ac3` stream, or Matroska, MP4 or MPEG-TS, as the
 Format tab offers) and the bit rate, see the equivalent `forge encode …` command, and encode. The
-save picker and the run strip are the ones Guided uses.
+save picker and the run strip are the ones Guided uses; the stream built for Hear is not a run, and
+only what you save is.
+
+The bit rate starts where the mode's width wants it (384 kbps for 3/2, 320 for 3/1 and 2/2, 256 for
+3/0 and 2/1) and stays where you set it. A **Lyrics** row names the `.lrc` that goes beside the
+stream: one of the backing's name beside it is offered, you can choose another or remove it, and
+the stream is saved with the same name and `.lrc`, where Hearth looks for lyrics. A lyrics file
+already there is left as it is.
+
+The start offsets and trims you set on the parts stay when you add, replace or remove a part.
+
+## A project of the parts
+
+**Project…**, **Save project…** keeps which file is which part, the levels, the bit rate and how
+the stream is heard in a `.forgeproj`, and **Open project…** (or dropping it on the window)
+puts the flow back as it was; see [Projects](projects.md). The
+[Auld Lang Syne example](https://github.com/iainchesworthlabs/iclforge/tree/main/examples/karaoke/auld-lang-syne)
+is four generated parts, a project that opens them here, the stream they make and its words.
 
 ## The same from the command line
 
@@ -69,7 +86,7 @@ The command the last step shows is the whole of it, for example a 3/1 stream (ba
 one vocal):
 
 ```text
-forge encode backing.wav out.ac3 192 L,C,R,Cs src=melody.wav src=lead.wav map=0.0:L,0.1:R,1.0:C,2.0:Cs bsmod=voiceover
+forge encode backing.wav out.ac3 320 L,C,R,Cs src=melody.wav src=lead.wav map=0.0:L,0.1:R,1.0:C,2.0:Cs bsmod=voiceover
 ```
 
 `bsmod=voiceover` is the `bsmod` 7 code: with a coding mode above 1/0 it is the karaoke main
@@ -87,5 +104,6 @@ the reproduction and the vocals.
 
 - **An LFE part.** Karaoke streams made here carry none.
 - **Annex C's optional re-levelling** of M, V1 and V2: the library offers none.
-- **Timing or editing lyrics.** Hearth reads `.lrc` files beside a stream; nothing here makes one.
+- **Timing or editing lyrics.** Hearth reads `.lrc` files beside a stream; nothing here makes or
+  times one, it only puts one you have beside the stream.
 - **E-AC-3 or AC-4.** Their specifications give a karaoke stream no mode.

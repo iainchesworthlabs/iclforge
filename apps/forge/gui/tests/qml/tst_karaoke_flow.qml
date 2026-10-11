@@ -40,10 +40,20 @@ TestCase {
     property int defaultCmix: 0
     property int defaultSurmix: 0
 
-    // 1.024 s at 48 kHz is exactly 32 AC-3 frames: the window and forge write the
-    // same bytes for whole frames, which is what the byte comparison below needs
-    // (they differ in how a final partial frame is padded).
+    // 1.024 s at 48 kHz is exactly 32 AC-3 frames, and 2.0 s is 62.5: the second
+    // ends in a partial frame, which both the window and forge pad by holding each
+    // channel's last sample (source_frame.hpp), and the byte comparisons below hold
+    // them to it for both.
+    property url longBacking
+    property url longMelody
+    property url longLead
+
     function initTestCase() {
+        longBacking = audioFixtures.writeTones("kb-long-backing.wav", 48000, 2.0, [440, 620]);
+        longMelody = audioFixtures.writeTones("kb-long-melody.wav", 48000, 2.0, [800]);
+        longLead = audioFixtures.writeTones("kb-long-lead.wav", 48000, 2.0, [1030]);
+        verify(longBacking.toString().length > 0 && longLead.toString().length > 0,
+               "the long parts could not be written");
         backing = audioFixtures.writeTones("kb-backing.wav", 48000, 1.024, [440, 620]);
         monoBacking = audioFixtures.writeTones("kb-mono.wav", 48000, 1.024, [440]);
         melody = audioFixtures.writeTones("kb-melody.wav", 48000, 1.024, [800]);
@@ -367,6 +377,161 @@ TestCase {
             compare(cliRunner.run(line, folder), 0, line);
                 verify(cliRunner.sameBytes(out, Qt.resolvedUrl("_test_output/tst_karaoke_flow_cli/out.ac3")),
                    "the command line wrote different bytes than the window did");
+        }
+    }
+
+    // ---- Naming, the rate, edits, the preview and the lyrics ---------------------------
+    function test_aKaraokeDraftIsNamedForWhatItIs() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        // Five channels, which a room would call 5.0: a karaoke stream's are a backing and parts.
+        compare(EncoderController.planLabel, "Karaoke 3/2");
+        verify(ctx.win.planLine.indexOf("Karaoke 3/2") >= 0, ctx.win.planLine);
+        compare(EncoderController.channelShapeName, "5.0");
+        // The same five channels with another service are a 5.0 again.
+        EncoderController.bsmodIndex = 0;
+        compare(EncoderController.planLabel, "5.0");
+    }
+
+    function test_theRateStartsAtTheModesAndTheAuthorsChoiceIsKept() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        compare(EncoderController.bitrateKbps, 256);
+        useParts(ctx, { vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        compare(EncoderController.bitrateKbps, 384);
+
+        // Picked on the Save step, the rate is the author's: a part leaving does not move it.
+        ctx.flow.currentStepKey = "save";
+        const box = findByName(ctx.win, "karaokeBitrate");
+        const at = EncoderController.bitrates.indexOf(448);
+        verify(at >= 0);
+        box.currentIndex = at;
+        box.activated(at);
+        compare(EncoderController.bitrateKbps, 448);
+        ctx.flow.currentStepKey = "parts";
+        press(ctx, "karaokeRemove-vocal2");
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        compare(EncoderController.bitrateKbps, 448);
+    }
+
+    function test_whatTheAuthorSetOnThePartsSurvivesAPartChanging() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        // As the rail and Expert set them: a start offset on the lead, a trim on the backing's
+        // left channel and one on the lead.
+        EncoderController.setSourceOffset(2, 0.25);
+        EncoderController.setAssignmentTrim(0, 0, -3.0);
+        EncoderController.setAssignmentTrim(2, 0, 2.5);
+
+        // A second vocal arrives, which reloads every source.
+        useParts(ctx, { vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        const rows = EncoderController.sourceModel;
+        compare(rows.length, 4);
+        compare(rows[2].label, "kb-lead.wav");
+        compare(rows[2].offsetSeconds, 0.25);
+        compare(rows[0].offsetSeconds, 0);
+        const trims = {};
+        for (const row of EncoderController.assignmentRows) {
+            trims[row.source + ":" + row.channel] = row.trimDb;
+        }
+        compare(trims["0:0"], -3.0);
+        compare(trims["2:0"], 2.5);
+        compare(trims["1:0"], 0, "nobody trimmed the melody");
+    }
+
+    function saveTo(ctx, url) {
+        press(ctx, "karaokeNextButton");
+        const dialog = findByName(ctx.win, "saveDialog");
+        tryCompare(dialog, "visible", true, 5000);
+        dialog.selectedFile = url;
+        dialog.accepted();
+        dialog.close();
+        tryCompare(EncoderController, "busy", false, 60000);
+    }
+
+    function test_theHearPreviewIsNotARunAndASavedStreamIs() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        const before = EncoderController.runs.length;
+        ctx.flow.currentStepKey = "hear";
+        tryCompare(ctx.flow, "previewState", "ready", 60000);
+        compare(EncoderController.runs.length, before, "the preview was listed as a run");
+
+        ctx.flow.currentStepKey = "save";
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_polish_run.ac3");
+        verify(audioFixtures.remove(out));
+        saveTo(ctx, out);
+        compare(EncoderController.runs.length, before + 1);
+        compare(EncoderController.runs[0].filename, "tst_karaoke_polish_run.ac3");
+        compare(EncoderController.runs[0].status, "done");
+    }
+
+    function test_aLyricsFileBesideTheBackingGoesBesideTheStream() {
+        const song = audioFixtures.writeTones("kb-song.wav", 48000, 1.024, [440, 620]);
+        const words = audioFixtures.writeText("kb-song.lrc", "[ti:Test]\n[00:00.10]<00:00.10>La <00:00.50>la\n");
+        verify(song.toString().length > 0 && words.toString().length > 0);
+        const ctx = openFlow();
+        useParts(ctx, { backing: song, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        // Offered because a .lrc of the backing's name is beside it.
+        compare(ctx.flow.lyricsUrl, words.toString());
+        ctx.flow.currentStepKey = "save";
+        compare(findByName(ctx.win, "karaokeLyricsFile").text, "kb-song.lrc");
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_polish_lyrics.ac3");
+        const beside = Qt.resolvedUrl("_test_output/tst_karaoke_polish_lyrics.lrc");
+        verify(audioFixtures.remove(out) && audioFixtures.remove(beside));
+        saveTo(ctx, out);
+        // Under the stream's name, with the file's own bytes, where Hearth looks.
+        verify(cliRunner.sameBytes(words, beside), "the lyrics were not put beside the stream");
+        verify(ctx.flow.lyricsNote.indexOf("beside the stream") >= 0, ctx.flow.lyricsNote);
+
+        // Removed, none goes.
+        press(ctx, "karaokeRemoveLyrics");
+        compare(ctx.flow.lyricsUrl, "");
+        const out2 = Qt.resolvedUrl("_test_output/tst_karaoke_polish_nolyrics.ac3");
+        const beside2 = Qt.resolvedUrl("_test_output/tst_karaoke_polish_nolyrics.lrc");
+        verify(audioFixtures.remove(out2) && audioFixtures.remove(beside2));
+        saveTo(ctx, out2);
+        compare(cliRunner.size(beside2), 0, "a lyrics file the author removed was put beside the stream");
+    }
+
+    // Parts of 2.0 s end in half a frame. The window once wrote silence into the
+    // rest of that frame where forge held the last sample, so the two files
+    // differed in their last frame (610 of 48,384 bytes) for the same plan.
+    function test_aPartialLastFrameIsWrittenAsTheCommandLineWritesIt() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: longBacking, melody: longMelody, vocal1: longLead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        ctx.flow.currentStepKey = "save";
+        const line = findByName(ctx.win, "karaokeCommandLine").text;
+        verify(line.indexOf("forge encode") === 0, line);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_flow_long.ac3");
+        press(ctx, "karaokeNextButton");
+        const dialog = findByName(ctx.win, "saveDialog");
+        tryCompare(dialog, "visible", true, 5000);
+        dialog.selectedFile = out;
+        dialog.accepted();
+        dialog.close();
+        tryCompare(EncoderController, "busy", false, 60000);
+        // 63 frames: 62.5 rounded up, which is the case the test is about.
+        compare(cliRunner.size(out) % 63, 0, "the stream is not a whole number of 63 frames");
+
+        if (cliRunner.available()) {
+            const folder = Qt.resolvedUrl("_test_output/tst_karaoke_flow_long_cli");
+            verify(cliRunner.prepare(folder, longBacking));
+            verify(cliRunner.copyInto(folder, longMelody));
+            verify(cliRunner.copyInto(folder, longLead));
+            compare(cliRunner.run(line, folder), 0, line);
+            verify(cliRunner.sameBytes(out, Qt.resolvedUrl("_test_output/tst_karaoke_flow_long_cli/out.ac3")),
+                   "the command line wrote different bytes than the window did for a partial last frame");
         }
     }
 }
