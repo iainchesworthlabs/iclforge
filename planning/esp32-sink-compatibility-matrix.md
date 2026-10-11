@@ -340,14 +340,16 @@ The board's own counters (`silence_frames`, `skipped_frames`) say the same: of a
 ### The real limit on the C6 (2026-10-11)
 
 Measured on the C6 `hearth-db4c40` (RSSI -60 dBm, 2.4 GHz, `Stresemannstrasse-IoT`), Hearth's test
-server playing a 15 s 48 kHz 16-bit stereo tone in 4,000-byte (1,000-frame, 20.8 ms) chunks, with
-temporary traces in the firmware (since removed).
+server playing a 15 s 48 kHz stereo tone, with temporary traces in the firmware (since removed).
+The link's quality moved from minute to minute, so each row below is a count of runs.
 
 | What | Measured |
 |---|---|
-| Player time per chunk, before the integer unpack | 5.4 ms (27% of the core) |
-| Player time per chunk, after it | 1.8 to 2.0 ms (9%) |
-| Underruns in 15 s on the same image, through one afternoon | 1 to 79; 1 to 4 in quiet minutes, 17 to 79 in bad ones |
+| Player time per 1,000-frame chunk, before the integer unpack / after | 5.4 ms (27% of the core) / 1.8 to 2.0 ms (9%) |
+| Underruns in 15 s, 16-bit, 4,000-byte (1,000-frame) chunks, 15 runs on six images | 10 to 65, median 22 |
+| The same with 2,000-byte (500-frame) chunks, 6 runs | 1, 1, 2, 2, 9, 35 |
+| The same with the 24-bit format listed first (666-frame chunks in 4,000 bytes), 5 runs | 1, 1, 1, 4, 4 |
+| 4,000-byte chunks, TCP window 5,760 -> 11,520 bytes and receive mailbox 6 -> 16, 3 runs | 5, 7, 7; the heap's least 96 KB -> 75 KB |
 | The CPU during a 320 ms stall | idle for 70 to 90 ms of every 100 |
 | A message's payload after its header | 30 to 60 ms in a bad minute, 200 to 320 ms about twice a second |
 | What the ring holds | 48 KB; a server fills three quarters: 36,864 bytes = **192 ms** of 16-bit stereo (128 ms of 24-bit), against 1.65 s of 192 kbit/s AC-3 |
@@ -355,29 +357,39 @@ temporary traces in the firmware (since removed).
 
 What follows from it:
 
-1. **The player was never the limit.** The server's task on the board was blocked in the read of a
-   message's payload while the CPU idled: the bytes had not arrived. Every board on that SSID shows
-   the link's jitter, the S3 and P4 too. They play the same stream because their rings, in PSRAM,
-   are 256 KB (about a second of PCM at the three quarters a server fills), where the C6's holds
-   192 ms.
+1. **The player was never the limit.** The server's task on the board was blocked in the read of
+   a message's payload while the CPU idled: the bytes had not arrived, in the middle of a message,
+   which is a segment held up or lost and retransmitted. Every board on that SSID shows the link's
+   jitter, the S3 and P4 too. They play the same stream because their rings, in PSRAM, are 256 KB
+   (about a second of PCM at the three quarters a server fills), where the C6's holds 192 ms.
 2. **A gap longer than the ring is a drop-out, and the playout does the right thing about it**: the
-   chunks behind the gap are late by then, so it skips them rather than playing the stream
-   late, about 0.2 s of audio a gap. The 15 s runs skipped 6 to 12 s of it in a bad minute.
-3. **The ring cannot be made deeper.** `docs/platforms/bare-metal/esp32-c6.md` has the 64 KB ring
+   chunks behind the gap are late by then, so it skips them rather than playing the stream late,
+   about 0.2 s of audio a gap. The 15 s runs skipped 6 to 12 s of it in a bad minute.
+3. **A bigger TCP window and receive mailbox take about two thirds of the stalls, at a price the C6
+   cannot pay.** Raising them (`CONFIG_LWIP_TCP_WND_DEFAULT` 5,760 -> 11,520 and
+   `CONFIG_LWIP_TCP_RECVMBOX_SIZE` 6 -> 16) took 17 to 23 underruns to 5 to 7 on the same stream (on
+   a base a few commits later) and the heap's least from 96 KB to 75 KB, on a part where the coded decoders abort for want of
+   heap. Not raised.
+4. **The ring cannot be made deeper.** `docs/platforms/bare-metal/esp32-c6.md` has the 64 KB ring
    failing on the heap (two WiFi receive allocations refused, `heap_least` 4,792 bytes). The 1.65 s
    AC-3 gets from the ring would take 317 KB of PCM, 8.6 times it. Lossless packing (FLAC) would
    give about 1.7 times the depth for music, not 8.
-4. **The 16-bit-first listing is right and not the cause of anything**: on a 16-bit board it
-   sends two thirds of 24-bit's bytes, which is a ring that holds half as long again. The earlier
-   reading that it made the C6 worse was a minute-to-minute difference in the link, which swings
-   the count tenfold on one image.
+5. **A shorter chunk costs nothing and helps.** The underruns fall with the chunk's duration:
+   500-frame chunks gave a median of 2 against 22 for 1,000-frame ones across the afternoon, and
+   1, 9 and 35 against 17, 18 and 23 alternated on one image. That is also why the 24-bit-first listing did better in the earlier runs: at the same 4,000
+   bytes it sends 666 frames a chunk, not 1,000. **The listing is not the cause and the chunk
+   duration is**, so #1251's 16-bit-first order is right (it sends fewer bytes) and the fix is to
+   size a PCM chunk by duration, about 10 ms, where `use_pcm(client, true, 0, width)` takes the
+   board's whole 4,096-byte limit. That is a change in `NetworkSinks::plan_group`, not in the
+   firmware, and it is not made yet.
 
-So the C6 is a board that plays PCM on a clean link and drops out on a busy one, and the
-difference is not the firmware's to remove. What is the owner's to decide: stay coded-only (a
-stream the board cannot decode is refused with its reason, as #1259's `form_policy` does); or offer the
-fallback with a stated caveat, which is "playback everywhere" at the cost of drop-outs on some
-networks; or, later, a lossy leg (Opus is in `player@v1`'s codec list, at a twelfth of the bytes
-and a decode the C6 would have to be measured for).
+So the C6 is a board that plays PCM on a clean link and drops out on a busy one, and a 10 ms chunk
+moves the line without a byte of firmware. What is the owner's to decide: stay coded-only (a
+stream the board cannot decode is refused with its reason, as #1259's `form_policy` does); or
+offer the fallback with 10 ms chunks and a stated caveat that it can drop out on a busy WiFi,
+which is "playback everywhere" at the cost of drop-outs on some networks; or, later, a lossy leg
+(Opus is in `player@v1`'s codec list, at a twelfth of the bytes and a decode the C6 would have
+to be measured for).
 
 ## What this means for the status rows
 
