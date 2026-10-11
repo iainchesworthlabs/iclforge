@@ -153,6 +153,11 @@ Raspberry Pi 4B without an underrun. See
 
 - **Send AC-4 to an ESP32 sink in a group.** [ESP32 sinks](#esp32-sinks) has the detail.
 - **Play from a container.** Only raw `.ac3`, `.ec3` and `.ac4` streams play.
+- **Offer the karaoke reproduction as a control.** An AC-3 stream flagged karaoke (`bsmod` 7 with
+  a layout wider than mono) is reproduced as Annex C's karaoke-aware decoder does, whatever the
+  layout: L, C, R and the LFE reach those speakers and the surrounds are silent. The window has no
+  page for choosing none, one or both vocals yet, and a bitstream output leaves the reproduction
+  to the receiver.
 - **List AC-4 objects on the Play page.** The Objects card shows the positions of E-AC-3 objects.
   An AC-4 item's objects are rendered into the speaker layout, and the Media page says an A-JOC
   stream carries object metadata without listing it.

@@ -187,6 +187,8 @@ DecoderSetup decoder_setup(const DecoderSettings& settings, const render::Output
     config.output.ltrt_phase_shift = settings.ltrt_phase_shift;
     config.output.mix_lfe = settings.mix_lfe.value_or(false);
     config.output.mix_override = settings.mix_levels;
+    config.output.karaoke = settings.karaoke;
+    config.output.karaoke_vocals = settings.karaoke_vocals;
     config.joc_domain = settings.joc_domain;
     // Not settings.programme: which programme plays is which units a session
     // feeds (Session::open), and a decoder told to skip every other
@@ -245,6 +247,20 @@ std::string describe(const DecoderSettings& settings) {
         case DualMonoChoice::kFirst: parts.emplace_back("dual mono: channel 1"); break;
         case DualMonoChoice::kSecond: parts.emplace_back("dual mono: channel 2"); break;
     }
+    switch (settings.karaoke) {
+        case ac3::KaraokeReproduction::kOff: parts.emplace_back("karaoke: as coded"); break;
+        case ac3::KaraokeReproduction::kAware: parts.emplace_back("karaoke: aware"); break;
+        case ac3::KaraokeReproduction::kCapable:
+            switch (settings.karaoke_vocals) {
+                case ac3::KaraokeVocals::kNone: parts.emplace_back("karaoke: capable, no vocals"); break;
+                case ac3::KaraokeVocals::kV1: parts.emplace_back("karaoke: capable, vocal 1"); break;
+                case ac3::KaraokeVocals::kV2: parts.emplace_back("karaoke: capable, vocal 2"); break;
+                case ac3::KaraokeVocals::kBoth:
+                    parts.emplace_back("karaoke: capable, both vocals");
+                    break;
+            }
+            break;
+    }
     parts.push_back(settings.programme ? fmt::format("programme {}", *settings.programme)
                                        : std::string{"the first programme"});
     switch (settings.objects) {
@@ -280,6 +296,9 @@ DecoderSettings transcode_settings(const DecoderSettings& listener) {
     neutral.heavy_compression = false;
     neutral.normalise_dialogue = false;
     neutral.objects = ac3::render::ObjectsPolicy::kNever;
+    // The programme as coded: a receiver reproduces karaoke or does not, and
+    // re-encoding three reproduced channels would write another stream.
+    neutral.karaoke = ac3::KaraokeReproduction::kOff;
     neutral.dual_mono = listener.dual_mono;
     neutral.concealment = listener.concealment;
     neutral.programme = listener.programme;
