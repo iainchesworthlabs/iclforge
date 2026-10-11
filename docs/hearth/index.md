@@ -39,6 +39,9 @@ Music Assistant itself has not been tested.
 
 ### Karaoke
 
+The [Karaoke guide](../karaoke/index.md) covers the page, the lyrics and the singer view; this
+section is the short form.
+
 A karaoke AC-3 stream (`bsmod` 7 with a layout wider than mono; ETSI TS 102 366 Annex C) codes L and
 R, a guide melody M where a centre would be, and one or two vocals V1 and V2 where the surrounds
 would be. Played as coded, the vocals come from the surround speakers. The Karaoke page chooses
