@@ -65,7 +65,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | §7.8 / dialnorm output stage | 🟢 | High | Essential | Opt-in; Lo/Ro, Lt/Rt, mono, RF |
 | | §7.10 error concealment | 🟢 | Medium | Important | Opt-in repeat / mute |
 | | Consumer diagnostics sink | 🟢 | Low | Optional | CRC fail and unknown EMDF id |
-| | Karaoke mode (Annex C, informative) | 🟡🔵 | Low | Optional | `bsmod` 7 with `acmod` above 1/0 is read and reported as a karaoke main service by `probe`. A karaoke-aware 2/0 reproduction is §7.8's Lo/Ro downmix, which Annex C says any decoder gives, and the output stage does give it. Not done: the 3/0 reproduction (Table C.2.2's third column) and a karaoke-capable decoder's listener controls over V1 and V2 (Table C.2.3). Accepted: the annex is informative, nothing in this project writes or reads a karaoke stream to check an implementation against, and the controls are a player's interface rather than a decoder's |
+| | Karaoke mode (Annex C, informative) | 🟢 | Low | Optional | `bsmod` 7 with `acmod` above 1/0 is read and reported as a karaoke main service by `probe`. Both decoders Annex C describes: the karaoke-aware one (C.2.3.1, Table C.2.2) - the 2/0 reproduction is §7.8's Lo/Ro downmix, which the output stage gives, and the 3/0 one (L, C, R from L M R V1 V2, the vocals at the stream's surround level, melody in the centre) is `OutputConfig::karaoke = kAware` and `forge decode ... karaoke` - and the karaoke-capable one (C.2.3.2, Table C.2.3), whose listener chooses none, one or both vocals (`kCapable` with `karaoke_vocals`; `karaoke=none|v1|v2|v1+v2`) in the 3/0 and 2/0 reproductions. Held to the annex's coefficients, transcribed from the specification's PDF, by impulse in every karaoke `acmod` and over a coded stream, since no outside decoder reproduces karaoke. The annex's optional further controls (re-levelling or moving V1, V2 and M) are left to the implementation and are not offered |
 
 ---
 
@@ -327,7 +327,6 @@ this register is the checklist that those bounds appear here too.
 |---|---|---|
 | Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | No preset token names them (a Table E2.5 list or a stated-speaker WAV does); a WAV with no mask is read by its width | 🟡🔵 |
 | §5.4.2.31 `addbsi`, §5.4.4 `auxdata` | Read past and written clear; no user-data surface | 🔴🔵 |
-| Annex C karaoke | 3/0 reproduction and V1/V2 listener controls | 🟡🔵 |
 | Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams: the stream type is supported; the conversion to and from AC-3 is not built | 🟡🔵 |
 | Annex E §E3.5 / §3.7 | Enhanced coupling stays out of `auto` because FFmpeg cannot read it, and no outside decoder reads it to check against; transient pre-noise stays out of `auto` on measured loss and holds 1536 samples back, so a decoder calls `flush()` at end of stream | 🟡🔵 |
 | Annex E `fscod2` | The half rates (24, 22.05, 16 kHz) encode and decode, and no outside decoder reads their audio (FFmpeg reads the header only), so they are checked against this project's own encoder and the spec's tables | 🟡🔵 |

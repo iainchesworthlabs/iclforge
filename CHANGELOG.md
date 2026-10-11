@@ -60,6 +60,26 @@ The sections below contain the complete change list and fixes.
   `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
   15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
 
+**AC-3 karaoke streams (Annex C)**
+
+- **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
+  outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
+  M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at
+  unity in the centre, a single V1 added to the centre and a pair added to the left and the right,
+  each vocal at the stream's own surround level and everything scaled down by the largest
+  output's sum (Table C.2.2). At `channels=2`/`1` it is the Lo/Ro downmix, which is Annex C's 2/0
+  reproduction, and `downmix=ltrt` is refused. A stream that is not karaoke is decoded as coded
+  and the report says so. The library form is `OutputConfig::karaoke`
+  (`KaraokeReproduction::kAware`), `MixLevels::karaoke`, `meta::is_karaoke()` and a
+  four-argument `output_channel_count()`; E-AC-3 and AC-4 streams ignore it.
+- **`karaoke=none|v1|v2|v1+v2` is the karaoke-capable decoder's listener choice of vocals
+  (C.2.3.2, Table C.2.3).** The same L, C, R with only the chosen vocals in it - V1 or V2 added to
+  the centre, or V1 into the left and V2 into the right at unity - and, at `channels=2`/`1`, the
+  2/0 reproduction: the melody at `cmixlev`, a single vocal at 0.7 in both channels, a pair left
+  and right, mono the two summed. The library form is `KaraokeReproduction::kCapable` with
+  `OutputConfig::karaoke_vocals` (`KaraokeVocals`). The table's cells were read from the
+  specification's own pages and are transcribed into the tests.
+
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
 - **An AC-3 core with E-AC-3 dependents is carried in MP4, fMP4 and MPEG-TS.** ETSI TS 102 366
