@@ -1890,6 +1890,14 @@
         "Desktop and ESP32"
       ],
       [
+        "AC-3 karaoke (Annex C)",
+        "Public API: `OutputConfig::karaoke` and `karaoke_vocals`, `output_mode()`",
+        "Encode `bsmod=voiceover` at 3/0 to 3/2; probe; decode as an aware decoder (`karaoke`) or a capable one (`karaoke=none|v1|v2|v1+v2`)",
+        "A Karaoke flow builds a stream from a backing, a guide melody and one or two vocals, and plays it under each reproduction before saving",
+        "No",
+        "Desktop: the Karaoke page with the listener's choice of vocals, word-timed lyrics and a full-screen singer view"
+      ],
+      [
         "AC-4 decode",
         "Public API",
         "File, play and monitor: channel-based to 7.1.4 and objects (A-JOC, direct-coded), one presentation of several mixed, every output and presentation control",

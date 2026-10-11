@@ -597,7 +597,11 @@ is held the same way: its four listener choices, in both the 3/0 and the 2/0 rep
 mono sum), are transcribed from the specification's page 105-106 into the tests and compared
 coefficient by coefficient, with a level pair (clev 0.5, slev 0.25) no cell could be mistaken for,
 and again over a coded stream through the decoder and through `forge decode`. That checks the code
-against the reading of the table, not the reading against anyone's decoder.
+against the reading of the table, not the reading against anyone's decoder. The part-to-speaker
+table the Forge GUI's Karaoke flow shows is held to the decoder the same way: every mode is
+encoded with a tone in each part and decoded as coded, aware and capable for each choice of
+vocals, and in the Lo/Ro fold, and the tones on each output are compared (this found that a
+single vocal under capable, both, is on the left alone, not in the centre).
 
 The four modes with no preset were measured the same way against FFmpeg's decode of this
 encoder's own streams (a tone per channel, 192 kbit/s): 3/0 at 98.7 to 101.1 dB, 2/1 at 98.7 to

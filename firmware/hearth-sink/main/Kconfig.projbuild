@@ -484,8 +484,9 @@ config ICLFORGE_EXAMPLE_DECODE_LANE
         On by default only where there is PSRAM. Without it the task's stack (12 KB) and its
         control block come out of internal RAM, which is what the player, the decoder and Wi-Fi
         share. Under QEMU (no PSRAM) CI's object render has 10 KB of internal RAM left at its
-        worst moment, and its 7.1.4 stream set 28 KB against a floor of 20,480 bytes; the
-        lane fits in neither. Set it to 1 on a part with no PSRAM that has the room.
+        worst moment, and its 7.1.4 stream set 24 KB against a floor of 20,480 bytes; the
+        lane fits in neither. Set it to 1 on a part with no PSRAM that has the room. CI runs it
+        in sdkconfig.ci-lane, over QEMU's emulated PSRAM.
 
 config ICLFORGE_EXAMPLE_AC4_PCM_HASH
     int "AC-4: hash every decoded sample (1) or not (0)"

@@ -10,11 +10,9 @@
 
 #include "platform/process.hpp"
 
-#include "item_loader.hpp"
-#include "lyrics.hpp"
-#include "media_info.hpp"
+#include "iclforge/lyrics/lyrics.hpp"
 
-// apps/hearth/engine/src/lyrics.cpp: the LRC reader, the lyrics file's place
+// libs/lyrics/src/lyrics.cpp: the LRC reader, the lyrics file's place
 // beside an item, and the cursor the lyric view asks on every frame
 // (planning/karaoke.md, L1 to L6).
 
@@ -22,12 +20,12 @@ namespace {
 
 namespace fs = std::filesystem;
 
-using iclforge::hearth::LyricPosition;
-using iclforge::hearth::Lyrics;
-using iclforge::hearth::WordState;
+using iclforge::lyrics::LyricPosition;
+using iclforge::lyrics::Lyrics;
+using iclforge::lyrics::WordState;
 
 Lyrics parsed(const std::string& text, std::optional<std::int64_t> duration = std::nullopt) {
-    const auto lyrics = iclforge::hearth::parse_lyrics(text, duration);
+    const auto lyrics = iclforge::lyrics::parse_lyrics(text, duration);
     REQUIRE(lyrics.has_value());
     return *lyrics;
 }
@@ -37,7 +35,7 @@ class Folder {
 public:
     Folder()
         : path_(fs::path{ICLFORGE_TEST_SCRATCH_DIR} /
-                ("hearth_lyrics_" + iclforge::test::platform::process_id())) {
+                ("lyrics_" + iclforge::test::platform::process_id())) {
         fs::remove_all(path_);
         fs::create_directories(path_);
     }
@@ -70,7 +68,7 @@ const char* const kWordTimed =
 
 }  // namespace
 
-TEST_CASE("lyrics: lines, metadata and the last line's end", "[hearth][lyrics]") {
+TEST_CASE("lyrics: lines, metadata and the last line's end", "[lyrics]") {
     const Lyrics lyrics = parsed(
         "[ti:Auld Lang Syne]\n[ar:Traditional]\n[al:Songs]\n[by:me]\n[length:3:42]\n"
         "[00:12.50]Should auld acquaintance be forgot,\n"
@@ -101,7 +99,7 @@ TEST_CASE("lyrics: lines, metadata and the last line's end", "[hearth][lyrics]")
     CHECK(alone.lines[1].end_ms == 25000);
 }
 
-TEST_CASE("lyrics: the time forms and a tag that is not one", "[hearth][lyrics]") {
+TEST_CASE("lyrics: the time forms and a tag that is not one", "[lyrics]") {
     const Lyrics lyrics = parsed(
         "[00:05]whole\n[1:02.5]tenth\n[01:03.34]hundredth\n[01:04.345]milli\n[01:05:30]colon\n"
         "[00:61.00]seconds out of range\n[Chorus]not a time\n");
@@ -118,7 +116,7 @@ TEST_CASE("lyrics: the time forms and a tag that is not one", "[hearth][lyrics]"
     }
 }
 
-TEST_CASE("lyrics: several time tags put a line at each time, in order", "[hearth][lyrics]") {
+TEST_CASE("lyrics: several time tags put a line at each time, in order", "[lyrics]") {
     const Lyrics lyrics = parsed("[00:10.00][00:40.00]Chorus\n[00:20.00]Verse\n");
     REQUIRE(lyrics.lines.size() == 3);
     CHECK(lyrics.lines[0].text == "Chorus");
@@ -130,7 +128,7 @@ TEST_CASE("lyrics: several time tags put a line at each time, in order", "[heart
 }
 
 TEST_CASE("lyrics: an offset moves every time, and a positive one makes lyrics sooner",
-          "[hearth][lyrics]") {
+          "[lyrics]") {
     const Lyrics sooner = parsed("[offset:+500]\n[00:10.00]x\n[00:00.10]y\n");
     CHECK(sooner.offset_ms == 500);
     REQUIRE(sooner.lines.size() == 2);
@@ -142,7 +140,7 @@ TEST_CASE("lyrics: an offset moves every time, and a positive one makes lyrics s
     CHECK(later.lines[0].start_ms == 10250);
 }
 
-TEST_CASE("lyrics: word tags give each word its time", "[hearth][lyrics]") {
+TEST_CASE("lyrics: word tags give each word its time", "[lyrics]") {
     const Lyrics lyrics = parsed(kWordTimed);
     REQUIRE(lyrics.lines.size() == 2);
     const auto& line = lyrics.lines[0];
@@ -167,7 +165,7 @@ TEST_CASE("lyrics: word tags give each word its time", "[hearth][lyrics]") {
 }
 
 TEST_CASE("lyrics: text before a line's first word tag starts with the line",
-          "[hearth][lyrics]") {
+          "[lyrics]") {
     const Lyrics lyrics = parsed("[00:05.00]Oh <00:05.50>yes\n[00:08.00]end\n");
     REQUIRE(lyrics.lines[0].words.size() == 2);
     CHECK(lyrics.lines[0].words[0].text == "Oh ");
@@ -177,7 +175,7 @@ TEST_CASE("lyrics: text before a line's first word tag starts with the line",
     CHECK(lyrics.lines[0].words[1].end_ms == 8000);
 }
 
-TEST_CASE("lyrics: a repeated line keeps its words' spacing in time", "[hearth][lyrics]") {
+TEST_CASE("lyrics: a repeated line keeps its words' spacing in time", "[lyrics]") {
     const Lyrics lyrics = parsed("[00:10.00][00:30.00]<00:10.00>la <00:10.50>la\n[00:50.00]x\n");
     REQUIRE(lyrics.lines.size() == 3);
     CHECK(lyrics.lines[0].words[1].start_ms == 10500);
@@ -186,7 +184,7 @@ TEST_CASE("lyrics: a repeated line keeps its words' spacing in time", "[hearth][
     CHECK(lyrics.lines[1].words[1].start_ms == 30500);
 }
 
-TEST_CASE("lyrics: a file with no times is plain text and is not followed", "[hearth][lyrics]") {
+TEST_CASE("lyrics: a file with no times is plain text and is not followed", "[lyrics]") {
     const Lyrics lyrics = parsed("[ti:Plain]\nLine one\n\n[Chorus]\nLine two\n");
     CHECK_FALSE(lyrics.timed);
     CHECK(lyrics.title == "Plain");
@@ -194,11 +192,11 @@ TEST_CASE("lyrics: a file with no times is plain text and is not followed", "[he
     CHECK(lyrics.lines[0].text == "Line one");
     CHECK(lyrics.lines[1].text == "[Chorus]");
     CHECK(lyrics.lines[2].text == "Line two");
-    const LyricPosition where = iclforge::hearth::lyric_position(lyrics, 5000);
+    const LyricPosition where = iclforge::lyrics::lyric_position(lyrics, 5000);
     CHECK_FALSE(where.line.has_value());
 }
 
-TEST_CASE("lyrics: a byte-order mark, and every kind of line ending", "[hearth][lyrics]") {
+TEST_CASE("lyrics: a byte-order mark, and every kind of line ending", "[lyrics]") {
     const Lyrics lyrics = parsed("\xEF\xBB\xBF[00:01.00]a\r\n[00:02.00]b\r[00:03.00]c\n");
     REQUIRE(lyrics.lines.size() == 3);
     CHECK(lyrics.lines[0].text == "a");
@@ -208,8 +206,8 @@ TEST_CASE("lyrics: a byte-order mark, and every kind of line ending", "[hearth][
     CHECK(accents.lines[0].text == "caf\xC3\xA9 \xE2\x80\x94 \xF0\x9F\x8E\xA4");
 }
 
-TEST_CASE("lyrics: what is not lyrics says why", "[hearth][lyrics]") {
-    const auto empty = iclforge::hearth::parse_lyrics("  \r\n \n");
+TEST_CASE("lyrics: what is not lyrics says why", "[lyrics]") {
+    const auto empty = iclforge::lyrics::parse_lyrics("  \r\n \n");
     REQUIRE_FALSE(empty.has_value());
     CHECK(empty.error().find("empty") != std::string::npos);
 
@@ -217,20 +215,20 @@ TEST_CASE("lyrics: what is not lyrics says why", "[hearth][lyrics]") {
     // guessed at.
     for (const char* bad : {"[00:01.00]caf\xE9\n", "[00:01.00]\xE2\x82\n", "\xC0\x80[00:01.00]x\n",
                             "[00:01.00]\xED\xA0\x80\n"}) {
-        const auto result = iclforge::hearth::parse_lyrics(bad);
+        const auto result = iclforge::lyrics::parse_lyrics(bad);
         REQUIRE_FALSE(result.has_value());
         CHECK(result.error().find("UTF-8") != std::string::npos);
     }
 
-    const auto tags_only = iclforge::hearth::parse_lyrics("[ti:x]\n[ar:y]\n");
+    const auto tags_only = iclforge::lyrics::parse_lyrics("[ti:x]\n[ar:y]\n");
     REQUIRE_FALSE(tags_only.has_value());
     CHECK(tags_only.error().find("no lyrics") != std::string::npos);
 }
 
 TEST_CASE("lyrics: the cursor finds the line, the word and how far through it",
-          "[hearth][lyrics]") {
+          "[lyrics]") {
     const Lyrics lyrics = parsed(kWordTimed);
-    using iclforge::hearth::lyric_position;
+    using iclforge::lyrics::lyric_position;
 
     // Before anything has started.
     CHECK_FALSE(lyric_position(lyrics, 11999).line.has_value());
@@ -267,7 +265,7 @@ TEST_CASE("lyrics: the cursor finds the line, the word and how far through it",
     CHECK(at.in_line);
     CHECK_FALSE(at.word.has_value());
     for (const auto& word : lyrics.lines[0].words) {
-        CHECK(iclforge::hearth::word_state(word, at.position_ms) == WordState::kSung);
+        CHECK(iclforge::lyrics::word_state(word, at.position_ms) == WordState::kSung);
     }
 
     // The next line has no word times: the line, and no word.
@@ -283,9 +281,9 @@ TEST_CASE("lyrics: the cursor finds the line, the word and how far through it",
 }
 
 TEST_CASE("lyrics: a seek is only another position, and the delay shifts it",
-          "[hearth][lyrics]") {
+          "[lyrics]") {
     const Lyrics lyrics = parsed(kWordTimed);
-    using iclforge::hearth::lyric_position;
+    using iclforge::lyrics::lyric_position;
 
     const LyricPosition late = lyric_position(lyrics, 15500);
     const LyricPosition back = lyric_position(lyrics, 12250);
@@ -308,106 +306,175 @@ TEST_CASE("lyrics: a seek is only another position, and the delay shifts it",
 }
 
 TEST_CASE("lyrics: a word is sung from its end, and a zero-length one from its start",
-          "[hearth][lyrics]") {
-    const iclforge::hearth::LyricWord word{.start_ms = 1000, .end_ms = 2000, .text = "x"};
-    CHECK(iclforge::hearth::word_state(word, 999) == WordState::kNotYetSung);
-    CHECK(iclforge::hearth::word_state(word, 1000) == WordState::kBeingSung);
-    CHECK(iclforge::hearth::word_state(word, 1999) == WordState::kBeingSung);
-    CHECK(iclforge::hearth::word_state(word, 2000) == WordState::kSung);
-    const iclforge::hearth::LyricWord blink{.start_ms = 5000, .end_ms = 5000, .text = "y"};
-    CHECK(iclforge::hearth::word_state(blink, 4999) == WordState::kNotYetSung);
-    CHECK(iclforge::hearth::word_state(blink, 5000) == WordState::kSung);
+          "[lyrics]") {
+    const iclforge::lyrics::LyricWord word{.start_ms = 1000, .end_ms = 2000, .text = "x"};
+    CHECK(iclforge::lyrics::word_state(word, 999) == WordState::kNotYetSung);
+    CHECK(iclforge::lyrics::word_state(word, 1000) == WordState::kBeingSung);
+    CHECK(iclforge::lyrics::word_state(word, 1999) == WordState::kBeingSung);
+    CHECK(iclforge::lyrics::word_state(word, 2000) == WordState::kSung);
+    const iclforge::lyrics::LyricWord blink{.start_ms = 5000, .end_ms = 5000, .text = "y"};
+    CHECK(iclforge::lyrics::word_state(blink, 4999) == WordState::kNotYetSung);
+    CHECK(iclforge::lyrics::word_state(blink, 5000) == WordState::kSung);
 }
 
-TEST_CASE("lyrics: the file beside an item, in any case of the extension", "[hearth][lyrics]") {
+TEST_CASE("lyrics: the file beside an item, in any case of the extension", "[lyrics]") {
     const Folder folder;
     folder.write("Song.LRC", "[00:01.00]hi\n");
     folder.write("other.txt", "x");
     folder.write("a.b.lrc", "[00:01.00]dots\n");
 
-    const auto found = iclforge::hearth::find_lyrics_file((folder.path() / "Song.ac3").string());
+    const auto found = iclforge::lyrics::find_lyrics_file((folder.path() / "Song.ac3").string());
     REQUIRE(found.has_value());
     // The same file, however this file system spells its name.
     CHECK(fs::equivalent(*found, folder.path() / "Song.LRC"));
 
     // A stem with a dot is the whole name less the last extension.
-    const auto dotted = iclforge::hearth::find_lyrics_file((folder.path() / "a.b.mp4").string());
+    const auto dotted = iclforge::lyrics::find_lyrics_file((folder.path() / "a.b.mp4").string());
     REQUIRE(dotted.has_value());
     CHECK(dotted->filename().string() == "a.b.lrc");
 
-    CHECK_FALSE(iclforge::hearth::find_lyrics_file((folder.path() / "other.ac3").string())
+    CHECK_FALSE(iclforge::lyrics::find_lyrics_file((folder.path() / "other.ac3").string())
                     .has_value());
-    CHECK_FALSE(iclforge::hearth::find_lyrics_file((folder.path() / "missing.ac3").string())
+    CHECK_FALSE(iclforge::lyrics::find_lyrics_file((folder.path() / "missing.ac3").string())
                     .has_value());
 
-    const auto read = iclforge::hearth::read_lyrics(*found, 90000);
+    const auto read = iclforge::lyrics::read_lyrics(*found, 90000);
     REQUIRE(read.has_value());
     CHECK(read->lines.size() == 1);
     CHECK(read->lines[0].end_ms == 90000);
 
-    const auto none = iclforge::hearth::read_lyrics(folder.path() / "nope.lrc");
+    const auto none = iclforge::lyrics::read_lyrics(folder.path() / "nope.lrc");
     REQUIRE_FALSE(none.has_value());
     CHECK_FALSE(none.error().empty());
 }
 
-// The karaoke example's own words (examples/karaoke/auld-lang-syne/, made by
-// tools/generators/gen_karaoke_example.py) read by this reader beside the stream they go with:
-// found by the stream's name, timed to the syllable, and every word inside the stream's length.
-// The file's other checks - that it is what the generator makes, that its tags are the vocal's
-// notes - are tools/checks/test_gen_karaoke_example.py.
-TEST_CASE("lyrics: the karaoke example's words are read and every word is inside its stream",
-          "[hearth][lyrics][example]") {
-    const fs::path stream = fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "auld-lang-syne.ac3";
-    const auto loaded = iclforge::hearth::ui::make_file_item_loader()(stream.string());
-    REQUIRE(loaded.has_value());
-    const auto info = iclforge::hearth::describe_media(stream.string(), *loaded);
-    REQUIRE(info.sample_rate == 48000);
-    const auto duration_ms =
-        static_cast<std::int64_t>(info.played_samples() * 1000 / info.sample_rate);
-    REQUIRE(duration_ms > 16000);
+// ---- UTF-16, Hebrew and Yiddish (planning/karaoke-phase2.md, D8) ---------------------------------
+//
+// The Hebrew and Yiddish lines are generated here, so there is no licence question; the UTF-8 each
+// is expected to become is written out in bytes and not produced by the code under test.
 
-    const auto found = iclforge::hearth::find_lyrics_file(stream.string());
-    REQUIRE(found.has_value());
-    CHECK(found->filename().string() == "auld-lang-syne.lrc");
-    const auto lyrics = iclforge::hearth::read_lyrics(*found, duration_ms);
+namespace {
+
+// `text` as UTF-16 bytes, with a byte-order mark unless told not to.
+std::string utf16_bytes(const std::u16string& text, bool big_endian, bool bom = true) {
+    std::string out;
+    const auto put = [&](char16_t unit) {
+        const auto high = static_cast<char>(static_cast<unsigned>(unit) >> 8U);
+        const auto low = static_cast<char>(static_cast<unsigned>(unit) & 0xFFU);
+        if (big_endian) {
+            out += high;
+            out += low;
+        } else {
+            out += low;
+            out += high;
+        }
+    };
+    if (bom) {
+        put(0xFEFF);
+    }
+    for (const char16_t unit : text) {
+        put(unit);
+    }
+    return out;
+}
+
+// "shalom olam" (hello world), and Yiddish "vos" with its pasekh-alef: a ligature and a point.
+const std::u16string kHebrewLine = u"[00:01.00]שלום עולם\n";
+const std::string kHebrewUtf8 = "\xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D \xD7\xA2\xD7\x95\xD7\x9C\xD7\x9D";
+const std::u16string kYiddishLine = u"[00:03.00]װאָס זאָגסט\n";
+const std::string kYiddishUtf8 =
+    "\xD7\xB0\xD7\x90\xD6\xB8\xD7\xA1 \xD7\x96\xD7\x90\xD6\xB8\xD7\x92\xD7\xA1\xD7\x98";
+
+}  // namespace
+
+TEST_CASE("lyrics: UTF-16 with a byte-order mark, in either order, reads as the same UTF-8",
+          "[lyrics][utf16]") {
+    const std::u16string both = kHebrewLine + kYiddishLine;
+    for (const bool big_endian : {false, true}) {
+        const auto lyrics = iclforge::lyrics::parse_lyrics(utf16_bytes(both, big_endian));
+        REQUIRE(lyrics.has_value());
+        REQUIRE(lyrics->lines.size() >= 2);
+        CHECK(lyrics->timed);
+        CHECK(lyrics->lines[0].text == kHebrewUtf8);
+        CHECK(lyrics->lines[0].start_ms == 1000);
+        CHECK(lyrics->lines[1].text == kYiddishUtf8);
+        CHECK(lyrics->lines[1].start_ms == 3000);
+    }
+}
+
+TEST_CASE("lyrics: UTF-8 Hebrew reads the same, with and without a byte-order mark",
+          "[lyrics][utf16]") {
+    const std::string line = "[00:01.00]" + kHebrewUtf8 + "\n";
+    const auto plain = iclforge::lyrics::parse_lyrics(line);
+    const auto marked = iclforge::lyrics::parse_lyrics("\xEF\xBB\xBF" + line);
+    REQUIRE(plain.has_value());
+    REQUIRE(marked.has_value());
+    CHECK(plain->lines[0].text == kHebrewUtf8);
+    CHECK(marked->lines[0].text == kHebrewUtf8);
+}
+
+TEST_CASE("lyrics: a line's last letter is not trimmed as white space, whatever the locale",
+          "[lyrics][utf16]") {
+    // U+05E0 (nun) is D7 A0: 0xA0 is white space in a Latin-1 locale's table, and the line's text
+    // ends in that byte. Trailing spaces and tabs are still trimmed.
+    const auto lyrics = iclforge::lyrics::parse_lyrics("[00:01.00]\xD7\xA9\xD7\xA0 \t\r\n");
     REQUIRE(lyrics.has_value());
-    CHECK(lyrics->title == "Auld Lang Syne");
-    CHECK(lyrics->timed);
+    CHECK(lyrics->lines[0].text == "\xD7\xA9\xD7\xA0");
+}
 
-    std::size_t sung = 0;
-    std::size_t syllables = 0;
-    std::int64_t previous = -1;
-    for (const auto& line : lyrics->lines) {
-        CHECK(line.start_ms >= previous);
-        CHECK(line.end_ms <= duration_ms);
-        previous = line.start_ms;
-        if (line.text.empty()) {
-            continue;  // the time that ends the last line
-        }
-        ++sung;
-        CHECK(line.word_timed());
-        for (const auto& word : line.words) {
-            CHECK(word.start_ms >= line.start_ms);
-            CHECK(word.end_ms >= word.start_ms);
-            CHECK(word.end_ms <= duration_ms);
-            ++syllables;
-        }
-    }
-    CHECK(sung == 4);
-    CHECK(syllables == 26);
-    CHECK(lyrics->lines.front().text == "Should auld acquaintance be forgot,");
-    CHECK(lyrics->lines.front().words.front().start_ms == 0);
-    CHECK(lyrics->lines.back().end_ms == duration_ms);
+TEST_CASE("lyrics: right-to-left words keep their timing and their spacing in UTF-16",
+          "[lyrics][utf16]") {
+    const std::u16string line =
+        u"[00:10.00]<00:10.00>שלום <00:10.60>עולם\n";
+    const auto lyrics = iclforge::lyrics::parse_lyrics(utf16_bytes(line, true), 20000);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    const auto& words = lyrics->lines[0].words;
+    REQUIRE(words.size() == 2);
+    CHECK(words[0].text == "\xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D ");
+    CHECK(words[0].start_ms == 10000);
+    CHECK(words[0].end_ms == 10600);
+    CHECK(words[1].text == "\xD7\xA2\xD7\x95\xD7\x9C\xD7\x9D");
+    CHECK(words[1].start_ms == 10600);
+}
 
-    // The lines-only file is the same four lines, timed to the line and not to the word.
-    const auto lines_only = iclforge::hearth::read_lyrics(
-        fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "auld-lang-syne-lines-only.lrc", duration_ms);
-    REQUIRE(lines_only.has_value());
-    CHECK(lines_only->timed);
-    std::size_t texts = 0;
-    for (const auto& line : lines_only->lines) {
-        CHECK_FALSE(line.word_timed());
-        texts += line.text.empty() ? 0U : 1U;
-    }
-    CHECK(texts == 4);
+TEST_CASE("lyrics: a code point outside the BMP survives a UTF-16 surrogate pair", "[lyrics][utf16]") {
+    // U+1F3A4 is D83C DFA4 in UTF-16 and F0 9F 8E A4 in UTF-8.
+    const auto lyrics =
+        iclforge::lyrics::parse_lyrics(utf16_bytes(u"[00:01.00]\U0001F3A4 la\n", false));
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->lines[0].text == "\xF0\x9F\x8E\xA4 la");
+}
+
+TEST_CASE("lyrics: UTF-16 that is not UTF-16, and a code page, say so and are not guessed at",
+          "[lyrics][utf16]") {
+    // An odd number of bytes, a high surrogate with nothing after it, a low one on its own.
+    const std::string odd = utf16_bytes(u"[00:01.00]a\n", false) + "x";
+    CHECK_FALSE(iclforge::lyrics::parse_lyrics(odd).has_value());
+    const std::u16string lone_high = u"[00:01.00]a\xD83C";
+    CHECK_FALSE(iclforge::lyrics::parse_lyrics(utf16_bytes(lone_high, false)).has_value());
+    const std::u16string lone_low = u"[00:01.00]a\xDFA4 b\n";
+    CHECK_FALSE(iclforge::lyrics::parse_lyrics(utf16_bytes(lone_low, true)).has_value());
+
+    // UTF-32 is refused by name.
+    const std::string utf32("\xFF\xFE\x00\x00[\x00\x00\x00", 8);
+    const auto refused = iclforge::lyrics::parse_lyrics(utf32);
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().find("UTF-32") != std::string::npos);
+
+    // Windows-1255, the Hebrew code page most old files are in: not UTF-8, so refused, and the
+    // sentence names both encodings that would have been read.
+    const auto cp1255 = iclforge::lyrics::parse_lyrics("[00:01.00]\xF9\xEC\xE5\xED\n");
+    REQUIRE_FALSE(cp1255.has_value());
+    CHECK(cp1255.error().find("UTF-8 or UTF-16") != std::string::npos);
+}
+
+TEST_CASE("lyrics: a UTF-16 file on disk is read, and its time is the item's", "[lyrics][utf16]") {
+    const Folder folder;
+    const fs::path file = folder.write("Hebrew.lrc", utf16_bytes(kHebrewLine, false));
+    const auto lyrics = iclforge::lyrics::read_lyrics(file, 5000);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == kHebrewUtf8);
+    CHECK(lyrics->lines[0].end_ms == 5000);
 }

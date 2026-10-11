@@ -11,8 +11,10 @@
 
 // Lyrics for karaoke playback (planning/karaoke.md, requirements L1 to L6): a
 // `.lrc` file read into lines of timed words, and a stateless cursor that says
-// where in them a playing position is. No Qt in it; the window's controller
-// reads a file with read_lyrics() and the view asks lyric_position() on every
+// where in them a playing position is. No Qt in it, and nothing but the
+// standard library, so that Hearth's window, Crucible, the sink firmware and
+// the browser can all link it (planning/karaoke-phase2.md, W13a); a controller
+// reads a file with read_lyrics() and a view asks lyric_position() on every
 // frame.
 //
 // The format is LRC, which is informal, so what is read is stated here:
@@ -34,13 +36,16 @@
 // with times, and no word times are invented for it. A file with no time tags
 // at all is plain text, `timed` false, and is not followed. In a timed file a
 // line with no time tag is not shown (credits and notes often look like that).
-// The text is UTF-8, with or without a byte-order mark; anything else is an
-// error with a reason, not a guess.
+// The text is UTF-8, with or without a byte-order mark, or UTF-16 with a
+// byte-order mark in either order (what an editor saves as "Unicode", and so
+// what a Hebrew or Yiddish file often is); anything else - Latin-1, Windows-
+// 1255, UTF-32 - is an error with a reason, not a guess. What is returned is
+// always UTF-8.
 //
 // A word's text keeps the spacing written after it, so the words of a line
 // joined are the line's text.
 
-namespace iclforge::hearth {
+namespace iclforge::lyrics {
 
 struct LyricWord {
     // Milliseconds from the start of the item, as the file says after its
@@ -78,9 +83,9 @@ struct Lyrics {
     std::vector<LyricLine> lines{};
 };
 
-// `text` as the file holds it. `duration_ms` is the item's length, for the end
-// of the last line. The error is a sentence for the page: the file is empty, is
-// not UTF-8, or has no lyrics in it.
+// `text` as the file holds it (its bytes, UTF-8 or UTF-16). `duration_ms` is
+// the item's length, for the end of the last line. The error is a sentence for
+// the page: the file is empty, is not UTF-8 or UTF-16, or has no lyrics in it.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_lyrics(
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
 
@@ -121,4 +126,4 @@ struct LyricPosition {
 // yet sung before that. A word that starts and ends together is sung from there.
 [[nodiscard]] WordState word_state(const LyricWord& word, std::int64_t position_ms);
 
-}  // namespace iclforge::hearth
+}  // namespace iclforge::lyrics
