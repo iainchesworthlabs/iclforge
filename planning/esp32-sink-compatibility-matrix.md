@@ -414,6 +414,14 @@ figures above were taken under); and the quality: Opus is lossy, so a stream dec
 as Opus is decoded, encoded and decoded again. It is a choice a person makes for a board on a busy
 link, not what a board is sent by default.
 
+**Built and played, 2026-10-11**: the player decodes Opus (`CONFIG_ICLFORGE_SENDSPIN_OPUS`,
+`firmware/esp-idf/iclforge/src/opus_stream.*`, `opus.cmake`), the board lists it after its PCM
+formats, and `ServerHost::use_pcm` takes the codec to play a sink in. Hearth's test server played
+30 s of tone as Opus to the C6, three runs: 0 underruns, late, dropped or invalid; the player's
+time 11.8 ms a packet (59% of the core), the heap's least 51 KB, the decode stack 7.9 KB to
+spare. Alternated with PCM streams in the same minutes: Opus 0 and 0 underruns; PCM 14 and 17.
+What is left is the choice: the engine offering it per sink, and the group editor's control.
+
 ## What this means for the status rows
 
 The question asked was whether the S3's limits and the C6 should be 🟡🔵 (a known, accepted gap).

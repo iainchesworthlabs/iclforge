@@ -34,6 +34,12 @@ CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS=0
 # decoder opens for it - the console says why, once per stream - instead.
 CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS=2
 
+# Opus from a server, for a board on a link too poor for PCM: libopus's decoder in fixed point,
+# 7.5 ms to decode 20 ms of 128 kbit/s stereo (37% of the core), 27,060 bytes of state and about
+# 16.4 KB of the decode task's 24 KB stack, while an Opus stream plays
+# (docs/platforms/bare-metal/esp32-c6.md, "Opus from a server").
+CONFIG_ICLFORGE_SENDSPIN_OPUS=y
+
 # 16-bit slots, the width an ES9080 on this part runs, and half the bytes a frame a
 # 32-bit stereo pair takes. A board can still take 32 (PUT /slot-width).
 CONFIG_ICLFORGE_EXAMPLE_I2S_SLOT_BITS=16

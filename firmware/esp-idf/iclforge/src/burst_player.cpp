@@ -12,6 +12,7 @@
 #include <cstring>
 #include <expected>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <span>
@@ -34,8 +35,9 @@
 #include "iclforge/render/render.hpp"
 #include "iclforge/render/routing.hpp"
 #include "iclforge/render/trim_delay.hpp"
-#include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/chunks.hpp"
+#include "iclforge/sendspin/iclforge_player.hpp"
+#include "opus_stream.hpp"
 
 #include "iclforge/access_units.hpp"
 #include "iclforge/pcm_unpack.hpp"
@@ -192,6 +194,9 @@ struct BurstPlayer::Impl {
     Stream stream = Stream::kIdle;
     ac::DataType data_type = ac::DataType::kEac3;
     m::AudioFormat pcm_format;
+    // The decoder of an Opus stream, open from its start to its end, and the packet's samples.
+    std::unique_ptr<OpusStream> opus;
+    std::array<std::int16_t, OpusStream::kMaxFrames * 2> opus_pcm{};
     std::optional<iclforge::ac3::FrameDecoder> ac3_decoder;
     // The decode lane (BurstPlayerConfig::decode_lane): started by the task, given back by it.
     std::optional<lanes::TaskExecutor> lane;
@@ -500,6 +505,9 @@ struct BurstPlayer::Impl {
     // and on a late chunk). Only a change of what they are made for - the
     // settings, or the other codec - drops them (drop_decoders).
     void reset_decoding() {
+        if (opus) {
+            opus->reset();
+        }
         if (ac3_decoder) {
             ac3_decoder->reset();
         }
@@ -542,6 +550,25 @@ struct BurstPlayer::Impl {
         // its closing line reports. Already running when the last stream was
         // never closed: its start, then, is the earlier one.
         (void)heap_caps_monitor_local_minimum_free_size_start();
+        // An Opus stream's decoder is kept from one Opus stream to the next, as the AC-3 ones are,
+        // and let go when another kind of stream starts; the AC-3 ones are let go when an Opus
+        // stream does. Each is 27 KB or more, and a heap that WiFi has cut up has room for one.
+        const bool opus_stream = kind == Stream::kPcm && pcm_format.codec == m::Codec::kOpus;
+        if (!opus_stream) {
+            opus.reset();
+        } else if (!opus) {
+            drop_decoders();
+            auto decoder = std::make_unique<OpusStream>();
+            if (decoder->open(pcm_format.sample_rate, pcm_format.channels)) {
+                opus = std::move(decoder);
+            } else {
+                std::printf(
+                    "burst player: could not open an Opus decoder for %d channels (heap free %u)\n",
+                    static_cast<int>(pcm_format.channels),
+                    static_cast<unsigned>(
+                        heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
+            }
+        }
         // Opened again whatever it was: a play from the control surface may
         // have opened the sink its own way since the last stream.
         open_outputs(true);
@@ -1008,10 +1035,24 @@ struct BurstPlayer::Impl {
         if (stream != Stream::kPcm) {
             return;
         }
+        const std::int64_t started = esp_timer_get_time();
         const std::size_t channels = static_cast<std::size_t>(std::clamp<std::int32_t>(pcm_format.channels, 1, 2));
-        const std::size_t width = pcm_format.bit_depth == 24 ? 3 : 2;
+        // An Opus packet is decoded to 16-bit samples, and from there is a PCM chunk of its own.
+        std::span<const std::uint8_t> samples = payload;
+        std::size_t width = pcm_format.bit_depth == 24 ? 3 : 2;
+        if (pcm_format.codec == m::Codec::kOpus) {
+            const int decoded = opus ? opus->decode(payload, opus_pcm) : -1;
+            if (decoded <= 0) {
+                invalid_chunks.fetch_add(1);
+                return;
+            }
+            width = 2;
+            samples = std::span<const std::uint8_t>(
+                reinterpret_cast<const std::uint8_t*>(opus_pcm.data()),
+                static_cast<std::size_t>(decoded) * channels * width);
+        }
         const std::size_t frame_bytes = channels * width;
-        if (payload.size() % frame_bytes != 0) {
+        if (samples.size() % frame_bytes != 0) {
             invalid_chunks.fetch_add(1);
             return;
         }
@@ -1023,19 +1064,18 @@ struct BurstPlayer::Impl {
         mark(first, local_of(header));
         decoded_frame = first;
         ++bursts_played;
-        const std::size_t frames = payload.size() / frame_bytes;
+        const std::size_t frames = samples.size() / frame_bytes;
         const iclforge::ac3::eac3::chanmap::Layout bed =
             iclforge::ac3::eac3::chanmap::expand(iclforge::ac3::eac3::chanmap::acmod_map(channels == 1 ? iclforge::ac3::Acmod::k1_0 : iclforge::ac3::Acmod::k2_0, false));
         if (!serving.fold && (!renderer_bed || !same_layout(*renderer_bed, bed))) {
             renderer.set_bed(bed);
             renderer_bed = bed;
         }
-        const std::int64_t started = esp_timer_get_time();
         std::size_t done = 0;
         while (done < frames) {
             const std::size_t n = std::min(kBlock, frames - done);
             const std::span<const std::uint8_t> bytes =
-                payload.subspan(done * frame_bytes, n * frame_bytes);
+                samples.subspan(done * frame_bytes, n * frame_bytes);
             // Integer operations only: a chunk's conversion to float and its meter were the whole
             // of the time it took to render on a part without a floating-point unit.
             std::array<PcmLevel, 2> levels{};
@@ -1204,7 +1244,9 @@ struct BurstPlayer::Impl {
                 case Kind::kStartPcm: {
                     const Stream kind = header.kind == Kind::kStartBursts ? Stream::kBursts : Stream::kPcm;
                     const ac::DataType type = static_cast<ac::DataType>(header.data_type);
-                    const m::AudioFormat format{.codec = m::Codec::kPcm,
+                    const m::AudioFormat format{.codec = kind == Stream::kPcm && header.pc == 1
+                                                             ? m::Codec::kOpus
+                                                             : m::Codec::kPcm,
                                                 .channels = header.channels,
                                                 .sample_rate = header.sample_rate,
                                                 .bit_depth = header.bit_depth};
@@ -1386,6 +1428,8 @@ void BurstPlayer::start_bursts(const ac::StreamStart& stream) {
 void BurstPlayer::start_pcm(const m::AudioFormat& format) {
     Header header;
     header.kind = Kind::kStartPcm;
+    // The codec the stream is in: 0 PCM, 1 Opus.
+    header.pc = format.codec == m::Codec::kOpus ? 1U : 0U;
     header.sample_rate = format.sample_rate;
     header.channels = format.channels;
     header.bit_depth = format.bit_depth;
@@ -1505,5 +1549,9 @@ BurstPlayerStatus BurstPlayer::status() const {
 }
 
 bool BurstPlayer::active() const { return impl_->active.load(); }
+
+bool BurstPlayer::decodes_opus() {
+    return OpusStream::available();
+}
 
 }  // namespace iclforge
