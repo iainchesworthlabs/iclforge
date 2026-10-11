@@ -1638,7 +1638,7 @@ PlayerConfig sink_config() {
     return config;
 }
 
-// The settings command that fills sink_config()'s every field.
+// The settings command that fills sink_config()'s every field: all sixteen decoder keys.
 ac::CommandMessage full_settings() {
     ac::CommandMessage command;
     command.command = ac::Command::kSettings;
@@ -1664,6 +1664,9 @@ ac::CommandMessage full_settings() {
     decoder.concealment = ac::Concealment::kRepeatFade;
     decoder.karaoke = ac::Karaoke::kCapable;
     decoder.karaoke_vocals = ac::KaraokeVocals::kBoth;
+    decoder.karaoke_melody_db = 6.0;
+    decoder.karaoke_vocal1_db = -3.0;
+    decoder.karaoke_vocal2_db = 12.0;
     return command;
 }
 
@@ -1743,6 +1746,20 @@ std::vector<Message> full_server_messages() {
                                                        .server_transmitted = 9'000'000'000'002})});
     out.push_back({"server/command, every key", m::write_server_command(command, Dialect::kSpecification)});
     out.push_back({"stream/start, every role", m::write_stream_start(start)});
+    // A lyric document is one string, whatever its bytes: a role's largest, and an anchor.
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = ac::LyricsDocument{.item = 4'000'000'000, .text = std::string(ac::kMaxLyricsBytes, 'l')};
+    m::ServerCommand lyrics;
+    lyrics.iclforge = document;
+    out.push_back({"server/command, a lyric document", m::write_server_command(lyrics, Dialect::kSpecification)});
+    ac::CommandMessage lyric_anchor;
+    lyric_anchor.command = ac::Command::kLyricsPosition;
+    lyric_anchor.lyrics_position = ac::LyricsAnchor{
+        .item = 4'000'000'000, .position_ms = 4'233'600'000, .at_us = 9'000'000'000'000, .speed = 1.0};
+    m::ServerCommand position;
+    position.iclforge = lyric_anchor;
+    out.push_back({"server/command, lyrics_position", m::write_server_command(position, Dialect::kSpecification)});
     out.push_back({"stream/clear, 8 roles", m::write_stream_clear({.server_transmitted = 9'000'000'000'000, .roles = roles})});
     out.push_back({"stream/end, 8 roles", m::write_stream_end({.roles = roles})});
     out.push_back({"group/update", m::write_group_update({.playback_state = m::PlaybackState::kPlaying,
@@ -1786,7 +1803,7 @@ std::vector<Message> full_server_messages() {
 // every optional field the readers take set, is server/state with all three of its roles: 94
 // tokens, 98 as Music Assistant sends it, whose metadata also carries repeat and shuffle.
 // stream/start with every role is 88, and the settings command for sixteen outputs and every
-// decoder key is 83 (93 with a player and a source command beside it). Only `languages` is
+// decoder key is 89 (99 with a player and a source command beside it). Only `languages` is
 // unbounded: a hundred make server/hello 109 and server/activate 126. So no message a server
 // legitimately sends comes within twice the cap; one would need 230 language tags, more than ISO
 // 639-1 has. A lyric document is one string, one token, whatever its bytes. If a field is added
@@ -1806,7 +1823,7 @@ TEST_CASE("sessions: no message a server sends comes within twice a sink's token
     // The settings command alone, which is what scales with a sink: two numbers for each output.
     m::ServerCommand settings;
     settings.iclforge = full_settings();
-    CHECK(tokens_in(m::write_server_command(settings, iclforge::sendspin::Dialect::kSpecification)) == 83);
+    CHECK(tokens_in(m::write_server_command(settings, iclforge::sendspin::Dialect::kSpecification)) == 89);
 }
 
 namespace {

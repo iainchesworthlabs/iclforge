@@ -3154,11 +3154,12 @@ The sections below contain the complete change list and fixes.
   block a session takes for a message of more than 64 values, and Hearth's sink sets
   `kSinkMaxJsonTokens`, 512. The largest message a server legitimately sends is 98 tokens
   (`server/state` with metadata, controller and color, as Music Assistant sends it;
-  `stream/start` with every role is 88 and a settings command for sixteen outputs 83); only
-  `languages` has no bound, and a hundred of them make `server/activate` 126. A lyric document is
-  one string, one token, whatever its bytes. No message comes within twice the cap, and a valid
-  4 KB text of 2,000 one-digit values, which needed one 32 KB block, is refused at its 513th token
-  with no block taken. A message over the cap is dropped as a malformed one is.
+  `stream/start` with every role is 88 and a settings command for sixteen outputs and every
+  decoder key 89); only `languages` has no bound, and a hundred of them make `server/activate`
+  126. A lyric document is one string, one token, whatever its bytes. No message comes within
+  twice the cap, and a valid 4 KB text of 2,000 one-digit values, which needed one 32 KB block,
+  is refused at its 513th token with no block taken. A message over the cap is dropped as a
+  malformed one is.
 
 **Object signing**
 
