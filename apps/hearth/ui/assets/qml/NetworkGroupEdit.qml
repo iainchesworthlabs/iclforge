@@ -116,73 +116,94 @@ RowLayout {
                 objectName: "networkGroupMemberRows"
                 model: root.members
 
-                delegate: RowLayout {
-                    id: memberRow
+                delegate: ColumnLayout {
+                    id: memberItem
                     required property var modelData
                     Layout.fillWidth: true
-                    spacing: Theme.gap
+                    spacing: 0
 
-                    ColumnLayout {
-                        // Layout.preferredWidth alone does not stop this
-                        // column growing past 160px to its content's
-                        // implicit width when the row has room - the same
-                        // trap NetworkSinkList.qml's own comment documents -
-                        // so it needs maximumWidth too, not just the inner
-                        // Text's minimumWidth: 0.
-                        Layout.preferredWidth: 160
-                        Layout.maximumWidth: 160
-                        spacing: 0
+                    RowLayout {
+                        id: memberRow
+                        readonly property var modelData: memberItem.modelData
+                        Layout.fillWidth: true
+                        spacing: Theme.gap
+
+                        ColumnLayout {
+                            // Layout.preferredWidth alone does not stop this
+                            // column growing past 160px to its content's
+                            // implicit width when the row has room - the same
+                            // trap NetworkSinkList.qml's own comment documents -
+                            // so it needs maximumWidth too, not just the inner
+                            // Text's minimumWidth: 0.
+                            Layout.preferredWidth: 160
+                            Layout.maximumWidth: 160
+                            spacing: 0
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                text: memberRow.modelData.name
+                                color: Theme.text
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                visible: !memberRow.modelData.connected
+                                text: qsTr("not connected")
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontMicro
+                            }
+                        }
                         Text {
-                            Layout.fillWidth: true
+                            Layout.preferredWidth: 140
+                            Layout.maximumWidth: 140
                             Layout.minimumWidth: 0
-                            text: memberRow.modelData.name
-                            color: Theme.text
+                            text: memberRow.modelData.getsText
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSmall
                             elide: Text.ElideRight
                         }
+                        AppSlider {
+                            objectName: "networkGroupMemberVolume-" + memberRow.modelData.sinkId
+                            Layout.fillWidth: true
+                            from: 0; to: 100
+                            stepSize: 1
+                            enabled: memberRow.modelData.connected && memberRow.modelData.volumeSupported
+                            value: memberRow.modelData.volume
+                            onMoved: NetworkController.setMemberVolume(root.group.id, memberRow.modelData.sinkId, Math.round(value))
+                        }
                         Text {
-                            visible: !memberRow.modelData.connected
-                            text: qsTr("not connected")
+                            Layout.preferredWidth: 28
+                            text: memberRow.modelData.volume
                             color: Theme.textMuted
-                            font.pixelSize: Theme.fontMicro
+                            horizontalAlignment: Text.AlignRight
+                        }
+                        AppCheckBox {
+                            objectName: "networkGroupMemberMute-" + memberRow.modelData.sinkId
+                            Layout.preferredWidth: 48
+                            enabled: memberRow.modelData.connected && memberRow.modelData.muteSupported
+                            checked: memberRow.modelData.muted
+                            onToggled: NetworkController.setMemberMuted(root.group.id, memberRow.modelData.sinkId, checked)
+                        }
+                        AppButton {
+                            objectName: "networkGroupRemoveMember-" + memberRow.modelData.sinkId
+                            Layout.preferredWidth: 32
+                            text: "×"
+                            Accessible.name: qsTr("Remove %1 from the group").arg(memberRow.modelData.name)
+                            onClicked: NetworkController.removeGroupMember(root.group.id, memberRow.modelData.sinkId)
                         }
                     }
+
+                    // Why the member is sent what it is, from the last programme the group opened:
+                    // a sink that decodes the stream says so, one that was moved to PCM or held
+                    // back says which of its own limits it was. Written by the engine, not here.
                     Text {
-                        Layout.preferredWidth: 140
-                        Layout.maximumWidth: 140
-                        Layout.minimumWidth: 0
-                        text: memberRow.modelData.getsText
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.fontSmall
-                        elide: Text.ElideRight
-                    }
-                    AppSlider {
-                        objectName: "networkGroupMemberVolume-" + memberRow.modelData.sinkId
+                        objectName: "networkGroupMemberReason-" + memberItem.modelData.sinkId
+                        visible: (memberItem.modelData.reasonText ?? "") !== ""
                         Layout.fillWidth: true
-                        from: 0; to: 100
-                        stepSize: 1
-                        enabled: memberRow.modelData.connected && memberRow.modelData.volumeSupported
-                        value: memberRow.modelData.volume
-                        onMoved: NetworkController.setMemberVolume(root.group.id, memberRow.modelData.sinkId, Math.round(value))
-                    }
-                    Text {
-                        Layout.preferredWidth: 28
-                        text: memberRow.modelData.volume
-                        color: Theme.textMuted
-                        horizontalAlignment: Text.AlignRight
-                    }
-                    AppCheckBox {
-                        objectName: "networkGroupMemberMute-" + memberRow.modelData.sinkId
-                        Layout.preferredWidth: 48
-                        enabled: memberRow.modelData.connected && memberRow.modelData.muteSupported
-                        checked: memberRow.modelData.muted
-                        onToggled: NetworkController.setMemberMuted(root.group.id, memberRow.modelData.sinkId, checked)
-                    }
-                    AppButton {
-                        objectName: "networkGroupRemoveMember-" + memberRow.modelData.sinkId
-                        Layout.preferredWidth: 32
-                        text: "×"
-                        Accessible.name: qsTr("Remove %1 from the group").arg(memberRow.modelData.name)
-                        onClicked: NetworkController.removeGroupMember(root.group.id, memberRow.modelData.sinkId)
+                        Layout.minimumWidth: 0
+                        text: memberItem.modelData.reasonText ?? ""
+                        color: memberItem.modelData.form === "held" ? Theme.text : Theme.textMuted
+                        font.pixelSize: Theme.fontMicro
+                        wrapMode: Text.WordWrap
                     }
                 }
             }

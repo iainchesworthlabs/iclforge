@@ -483,6 +483,8 @@ struct LayoutFields {
     map[QStringLiteral("sinkId")] = QString::fromStdString(member.sink_id);
     map[QStringLiteral("name")] = QString::fromStdString(member.name);
     map[QStringLiteral("getsText")] = QString::fromStdString(member.gets_text);
+    map[QStringLiteral("form")] = QString::fromStdString(member.form);
+    map[QStringLiteral("reasonText")] = QString::fromStdString(member.reason_text);
     map[QStringLiteral("volume")] = member.volume;
     map[QStringLiteral("muted")] = member.muted;
     map[QStringLiteral("volumeSupported")] = member.volume_supported;

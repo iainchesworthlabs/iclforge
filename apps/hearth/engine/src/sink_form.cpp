@@ -252,6 +252,19 @@ GroupFormPlan plan_group_forms(const StreamNeeds& stream, const render::OutputLa
                 break;
             }
         }
+        switch (member.action) {
+            case MemberAction::kCoded:
+                member.label = fmt::format("{} as it is",
+                                           stream.stream ? type_text(data_type_of(*stream.stream))
+                                                         : std::string_view{"The stream"});
+                break;
+            case MemberAction::kPcm:
+                member.label = fmt::format("PCM · {}", member.choice.layout->text());
+                break;
+            case MemberAction::kHold:
+                member.label = "Nothing · held back";
+                break;
+        }
         plan.members.push_back(std::move(member));
     }
     return plan;

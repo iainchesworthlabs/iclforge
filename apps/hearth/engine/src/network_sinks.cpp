@@ -545,6 +545,7 @@ void NetworkSinks::remove_group_member(const std::string& group_id, const std::s
             return;
         }
         std::erase(it->second.member_sink_ids, sink_id);
+        it->second.planned.erase(sink_id);
         client_id = member_client_id_locked(sink_id);
         group = it->second.group;
         publish_locked();
@@ -750,6 +751,7 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
         return {};
     }
     struct Member {
+        std::string sink_id;
         std::string client_id;
         SinkFacts facts;
     };
@@ -772,7 +774,8 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
                 sink->second.client_id.empty()) {
                 continue;
             }
-            members.push_back({.client_id = sink->second.client_id,
+            members.push_back({.sink_id = sink_id,
+                               .client_id = sink->second.client_id,
                                .facts = facts_locked(sink_id, sink->second)});
         }
     }
@@ -810,6 +813,23 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
         on_log(fmt::format("group \"{}\": {}: {}", group_name, members[index].facts.name,
                            form.choice.reason));
     }
+    {
+        // What the Network page shows beside each member until the next programme opens.
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto found = groups_.find(request.group_name);
+        if (found != groups_.end()) {
+            for (std::size_t index = 0; index < members.size(); ++index) {
+                const MemberForm& form = plan.members[index];
+                found->second.planned[members[index].sink_id] = {
+                    .form = form.action == MemberAction::kCoded ? "coded"
+                            : form.action == MemberAction::kPcm ? "pcm"
+                                                                : "held",
+                    .label = form.label,
+                    .reason = form.choice.reason};
+            }
+            publish_locked();
+        }
+    }
     return plan.variants;
 }
 
@@ -841,6 +861,11 @@ GroupFacts NetworkSinks::group_facts_locked(const std::string& group_id, const G
         member.name = sink_facts.name;
         member.kind = sink_facts.kind;
         member.required_lead_time_ms = sink_facts.required_lead_time_ms;
+        if (const auto planned = entry.planned.find(sink_id); planned != entry.planned.end()) {
+            member.form = planned->second.form;
+            member.form_label = planned->second.label;
+            member.form_reason = planned->second.reason;
+        }
         member.connected = sink_it->second.client.has_value();
         if (member.connected && !sink_it->second.client_id.empty()) {
             if (const std::optional<ss::controller::Player> player =
