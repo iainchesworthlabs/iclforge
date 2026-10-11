@@ -428,6 +428,28 @@ bool NetworkSinks::push_sink_settings(const std::string& id, ss::player::Setting
     return sent;
 }
 
+bool NetworkSinks::set_sink_opus_fallback(const std::string& id, bool opus) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto it = sinks_.find(id);
+    if (it == sinks_.end()) {
+        return false;
+    }
+    const std::optional<ss::ClientView>& view = it->second.known;
+    const bool lists = view.has_value() && view->player_support.has_value() &&
+                       std::ranges::any_of(view->player_support->supported_formats,
+                                           [](const ss::messages::AudioFormat& format) {
+                                               return format.codec == ss::messages::Codec::kOpus;
+                                           });
+    if (opus && !lists) {
+        return false;
+    }
+    if (it->second.opus_fallback != opus) {
+        it->second.opus_fallback = opus;
+        publish_locked();
+    }
+    return true;
+}
+
 bool NetworkSinks::push_sink_identify(const std::string& id, std::optional<ss::player::Identify> identify) {
     std::string client_id;
     {
@@ -742,6 +764,7 @@ SinkFacts NetworkSinks::facts_locked(const std::string& instance, const Entry& e
 
     facts.intended_settings = entry.intended_settings;
     facts.identify_slot = entry.identify_slot;
+    facts.opus_fallback = entry.opus_fallback;
 
     return facts;
 }
@@ -802,7 +825,11 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
                 group->hold(client_id, false);
                 break;
             case MemberAction::kPcm:
-                (void)host_->use_pcm(client_id, true, 0, form.channels);
+                // The codec is asked for by name, so that a sink that lists Opus first is not
+                // sent it when it was not chosen, nor one that lists PCM first when it was.
+                (void)host_->use_pcm(client_id, true, 0, form.channels,
+                                     form.codec == PcmCodec::kOpus ? ss::messages::Codec::kOpus
+                                                                   : ss::messages::Codec::kPcm);
                 group->hold(client_id, false);
                 break;
             case MemberAction::kHold:

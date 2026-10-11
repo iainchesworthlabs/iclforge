@@ -1958,93 +1958,93 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="144"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="150"/>
         <source>not connected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="184"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="190"/>
         <source>Remove %1 from the group</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="208"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="229"/>
         <source>Add to the group</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="219"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="240"/>
         <source>Group volume</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="233"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="254"/>
         <source>%1 · the mean of the members</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="242"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="263"/>
         <source>✓ Every member plays the same item at the same moment. A Hearth sink renders it to its own speakers; a Sendspin player gets stereo.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="251"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="272"/>
         <source>✓ Every member has synchronised its clock with this computer. A member reports itself ready only once it has.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="260"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="281"/>
         <source>This computer&apos;s own outputs are not group members in this version. A receiver fed a bitstream cannot be one, because it reports no decode latency.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="280"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="301"/>
         <source>Group</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="288"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="309"/>
         <source>State</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="293"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="314"/>
         <source>Playing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="295"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="316"/>
         <source>The output - ready to play</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="296"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="317"/>
         <source>The output - waiting for a member to connect</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="297"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="318"/>
         <source>Not the output</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="302"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="323"/>
         <source>Members</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="309"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="330"/>
         <source>Lead time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="312"/>
-        <location filename="../qml/NetworkGroupEdit.qml" line="318"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="333"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="339"/>
         <source>—</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkGroupEdit.qml" line="317"/>
+        <location filename="../qml/NetworkGroupEdit.qml" line="338"/>
         <source>Late chunks</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2116,147 +2116,177 @@
 <context>
     <name>NetworkSinkDecoder</name>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="48"/>
-        <source>Dynamic range</source>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="50"/>
+        <source>Audio decoded here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="54"/>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="61"/>
-        <source>Mode</source>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="56"/>
+        <source>Sent as</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="64"/>
-        <source>Line</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="65"/>
-        <source>RF</source>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="63"/>
+        <source>PCM or Opus</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkDecoder.qml" line="66"/>
+        <source>PCM</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="67"/>
+        <source>Opus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="75"/>
+        <source>When this sink cannot take a stream as it is, Hearth decodes it and sends PCM, which is lossless and needs a good link. Opus is lossy and a twelfth of the bytes, for a sink on a busy WiFi network. It applies the next time the group plays.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="92"/>
+        <source>Dynamic range</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="98"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="105"/>
+        <source>Mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="108"/>
+        <source>Line</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="109"/>
+        <source>RF</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="110"/>
         <source>Custom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="73"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="117"/>
         <source>Line: dialogue normalisation and the stream&apos;s dynamic range control in full. RF: heavy compression as well. Custom: the settings below.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="84"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="128"/>
         <source>Cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="106"/>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="133"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="150"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="177"/>
         <source>%1%</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="115"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="159"/>
         <source>Boost</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="140"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="184"/>
         <source>Heavy compression</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="146"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="190"/>
         <source>Dialogue normalisation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="154"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="198"/>
         <source>Stereo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="162"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="206"/>
         <source>✓ Used when this sink&apos;s layout is 2.0.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="163"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="207"/>
         <source>✓ Used when this sink&apos;s layout is 2.0. Its layout, %1, is rendered instead.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="173"/>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="180"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="217"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="224"/>
         <source>Downmix</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="183"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="227"/>
         <source>Lo/Ro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="184"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="228"/>
         <source>Lt/Rt</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="191"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="235"/>
         <source>Mix the LFE in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="199"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="243"/>
         <source>Objects and errors</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="205"/>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="212"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="249"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="256"/>
         <source>Objects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="215"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="259"/>
         <source>Auto</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="216"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="260"/>
         <source>Always</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="217"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="261"/>
         <source>Never</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="224"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="268"/>
         <source>Auto places the objects when the layout has heights. %1 has none, so this sink plays the stream&apos;s downmix.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="237"/>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="244"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="281"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="288"/>
         <source>Bad frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="247"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="291"/>
         <source>None</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="248"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="292"/>
         <source>Repeat and fade</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkDecoder.qml" line="249"/>
+        <location filename="../qml/NetworkSinkDecoder.qml" line="293"/>
         <source>Mute</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4348,12 +4378,12 @@ Drop AC-3, E-AC-3 or AC-4 files or a folder here.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2215"/>
+        <location filename="../../src/hearth_controller.cpp" line="2219"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2218"/>
+        <location filename="../../src/hearth_controller.cpp" line="2222"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4361,12 +4391,12 @@ Drop AC-3, E-AC-3 or AC-4 files or a folder here.</source>
 <context>
     <name>iclforge::hearth::ui::NetworkController</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="896"/>
+        <location filename="../../src/network_controller.cpp" line="908"/>
         <source>it could not be read: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="899"/>
+        <location filename="../../src/network_controller.cpp" line="911"/>
         <source>it is %1 bytes, more than any sink&apos;s app slot holds</source>
         <translation type="unfinished"></translation>
     </message>

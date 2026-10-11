@@ -823,6 +823,158 @@ TEST_CASE("engine: NetworkSinks plans a group of paired sinks and each is sent w
     CHECK(energy > 1.0);
 }
 
+// A sink the person has set to Opus (NetworkSinks::set_sink_opus_fallback), for a link too poor for
+// PCM, is sent what Hearth decodes for it as Opus: the stream it starts says so, it gets no PCM and
+// no burst, and what it plays is the whole programme, lossily.
+TEST_CASE("engine: a sink set to Opus is sent the decoded programme as Opus",
+          "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    constexpr int kFrameCount = 20;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_engine_group_opus_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    const SurroundProgramme made = surround_programme(kFrameCount);
+
+    // The sink's dynamic pairing code and the streams it was started with, from its log.
+    class Log final : public testsink::SinkLog {
+       public:
+        void line(std::string_view text) override {
+            const std::lock_guard lock(mutex_);
+            lines_.emplace_back(text);
+            const std::size_t at = text.find("PAIRING CODE ");
+            if (at == std::string_view::npos) {
+                return;
+            }
+            std::string digits;
+            for (const char c : text.substr(at + 13)) {
+                if (c >= '0' && c <= '9') {
+                    digits.push_back(c);
+                }
+            }
+            code_ = digits;
+        }
+        std::optional<std::string> code() {
+            const std::lock_guard lock(mutex_);
+            return code_;
+        }
+        bool saw(std::string_view text) {
+            const std::lock_guard lock(mutex_);
+            return std::ranges::any_of(lines_, [&](const std::string& line) {
+                return line.find(text) != std::string::npos;
+            });
+        }
+
+       private:
+        std::mutex mutex_;
+        std::optional<std::string> code_;
+        std::vector<std::string> lines_;
+    };
+    Log log;
+    testsink::SinkOptions options;
+    options.name = "opus";
+    options.address = "127.0.0.1";
+    options.port = 0;
+    options.state_directory = scratch / "state";
+    options.output_directory = scratch / "out";
+    options.advertise = false;
+    // PCM first, as a board lists it: Opus is sent only because the sink is set to it.
+    options.codecs = {m::Codec::kPcm, m::Codec::kOpus};
+    options.layout = "2.0";
+    options.max_coded_channels = 2;
+    auto started = testsink::Sink::start(options, log);
+    REQUIRE(started.has_value());
+    const std::unique_ptr<testsink::Sink> sink = std::move(*started);
+
+    iclforge::hearth::MemorySettingsStore settings;
+    iclforge::hearth::PairingStore store{settings, [] { return std::string("2026-10-11"); }};
+    const std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    iclforge::hearth::NetworkSinks sinks{*identity, "Test Hearth", store,
+                                         iclforge::hearth::NetworkSinksOptions{.browse = false}};
+    REQUIRE(sinks.started());
+    const auto find = [&](const std::string& id) -> std::optional<iclforge::hearth::SinkFacts> {
+        for (const iclforge::hearth::SinkFacts& facts : sinks.status().sinks) {
+            if (facts.id == id) {
+                return facts;
+            }
+        }
+        return std::nullopt;
+    };
+    sinks.on_found(ss::discovery::Service{.instance = "opus",
+                                          .host = "127.0.0.1",
+                                          .addresses = {"127.0.0.1"},
+                                          .port = sink->port(),
+                                          .txt = {{.key = "path", .value = "/sendspin"}}});
+    REQUIRE(eventually([&] {
+        const auto facts = find("opus");
+        return facts && facts->link == iclforge::hearth::SinkLink::kConnected &&
+               facts->iclforge_support;
+    }));
+    sinks.pair_sink("opus");
+    REQUIRE(eventually([&] { return log.code().has_value(); }));
+    sinks.submit_pairing_code("opus", *log.code());
+    REQUIRE(eventually([&] {
+        const auto facts = find("opus");
+        return facts && facts->pair_state == iclforge::hearth::PairState::kPaired &&
+               facts->link == iclforge::hearth::SinkLink::kConnected && facts->iclforge_state &&
+               facts->clock_converged;
+    }));
+    REQUIRE(sinks.set_sink_opus_fallback("opus", true));
+
+    const std::string group_id = sinks.create_group("Opus");
+    REQUIRE_FALSE(group_id.empty());
+    sinks.add_group_member(group_id, "opus");
+    const std::shared_ptr<ss::Group> group = sinks.group(group_id);
+    REQUIRE(group != nullptr);
+
+    const std::vector<std::byte>& programme = made.bytes;
+    const ItemLoader loader =
+        [&programme](const std::string& path) -> std::expected<LoadedItem, std::string> {
+        if (path != "programme") {
+            return std::unexpected("no such file: " + path);
+        }
+        return LoadedItem{.bytes = programme};
+    };
+    const auto master = iclforge::render::OutputLayout::parse("5.1");
+    REQUIRE(master.has_value());
+    EngineOutputs outputs{.group = iclforge::hearth::make_group_sink(
+                              [group](const std::string&) { return group; },
+                              [&sinks](const iclforge::hearth::GroupPlanRequest& request) {
+                                  return sinks.plan_group(request);
+                              })};
+    Engine engine(std::move(outputs), loader, *master, iclforge::hearth::DecoderSettings{},
+                  EngineTiming{.period = 5ms, .budget = 4800});
+    engine.set_output_preferences(OutputPreferences{.pinned = OutputMode::kNetworkGroup,
+                                                    .follow_sink = true,
+                                                    .group_name = group_id,
+                                                    .group_ready = true});
+    engine.add({QueueItem{.path = "programme", .title = "Test programme"}});
+    engine.play();
+    REQUIRE(eventually([&] {
+        const EngineStatus status = engine.status();
+        return status.state == TransportState::kStopped && !status.history.empty();
+    }));
+
+    // Every frame of the programme, less what Opus's own packet boundary holds at the end.
+    const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
+    REQUIRE(eventually([&] { return sink->totals().frames >= expected_frames - 4800; }));
+    CHECK(log.saw("stream Opus 48000 Hz"));
+    CHECK_FALSE(log.saw("stream PCM"));
+    CHECK(sink->totals().bursts == 0);
+    // And it is the programme: Opus-coded audio of the render, not silence.
+    const auto wav =
+        iclforge::ac3::io::read_wav(only_file(scratch / "out", "stream-", ".wav").string());
+    REQUIRE(wav.has_value());
+    REQUIRE(wav->channels.size() == 2);
+    double energy = 0.0;
+    for (const std::vector<float>& channel : wav->channels) {
+        for (const float sample : channel) {
+            energy += static_cast<double>(sample) * static_cast<double>(sample);
+        }
+    }
+    CHECK(energy > 1.0);
+}
+
 // planning/ac4.md, I2: "AC-4 decodes to PCM for every output, and is sent as a
 // bitstream only over the extension role ... to sinks that decode it." One
 // AC-4 item from the Engine to a group of a player@v1 sink and an

@@ -267,6 +267,8 @@ SinkDetail to_detail(const SinkFacts& facts) {
     detail.notice = facts.notice;
     detail.link_text = link_text(facts);
     detail.connected = facts.link == SinkLink::kConnected;
+    detail.opus_available = std::ranges::find(facts.codecs, "opus") != facts.codecs.end();
+    detail.opus_fallback = facts.opus_fallback;
     if (!facts.address.empty()) {
         detail.page_url = fmt::format("http://{}/", facts.address);
     }

@@ -78,9 +78,22 @@ struct StreamNeeds {
     std::optional<render::OutputLayout> default_layout{};
 };
 
+// The codec decoded audio is sent in: PCM, or Opus for a sink on a link too poor for PCM.
+enum class PcmCodec : std::uint8_t {
+    kPcm,
+    kOpus,
+};
+
+// Whether a sink lists Opus (48 kHz, stereo) in its player@v1 formats.
+[[nodiscard]] bool sink_lists_opus(const SinkFacts& sink);
+
 struct SinkFormPolicy {
     // Whether a sink that cannot take the stream as coded may be sent PCM.
     bool pcm_fallback = true;
+    // Whether it is sent Opus instead, lossy and a twelfth of PCM's bytes: set for a sink the
+    // person has chosen it for that lists it (SinkFacts::opus_fallback). Where the stream's
+    // rate is not 48 kHz, or the sink lists no Opus, it is PCM as before.
+    bool opus = false;
     // A sentence added to the reason of a sink that is sent PCM: what may go wrong with it on
     // this board. Empty for a sink with nothing to add.
     std::string pcm_caveat{};
@@ -90,6 +103,8 @@ struct SinkChoice {
     SinkForm form = SinkForm::kNone;
     // kPcm: the layout rendered for this sink. Unset otherwise.
     std::optional<render::OutputLayout> layout{};
+    // kPcm: the codec it is sent in.
+    PcmCodec codec = PcmCodec::kPcm;
     // One sentence, for the sink's row: what is sent and, when it is not the
     // stream as it is, which of the sink's own limits it was.
     std::string reason{};
@@ -114,10 +129,11 @@ struct MemberForm {
     // overruled it (a width another sink already has).
     SinkChoice choice{};
     MemberAction action = MemberAction::kHold;
-    // kPcm: the width the sink is asked for.
+    // kPcm: the width the sink is asked for, and the codec it is asked to be played in.
     std::int32_t channels = 0;
+    PcmCodec codec = PcmCodec::kPcm;
     // What the sink is sent, in a few words, for the column of a table: "E-AC-3 as it is",
-    // "PCM · 2.0", "Nothing · held back". The reason is choice.reason.
+    // "PCM · 2.0", "Opus · 2.0", "Nothing · held back". The reason is choice.reason.
     std::string label{};
 };
 
@@ -133,7 +149,8 @@ struct GroupFormPlan {
 // stream as it is, and what to say about it. An ESP32-C6 is sent PCM with a caveat, its buffer
 // being short enough that a busy WiFi drops the stream out (planning/esp32-sink-compatibility-
 // matrix.md): the sink does not state that, so it is read from the hardware it names, until the
-// board can say it. This is the place a person's own "never decode in Hearth" setting will be
+// board can say it. A sink the person has set to Opus (SinkFacts::opus_fallback) that lists it is
+// sent that instead. This is the place a person's own "never decode in Hearth" setting will be
 // read as well.
 [[nodiscard]] SinkFormPolicy form_policy(const SinkFacts& sink);
 

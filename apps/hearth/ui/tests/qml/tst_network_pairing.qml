@@ -524,6 +524,29 @@ TestCase {
         tryVerify(function() { return H.textItem(page, "0 bursts") !== null; }, 5000);
     }
 
+    // A sink that lists Opus is offered the choice of it on the Decoder tab, and the choice is
+    // read back from the controller: PCM until it is chosen, Opus once it is. (The test sink lists
+    // PCM, FLAC and Opus.)
+    function test_pairedSinkDecoderTabOffersOpusForADecodedStream() {
+        const page = makePage();
+        ensurePaired(page);
+        mouseClick(H.segment(page, "Speakers, decoder or firmware", "decoder"));
+        tryVerify(function() { return NetworkController.selectedSink.opusAvailable === true; }, 10000,
+                  "the sink lists Opus and the controller does not say so");
+        compare(NetworkController.selectedSink.opusFallback, false);
+        const card = findChild(page, "networkSinkOpusCard");
+        verify(card !== null && card.visible, "the Decoder tab does not offer Opus to a sink that lists it");
+        let opus = null;
+        tryVerify(function() { opus = H.segment(page, "PCM or Opus", "opus"); return opus !== null; }, 5000,
+                  "the Decoder tab has no Opus choice");
+        mouseClick(opus);
+        tryVerify(function() { return NetworkController.selectedSink.opusFallback === true; }, 5000,
+                  "choosing Opus did not reach the sink's setting");
+        mouseClick(H.segment(page, "PCM or Opus", "pcm"));
+        tryVerify(function() { return NetworkController.selectedSink.opusFallback === false; }, 5000,
+                  "choosing PCM did not put it back");
+    }
+
     // The Speakers tab reads the sink's own facts: its 5.1 test layout's six
     // outputs, its crossover range. This sink's state does not list the
     // Settings command, so nothing on the tab can reach it: the controls are

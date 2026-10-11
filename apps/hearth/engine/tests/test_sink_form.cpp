@@ -29,6 +29,7 @@ using iclforge::hearth::choose_sink_form;
 using iclforge::hearth::data_type_of;
 using iclforge::hearth::MemberAction;
 using iclforge::hearth::PairState;
+using iclforge::hearth::PcmCodec;
 using iclforge::hearth::PcmFormat;
 using iclforge::hearth::plan_group_forms;
 using iclforge::hearth::SinkFacts;
@@ -372,6 +373,77 @@ TEST_CASE("sink form: a caveat is added to the reason of a sink sent PCM, and to
     const auto coded = choose_sink_form(ac3(2), c6, policy);
     REQUIRE(coded.form == SinkForm::kCoded);
     CHECK_FALSE(mentions(coded.reason, "drop out"));
+}
+
+// A sink the person has set to Opus, on a link too poor for PCM: sent decoded audio as Opus,
+// at 2.0, where it lists Opus and the stream is at 48 kHz; PCM as before where it is not set, does
+// not list it, or the stream is at another rate.
+TEST_CASE("sink form: a sink set to Opus is sent it where it lists it", "[hearth][sink_form]") {
+    SinkFacts c6 = hearth_sink({sp::DataType::kAc3});
+    c6.hardware = "ESP32-C6";
+    limit(c6, sp::DataType::kAc3, 2);
+    c6.codecs = {"pcm", "opus"};
+    c6.opus_fallback = true;
+
+    SECTION("it is sent Opus at 2.0, and the reason says so and carries no PCM caveat") {
+        const auto policy = iclforge::hearth::form_policy(c6);
+        CHECK(policy.opus);
+        const auto sent = choose_sink_form(ac3(6), c6, policy);
+        REQUIRE(sent.form == SinkForm::kPcm);
+        CHECK(sent.codec == PcmCodec::kOpus);
+        REQUIRE(sent.layout.has_value());
+        CHECK(sent.layout->slots() == 2);
+        CHECK(mentions(sent.reason, "up to 2 channels"));
+        CHECK(mentions(sent.reason, "Opus"));
+        CHECK_FALSE(mentions(sent.reason, "drop out"));
+    }
+    SECTION("not set, it is sent PCM with the caveat") {
+        c6.opus_fallback = false;
+        const auto sent = choose_sink_form(ac3(6), c6, iclforge::hearth::form_policy(c6));
+        REQUIRE(sent.form == SinkForm::kPcm);
+        CHECK(sent.codec == PcmCodec::kPcm);
+        CHECK(mentions(sent.reason, "drop out"));
+    }
+    SECTION("a sink that does not list Opus is sent PCM whatever was set") {
+        c6.codecs = {"pcm"};
+        const auto policy = iclforge::hearth::form_policy(c6);
+        CHECK_FALSE(policy.opus);
+        const auto sent = choose_sink_form(ac3(6), c6, policy);
+        REQUIRE(sent.form == SinkForm::kPcm);
+        CHECK(sent.codec == PcmCodec::kPcm);
+    }
+    SECTION("a stream it takes as it is is sent as it is") {
+        const auto sent = choose_sink_form(ac3(2), c6, iclforge::hearth::form_policy(c6));
+        CHECK(sent.form == SinkForm::kCoded);
+        CHECK(sent.codec == PcmCodec::kPcm);
+    }
+    SECTION("a stream at another rate is not sent Opus, which is listed at 48 kHz only") {
+        c6.pcm_formats.push_back({.channels = 2, .sample_rate = 44100, .bit_depth = 16});
+        const StreamNeeds at_44k{
+            .stream = BitstreamFormat::kAc3, .sample_rate = 44100, .coded_channels = 6};
+        c6.iclforge_support->sample_rates = {44100};
+        const auto sent = choose_sink_form(at_44k, c6, iclforge::hearth::form_policy(c6));
+        CHECK(sent.codec == PcmCodec::kPcm);
+    }
+    SECTION("in a group it shares the 2.0 render the stereo player has") {
+        SinkFacts stereo;
+        stereo.name = "Stereo";
+        stereo.kind = SinkKind::kStandardPlayer;
+        stereo.pcm_formats.push_back({.channels = 2, .sample_rate = k48k, .bit_depth = 16});
+        const auto master = iclforge::render::OutputLayout::parse("5.1");
+        REQUIRE(master.has_value());
+        const std::vector<SinkFacts> sinks{c6, stereo};
+        const auto plan = plan_group_forms(ac3(6), *master, sinks);
+        REQUIRE(plan.members.size() == 2);
+        CHECK(plan.members[0].action == MemberAction::kPcm);
+        CHECK(plan.members[0].codec == PcmCodec::kOpus);
+        CHECK(plan.members[0].channels == 2);
+        CHECK(plan.members[0].label == "Opus · 2.0");
+        CHECK(plan.members[1].action == MemberAction::kPcm);
+        CHECK(plan.members[1].codec == PcmCodec::kPcm);
+        CHECK(plan.members[1].label == "PCM · 2.0");
+        CHECK(plan.variants.size() == 1);
+    }
 }
 
 TEST_CASE("sink form: a layout the sink's PCM cannot carry is folded to the widest it can",
