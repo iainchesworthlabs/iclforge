@@ -868,14 +868,24 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         // fell back to. Everyone else gets the WAV speaker order the encode
         // side reads a file in.
         std::vector<std::size_t> order;
+        // Which speaker each WAV position is, for a file of three channels or
+        // more: the header then says so, and a re-encode reads a 2/1 file as
+        // 2/1 rather than as the 3/0 its width alone would suggest.
+        std::uint32_t mask = 0;
         // A fold has already put its own channels in their own order, so like
         // dual mono it takes the identity permutation rather than the
         // rendered layout's.
         if (unit.acmod != iclforge::ac3::Acmod::kDualMono && !folding(meta, unit.acmod)) {
-            order = plan::wav_order(std::span{unit.layout.items}.first(
-                static_cast<std::size_t>(unit.layout.count)));
+            const auto placed = std::span{unit.layout.items}.first(
+                static_cast<std::size_t>(unit.layout.count));
+            order = plan::wav_order(placed);
+            std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
+            for (const auto slot : order) {
+                in_wav_order.push_back(placed[slot]);
+            }
+            mask = plan::wav_channel_mask(in_wav_order);
         }
-        if (!sink.open(out_path, sample_rate_hz(unit.sample_rate), slots, order)) {
+        if (!sink.open(out_path, sample_rate_hz(unit.sample_rate), slots, order, mask)) {
             fmt::println(stderr, "error: cannot open {} for writing", out_path);
             return false;
         }
@@ -1457,10 +1467,24 @@ int run_decode(std::string_view in_path, std::string_view out_path,
             // L then R, or the one mono channel - so it takes the identity
             // permutation rather than the coded layout's.
             const bool folded = folding(meta, decoded->acmod);
+            // Which speaker each WAV position is, for three channels or more
+            // (see the E-AC-3 path's note); dual mono has no speakers to name.
+            std::uint32_t mask = 0;
+            if (!folded && decoded->acmod != iclforge::ac3::Acmod::kDualMono) {
+                const auto coded = iclforge::ac3::eac3::chanmap::expand(
+                    iclforge::ac3::eac3::chanmap::acmod_map(decoded->acmod, decoded->lfe));
+                std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
+                for (const auto slot :
+                     iclforge::ac3::io::wav_channel_order(decoded->acmod, decoded->lfe)) {
+                    in_wav_order.push_back(coded[static_cast<int>(slot)]);
+                }
+                mask = plan::wav_channel_mask(in_wav_order);
+            }
             if (!sink.open(
                     out_path, sample_rate_hz(decoded->sample_rate), decoded->channels.size(),
                     folded ? std::vector<std::size_t>{}
-                           : iclforge::ac3::io::wav_channel_order(decoded->acmod, decoded->lfe))) {
+                           : iclforge::ac3::io::wav_channel_order(decoded->acmod, decoded->lfe),
+                    mask)) {
                 fmt::println(stderr, "error: cannot open {} for writing", out_path);
                 return kExitOutput;
             }

@@ -360,6 +360,12 @@ void print_layout_topic() {
     fmt::println("        Locations: L C R Ls Rs Lc Rc Lrs Rrs Cs Ts Lsd Rsd Lw Rw Vhl Vhr");
     fmt::println("        Vhc Lts Rts LFE2 LFE - a paired location (Lc/Rc, Lrs/Rrs, Lsd/Rsd,");
     fmt::println("        Lw/Rw, Vhl/Vhr, Lts/Rts) must be given both halves.");
+    fmt::println("");
+    fmt::println("        With no [layout], 'encode' and 'eac3-encode' follow the source: a WAV");
+    fmt::println("        that states which speakers its channels are (a WAVE_FORMAT_EXTENSIBLE");
+    fmt::println("        channel mask, which 'decode' writes from three channels up) is encoded");
+    fmt::println("        as exactly those - FL FR BC is 2/1, FL FR FC BC is 3/1 - and one that");
+    fmt::println("        states none is read by its channel count.");
 }
 
 void print_tools_topic() {
