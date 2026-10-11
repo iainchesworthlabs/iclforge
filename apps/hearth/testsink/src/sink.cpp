@@ -570,6 +570,9 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         if (options_.max_coded_channels != 0) {
             support.max_coded_channels.fill(options_.max_coded_channels);
         }
+        if (options_.max_objects) {
+            support.max_objects.fill(options_.max_objects);
+        }
         config.iclforge_support = std::move(support);
         // What the sink's streams are rendered to, as its own page would say.
         config.iclforge_state.layout = options_.layout;
