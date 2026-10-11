@@ -347,6 +347,52 @@ TEST_CASE("iclforge_player: the channel limit a sink states per data type",
     CHECK_FALSE(with_limits("null"));
 }
 
+TEST_CASE("iclforge_player: the object limit a sink states per data type", "[sendspin][iclforge]") {
+    // Written only when some type has one, so a sink that states none writes what it always did.
+    ac::Support support = board_support();
+    CHECK(written(support, ac::write_support).find("max_objects") == std::string::npos);
+
+    // 0 is a statement (the bed alone), where a type the object does not name is none.
+    support.max_objects[static_cast<std::size_t>(ac::DataType::kEac3)] = 0;
+    support.max_objects[static_cast<std::size_t>(ac::DataType::kAc4)] = 4;
+    const std::string text = written(support, ac::write_support);
+    CHECK(text.ends_with(R"("buffer_capacity":1048576,"max_objects":{"eac3":0,"ac4":4}})"));
+    const std::optional<ac::Support> read = ac::read_support(Parsed(text).root());
+    REQUIRE(read.has_value());
+    REQUIRE(read->max_objects_of(ac::DataType::kEac3).has_value());
+    CHECK(*read->max_objects_of(ac::DataType::kEac3) == 0);
+    CHECK(read->max_objects_of(ac::DataType::kAc4) == 4);
+    CHECK_FALSE(read->max_objects_of(ac::DataType::kAc3).has_value());
+
+    // A sink from before the key sends none, and every type reads as stating none.
+    const std::optional<ac::Support> before =
+        ac::read_support(Parsed(written(board_support(), ac::write_support)).root());
+    REQUIRE(before.has_value());
+    for (const ac::DataType type : {ac::DataType::kAc3, ac::DataType::kEac3, ac::DataType::kAc4}) {
+        CHECK_FALSE(before->max_objects_of(type).has_value());
+    }
+
+    const auto with_limits = [&](const std::string& value) {
+        std::string source = written(board_support(), ac::write_support);
+        source.pop_back();  // the closing brace
+        return ac::read_support(Parsed(source + R"(,"max_objects":)" + value + "}").root());
+    };
+    // A name this reader does not know is skipped, as an unknown key is.
+    const std::optional<ac::Support> future = with_limits(R"({"eac3":15,"dts":8})");
+    REQUIRE(future.has_value());
+    CHECK(future->max_objects_of(ac::DataType::kEac3) == 15);
+    CHECK(with_limits("{}").has_value());
+    CHECK(with_limits(R"({"ac4":255})").has_value());
+    // A count that is not a count, or a limit that is not an object, is refused with the object.
+    CHECK_FALSE(with_limits(R"({"eac3":-1})"));
+    CHECK_FALSE(with_limits(R"({"eac3":256})"));
+    CHECK_FALSE(with_limits(R"({"eac3":2.5})"));
+    CHECK_FALSE(with_limits(R"({"eac3":"4"})"));
+    CHECK_FALSE(with_limits("4"));
+    CHECK_FALSE(with_limits("[4]"));
+    CHECK_FALSE(with_limits("null"));
+}
+
 TEST_CASE("iclforge_player: the layout a sink states", "[sendspin][iclforge]") {
     ac::State state;
     state.supported_commands = {ac::Command::kVolume};

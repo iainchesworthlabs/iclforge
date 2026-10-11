@@ -66,6 +66,8 @@ public:
         // The channels the item codes (ItemFacts::channels), which a member's
         // stated limit is compared with; 0 when not known.
         std::uint16_t coded_channels = 0;
+        // The objects it places (ItemFacts::objects); 0 for none or not known.
+        std::uint16_t objects = 0;
     };
 
     // The layouts the open group's members are to be sent PCM at, beyond
@@ -156,6 +158,7 @@ struct GroupPlanRequest {
     std::optional<audio::BitstreamFormat> stream{};
     std::uint32_t sample_rate = 0;
     std::uint16_t coded_channels = 0;
+    std::uint16_t objects = 0;
     // The layout the player renders to, which a member that wants it is sent.
     render::OutputLayout layout{};
 };

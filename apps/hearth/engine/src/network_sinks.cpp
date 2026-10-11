@@ -1,5 +1,7 @@
 #include "network_sinks.hpp"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -8,6 +10,7 @@
 #include <utility>
 
 #include "iclforge/sendspin/mdns.hpp"
+#include "sink_form.hpp"
 
 namespace iclforge::hearth {
 
@@ -542,6 +545,7 @@ void NetworkSinks::remove_group_member(const std::string& group_id, const std::s
             return;
         }
         std::erase(it->second.member_sink_ids, sink_id);
+        it->second.planned.erase(sink_id);
         client_id = member_client_id_locked(sink_id);
         group = it->second.group;
         publish_locked();
@@ -742,6 +746,94 @@ SinkFacts NetworkSinks::facts_locked(const std::string& instance, const Entry& e
     return facts;
 }
 
+std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanRequest& request) {
+    if (host_ == nullptr) {
+        return {};
+    }
+    struct Member {
+        std::string sink_id;
+        std::string client_id;
+        SinkFacts facts;
+    };
+    std::vector<Member> members;
+    std::shared_ptr<ss::Group> group;
+    std::string group_name;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto found = groups_.find(request.group_name);
+        if (found == groups_.end()) {
+            return {};
+        }
+        group = found->second.group;
+        group_name = found->second.name;
+        for (const std::string& sink_id : found->second.member_sink_ids) {
+            const auto sink = sinks_.find(sink_id);
+            // A member that is not connected is nothing to decide about: it is sent the
+            // programme when it comes back, by the plan of the next one.
+            if (sink == sinks_.end() || !sink->second.client.has_value() ||
+                sink->second.client_id.empty()) {
+                continue;
+            }
+            members.push_back({.sink_id = sink_id,
+                               .client_id = sink->second.client_id,
+                               .facts = facts_locked(sink_id, sink->second)});
+        }
+    }
+    if (members.empty() || !group) {
+        return {};
+    }
+
+    std::vector<SinkFacts> facts;
+    facts.reserve(members.size());
+    for (const Member& member : members) {
+        facts.push_back(member.facts);
+    }
+    const StreamNeeds needs{.stream = request.stream,
+                            .sample_rate = request.sample_rate,
+                            .coded_channels = request.coded_channels,
+                            .objects = request.objects};
+    const GroupFormPlan plan = plan_group_forms(needs, request.layout, facts);
+
+    for (std::size_t index = 0; index < members.size(); ++index) {
+        const std::string& client_id = members[index].client_id;
+        const MemberForm& form = plan.members[index];
+        switch (form.action) {
+            case MemberAction::kCoded:
+                (void)host_->use_pcm(client_id, false);
+                group->hold(client_id, false);
+                break;
+            case MemberAction::kPcm:
+                (void)host_->use_pcm(client_id, true, 0, form.channels);
+                group->hold(client_id, false);
+                break;
+            case MemberAction::kHold:
+                (void)host_->use_pcm(client_id, false);
+                group->hold(client_id, true);
+                break;
+        }
+        on_log(fmt::format("group \"{}\": {}: {}", group_name, members[index].facts.name,
+                           form.choice.reason));
+    }
+    {
+        // What the Network page shows beside each member until the next programme opens.
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto found = groups_.find(request.group_name);
+        if (found != groups_.end()) {
+            for (std::size_t index = 0; index < members.size(); ++index) {
+                const MemberForm& form = plan.members[index];
+                found->second.planned[members[index].sink_id] = {
+                    .form = form.action == MemberAction::kCoded ? "coded"
+                            : form.action == MemberAction::kPcm ? "pcm"
+                                                                : "held",
+                    .label = form.label,
+                    .reason = form.choice.reason};
+            }
+            publish_locked();
+        }
+    }
+    return plan.variants;
+}
+
 std::string NetworkSinks::member_client_id_locked(const std::string& sink_id) const {
     auto it = sinks_.find(sink_id);
     if (it == sinks_.end()) {
@@ -770,6 +862,11 @@ GroupFacts NetworkSinks::group_facts_locked(const std::string& group_id, const G
         member.name = sink_facts.name;
         member.kind = sink_facts.kind;
         member.required_lead_time_ms = sink_facts.required_lead_time_ms;
+        if (const auto planned = entry.planned.find(sink_id); planned != entry.planned.end()) {
+            member.form = planned->second.form;
+            member.form_label = planned->second.label;
+            member.form_reason = planned->second.reason;
+        }
         member.connected = sink_it->second.client.has_value();
         if (member.connected && !sink_it->second.client_id.empty()) {
             if (const std::optional<ss::controller::Player> player =

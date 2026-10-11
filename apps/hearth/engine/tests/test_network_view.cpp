@@ -269,10 +269,13 @@ TEST_CASE("network view: a group's editor rows, and its volume as the mean of th
 
     CHECK(detail.members[0].sink_id == "hearth-s3-kitchen");
     CHECK(detail.members[0].volume == 80);
-    CHECK(mentions(detail.members[0].gets_text, "E-AC-3"));
+    // Nothing has played to the group yet: what kind of sink it is, in general terms.
+    CHECK(mentions(detail.members[0].gets_text, "The stream, or PCM"));
+    CHECK(detail.members[0].form.empty());
+    CHECK(detail.members[0].reason_text.empty());
     CHECK(detail.members[1].sink_id == "hearth-s3-lounge");
     CHECK(detail.members[2].sink_id == "kitchen-speaker");
-    CHECK(mentions(detail.members[2].gets_text, "Stereo"));
+    CHECK(mentions(detail.members[2].gets_text, "PCM, decoded here"));
 
     // (80 + 100 + 64) / 3, rounded - state_roles.hpp's own group_volume().
     CHECK(detail.group_volume == 81);
@@ -280,6 +283,38 @@ TEST_CASE("network view: a group's editor rows, and its volume as the mean of th
     CHECK(detail.members_connected_text == "3 of 3 connected");
     // The largest of 38, 180 and 60.
     CHECK(detail.lead_time_text == "180 ms · the largest a member asks for");
+}
+
+TEST_CASE("network view: a member shows what the group last sent it, and why",
+          "[hearth][network-view]") {
+    GroupFacts facts = living_room();
+    facts.members[0].form = "coded";
+    facts.members[0].form_label = "E-AC-3 as it is";
+    facts.members[0].form_reason =
+        "Sending E-AC-3 as it is: the sink decodes it for its own speakers.";
+    facts.members[1].form = "pcm";
+    facts.members[1].form_label = "PCM · 2.0";
+    facts.members[1].form_reason =
+        "This sink decodes E-AC-3 up to 2 channels, and this stream has 6, so it is "
+        "decoded here and sent as PCM at 2.0.";
+    facts.members[2].form = "held";
+    facts.members[2].form_label = "Nothing · held back";
+    facts.members[2].form_reason = "This sink takes PCM only at 44100 Hz, not 48000 Hz.";
+    facts.members[2].connected = false;
+
+    const auto detail = to_group_detail(facts);
+    REQUIRE(detail.members.size() == 3);
+    CHECK(detail.members[0].gets_text == "E-AC-3 as it is");
+    CHECK(detail.members[0].form == "coded");
+    CHECK(mentions(detail.members[0].reason_text, "decodes it for its own speakers"));
+    CHECK(detail.members[1].gets_text == "PCM · 2.0");
+    CHECK(detail.members[1].form == "pcm");
+    CHECK(mentions(detail.members[1].reason_text, "up to 2 channels"));
+    // A member that is not connected is sent nothing now, whatever the last programme planned.
+    CHECK(mentions(detail.members[2].gets_text, "held back"));
+    CHECK(mentions(detail.members[2].gets_text, "not connected"));
+    CHECK(detail.members[2].form == "held");
+    CHECK(mentions(detail.members[2].reason_text, "44100 Hz"));
 }
 
 TEST_CASE("network view: a disconnected member is shown but does not count toward the group volume or lead time",

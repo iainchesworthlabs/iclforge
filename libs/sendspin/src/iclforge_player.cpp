@@ -88,6 +88,9 @@ constexpr std::int32_t kMaxOutputDelay = 5000;
 constexpr std::int32_t kMaxChunkBytes = 1 << 20;
 // The most channels a sink may state it decodes: past AC-4's immersive beds and a few objects.
 constexpr std::int32_t kMaxCodedChannels = 64;
+// The most objects a sink may state it places: a JOC programme carries sixteen, an AC-4
+// presentation more, and the count is a byte.
+constexpr std::int32_t kMaxObjects = 255;
 // The longest layout text a state may carry. A layout is a name or a speaker list, a few hundred
 // characters at the most.
 constexpr std::size_t kMaxLayoutText = 512;
@@ -249,6 +252,18 @@ void write_support(json::Writer& w, const Support& support) {
         }
         w.end_object();
     }
+    const bool any_object_limit = std::ranges::any_of(
+        support.max_objects,
+        [](const std::optional<std::uint8_t>& limit) { return limit.has_value(); });
+    if (any_object_limit) {
+        w.key("max_objects").begin_object();
+        for (const Named<DataType>& entry : kDataTypes) {
+            if (const std::optional<std::uint8_t> limit = support.max_objects_of(entry.value)) {
+                w.member(entry.name, static_cast<std::int32_t>(*limit));
+            }
+        }
+        w.end_object();
+    }
     w.end_object();
 }
 
@@ -357,6 +372,25 @@ std::optional<Support> read_support(json::Value value) {
             }
             support.max_coded_channels[static_cast<std::size_t>(entry.value)] =
                 static_cast<std::uint8_t>(*channels);
+        }
+    }
+    // And the objects a sink places, the same shape: 0 is a count, so a type the object does not
+    // name is the only absence.
+    if (const json::Value limits = value["max_objects"]; limits.exists()) {
+        if (!limits.is_object()) {
+            return std::nullopt;
+        }
+        for (const Named<DataType>& entry : kDataTypes) {
+            const json::Value limit = limits[entry.name];
+            if (!limit.exists()) {
+                continue;
+            }
+            const std::optional<std::int32_t> objects = read_int32(limit, 0, kMaxObjects);
+            if (!objects) {
+                return std::nullopt;
+            }
+            support.max_objects[static_cast<std::size_t>(entry.value)] =
+                static_cast<std::uint8_t>(*objects);
         }
     }
     return support;
