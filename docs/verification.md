@@ -1778,7 +1778,12 @@ paragraph on the objects follows them:
   The A-CPL legs, 5.1 at 96 and 128 kbps, 5.0 at 112, 5.1 in ASPX_ACPL_1 at 160 and stereo in both
   modes, are scored as `score_ac4_decode.py` scores DEE's: the coded downmixes, recovered from the
   output, as waveforms below the crossover, each parameter band's level difference and correlation
-  against the source's, and on the tones the routing margin.
+  against the source's, and on the tones the routing margin. `--json-out` writes the scores of 24
+  of its 72 legs, the programme content at the options a rate alone gives, and FFmpeg Validate
+  uploads them: the job that publishes the external-encoder comparison appends them to
+  `ac4-encode-quality-main.jsonl`, which [AC-4 encode quality](quality-trend.md#ac-4-encode-quality)
+  charts and the Listening quality card reads. Its only tier is a warning, when a leg's MOS falls
+  0.1 under its own trailing mean; the pinned floors are what fail a run.
 - **Frame rates, rates and metadata** (phase E5). At every frame rate each frame decodes to the
   samples Part 2 clause 5.11 gives it, over a second in `test_frame_rates.cpp`, and over
   100 000 frames at every rate, across 98 wraps of `sequence_counter`, in a test run on demand; the

@@ -1101,9 +1101,21 @@ jobs:
       # of the programme fixtures and synthetic signals, decoded by this
       # project's decoder, against SNR, log-spectral distance and ViSQOL
       # floors pinned at the first measurement. The race against DEE's streams
-      # of the same sources is the same script's --gold, locally.
+      # of the same sources is the same script's --gold, locally. --json-out is
+      # the programme legs' scores, which persist-external-comparison-trend
+      # appends to ac4-encode-quality-<branch>.jsonl: the series behind the
+      # AC-4 line of the Listening quality card.
       - name: AC-4 encode, decoded against its sources (SNR, LSD and ViSQOL floors)
-        run: python3 tools/checks/score_ac4_encode.py --cli build/config-linux-llvm/bin/forge
+        run: |
+          python3 tools/checks/score_ac4_encode.py --cli build/config-linux-llvm/bin/forge \
+            --json-out ac4-quality/ac4-encode-quality.json
+
+      - name: Upload AC-4 encode quality results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ac4-quality-encode-linux-llvm
+          path: ac4-quality/ac4-encode-quality.json
+          if-no-files-found: error
 
       # The AC-4 decoder in float (planning/ac4.md, D14a): the two scorers above
       # again with a decoder built ICLFORGE_DECODE_SCALAR=float, at the same pins,
@@ -1401,6 +1413,20 @@ jobs:
           name: quality-spectrograms
           path: results/spectrograms
 
+      # The AC-4 encoder's listening scores: the one series this job writes
+      # that is not the external-encoder comparison. It is here because the
+      # Listening quality card reads both side by side and this is the job
+      # that is guaranteed to follow the scoring step (needs: ffmpeg-validate),
+      # which quality-trend in _build.yml, a sibling of the build legs, is not.
+      # continue-on-error: a run that did not produce it must not stop the
+      # comparison above being published.
+      - name: Download AC-4 encode quality
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ac4-quality-encode-linux-llvm
+          path: ac4-encode-results
+
       # Same mechanic as persist-performance-trend's identical step: plain
       # git over an HTTPS remote carrying the token, not actions/checkout,
       # which fails outright if quality-history does not exist yet.
@@ -1443,6 +1469,29 @@ jobs:
             --branch "$BRANCH" \
             --commit "$COMMIT_SHA" \
             --commit-date "$commit_date"
+
+      # A file of its own (ac4-encode-quality-<branch>.jsonl), written in the
+      # same commit as the file above. Soft-tier only, so unlike the step
+      # above it sets no hard_regression output.
+      - name: Append AC-4 encode quality history
+        shell: bash
+        env:
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          commit_date="$(git show -s --format=%cI "$COMMIT_SHA")"
+          ac4_json="$(find ac4-encode-results -name 'ac4-encode-quality.json' -print -quit 2>/dev/null || true)"
+          if [ -n "$ac4_json" ]; then
+            python3 tools/ci/append_ac4_encode_quality_history.py \
+              --json-in "$ac4_json" \
+              --history-dir history \
+              --branch "$BRANCH" \
+              --commit "$COMMIT_SHA" \
+              --commit-date "$commit_date"
+          else
+            echo "No AC-4 encode quality artifact on this run; skipping ac4-encode-quality history."
+          fi
 
       # main-only: this records the latest comparison on the trunk branch.
       # See docs/landscape.md's release-by-release framing.

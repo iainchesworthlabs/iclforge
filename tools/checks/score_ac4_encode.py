@@ -84,8 +84,18 @@ decision 13.
 
 --measure prints what every leg measures and checks nothing, for pinning a new leg.
 
+--json-out PATH writes the scores of the legs that go in the encoder's trend series (SERIES_CONTENT,
+in_series()): programme content (music, speech, film) at the options a rate alone gives, in 2.0,
+1.0, 5.0, 5.1 and 5.1.4, A-CPL legs included. One entry per leg, as score_ac4_decode.py's
+--json-out writes the decoder's: the minimum SNR over the full-band channels (none for an A-CPL
+leg, whose SNRs are of its downmixes), the LSD and the MOS. FFmpeg Validate uploads it, and
+tools/ci/append_ac4_encode_quality_history.py appends it to `ac4-encode-quality-main.jsonl`, which
+the Listening quality tile and docs/quality-trend.md read. The synthetic signals, the legs that
+name options and the frame-rate legs are held to their pins as before and are not in it.
+
 Usage:
     python tools/checks/score_ac4_encode.py --cli build/config-linux-llvm/bin/forge
+        [--json-out ac4-quality/ac4-encode-quality.json]
     python tools/checks/score_ac4_encode.py --cli forge.exe --gold D:/ac3bld/ac4-gold
         [--librempeg /mnt/d/ac3bld/librempeg/install/bin/ffmpeg]
 """
@@ -1116,6 +1126,38 @@ class Measured:
     aligned: np.ndarray
 
 
+# What --json-out writes, for tools/ci/append_ac4_encode_quality_history.py's series: the legs
+# whose MOS says something about how the encoder sounds on programme material, at the options a
+# user gets by naming only a rate. The synthetic signals (tones, sweeps, noise, castanets, the
+# panned source) are left out: ViSQOL's score of a sine or of white noise predicts no listener's
+# answer, and white noise at 192 kbps scores about 3.8 (its floor is 3.72) without anything
+# having gone wrong. Their MOS floors still fail the run. A leg that names ac4-encode's options
+# (the experimental coding configurations, A-CPL and A-JCC modes by name) is left out as well, as
+# are the frame-rate legs, which are held to the index-13 stream of the same source and have no
+# score of their own.
+SERIES_CONTENT = ("music", "speech", "film")
+
+
+def in_series(source_name, options):
+    """Whether a leg's scores go in the encoder's trend series: programme content, at the
+    options a rate alone gives."""
+    return source_name.split("_")[0] in SERIES_CONTENT and not options
+
+
+def series_record(name, kbps, min_snr, lsd, mos):
+    """One leg of --json-out. The leg is "ac4-" and the leg's name here, as the other series name
+    theirs ("ac3-51-448", "eac3-music-stereo-96", the decode series' "ac4-20-music-192").
+    `min_snr` is None where the leg's SNRs are not per output channel (A-CPL's are the
+    downmixes')."""
+    return {
+        "leg": f"ac4-{name}",
+        "bitrate_kbps": kbps,
+        "min_snr_db": None if min_snr is None else float(min_snr),
+        "lsd_db": float(lsd),
+        "mos_lqo": None if mos is None else float(mos),
+    }
+
+
 def measure(source, decoded, rate, groups):
     """The scores above, of `decoded` against `source`: each channel's SNR over the whole band
     where its entry in `groups` is None (SIMPLE, and the LFE), and below the crossover, with the
@@ -1418,8 +1460,10 @@ def score_immersive_leg(args, name, stream, source, source_name, failures, pins,
     return measured, extras
 
 
-def immersive_run(args, work, paths):
-    """The immersive legs, against IMMERSIVE_FLOORS and IMMERSIVE_EXTRA."""
+def immersive_run(args, work, paths, records):
+    """The immersive legs, against IMMERSIVE_FLOORS and IMMERSIVE_EXTRA. The series' legs are
+    added to `records` as their full decoding scores them: the SNR is the lowest of the heard
+    channels below the lowest crossover, the LFE left out as the decode series leaves it."""
     failures, pins, extra_pins = [], [], []
     count = 0
     for name, (source_name, kbps, *options) in IMMERSIVE_LEGS.items():
@@ -1430,8 +1474,14 @@ def immersive_run(args, work, paths):
         stream = work / f"{name}.ac4"
         encode(args.cli, path, kbps, stream, options)
         source, _ = decoding.read_wav(path)
-        score_immersive_leg(args, name, stream, source, source_name, failures, pins, extra_pins,
-                            (IMMERSIVE_FLOORS, IMMERSIVE_EXTRA), work)
+        scored = score_immersive_leg(args, name, stream, source, source_name, failures, pins,
+                                     extra_pins, (IMMERSIVE_FLOORS, IMMERSIVE_EXTRA), work)
+        if scored is not None and in_series(source_name, options):
+            full = scored[0]["full"]
+            heard = [snr for column, snr in zip(full["names"], full["snrs"], strict=True)
+                     if column != "LFE" and snr is not None]
+            records.append(series_record(name, kbps, min(heard) if heard else None, full["lsd"],
+                                         full["mos"]))
         if args.librempeg:
             print(librempeg_reading(args, stream, work / f"{name}.librempeg.wav", source))
     if args.measure and count:
@@ -1440,7 +1490,9 @@ def immersive_run(args, work, paths):
     return failures, count
 
 
-def committed_run(args, work):
+def committed_run(args, work, records):
+    """The committed legs, the frame-rate legs and the immersive legs against their pins. The legs
+    in_series() names are added to `records` (series_record()) as they are scored."""
     paths = build_sources(work)
     failures = []
     pins = []
@@ -1456,12 +1508,22 @@ def committed_run(args, work):
             continue
         trace = Path(str(work / f"{name}.wav") + ".trace")
         if acpl_mode(trace) is not None:
-            score_acpl_leg(args, name, source, original, decoded, trace, failures, acpl_pins,
-                           ACPL_FLOORS)
+            scored = score_acpl_leg(args, name, source, original, decoded, trace, failures,
+                                    acpl_pins, ACPL_FLOORS)
+            if scored is not None and in_series(source, options):
+                # The SNRs are of the downmixes the waveform codes, not of output channels.
+                records.append(series_record(name, kbps, None, scored["lsd"], scored["mos"]))
             continue
         m = measure(original, decoded, rate, groups)
         print(row(name, m), flush=True)
         pins.append(pin_text(name, m))
+        if in_series(source, options):
+            # The LFE is left out of the minimum, as score_ac4_decode.py leaves it out of the
+            # decode series': its SNR against the full-band source is a constant of the stream.
+            lfe = decoding.LFE_CHANNEL.get(len(m.channels))
+            full_band = [snr for c, (_, snr) in enumerate(m.channels) if c != lfe]
+            records.append(series_record(name, kbps, min(full_band) if full_band else None,
+                                         m.lsd, m.mos))
         if args.librempeg:
             other, _ = decode_librempeg(args, stream, work / f"{name}.librempeg.wav")
             print(row("  librempeg", measure(original, other, rate, groups)))
@@ -1475,7 +1537,7 @@ def committed_run(args, work):
         print("\nFLOORS = {\n" + "\n".join(pins) + "\n}")
         print("\nACPL_FLOORS = {\n" + "\n".join(acpl_pins) + "\n}")
     rate_failures, rate_legs = frame_rate_run(args, work, paths)
-    immersive_failures, immersive_legs = immersive_run(args, work, paths)
+    immersive_failures, immersive_legs = immersive_run(args, work, paths, records)
     return (failures + rate_failures + immersive_failures,
             len(legs) + rate_legs + immersive_legs)
 
@@ -1726,11 +1788,25 @@ def main():
         "--measure", action="store_true", help="print the measurements, check nothing"
     )
     parser.add_argument("--only", help="run only the legs whose names contain this")
+    parser.add_argument(
+        "--json-out", type=Path,
+        help="write the trend series' legs' min SNR, LSD and MOS (SERIES_CONTENT)",
+    )
     args = parser.parse_args()
+    if args.json_out is not None and args.gold:
+        parser.error("--json-out is the committed legs' series; --gold's race keeps no history")
+    records = []
     with tempfile.TemporaryDirectory() as temporary:
         work = args.work or Path(temporary)
         work.mkdir(parents=True, exist_ok=True)
-        failures, count = gold_run(args, work) if args.gold else committed_run(args, work)
+        failures, count = (gold_run(args, work) if args.gold
+                           else committed_run(args, work, records))
+    # Written whether or not a pin failed, as score_ac4_decode.py writes its own: a failed run's
+    # artifact is not published (the job that does needs the scoring step to have passed), but
+    # it is what a reader of the log wants to open.
+    if args.json_out is not None:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        args.json_out.write_text(json.dumps({"legs": records}, indent=2) + "\n", encoding="utf-8")
     if failures:
         print("\nFAILED:")
         for failure in failures:
