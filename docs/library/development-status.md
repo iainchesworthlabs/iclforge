@@ -89,12 +89,12 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Closed-loop `auto` tool selection | 🟢 | High | Essential | Spectrum-aware cpl / spx / aht only |
 | **Metadata** | `mixmdate` downmix levels | 🟢 | High | Essential | Tables D2.2–D2.6 |
 | | Programme-mix wire format (`pgmscl`, `mixdef`, pan, `blkmixcfg`, …) | 🟢 | Medium | Important | Written and decoded (§E2.3.1.12–61); the `blkmixcfginfo` desync at `numblkscod==0x0` is fixed and round-trip gaps are closed |
-| | Receiver-side programme mixer | 🔴 | Medium | Important | No runtime mix of main + AD / commentary / external programme |
+| | Receiver-side programme mixer | 🟢 | Medium | Important | `AssociatedServiceMixer` and `forge decode associated=` (§E3.10): `pgmscl`, `extpgmscl`, the per-channel scales and `dmixscl`, and `panmean` by Tables E3.15–E3.17 for a mono service (an extension for layouts they do not cover). Not applied because Annex E gives them no processing: `premixcmp*`, speech enhancement, `blkmixcfginfo`. No external oracle (FFmpeg decodes one programme); live `monitor`, `play` and Hearth do not mix yet |
 | | `infomdat` service / production | 🟢 | Medium | Important | Table E1.2 |
 | **Decoder** | Full E-AC-3 reconstruction | 🟢 | High | Essential | Every Annex E tool, alone or stacked |
 | | Dependent render (§E3.8.2) | 🟢 | High | Essential | Including 7.1.4 |
 | | Legacy AC-3 core + E-AC-3 extension (§E2.3.1.2) | 🟢 | Medium | Important | `StreamKind::kAc3CoreEac3Extension` |
-| | Convertible substreams (`strmtyp` 2) | 🔴 | Low | Out-of-scope | Spec’s no-re-encode AC-3 path; encode / decode / probe / edit / split all refuse |
+| | Convertible substreams (`strmtyp` 2) | 🟡🔵 | Low | Optional | The stream type: written (`FrameConfig::ac3_frmsizecod`, held to AC-3's tools), decoded, probed (`converted_frmsizecod`), scanned, split, cut, concatenated and metadata-edited, read as FFmpeg and the Python reference parser read it. Not built: the conversion itself, to and from AC-3 — A/52 gives the `blkid` / `frmsizecod` signalling and no process, nothing here produces or consumes a type 2 stream, and no outside tool converts one to check it against. The converter hints a type 0 stream carries (`convexpstr`, `convsnroffst`) are written as none and read past |
 | | Multi-programme select | 🟢 | Medium | Important | One programme per decode (`DecoderConfig::programme`) |
 | | Dependent failure → bed-only | 🟢 | Medium | Important | Concealment / soft fail path |
 
@@ -322,10 +322,9 @@ this register is the checklist that those bounds appear here too.
 | Clause / annex | Open item | Status |
 |---|---|---|
 | Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | Named-layout / CLI encode coverage | 🟡 |
-| Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams | 🔴 |
-| Annex E §E2.3.1.2 I0–I7 | Associated-service labelling; receiver mixer | 🟡 / 🔴 |
-| Annex E §E3.5 / §3.7 | In `auto`; external oracle; TPN EOF hold-back | 🟢 tools / 🟡 policy |
-| Annex E `fscod2` | External PCM oracle | 🟢 code / validation gap |
+| Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams: the stream type is supported; the conversion to and from AC-3 is not built | 🟡🔵 |
+| Annex E §E3.5 / §3.7 | Enhanced coupling stays out of `auto` because FFmpeg cannot read it, and no outside decoder reads it to check against; transient pre-noise stays out of `auto` on measured loss and holds 1536 samples back, so a decoder calls `flush()` at end of stream | 🟡🔵 |
+| Annex E `fscod2` | The half rates (24, 22.05, 16 kHz) encode and decode, and no outside decoder reads their audio (FFmpeg reads the header only), so they are checked against this project's own encoder and the spec's tables | 🟡🔵 |
 | Annex H §H.2.2 | Reserved EMDF variants | 🔴 |
 
 ### ETSI TS 103 420 (Atmos / JOC / OAMD)

@@ -218,6 +218,11 @@ struct FrameHeader {
     // TS 103 420 §8.3.2.2's complexity_index_type_a, when this substream's own
     // addbsi carried the flag - see ScannedStream::oba_complexity_index.
     std::optional<int> oba_complexity_index = std::nullopt;
+    // §E2.3.1.65: a type 2 substream's frmsizecod - Table 5.18's code for the
+    // AC-3 syncframe whose blocks this syncframe holds - present when its
+    // blkid says this one holds the first of them. At six blocks a syncframe
+    // that is every frame. std::nullopt for any other strmtyp.
+    std::optional<int> converted_frmsizecod = std::nullopt;
     // The four Annex G §3.5 mixinfoexists conditions (pgmscle, extpgmscle,
     // mixdef > 0, paninfoe) - see ScannedStream::mix_metadata, the same
     // question asked one level out. Always false for AC-3, which has no

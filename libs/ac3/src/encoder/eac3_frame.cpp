@@ -1367,6 +1367,12 @@ void emit_frame(BitWriter& w, const FrameConfig& config, std::uint32_t words,
     const int nfchans = fullbw_channel_count(config.acmod);
     const int nblks = blocks_per_syncframe(config.numblkscod);
     const bool dependent = config.strmtyp == StreamType::kDependent;
+    // Table E1.2 and E1.3 write the programme-mixing group, the converter
+    // strategy element and the converter SNR offset as `strmtyp == 0x0`: a
+    // type 2 substream (§E2.3.1.1, previously coded in AC-3) sends none of
+    // them any more than a dependent does, and swaps convsync for
+    // blkid/frmsizecod.
+    const bool type_zero = config.strmtyp == StreamType::kIndependent;
     const auto& cpl = payload.cpl;
     const auto& spx = payload.spx;
     const int skipflde = metadata.empty() ? 0 : 1;
@@ -1553,9 +1559,10 @@ void emit_frame(BitWriter& w, const FrameConfig& config, std::uint32_t words,
         // The rest of the group is gated on strmtyp == 0x0: programme scale,
         // the mixing-parameter block, pan information and the per-block mixing
         // configuration all describe how to combine this programme with
-        // ANOTHER one, which is an independent substream's business. A
-        // dependent therefore stops after the levels above.
-        if (!dependent) {
+        // ANOTHER one, which is a type 0 independent substream's business. A
+        // dependent therefore stops after the levels above, and so does a
+        // type 2 substream, which carries what AC-3's bsi could say.
+        if (type_zero) {
             // §E2.3.1.12/16: the *e flag clear means 0 dB, so an absent scale
             // is a positive statement of unity gain in one bit rather than
             // seven.
@@ -1652,6 +1659,19 @@ void emit_frame(BitWriter& w, const FrameConfig& config, std::uint32_t words,
     if (config.strmtyp == StreamType::kIndependent && nblks != kBlocksPerFrame) {
         w.put(payload.convsync ? 1 : 0, 1);  // convsync
     }
+    if (config.strmtyp == StreamType::kConvertible) {
+        // §E2.3.1.65. blkid says this syncframe holds the first block of the
+        // AC-3 syncframe it was coded as: implied at six blocks, where every
+        // syncframe is a whole one, and chosen by the same group-of-6/nblks
+        // counter convsync is below that. frmsizecod follows it when set.
+        // validate() has already required one.
+        if (nblks != kBlocksPerFrame) {
+            w.put(payload.convsync ? 1 : 0, 1);  // blkid
+        }
+        if (nblks == kBlocksPerFrame || payload.convsync) {
+            w.put(static_cast<std::uint32_t>(*config.ac3_frmsizecod), 6);  // frmsizecod
+        }
+    }
     if (config.oba_complexity_index.has_value()) {
         // TS 103 420 §8.3.1 fixes the addbsi contents for an object-audio
         // stream: seven reserved bits, the extension flag, then the complexity
@@ -1738,7 +1758,7 @@ void emit_frame(BitWriter& w, const FrameConfig& config, std::uint32_t words,
     // implements no E-AC-3-to-AC-3 converter and has no real converter
     // strategy to offer one, so it is sent clear rather than filled with
     // convexpstr data nothing produced.
-    if (!dependent) {
+    if (type_zero) {
         if (nblks == kBlocksPerFrame) {
             for (int ch = 0; ch < nfchans; ++ch) {
                 w.put(0, 5);  // convexpstr[ch]
@@ -2286,7 +2306,7 @@ void emit_frame(BitWriter& w, const FrameConfig& config, std::uint32_t words,
                 w.put(code, 3);  // lfefgaincod, last of the 0..nchans run
             }
         }
-        if (!dependent) {
+        if (type_zero) {
             w.put(0, 1);  // convsnroffste, gated on strmtyp == 0x0
         }
         // The coupling leak seeds follow the same first-time rule as the
@@ -2498,11 +2518,27 @@ std::expected<void, FrameError> validate(const FrameConfig& config) {
     if (config.substreamid < 0 || config.substreamid > 7) {
         return std::unexpected(FrameError::kInvalidSubstream);
     }
-    // strmtyp 0x2 needs the blkid/frmsizecod branch of Table E1.2 that emit_frame
-    // does not write, and 0x3 is reserved. Both would produce a frame whose
-    // header promises fields the payload does not contain.
-    if (config.strmtyp != StreamType::kIndependent &&
-        config.strmtyp != StreamType::kDependent) {
+    // 0x3 is reserved. A type 2 substream (§E2.3.1.1) says it was previously
+    // coded in AC-3, which its blkid/frmsizecod fields have to back with the
+    // frame size code of that AC-3 syncframe (Table 5.18: 0 to 37), and which
+    // an AC-3 decoder's syntax has no room to contradict: no tool AC-3 lacks
+    // (enhanced coupling, spectral extension, AHT, transient pre-noise), and
+    // no dependents, which AccessUnitEncoder refuses. Written, the stream is
+    // one a converter turns back into AC-3 without re-encoding it.
+    if (config.strmtyp == StreamType::kReserved) {
+        return std::unexpected(FrameError::kInvalidSubstream);
+    }
+    if (config.strmtyp == StreamType::kConvertible) {
+        if (!config.ac3_frmsizecod.has_value() || *config.ac3_frmsizecod < 0 ||
+            *config.ac3_frmsizecod > kMaxAc3FrameSizeCode) {
+            return std::unexpected(FrameError::kInvalidSubstream);
+        }
+        if (config.enhanced || config.spx || config.aht || config.transient_prenoise ||
+            config.auto_tools) {
+            return std::unexpected(FrameError::kInvalidSubstream);
+        }
+    } else if (config.ac3_frmsizecod.has_value()) {
+        // A frame size code with no type 2 to carry it would be dropped.
         return std::unexpected(FrameError::kInvalidSubstream);
     }
     // TS 103 420 §8.3.2.2: complexity_index_type_a is the object count, and
@@ -2526,7 +2562,7 @@ std::expected<void, FrameError> validate(const FrameConfig& config) {
     }
     // §E3.8.5 owns a dependent substream's compre, so heavy compression there
     // would either be ignored or break the end-of-programme marker.
-    if (config.heavy.has_value() && config.strmtyp != StreamType::kIndependent) {
+    if (config.heavy.has_value() && config.strmtyp == StreamType::kDependent) {
         return std::unexpected(FrameError::kInvalidSubstream);
     }
     if (config.mixing.has_value()) {
@@ -3121,11 +3157,11 @@ std::expected<std::vector<std::byte>, FrameError> FrameEncoder::encode_frame(
     // compr (AccessUnitEncoder is the only caller that ever sets
     // last_dependent and supplies a metadata.compr for one).
     payload.dynrng = metadata.dynrng;
-    if (impl_->config_.strmtyp == StreamType::kIndependent || impl_->config_.last_dependent) {
+    if (impl_->config_.strmtyp != StreamType::kDependent || impl_->config_.last_dependent) {
         payload.compr = metadata.compr;
     }
     payload.dynrng2 = metadata.dynrng2;
-    if (impl_->config_.strmtyp == StreamType::kIndependent) {
+    if (impl_->config_.strmtyp != StreamType::kDependent) {
         payload.compr2 = metadata.compr2;
     }
     auto& cpl = payload.cpl;
@@ -4487,8 +4523,10 @@ std::expected<std::vector<std::byte>, FrameError> FrameEncoder::encode_frame(
     // §E2.3.1.64: this frame starts a new group-of-6/nblks whenever the
     // counter has cycled - see FrameConfig::numblkscod's own comment. Every
     // frame at the default numblkscod is trivially "the whole group" and the
-    // bit does not exist, so the counter is never advanced there.
-    if (impl_->config_.strmtyp == StreamType::kIndependent && nblks != kBlocksPerFrame) {
+    // bit does not exist, so the counter is never advanced there. §E2.3.1.65's
+    // blkid, which a type 2 substream carries in its place, is the same
+    // question and has the same answer.
+    if (impl_->config_.strmtyp != StreamType::kDependent && nblks != kBlocksPerFrame) {
         const int group = kBlocksPerFrame / nblks;
         payload.convsync = impl_->convsync_counter_ == 0;
         impl_->convsync_counter_ = (impl_->convsync_counter_ + 1) % group;
@@ -5714,7 +5752,14 @@ namespace {
 // itself.
 std::expected<std::vector<FrameConfig>, FrameError> programme_configs(
     const ProgrammeConfig& programme, int id, SampleRate rate, int numblkscod) {
-    if (programme.independent.strmtyp != StreamType::kIndependent) {
+    if (programme.independent.strmtyp == StreamType::kDependent ||
+        programme.independent.strmtyp == StreamType::kReserved) {
+        return std::unexpected(FrameError::kInvalidSubstream);
+    }
+    // §E2.3.1.1: a type 2 stream "may not have any dependent streams
+    // associated with" it.
+    if (programme.independent.strmtyp == StreamType::kConvertible &&
+        !programme.dependents.empty()) {
         return std::unexpected(FrameError::kInvalidSubstream);
     }
     if (programme.independent.sample_rate != rate ||
