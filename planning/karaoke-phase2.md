@@ -12,7 +12,7 @@
     | 0 | This page: scope, order, decisions | Drafted 2026-10-11, for sign-off |
     | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1 fixed in PR #1290; W2 and W3 follow |
     | 2 | Research W4 and W5 (lyrics for a network group; Android and a browser page) | Read from the code; written up in [the findings](karaoke-phase2-findings.md) |
-    | 3 | Builds W6 to W11, one pull request each | After sign-off |
+    | 3 | Builds W6 to W11 and W13, one pull request each | After sign-off |
     | 4 | W12, the ESP32-P4 with a panel | **Parked** until the board arrives; only its questions are kept |
 
 ## What this phase is
@@ -32,15 +32,23 @@ the LFE part in authoring and Annex C's re-levelling of M, V1 and V2; and maybe 
 know if we need to remember that per song; probably not a thing"). "All the things listed as first
 in phase two should be first."
 
+Added later the same day, and "for the next phase that we're planning": **Crucible should allow the
+importing of LRC / timed text** (the standard for karaoke), with **CD+G (the subchannel, ripped),
+SubRip, Advanced SubStation Alpha and "mini karaoke"** as stretch goals "for getting the
+text/lyric meta data and events". That is W13.
+
 ## Order
 
 1. **First items (W1 to W3).** The three things phase 1's wrap-up named as first: a defect to
    find, the flow's polish, and word timing as a design.
 2. **Research (W4, W5).** The two "understood" items. They are findings with sizes, not builds;
    what they recommend becomes a build (W7, W8) only on the owner's say.
-3. **Builds, in the owner's priority (W6 to W11).** Word timing; then the karaoke choice reaching a
-   sink and a browser, if the findings are accepted; then the LFE part and the re-levelling;
-   duets only if asked.
+3. **Builds, in the owner's priority (W6 to W11, W13).** Word timing; then the karaoke choice
+   reaching a sink and a browser, if the findings are accepted; then the LFE part and the
+   re-levelling; duets only if asked. Timed-text import (W13) is the owner's addition and has no
+   place in that list yet; its first step, moving the lyric module out of Hearth's engine into a
+   library, belongs **before** word timing, so that the word-timing writer is written where it will
+   live ([W13](#w13-timed-text-import)).
 4. **Parked (W12).** The ESP32-P4 with a panel.
 
 ## Work items
@@ -62,6 +70,7 @@ tests, **L** is two to four stacked PRs. "Needs" is what the item cannot start w
 | W10 | **Annex C's re-levelling of M, V1 and V2** | M to L | A library change, reviewed with the AC-3 decoder's owner session | After sign-off |
 | W11 | **Duets** beyond the V1 and V2 choice that exists | M | The owner asking for it | Not planned; costed [below](#w11-duets) |
 | W12 | **The ESP32-P4 with a panel** | L | The board | **Parked**; [questions only](#w12-parked-the-esp32-p4-with-a-panel) |
+| W13 | **Timed-text import.** The lyric module in a library, Crucible importing LRC; SubRip, Advanced SubStation Alpha, MIDI karaoke and CD+G as stretch | L (six PRs; the first is S to M) | D9 to D12; the owner's answer on what Crucible does with the text | Scoped in [the findings](karaoke-phase2-findings.md#w13-timed-text-beyond-lrc-and-crucible); not started |
 
 ## First items
 
@@ -193,6 +202,10 @@ The answer assumed is the one the plan is written to; each can be reversed befor
 | D6 | Re-levelling: gains for M, V1 and V2 in the library's output stage and sliders on Hearth's Karaoke page | **Yes**, after the first items | Not built; Annex C calls it optional |
 | D7 | Duets: no per-song memory, and nothing beyond V1 and V2 until asked | **Yes** | The costed duet slice below |
 | D8 | UTF-16 with a byte-order mark for `.lrc` (carried over from phase 1's decision 4; the reader takes UTF-8 only) | **Not now** | Read it: small and unambiguous |
+| D9 | What Crucible does with imported lyrics, and where their position comes from | **A lyric strip in Crucible's window for the application it is attached to; the position from that application's operating-system media session where it publishes one, and a start-and-nudge where it does not** | Events out (OSC) instead of, or as well as, a strip; the strip only, with no position source |
+| D10 | "Mini karaoke" is read as **MIDI karaoke** (`.kar`, lyrics as MIDI meta events) | **Yes**; please confirm, since the words were dictated | Another format: say which |
+| D11 | CD+G is read as an already-ripped `.cdg` file and shown as its picture; no drive ripping and no text extracted | **Yes**: a CD+G carries a 300 by 216 picture, not text | OCR of the picture for text (a model and its runtime; not planned) |
+| D12 | The lyric reader and cursor move from `apps/hearth/engine` into a library before word timing's writer and Crucible's import are built | **Yes** | Leave them in Hearth and give Crucible its own parser: two readers of one format that cannot share a test |
 
 ### W11: duets
 
@@ -203,6 +216,34 @@ or a tag) that the reader would have to learn and the word-timing editor would h
 **a duet view** that colours a line by singer and says which part the chosen vocal covers. Names
 are S; the line marker and the view are M together. None of it needs a per-song memory, which the
 owner thinks is "probably not a thing", and none is planned.
+
+### W13: timed-text import
+
+The owner's request is Crucible importing LRC, with four more formats as stretch goals. What reads
+LRC today is Hearth's `apps/hearth/engine/src/lyrics.*`, and that is the first fact that shapes it:
+**a program may not use another program** (`tools/checks/projects.json`), and Crucible's `may_use`
+does not list Hearth. The module has to leave Hearth's engine to be used anywhere else, and the
+places that want it are four: Hearth, Crucible, the sink firmware (W12) and the browser (W8).
+Only a project under `libs/` is reachable from all four, which is also where the word-timing
+writer (W6) should be written.
+
+The second fact is about Crucible: it taps applications and places them in a room; it knows each
+one's audio, and **nothing in Crucible or `libs/audio` reads a track's position** (no media
+session, no file). Importing a `.lrc` there needs a position source before it can follow anything.
+[The findings](karaoke-phase2-findings.md#w13-timed-text-beyond-lrc-and-crucible) set out the
+candidates, the five formats (what each carries and how it is timed), and the sizes.
+
+| Step | What | Size |
+|---|---|---|
+| W13a | The reader and cursor into a library (name, namespace, `projects.json` row, tests moved; Hearth includes it from there) | S to M |
+| W13b | Crucible imports an `.lrc` and shows it against a chosen application, with the position source D9 settles | M to L |
+| W13c | SubRip (`.srt`): cues with a start and an end, no words | S |
+| W13d | Advanced SubStation Alpha (`.ass`): events, with the karaoke tags that give a syllable's duration | M |
+| W13e | MIDI karaoke (`.kar`): the Lyric and Text meta events of a Standard MIDI File, through its tempo map | M |
+| W13f | CD+G (`.cdg`): the packet stream decoded to its 300 by 216 picture and timed against the audio; no text exists in it | M |
+
+W13c to W13f are the owner's stretch goals and each is independent of the others, so any can be
+dropped; W13a is the only one the rest of the phase also wants.
 
 ### W12: parked, the ESP32-P4 with a panel
 

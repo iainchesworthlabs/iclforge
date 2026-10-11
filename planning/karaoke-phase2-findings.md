@@ -221,6 +221,74 @@ karaoke stream plays as coded unless the receiver is karaoke-capable (requiremen
 new program with its own row in `projects.json`, its CI lane and its distribution decision, not a
 slice of this phase; the plan's D4 says so.
 
+## W13: timed text beyond LRC, and Crucible
+
+The owner asked, later on 2026-10-11, for Crucible to import LRC and for **CD+G (the subchannel,
+ripped), SubRip, Advanced SubStation Alpha and "mini karaoke"** as stretch goals "for getting the
+text/lyric meta data and events". This section is what each would take. **The format facts below are
+from general knowledge of the formats, not from anything in this repository** (the project has
+none of their specifications): each is to be checked against the format's own documentation when
+its step starts.
+
+### The formats
+
+| Format | What it carries | How it is timed | Word level | Notes |
+|---|---|---|---|---|
+| LRC (`.lrc`) | Lines of text, and id tags (title, artist, album, by, length, offset) | `[mm:ss.xx]` a line; the enhanced form adds `<mm:ss.xx>` before each word | Only in the enhanced form | Read today by `apps/hearth/engine/src/lyrics.*`, UTF-8 only |
+| SubRip (`.srt`) | Numbered cues of text | A start and an end for each cue, `hh:mm:ss,mmm --> hh:mm:ss,mmm` | No | The simplest to read; a few styling tags to strip; the encoding is often not UTF-8, which the reader has no answer to (phase 1's decision 4) |
+| Advanced SubStation Alpha (`.ass`) | `Dialogue:` events with a style, a layer and text | A start and an end for each event, and inside the text the karaoke override tags (`\k`, `\kf`, `\ko`) that give each syllable's duration in hundredths of a second | **Yes**, by syllable | The format subtitle-karaoke tools write; the override blocks (`{...}`) carry the timing and a great deal of styling that is to be skipped |
+| MIDI karaoke (`.kar`, a Standard MIDI File) | The music as MIDI, and the words as Lyric and Text meta events, with `@T` and `@K` header lines and `/` and `\` for a new line and a new paragraph | MIDI ticks, turned into time through the file's tempo map | **Yes**, by syllable | Read here as what "mini karaoke" means; see D10. A `.kar` is a backing as well as its words, and only the text and its events are wanted |
+| CD+G (`.cdg`, a CD's subcode) | **Graphics, not text**: tile and palette commands that draw a 300 by 216 picture in 16 colours | 300 packets a second (75 sectors a second, four packets each), against the CD's own audio | No | There is **no lyric text to extract**: the words are pixels. What an import can give is the picture, timed with the audio, and the audio is ripped separately |
+
+CD+G is the one that does not fit the others. Everything else produces the same thing the reader
+already produces (lines of timed words), and a new parser is a new function. CD+G produces *picture
+events*, a second kind of cue with its own view, and "getting the text" from it would be optical
+character recognition, which is a model and a runtime and is not proposed. D11 asks for the picture.
+
+### What Crucible can know
+
+Crucible "captures applications separately and places each one in a Dolby Atmos scene"
+(`docs/crucible/index.md`). It has each application's audio and its name. It has no file and no
+track: a search of `apps/crucible` and `libs/audio` for a media session (MPRIS, Windows' System
+Media Transport Controls, macOS's now-playing information) finds none. So an imported `.lrc` has
+nothing to follow until a position is supplied, and the candidates are:
+
+| Position source | What it gives | Against |
+|---|---|---|
+| **The application's OS media session** | The track's position, where the player publishes one (MPRIS `Position` on Linux; the media transport controls' timeline on Windows; the now-playing information on macOS: *named from general knowledge, to verify*) | Not every player publishes it, a browser tab may not, and macOS needs a permission; three platform back ends |
+| **Start and nudge** | The person presses a key as the song starts and nudges with a delay control (Hearth's lyric delay is the model) | Drifts the moment the player pauses or seeks; honest about being manual |
+| **The tap's own sample count** | Time since the application began producing audio | Wrong after a pause the application does not signal, or a seek; the tap sees silence, not a pause |
+
+**Recommended** (D9): the strip in Crucible's window, the position from the media session where
+there is one and from start-and-nudge where there is not, and nothing derived from the tap. What the
+events could drive beyond a strip (an OSC message a visual rig reads, say) is the owner's call; the
+library's cue type is the same either way.
+
+### Where the module lives
+
+A **library under `libs/`**. `apps/shared` would reach Hearth, Crucible and the Forge programs and
+not the firmware (`firmware/hearth-sink` may use `ac3`, `device`, `esp-idf`, `render` and `sendspin`)
+or WebAssembly. `libs/device` is the sink firmware's own place for logic with no SDK and could
+hold the cursor alone, but the reader and the other four parsers are not device logic. A new
+library named `lyrics` under `libs`: kind library, `may_use` nothing (it needs only the standard library, as
+`lyrics.hpp` does today), internal (never installed) at first, namespace `iclforge::lyrics`, with
+its row, its generated project page and its test binary. The reader's `read_lyrics(path)` takes a
+`std::filesystem` path; the firmware wants only `parse_lyrics(text)`, which is already separate.
+
+### Sizes and order
+
+| Step | Size | Notes |
+|---|---|---|
+| W13a: the module into a `lyrics` library under `libs` | **S** to **M** | A move: the 14 `[lyrics]` cases go with it, Hearth's includes change, a project row and a namespace entry are added; no behaviour changes |
+| W6's writer into it | in W6 | Written in the library, beside the reader, once W13a is in |
+| W13b: Crucible imports `.lrc` | **M** to **L** | M for start-and-nudge and the strip; L when the media-session back ends are in |
+| W13c: SubRip | **S** | A parser that fills the same structure; line-level only |
+| W13d: ASS | **M** | The event lines, the karaoke override tags, the styling skipped, an encoding answer |
+| W13e: MIDI karaoke | **M** | A Standard MIDI File reader (variable-length quantities, running status, the tempo map) for the meta events only |
+| W13f: CD+G | **M** | The packet decoder and a picture view; a second cue type |
+
+**L** in all, six pull requests, and W13a is the only one the rest of the phase also wants.
+
 ## What the findings add to the plan
 
 | Plan item | What the findings say |
@@ -230,3 +298,4 @@ slice of this phase; the plan's D4 says so.
 | After W7, if the owner wants a screen | The lyric module moves to `libs/device`; the document and the `metadata@v1` anchor; **M** to **L**. This is W12's design, ready for the board |
 | W8 | The browser decode demo: two arguments, a flag, a panel; **S** to **M** |
 | Android | Not a slice: a player app first |
+| W13 | The lyric module to a `lyrics` library under `libs` first (S to M), before W6's writer; Crucible has no position source, so its import needs one (D9); CD+G is a picture, not text; "mini karaoke" read as MIDI karaoke (D10) |
