@@ -29,6 +29,108 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Atmos object signing: several keys, and the licensed gate**
+
+- **`verify-objects` takes a keyring.** `signing-key=` repeats, and a frame is valid when any of the
+  keys reproduces its tag; the summary says which key accepted how many frames. The library gains
+  `signing::verify_atmos_frame_any` and `verify_atmos_stream_any` (a `KeyringVerdict` and a
+  `KeyringSummary` with `per_key` counts) and Python `signing.verify_atmos_stream_any`. An empty
+  set accepts nothing; with paths given the environment key is not consulted. `sign-objects` stays
+  single-key and refuses a second `signing-key=`.
+- **`gate-objects` is the AVR-like policy.** `decode`, `monitor` and `spatial` play the objects of
+  every frame whose tag verifies and the 5.1 bed of every other (unsigned, another key's, altered),
+  and carry on, where `verify-objects` refuses. `signing::gate_atmos_stream` (Python
+  `signing.gate_atmos_stream`) removes the object layer from the frames that do not verify with the
+  same lossless rewrite `strip_objects` does, so the bed is bit-identical and the result plays in
+  any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
+  combined with `verify-objects`, and is a usage error on AC-4.
+
+**E-AC-3: an associated service mixed into the main**
+
+- **`iclforge::ac3::AssociatedServiceMixer` and `forge decode associated=`.** A description or a
+  commentary carried beside the main programme (§E2.3.1.2's second independent substream, labelled
+  by `bsmod`) is mixed into it with what Annex E §E3.10 gives the stream control of: `pgmscl` on
+  its own programme, `extpgmscl` and the per-channel `extpgm*scl` on the other (or `dmixscl`, when
+  the main was folded to two channels), and `panmean` for a mono service by Tables E3.15 to E3.17,
+  at stereo and at 5.1 as printed and by an extension for other layouts. Gain changes ramp over a
+  block. `premixcmp*`, the speech enhancement words and `blkmixcfginfo` are not applied, because
+  Annex E gives them no processing (§E2.3.1.21: "decoders are not required to use them").
+  `associated=1` or `associated=visually-impaired`, with `associated-gain=<dB>` as the listener's
+  own trim; `monitor`, `play` and Hearth do not mix yet. `meta::pgm_scale_gain()` and
+  `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
+  15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
+
+**AC-3 karaoke streams (Annex C)**
+
+- **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
+  outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
+  M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at
+  unity in the centre, a single V1 added to the centre and a pair added to the left and the right,
+  each vocal at the stream's own surround level and everything scaled down by the largest
+  output's sum (Table C.2.2). At `channels=2`/`1` it is the Lo/Ro downmix, which is Annex C's 2/0
+  reproduction, and `downmix=ltrt` is refused. A stream that is not karaoke is decoded as coded
+  and the report says so. The library form is `OutputConfig::karaoke`
+  (`KaraokeReproduction::kAware`), `MixLevels::karaoke`, `meta::is_karaoke()` and a
+  four-argument `output_channel_count()`; E-AC-3 and AC-4 streams ignore it.
+- **`karaoke=none|v1|v2|v1+v2` is the karaoke-capable decoder's listener choice of vocals
+  (C.2.3.2, Table C.2.3).** The same L, C, R with only the chosen vocals in it - V1 or V2 added to
+  the centre, or V1 into the left and V2 into the right at unity - and, at `channels=2`/`1`, the
+  2/0 reproduction: the melody at `cmixlev`, a single vocal at 0.7 in both channels, a pair left
+  and right, mono the two summed. The library form is `KaraokeReproduction::kCapable` with
+  `OutputConfig::karaoke_vocals` (`KaraokeVocals`). The table's cells were read from the
+  specification's own pages and are transcribed into the tests.
+
+**Stream carriage: legacy cores, every programme, and moov-last MP4 files**
+
+- **An AC-3 core with E-AC-3 dependents is carried in MP4, fMP4 and MPEG-TS.** ETSI TS 102 366
+  F.1 asks for an `ec-3` entry for every E-AC-3 bit stream and F.6.2.5 sets the `dec3`'s `bsid` to
+  the independent substream's own, which §E2.3.1.2 makes the core's. `build_codec_config_box` used
+  to return nothing for it and `forge mp4`, `fmp4` and `ts` refused the stream; they write the
+  ordinary `dec3` now, with the core's `bsid`. Matroska still refuses it: `A_AC3` is `bsid` 10 and
+  below and `A_EAC3` is 11 to 16.
+- **A multi-programme stream keeps every programme in MP4, fMP4 and MPEG-TS.** They warned and
+  wrote the first. A sample or PES payload is the syncframes of every substream present (F.2, A/52
+  Annex G §3.3), so `build_codec_config_box(stream, BoxProgrammes::kAll)` writes a `dec3` block
+  for each independent substream with `data_rate` their sum (the default still describes the lead
+  programme, which is what `ScannedStream::access_units` holds), and the transport stream's
+  `substream1`-`substream3` descriptor fields describe what the payload holds.
+  `iclforge::ac3::io::all_programme_access_units()` returns the samples.
+  `programme=<0..7>` on `mkv`, `mp4`, `fmp4` and `ts` writes one programme alone, renumbered as
+  substream 0 (`iclforge::ac3::io::extract_programme()`), for a player that takes only the first;
+  without it `mkv` keeps the first programme with a warning. FFmpeg 8.0.1 cannot decode a
+  multi-programme stream in any container, raw included.
+- **`iclforge::containers::mp4::demux_seekable()` reads an MP4 from a source that can be read at
+  an offset**, jumping over `mdat` to find the sample table and then reading each sample where it
+  says, in bounded memory. `forge demux` uses it for a file path, so a file whose `moov` follows
+  its `mdat` reads instead of being refused; from a pipe it is still refused, with the reason.
+
+**Stream carriage: checked**
+
+- **`forge fmp4`'s DASH manifests are validated against ISO/IEC 23009-1's schema.**
+  `tools/checks/verify_dash_schema.py` fetches MPEG's `DASHSchema` at a pinned commit, writes an
+  AC-3, an E-AC-3, two Atmos JOC and an AC-4 manifest, and validates each with `xmllint` (or .NET's
+  XSD validator where there is none) beside a corrupted copy it must reject. It runs in
+  `interop.yml`. What a Dolby descriptor means is not something the schema can say.
+
+**Metadata: insert a field an E-AC-3 stream lacks**
+
+- **`forge metadata ... insert` and `insert_stream_metadata()`.** `compr`, `compr2`, `bsmod` and
+  `dsurmod` were refused on a stream that did not already transmit them, because putting the bits in
+  moves every later bit. E-AC-3's frame length is free, so the field is inserted into every
+  independent substream, the frame is padded to a whole word with `auxbits`, `frmsiz` follows and
+  the CRC is re-stamped; the audio blocks are copied bit for bit. The decoder and FFmpeg 8.0.1
+  (with `-err_detect crccheck+bitstream`) decode the grown stream to the same samples. Frames with
+  block start information or auxiliary data are refused by name, and AC-3 cannot take it (its frame
+  size is a code). `fuzz_scan` drives the edit and the insert.
+
+**Stream carriage: fixed**
+
+- **`dec3`'s `chan_loc` was always 0.** F.5.2 has a player ignore the sample entry's
+  `ChannelCount`, which leaves `chan_loc` and `acmod`/`lfeon` as the box's only description of the
+  layout; it is now read from the dependents' `chanmap` (Table F.6.1). No tool here reads the
+  field back: FFmpeg 8.0.1 gives the same layout with it zeroed, so it is checked against the
+  table's text alone.
+
 **IAMF: Opus, AAC-LC and FLAC carriage, every IA track, and a 64-bit `mdat`**
 
 - **`mux_coded()` carries the other IAMF codecs.** The module still links no codec: the caller's encoder
@@ -62,6 +164,33 @@ The sections below contain the complete change list and fixes.
 - **The expanded loudspeaker layouts read.** `expanded_layout_info()` lists the 20
   `expanded_loudspeaker_layout` values (9.1.6ch, 10.2.9.3ch, 7.1.5.4ch and their subsets) with the
   substream order of 3.6.2.3, and `decode_pcm()` decodes a single-layer element in any of them.
+
+**Atmos objects: channel lock, zones and extent in the renderer, and DEE-checked 7.1.4 and 9.1.6 beds**
+
+- **`LayoutRenderer` applies an object's channel lock, zone constraints and extent.** The renderer
+  Hearth, the ESP32 player and `forge decode`'s AC-4 object rendering play objects through took an
+  object's position and gain and nothing else. It now follows what TS 103 420 §5.2 says each
+  property means: `b_object_snap` puts the object on the one nearest speaker; the
+  zone constraints of Tables 20 and 21 take the excluded zones' speakers (Table A.7) out of the set
+  it is panned over, with a surround pair the back zone in a 5.X layout and the side zone in a
+  larger one, and `b_enable_elevation` false keeping it off the height speakers; and an extent is
+  rendered as the cuboid it describes, sampled and power-averaged, so a large object spreads over
+  more speakers at the same level. `DisplayObject` gains `zone` and `enable_elevation`. An object
+  that says none of this renders exactly as before. Object divergence and the screen and depth
+  factors are still not applied: the standard gives no geometry for the first, and the output
+  layouts describe no screen for the others.
+- **Extended precision positions are applied.** §5.5.15's `ext_prec_pos_block` was read and thrown
+  away. A position now gets the refinement it carries (x and y by up to two fifths of the 1/62
+  step, z of the 1/15 one), per update block and without feeding the next block's differential
+  coding, as §5.6.1.1.8-.14 say. It is decoded from the text alone, no outside stream carries one.
+  Reading it also fixed a bit count: an object that is not active sends no `b_ext_prec_pos`, and the
+  reader took one for it. `ObjectUpdate::extended_position_precision` lets the writer send it.
+- **7.1.4 and 9.1.6 channel-based-immersive beds are checked against DEE.** Two committed Dolby
+  Encoding Engine streams, `dee_joc_714.ec3` and `dee_joc_916.ec3`, play one input channel at a
+  time, and every reconstructed object comes back as the channel its bed label names. That settles
+  what the 5.1.4 fixture could not: the bed's order holds at twelve and sixteen channels, where
+  Table 12's order and the input order differ (9.1.6 has the wides last in the bed and after the
+  rears at the input).
 
 **IAB (SMPTE ST 2098-2): lossless audio, a writer, and spread and zones in the bridge**
 
@@ -1940,6 +2069,37 @@ The sections below contain the complete change list and fixes.
   floating point, so the Cortex-M3 probe's instructions a frame fall to 6.7 M to 43.0 M at fixed and 25.2 M to 161.8 M at `float`; the images grow
   by the tables, to 801,812 and 750,276 bytes. The AC-4 probe names the frame, the stage and the live size classes at each fixture's peak.
   [`planning/ac4.md`, D14f](planning/ac4.md#d14f-the-decoders-memory) has each step's figures.
+- **AC-4 plays faster on the ESP32-S3 and the ESP32-P4, with the PCM unchanged (phase D14g).** A decoder given an executor
+  (`DecoderConfig::executor`, `iclforge::ac4::Executor`) runs each channel's inverse transform and QMF analysis, A-SPX's elements,
+  A-CPL's slots and decorrelators, the downmix's outputs and each output's synthesis and converter on two threads; the ESP32 player's
+  is a task on the core the decode task is not on (`CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL`, on in `sdkconfig.ac4`, `?parallel=` for a
+  play). The frame-rate converter reads its table a row at a time, and the immersive element reserves its tracks. The ESP32-P4's
+  firmware runs from PSRAM (`CONFIG_SPIRAM_XIP_FROM_PSRAM`, in `sdkconfig.p4`). A 5.1 frame takes 0.42, 0.53, 0.59 and 0.73 of
+  its duration in SIMPLE mode, A-SPX, A-SPX with A-CPL mode 2 and A-CPL mode 3, from 0.67, 0.83, 0.93 and 1.16; 5.1.4 takes 1.01
+  to 1.21, from 1.59 to 1.92; 2.0 and the converter's four frame rates take 0.15 to 0.38, from 0.29 to 0.72. The ESP32-S3 has
+  two new files, `sdkconfig.s3-fast` (QIO flash, 64-byte data-cache lines, the code and constants in PSRAM; in its release image)
+  and `sdkconfig.s3-dcache` (a 64 KB data cache, 32 KB of the heap; for the images with the AC-4 decoder): with both, and the
+  second core, it takes 2.0 SIMPLE at 0.40 (from
+  0.87) and A-SPX at 0.50 (from 1.09), the converter at every frame rate at 0.67 to 0.87 (from 1.32 to 1.86), E-AC-3 7.1.4 at 0.75
+  (from 0.99) and 5.1 in SIMPLE mode at 0.99 (from 2.13); with the second core and neither file, 2.0 SIMPLE at 0.80 and A-SPX at 0.99. The PCM hash of
+  every play is the one it was (40 plays in the P4's image and in each of four S3 images, with the second core on and off), and the
+  AC-4, DSP and AC-3 tests pass at `double` and `float` on MSVC, GCC 16 and Clang 22, with the executor's test clean under
+  ThreadSanitizer.
+  [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md#the-firmware-in-psram-and-the-second-core) and
+  [ESP32-S3](docs/platforms/bare-metal/esp32-s3.md#playback-speed) have the figures.
+- **The AC-4 decoder reads the next frame's syntax on a second core while it reconstructs this frame (phase D14i).**
+  `Decoder::decode(frame, next)` and `decode_by_block(frame, next, sink)` take the frame the following call will be given and, with an
+  executor of two lanes, read its syntax on the second while this frame is reconstructed (`Executor::run_async()`, `wait_async()`); the
+  signal, `presentations()`, `metadata()` and the refusals are what a call without `next` gives, bit for bit. Nothing is read ahead for
+  object audio, a change of source or the efficient high frame rate mode; a `set_presentation()` takes effect one frame later. The
+  ESP32 player decodes a frame when the one after it has arrived. The ESP32-P4's 5.1.4 frame takes 0.94 of its duration in S-CPL
+  from 1.01 and 1.15 and 1.15 with A-SPX from 1.19 and 1.21; the ESP32-S3's 5.1 in SIMPLE mode 0.94 from 0.98.
+- **A-CPL's interpolation runs in single precision at the AC-4 decoder's float tier (phase D14h).** Pseudocode 109's interpolation of
+  A-CPL's parameters, 46,000 `double` operations a 5.1 A-CPL mode 3 frame and calls into software on the ESP32s, is evaluated in
+  single precision there (`acpl::BasicInterpolator<float>`), operation for operation from values narrowed once; the `double` and
+  fixed-point tiers keep the `double`. The ESP32-P4's 5.1 A-CPL mode 3 frame takes 0.63 of its duration from 0.73 and the
+  ESP32-S3's 1.44 from 1.57. The PCM of a `float` stream whose A-CPL parameters change moves by that rounding (the six probe fixtures'
+  hashes and the float against double decode floors do not), and is the same on the two boards.
 - **The ESP32-S3 decodes AC-4 under QEMU, with the decoder's state in PSRAM (phase D14c).** The S3 probe has an AC-4 shape
   (`sdkconfig.ac4`: the component's AC-4 decoder, the AC-4 probe and the board's octal PSRAM, which the QEMU of ESP-IDF v6.1 emulates), and CI runs it
   as `run_esp32s3_probe.sh --ac4`: the six fixtures' PCM equals the hashes the Cortex-M3 leg and the host are pinned to, and the internal RAM each takes
@@ -2090,6 +2250,18 @@ The sections below contain the complete change list and fixes.
   reassembles each unit, and its output holds the plain stream's quality at the audio frame rate
   (47.95 to 120 fps in halves and 100 to 120 fps in quarters, with the 29.97 fps cycle of 1 601 and
   1 602 samples). No other encoder's stream or decoder has read the mode. Not mirrored in the C API.
+- **The AC-4 encoder writes the 22.2 channel element** (`EncoderConfig::experimental.twenty_two_two`,
+  `forge ac4-encode experimental=twenty-two-two`): 24 input channels in Part 2 Table A.27's order,
+  the order `decode` writes, as the two LFE tracks and eleven channel pairs of Table 21 (clause
+  6.2.4.3), in the SIMPLE and ASPX codec modes, each pair with its own transform layout, stereo
+  processing and `aspx_data_2ch()`. The element has no A-CPL or companding data, so those codec
+  modes are refused by name, as are dialogue enhancement, DRC gains and the downmix values for it. A
+  rate must hold the 24 tracks' least frame, 17 kbps in SIMPLE and 49 in ASPX at the native frame
+  rate, and `kAuto` takes ASPX below 76.8 kbps a full-band channel. A 22.2 presentation has 22
+  tracks, so its `md_compat` is 7 and a decoder takes it at `md-compat=7`. Each channel's tone
+  decodes on its own channel, the syntax reads back with the encoder's trace, and the Python
+  transcription reads the encoder's streams; no stream from another encoder and no other decoder
+  has read it. Not mirrored in the C API.
 
 **AC-4 bindings: the C API, Python, Rust and WebAssembly**
 
@@ -2299,6 +2471,10 @@ The sections below contain the complete change list and fixes.
   take the new strings.
 
 ### Changed
+
+**AC-4 decoder**
+
+- **The AC-4 decoder claims `md_compat` level 7 by default, where it claimed 3.** Part 2 Table 55 calls `md_compat` 7 "unrestricted", above every level its tables define, so a decoder that claimed 3 did not select a presentation of more than eleven tracks, and the encoder's 9.0.4 and 9.1.4 streams (thirteen and fourteen tracks) needed `md-compat=7` to decode and were refused when Hearth opened them. The decoder takes every presentation the tables define, 9.X.4's tracks and 22.2's included, and refuses by name a frame it cannot decode, so it now claims what it does. `DecoderConfig::level` (and the C API's, Python's, Rust's and JavaScript's `level`, and `md-compat=` in `forge decode`) set it lower, `3` choosing as a receiver at the floor DVB and ATSC set would. No committed stream carries `md_compat` 7, so none of them changes (`libs/ac4/ERRATA.md`, "Which presentations can be selected").
 
 **Names and layout**
 
@@ -2619,6 +2795,54 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**Object signing**
+
+- **A signed frame could carry unauthenticated object data and still verify.** The tag hashes the
+  container and the audio, and every skip field is excised from the message, so a second payload in
+  another block's skip field, or bytes trailing the container in its own, were outside it.
+  `verify_atmos_frame` now reports such a frame as a mismatch, and likewise a container that
+  declares no primary protection field (`protection_length_primary` `00`, reserved), for which
+  comparing zero bits used to read as a match. `sign_atmos_frame` no longer reports having signed
+  one. The docs' claim that the tag does not cover the audio was wrong and is corrected.
+
+**E-AC-3: a type 2 substream, read and written as the standard has it**
+
+- **`strmtyp` 2 (§E2.3.1.1, "previously coded in AC-3") is a whole stream type now, not a
+  half-parsed one.** Table E1.2 and E1.3 gate the programme-mixing group, the converter exponent
+  strategies and the converter SNR offset on `strmtyp == 0x0`; the decoder, the EMDF walker, the
+  scanner and the metadata editor read them for any substream that was not dependent, so a real
+  type 2 stream would have been decoded from the wrong bit offset (FFmpeg and the Python reference
+  parser read it as the table says). The encoder refused it, `scan` and the access unit
+  accumulator did not start an access unit at one, and `forge metadata` refused it by name. All
+  now treat it as the independent substream it is. `FrameConfig::ac3_frmsizecod` writes one
+  (held to AC-3's tools, no dependents, a Table 5.18 code) and `DecodedSubstream`,
+  `FrameHeader` and `forge probe` report the code it was converted from. The conversion to and
+  from AC-3 itself is not built: the standard gives the signalling and no process.
+
+**AC-3 coding modes 3/0, 2/1, 3/1 and 2/2**
+
+- **A WAV's speakers were never read, so a 2/1 or 3/1 file was encoded as a different mode.** The
+  encoder took a source's width as its layout: three channels were L R C and four were L R Ls Rs
+  whatever the file said, so `forge decode`'s own output for a 2/1 stream encoded back with its
+  lone surround in the centre channel, a 3/1 stream's centre in a surround, and a 3/0 + LFE
+  stream's centre and LFE in the surrounds, all on a 5.1 with silent channels besides. `WavData::channel_mask`
+  (and `WavStreamReader::channel_mask()`) now carry a `WAVE_FORMAT_EXTENSIBLE` header's
+  `dwChannelMask`, and `encode`, `eac3-encode`, `programmeN=` and Forge GUI follow it for an unnamed
+  layout: FL FR BC is 2/1, FL FR FC BC is 3/1, FL FR BL BR or FL FR SL SR is 2/2, each with or
+  without the LFE. The same file named onto a narrower layout folds by that mode's §7.8
+  coefficients (a lone surround at 0.707 × `surmixlev`, where the width's guess used the centre
+  level), `dialnorm=auto` weights its channels by the speakers they are, and `transcode` keeps a
+  stream that is exactly one coding mode in that mode instead of widening it to 5.1.
+- **`forge decode` states its speakers.** An AC-3 or E-AC-3 decode of three channels or more is
+  written as `WAVE_FORMAT_EXTENSIBLE` with its channel mask (`write_wav_f32` and
+  `WavStreamWriter::open` take one; a mask that does not name exactly the channels written leaves
+  the plain header). Mono and stereo output, and any decode that cannot name its speakers, keep
+  the 44-byte header they always had. A WAV that states no speakers is read by its width exactly
+  as before: every checked-in fixture encodes to the same bytes.
+- **New in `iclforge::ac3::plan`:** `wav_mask_locations`, `wav_channel_mask`, `source_layout`,
+  `channel_mask_of`, `layout_for_locations`, and a `route()` overload that takes the source's own
+  locations. The two front ends share them, as they share every other layout rule there.
 
 **ADM / BW64**
 

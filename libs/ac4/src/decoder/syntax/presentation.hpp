@@ -160,6 +160,8 @@ struct CdmxParameters {
     std::optional<int> gain_t2d_code;
     std::optional<int> gain_t2e_code;
     std::optional<int> gain_t2f_code;
+
+    friend bool operator==(const CdmxParameters&, const CdmxParameters&) = default;
 };
 
 // Part 2 clause 6.2.9.2.
@@ -169,6 +171,8 @@ struct CustomDmxData {
     int n_cdmx_configs = 0;
     std::array<CdmxParameters, 4> cdmx{};  // n_cdmx_configs_minus1 is 2 bits
     std::optional<StereoDmxCoeff> stereo_dmx_coeff;  // without the two dmx loudness corrections
+
+    friend bool operator==(const CustomDmxData&, const CustomDmxData&) = default;
 };
 
 // Part 2 clause 6.2.9.1: each correction present when its b_loud_comp (or

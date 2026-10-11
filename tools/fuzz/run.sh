@@ -61,7 +61,7 @@ readonly BASE_TARGETS=(fuzz_scan fuzz_ac3_decode fuzz_eac3_decode fuzz_wav_read
                        fuzz_ac4_decode fuzz_ac4_encode fuzz_sendspin_json fuzz_sendspin_frames
                        fuzz_sendspin_handshake fuzz_sendspin_messages)
 
-adm_enabled() { [ -n "${ICLFORGE_FUZZ_ADM:-}" ]; }
+adm_enabled() { [[ -n "${ICLFORGE_FUZZ_ADM:-}" ]]; }
 
 target_list() {
     local targets=("${BASE_TARGETS[@]}")
@@ -93,7 +93,7 @@ configure_and_build() {
     # VCPKG_ROOT has to point somewhere real when it is.
     local adm_args=()
     if adm_enabled; then
-        if [ -z "${VCPKG_ROOT:-}" ]; then
+        if [[ -z "${VCPKG_ROOT:-}" ]]; then
             echo "error: ICLFORGE_FUZZ_ADM needs VCPKG_ROOT set - iclforge::adm's libadm" >&2
             echo "dependency takes its Boost headers from vcpkg's 'adm' feature." >&2
             exit 1
@@ -145,7 +145,7 @@ prepare_dirs() {
 
 cmd_run() {
     local requested=("$@")
-    if [ "${#requested[@]}" -eq 0 ]; then
+    if [[ "${#requested[@]}" -eq 0 ]]; then
         mapfile -t requested < <(target_list)
     fi
     configure_and_build
@@ -163,8 +163,8 @@ cmd_run() {
         local regressions
         regressions="$(fuzz_dir_of "$target")/regressions/$target"
         local extra_corpora=()
-        [ -d "$seeds" ] && extra_corpora+=("$seeds")
-        [ -d "$regressions" ] && extra_corpora+=("$regressions")
+        [[ -d "$seeds" ]] && extra_corpora+=("$seeds")
+        [[ -d "$regressions" ]] && extra_corpora+=("$regressions")
         echo "==> $target: ${SECONDS_PER_TARGET}s (corpus: $CORPUS_ROOT/$target)"
         if ! "$(target_binary "$target")" \
                 -max_total_time="$SECONDS_PER_TARGET" \
@@ -177,7 +177,7 @@ cmd_run() {
                  "see $ARTIFACT_DIR/${target}-*" >&2
         fi
     done
-    if [ "$status" -ne 0 ]; then
+    if [[ "$status" -ne 0 ]]; then
         echo "" >&2
         echo "fuzzing found something - minimize it with:" >&2
         echo "  tools/fuzz/run.sh minimize <target> <artifact file>" >&2
@@ -191,7 +191,7 @@ cmd_run() {
 # mutation budget in cmd_run is for the scheduled/nightly job.
 cmd_regress() {
     local requested=("$@")
-    if [ "${#requested[@]}" -eq 0 ]; then
+    if [[ "${#requested[@]}" -eq 0 ]]; then
         mapfile -t requested < <(target_list)
     fi
     configure_and_build
@@ -202,9 +202,9 @@ cmd_regress() {
         local regressions
         regressions="$(fuzz_dir_of "$target")/regressions/$target"
         local inputs=()
-        [ -d "$seeds" ] && inputs+=("$seeds")
-        [ -d "$regressions" ] && inputs+=("$regressions")
-        if [ "${#inputs[@]}" -eq 0 ]; then
+        [[ -d "$seeds" ]] && inputs+=("$seeds")
+        [[ -d "$regressions" ]] && inputs+=("$regressions")
+        if [[ "${#inputs[@]}" -eq 0 ]]; then
             continue
         fi
         echo "==> $target: replaying ${inputs[*]}"

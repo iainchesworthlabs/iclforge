@@ -304,7 +304,9 @@ vector of spans per frame is a pure waste.
 **Channel order is A/52 Table 5.8, not WAV order.** That is `L, C, R, SL, SR` with LFE last,
 against WAVE_FORMAT_EXTENSIBLE's `FL, FR, FC, LFE, BL, BR`. `iclforge::ac3::io::ac3_layout_for` and
 `iclforge::ac3::io::wav_channel_order` give you the permutation both ways; use them rather than writing
-it out again. AC-4 uses neither: `iclforge::ac4::Decoder` writes `L, R, C, LFE, Ls, Rs` and then the
+it out again. A WAV that states its speakers (`WavData::channel_mask`) says more than its width does:
+`iclforge::ac3::plan::wav_mask_locations` and `plan::route` take it from there ([File I/O](file-io.md)).
+AC-4 uses neither: `iclforge::ac4::Decoder` writes `L, R, C, LFE, Ls, Rs` and then the
 layout's remaining pairs, each channel named in `DecodedFrame::speakers`, and `iclforge::ac4::Encoder` takes
 the same order.
 

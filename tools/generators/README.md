@@ -147,7 +147,7 @@ All of these are run from the repo root.
 | `gen_external_baseline.py` | `testdata/external-baseline/` | needs **Dolby DEE**, `ffmpeg`, a built `forge` |
 | `gen_dee_gold.py` | a local set of DEE's AC-3, E-AC-3, E-AC-3 JOC and TrueHD streams, never committed | needs **Dolby DEE**, `ffmpeg`; `--cli` records a built `forge`'s reading |
 | `gen_dee_tpn_fixture.py` | `testdata/external-baseline/eac3-transient-stereo-128/` | needs the local DEE golden-master set (`--gold`) |
-| `gen_object_fixture.py` | `testdata/object-fixture/dee_joc_514.ec3`, a DD+ JOC stream that DEE makes from the synthetic 5.1.4 tone bed this script also writes | needs **Dolby DEE** and numpy |
+| `gen_object_fixture.py` | `testdata/object-fixture/dee_joc_514.ec3`, a DD+ JOC stream that DEE makes from the synthetic 5.1.4 tone bed this script also writes, and `dee_joc_714.ec3` / `dee_joc_916.ec3` from 7.1.4 and 9.1.6 beds that play one channel at a time | needs **Dolby DEE** and numpy |
 | `gen_ac4_baseline.py` | the committed AC-4 set: `testdata/external-baseline/ac4-*/dee.ac4`, `ac4-manifest.json` and the syntax digests under `testdata/ac4/`. With `--gold-set DIR`, a local set that is never committed | needs **Dolby DEE** (its licence ends 2026-11-06), numpy, `ffmpeg` and a built `forge` (`--cli`) |
 | `gen_ac4_presentation_sources.py` | the six encoder-made substreams under `testdata/ac4/presentations/sources/` that the presentation tests multiplex | needs a built `forge` (`--cli`) |
 | `gen_aht_tables.py`, `gen_bitalloc_tables.py`, `gen_joc_tables.py` | `aht_tables.hpp` and `bitalloc_tables.hpp` in `libs/ac3/include/iclforge/ac3/core/`, `joc_tables.hpp` in `libs/ac3/include/iclforge/ac3/oba/` | read spec text (and JOC's tables attachment), not committed |

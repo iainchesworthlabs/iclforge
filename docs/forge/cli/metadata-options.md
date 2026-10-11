@@ -160,8 +160,15 @@ metadata options (any order, after the positional arguments):
   verify-objects    decode/monitor: check each frame's EMDF object signature against
                     signing-key= instead of just playing it - a mismatch refuses the command;
                     omitted (the default) decodes signed and unsigned streams alike, unchecked
-  signing-key=<path>  the key file sign-objects/verify-objects use (or
-                    ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY)
+  gate-objects      decode/monitor/spatial: the licensed policy - frames whose object
+                    signature verifies against signing-key= play as objects, any other
+                    (unsigned, another key's, altered) plays as its 5.1 bed and the decode
+                    carries on, where verify-objects would refuse. Not combinable with
+                    verify-objects
+  signing-key=<path>  the key file sign-objects/verify-objects/gate-objects use (or
+                    ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY). Repeat it to give
+                    verify-objects and gate-objects several keys - a frame is good under any
+                    of them; sign-objects takes one
   verify            eac3-encode: decode every access unit as it is encoded and diff the
                     decoder's model against the encoder's own, refusing the run at the first
                     disagreement - off by default, since it roughly doubles the work
@@ -394,6 +401,12 @@ layout: mono | stereo | 1+1 | 51 | 71 | 512 | 514 | 714
         Locations: L C R Ls Rs Lc Rc Lrs Rrs Cs Ts Lsd Rsd Lw Rw Vhl Vhr
         Vhc Lts Rts LFE2 LFE - a paired location (Lc/Rc, Lrs/Rrs, Lsd/Rsd,
         Lw/Rw, Vhl/Vhr, Lts/Rts) must be given both halves.
+
+        With no [layout], 'encode' and 'eac3-encode' follow the source: a WAV
+        that states which speakers its channels are (a WAVE_FORMAT_EXTENSIBLE
+        channel mask, which 'decode' writes from three channels up) is encoded
+        as exactly those - FL FR BC is 2/1, FL FR FC BC is 3/1 - and one that
+        states none is read by its channel count.
 ```
 
 `71` and `714` render fewer speakers than they code because, per §E3.8.2, a dependent
@@ -903,15 +916,42 @@ only the second programme — see
 ## Programme options (`decode`, `qc`, `levels`): `programme=`
 
 ```text
-programme options (decode, qc, levels; any order, after the positional arguments):
+programme options (decode, qc, levels, mkv, mp4, fmp4, ts; any order, after the positional
+arguments):
   programme=<0..7>  which programme of a multi-programme stream to work on, by the §E2.3.1.2
                     substreamid of its independent substream; omitted takes the first the
-                    stream carries
+                    stream carries (mp4, fmp4 and ts omit it to carry every programme)
 ```
 
 The decode-side half of `programme2=` above. All three commands work on exactly one programme —
 never a fold of several, since two programmes are alternatives rather than layers and mixing them
 would give a WAV that splices unrelated audio, or a loudness figure neither programme has.
+
+`decode` alone can also mix one programme into another when the second is an **associated service**
+(§E3.10): a description, a commentary, a voice-over, carried beside the main with the gains and pan
+the stream gives it.
+
+```text
+  associated=<0..7>|<service>  mix this programme into the one being decoded: a substream id, or a
+                    service name (visually-impaired, audio-description, hearing-impaired,
+                    commentary, emergency-information, spoken-subtitles) that the stream's own
+                    bsmod labels
+  associated-gain=<dB>  the listener's level for it, 0 dB or less, on top of the stream's own
+```
+
+```bash
+forge decode broadcast.ec3 mixed.wav associated=visually-impaired
+forge decode broadcast.ec3 mixed.wav programme=0 associated=1 associated-gain=-3
+```
+
+The main is `programme=` as above, and the status output names what was mixed and the range of
+each gain. What is applied is the associated programme's `pgmscl` to itself, its `extpgmscl` and
+per-channel scales to the main (or `dmixscl`, when `channels=2` or `1` folded the main), the main's
+own `pgmscl`, and for a mono service its `paninfo` by Tables E3.15 to E3.17 — see
+[Mixing an associated service](../../library/decoding.md#mixing-an-associated-service-iclforgeac3associatedservicemixer)
+for the rules and for what Annex E gives no processing. A stream with no such programme, or
+whose main is 1+1 dual mono, is refused rather than decoded without it. `monitor` and `play` do not
+mix a second programme yet.
 
 ```bash
 forge decode out.ec3 main.wav                # programme 0
@@ -920,6 +960,11 @@ forge levels out.ec3 programme=1
 forge qc out.ec3 programme=1 preset=atsc-a85
 ```
 
+On `mkv`, `mp4`, `fmp4` and `ts` the chosen programme is written alone, renumbered as independent
+substream 0 with its CRC re-stamped (a player takes substream 0 and ignores the rest, so another
+programme's frames left as they are would be a track it will not play); the audio and every other
+field are untouched. Without it `mp4`, `fmp4` and `ts` carry every programme, as TS 102 366 F.2 and
+A/52 Annex G §3.3 define a sample or PES payload, and `mkv` keeps the first with a warning.
 Omitting it takes the first programme the stream carries. When there is more than one, each
 command says which it picked and what else was there (`programme 0 of 2 (0, 1)`), so a
 multi-programme stream is never handled silently. Asking for a programme the stream does not
@@ -946,7 +991,7 @@ presentation the same way; the rest belong to the three that play or write the d
 | `associated=<service>` | all seven | `visually-impaired`, `audio-description`, `audio-description-subtitles`, `spoken-subtitles`, `emergency-information`, `hearing-impaired` or `commentary` |
 | `dialogue-gain=<dB>` | all seven | The dialogue against the music and effects, up to 12 dB and the stream's own maximum |
 | `associated-gain=<dB>` | all seven | The associated audio's gain, 0 dB or less |
-| `md-compat=<0..7>` | all seven | The `md_compat` level the decoder claims; 3 by default |
+| `md-compat=<0..7>` | all seven | The `md_compat` level the decoder claims; 7 by default |
 | `conceal=repeat\|mute\|off` | `decode`, `monitor` | What stands in for a frame that will not decode; `off` by default |
 | `output-level=<dBFS>` | `decode`, `monitor`, `play` | The level the stream's dialnorm is taken to, -60 to 0; unset leaves the coded level |
 | `drcmode=<mode>` | `decode`, `monitor`, `play` | `default`, `home-theatre`, `flat-panel-tv`, `portable-speakers`, `portable-headphones` or `off`; every one but `off` needs `output-level=` |
@@ -959,8 +1004,8 @@ presentation the same way; the rest belong to the three that play or write the d
 
 `decode` also takes AC-4's objects out as `objects_dir` and `adm_out`. The options only AC-3 and
 E-AC-3 read (`drc=`, `heavy`, `ltrt-phase=`, `fast-imdct`, `mode=`, `programme=`, `bed-only`,
-`joc-domain=`) are named and ignored by `decode` for an AC-4 stream, and `bap-census=` and
-`verify-objects` refuse it; AC-4's own are named and ignored for AC-3 and E-AC-3, and
+`joc-domain=`) are named and ignored by `decode` for an AC-4 stream, and `bap-census=`,
+`verify-objects` and `gate-objects` refuse it; AC-4's own are named and ignored for AC-3 and E-AC-3, and
 `channels=5.1` and `syntax-trace=` refuse them.
 
 **Writing AC-4.** `ac4-encode` takes every key below; the other commands that write AC-4 take the

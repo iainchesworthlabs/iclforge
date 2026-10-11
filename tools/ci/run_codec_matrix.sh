@@ -1164,7 +1164,7 @@ run_ac4_frames_check() {
     decoded=$("$CLI" decode "$1" "$1.wav" | sed -n 's/^decoded \([0-9]*\) AC-4 frames.*/\1/p')
     packets=$(ffprobe -v error "${@:2}" -count_packets -show_entries stream=nb_read_packets \
         -of csv=p=0 "$1")
-    if [ -z "$decoded" ] || [ "$decoded" != "$packets" ]; then
+    if [[ -z "$decoded" ]] || [[ "$decoded" != "$packets" ]]; then
         echo "forge decoded '$decoded' AC-4 frames from $1 and ffprobe read '$packets'" >&2
         exit 1
     fi
@@ -1249,14 +1249,14 @@ run_ac4_fmp4_check() {
     echo "[$count] AC-4 fragments: ffprobe reads every frame of $2 from $1"
     local joined="$1.joined.mp4" frames packets n=1
     cat "$1/init.mp4" > "$joined"
-    while [ -f "$1/segment$n.m4s" ]; do
+    while [[ -f "$1/segment$n.m4s" ]]; do
         cat "$1/segment$n.m4s" >> "$joined"
         n=$((n + 1))
     done
     frames=$("$CLI" probe "$2" | sed -n 's/^access units *\([0-9]*\) .*/\1/p')
     packets=$(ffprobe -v error -count_packets -show_entries stream=nb_read_packets \
         -of csv=p=0 "$joined")
-    if [ -z "$frames" ] || [ "$frames" != "$packets" ]; then
+    if [[ -z "$frames" ]] || [[ "$frames" != "$packets" ]]; then
         echo "$2 holds '$frames' AC-4 frames and ffprobe read '$packets' from $1" >&2
         exit 1
     fi

@@ -176,12 +176,13 @@ to silently drop or mis-signal the Atmos extension
 what this module avoided that bug by construction rather than by patching it after the fact, and
 still does for any FFmpeg build older than the fix.
 
-### Demuxing: `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader`
+### Demuxing: `iclforge::containers::mp4::demux`, `iclforge::containers::mp4::Reader`, `iclforge::containers::mp4::demux_seekable`
 
 `iclforge/containers/mp4/reader.hpp`, same library. The read side of both writers above, and the same shape the
 Matroska reader has: `demux` is batch and zero-copy (samples are spans into your buffer),
 `Reader` is incremental (samples arrive through a callback, peak memory is one chunk plus one
-sample).
+sample), and `demux_seekable` is incremental over a source that can be read at an offset - a file,
+a memory map - which is what a `moov`-last file needs.
 
 It reads both layouts, from either writer and from a real muxer: a plain `moov`/`mdat` file,
 walking `stsc`/`stsz`(or `stz2`)/`stco`(or `co64`) to turn the sample table into byte ranges, and
@@ -195,6 +196,17 @@ stream has nowhere to go back to — so a `moov`-last file reports `kMoovAfterMd
 silently returning nothing. That is the layout a muxer leaves behind when it never rewrote the
 file for "faststart"; `mux()` and `fragment()` both write `moov` first, as does any web-optimised
 file.
+
+`demux_seekable(read_at, size, on_track, on_sample)` is the third way to read it, for a source that
+*can* go back. It walks the boxes through the same parser, which steps over `mdat` by its declared
+length, so the audio is never read to find the table that indexes it, and then reads each sample at
+the offset the table gives. Memory is the largest box the table needs, which `max_box_bytes`
+bounds, plus one sample - whichever side of `mdat` the `moov` is on, and for a fragmented file too.
+`on_track` is called once, before the first sample, with the track as the container declares it,
+so a caller that has to treat samples by codec (AC-4's raw frames need a sync frame put back
+around them) knows which it is. A sample whose range runs past `size` ends delivery there, as
+`demux` does for a truncated file. `forge demux` uses it for a file path, and keeps the chunked
+`Reader` for a pipe.
 
 **The `dec3`/`dac3` box comes back parsed.** `ReadTrack::codec_config` is a `CodecConfig`, the read
 twin of [`iclforge::ac3::io::build_codec_config_box`](#muxing-iclforgecontainersmp4mux): `fscod`, `bsid`, `bsmod`, `acmod`,

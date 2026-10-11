@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <initializer_list>
 #include <limits>
 #include <memory>
@@ -647,6 +648,45 @@ TEST_CASE("the converter's float dot product is the sum of four lanes added in t
         const float got = dsp::dot_four_lanes(c.data(), x.data(), n);
         CHECK(std::bit_cast<std::uint32_t>(got) == std::bit_cast<std::uint32_t>(want));
     }
+}
+
+TEST_CASE(
+    "a converter whose table the cache cannot hold makes the outputs a frame at a time as it makes "
+    "them one at a time",
+    "[ac4][core][dsp][src]") {
+    // A table over 16 KB (1001/960's, 188 KB at float) is read in the order of its rows when a call
+    // makes more than one output, and an output at a time, in the order of the grid, when a call
+    // makes one: the same sums either way, to the bit. The input goes to one converter a frame at
+    // a time and to the other a sample at a time.
+    const Rate& rate = kRates[0];
+    const auto filter = std::make_shared<const RealFilter>(rate.up, rate.down);
+    REQUIRE(filter->table_bytes() > 16384);
+    dsp::Resampler<Real> by_frame(filter);
+    dsp::Resampler<Real> by_sample(filter);
+    std::uint32_t state = 20261011U;
+    std::vector<Real> frame_out;
+    std::vector<Real> sample_out;
+    for (int t = 0; t < 5; ++t) {
+        std::vector<Real> in(static_cast<std::size_t>(rate.frame));
+        for (Real& v : in) {
+            state = state * 1664525U + 1013904223U;
+            v = static_cast<Real>(static_cast<double>(state >> 8U) / 16777216.0 - 0.5) *
+                Real{30000};
+        }
+        by_frame.process(in, frame_out);
+        for (const Real v : in) {
+            by_sample.process(std::span<const Real>(&v, 1), sample_out);
+        }
+    }
+    REQUIRE(frame_out.size() == sample_out.size());
+    REQUIRE(frame_out.size() > static_cast<std::size_t>(rate.frame));
+    std::size_t different = 0;
+    for (std::size_t i = 0; i < frame_out.size(); ++i) {
+        if (std::memcmp(&frame_out[i], &sample_out[i], sizeof(Real)) != 0) {
+            ++different;
+        }
+    }
+    CHECK(different == 0);
 }
 
 TEST_CASE("the reversed dot product is the four lane sum of the phase written out backwards",

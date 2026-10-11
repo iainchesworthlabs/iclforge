@@ -20,7 +20,7 @@
 // back by the decoder (planning/ac4.md, the encoder's ladder, items 1 and 8).
 //
 // The first bytes choose the configuration - the channel layout, mono to
-// 7.1 and phase E8's immersive layouts, sample rate, bit rate, I-frame
+// 7.1, phase E8's immersive layouts and 22.2, sample rate, bit rate, I-frame
 // interval, dialnorm, codec mode, the A-CPL and immersive ones among them, the
 // experimental tools, the size of the pieces the input arrives in, and phase
 // E5's frame rate, rate mode, named I-frames, fragment start, loudness values,
@@ -167,15 +167,22 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     config.experimental.coding_configs = (layout & 0x20) != 0;
     config.experimental.acpl = (layout & 0x40) != 0;
     config.experimental.ajcc = (layout & 0x80) != 0;
-    // The sample rate byte's low bit; the two over it name the A-CPL mode, and
-    // its top bit widens an immersive layout to 9.0.4 or 9.1.4 with the screen
-    // pair (experimental.nine_x_4).
+    // The sample rate byte's low bit; the two over it name the A-CPL mode. The four bits over
+    // those together make the layout above 22.2's 24 channels (Part 2 clause 6.2.4.3), and the top
+    // bit then lets experimental.twenty_two_two in; set for another layout (one in eight, by
+    // the bits that name no layout) that option is the refusal that names it. The top bit of an
+    // immersive layout widens it to 9.0.4 or 9.1.4 with the screen pair
+    // (experimental.nine_x_4).
     const std::uint8_t rate = take.byte();
     config.sample_rate_hz = (rate & 1) != 0 ? 44100 : 48000;
-    if (config.channels >= 9 && config.channels <= 12 && (rate & 0x80) != 0) {
+    const bool twenty_two = (rate & 0x78) == 0x78;
+    if (twenty_two) {
+        config.channels = 24;
+    } else if (config.channels >= 9 && config.channels <= 12 && (rate & 0x80) != 0) {
         config.channels = lfe ? 14 : 13;
         config.experimental.nine_x_4 = true;
     }
+    config.experimental.twenty_two_two = twenty_two ? (rate & 0x80) != 0 : (rate & 0x1C) == 0x1C;
     // 4 to 1024 kbps, so the refusals below 8 are reached too.
     config.bitrate_kbps = 4 + static_cast<int>(take.byte()) * 4;
     // The interval takes the low five bits of its byte and dialnorm seven of
@@ -194,7 +201,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     constexpr std::array<iclforge::ac4::CodecMode, 4> kImmersiveParametric = {
         iclforge::ac4::CodecMode::kAspxAcpl1, iclforge::ac4::CodecMode::kAspxAcpl2,
         iclforge::ac4::CodecMode::kAspxAcpl3, iclforge::ac4::CodecMode::kAspxAjcc};
-    const bool immersive = config.channels > 8;
+    const bool immersive = config.channels > 8 && !twenty_two;
     const auto mode = static_cast<std::size_t>((interval >> 5) & 3);
     const auto parametric = static_cast<std::size_t>((rate >> 1) & 3);
     config.codec_mode = mode < kModes.size() ? (immersive ? kImmersiveModes[mode] : kModes[mode])

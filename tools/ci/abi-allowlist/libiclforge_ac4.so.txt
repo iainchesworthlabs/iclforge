@@ -2,7 +2,9 @@ iclforge::ac4::Decoder::Decoder()
 iclforge::ac4::Decoder::Decoder(iclforge::ac4::Decoder&&)
 iclforge::ac4::Decoder::Decoder(iclforge::ac4::DecoderConfig const&)
 iclforge::ac4::Decoder::decode(std::span<std::byte const, 18446744073709551615ul>)
+iclforge::ac4::Decoder::decode(std::span<std::byte const, 18446744073709551615ul>, std::span<std::byte const, 18446744073709551615ul>)
 iclforge::ac4::Decoder::decode_by_block(std::span<std::byte const, 18446744073709551615ul>, iclforge::ac4::BlockSink)
+iclforge::ac4::Decoder::decode_by_block(std::span<std::byte const, 18446744073709551615ul>, std::span<std::byte const, 18446744073709551615ul>, iclforge::ac4::BlockSink)
 iclforge::ac4::Decoder::flush(iclforge::ac4::BlockSink)
 iclforge::ac4::Decoder::latency_samples() const
 iclforge::ac4::Decoder::metadata() const

@@ -2954,7 +2954,7 @@ TEST_CASE("iclforge_ac4_*_config_init match their C++ struct defaults", "[capi][
     iclforge_ac4_decoder_config_t decoder_config;
     iclforge_ac4_decoder_config_init(&decoder_config);
     CHECK(decoder_config.concealment == ICLFORGE_AC4_CONCEALMENT_NONE);
-    CHECK(decoder_config.level == 3);
+    CHECK(decoder_config.level == 7);
     CHECK(decoder_config.decoding == ICLFORGE_AC4_DECODING_FULL);
 
     iclforge_ac4_encoder_config_t encoder_config;

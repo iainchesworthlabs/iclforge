@@ -48,7 +48,7 @@ image=""
 wifi_image=""
 server=""
 out="improv-qemu-run"
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
     case "$1" in
         --qemu) qemu="$2"; shift 2 ;;
         --image) image="$2"; shift 2 ;;
@@ -58,7 +58,7 @@ while [ $# -gt 0 ]; do
         *) echo "unknown option $1" >&2; exit 2 ;;
     esac
 done
-if [ -z "$qemu" ] || [ -z "$image" ] || [ -z "$wifi_image" ] || [ -z "$server" ]; then
+if [[ -z "$qemu" ]] || [[ -z "$image" ]] || [[ -z "$wifi_image" ]] || [[ -z "$server" ]]; then
     echo "usage: $0 --qemu QEMU --image DIR --wifi-image DIR --server SERVER [--out DIR]" >&2
     exit 2
 fi
@@ -112,7 +112,7 @@ stop() {
     kill "$qemu_pid" 2>/dev/null || true
     wait "$qemu_pid" 2>/dev/null || true
     qemu_pid=""
-    if [ -n "$helper_pid" ]; then
+    if [[ -n "$helper_pid" ]]; then
         helper_status=0
         wait "$helper_pid" || helper_status=$?
         helper_pid=""
@@ -135,12 +135,12 @@ helper_pid=$!
 # The helper says when the board has its network and its player, or exits.
 # Its own waits bound this one.
 for _ in $(seq 1 900); do
-    if [ -e "$dir/improv.ready" ] || ! kill -0 "$helper_pid" 2>/dev/null; then
+    if [[ -e "$dir/improv.ready" ]] || ! kill -0 "$helper_pid" 2>/dev/null; then
         break
     fi
     sleep 1
 done
-if [ ! -e "$dir/improv.ready" ]; then
+if [[ ! -e "$dir/improv.ready" ]]; then
     stop
     fail "$title" "$console" "the board was not provisioned over Improv (the helper's annotation above says why)"
 else
@@ -157,7 +157,7 @@ else
         --sink "$dir/reference" --sink-layout 2.0 \
         --report "$dir/report.json" 2> "$dir/server.txt" || server_status=$?
     cat "$dir/server.txt"
-    if [ "$server_status" -ne 0 ]; then
+    if [[ "$server_status" -ne 0 ]]; then
         stop
         fail "$title" "$console" "the test server failed ($(tail -1 "$dir/server.txt"))"
     else
@@ -170,9 +170,9 @@ else
         done
         stop
         wav="$(find "$dir/reference/out" -name 'bursts-*.wav' -print -quit 2>/dev/null)" || true
-        if [ "$helper_status" -ne 0 ]; then
+        if [[ "$helper_status" -ne 0 ]]; then
             fail "$title" "$console" "the helper's capture ended badly (status $helper_status)"
-        elif [ -z "$wav" ]; then
+        elif [[ -z "$wav" ]]; then
             fail "$title" "$console" "the test sink wrote no WAV file"
         elif ! python3 "$here/check_sendspin_levels.py" --title "$title" --console "$console" --wav "$wav"; then
             fail "$title" "$console" "the board's levels are not the test sink's (the lines above say which)"
@@ -197,7 +197,7 @@ python3 "$here/improv_qemu.py" unprovisioned \
     --serial 127.0.0.1:15581 --monitor 127.0.0.1:15582 \
     --capture "$console" --hold 5 --title "$title" || answers_status=$?
 stop
-if [ "$answers_status" -ne 0 ]; then
+if [[ "$answers_status" -ne 0 ]]; then
     fail "$title" "$console" "the board did not answer Improv as a board with nothing stored should (the helper's annotation above says why)"
 elif ! python3 "$here/check_esp_console.py" --title "$title" "$console"; then
     failed=1

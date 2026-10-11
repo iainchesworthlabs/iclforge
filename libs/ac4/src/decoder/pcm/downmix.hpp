@@ -125,8 +125,10 @@ class DownmixStage {
 
     // Takes this frame's values and writes out[o] = sum_c M[o][c] in[c] for
     // every QMF value, out resized to speakers().
+    // Each output channel is its own sum, and runs through `executor` where there is one
+    // (iclforge/ac4/decoder/executor.hpp).
     void process(const DownmixValues& values, std::span<const QmfMatrix> in,
-                 std::vector<std::vector<QmfValue>>& out);
+                 std::vector<std::vector<QmfValue>>& out, Executor* executor = nullptr);
 
     // The matrix in force, one row per channel out, one column per channel in.
     [[nodiscard]] const std::vector<std::vector<double>>& matrix() const noexcept {

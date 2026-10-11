@@ -1196,6 +1196,31 @@ std::optional<DecodeRenderStats> decode_and_render(std::string_view in_path,
     return stats;
 }
 
+namespace {
+
+// The locations of a stream whose channels are exactly one Table 5.8 coding
+// mode plus its LFE - no dependent substream, no chanmap - in the order the
+// decode writes them (WAV order), or nothing for a stream that holds more
+// (7.1, the heights) or whose mode is dual mono, which has no locations.
+std::optional<std::vector<iclforge::ac3::eac3::chanmap::Location>> own_coding_mode(
+    const iclforge::ac3::io::ScannedStream& scan, std::size_t channels) {
+    if (scan.acmod == iclforge::ac3::Acmod::kDualMono ||
+        static_cast<int>(channels) !=
+            iclforge::ac3::fullbw_channel_count(scan.acmod) + (scan.lfe ? 1 : 0)) {
+        return std::nullopt;
+    }
+    const auto coded = iclforge::ac3::eac3::chanmap::expand(
+        iclforge::ac3::eac3::chanmap::acmod_map(scan.acmod, scan.lfe));
+    std::vector<iclforge::ac3::eac3::chanmap::Location> out;
+    out.reserve(static_cast<std::size_t>(coded.count));
+    for (const auto location : coded) {
+        out.push_back(location);
+    }
+    return out;
+}
+
+}  // namespace
+
 int run_transcode(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   std::string_view layout, const Options& meta) {
     // A stream inside a container is read as decode reads it.
@@ -1349,6 +1374,12 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
             fmt::println(stderr, "error: {} is 1+1 but carries no dialnorm2", in_path);
             return kExitInput;  // both bsi syntaxes always send it for 1+1
         }
+    } else if (!to_ac4 && own_coding_mode(loaded->scan, source_channels) &&
+               plan_from_locations(p, label, *own_coding_mode(loaded->scan, source_channels))) {
+        // A stream that is exactly one Table 5.8 coding mode - 3/0, 2/1, 3/1 or
+        // 2/2 among them - goes out in that mode. Following the channel COUNT
+        // would put three channels on a 5.1 as L R C whatever they were, so a
+        // 2/1 programme's lone surround would come back as its centre.
     } else {
         auto id = plan::layout_for_source(source_channels);
         if (id.has_value() && !plan::carries(*target_codec, *id)) {
@@ -1549,15 +1580,43 @@ int run_metadata(std::string_view in_path, std::string_view out_path, const Opti
         return kExitUsage;
     }
 
-    const auto summary = iclforge::ac3::io::edit_stream_metadata(loaded->bytes, edit);
-    if (!summary.has_value()) {
-        fmt::println(stderr, "error: {}: {}", in_path,
-                     iclforge::ac3::io::describe(summary.error()));
-        return kExitUsage;
+    iclforge::ac3::io::EditSummary summary_value;
+    std::size_t grown_frames = 0;
+    std::size_t added_bytes = 0;
+    // 'insert' opts in to a rewrite that is not in place: the result is a new
+    // buffer, and it replaces the loaded bytes so everything after - the
+    // re-scan, the read-back, the write - is the same code either way.
+    std::vector<std::byte> inserted_bytes;
+    if (meta.insert_missing) {
+        auto inserted = iclforge::ac3::io::insert_stream_metadata(loaded->bytes, edit);
+        if (!inserted.has_value()) {
+            fmt::println(stderr, "error: {}: {}", in_path,
+                         iclforge::ac3::io::describe(inserted.error()));
+            return kExitUsage;
+        }
+        summary_value = inserted->summary;
+        grown_frames = inserted->grown;
+        added_bytes = inserted->added_bytes;
+        inserted_bytes = std::move(inserted->bytes);
+        loaded->bytes = std::move(inserted_bytes);
+    } else {
+        const auto in_place = iclforge::ac3::io::edit_stream_metadata(loaded->bytes, edit);
+        if (!in_place.has_value()) {
+            fmt::println(stderr, "error: {}: {}", in_path,
+                         iclforge::ac3::io::describe(in_place.error()));
+            if (in_place.error() == iclforge::ac3::io::EditError::kFieldAbsent) {
+                fmt::println(stderr,
+                             "       add 'insert' to put the field in (E-AC-3 only: the "
+                             "syncframes that gain it grow)");
+            }
+            return kExitUsage;
+        }
+        summary_value = *in_place;
     }
-    // Re-scanned rather than reusing the pre-edit spans: edit_stream_metadata
-    // rewrote the buffer those pointed into, and re-deriving the framing from
-    // the rewritten bytes is also a check that the rewrite left it walkable.
+    const auto* summary = &summary_value;
+    // Re-scanned rather than reusing the pre-edit spans: the rewrite replaced
+    // or rewrote the buffer those pointed into, and re-deriving the framing
+    // from the rewritten bytes is also a check that it left it walkable.
     const auto rescanned = iclforge::ac3::io::scan(loaded->bytes);
     if (!rescanned.has_value()) {
         fmt::println(stderr, "error: the rewritten stream no longer scans: {}",
@@ -1572,6 +1631,10 @@ int run_metadata(std::string_view in_path, std::string_view out_path, const Opti
     const auto after = iclforge::ac3::io::read_frame_metadata(loaded->bytes);
     status_println(status, "rewrote {} of {} {} syncframes -> {} (audio untouched)",
                    summary->changed, summary->syncframes, codec_label(loaded->scan.kind), out_path);
+    if (meta.insert_missing) {
+        status_println(status, "  {} syncframes gained a field; the stream is {} bytes longer",
+                       grown_frames, added_bytes);
+    }
     if (after.has_value()) {
         status_println(status, "  dialnorm {} -> {}", before->dialnorm, after->dialnorm);
         if (before->compr.has_value() && after->compr.has_value()) {

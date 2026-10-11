@@ -1,7 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <optional>
 #include <span>
 #include <string>
@@ -999,6 +1001,173 @@ TEST_CASE("MP4 with moov after mdat reads batch but not streamed", "[mp4][reader
             REQUIRE_FALSE(done.has_value());
             CHECK(done.error() == iclforge::containers::mp4::DemuxError::kMoovAfterMdat);
         }
+    }
+}
+
+namespace {
+
+// A source of bytes that can be read at an offset, with a tally of what the
+// reader actually asked for - so a test can say how much of a file was read
+// before the track was known, not only that the samples came out right.
+struct CountingSource {
+    std::span<const std::byte> bytes;
+    std::uint64_t requested = 0;
+    std::size_t reads = 0;
+
+    iclforge::containers::mp4::ReadAtFn reader() {
+        return [this](std::uint64_t offset, std::span<std::byte> out) -> std::size_t {
+            ++reads;
+            if (offset >= bytes.size()) {
+                return 0;
+            }
+            const auto take = std::min<std::size_t>(out.size(), bytes.size() - offset);
+            std::copy_n(bytes.begin() + static_cast<std::ptrdiff_t>(offset), take, out.begin());
+            requested += take;
+            return take;
+        };
+    }
+};
+
+struct SeekableRead {
+    iclforge::containers::mp4::ReadTrack track;
+    std::vector<Bytes> samples;
+    std::uint64_t read_before_track = 0;
+};
+
+std::expected<SeekableRead, iclforge::containers::mp4::DemuxError> read_seekable(
+    std::span<const std::byte> file, const iclforge::containers::mp4::ReadOptions& options = {}) {
+    CountingSource source{.bytes = file};
+    SeekableRead out;
+    const auto track = iclforge::containers::mp4::demux_seekable(
+        source.reader(), file.size(),
+        [&](const iclforge::containers::mp4::ReadTrack&) {
+            out.read_before_track = source.requested;
+        },
+        [&out](std::span<const std::byte> sample) { out.samples.emplace_back(sample.begin(), sample.end()); },
+        options);
+    if (!track.has_value()) {
+        return std::unexpected(track.error());
+    }
+    out.track = *track;
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("MP4 with moov after mdat reads from a seekable source, mdat unread until its samples",
+          "[mp4][reader]") {
+    // The layout a stream refuses. Two samples of a megabyte each put 2 MiB
+    // between ftyp and moov, so "the table was found without reading the audio"
+    // is something the byte tally can show rather than a claim.
+    const std::vector<std::uint32_t> sizes{1U << 20, 1U << 20, 700};
+    std::vector<Bytes> expect;
+    Bytes payload;
+    for (std::size_t i = 0; i < sizes.size(); ++i) {
+        expect.push_back(frame_of(sizes[i], static_cast<std::uint8_t>(0xA0 + i)));
+        payload.insert(payload.end(), expect.back().begin(), expect.back().end());
+    }
+    MoovSpec spec{.sizes = sizes};
+    spec.mdat_data_offset = ftyp().size() + 8;
+    const auto moov = build_moov(spec);
+    Bytes file = ftyp();
+    const auto mdat = box("mdat", payload);
+    file.insert(file.end(), mdat.begin(), mdat.end());
+    file.insert(file.end(), moov.begin(), moov.end());
+
+    SECTION("every sample comes back, and the table is found by jumping over mdat") {
+        const auto out = read_seekable(file);
+        REQUIRE(out.has_value());
+        CHECK(out->samples == expect);
+        CHECK(out->track.codec_id == "ec-3");
+        CHECK(out->track.sample_rate == 48000);
+        // ftyp, the mdat header and the moov: a window or two, nowhere near
+        // the 2 MiB of audio between them.
+        CHECK(out->read_before_track < 256U * 1024U);
+    }
+
+    SECTION("a moov before mdat reads the same way") {
+        MoovSpec first{.sizes = sizes};
+        first.mdat_data_offset = 0;
+        const auto measured = build_moov(first);
+        first.mdat_data_offset = ftyp().size() + measured.size() + 8;
+        const auto head = build_moov(first);
+        Bytes faststart = ftyp();
+        faststart.insert(faststart.end(), head.begin(), head.end());
+        faststart.insert(faststart.end(), mdat.begin(), mdat.end());
+
+        const auto out = read_seekable(faststart);
+        REQUIRE(out.has_value());
+        CHECK(out->samples == expect);
+    }
+
+    SECTION("a file cut inside the last sample delivers the whole ones before it") {
+        const auto cut = std::span<const std::byte>{file}.first(ftyp().size() + 8 + (2U << 20) + 300);
+        // moov went with the cut, so there is no table at all...
+        const auto no_table = read_seekable(cut);
+        REQUIRE_FALSE(no_table.has_value());
+        // ...but a moov-first file cut the same way keeps its table and ends
+        // at the last sample the bytes hold.
+        MoovSpec first{.sizes = sizes};
+        first.mdat_data_offset = 0;
+        const auto measured = build_moov(first);
+        first.mdat_data_offset = ftyp().size() + measured.size() + 8;
+        const auto head = build_moov(first);
+        Bytes faststart = ftyp();
+        faststart.insert(faststart.end(), head.begin(), head.end());
+        faststart.insert(faststart.end(), mdat.begin(), mdat.end());
+        const auto short_file = std::span<const std::byte>{faststart}.first(
+            ftyp().size() + head.size() + 8 + (2U << 20) + 300);
+        const auto out = read_seekable(short_file);
+        REQUIRE(out.has_value());
+        REQUIRE(out->samples.size() == 2);
+        CHECK(out->samples[0] == expect[0]);
+        CHECK(out->samples[1] == expect[1]);
+    }
+
+    SECTION("a sample larger than the box bound is refused, not allocated") {
+        iclforge::containers::mp4::ReadOptions options;
+        options.max_box_bytes = 64U * 1024U;
+        const auto out = read_seekable(file, options);
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == iclforge::containers::mp4::DemuxError::kLimitExceeded);
+    }
+}
+
+TEST_CASE("MP4 fragmented files read from a seekable source", "[mp4][reader][fragment]") {
+    const std::vector<Bytes> frames{frame_of(300, 0x11), frame_of(310, 0x22), frame_of(320, 0x33),
+                                    frame_of(330, 0x44), frame_of(340, 0x55)};
+    const iclforge::containers::mp4::AudioTrack track{
+        .codec_id = std::string{iclforge::containers::mp4::kCodecEac3},
+        .sample_rate = 48000,
+        .channels = 6,
+        .samples_per_frame = 1536,
+        .codec_config = atmos_dec3(),
+        .language = "und"};
+    const auto out = iclforge::containers::mp4::fragment(
+        track, views_of(frames), iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = 2});
+    REQUIRE(out.has_value());
+    Bytes whole = out->init_segment;
+    for (const auto& segment : out->media_segments) {
+        whole.insert(whole.end(), segment.bytes.begin(), segment.bytes.end());
+    }
+    const auto read = read_seekable(whole);
+    REQUIRE(read.has_value());
+    CHECK(read->samples == frames);
+    CHECK(read->track.codec_id == "ec-3");
+}
+
+TEST_CASE("MP4 seekable read refuses what is not an MP4", "[mp4][reader]") {
+    SECTION("nothing") {
+        const auto out = read_seekable({});
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == iclforge::containers::mp4::DemuxError::kNotIsobmff);
+    }
+    SECTION("a Matroska header") {
+        const Bytes ebml{std::byte{0x1A}, std::byte{0x45}, std::byte{0xDF}, std::byte{0xA3},
+                         std::byte{0x01}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}};
+        const auto out = read_seekable(ebml);
+        REQUIRE_FALSE(out.has_value());
+        CHECK(out.error() == iclforge::containers::mp4::DemuxError::kNotIsobmff);
     }
 }
 

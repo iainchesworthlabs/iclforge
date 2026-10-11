@@ -153,13 +153,35 @@ readings are in `libs/ac4/ERRATA.md` under "The 9.X.4 element", and the streams 
 are built from the standard's tables.
 
 `DecoderConfig` holds the rest: `output`, `presentation` (below), `concealment`, `level` (the
-`md_compat` level the decoder claims, 3 by default; presentations above it are not chosen),
+`md_compat` level the decoder claims, 7 by default, unrestricted; presentations above it are not
+chosen),
 `decoding` (full or core decoding, Part 2 clause 4.7, full by default), and `syntax`, a trace of
 every syntax element read. `syntax` is an `iclforge::ac4::SyntaxTrace`, a
 `std::function` the configuration owns, and the decoder keeps a copy of its own, so a lambda
 written in place, in a class's constructor for instance, stays valid; what it captures by
 reference has to outlive the decoder. The records are described under
 [Validation](../verification.md#the-decoders-syntax).
+
+`DecoderConfig::executor` lets a caller with a second core spread a frame's per-channel work over
+two threads: each channel's inverse transform and QMF analysis, A-SPX's elements, A-CPL's slots and
+decorrelators, each output's QMF synthesis and sample rate converter. An
+`iclforge::ac4::Executor` (`iclforge/ac4/decoder/executor.hpp`) is two functions, `lanes()` and
+`run(count, task, context)`, which calls `task(context, index, lane)` once for each index and
+returns when all have; the tasks of one run read and write what no other task does, so the PCM is
+the same bit for bit whichever way they run, and a null executor, the default, runs them in order on
+the calling thread. The executor is the caller's and must outlive the decoder; only the thread
+that decodes calls it. The ESP32 player's is a task pinned to the core the decode task is not on
+(`CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL`); the tests' is two threads and a lock
+(`libs/ac4/tests/decoder/test_executor.cpp`), which decodes every committed stream through it and
+compares the bits.
+
+`decode(frame, next)` and `decode_by_block(frame, next, sink)` take, as well, the frame the following call will be given, and read its syntax
+on the executor's second lane while this frame is reconstructed (`Executor::run_async()` and `wait_async()`, which an executor with no
+second lane runs in place). The signal, `presentations()`, `metadata()`, `refusal_reason()` and `latency_samples()` after each call are
+what a call without `next` gives. Nothing is read ahead for a frame with object audio, one that does not continue the stream (a change of
+source), one of the efficient high frame rate mode, or with a syntax trace set; the frame the following call is given must be `next`, and any
+other is taken as a change of source; and a `set_presentation()` between the calls takes effect one frame later, since the frame was read
+with the choice that stood. The ESP32 player holds one frame back to give it the next.
 
 `forge decode` spells each control as an option (`output-level=`, `drcmode=`, `headphones`,
 `dialogue-enhancement=`, `channels=`, `downmix=`, `speakers=`, `mix-lfe=`, `dialogue-gain=`,
@@ -279,12 +301,16 @@ of objects takes them from `decode()`.
 plays E-AC-3's objects with (`iclforge::render::LayoutRenderer`, by way of
 `apps/shared/media/src/ac4_object_render.hpp`): each object panned from its position at its gain, moving to
 each update over its ramp, to the layout `speakers=`, `channels=` or `downmix=` names, 7.1.4
-without them. Width, divergence, zones and the screen factor are not rendered.
+without them. Width, divergence, zones and the screen factor are not rendered: the layout renderer
+applies E-AC-3's channel lock, zones and extent (see [Spatial & Atmos
+objects](spatial-and-atmos.md)), and this path does not hand them over from AC-4's object
+properties.
 
 ## Encoding a stream
 
 `iclforge::ac4::Encoder` writes mono, stereo, 5.0 and 5.1, and 5.0.4 and 5.1.4 in Part 2's immersive element
-(and, as experimental options, 7.0, 7.1, 7.0.4, 7.1.4, 9.0.4 and 9.1.4 and a 3.0 dialogue substream), at 48 kHz at
+(and, as experimental options, 7.0, 7.1, 7.0.4, 7.1.4, 9.0.4, 9.1.4, 22.2 and a 3.0 dialogue
+substream), at 48 kHz at
 every frame rate of Part 1 Table 83, or at 44.1 kHz in frames of 2 048 samples, in the SIMPLE, ASPX
 and A-CPL codec modes and, in the immersive layouts, S-CPL and A-SPX with S-CPL, at a constant,
 average or variable rate. It takes planar samples at full scale 1.0, in the order the decoder
@@ -323,14 +349,14 @@ rate its frames cannot hold, a presentation of the wrong number of substreams, a
 
 | `EncoderConfig` field | What it sets | Default |
 |---|---|---|
-| `channels`, `sample_rate_hz` | 1, 2, 5 or 6 channels; 9 or 10 (5.0.4 and 5.1.4); 7 or 8 with `experimental.seven_x`, 11 or 12 with `experimental.back_pair`, and 13 or 14 (9.0.4 and 9.1.4, with the screen pair Lscr and Rscr last, after the LFE) with `experimental.nine_x_4`; 48 000 or 44 100 Hz | 2, 48 000 |
+| `channels`, `sample_rate_hz` | 1, 2, 5 or 6 channels; 9 or 10 (5.0.4 and 5.1.4); 7 or 8 with `experimental.seven_x`, 11 or 12 with `experimental.back_pair`, 13 or 14 (9.0.4 and 9.1.4, with the screen pair Lscr and Rscr last, after the LFE) with `experimental.nine_x_4`, and 24 (22.2) with `experimental.twenty_two_two`; 48 000 or 44 100 Hz | 2, 48 000 |
 | `frame_rate_index`, `bitrate_kbps`, `rate_mode` | Part 1 Table 83's frame rate; the rate over whole frames, 8 to 3 000 kbps; `kConstant`, `kAverage` (within the decoder's buffer, Part 1 clause 6.2.4) or `kVariable` | 13, 192, `kConstant` |
 | `codec_mode` | `kAuto` (the rate's choice, as DEE's streams make it), `kSimple`, `kAspx`, an A-CPL mode, and in the immersive layouts `kScpl`, `kAspxScpl` and, behind `experimental.ajcc`, `kAspxAjcc` | `kAuto` |
 | `iframe_interval`, `iframes`, `fragment_starts` | An I-frame every so many frames, at named frames, and where a container's fragments start, which an MP4 lists as its sync samples | 24 |
 | `dialnorm_db`, `loudness` | The dialogue level, 0 to -31.75 dBFS, and Part 1's further loudness values | -31, none |
 | `drc`, `downmix`, `dialogue` | The DRC decoder modes on their profiles, the stereo downmix's values, and dialogue enhancement from marked channels or a stem | none |
 | `substreams`, `presentations` | Several substreams and the presentations of Part 2 Table 53 made of them (below) | one of each |
-| `trace`, `experimental` | A record of every syntax element written; the tools and layouts that no reader outside this project has been checked against, among them `noise_fill`, which sends each band that quantises to zero a noise level for the decoder to fill it with, and `frame_rate_fraction` 2 or 4, the efficient high frame rate mode: at `frame_rate_index` 5 to 12 (4 from 10) each frame the codec codes at Table 18's audio frame rate goes out as that many transmission frames, at a constant rate | none |
+| `trace`, `experimental` | A record of every syntax element written; the tools and layouts that no reader outside this project has been checked against, among them `noise_fill`, which sends each band that quantises to zero a noise level for the decoder to fill it with, and `frame_rate_fraction` 2 or 4, the efficient high frame rate mode: at `frame_rate_index` 5 to 12 (4 from 10) each frame the codec codes at Table 18's audio frame rate goes out as that many transmission frames, at a constant rate, and `twenty_two_two`, the 22.2 channel element (below) | none |
 
 9.0.4 and 9.1.4 (`experimental.nine_x_4`, 13 or 14 channels) take Part 2's immersive element with
 `b_5fronts`, which adds the screen pair Lscr and Rscr to the 7.X.4 channels, in SCPL, ASPX_SCPL and
@@ -338,7 +364,7 @@ ASPX_ACPL_2 by the rate and, with `experimental.acpl`, ASPX_ACPL_1. The channels
 `Decoder::decode()` writes them: L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr, the LFE of 9.1.4, then Lscr and
 Rscr. ASPX_AJCC with `b_5fronts`, dialogue enhancement and the height downmix are refused for them,
 naming the element. Their thirteen tracks are above Table 55's level 3, so the presentation carries
-`md_compat` 7 and a decoder selects it when `DecoderConfig::level` is 7.
+`md_compat` 7, which a decoder selects at its default level, 7, and not at level 3.
 
 A frame comes out when the input it needs has arrived: `encode()` returns the frames each call
 completes, and `flush()` pads the input with silence to the end of its last frame and returns the
@@ -346,6 +372,25 @@ rest. Each `EncodedFrame` holds the raw frame, the samples it decodes to and whe
 I-frame. `delay_samples()` and `decoder_delay_samples()` give where an input sample lands in the
 decoded output, which an MP4's edit list can skip; at `frame_rate_index` 13 the two are 3 072 and
 1 313 samples.
+
+### The 22.2 element
+
+With `experimental.twenty_two_two` and 24 channels `Encoder` writes Part 2's 22_2_channel_element()
+(clause 6.2.4.3): two LFE tracks and eleven channel pairs of Table 21, in the SIMPLE and ASPX codec
+modes. The input is Part 2 Table A.27's order by speaker index, which is the order the decoder writes
+the layout in: L R C Ls Rs Lb Rb Tfl Tfr Tbl Tbr LFE Tsl Tsr Tfc Tbc Tc LFE2 Bfl Bfr Bfc Cb Lw Rw. Each
+pair is a stereo pair as the 5.X element's L and R: it has its own transform layout, its own stereo
+processing and, in ASPX, its own `aspx_data_2ch()`; the LFEs are coded as the 5.1 LFE is, to 120 Hz.
+The element has no companding, S-CPL or A-CPL data, so the A-CPL, S-CPL and A-JCC codec modes are
+refused by name, and so are dialogue enhancement, DRC gains and the stereo and height downmix values,
+which have no 22.2 definition to write. `kAuto` takes ASPX below 76.8 kbps a full-band channel (22 of
+them, so 1 690 kbps) and SIMPLE from there. The rate must hold the least frame, which the 24 tracks
+set at 17 kbps in SIMPLE and 49 in ASPX at the native frame rate (15 and 45 at 44.1 kHz), and more at
+the higher frame rates: `refusal_reason()` names a rate that cannot hold it.
+
+A 22.2 presentation has 22 tracks, which only `md_compat` 7 (unrestricted) holds (Part 2 Table 55),
+so a decoder takes it at `DecoderConfig::level` 7: at the default level 3 `decode()` finds no
+presentation it can select.
 
 ### Substreams and presentations
 

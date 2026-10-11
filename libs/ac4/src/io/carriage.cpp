@@ -517,7 +517,7 @@ std::expected<std::vector<std::byte>, Refusal> presentation_v1_dsi(const Toc& to
                 return std::unexpected("an alternative presentation's target past its fields");
             }
             w.put(static_cast<std::uint32_t>(target.md_compat), 3);
-            w.put(static_cast<std::uint32_t>(target.device_category) << 4U, 8);
+            w.put(static_cast<std::uint64_t>(target.device_category) << 4U, 8);
         }
     }
     w.align();

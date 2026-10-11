@@ -107,11 +107,28 @@ placement[obj] = {
 };
 ```
 
-These are **transmitted, not rendered here**. §4.3 makes the renderer, not the decoder,
+These are **transmitted, not applied by the encoder**. §4.3 makes the renderer, not the decoder,
 responsible for turning an extent into loudspeaker feeds, and the 5.1 downmix this encoder
 builds is a point-source VBAP pan by construction — a downmix that spread the object would
 then be spread *again* by the receiving renderer. So a sized object is transmitted as sized and
 folded into the bed as a point, which is the split used.
+
+The renderer that plays the objects back — `iclforge::render::LayoutRenderer`, what Hearth, the
+ESP32 player and `forge decode`'s AC-4 object rendering go through — is where they are applied,
+from the `DisplayObject` that `describe_objects` returns. §5.2 fixes what each property means, and
+Table A.7 which zones each speaker is in, so the renderer follows the meaning rather than
+inventing one:
+
+| Property | What the renderer does |
+|---|---|
+| **Channel lock** (`snap`, §5.2.5) | The one speaker nearest the object, at unit gain: "constrained to a single speaker", no panning between. It wins over size. |
+| **Zone constraints** (§5.2.6, Tables 20 and 21) | The speakers in an excluded zone are taken out of the set the object is panned over, so the object moves rather than gets quieter. A surround pair is the back zone in a 5.X layout and the side zone in a larger one (Table A.7 note 2); the Top-Bottom zone answers to `b_enable_elevation` alone. A constraint no speaker of the layout satisfies (a stereo room asked for "surround only") cannot be honoured and the object plays unconstrained. |
+| **Size** (§5.2.2) | The cuboid `width`/`depth`/`height` describe, centred on the position, in room units, rendered as that cuboid sampled at the centre and the two ends of each axis it extends along (27 points at most), each point panned and their powers averaged: more speakers at the same level, never louder. |
+
+An object that says none of this — a point, no lock, no zone, elevation allowed, which is what a
+bed channel always is — renders exactly as it did before the renderer read any of it. Object
+**divergence** (§5.2.7) is carried and reported but not applied: the standard gives the amount
+and says nothing of where the two objects it makes should sit, so there is nothing to follow.
 
 `Keyframe` carries the same four fields. `size` interpolates between keyframes the way position
 and gain do (BS.2076-2 §10.3 lists width/height/depth among its interpolatable parameters);
@@ -181,10 +198,12 @@ already undoes an authored object's own gain. The LFE feeds the bed's own LFE ch
 unpanned — it is not a JOC object either way (§6.3.2.2 bypasses it for a bed programme exactly as
 it does for a dynamic-object one).
 
-Only the 5.1.4 channel order has been checked against a real DEE-produced stream
-(`libs/ac3/tests/oba/test_dee_joc_fixture.cpp`); 7.1.4 and 9.1.6 extend it by Table 12's own channel order,
-unverified against DEE itself. `forge atmos-cbi` is the CLI surface — see
-[CLI commands](../forge/cli/commands.md).
+The channel order is checked against real DEE-produced streams for all three layouts
+(`libs/ac3/tests/oba/test_dee_joc_fixture.cpp`: `dee_joc_514.ec3` by tone, `dee_joc_714.ec3` and
+`dee_joc_916.ec3` one channel at a time). Table 12's order and the order a production tool takes
+its input in are different permutations at 9.1.6 — the wides are last in the bed and follow the
+rears at the input — and the objects come back as the bed's labels say. `forge atmos-cbi` is the
+CLI surface — see [CLI commands](../forge/cli/commands.md).
 
 ## Getting the objects back: `oba::joc::reconstruct`
 

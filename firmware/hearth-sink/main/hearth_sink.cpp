@@ -82,6 +82,10 @@
 // no zones and the report prints nothing.
 namespace iclforge_probe {
 std::uint64_t now_us() { return static_cast<std::uint64_t>(esp_timer_get_time()); }
+// The task that is calling, for the stage timers' table, which is one task's.
+const void* thread_token() noexcept {
+    return xTaskGetCurrentTaskHandle();
+}
 [[gnu::weak]] void reset_stages() {}
 [[gnu::weak]] void report_stages(const char* /*codec*/, int /*frames*/) {}
 }  // namespace iclforge_probe
@@ -448,6 +452,11 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
                       location.find("decoding=core") != std::string_view::npos;
     config.ac4.pcm_hash = CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH != 0 &&
                           location.find("hash=off") == std::string_view::npos;
+    // parallel=on or parallel=off is this play's choice of one core or both for the decoder's
+    // per-channel stages; without it the Kconfig's value holds.
+    config.ac4.parallel = location.find("parallel=on") != std::string_view::npos ||
+                          (CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL != 0 &&
+                           location.find("parallel=off") == std::string_view::npos);
     // below=N is this play's allocation limit for internal RAM, so that one image
     // compares limits (planning/ac4.md, D14c); without it the Kconfig's value holds.
     if (const auto at = location.find("below="); at != std::string_view::npos) {

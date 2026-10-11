@@ -114,6 +114,22 @@ bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<con
 template <typename Real>
 bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<const Real> spectrum,
                                    int exponent, std::span<Real> pcm) {
+    return block_in(transforms, spectrum, exponent, pcm, transforms.block_scratch(),
+                    transforms.transform_scratch());
+}
+
+template <typename Real>
+bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<const Real> spectrum,
+                                   int exponent, std::span<Real> pcm,
+                                   TransformScratch<Real>& scratch) {
+    return block_in(transforms, spectrum, exponent, pcm, scratch.block, scratch.transform);
+}
+
+template <typename Real>
+bool ChannelSynthesis<Real>::block_in(TransformSet<Real>& transforms,
+                                      std::span<const Real> spectrum, int exponent,
+                                      std::span<Real> pcm, std::span<Real> block_scratch,
+                                      std::span<Complex<Real>> transform_scratch) {
     const std::size_t n = spectrum.size();
     const auto n_int = static_cast<int>(n);
     if (transforms.full_length() != full_length_ || pcm.size() < n) {
@@ -133,15 +149,14 @@ bool ChannelSynthesis<Real>::block(TransformSet<Real>& transforms, std::span<con
     // window and overlap-add are one pass over the samples (Imdct::inverse_overlap). At Fixed32
     // every block takes the inverse that carries its exponent.
     if (std::is_floating_point_v<Real> && n == full && n_prev == full) {
-        imdct->inverse_overlap(spectrum, kbd, overlap_, pcm,
-                               transforms.transform_scratch().first(n));
+        imdct->inverse_overlap(spectrum, kbd, overlap_, pcm, transform_scratch.first(n));
         previous_length_ = n_int;
         return true;
     }
 
     // Steps 1 to 4 and Pseudocode 63's unfolding, into the set's block scratch.
-    const std::span<Real> x = transforms.block_scratch().first(2 * n);
-    imdct->inverse(spectrum, exponent, x, transforms.transform_scratch().first(n));
+    const std::span<Real> x = block_scratch.first(2 * n);
+    imdct->inverse(spectrum, exponent, x, transform_scratch.first(n));
 
     // Pseudocode 63's window over the first half.
     const std::size_t skip_left = (n - nw) / 2;

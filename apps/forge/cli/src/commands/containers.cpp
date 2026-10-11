@@ -46,21 +46,80 @@ namespace forge_cli::commands {
 
 namespace {
 
-// A container track carries one programme. iclforge::ac3::io::scan hands back the FIRST
-// programme's access units for exactly that reason - two independent
-// substreams (§E2.3.1.2) are alternatives rather than layers, and splicing
-// their units into one track is not something a player can undo - so a stream
-// carrying more than one loses the rest here. Said out loud rather than left
-// for someone to notice a missing commentary later; carrying every programme,
-// a track each, is the job of the container readers (mkv/mp4/ts) and MPEG-TS profiles.
+// A Matroska track carries one programme, and this muxer writes one track, so
+// a stream with several independent substreams (§E2.3.1.2) keeps its first
+// here. Said out loud rather than left for someone to notice a missing
+// commentary later. MP4, fragmented MP4 and MPEG-TS carry every programme
+// instead (carried_units below): ETSI TS 102 366 F.2 and A/52 Annex G §3.3 both
+// define a sample or PES payload as the syncframes of every substream present.
 void warn_if_programmes_dropped(const iclforge::ac3::io::ScannedStream& scanned) {
     if (scanned.programmes.size() <= 1) {
         return;
     }
     fmt::println(stderr,
                  "warning: this stream carries {} programmes (§E2.3.1.2 independent "
-                 "substreams); only programme {} is muxed - a container track carries one",
+                 "substreams); only programme {} is muxed - this Matroska track carries one "
+                 "(programme=N picks another; mp4, fmp4 and ts keep them all)",
                  scanned.programmes.size(), scanned.programmes.front().substreamid);
+}
+
+// The units a MP4 / fMP4 / MPEG-TS writer is handed: every programme's, one
+// frame period at a time and in wire order, which is what the sample entry's
+// num_ind_sub declares (iclforge::ac3::io::build_codec_config_box). A stream
+// whose programmes do not run in step has no such frame periods, and is
+// refused with that reason rather than muxed into samples that are not one.
+std::optional<std::vector<std::span<const std::byte>>> carried_units(
+    const iclforge::ac3::io::ScannedStream& scanned, std::string_view in_path) {
+    auto units = iclforge::ac3::io::all_programme_access_units(scanned);
+    if (!units.has_value()) {
+        fmt::println(stderr,
+                     "error: {}: this stream's programmes do not run in step (a different number "
+                     "of frame periods each, or substreams that are not adjacent), so no sample "
+                     "can hold one frame period of all of them",
+                     in_path);
+    }
+    return units;
+}
+
+// programme=N on a command that wraps a stream: the stream becomes that
+// programme alone, as a stream of its own (iclforge::ac3::io::extract_programme
+// renumbers it as independent substream 0, which is what a player takes).
+// Without it every programme is carried (MP4, fMP4, MPEG-TS) or the first is
+// (Matroska). A stream with no programme of that id is refused by name, and
+// one this reader does not scan (AC-4, say) is left for the command to report
+// as it always did.
+[[nodiscard]] bool apply_programme_option(std::vector<std::byte>& raw, const Options& meta,
+                                          std::string_view in_path) {
+    if (!meta.programme.has_value()) {
+        return true;
+    }
+    const auto scanned = iclforge::ac3::io::scan(raw);
+    if (!scanned.has_value()) {
+        return true;
+    }
+    auto selected = iclforge::ac3::io::extract_programme(*scanned, *meta.programme);
+    if (!selected.has_value()) {
+        std::string carried;
+        for (const auto& programme : scanned->programmes) {
+            carried += (carried.empty() ? "" : ", ") + std::to_string(programme.substreamid);
+        }
+        fmt::println(stderr, "error: {}: no programme {} in this stream (it carries {})", in_path,
+                     *meta.programme, carried);
+        return false;
+    }
+    raw = std::move(*selected);
+    return true;
+}
+
+// What the stream's shape reads as in a report: the programme count when
+// there is more than one, otherwise the lead programme's substreams or layout.
+std::string stream_shape(const iclforge::ac3::io::ScannedStream& scanned) {
+    if (scanned.programmes.size() > 1) {
+        return fmt::format("{} programmes", scanned.programmes.size());
+    }
+    return scanned.substreams_per_unit > 1
+               ? fmt::format("{} substreams", scanned.substreams_per_unit)
+               : std::string{iclforge::ac3::analysis::layout_name(scanned.acmod, scanned.lfe)};
 }
 
 // Every container writer here holds ONE samples_per_frame for the whole
@@ -108,12 +167,13 @@ bool write_text_to_path(const std::filesystem::path& path, std::string_view text
 }
 
 // §E2.3.1.2's legacy-core delivery - an AC-3 bed with Annex E dependent
-// substreams extending it - has no codec-config box defined for it in any of
-// these containers: 'dac3' cannot mention the dependents and 'dec3' would
-// have to call the AC-3 core Annex E syntax (iclforge::ac3::io::build_codec_config_box
-// declines it for exactly that reason, returning an empty payload). Refused
-// here, where the message can name the file and point somewhere useful,
-// rather than written into a file whose header contradicts its own mdat.
+// substreams extending it - is an E-AC-3 stream whose independent substream 0
+// is an AC-3 frame, which an ISOBMFF 'ec-3' entry and a transport stream's
+// E-AC-3 descriptor both describe (the core's bsid goes in the bsid field). A
+// Matroska track cannot: the codec registry defines A_AC3 for bsid 10 and below
+// and A_EAC3 for bsid 11 to 16, and names no ID for a stream that is both.
+// Refused here, where the message can name the file and point somewhere useful,
+// rather than written under an ID that contradicts the stream.
 [[nodiscard]] bool reject_legacy_core(const iclforge::ac3::io::ScannedStream& scanned,
                                       std::string_view in_path, std::string_view container) {
     if (scanned.kind != iclforge::ac3::io::StreamKind::kAc3CoreEac3Extension) {
@@ -121,7 +181,8 @@ bool write_text_to_path(const std::filesystem::path& path, std::string_view text
     }
     fmt::println(stderr,
                 "error: {} is an AC-3 core with E-AC-3 extension substreams (A/52 §E2.3.1.2); "
-                "{} has no codec-config box that can describe that arrangement. "
+                "{}'s codec IDs cover bsid 10 and below (A_AC3) or 11 to 16 (A_EAC3) and none "
+                "names that arrangement. `forge mp4`, `fmp4` and `ts` carry it; "
                 "`forge decode` reads the stream itself.",
                 in_path, container);
     return true;
@@ -220,7 +281,7 @@ void describe_alternatives(iclforge::ac4::Toc& toc,
 
 }  // namespace
 
-int run_mkv(std::string_view in_path, std::string_view out_path) {
+int run_mkv(std::string_view in_path, std::string_view out_path, const Options& meta) {
     // read_elementary_stream (container readers (mkv/mp4/ts)) also accepts an MP4 or MPEG-TS
     // input here, not just a raw .ac3/.ec3 - which is what makes this
     // container-to-container remux (`forge mkv broken.mp4 fixed.mkv`) rather
@@ -229,8 +290,11 @@ int run_mkv(std::string_view in_path, std::string_view out_path) {
     // scan(raw) a few lines down, never from whatever the SOURCE container
     // declared - see run_mp4's own comment for the sharpest case of that,
     // the dec3 box.
-    const auto raw = read_elementary_stream(in_path);
+    auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
+        return kExitInput;
+    }
+    if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
     }
     // Everything the container needs to declare comes out of the bitstream:
@@ -306,7 +370,7 @@ int run_mkv(std::string_view in_path, std::string_view out_path) {
     return kExitOk;
 }
 
-int run_mp4(std::string_view in_path, std::string_view out_path) {
+int run_mp4(std::string_view in_path, std::string_view out_path, const Options& meta) {
     // read_elementary_stream (container readers (mkv/mp4/ts)) also accepts a Matroska or
     // MPEG-TS input here, so this doubles as container-to-container remux
     // (`forge mp4 broken.mkv fixed.mp4`). That is what makes it the
@@ -315,8 +379,11 @@ int run_mp4(std::string_view in_path, std::string_view out_path) {
     // real bitstream iclforge::ac3::io::scan just walked - never whatever dec3 (or
     // its absence) the SOURCE container declared - so a source whose Atmos
     // dec3 flag is wrong or missing comes out correct on the far side.
-    const auto raw = read_elementary_stream(in_path);
+    auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
+        return kExitInput;
+    }
+    if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
     }
     const auto scanned = iclforge::ac3::io::scan(raw);
@@ -382,15 +449,19 @@ int run_mp4(std::string_view in_path, std::string_view out_path) {
         fmt::println(stderr, "error: {}", iclforge::ac3::io::describe(scanned.error()));
         return kExitInput;
     }
-    warn_if_programmes_dropped(*scanned);
-    if (reject_legacy_core(*scanned, in_path, "MP4")) {
-        return kExitInput;
-    }
-    const bool eac3 = scanned->kind == iclforge::ac3::io::StreamKind::kEac3;
+    // A legacy core (§E2.3.1.2) is an E-AC-3 stream whose independent
+    // substream 0 is an AC-3 frame, so it takes the 'ec-3' entry like any
+    // other with dependents.
+    const bool eac3 = scanned->kind != iclforge::ac3::io::StreamKind::kAc3;
 
     // scan()'s access units pass to the muxer as the views they already are
     // - the whole-stream copy that satisfied the old parameter type is gone.
-    const auto& units = scanned->access_units;
+    // Every programme's, a frame period to a sample (ETSI TS 102 366 F.2).
+    const auto carried = carried_units(*scanned, in_path);
+    if (!carried.has_value()) {
+        return kExitInput;
+    }
+    const auto& units = *carried;
 
     const auto samples_per_frame = track_samples_per_frame(*scanned);
     if (!samples_per_frame.has_value()) {
@@ -403,7 +474,9 @@ int run_mp4(std::string_view in_path, std::string_view out_path) {
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned->sample_rate),
         .channels = scanned->channels,
         .samples_per_frame = *samples_per_frame,
-        .codec_config = iclforge::ac3::io::build_codec_config_box(*scanned)};
+        // Every programme is in the samples, so every programme is in the box.
+        .codec_config = iclforge::ac3::io::build_codec_config_box(
+            *scanned, iclforge::ac3::io::BoxProgrammes::kAll)};
     const auto file = iclforge::containers::mp4::mux(track, units);
     if (!file.has_value()) {
         fmt::println(stderr, "error: {}", iclforge::containers::mp4::describe(file.error()));
@@ -420,10 +493,7 @@ int run_mp4(std::string_view in_path, std::string_view out_path) {
         fmt::println(stderr, "error: write failed");
         return kExitOutput;
     }
-    const std::string shape =
-        scanned->substreams_per_unit > 1
-            ? fmt::format("{} substreams", scanned->substreams_per_unit)
-            : std::string{iclforge::ac3::analysis::layout_name(scanned->acmod, scanned->lfe)};
+    const std::string shape = stream_shape(*scanned);
     const std::string atmos =
         scanned->oba_complexity_index
             ? fmt::format(", Atmos complexity {}", *scanned->oba_complexity_index)
@@ -473,10 +543,16 @@ bool write_rendition(const std::filesystem::path& dir, const RenditionFiles& ren
 // bitstream rather than taken on trust - the same derivation for the JOC
 // rendition and for its stripped companion.
 std::optional<RenditionFiles> build_rendition(const iclforge::ac3::io::ScannedStream& scanned,
-                                              std::uint32_t frames_per_fragment) {
-    const bool eac3 = scanned.kind == iclforge::ac3::io::StreamKind::kEac3;
+                                              std::uint32_t frames_per_fragment,
+                                              std::string_view in_path) {
+    // A legacy core is E-AC-3-shaped: see run_mp4.
+    const bool eac3 = scanned.kind != iclforge::ac3::io::StreamKind::kAc3;
     const auto samples_per_frame = track_samples_per_frame(scanned);
     if (!samples_per_frame.has_value()) {
+        return std::nullopt;
+    }
+    const auto units = carried_units(scanned, in_path);
+    if (!units.has_value()) {
         return std::nullopt;
     }
     iclforge::containers::mp4::AudioTrack track{
@@ -485,7 +561,9 @@ std::optional<RenditionFiles> build_rendition(const iclforge::ac3::io::ScannedSt
         .sample_rate = iclforge::ac3::sample_rate_hz(scanned.sample_rate),
         .channels = scanned.channels,
         .samples_per_frame = *samples_per_frame,
-        .codec_config = iclforge::ac3::io::build_codec_config_box(scanned)};
+        // Every programme is in the samples, so every programme is in the box.
+        .codec_config = iclforge::ac3::io::build_codec_config_box(
+            scanned, iclforge::ac3::io::BoxProgrammes::kAll)};
     // ETSI TS 103 420 §E.5's 'ceao' compatibility brand, which DASH-IF IOP
     // Part 8 v5.0.0 §5.3.3 asks for on a backward-compatible object-audio
     // E-AC-3 track: iclforge::containers::mp4:: never reads the object layer itself, so this front
@@ -494,7 +572,7 @@ std::optional<RenditionFiles> build_rendition(const iclforge::ac3::io::ScannedSt
     // companion's own scan carries no such marker, so this naturally comes
     // out false for it without a separate branch.
     auto fragmented = iclforge::containers::mp4::fragment(
-        track, scanned.access_units,
+        track, *units,
         iclforge::containers::mp4::FragmentOptions{.frames_per_fragment = frames_per_fragment,
                              .object_audio_brand = scanned.oba_complexity_index.has_value()});
     if (!fragmented.has_value()) {
@@ -683,8 +761,11 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
     // read_elementary_stream also takes a Matroska, MP4 or MPEG-TS input, as
     // mkv/mp4/ts do: 'ac4-encode' and 'mp4' write MP4, which this fragments
     // as readily as the raw stream.
-    const auto raw = read_elementary_stream(in_path);
+    auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
+        return kExitInput;
+    }
+    if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
     }
     const auto scanned = iclforge::ac3::io::scan(raw);
@@ -696,11 +777,7 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
         fmt::println(stderr, "error: {}", iclforge::ac3::io::describe(scanned.error()));
         return kExitInput;
     }
-    warn_if_programmes_dropped(*scanned);
-    if (reject_legacy_core(*scanned, in_path, "fragmented MP4")) {
-        return kExitInput;
-    }
-    const auto primary = build_rendition(*scanned, frames_per_fragment);
+    const auto primary = build_rendition(*scanned, frames_per_fragment, in_path);
     if (!primary.has_value()) {
         return kExitInput;
     }
@@ -743,7 +820,7 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
             return kExitInternal;
         }
         stripped_scan = *rescanned;
-        companion = build_rendition(stripped_scan, frames_per_fragment);
+        companion = build_rendition(stripped_scan, frames_per_fragment, in_path);
         if (!companion.has_value()) {
             return kExitInternal;
         }
@@ -787,10 +864,7 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
         return kExitOutput;
     }
 
-    const std::string shape =
-        scanned->substreams_per_unit > 1
-            ? fmt::format("{} substreams", scanned->substreams_per_unit)
-            : std::string{iclforge::ac3::analysis::layout_name(scanned->acmod, scanned->lfe)};
+    const std::string shape = stream_shape(*scanned);
     const std::string atmos =
         scanned->oba_complexity_index
             ? fmt::format(", Atmos complexity {}", *scanned->oba_complexity_index)
@@ -799,7 +873,7 @@ int run_fmp4(std::string_view in_path, std::string_view out_dir,
         companion ? fmt::format(", and bed51/ with the same {} channels and the objects stripped",
                                 companion->track.channels)
                   : std::string{};
-    const bool eac3 = scanned->kind == iclforge::ac3::io::StreamKind::kEac3;
+    const bool eac3 = scanned->kind != iclforge::ac3::io::StreamKind::kAc3;
     status_println(
         status_stream(),
         "wrote {} {} access units ({}, {} channels{}) as {} fragment(s) to {} "
@@ -902,8 +976,11 @@ int run_ts(std::string_view in_path, std::string_view out_path, std::string_view
     // read_elementary_stream (container readers (mkv/mp4/ts)) also accepts a Matroska or MP4
     // input here - container-to-container remux, same as run_mkv/run_mp4
     // above.
-    const auto raw = read_elementary_stream(in_path);
+    auto raw = read_elementary_stream(in_path);
     if (raw.empty()) {
+        return kExitInput;
+    }
+    if (!apply_programme_option(raw, meta, in_path)) {
         return kExitInput;
     }
     const auto scanned = iclforge::ac3::io::scan(raw);
@@ -964,18 +1041,22 @@ int run_ts(std::string_view in_path, std::string_view out_path, std::string_view
         fmt::println(stderr, "error: {}", iclforge::ac3::io::describe(scanned.error()));
         return kExitInput;
     }
-    warn_if_programmes_dropped(*scanned);
-    if (reject_legacy_core(*scanned, in_path, "MPEG-TS")) {
-        return kExitInput;
-    }
     if (!validate_service_association(*scanned, meta)) {
         return kExitUsage;
     }
-    const bool eac3 = scanned->kind == iclforge::ac3::io::StreamKind::kEac3;
+    // A legacy core is carried as E-AC-3 (A/52 §E2.3.1.2 makes its AC-3 frame
+    // independent substream 0; the descriptor's bsid is that substream's).
+    const bool eac3 = scanned->kind != iclforge::ac3::io::StreamKind::kAc3;
 
     // scan()'s access units pass to the muxer as the views they already are
     // - the whole-stream copy that satisfied the old parameter type is gone.
-    const auto& units = scanned->access_units;
+    // Every programme's, one frame period per PES payload (A/52 Annex G §3.3),
+    // which is also what the descriptor's substream1-3 fields describe.
+    const auto carried = carried_units(*scanned, in_path);
+    if (!carried.has_value()) {
+        return kExitInput;
+    }
+    const auto& units = *carried;
 
     const auto samples_per_frame = track_samples_per_frame(*scanned);
     if (!samples_per_frame.has_value()) {
@@ -1006,10 +1087,7 @@ int run_ts(std::string_view in_path, std::string_view out_path, std::string_view
         fmt::println(stderr, "error: write failed");
         return kExitOutput;
     }
-    const std::string shape =
-        scanned->substreams_per_unit > 1
-            ? fmt::format("{} substreams", scanned->substreams_per_unit)
-            : std::string{iclforge::ac3::analysis::layout_name(scanned->acmod, scanned->lfe)};
+    const std::string shape = stream_shape(*scanned);
     status_println(
         status_stream(), "wrote {} {} access units ({}, {} channels, {} bytes) to {} ({} profile)",
         units.size(), eac3 ? "E-AC-3" : "AC-3", shape, track.channels, file->size(), out_path,
@@ -1141,7 +1219,6 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
         sample_rate = reader.track().sample_rate;
         channels = reader.track().channels;
     } else if (kind == iclforge::apps::ContainerKind::kMp4) {
-        iclforge::containers::mp4::Reader reader{};
         // An 'ac-4' sample is the raw_ac4_frame alone (TS 103 190-2 Annex
         // E.4); writing samples back to back would produce a stream nothing
         // can re-sync on, so each is re-wrapped in Annex G.3.1's
@@ -1149,8 +1226,9 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
         // apps/shared/media/src/container_input.cpp applies for the decode/qc path,
         // and byte-for-byte what 'forge ts' produces for the same input.
         // A/52 tracks pass through untouched, exactly as before.
-        const auto on_mp4_sample = [&reader, &on_frame](std::span<const std::byte> sample) {
-            if (reader.track().codec_id != iclforge::containers::mp4::kCodecAc4) {
+        const auto emit_mp4_sample = [&on_frame](std::string_view track_codec,
+                                                 std::span<const std::byte> sample) {
+            if (track_codec != iclforge::containers::mp4::kCodecAc4) {
                 on_frame(sample);
                 return;
             }
@@ -1171,15 +1249,57 @@ int run_demux(std::string_view in_path, std::string_view out_path) {
             framed.insert(framed.end(), sample.begin(), sample.end());
             on_frame(framed);
         };
-        drive(
-            reader,
-            [](iclforge::containers::mp4::DemuxError e) {
-                return iclforge::containers::mp4::describe(e);
-            },
-            on_mp4_sample);
-        codec_id = reader.track().codec_id;
-        sample_rate = reader.track().sample_rate;
-        channels = reader.track().channels;
+        if (!is_stdio_path(in_path)) {
+            // A file can be read at an offset, which a pipe cannot: the
+            // sample table is found by walking the boxes and jumping over
+            // mdat, and each sample is then read where the table says. That
+            // reads an MP4 whose moov follows its mdat - the layout the
+            // chunk-fed Reader below has to refuse, since it cannot go back -
+            // in the same bounded memory, and a faststart file in no more.
+            std::error_code size_error;
+            const auto file_size = std::filesystem::file_size(std::string{in_path}, size_error);
+            if (size_error) {
+                return fail("cannot size the input", kExitInput);
+            }
+            const auto read_at = [&file](std::uint64_t offset, std::span<std::byte> out) {
+                file.clear();
+                file.seekg(static_cast<std::streamoff>(offset), std::ios::beg);
+                file.read(reinterpret_cast<char*>(out.data()),
+                          static_cast<std::streamsize>(out.size()));
+                return static_cast<std::size_t>(file.gcount());
+            };
+            std::string track_codec;
+            const auto track = iclforge::containers::mp4::demux_seekable(
+                read_at, file_size,
+                [&track_codec](const iclforge::containers::mp4::ReadTrack& t) {
+                    track_codec = t.codec_id;
+                },
+                [&](std::span<const std::byte> sample) { emit_mp4_sample(track_codec, sample); });
+            if (!track.has_value()) {
+                status = fail(iclforge::containers::mp4::describe(track.error()), kExitInput);
+            } else {
+                codec_id = track->codec_id;
+                sample_rate = track->sample_rate;
+                channels = track->channels;
+            }
+        } else {
+            iclforge::containers::mp4::Reader reader{};
+            drive(
+                reader,
+                [](iclforge::containers::mp4::DemuxError e) -> std::string_view {
+                    if (e == iclforge::containers::mp4::DemuxError::kMoovAfterMdat) {
+                        return "this MP4's sample table (moov) follows its media data, which "
+                               "cannot be read from a pipe: give demux the file's path instead";
+                    }
+                    return iclforge::containers::mp4::describe(e);
+                },
+                [&reader, &emit_mp4_sample](std::span<const std::byte> sample) {
+                    emit_mp4_sample(reader.track().codec_id, sample);
+                });
+            codec_id = reader.track().codec_id;
+            sample_rate = reader.track().sample_rate;
+            channels = reader.track().channels;
+        }
     } else {
         iclforge::containers::mpegts::Reader reader{};
         drive(
@@ -1244,10 +1364,10 @@ int run_remux(std::string_view in_path, std::string_view out_path, std::string_v
     constexpr std::array<std::string_view, 2> kTsExts{".ts", ".m2ts"};
 
     if (has_extension(out_path, kMkvExts)) {
-        return run_mkv(in_path, out_path);
+        return run_mkv(in_path, out_path, meta);
     }
     if (has_extension(out_path, kMp4Exts)) {
-        return run_mp4(in_path, out_path);
+        return run_mp4(in_path, out_path, meta);
     }
     if (has_extension(out_path, kTsExts)) {
         return run_ts(in_path, out_path, profile, meta);

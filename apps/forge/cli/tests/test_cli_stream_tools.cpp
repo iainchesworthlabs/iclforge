@@ -278,6 +278,62 @@ TEST_CASE("metadata refuses a field the stream does not carry", "[cli][metadata]
     CHECK_FALSE(fs::exists(out));
 }
 
+TEST_CASE("metadata insert adds a field an E-AC-3 stream lacks, and the audio does not move",
+          "[cli][metadata]") {
+    const auto dir = scratch_dir();
+    // No `heavy`: compre is clear, so there are no compr bits to overwrite.
+    const auto source = make_stream("meta_insert.ec3", "eac3-encode", "none 51 off");
+    const auto in_place = dir / "meta_insert_refused.ec3";
+    const auto grown = dir / "meta_insert_out.ec3";
+    const auto log = dir / "meta_insert.log";
+    fs::remove(in_place);
+    fs::remove(grown);
+
+    // Without `insert` it is the same refusal an AC-3 stream gets, now with
+    // the way out named.
+    REQUIRE(run_cli("metadata " + quoted(source) + " " + quoted(in_place) + " compr=-6 bsmod=vi",
+                    log) == 1);
+    const auto refusal = read_log(log);
+    CHECK(refusal.find("does not transmit that field") != std::string::npos);
+    CHECK(refusal.find("insert") != std::string::npos);
+    CHECK_FALSE(fs::exists(in_place));
+
+    REQUIRE(run_cli("metadata " + quoted(source) + " " + quoted(grown) +
+                        " compr=-6 bsmod=vi insert",
+                    log) == 0);
+    const auto text = read_log(log);
+    INFO(text);
+    CHECK(text.find("gained a field") != std::string::npos);
+    CHECK(fs::file_size(grown) > fs::file_size(source));
+
+    const auto before = iclforge::ac3::io::read_frame_metadata(read_bytes(source));
+    const auto after = iclforge::ac3::io::read_frame_metadata(read_bytes(grown));
+    REQUIRE(before.has_value());
+    REQUIRE(after.has_value());
+    CHECK_FALSE(before->compr.has_value());
+    REQUIRE(after->compr.has_value());
+    CHECK(iclforge::ac3::meta::to_db(iclforge::ac3::meta::compr_gain(*after->compr)) <= -6.0 + 1e-9);
+    REQUIRE(after->bsmod.has_value());
+    CHECK(*after->bsmod == 2);  // Table 5.7: visually impaired
+
+    // And the whole stream still frames and decodes to the same samples.
+    const auto scanned = iclforge::ac3::io::scan(read_bytes(grown));
+    REQUIRE(scanned.has_value());
+    require_same_audio(source, grown, "meta_insert_audio");
+}
+
+TEST_CASE("metadata insert cannot grow an AC-3 frame", "[cli][metadata]") {
+    const auto dir = scratch_dir();
+    const auto source = make_stream("meta_insert_ac3.ac3", "encode", "51");
+    const auto out = dir / "meta_insert_ac3_out.ac3";
+    const auto log = dir / "meta_insert_ac3.log";
+    fs::remove(out);
+    REQUIRE(run_cli("metadata " + quoted(source) + " " + quoted(out) + " compr=-6 insert", log) ==
+            1);
+    CHECK(read_log(log).find("does not transmit that field") != std::string::npos);
+    CHECK_FALSE(fs::exists(out));
+}
+
 TEST_CASE("metadata stamps compr onto a stream that carries one", "[cli][metadata]") {
     const auto dir = scratch_dir();
     const auto source = make_stream("meta_compr.ac3", "encode", "51 heavy");

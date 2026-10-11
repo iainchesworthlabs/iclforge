@@ -62,6 +62,33 @@ to check — so `verify_atmos_frame` returns one of three outcomes, not a bool:
 `no_container` counts) — the aggregate shape, mirroring `sign_atmos_stream`'s own frame-count
 return, rather than a per-frame vector callers would otherwise have to reduce themselves.
 
+A tag only vouches for what it covers, so `kValid` also requires that the frame's object layer *is*
+that container and nothing beside it. The tag hashes the container's content and the audio around
+it, and every skip field is excised from the authenticated message — so a second payload in
+another block's skip field, or bytes trailing the container in its own, would sit outside the tag.
+The signer's own encoder writes exactly one container in one block's skip field and nothing
+elsewhere; a frame that carries more than that is a `kMismatch` even when its tag matches, and so
+is a container that declares no primary protection field (Table H.2.5 reserves
+`protection_length_primary` `00`; there is no tag to match).
+
+### Several keys: the keyring
+
+An operator rarely has one key — a facility signs per show, per year or per customer, and a QC pass
+has to accept any of them. `verify_atmos_stream_any` / `verify_atmos_frame_any` take a list of
+keys and call a frame valid when **any** of them reproduces its tag. Signing is per frame, so a
+stream spliced from material signed under different keys verifies against a list that holds each.
+
+```cpp
+const std::vector<iclforge::base::crypto::SigningKey> ring{key_2025, key_2026};
+const auto summary = iclforge::ac3::signing::verify_atmos_stream_any(stream, ring);
+// summary.totals.valid / .mismatch / .no_container, and summary.per_key[i]:
+// how many frames key i accepted (the first accepting key is credited).
+```
+
+A keyring adds no authority — every key in it is one the operator provisioned, exactly as for a
+single key. An empty list, or a list of empty keys, accepts nothing: a frame with a container is
+then a mismatch, never a pass.
+
 ## Using the library (any consumer)
 
 Any code that links `iclforge::ac3` gets a key-less signer and must construct a key to use it. The
@@ -156,6 +183,35 @@ forge decode signed.ec3 out.wav verify-objects signing-key=/path/to/atmos.key
 - `verify-objects` with no key anywhere is the same hard error `sign-objects` gives.
 - A frame with no object container (a plain AC-3/E-AC-3 stream, or an Atmos `bed51` stream) reports
   as unsigned, not as a mismatch — there is nothing in it to check.
+- **`signing-key=` repeats.** Give it once per key and a frame is good under any of them; the
+  summary then says which key accepted how many (`object signature: 40 valid (key 1 (a.key) 30,
+  key 2 (b.key) 10), 0 mismatched, 0 unsigned frame(s)`). With paths given the environment
+  variables are not consulted, so an exported `ICLFORGE_SIGNING_KEY` cannot quietly widen the set.
+  `sign-objects` signs with exactly one key and refuses a second.
+
+`gate-objects` is the other policy, the licensed one:
+
+```bash
+forge decode show.ec3 out.wav gate-objects signing-key=/keys/2025.key signing-key=/keys/2026.key
+```
+
+- A frame whose object layer verifies is decoded as objects; any other frame — unsigned, signed
+  under a key not in the set, or altered after signing — is decoded as its 5.1 **bed**, and the
+  command carries on and succeeds. That is what a licensed AVR does with a stream it cannot
+  authenticate, and the opposite of `verify-objects`, which refuses.
+- The decision is per syncframe, like the tag. A stream that is good for a stretch and unsigned
+  after it plays as objects and then as its bed.
+- It is built from the pieces above, not a second path into the decoder: a frame that does not
+  verify has its object layer **removed** by the same lossless rewrite `strip_objects` does (the
+  bed audio is bit-identical, no re-encode), and the decode runs over the result. `Eac3Decoder`
+  still never learns that signing exists, and the gated stream is an ordinary stream any decoder
+  plays.
+- **It fails closed.** A frame that carries an object layer this build can neither verify nor
+  remove (a shape outside the frame walker's scope) is an error, not a pass — passing it on would
+  play objects nothing authenticated. A stream with no object layer at all is not an error.
+- `gate-objects` and `verify-objects` cannot be combined: one says "refuse" and the other "play the
+  bed".
+- Like `verify-objects`, it needs a key and is a usage error on AC-4.
 
 ### Shield app (on-device signing)
 
@@ -195,19 +251,24 @@ AC-4 objects carry no such tag in this project. The AC-4 encoder writes its EMDF
 protection bytes (`libs/ac4/ERRATA.md`), and the decoder reconstructs objects without a key. See
 [AC-4](ac4.md).
 
-## Planned decode modes
+## Decode modes
 
-Roadmap: [Object authenticity modes](https://github.com/iainchesworthlabs/iclforge/blob/main/ROADMAP.md) (Partial tail + Proposed). Three policies
-for decode into multi-channel / objects — only the first two ship today:
+Three policies for decode into multi-channel / objects, all shipped:
 
-| Mode | Intent | Today |
+| Mode | Intent | How |
 |---|---|---|
-| **Unchecked** (default) | FOSS-style: reconstruct objects without checking the tag | Shipped — omit `verify-objects` |
-| **Verify** | Multi-key HMAC QC; mismatch **fails** the command | Partial — single `signing-key=` only; keyring not yet |
-| **Licensed** | AVR-like: match → reconstruct; mismatch / unsigned → **bed only**, decode continues | Not started — e.g. future `gate-objects` |
+| **Unchecked** (default) | FOSS-style: reconstruct objects without checking the tag | Omit both options |
+| **Verify** | Multi-key HMAC QC; mismatch **fails** the command | `verify-objects` with one or several `signing-key=`; `verify_atmos_stream_any` |
+| **Licensed** | AVR-like: match → reconstruct; mismatch / unsigned → **bed only**, decode continues | `gate-objects` with one or several `signing-key=`; `gate_atmos_stream` |
 
 Sign remains single-key (`sign-objects`). Keys are always operator-provisioned; nothing here forges
 a licensed decoder's secret.
+
+What no mode does is make a Dolby-licensed decoder accept a stream. That decoder checks its own
+tag with a key and construction this project does not have and will not ship — a stream this
+project signs plays as objects there only for someone who provisions that key, which is theirs
+to hold and to be entitled to use. The project's own object-unlock is therefore a personal-use
+path, never a shipped one; it is a known and accepted gap, not an open task.
 
 ## What this is not
 

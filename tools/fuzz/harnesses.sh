@@ -9,7 +9,7 @@
 fuzz_dir_of() {
     local source
     for source in "$REPO_ROOT"/libs/*/fuzz/"$1".cpp; do
-        if [ -f "$source" ]; then
+        if [[ -f "$source" ]]; then
             dirname "$source"
             return 0
         fi

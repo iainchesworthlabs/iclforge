@@ -138,9 +138,9 @@ Decoded decode(const std::vector<iclforge::ac4::EncodedFrame>& frames,
     iclforge::ac4::DecoderConfig config;
     config.decoding = mode;
     config.output.downmix = target;
-    // Thirteen tracks are above Table 55's level 3, the decoder's default: md_compat 7,
-    // "unrestricted", which a decoder takes only when told its level is 7 (libs/ac4/ERRATA.md,
-    // "Which presentations can be selected").
+    // Thirteen tracks are above Table 55's level 3: md_compat 7, "unrestricted", which a decoder
+    // takes at level 7, its default, and not at level 3 (libs/ac4/ERRATA.md, "Which presentations
+    // can be selected").
     config.level = 7;
     iclforge::ac4::Decoder decoder(config);
     Decoded out;
@@ -634,4 +634,34 @@ TEST_CASE("the encoder refuses the 9.X.4 configurations it does not write",
         INFO(iclforge::ac4::Encoder::refusal_reason(config));
         CHECK(iclforge::ac4::Encoder::create(config).has_value());
     }
+}
+
+TEST_CASE("a decoder at its default level selects a 9.X.4 stream and one at level 3 does not",
+          "[ac4][encoder][immersive][nine-x-four]") {
+    // Thirteen or fourteen tracks are above Table 55's level 3, so the table of contents carries
+    // md_compat 7, "unrestricted". The decoder's level is 7 unless it is told another.
+    const Encoded encoded = encode({.channels = 14,
+                                    .bitrate_kbps = 1024,
+                                    .codec_mode = CodecMode::kScpl,
+                                    .experimental = {.nine_x_4 = true}},
+                                   tones(layout(true, true)));
+    REQUIRE_FALSE(encoded.frames.empty());
+    REQUIRE(encoded.toc.presentations_v1.size() == 1);
+    CHECK(encoded.toc.presentations_v1.front().md_compat == 7);
+
+    iclforge::ac4::DecoderConfig config;
+    CHECK(config.level == 7);
+    iclforge::ac4::Decoder at_default(config);
+    const auto decoded = at_default.decode(encoded.frames.front().raw_ac4_frame);
+    INFO(at_default.refusal_reason());
+    REQUIRE(decoded.has_value());
+    REQUIRE(decoded->has_value());
+    CHECK((*decoded)->channels.size() == 14);
+
+    config.level = 3;
+    iclforge::ac4::Decoder at_three(config);
+    const auto refused = at_three.decode(encoded.frames.front().raw_ac4_frame);
+    CHECK_FALSE(refused.has_value());
+    CHECK(at_three.presentations().size() == 1);
+    CHECK_FALSE(at_three.presentations().front().selectable);
 }

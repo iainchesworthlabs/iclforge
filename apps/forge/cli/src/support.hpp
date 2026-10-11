@@ -155,6 +155,7 @@ struct Options {
     bool ac4_experimental_noise_fill = false;
     // experimental=hfr-2 or hfr-4: the efficient high frame rate mode's fraction, 1 for off
     int ac4_experimental_frame_rate_fraction = 1;
+    bool ac4_experimental_twenty_two_two = false;
     std::string ac4_experimental_seven_x;
     // 'ac4-encode' only: experimental=objects, and objects=, the path of a
     // scene file that makes the WAV file's channels objects
@@ -207,7 +208,7 @@ struct Options {
     // (DownmixTarget::k5X).
     bool ac4_mix_lfe = true;
     bool ac4_headphones = false;
-    int ac4_level = 3;
+    int ac4_level = 7;
     bool ac4_fold_5x = false;
     // 'decode' only: the options given that one format's decode reads and
     // the other's does not, so that decode says which it ignores for the
@@ -335,10 +336,13 @@ struct Options {
     // parse_options itself cannot do (it only sees command-line text, not
     // opened files).
     std::optional<std::string> map_spec;
-    // signing-key=<path>, read by sign-objects/verify-objects below - kept
-    // apart from those two so their own comments stay about what they DO
-    // rather than where the key comes from.
-    std::optional<std::string> signing_key;
+    // signing-key=<path>, read by sign-objects/verify-objects/gate-objects
+    // below - kept apart from those so their own comments stay about what they
+    // DO rather than where the key comes from. Repeatable: verify-objects and
+    // gate-objects try each in the order given (a keyring), while sign-objects
+    // signs with exactly one and refuses a second. Empty means "no path given",
+    // which still lets ICLFORGE_SIGNING_KEY[_FILE] supply the one key.
+    std::vector<std::string> signing_keys;
     // 'probe' only: how much per-frame detail the report carries - unset for
     // the stream summary alone, "frames" for one entry per access unit,
     // "blocks" to also dump every block's coding tools and exponent
@@ -366,6 +370,14 @@ struct Options {
     // an unsigned one unless the operator opts in here - see
     // docs/concepts/object-signing.md.
     bool verify_objects = false;
+    // 'decode'/'monitor'/'spatial' only: the licensed policy, the permissive
+    // half of verify-objects. A frame whose object layer verifies against
+    // signing-key= is played as objects; one that does not - another key's,
+    // unsigned, altered - is played as its 5.1 bed and the decode carries on,
+    // where verify-objects would refuse the command. Off by default, like
+    // verify-objects; the two cannot be combined (one says "refuse", the other
+    // "play the bed"). See ac3::signing::gate_atmos_stream.
+    bool gate_objects = false;
     // 'fmp4' only: also write the object-stripped 5.1 companion rendition
     // into the same #EXT-X-MEDIA group, which is what Apple's HLS Authoring
     // Specification asks for alongside a CHANNELS="<N>/JOC" Atmos rendition.
@@ -373,6 +385,12 @@ struct Options {
     // writes exactly the single-rendition directory it always has, and a
     // stream with no object layer has no companion to write anyway.
     bool hls_fallback_51 = false;
+    // 'metadata' only: add a field the stream does not transmit instead of
+    // refusing it. Off by default because it is not an in-place edit - the
+    // syncframes that gain a field get longer (E-AC-3 independent substreams
+    // only; see iclforge::ac3::io::insert_stream_metadata), and a stream that
+    // was a constant rate no longer is.
+    bool insert_missing = false;
     // 'ts' only, both broadcast profiles: the identification values neither
     // registry's descriptor can read off the bitstream because they describe
     // how services in a multiplex RELATE, not what one elementary stream
@@ -613,9 +631,17 @@ struct Options {
     // substream. Unset takes the first programme the stream carries, which is
     // the only one there is for effectively all content; the commands say so
     // when a stream turns out to carry more than one. Never a fold of several
-    // programmes: they are alternatives (a second language, an audio
-    // description), not layers, so mixing them is never what a caller wants.
+    // programmes unless associated= asks for it: they are alternatives (a
+    // second language, an audio description), not layers, and the only
+    // combination §E3.10 defines is a main with an associated service.
     std::optional<int> programme;
+    // 'decode' of E-AC-3: the independent substream (§E2.3.1.2's substreamid,
+    // 0..7) of an associated service to mix into `programme`, by associated=
+    // given a number. associated= given a service name selects by bsmod
+    // instead, through ac4_associated's classifier, which is the same code
+    // (Table 5.7 and TS 103 190-1 Table 91 number the services alike).
+    // associated-gain= is the listener's trim on it (ac4_associated_gain).
+    std::optional<int> eac3_associated_programme;
     // 'eac3-encode': further programmes to author into the same stream, each
     // its own independent substream (§E2.3.1.2's I1-I7) - up to
     // iclforge::ac3::eac3::kMaxProgrammes - 1 of them, so index 0 is I1 (the CLI's
@@ -711,6 +737,11 @@ std::optional<int> finish_measurement(const iclforge::ac3::meta::LoudnessMeter& 
 // blend of two different things rather than either programme's own level;
 // callers route dual mono through measured_dialnorm_channel on each
 // programme's own channel alone instead.
+//
+// A file that states its speakers (WavData::channel_mask) is metered by them,
+// each of the bed's coded channels looked up by location; one that does not,
+// or that has no channel the bed needs, goes by the channel count, so a
+// three-channel file is 3/0 and nothing else.
 std::optional<int> measured_dialnorm(const iclforge::ac3::io::WavData& wav,
                                      iclforge::ac3::SampleRate rate, iclforge::ac3::Acmod acmod,
                                      bool lfe, FILE* out = stdout);
@@ -973,9 +1004,14 @@ std::expected<iclforge::ac3::io::WavData, iclforge::ac3::io::WavError> read_wav_
 class PlanarWavSink {
    public:
     // `order`: entry i names the source slot that belongs at WAV position i
-    // (write_wav_f32's convention); empty means identity.
+    // (write_wav_f32's convention); empty means identity. `channel_mask` is
+    // the SPEAKER_* bits of the speakers those positions are, in increasing
+    // bit order (plan::wav_channel_mask() produces one): non-zero, and naming
+    // exactly `slots` speakers, it makes the header WAVE_FORMAT_EXTENSIBLE so
+    // a reader can tell a 2/1 file from a 3/0 one; 0 is the plain header
+    // every decode wrote before.
     [[nodiscard]] bool open(std::string_view path, std::uint32_t sample_rate, std::size_t slots,
-                            std::span<const std::size_t> order);
+                            std::span<const std::size_t> order, std::uint32_t channel_mask = 0);
 
     [[nodiscard]] bool is_open() const { return open_; }
 
@@ -997,6 +1033,7 @@ class PlanarWavSink {
     bool stdio_ = false;
     bool open_ = false;
     std::uint32_t sample_rate_ = 0;
+    std::uint32_t channel_mask_ = 0;
     iclforge::ac3::io::WavStreamWriter writer_;
     std::vector<std::vector<float>> slots_;
     std::vector<std::size_t> consumed_;
@@ -1240,9 +1277,40 @@ std::string_view container_note(RecordingSink::Container container);
 std::optional<iclforge::ac3::SampleRate> wav_sample_rate(std::uint32_t hz, std::string_view codec,
                                                     bool eac3);
 
+// Where a WAV source says its channels are, one Table E2.5 location per
+// channel in file order: `channel_mask` (the file's dwChannelMask, 0 when it
+// states none) read as locations. Empty - and a caller then goes by the
+// channel COUNT, as it always has - when the file states none, names a speaker
+// Table E2.5 has no location for (SPEAKER_TOP_BACK_CENTER), or does not name
+// exactly `channels` speakers.
+std::vector<iclforge::ac3::eac3::chanmap::Location> source_locations(std::uint32_t channel_mask,
+                                                                      std::size_t channels);
+
+// The AC-3 coding mode a WAV is, for the commands that name or meter a file's
+// channels as A/52 does: the Table 5.8 mode (with or without LFE) its stated
+// speakers are exactly, with `wav_index` the file position of each coded
+// channel; or, for a file that states none or whose speakers are no one mode,
+// the channel count's answer (iclforge::ac3::io::ac3_layout_for). Nothing for
+// a width no mode has.
+std::optional<iclforge::ac3::io::Ac3Layout> wav_source_layout(
+    const iclforge::ac3::io::WavData& wav);
+
+// Gives `p` the layout a source with these stated `locations` has, for an
+// unnamed layout= (the layout then follows the source): the named layout that
+// renders exactly them, else a custom Table E2.5 selection, and `label` says
+// which. False - `p` and `label` untouched - when the locations are not a
+// layout this codec can carry (no full-bandwidth channel, a pair named by one
+// half, or a dependent substream for AC-3), so the caller falls back to the
+// channel count's own answer and its own diagnosis.
+bool plan_from_locations(iclforge::ac3::plan::Plan& p, std::string& label,
+                         std::span<const iclforge::ac3::eac3::chanmap::Location> locations);
+
 // A source's channels routed onto a plan's coded channels, or a diagnosis.
-std::optional<iclforge::ac3::plan::Routing> routing_or_error(const iclforge::ac3::plan::Plan& p,
-                                                        std::size_t channels);
+// `locations` are the source's own stated speakers (source_locations()); empty
+// means the file stated none and the routing goes by `channels` alone.
+std::optional<iclforge::ac3::plan::Routing> routing_or_error(
+    const iclforge::ac3::plan::Plan& p, std::size_t channels,
+    std::span<const iclforge::ac3::eac3::chanmap::Location> locations = {});
 
 // --- AC-4 ----------------------------------------------------------------------
 
@@ -1292,6 +1360,26 @@ using iclforge::apps::is_ac4_stream;
 // `status`, the caller's status stream: nowhere under quiet, and stderr when
 // a "-" output owns stdout (see status_stream above).
 std::optional<iclforge::ac3::signing::VerifySummary> apply_object_verification(
+    std::span<const std::byte> stream, const Options& meta, FILE* status);
+
+// The keys verify-objects and gate-objects try: each signing-key=<path> in the
+// order given, or - with none - the one key ICLFORGE_SIGNING_KEY_FILE /
+// ICLFORGE_SIGNING_KEY names. `option` is the word the error uses. nullopt
+// means a key could not be loaded or none was offered (both already printed).
+[[nodiscard]] std::optional<std::vector<iclforge::base::crypto::SigningKey>> load_object_keyring(
+    const Options& meta, std::string_view option);
+
+// gate-objects: the licensed policy (see Options::gate_objects). Returns the
+// stream to decode instead of `stream` - every frame whose object layer
+// verifies against the keyring byte for byte, every other one reduced to its
+// bed by taking the object layer out (iclforge::ac3::signing::gate_atmos_stream)
+// - or nullopt, with the reason printed, when a key could not be loaded or a
+// frame carries an object layer that can be neither verified nor removed (the
+// gate fails closed rather than play objects nothing vouched for). Call it
+// only when meta.gate_objects; the caller keeps its own `stream` otherwise,
+// so an ordinary decode never copies the stream. The summary line goes to
+// `status`, as apply_object_verification's does.
+[[nodiscard]] std::optional<std::vector<std::byte>> apply_object_gate(
     std::span<const std::byte> stream, const Options& meta, FILE* status);
 
 // The object layer (TS 103 420's OAMD) an E-AC-3 decode found, reported the

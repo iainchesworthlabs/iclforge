@@ -42,12 +42,17 @@
 
 namespace iclforge::ac3::eac3 {
 
+// Table 5.18's last frmsizecod: 38 codes, 0 to 37, for each of the three rates.
+inline constexpr int kMaxAc3FrameSizeCode = 37;
+
 // kBsid, StreamType and the Table E2.5 chanmap live in
 // ac3/core/eac3_tables.hpp: the decoder reads the same fields this writes, and
 // one definition is what keeps the two agreeing on what a bit pattern means.
-// This encoder writes only strmtyp 0x0 and 0x1 - 0x2, an independent substream
-// whose program was previously coded as AC-3, drags in a blkid/frmsizecod
-// branch nothing here would ever emit, so validate() refuses it.
+// This encoder writes strmtyp 0x0 and 0x1, and 0x2 on request: a type 2
+// substream (§E2.3.1.1), an independent one whose programme was previously
+// coded as AC-3, carries blkid and frmsizecod where a type 0 carries convsync,
+// and none of the programme-mixing group or converter elements. See
+// FrameConfig::ac3_frmsizecod for what it asks of the caller. 0x3 is reserved.
 
 // Average bit rate: a long-run rate target that still lets each frame's size
 // move with the content. CBR holds every frame to the same size; VBR holds
@@ -225,6 +230,18 @@ struct FrameConfig {
     // independent substream number from 0 in their OWN space, so a dependent's
     // id does not continue its parent's.
     int substreamid = 0;
+    // §E2.3.1.65: Table 5.18's frmsizecod (0 to kMaxAc3FrameSizeCode) of the
+    // AC-3 syncframe a type 2 substream (strmtyp kConvertible) was coded as,
+    // which is what a converter sizes the AC-3 syncframe it turns this one
+    // back into by. Required with kConvertible and refused without it. Setting
+    // it is the caller's claim that the stream IS convertible: validate()
+    // holds the tools to AC-3's (no enhanced coupling, spectral extension,
+    // AHT, transient pre-noise or auto selection) and a type 2 substream has
+    // no dependents, but whether the frame fits the AC-3 syncframe it names
+    // is a property of the rate it was coded at, not something this field
+    // can make true. At numblkscod < 3 the code is written on the first
+    // syncframe of each group of 6 / blocks, where blkid is set.
+    std::optional<int> ac3_frmsizecod = std::nullopt;
     // Sent only by dependent substreams. std::nullopt clears chanmape, which
     // lets acmod and lfeon speak for themselves - the dependent's channels
     // then simply overwrite the matching ones in the independent substream.

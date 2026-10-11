@@ -1448,16 +1448,17 @@ std::vector<std::byte> to_bytes(std::span<const char> raw) {
 // pipe stdout usually is as the path overload is on a plain file.
 std::expected<void, iclforge::ac3::io::WavError> write_wav_f32_arg(
         std::string_view path, std::span<const std::vector<float>> channels,
-        std::uint32_t sample_rate, std::span<const std::size_t> channel_order = {}) {
+        std::uint32_t sample_rate, std::span<const std::size_t> channel_order = {},
+        std::uint32_t channel_mask = 0) {
     if (is_stdio_path(path)) {
         iclforge::cli::platform::set_stdio_binary();
-        auto result =
-            iclforge::ac3::io::write_wav_f32(std::cout, channels, sample_rate, channel_order);
+        auto result = iclforge::ac3::io::write_wav_f32(std::cout, channels, sample_rate,
+                                                       channel_order, channel_mask);
         std::cout.flush();
         return result;
     }
     return iclforge::ac3::io::write_wav_f32(std::string{path}, channels, sample_rate,
-                                            channel_order);
+                                            channel_order, channel_mask);
 }
 
 }  // namespace
@@ -1576,11 +1577,13 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             constexpr std::array<std::string_view, 8> kEac3Only = {
                 "drc",  "heavy",     "ltrt-phase", "fast-imdct",
                 "mode", "programme", "bed-only",   "joc-domain"};
-            constexpr std::array<std::string_view, 10> kAc4Only = {
+            // associated= and associated-gain= are not here: AC-4 reads them
+            // for a presentation, E-AC-3 for a second programme to mix in,
+            // and run_decode says when a plain AC-3 stream has neither.
+            constexpr std::array<std::string_view, 8> kAc4Only = {
                 "output-level",  "dialogue-enhancement",
                 "presentation",  "presentation-id",
-                "language",      "associated",
-                "dialogue-gain", "associated-gain",
+                "language",      "dialogue-gain",
                 "headphones",    "md-compat"};
             const bool ac4_drcmode = key == "drcmode" && value != "line" && value != "rf" &&
                                      value != "none" && !value.empty();
@@ -1612,6 +1615,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (token == "fallback-51") {
             out.hls_fallback_51 = true;
+            continue;
+        }
+        if (token == "insert") {
+            out.insert_missing = true;
             continue;
         }
         if (token == "couple" || token == "heavy" || token == "heavy2" || token == "mixmeta" ||
@@ -1721,6 +1728,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (token == "verify-objects") {
             out.verify_objects = true;
+            continue;
+        }
+        if (token == "gate-objects") {
+            out.gate_objects = true;
             continue;
         }
         if (token == "verify") {
@@ -1883,6 +1894,43 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             fmt::println(stderr,
                          "error: mode is 'performance' (the default) or 'reference' (got '{}')",
+                         token);
+            return false;
+        }
+        if (command == "decode" && (token == "karaoke" || key == "karaoke")) {
+            // Annex C's karaoke-aware 3/0 reproduction, for a decode: its
+            // output has fewer channels than the stream codes and is named by
+            // a layout (L C R) the other commands that read this stage's
+            // output do not know, so it is `decode`'s alone.
+            // Bare, on and aware are the karaoke-AWARE decoder (C.2.3.1); none,
+            // v1, v2 and v1+v2 are the karaoke-CAPABLE one's listener choices
+            // (C.2.3.2, Table C.2.3), which also pick the vocals a stereo or
+            // mono target is given.
+            using iclforge::ac3::KaraokeReproduction;
+            using iclforge::ac3::KaraokeVocals;
+            if (token == "karaoke" || value == "on" || value == "aware") {
+                out.output.karaoke = KaraokeReproduction::kAware;
+                continue;
+            }
+            if (value == "off") {
+                out.output.karaoke = KaraokeReproduction::kOff;
+                continue;
+            }
+            const std::optional<KaraokeVocals> vocals =
+                value == "none"                       ? std::optional{KaraokeVocals::kNone}
+                : value == "v1"                       ? std::optional{KaraokeVocals::kV1}
+                : value == "v2"                       ? std::optional{KaraokeVocals::kV2}
+                : (value == "v1+v2" || value == "both") ? std::optional{KaraokeVocals::kBoth}
+                                                      : std::nullopt;
+            if (vocals) {
+                out.output.karaoke = KaraokeReproduction::kCapable;
+                out.output.karaoke_vocals = *vocals;
+                continue;
+            }
+            fmt::println(stderr,
+                         "error: karaoke is bare, 'on' or 'aware' (the karaoke-aware decoder), "
+                         "'none', 'v1', 'v2' or 'v1+v2' (the capable one's vocals), or 'off' "
+                         "(got '{}')",
                          token);
             return false;
         }
@@ -2140,6 +2188,23 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             continue;
         }
         if (key == "associated") {
+            // A number is an E-AC-3 independent substream to mix in (§E3.10);
+            // a name is a service, which AC-4 reads as the presentation it
+            // prefers and E-AC-3 as the programme whose bsmod says it is one.
+            if (!value.empty() && std::ranges::all_of(value, [](char c) {
+                    return std::isdigit(static_cast<unsigned char>(c)) != 0;
+                })) {
+                const auto id = parse_u32_or(value, 8);
+                if (id > 7) {
+                    fmt::println(stderr,
+                                 "error: associated= needs a substream id 0..7 or a service name "
+                                 "(got '{}')",
+                                 token);
+                    return false;
+                }
+                out.eac3_associated_programme = static_cast<int>(id);
+                continue;
+            }
             // The associated audio service AC-4 presentation selection
             // prefers: a content_classifier of ETSI TS 103 190-1 Table 91 and
             // its Table 92 refinement.
@@ -2164,7 +2229,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 fmt::println(stderr,
                              "error: associated is visually-impaired, audio-description, "
                              "audio-description-subtitles, spoken-subtitles, emergency-information, "
-                             "hearing-impaired or commentary (got '{}')",
+                             "hearing-impaired or commentary, or an E-AC-3 substream id 0..7 "
+                             "(got '{}')",
                              token);
                 return false;
             }
@@ -2231,8 +2297,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     stderr,
                     "error: codec-mode is 'auto' (the default: in 5.X ASPX_ACPL_3 below 22.4 kbps "
                     "a channel and ASPX_ACPL_2 below 33.6, then ASPX below 96 kbps a channel, "
-                    "76.8 in 5.X and 7.X; in 5.1.4 ASPX_ACPL_2 below 480 kbps, ASPX_SCPL below "
-                    "640 and SCPL from there), 'simple', 'aspx', 'aspx-acpl-1', 'aspx-acpl-2', "
+                    "76.8 in 5.X, 7.X and 22.2; in 5.1.4 ASPX_ACPL_2 below 480 kbps, ASPX_SCPL "
+                    "below 640 and SCPL from there), 'simple', 'aspx', 'aspx-acpl-1', 'aspx-acpl-2', "
                     "'aspx-acpl-3', 'scpl', 'aspx-scpl' or 'aspx-ajcc' (got '{}')",
                     token);
                 return false;
@@ -2272,6 +2338,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                     out.ac4_experimental_noise_fill = true;
                 } else if (tool == "hfr-2" || tool == "hfr-4") {
                     out.ac4_experimental_frame_rate_fraction = tool == "hfr-4" ? 4 : 2;
+                } else if (tool == "twenty-two-two") {
+                    out.ac4_experimental_twenty_two_two = true;
                 } else if (tool == "7x-back" || tool == "7x-wide" || tool == "7x-top-front") {
                     out.ac4_experimental_seven_x = std::string{tool.substr(3)};
                 } else if (tool.size() == 11 && tool.starts_with("drc-gains-") && tool[10] >= '0' &&
@@ -2284,8 +2352,9 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                         stderr,
                         "error: experimental takes aspx-balance, aspx-varvar, aspx-interleave, "
                         "coding-configs, acpl, three-zero, back-pair, ajcc, nine-x-4, objects, "
-                        "noise-fill, hfr-2, hfr-4, one of 7x-back, 7x-wide and 7x-top-front, and "
-                        "one of drc-gains-0 to drc-gains-3, comma-separated (got '{}')",
+                        "noise-fill, hfr-2, hfr-4, twenty-two-two, one of 7x-back, 7x-wide and "
+                        "7x-top-front, and one of drc-gains-0 to drc-gains-3, comma-separated "
+                        "(got '{}')",
                         token);
                     return false;
                 }
@@ -3045,7 +3114,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 fmt::println(stderr, "error: signing-key= needs a key file path");
                 return false;
             }
-            out.signing_key = std::string{value};
+            out.signing_keys.emplace_back(value);
             continue;
         }
         if (key == "programme") {
@@ -3115,6 +3184,15 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         print_meta_usage();
         return false;
     }
+    // One says "refuse the command on a mismatch", the other "play the bed on
+    // one": asking for both has no answer, and silently preferring either
+    // would make the other's promise a lie.
+    if (out.verify_objects && out.gate_objects) {
+        fmt::println(stderr,
+                     "error: verify-objects refuses a stream whose objects do not verify and "
+                     "gate-objects plays it as its bed - give one, not both");
+        return false;
+    }
     return true;
 }
 
@@ -3140,6 +3218,40 @@ std::optional<int> measured_dialnorm(const iclforge::ac3::io::WavData& wav,
                                      iclforge::ac3::SampleRate rate, iclforge::ac3::Acmod acmod,
                                      bool lfe, FILE* out) {
     iclforge::ac3::meta::LoudnessMeter meter{rate, acmod, lfe};
+    const auto locations = source_locations(wav.channel_mask, wav.channels.size());
+    // A source that states its speakers is metered by them: the bed's coded
+    // channels (Table 5.8 order, LFE last) are looked up by location, so a
+    // 2/1 file's lone surround is weighted as the surround it is and not as
+    // the right channel the count-based permutation below would seat it in.
+    // When the bed has a channel the file does not, the count-based answer is
+    // what it was.
+    if (!locations.empty() && locations.size() == wav.channels.size()) {
+        using iclforge::ac3::eac3::chanmap::acmod_map;
+        using iclforge::ac3::eac3::chanmap::expand;
+        const auto bed = expand(acmod_map(acmod, false));
+        std::vector<std::span<const float>> placed;
+        placed.reserve(wav.channels.size());
+        bool complete = true;
+        const auto place = [&](iclforge::ac3::eac3::chanmap::Location location) {
+            const auto at = std::ranges::find(locations, location);
+            if (at == locations.end()) {
+                complete = false;
+                return;
+            }
+            placed.emplace_back(
+                wav.channels[static_cast<std::size_t>(std::distance(locations.begin(), at))]);
+        };
+        for (int k = 0; k < bed.count; ++k) {
+            place(bed[k]);
+        }
+        if (lfe) {
+            place(iclforge::ac3::eac3::chanmap::Location::kLfe);
+        }
+        if (complete) {
+            meter.push(placed);
+            return finish_measurement(meter, {}, "dialnorm", out);
+        }
+    }
     // LoudnessMeter takes its spans in AC-3 CODED order (Table 5.8: L, C, R,
     // Ls, Rs, LFE), which is not WAV order (FL, FR, FC, LFE, BL, BR) for any
     // layout wider than stereo. Pushing the file's own order straight in put
@@ -3711,10 +3823,11 @@ std::expected<iclforge::ac3::io::WavData, iclforge::ac3::io::WavError> read_wav_
 }
 
 bool PlanarWavSink::open(std::string_view path, std::uint32_t sample_rate, std::size_t slots,
-                         std::span<const std::size_t> order) {
+                         std::span<const std::size_t> order, std::uint32_t channel_mask) {
     path_ = std::string{path};
     stdio_ = is_stdio_path(path);
     sample_rate_ = sample_rate;
+    channel_mask_ = channel_mask;
     slots_.assign(slots, {});
     consumed_.assign(slots, 0);
     order_.assign(order.begin(), order.end());
@@ -3725,7 +3838,7 @@ bool PlanarWavSink::open(std::string_view path, std::uint32_t sample_rate, std::
         }
     }
     if (!stdio_) {
-        if (!writer_.open(path_, sample_rate, static_cast<std::uint16_t>(slots))) {
+        if (!writer_.open(path_, sample_rate, static_cast<std::uint16_t>(slots), channel_mask)) {
             return false;
         }
     }
@@ -3745,7 +3858,7 @@ std::expected<void, iclforge::ac3::io::WavError> PlanarWavSink::close() {
     }
     open_ = false;
     if (stdio_) {
-        return write_wav_f32_arg(path_, slots_, sample_rate_, order_);
+        return write_wav_f32_arg(path_, slots_, sample_rate_, order_, channel_mask_);
     }
     if (!drain()) {
         writer_.close();
@@ -4277,9 +4390,69 @@ std::optional<iclforge::ac3::SampleRate> wav_sample_rate(std::uint32_t hz, std::
     return std::nullopt;
 }
 
-std::optional<iclforge::ac3::plan::Routing> routing_or_error(const iclforge::ac3::plan::Plan& p,
-                                                        std::size_t channels) {
-    auto routing = plan::route(plan::resolve(p), channels, p.meta.cmixlev, p.meta.surmixlev);
+std::vector<iclforge::ac3::eac3::chanmap::Location> source_locations(std::uint32_t channel_mask,
+                                                                      std::size_t channels) {
+    return plan::wav_mask_locations(channel_mask, channels).value_or(
+        std::vector<iclforge::ac3::eac3::chanmap::Location>{});
+}
+
+std::optional<iclforge::ac3::io::Ac3Layout> wav_source_layout(
+    const iclforge::ac3::io::WavData& wav) {
+    namespace chanmap = iclforge::ac3::eac3::chanmap;
+    const auto stated = source_locations(wav.channel_mask, wav.channels.size());
+    if (const auto held = plan::channel_mask_of(stated); held.has_value() && !stated.empty()) {
+        for (const auto acmod : {iclforge::ac3::Acmod::k1_0, iclforge::ac3::Acmod::k2_0,
+                                 iclforge::ac3::Acmod::k3_0, iclforge::ac3::Acmod::k2_1,
+                                 iclforge::ac3::Acmod::k3_1, iclforge::ac3::Acmod::k2_2,
+                                 iclforge::ac3::Acmod::k3_2}) {
+            for (const bool lfe : {false, true}) {
+                if (chanmap::acmod_map(acmod, lfe) != *held) {
+                    continue;
+                }
+                // The mode's own channels in coded order, then the LFE, each at
+                // the file position of its speaker.
+                iclforge::ac3::io::Ac3Layout layout{.acmod = acmod, .lfe = lfe, .wav_index = {}};
+                const auto position = [&](chanmap::Location location) {
+                    return static_cast<std::size_t>(std::distance(
+                        stated.begin(), std::ranges::find(stated, location)));
+                };
+                for (const auto location : chanmap::expand(chanmap::acmod_map(acmod, false))) {
+                    layout.wav_index.push_back(position(location));
+                }
+                if (lfe) {
+                    layout.wav_index.push_back(position(chanmap::Location::kLfe));
+                }
+                return layout;
+            }
+        }
+    }
+    return iclforge::ac3::io::ac3_layout_for(wav.channels.size());
+}
+
+bool plan_from_locations(iclforge::ac3::plan::Plan& p, std::string& label,
+                         std::span<const iclforge::ac3::eac3::chanmap::Location> locations) {
+    const auto chosen = plan::source_layout(p.codec, locations);
+    if (!chosen.has_value()) {
+        return false;
+    }
+    if (chosen->layout.has_value()) {
+        p.layout = *chosen->layout;
+        p.custom_locations = std::nullopt;
+        label = std::string(plan::layout(*chosen->layout).label);
+    } else {
+        p.custom_locations = chosen->custom_locations;
+        label = plan::format_channels(*chosen->custom_locations);
+    }
+    return true;
+}
+
+std::optional<iclforge::ac3::plan::Routing> routing_or_error(
+    const iclforge::ac3::plan::Plan& p, std::size_t channels,
+    std::span<const iclforge::ac3::eac3::chanmap::Location> locations) {
+    auto routing = locations.empty() || locations.size() != channels
+                       ? plan::route(plan::resolve(p), channels, p.meta.cmixlev, p.meta.surmixlev)
+                       : plan::route(plan::resolve(p), locations, p.meta.cmixlev,
+                                     p.meta.surmixlev);
     if (!routing.has_value()) {
         fmt::println(stderr, "error: {} channels - {}", channels,
                      plan::describe(plan::PlanError::kNoSourceLayout));
@@ -4479,33 +4652,102 @@ iclforge::ac4::DecoderConfig ac4_coded_config(const Options& meta) {
     return config;
 }
 
+std::optional<std::vector<iclforge::base::crypto::SigningKey>> load_object_keyring(
+    const Options& meta, std::string_view option) {
+    std::vector<iclforge::base::crypto::SigningKey> keys;
+    // No signing-key= at all: the environment's one key, if any. With paths
+    // given the environment is not consulted - an explicit list is the whole
+    // set, so an exported ICLFORGE_SIGNING_KEY cannot quietly widen it.
+    const std::vector<std::string> sources =
+        meta.signing_keys.empty() ? std::vector<std::string>{std::string{}} : meta.signing_keys;
+    for (const auto& path : sources) {
+        auto key = iclforge::base::crypto::load_signing_key(path);
+        if (!key.has_value()) {
+            if (key.error().kind == iclforge::base::crypto::KeyErrorKind::kAbsent) {
+                fmt::println(stderr,
+                             "error: {} needs a key — pass signing-key=<path> (repeat it for more "
+                             "than one), or set ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY",
+                             option);
+            } else {
+                fmt::println(stderr, "error: {}", key.error().message);
+            }
+            return std::nullopt;
+        }
+        keys.push_back(std::move(*key));
+    }
+    return keys;
+}
+
+namespace {
+
+// "key 1 (a.key) verified 40, key 2 (b.key) verified 10" - which of several
+// keys a stream's frames were signed under, for the status line. Empty for a
+// single key, where there is nothing to tell apart.
+std::string per_key_breakdown(const Options& meta, std::span<const int> per_key) {
+    if (per_key.size() < 2) {
+        return {};
+    }
+    std::string out;
+    for (std::size_t i = 0; i < per_key.size(); ++i) {
+        if (!out.empty()) {
+            out += ", ";
+        }
+        const std::string_view name =
+            i < meta.signing_keys.size() ? std::string_view{meta.signing_keys[i]} : std::string_view{};
+        out += fmt::format("key {}{} {}", i + 1,
+                           name.empty() ? std::string{} : fmt::format(" ({})", name), per_key[i]);
+    }
+    return out;
+}
+
+}  // namespace
+
 std::optional<iclforge::ac3::signing::VerifySummary> apply_object_verification(
     std::span<const std::byte> stream, const Options& meta, FILE* status) {
     if (!meta.verify_objects) {
         return iclforge::ac3::signing::VerifySummary{};
     }
-    const auto key = iclforge::base::crypto::load_signing_key(meta.signing_key.value_or(""));
-    if (!key.has_value()) {
-        if (key.error().kind == iclforge::base::crypto::KeyErrorKind::kAbsent) {
-            fmt::println(stderr,
-                         "error: verify-objects needs a key — pass signing-key=<path>, or set "
-                         "ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY");
-        } else {
-            fmt::println(stderr, "error: {}", key.error().message);
-        }
+    const auto keys = load_object_keyring(meta, "verify-objects");
+    if (!keys.has_value()) {
         return std::nullopt;
     }
-    const auto summary = iclforge::ac3::signing::verify_atmos_stream(stream, *key);
-    status_println(status, "  object signature: {} valid, {} mismatched, {} unsigned frame(s)",
-                   summary.valid, summary.mismatch, summary.no_container);
+    const auto result = iclforge::ac3::signing::verify_atmos_stream_any(stream, *keys);
+    const auto& summary = result.totals;
+    const std::string breakdown = per_key_breakdown(meta, result.per_key);
+    status_println(status, "  object signature: {} valid{}, {} mismatched, {} unsigned frame(s)",
+                   summary.valid, breakdown.empty() ? std::string{} : " (" + breakdown + ")",
+                   summary.mismatch, summary.no_container);
     if (summary.mismatch > 0) {
         fmt::println(stderr,
                      "error: object signature verification failed ({} of {} signed frames did "
-                     "not match the supplied key)",
-                     summary.mismatch, summary.valid + summary.mismatch);
+                     "not match {})",
+                     summary.mismatch, summary.valid + summary.mismatch,
+                     keys->size() == 1 ? "the supplied key" : "any of the supplied keys");
         return std::nullopt;
     }
     return summary;
+}
+
+std::optional<std::vector<std::byte>> apply_object_gate(std::span<const std::byte> stream,
+                                                        const Options& meta, FILE* status) {
+    const auto keys = load_object_keyring(meta, "gate-objects");
+    if (!keys.has_value()) {
+        return std::nullopt;
+    }
+    auto gated = iclforge::ac3::signing::gate_atmos_stream(stream, *keys);
+    if (!gated.has_value()) {
+        fmt::println(stderr,
+                     "error: gate-objects: {} - refusing to play an object layer that could be "
+                     "neither verified nor removed",
+                     iclforge::ac3::io::describe(gated.error()));
+        return std::nullopt;
+    }
+    const auto& summary = gated->summary;
+    const std::string breakdown = per_key_breakdown(meta, summary.per_key);
+    status_println(status, "  object gate: {} frame(s) kept their objects{}, {} played as the bed, {} had none",
+                   summary.passed, breakdown.empty() ? std::string{} : " (" + breakdown + ")",
+                   summary.gated, summary.no_objects);
+    return std::move(gated->bytes);
 }
 
 void print_object_summary(FILE* status,

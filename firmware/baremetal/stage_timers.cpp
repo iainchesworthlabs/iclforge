@@ -33,6 +33,18 @@ void zone_enter(const char* name);
 void zone_leave();
 }  // namespace iclforge::internal::profiling
 
+// Which thread is calling: a value that differs between threads and is stable within one. A
+// platform with more than one supplies it (the ESP-IDF example gives the task); the stand-in
+// below, for one that has none, gives every caller the same. The table below is one thread's:
+// the zones of the first thread to enter one after reset_stages() are timed, and those another
+// thread enters (a decoder that spreads a frame's per-channel stages over two cores, whose
+// second never nests inside the first's stack) are not.
+namespace iclforge_probe {
+[[gnu::weak]] const void* thread_token() noexcept {
+    return nullptr;
+}
+}  // namespace iclforge_probe
+
 namespace {
 
 // Zones are the library's marker names, and a decode nests them at most five
@@ -83,6 +95,8 @@ std::uint64_t g_root_us = 0;
 std::uint32_t g_enters = 0;
 std::uint32_t g_overflows = 0;
 bool g_ever_active = false;
+const void* g_owner = nullptr;
+bool g_owner_set = false;
 
 std::size_t resolve(const char* name) {
     for (std::size_t i = 0; i < g_alias_count; ++i) {
@@ -117,6 +131,13 @@ std::size_t resolve(const char* name) {
 namespace iclforge::internal::profiling {
 
 void zone_enter(const char* name) {
+    const void* const caller = iclforge_probe::thread_token();
+    if (!g_owner_set) {
+        g_owner = caller;
+        g_owner_set = true;
+    } else if (g_owner != caller) {
+        return;
+    }
     ++g_enters;
     g_ever_active = true;
     // Depth is counted past the array so the matching leave still pairs up;
@@ -137,6 +158,9 @@ void zone_leave() {
     // The clock first, before any bookkeeping, for the same reason as above:
     // what follows belongs to whoever is still open.
     const std::uint64_t now = iclforge_probe::now_us();
+    if (g_owner_set && g_owner != iclforge_probe::thread_token()) {
+        return;
+    }
     if (g_depth == 0) {
         ++g_overflows;
         return;
@@ -174,6 +198,7 @@ void reset_stages() {
     g_root_us = 0;
     g_enters = 0;
     g_overflows = 0;
+    g_owner_set = false;
 }
 
 void report_stages(const char* codec, int frames) {

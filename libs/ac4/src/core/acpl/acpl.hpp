@@ -101,36 +101,44 @@ using ParamPrev = std::array<double, kSubbands>;
 // exact and both are correctly rounded (a frame of 2 048 samples has 32 slots, its halves 16). The
 // other divisors, 24 and 30 slots and their halves, divide.
 // libs/ac4/tests/core/test_acpl_exact.cpp holds it to the expression as written.
-class Interpolator {
+//
+// It is a template on the scalar the expression runs at: double, which is the pseudocode's and
+// what every tier but the decoder's float one uses, and float, which the float tier uses where the
+// chip's FPU is single precision and a double operation is a call into software (planning/ac4.md,
+// D14h). At float the same expression is evaluated operation for operation in single precision,
+// from values narrowed once, in the column; the float output is the same on every platform
+// (IEEE single, no fused multiply-add) and is not the double's narrowed.
+template <typename R>
+class BasicInterpolator {
    public:
     // One band's values for a frame, and the two differences the ramps multiply.
     struct Column {
-        double prev = 0.0;    // acpl_param_prev
-        double first = 0.0;   // set 0's value
-        double second = 0.0;  // set 1's value
-        double rise = 0.0;    // first - prev
-        double step = 0.0;    // second - first
+        R prev{};    // acpl_param_prev
+        R first{};   // set 0's value
+        R second{};  // set 1's value
+        R rise{};    // first - prev
+        R step{};    // second - first
     };
 
-    Interpolator(const Framing& framing, int num_ts) noexcept;
+    BasicInterpolator(const Framing& framing, int num_ts) noexcept;
 
-    [[nodiscard]] static Column column(double prev, double first, double second) noexcept {
+    [[nodiscard]] static Column column(R prev, R first, R second) noexcept {
         return {prev, first, second, first - prev, second - first};
     }
 
     // The value at slot `ts`, 0 to num_ts - 1.
-    [[nodiscard]] double at(const Column& column, int ts) const noexcept;
+    [[nodiscard]] R at(const Column& column, int ts) const noexcept;
 
    private:
     // x / n for one of Pseudocode 109's divisors.
     struct Divisor {
-        double n = 1.0;
-        double reciprocal = 1.0;
+        R n = R{1};
+        R reciprocal = R{1};
         bool by_multiply = false;
 
         Divisor() = default;
         explicit Divisor(int divisor) noexcept;
-        [[nodiscard]] double operator()(double x) const noexcept {
+        [[nodiscard]] R operator()(R x) const noexcept {
             return by_multiply ? x * reciprocal : x / n;
         }
     };
@@ -144,12 +152,20 @@ class Interpolator {
     Divisor second_half_;
 };
 
+using Interpolator = BasicInterpolator<double>;
+extern template class BasicInterpolator<double>;
+extern template class BasicInterpolator<float>;
+
 // Pseudocode 109 at every slot and subband of a frame of `num_ts` slots:
 // out[ts * 64 + sb] = interpolate(values, num_param_sets, sb, ts). A subband that shares its band
 // and its acpl_param_prev with the one before it takes that one's values, which are the same to the
 // bit.
 void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values,
                  const ParamPrev& prev, int num_ts, std::span<double> out) noexcept;
+// The same at float: the values and acpl_param_prev narrowed once for a run of subbands, and
+// the expression evaluated in single precision (see BasicInterpolator).
+void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values,
+                 const ParamPrev& prev, int num_ts, std::span<float> out) noexcept;
 
 // Pseudocode 110: the last parameter set's value in each subband's band.
 void end_frame(const Framing& framing, int num_param_bands, const ParamSets& values,

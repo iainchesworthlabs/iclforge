@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <utility>
 
+#include "decoder/pcm/lanes.hpp"
+
 namespace iclforge::ac4::detail {
 namespace {
 
@@ -494,20 +496,24 @@ void DownmixStage::push_two(const Mix& lo, const Mix& ro) {
 
 void DownmixStage::update(const DownmixValues& values) {
     bool changed = false;
-    if (values.coeff) {
+    // A frame sends these again and again with the same values, and the stage is now asked at every
+    // frame, as coded or not: only a value that differs is worth a matrix.
+    if (values.coeff && values.coeff != coeff_) {
         coeff_ = values.coeff;
         changed = true;
     }
-    if (values.cdmx) {
+    if (values.cdmx && values.cdmx != cdmx_) {
         cdmx_ = values.cdmx;
         changed = true;
     }
-    // The frame's own: they replace the last frame's whether or not this one sends any.
-    if (values.rtll_comp != rtll_comp_ || values.target_corr != target_corr_ ||
-        values.device != device_) {
-        rtll_comp_ = values.rtll_comp;
-        target_corr_ = values.target_corr;
-        device_ = values.device;
+    // The frame's own: they replace the last frame's whether or not this one sends any. Only the
+    // gain they come to reaches the matrix, and a frame that sends nothing comes to the same 0 dB
+    // as one that sends rtll_comp 128, so a stream that alternates the two must not rebuild the
+    // matrix at every frame.
+    rtll_comp_ = values.rtll_comp;
+    target_corr_ = values.target_corr;
+    device_ = values.device;
+    if (corrections() != correction_gain_) {
         changed = true;
     }
     for (auto [from, to] : {std::pair{&values.loro_loud_corr, &loro_loud_corr_},
@@ -533,11 +539,11 @@ void DownmixStage::update(const DownmixValues& values) {
 }
 
 void DownmixStage::process(const DownmixValues& values, std::span<const QmfMatrix> in,
-                           std::vector<std::vector<QmfValue>>& out) {
+                           std::vector<std::vector<QmfValue>>& out, Executor* executor) {
     update(values);
     const std::size_t length = in.empty() ? 0 : in.front().size();
     out.resize(matrix_.size());
-    for (std::size_t o = 0; o < matrix_.size(); ++o) {
+    run_lanes(executor, matrix_.size(), [&](std::size_t o, std::size_t) {
         out[o].assign(length, QmfValue{});
         for (std::size_t c = 0; c < in.size() && c < matrix_[o].size(); ++c) {
             const double w = matrix_[o][c];
@@ -554,7 +560,7 @@ void DownmixStage::process(const DownmixValues& values, std::span<const QmfMatri
                 out[o][i] += weight * source[i];
             }
         }
-    }
+    });
 }
 
 }  // namespace iclforge::ac4::detail

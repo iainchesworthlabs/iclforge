@@ -32,7 +32,7 @@
 set -euo pipefail
 export LC_ALL=C
 
-if [ "$#" -lt 2 ]; then
+if [[ "$#" -lt 2 ]]; then
     echo "usage: $0 <executable> <library.so>..." >&2
     exit 2
 fi
@@ -58,7 +58,7 @@ for lib in "$@"; do
     nm -D --defined-only "$lib" | names | sed "s/^/$stem /" >> "$work/exports"
 done
 sort -u -o "$work/exports" "$work/exports"
-if [ ! -s "$work/exports" ]; then
+if [[ ! -s "$work/exports" ]]; then
     echo "error: none of the libraries exports iclforge:: symbols; are they the codec's?" >&2
     exit 2
 fi
@@ -81,7 +81,7 @@ mv "$work/kept" "$work/linked_in"
 rc=0
 LD_DEBUG=bindings LD_BIND_NOW=1 "$exe" '[no-such-tag-for-the-binding-check]' \
     > /dev/null 2> "$work/ld_debug" || rc=$?
-if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+if [[ "$rc" -ne 0 ]] && [[ "$rc" -ne 2 ]]; then
     echo "error: $exe exited with status $rc before it could be checked:" >&2
     grep -v 'binding file' "$work/ld_debug" | tail -n 5 >&2 || true
     exit 2
@@ -110,27 +110,27 @@ report() {
     local heading=$1 file=$2
     echo "FAIL: $heading" >&2
     awk '{print $NF}' "$file" | head -n 15 | c++filt | sed 's/^/    /' >&2
-    if [ "$(wc -l < "$file")" -gt 15 ]; then
+    if [[ "$(wc -l < "$file")" -gt 15 ]]; then
         echo "    ... and $(( $(wc -l < "$file") - 15 )) more" >&2
     fi
     status=1
 }
 
-if [ -s "$work/elsewhere" ]; then
+if [[ -s "$work/elsewhere" ]]; then
     report "$(wc -l < "$work/elsewhere") iclforge:: symbol(s) $(basename "$exe") imports from the codec's libraries bind to another library:" \
         "$work/elsewhere"
     awk '{print "    bound to " $1}' "$work/elsewhere" | sort | uniq -c >&2
 fi
-if [ -s "$work/linked_in" ]; then
+if [[ -s "$work/linked_in" ]]; then
     report "$(wc -l < "$work/linked_in") iclforge:: symbol(s) the libraries export are defined inside $(basename "$exe") itself:" \
         "$work/linked_in"
 fi
-if [ "$bound" -eq 0 ]; then
+if [[ "$bound" -eq 0 ]]; then
     echo "FAIL: nothing in $(basename "$exe") binds to the libraries; the check has nothing to say." >&2
     status=1
 fi
 
-if [ "$status" -eq 0 ]; then
+if [[ "$status" -eq 0 ]]; then
     echo "OK: $bound iclforge:: symbols bind from $(basename "$exe") to the $# libraries that export them; none are linked in."
 fi
 exit "$status"

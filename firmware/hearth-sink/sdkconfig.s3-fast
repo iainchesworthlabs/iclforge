@@ -1,0 +1,54 @@
+# The ESP32-S3's flash and caches tuned for the decoder (planning/ac4.md, D14g). Adds to
+# sdkconfig.psram; costs about 1 KB of internal RAM. The S3 board's release image is built
+# with it (decision 43, 2026-10-11).
+#
+#   SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast" idf.py build
+#
+# With the AC-4 decoder: sdkconfig.ac4 before sdkconfig.s3-fast and sdkconfig.s3-dcache after it.
+#
+# What each line bought, an AC-4 frame's time against its duration on a board with Wi-Fi up
+# (2026-10-10, hearth-eb2c64, a null sink; the same PCM in every column). One core, the decoder
+# as it was:
+#
+#                                 as before    QIO    QIO, 64 B lines
+#   2.0 SIMPLE                       0.87      0.78        0.68
+#   2.0 A-SPX                        1.09      0.92        0.81
+#   5.1 SIMPLE                       2.13      1.85        1.60
+#   5.1 A-SPX, A-CPL mode 3          3.24      2.87        2.55
+#   5.1.4 S-CPL                      4.90      4.36        3.75
+#   29.97 fps through the converter  1.86      1.71        1.45
+#   E-AC-3 7.1.4                     0.99      0.87        0.81
+#
+# And with the second lane (sdkconfig.ac4's CONFIG_ICLFORGE_EXAMPLE_AC4_PARALLEL) and the
+# resampler's rows in order:
+#
+#                                 QIO, 64 B lines   + code and constants in PSRAM
+#   2.0 A-SPX                           0.71                  0.61
+#   5.1 SIMPLE                          1.36                  1.17
+#   5.1 A-SPX                           1.75                  1.49
+#   5.1 A-SPX, A-CPL mode 3             2.17                  1.93
+#   5.1.4 S-CPL                         3.01                  2.67
+#   24 fps through the converter        0.96                  0.78
+#   29.97 fps through the converter     1.25                  1.13
+#
+# The three lines, in order:
+
+# Quad I/O to the flash, as sdkconfig.p4 and sdkconfig.c6 have it: the decoder's code and
+# the tables it reads are far larger than the caches, and a line comes from the flash at
+# 2 bits a clock in DIO and 4 in QIO. The mode is the second stage bootloader's, so a board
+# flashed before this line keeps DIO until it is flashed again over USB with its bootloader
+# (`idf.py flash`); an update over the network replaces only the application. A bootloader
+# that cannot set a flash chip's quad-enable bit says so and stays in DIO.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+# 64-byte lines in the data cache, where the default is 32: the decoder reads its state and
+# its tables in runs, and a line fill from the octal PSRAM (80 MHz) costs little more for 64
+# bytes than for 32. The cache stays 32 KB, so none of the internal RAM goes.
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+# The firmware's code and constants executed from PSRAM, where a line fills about three times
+# as fast as from the flash in QIO mode: the decoder's tables (0.45 MB of .rodata) and the
+# code beside them. An update over the network works as before, and the part runs on through
+# a flash write. It needs PSRAM and takes 2.3 MB of the 8.
+CONFIG_SPIRAM_RODATA=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y

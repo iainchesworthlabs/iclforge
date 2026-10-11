@@ -136,6 +136,22 @@ class ICLFORGE_AC4_EXPORT Decoder {
     [[nodiscard]] std::expected<std::optional<DecodedFrame>, DecodeError> decode(
         std::span<const std::byte> raw_ac4_frame);
 
+    // decode(), reading `next` - the frame the following call is given - on
+    // DecoderConfig::executor's other lane while this frame is reconstructed, so that
+    // the syntax of a frame is read while the signal of the one before it is made
+    // (planning/ac4.md, D14i). What comes out is what decode() without `next` gives, bit
+    // for bit, and so are presentations() and metadata() after each call. Without an
+    // executor with a second lane, with an empty `next`, with an object audio frame, one
+    // that does not continue the stream or one in the efficient high frame rate mode,
+    // nothing is read ahead and this is decode(). The frame the following call is given
+    // must be `next`: any other is taken as a change of source (a frame read ahead has
+    // moved on what the stream carries, so the stream is forgotten and the frame waits for
+    // an I-frame). A set_presentation() in between takes effect one frame later, since
+    // the frame was read with the choice that stood. `next` need only stay valid for the
+    // call.
+    [[nodiscard]] std::expected<std::optional<DecodedFrame>, DecodeError> decode(
+        std::span<const std::byte> raw_ac4_frame, std::span<const std::byte> next);
+
     // decode(), with the output handed to `sink` in blocks of kBlockSamples as
     // it completes them, the samples left over held for the next frame. The
     // decoder keeps the frame's storage, so a stream decoded this way
@@ -144,6 +160,10 @@ class ICLFORGE_AC4_EXPORT Decoder {
     // over channels alone: a presentation's objects come from decode().
     [[nodiscard]] std::expected<std::optional<FrameInfo>, DecodeError> decode_by_block(
         std::span<const std::byte> raw_ac4_frame, BlockSink sink);
+
+    // decode_by_block() with `next` read ahead, as decode() does.
+    [[nodiscard]] std::expected<std::optional<FrameInfo>, DecodeError> decode_by_block(
+        std::span<const std::byte> raw_ac4_frame, std::span<const std::byte> next, BlockSink sink);
 
     // The samples decode_by_block() holds back, handed to `sink` as one
     // shorter block, at the end of a stream; returns how many there were.

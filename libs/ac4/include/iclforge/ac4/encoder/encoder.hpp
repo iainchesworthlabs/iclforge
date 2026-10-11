@@ -39,7 +39,10 @@
 // element as DEE's streams have it: the 7.0.4 or 7.1.4 channel mode with the
 // back pair absent, in SCPL, ASPX_SCPL or ASPX_ACPL_2 by the rate, with
 // core_5ch_grouping 0 and 2ch_mode 0; 7.0.4 and 7.1.4 with the back pair,
-// ASPX_ACPL_1 and ASPX_AJCC there are experimental. The table of contents is bitstream
+// ASPX_ACPL_1 and ASPX_AJCC there are experimental, as is 22.2, 24 channels in Part
+// 2's 22_2_channel_element (clause 6.2.4.3): two LFE tracks and eleven channel
+// pairs, in SIMPLE or ASPX alone, whose presentation has md_compat 7. The table
+// of contents is bitstream
 // version 2 with presentation version 1, every presentation that carries
 // audio with a presentation_id and the least md_compat its tracks need (Part
 // 2 Table 55; configuration 6's EMDF payloads alone have neither),

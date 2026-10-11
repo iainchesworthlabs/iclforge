@@ -109,8 +109,8 @@ so a misrouted channel is identifiable by ear.)
 
 | Command | What it does |
 |---|---|
-| `encode` | WAV → AC-3. Without `[layout]`, follows the source channel count (1→mono, 2→stereo, 3–6→5.1); a wider source is refused, since no AC-3 coding mode is wider than 3/2 + LFE. |
-| `eac3-encode` | WAV → E-AC-3, with the Annex E `tools:` token and an optional `vbr:` token available (see [Options & grammars](metadata-options.md)). Without `[layout]`, follows the source channel count (1→mono, 2→stereo, 3–6→5.1, 8→7.1, 10→5.1.4, 12→7.1.4). |
+| `encode` | WAV → AC-3. Without `[layout]`, follows the source: the speakers its `WAVE_FORMAT_EXTENSIBLE` header states (FL FR BC is 2/1, FL FR FC BC is 3/1, `decode` writes them from three channels up so its own output encodes back into its mode), or, for a file that states none, its channel count (1→mono, 2→stereo, 3–6→5.1); a wider source is refused, since no AC-3 coding mode is wider than 3/2 + LFE. |
+| `eac3-encode` | WAV → E-AC-3, with the Annex E `tools:` token and an optional `vbr:` token available (see [Options & grammars](metadata-options.md)). Without `[layout]`, follows the source: the speakers its `WAVE_FORMAT_EXTENSIBLE` header states, or, for a file that states none, its channel count (1→mono, 2→stereo, 3–6→5.1, 8→7.1, 10→5.1.4, 12→7.1.4). |
 | `atmos-encode` | WAV → E-AC-3 Atmos, every source channel becomes its own object; optional `[paths.txt]` drives per-object motion from an authored scene file the same way `atmos-path` does, keyed by WAV channel index — an object it doesn't mention keeps its default (fanned-out) placement. With `codec=ac4` it writes AC-4 objects instead: see [AC-4 objects from a WAV](#ac-4-objects-from-a-wav) below |
 | `atmos-cbi` | WAV already mixed into a fixed channel-based-immersive (CBI) bed layout → E-AC-3 Atmos with `program.bed != 0` and 0 dynamic objects — Dolby's `dee_ddpjoc_encoder --input-format cbi_wav` shape, not free-floating objects |
 | `ac4-encode` | WAV → AC-4: mono, stereo, 5.0, 5.1, 5.0.4 or 5.1.4 (7.0, 7.1, 7.0.4, 7.1.4 and 3.0 experimental), at 48 kHz at every frame rate of Part 1 Table 83 or at 44.1 kHz at the native one, as raw sync frames with their CRC (or without, `crc=off`) or, for `.mp4`, `.m4a` or `.mov`, an MP4 file with the `ac-4` sample entry and its `dac4`. The codec mode follows the rate: SIMPLE from 96 kbps a channel (76.8 in 5.X), the ASPX mode below, in 5.X the A-CPL modes lower still, and in the immersive layouts ASPX_ACPL_2, ASPX_SCPL and SCPL by the rate. The frame rate, the rate mode, the I-frames, the metadata, and further substreams and the presentations that play them are options: see [`ac4-encode`](#ac4-encode) below |
@@ -119,7 +119,7 @@ so a misrouted channel is identifiable by ear.)
 forge encode in.wav out.ac3 448 couple
 ```
 
-448 kbps, channel coupling on, layout inferred from the WAV's channel count.
+448 kbps, channel coupling on, layout inferred from the WAV: its stated speakers, or its channel count when it states none.
 
 `1+1` (dual mono — two independent programmes, never inferred from a channel count, so it always
 has to be named explicitly) takes its two channels either as one two-channel file or as two mono
@@ -167,7 +167,7 @@ surrounds in BL and BR; 5.1.4 adds the top front pair (TFL TFR) and then the top
 TBR), and 5.0.4 is the same without the LFE. The layout is the channel count: 1 mono, 2 stereo, 5
 and 6 5.0 and 5.1, 9 and 10 5.0.4 and 5.1.4 (ETSI TS 103 190-2's immersive element with its back
 pair absent, which is how DEE writes 5.1.4). The experimental options below name the other layouts
-the encoder writes: 7.0 and 7.1, 7.0.4 and 7.1.4, and 3.0.
+the encoder writes: 7.0 and 7.1, 7.0.4 and 7.1.4, 3.0, and 22.2 (24 channels).
 
 **Codec mode.** Below 96 kbps a channel the ASPX codec mode: the spectral frontend up to a crossover
 of 7.5, 10.5 or 13.5 kHz by rate, A-SPX above it, and companding below 64 kbps a channel; in 5.X
@@ -212,8 +212,22 @@ dialogue of a music and effects presentation (below);
 and so trades some SNR for a spectrum without holes at a low rate; `hfr-2` and `hfr-4`, the
 efficient high frame rate mode (Part 2 5.1.3): with `frame-rate=` 47.95 to 120 (`hfr-4` from 100)
 the encoder codes at half or a quarter of that rate (Table 18) and sends each frame as two or four
-transmission frames, which a decoder joins again; a constant rate only; and `objects`, which
+transmission frames, which a decoder joins again; a constant rate only; `twenty-two-two`, which
+takes 24 channels as 22.2, the element of ETSI TS 103 190-2 clause 6.2.4.3 (below); and `objects`,
+which
 `objects=<scene file>` needs.
+
+**22.2.** With `experimental=twenty-two-two`, a 24-channel WAV file is written as the 22.2 channel
+element: two LFE tracks and eleven channel pairs, in the SIMPLE and ASPX codec modes
+(`codec-mode=simple` or `aspx`). The channels are taken in the order `decode` writes a 22.2 stream
+in: L R C LFE (FL FR FC LFE), Lb Rb Cb (BL BR BC), Ls Rs (SL SR), Tc Tfl Tsl Tfc Tfr Tsr Tbl Tbc Tbr
+(TC TFL TSL TFC TFR TSR TBL TBC TBR), then LFE2, Bfl, Bfr, Bfc, Lw and Rw. The default codec mode is
+ASPX below 76.8 kbps a full-band channel (1 690 kbps over the 22 of them) and SIMPLE from there. The
+A-CPL, S-CPL and A-JCC modes, the stereo and height downmix values, dialogue enhancement and DRC
+gains are refused for it. The rate must hold the element's least frame: 17 kbps in SIMPLE and 49 in
+ASPX at the native frame rate (15 and 45 at 44.1 kHz), more at the higher frame rates, and the
+encoder's refusal names a rate that cannot. A decoder takes the presentation at `md-compat=7`
+(22 tracks, Part 2 Table 55). An MP4 file carries it with a `dac4`.
 
 **Objects.** With `experimental=objects`, `objects=<scene file>` takes the WAV file's channels as the
 objects of one object substream, written as a raw stream. The scene file is text, one directive a
@@ -529,7 +543,7 @@ requirements ask for beside an Atmos one.
 
 | Command | What it does |
 |---|---|
-| `decode` | AC-3, E-AC-3 or AC-4 → WAV; the stream decides which decoder runs (for AC-4, mono, stereo, 3.0, 5.X and 7.X in the SIMPLE, ASPX and A-CPL codec modes, and 7.0.4 and 7.1.4 in every immersive codec mode, in [full or core decoding and to the layout `speakers=` names](#ac-4-immersive-speakers-and-decoding), written in WAV speaker order, and of a stream of several presentations the one [`presentation=`, `language=` and `associated=`](#ac-4-presentations-presentation-language-associated) choose, its substreams mixed; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded, 7.1.4 by default). The input may be a Matroska/MP4/MPEG-TS container as well as a bare elementary stream, sniffed by content rather than by name — the same three readers `demux` uses. For an Atmos E-AC-3 stream or an AC-4 stream with objects, reports the object count found and, with `objects_dir`, exports each decoded object as its own `object_NN.wav` there — JOC-reconstructed for E-AC-3, D10's own decoded objects for AC-4. With `adm_out` (needs `-DICLFORGE_BUILD_ADM=ON`), also writes a Dolby Atmos Master ADM Profile BW64 there: for E-AC-3, the bed's LFE plus every JOC-reconstructed channel (a channel-based-immersive bed's channels pinned to their speakers, a dynamic object positioned by its own decoded OAMD automation); for AC-4, every bed and dynamic object with its own decoded Annex F properties |
+| `decode` | AC-3, E-AC-3 or AC-4 → WAV (an AC-3 or E-AC-3 stream of three channels or more is written with its speaker mask, so `encode` reads the file back as the coding mode it came from); the stream decides which decoder runs (for AC-4, mono, stereo, 3.0, 5.X and 7.X in the SIMPLE, ASPX and A-CPL codec modes, and 7.0.4 and 7.1.4 in every immersive codec mode, in [full or core decoding and to the layout `speakers=` names](#ac-4-immersive-speakers-and-decoding), written in WAV speaker order, and of a stream of several presentations the one [`presentation=`, `language=` and `associated=`](#ac-4-presentations-presentation-language-associated) choose, its substreams mixed; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded, 7.1.4 by default). The input may be a Matroska/MP4/MPEG-TS container as well as a bare elementary stream, sniffed by content rather than by name — the same three readers `demux` uses. For an Atmos E-AC-3 stream or an AC-4 stream with objects, reports the object count found and, with `objects_dir`, exports each decoded object as its own `object_NN.wav` there — JOC-reconstructed for E-AC-3, D10's own decoded objects for AC-4. With `adm_out` (needs `-DICLFORGE_BUILD_ADM=ON`), also writes a Dolby Atmos Master ADM Profile BW64 there: for E-AC-3, the bed's LFE plus every JOC-reconstructed channel (a channel-based-immersive bed's channels pinned to their speakers, a dynamic object positioned by its own decoded OAMD automation); for AC-4, every bed and dynamic object with its own decoded Annex F properties |
 | `probe` | What a stream *declares*, without rendering its audio: bsid, sample rate, layout, substream map, counts, duration, bit rate, metadata ranges, EMDF/OAMD/JOC, authenticity, per-frame CRC and coding-tool usage. Human table by default, or the `iclforge.probe/1` JSON document with `json=1`. An AC-4 stream gets its table of contents, frame rate, bit rate, I-frames and splices, and each presentation with the metadata the decoder reads of it. The input may be a Matroska, MP4 or MPEG-TS container, sniffed by content: the report then also says what the container declares of the track (codec ID, sample entry or descriptor, time scale, language), in the JSON document as `container`, which is `null` for a bare stream |
 | `levels` | Per-channel peak/RMS report — takes a WAV, a bare encoded stream, or a Matroska/MP4/MPEG-TS container carrying one; of an AC-4 stream, the presentation [`presentation=` and the rest](#ac-4-presentations-presentation-language-associated) choose, as coded |
 | `loudness` | BS.1770-4 gated loudness, reported as the `dialnorm` it implies: of a WAV; of an AC-3 or E-AC-3 stream's first programme, beside the `dialnorm` it carries; or of an AC-4 presentation as coded, in AC-4's steps of 0.25 dB, beside the stream's own. Bare or inside a container |
@@ -555,7 +569,9 @@ A stream carrying more than one programme (a second independent substream — a 
 an audio description) is handled one programme at a time: `decode`, `levels` and `qc` all take
 `programme=<0..7>`, and without it take the first the stream carries while saying what else was
 there. See [Options & grammars](metadata-options.md) for the token, and `eac3-encode`'s
-`programme2=` for authoring such a stream.
+`programme2=` for authoring such a stream. `decode` can also mix an associated service (a
+description, a commentary) into the programme it decodes, with `associated=` — see
+[Options & grammars](metadata-options.md#programme-options-decode-qc-levels-programme).
 
 ```bash
 forge decode out.ec3 commentary.wav programme=1
@@ -607,6 +623,39 @@ Lt/Rt (whose surround sum really is phase shifted 90°, costing 63 samples of ou
 matrix comes from the stream's own `cmixlev`/`surmixlev` or `mixmdate` levels, and §7.8.1's
 normalisation means the fold can never be louder than the loudest coded sample. `mix-lfe` folds
 the LFE in as well — §7.8 makes that optional and this decoder drops it by default.
+
+`karaoke` (or `karaoke=on`) decodes an AC-3 **karaoke** stream - `bsmod` 7 with an `acmod` above
+1/0 (Annex C, informative) - the way a karaoke-aware decoder with three outputs does. Such a
+stream carries L and R (the music), a guide melody M where a centre would be, and one or two
+vocal channels V1 and V2 where the surrounds would be (3/0 is L M R, 2/1 is L R V1, 3/1 is
+L M R V1, 2/2 is L R V1 V2, 3/2 is L M R V1 V2). The output is L, C, R and then the LFE when there
+is one: M at unity in the centre, a single V1 added to the centre, and a pair V1 and V2 added to
+the left and the right, each vocal at the stream's own surround level (`surmixlev`, §5.4.2.5 -
+under the programme provider's control, as Annex C intends) and the whole scaled down by the
+largest output's sum, §7.8.1's way (Table C.2.2's 3/0 columns). A 3/0 stream is already that,
+and a 2/0 one has nothing but L and R, so both decode as coded. At `channels=2` or `channels=1`
+the stereo or mono fold *is* Annex C's 2/0 reproduction - "any AC-3 decoder will produce the
+appropriate output if it is set to perform an Lo, Ro 2-channel downmix" - so `karaoke` changes
+nothing there, and `downmix=ltrt` is refused, since Annex C has no Lt/Rt. A stream that is not
+karaoke is decoded as coded and the report says so; E-AC-3 and AC-4 streams warn and ignore the
+option.
+
+`karaoke=none|v1|v2|v1+v2` is the karaoke-*capable* decoder (C.2.3.2, Table C.2.3): the same
+reproduction with the listener choosing which vocals are heard rather than the stream's own
+`surmixlev`. At the default layout it is L, C, R again - `none` leaves M alone in the centre, `v1`
+or `v2` adds that vocal to the centre, `v1+v2` puts V1 into the left and V2 into the right at unity -
+and at `channels=2` or `channels=1` it is the 2/0 reproduction: M at the stream's `cmixlev`, a single
+vocal at 0.7 in both channels, a pair left and right at unity, with mono the two summed. Every
+coefficient is scaled down together when an output's sum exceeds 1. `karaoke=off` (the default),
+`karaoke=on` and `karaoke=aware` are the spellings of no reproduction and of the bare option.
+
+```bash
+forge decode sing-along.ac3 karaoke.wav karaoke       # L C R: melody centre, vocals at surmixlev
+forge decode sing-along.ac3 stereo.wav channels=2     # the 2/0 reproduction, Lo/Ro
+forge decode sing-along.ac3 backing.wav karaoke=none  # L C R with the vocals muted
+forge decode sing-along.ac3 duet.wav karaoke=v1+v2    # V1 left, V2 right, melody centre
+forge decode sing-along.ac3 lead.wav channels=2 karaoke=v1   # stereo with V1 in the middle
+```
 
 `downmix=auto` lets the stream choose between the two stereo folds, the third option A/52
 §D3.1.1 describes. The stream's preference is its `dmixmod` (Table D2.2): in AC-3's Annex D
@@ -710,8 +759,9 @@ forge decode broadcast.ac4 out.wav presentation-id=3
 Table 91's associated audio), and Table 92's services: `audio-description`,
 `audio-description-subtitles`, `spoken-subtitles` and `emergency-information`.
 
-`md-compat=<0..7>` sets the compatibility level the decoder claims, 3 by default: a presentation
-whose `md_compat` is above it is not chosen (ETSI TS 103 190-2 Table 55).
+`md-compat=<0..7>` sets the compatibility level the decoder claims, 7 by default: a presentation
+whose `md_compat` is above it is not chosen (ETSI TS 103 190-2 Table 55). `md-compat=3` chooses as a
+receiver of DVB's and ATSC's floor level would.
 
 A presentation of several substreams is mixed as ETSI TS 103 190-1 clause 6.2.16 gives, with the
 stream's own gains and pans. `dialogue-gain=<dB>` sets the dialogue against the music and effects,
@@ -774,10 +824,12 @@ Each format's decode reads options the other's does not. Given an AC-4 stream, `
 the AC-3 and E-AC-3 ones it was given (`drc=`, `heavy`, `ltrt-phase=`, `fast-imdct`, `mode=`,
 `programme=`, `bed-only`, `joc-domain=`) in a warning and ignores them, and given an AC-3 or
 E-AC-3 stream it does the same with AC-4's (`output-level=`, `dialogue-enhancement=`,
-`presentation=`, `presentation-id=`, `language=`, `associated=`, `dialogue-gain=`,
-`associated-gain=`, `headphones`, `md-compat=` and AC-4's `drcmode=` names). The options that
-promise what the other format cannot give stop the run: `bap-census=` and `verify-objects` for
-AC-4, and `channels=5.1` and `syntax-trace=` for AC-3 and E-AC-3.
+`presentation=`, `presentation-id=`, `language=`, `dialogue-gain=`, `headphones`,
+`md-compat=` and AC-4's `drcmode=` names). `associated=` and `associated-gain=` are read by
+both: an AC-4 stream's choose a presentation and its mix, an E-AC-3 stream's [mix a second
+programme into the first](metadata-options.md#programme-options-decode-qc-levels-programme). The options that
+promise what the other format cannot give stop the run: `bap-census=`, `verify-objects` and
+`gate-objects` for AC-4, and `channels=5.1` and `syntax-trace=` for AC-3 and E-AC-3.
 
 ```text
 warning: stream.ac4 is AC-4: heavy is AC-3's and E-AC-3's, and ignored
@@ -1171,7 +1223,7 @@ Everything above takes PCM. These five take an already-encoded AC-3/E-AC-3 eleme
 | Command | What it does |
 |---|---|
 | `transcode` | Decode and re-encode. The only one here that re-encodes, because DD+ and DD are different codecs and nothing else bridges them — the route to an optical link or an AC-3-only HDMI sink, which had no route at all before. It also goes between AC-4 and AC-3 or E-AC-3, either way — see [below](#transcode-and-ac-4) |
-| `metadata` | Rewrite `dialnorm`, `compr`, `bsmod`, `dsurmod` on an existing stream and re-stamp its CRCs. The audio bytes are copied through untouched |
+| `metadata` | Rewrite `dialnorm`, `compr`, `bsmod`, `dsurmod` on an existing stream and re-stamp its CRCs. The audio bytes are copied through untouched. A field the stream does not transmit is refused, naming `insert`; with `insert` an E-AC-3 stream gets the field added to every independent substream, and each syncframe that gains one grows by a word or two (the rate rises by about 16 bits a frame at most). An AC-3 stream cannot take it, nor can a frame with block start information or auxiliary data |
 | `normalize` | The measurement-driven case of the above: decode to measure BS.1770-4 integrated loudness, write the `dialnorm` ATSC A/85 §8 implies, change nothing else |
 | `cut` | Extract on access-unit boundaries |
 | `cat` | Join streams end to end |
@@ -1272,9 +1324,12 @@ variadic. It refuses inputs whose codec, sample rate, coding mode, LFE presence,
 channel count or substream-per-unit count differ from the first — a decoder walking the join has
 no way to be told the format changed.
 
-**Out of scope for all five:** `strmtyp 2` convertible streams — the spec's own no-re-encode
-path to AC-3 — which `iclforge::ac3::plan::validate` already refuses. Nothing here produces or consumes
-one.
+**`strmtyp 2`, a convertible substream** (§E2.3.1.1, "previously coded in AC-3"), is an
+independent substream like any other to all five: `metadata` and `normalize` rewrite its fields
+and keep the `blkid` and `frmsizecod` it carries, `cut` and `cat` move its access units whole, and
+`probe` names the AC-3 frame size code it was converted from. What is not here is the conversion
+to or from AC-3 that gives the type its name: the standard specifies the signalling and no process,
+and nothing in this project produces or consumes a type 2 stream.
 
 **AC-4 and the four that copy.** `metadata`, `normalize`, `cut` and `cat` frame AC-3 and E-AC-3
 syncframes and do not read AC-4: given an AC-4 stream they stop with exit `2` (`lost sync:
@@ -1294,10 +1349,10 @@ practice; `dsurmod` additionally exists only for coding mode 2/0 (§5.4.2.7).
 |---|---|
 | `spdif` | Wraps AC-3, E-AC-3 or AC-4 as IEC 61937 bursts inside a playable PCM16 WAV — the stream's `bsid`, or its AC-4 sync word, decides which, and the E-AC-3 carrier runs at four times the content sample rate. AC-4 goes in IEC 61937-14's bursts, the smallest of AC-4, AC-4 HBR4 and AC-4 HBR16 that holds the stream's largest frame, on the link its frame rate gives (HBR16's as eight channels at a quarter of the link rate). For feeding a receiver through an ordinary audio path |
 | `unspdif` | The inverse of `spdif`: reads IEC 61937 bursts back and writes the AC-3, E-AC-3 or AC-4 elementary stream inside them. Takes the WAV `spdif` writes, a capture of an S/PDIF or HDMI input, or a bare dump of carrier bytes with no RIFF header at all — the data type in `Pc` decides AC-3, E-AC-3 or AC-4, and both 16-bit word orders are read. Nothing is re-encoded: the output is what the source sent, byte for byte. `-` works on either end — a capture tool piped straight in, the stream piped straight out — with the report going to stderr, same convention as `encode`/`decode` |
-| `mkv` | Wraps AC-3 or E-AC-3 as Matroska, reading format/packet boundaries/sample rate/channel count from the bitstream itself so the container can't be told the wrong ones. The input may itself be a container — Matroska/MP4/MPEG-TS are sniffed by content, not by name — which is what makes `mkv`/`mp4`/`ts` container-to-container remuxers as well as encode targets. AC-4 is refused: Matroska's codec specification registers no codec ID for it, and a file under one of this project's invention would be one no other reader could name |
-| `mp4` | Wraps AC-3, E-AC-3 **or AC-4** as a single-file MP4/ISOBMFF (an AC-4 input takes TS 103 190-2 Annex E's `ac-4`/`dac4` path, with the Annex E.13 codecs string reported), writing a spec-correct `dac3`/`dec3` sample-entry box (fscod/bsid/bsmod/acmod/lfeon, plus the Atmos complexity-index extension for JOC content) read straight off the bitstream — never off whatever a container INPUT declared, which is the dec3-repair case: a source with a broken or missing Atmos `dec3` flag gets a correct one on the way out |
-| `ts` | Wraps AC-3, E-AC-3 **or AC-4** (DVB profile only — EN 300 468 Annex D.7; `atsc` is refused for AC-4) as an MPEG-2 Transport Stream (PAT + PMT + one PES-wrapped audio PID), identified per whichever broadcast profile the optional third argument names — `dvb` (the default) or `atsc`. See below |
-| `demux` | The inverse of `mkv`: reads a container and writes the bare AC-3/E-AC-3 elementary stream inside it (an AC-4 track as sync frames), which is what every other command here takes as input. The container is identified by its **own magic bytes**, never by the file name — a rip called `title00.mkv` that is really something else, or one with no extension at all, is the normal case. Unlike the wrapping commands it streams: the reader is fed in 64 KiB chunks and each access unit is written as it comes out, so peak memory is a chunk plus a frame whatever the file's duration. Matroska/WebM, MP4 (plain and fragmented) and MPEG-2 Transport Stream (188/192/204-byte packet grids; DVB, ATSC and registration-descriptor codec signalling all read). An MP4 whose `moov` follows its `mdat` is refused with an explanation rather than read wrong — that layout cannot be streamed. For MPEG-TS the destination gets the concatenated PES payloads rather than a guaranteed one-access-unit-per-payload split, since PES makes no such promise — the status line omits sample rate/channels for it, since a transport stream's PMT names the codec but not those |
+| `mkv` | Wraps AC-3 or E-AC-3 as Matroska, reading format/packet boundaries/sample rate/channel count from the bitstream itself so the container can't be told the wrong ones. The input may itself be a container — Matroska/MP4/MPEG-TS are sniffed by content, not by name — which is what makes `mkv`/`mp4`/`ts` container-to-container remuxers as well as encode targets. AC-4 is refused: Matroska's codec specification registers no codec ID for it, and a file under one of this project's invention would be one no other reader could name. So is an AC-3 core with E-AC-3 dependents (A/52 §E2.3.1.2): `A_AC3` covers `bsid` 10 and below and `A_EAC3` 11 to 16, and neither names a stream that is both. A stream with several programmes keeps its first, with a warning — the muxer writes one track — and `programme=<0..7>` picks another, renumbered as substream 0 |
+| `mp4` | Wraps AC-3, E-AC-3 **or AC-4** as a single-file MP4/ISOBMFF (an AC-4 input takes TS 103 190-2 Annex E's `ac-4`/`dac4` path, with the Annex E.13 codecs string reported), writing a spec-correct `dac3`/`dec3` sample-entry box (fscod/bsid/bsmod/acmod/lfeon, plus the Atmos complexity-index extension for JOC content) read straight off the bitstream — never off whatever a container INPUT declared, which is the dec3-repair case: a source with a broken or missing Atmos `dec3` flag gets a correct one on the way out. A stream with several programmes (§E2.3.1.2's independent substreams) keeps every one: an E-AC-3 sample is the syncframes of every substream present (TS 102 366 F.2), the `dec3` carries one block for each, and `data_rate` is their sum; `programme=<0..7>` writes that programme alone, renumbered as substream 0, for a player that takes only the first. An AC-3 core with E-AC-3 dependents is an `ec-3` entry whose `dec3` carries the core's `bsid`, and `chan_loc` is filled in from the dependents' `chanmap` (Table F.6.1) |
+| `ts` | Wraps AC-3, E-AC-3 **or AC-4** (DVB profile only — EN 300 468 Annex D.7; `atsc` is refused for AC-4) as an MPEG-2 Transport Stream (PAT + PMT + one PES-wrapped audio PID), identified per whichever broadcast profile the optional third argument names — `dvb` (the default) or `atsc`. Every programme of a multi-programme stream rides in each PES payload (A/52 Annex G §3.3), which is what the descriptor's `substream1`-`substream3` fields describe; `programme=<0..7>` writes one alone. See below |
+| `demux` | The inverse of `mkv`: reads a container and writes the bare AC-3/E-AC-3 elementary stream inside it (an AC-4 track as sync frames), which is what every other command here takes as input. The container is identified by its **own magic bytes**, never by the file name — a rip called `title00.mkv` that is really something else, or one with no extension at all, is the normal case. Unlike the wrapping commands it streams: the reader is fed in 64 KiB chunks and each access unit is written as it comes out, so peak memory is a chunk plus a frame whatever the file's duration. Matroska/WebM, MP4 (plain and fragmented) and MPEG-2 Transport Stream (188/192/204-byte packet grids; DVB, ATSC and registration-descriptor codec signalling all read). An MP4 whose `moov` follows its `mdat` is read from a file path by walking the boxes and jumping over `mdat`, then reading each sample where the sample table says, in the same bounded memory; from a pipe it is refused with an explanation rather than read wrong, since a pipe cannot go back for the table. For MPEG-TS the destination gets the concatenated PES payloads rather than a guaranteed one-access-unit-per-payload split, since PES makes no such promise — the status line omits sample rate/channels for it, since a transport stream's PMT names the codec but not those |
 | `remux` | Container-to-container in one step: `mkv`/`mp4`/`ts` under the hood, picked by `out_path`'s **extension** (`.mkv`/`.webm`, `.mp4`/`.m4a`/`.mov`, `.ts`/`.m2ts`) since a file that doesn't exist yet has no bytes to sniff. The input is still identified by its own magic bytes, exactly as `demux`'s. `[dvb\|atsc]` is passed through when the target is a Transport Stream and ignored otherwise |
 | `fmp4` | Writes fragmented MP4/CMAF — an init segment plus one media segment per fragment — alongside an HLS media+master playlist pair and a DASH MPD, all pointing at the same segments, ready for a real HLS/DASH origin or packager. `[frames_per_fragment]` defaults to 48 access units per fragment, about 1.5 s at 48 kHz. Atmos content signals itself automatically and completely: `CHANNELS="<N>/JOC"` in the HLS playlists, the two `EC3_ExtensionType`/`EC3_ExtensionComplexityIndex` supplemental descriptors ETSI TS 103 420 clause D.2 defines in the MPD, and the `ceao` compatibility brand its Annex E requires on the segments. Every representation also states its channel configuration, on the Dolby scheme TS 102 366 clause I.1.2.1 defines. `fallback-51` additionally writes the paired 5.1 rendition. AC-4, bare or in MP4, is fragmented as ETSI TS 103 190-2 Annex H has a CMAF track: each fragment starts at an I-frame, the first once it holds `frames_per_fragment` frames; each sample that is not an I-frame is listed with its flags; the track counts in Table E.1's time scale (240 000 at 29.97, 59.94 and 119.88 fps); its brands are `ca4m` and `ca4s`; and the manifests carry the codecs parameter, the channel configuration (Annex G's Table G.1, or the Dolby 2015 scheme) and the frame rate of the presentation with the widest compatibility. A stream Annex H.1.2 does not allow in a CMAF track is refused, naming the rule |
 
@@ -1547,7 +1602,8 @@ and the access units played, active dynamic objects and underruns at the end.
 
 `spatial` builds its `iclforge::ac3::DecoderConfig` from the same options `decode` and `monitor` do, so the
 decode-side tokens above (`drc=`, `heavy`, `conceal=`, `fast-imdct=off`) reach it, and
-`verify-objects` checks each frame's object signature here as it does there. Two do not reach it:
+`verify-objects` checks each frame's object signature here as it does there, and `gate-objects`
+renders the objects of the frames that verify and the bed of the rest. Two do not reach it:
 `run_spatial` leaves `fast-mdct=off` and `joc-domain=` out of the config it builds, so the JOC
 reconstruction on this path always takes the defaults — the fast forward MDCT, in the QMF domain.
 

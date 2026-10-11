@@ -1679,9 +1679,9 @@ lower band. That is what the MSVC STL had chosen in this frame, so Windows outpu
 Linux now equals it; the three gold pins did not move either.
 
 The same sixteen on real arm64 hardware (the Linux GCC leg, libstdc++, CI run 38036705121) are
-byte-identical to the x86-64 ones, so `aarch64-neon/fast` is pinned too. What is still unpinned: the
-macOS leg's libc++ (it did not build that day, an `-Wsign-conversion` error in an IAMF example on
-main), and the `encfloat` family. The float32 encoder's existing pins no longer match a fresh GCC 16 build of main
+byte-identical to the x86-64 ones, so `aarch64-neon/fast` is pinned too, and the macOS LLVM leg
+(Homebrew's libc++, the third standard library) passed all nineteen keys against those pins on
+2026-10-10 (CI run 38039522656). What is still unpinned is the `encfloat` family. The float32 encoder's existing pins no longer match a fresh GCC 16 build of main
 (the same three hashes before and after this change), the nightly leg that checks them stops at
 its float32 decode suite before reaching them (the run of 2026-10-09), and that variant does not build
 with Clang 22 (`-Wdouble-promotion` in `eac3_frame.cpp`); neither was investigated here.
