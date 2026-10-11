@@ -57,8 +57,8 @@ Three details that decide whether it is usable:
   heard position, which is the clock every player follows, so the file plays correctly on any
   device.
 - **A tap's clock.** The engine's heard position is published every 60 ms and `LyricClock`
-  interpolates it per frame (`LyricClock`, PR #1284); a tap reads that interpolated time, which
-  is good to a frame. The person's jitter is larger than the clock's.
+  interpolates it per frame (`apps/hearth/ui/assets/qml/LyricClock.qml`); a tap reads that
+  interpolated time, which is good to a frame. The person's jitter is larger than the clock's.
 - **The file.** The writer emits what the reader reads (`[mm:ss.xx]` per line, `<mm:ss.xx>` per
   tapped word, the id tags it was given, `[offset:]` untouched) at its 10 ms resolution, and a
   round trip (read, write, read) is the test. A word tap never changes the text.
