@@ -175,6 +175,67 @@ ScrollView {
                             onSelected: function(value) { HearthController.onFailure = value; }
                         }
                     }
+
+                    // Karaoke (planning/karaoke-design.md, K5): the nudge a
+                    // singer most often needs, because a file's own times and
+                    // a particular output path rarely agree to the frame.
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.gap
+                        Text {
+                            text: qsTr("Lyric delay")
+                            color: Theme.text
+                            font.pixelSize: Theme.fontNormal
+                            elide: Text.ElideRight
+                            Layout.preferredWidth: root.labelWidth
+                        }
+                        AppSlider {
+                            id: lyricDelaySlider
+                            objectName: "settingsLyricDelay"
+                            Layout.fillWidth: true
+                            from: -KaraokeController.maxDelayMs
+                            to: KaraokeController.maxDelayMs
+                            stepSize: 10
+                            snapMode: AppSlider.SnapAlways
+                            value: KaraokeController.delayMs
+                            onMoved: KaraokeController.delayMs = Math.round(lyricDelaySlider.value)
+                            // A drag removes the binding on `value`.
+                            Connections {
+                                target: KaraokeController
+                                function onDelayChanged() { lyricDelaySlider.value = KaraokeController.delayMs; }
+                            }
+                        }
+                        Text {
+                            objectName: "settingsLyricDelayValue"
+                            text: qsTr("%1 ms").arg((KaraokeController.delayMs > 0 ? "+" : "")
+                                                    + KaraokeController.delayMs)
+                            color: Theme.text
+                            font.family: Theme.monoFamily
+                            font.pixelSize: Theme.fontSmall
+                            horizontalAlignment: Text.AlignRight
+                            Layout.preferredWidth: Math.round(72 * Theme.fontScale)
+                        }
+                        AppButton {
+                            objectName: "settingsLyricDelayReset"
+                            text: qsTr("Reset")
+                            enabled: KaraokeController.delayMs !== 0
+                            onClicked: KaraokeController.delayMs = 0
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.gap
+                        Item { Layout.preferredWidth: root.labelWidth }
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTr("Shows the lyrics later (+) or sooner (-) than the music, on top of the "
+                                      + "timing in the lyrics file. Nudge it when the words are off against "
+                                      + "this output.")
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSmall
+                            wrapMode: Text.WordWrap
+                        }
+                    }
                 }
 
                 Card {

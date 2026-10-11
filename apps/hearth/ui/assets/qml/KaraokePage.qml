@@ -13,13 +13,17 @@ import Hearth
 // DecoderSettings ("karaoke" and "karaokeVocals" in HearthController.
 // decoderSettings), the stream's facts are the playing item's media information,
 // and the page says in words when the choice cannot apply (a stream that is not
-// karaoke, a bitstream output, an Lt/Rt fold). The lyric view is the next PR.
+// karaoke, a bitstream output, an Lt/Rt fold). The lyrics of the item sit
+// under them, and the full-screen view is one button away (K5).
 ScrollView {
     id: root
 
     // Asked for by the bitstream notice's button; Main.qml opens the output
     // picker, as the Play page's signal path does.
     signal outputPickerRequested()
+    // Asked for by the lyrics card's button, and by F11 through Main.qml, which
+    // puts the window full screen with the singer view.
+    signal lyricsFullScreenRequested()
 
     clip: true
     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
@@ -58,6 +62,11 @@ ScrollView {
         const next = {};
         next[key] = value;
         HearthController.setDecoderSettings(next);
+    }
+
+    function clock(ms) {
+        const seconds = Math.max(0, Math.floor(ms / 1000));
+        return Math.floor(seconds / 60) + ":" + ("0" + (seconds % 60)).slice(-2);
     }
 
     function fileNameOf(path) {
@@ -370,6 +379,70 @@ ScrollView {
                         }
                     }
                 }
+
+                Card {
+                    id: lyricsCard
+                    ordinal: "03"
+                    title: qsTr("Lyrics")
+                    summary: lyricView.lineCount > 0
+                             ? qsTr("%1 · line %2 of %3")
+                                   .arg(root.clock(lyricClock.positionMs))
+                                   .arg(Math.max(1, lyricView.lineNumber)).arg(lyricView.lineCount)
+                             : ""
+                    framed: true
+
+                    LyricClock {
+                        id: lyricClock
+                        active: root.visible && root.isKaraoke
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.gap
+                        Text {
+                            objectName: "lyricsFile"
+                            Layout.fillWidth: true
+                            text: KaraokeController.fileName.length > 0
+                                  ? KaraokeController.fileName
+                                    + (KaraokeController.status === "timed"
+                                       ? (KaraokeController.wordTimed ? qsTr(", word-timed")
+                                                                       : qsTr(", line-timed"))
+                                       : "")
+                                  : ""
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSmall
+                            elide: Text.ElideMiddle
+                        }
+                        AppButton {
+                            objectName: "lyricsFullScreenButton"
+                            text: qsTr("Full screen · F11")
+                            onClicked: root.lyricsFullScreenRequested()
+                        }
+                    }
+
+                    LyricView {
+                        id: lyricView
+                        objectName: "lyricsView"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.round(240 * Theme.fontScale)
+                        positionMs: lyricClock.positionMs
+                    }
+
+                    Text {
+                        objectName: "lyricsNote"
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        text: KaraokeController.status === "plain"
+                              ? qsTr("These lyrics have no times, so they are shown whole and not followed.")
+                              : (KaraokeController.status === "timed" && !KaraokeController.wordTimed
+                                 ? qsTr("This file times lines, not words: a whole line is emphasised as it "
+                                        + "is sung.")
+                                 : "")
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontSmall
+                        wrapMode: Text.WordWrap
+                    }
+                }
             }
 
             // --- the stream and what plays -----------------------------
@@ -380,7 +453,7 @@ ScrollView {
                 spacing: Theme.gap * 2
 
                 Card {
-                    ordinal: "03"
+                    ordinal: "04"
                     title: qsTr("The stream")
                     framed: true
 
@@ -417,7 +490,7 @@ ScrollView {
                 }
 
                 Card {
-                    ordinal: "04"
+                    ordinal: "05"
                     title: qsTr("What plays")
                     framed: true
 
@@ -463,7 +536,7 @@ ScrollView {
                 }
 
                 Card {
-                    ordinal: "05"
+                    ordinal: "06"
                     title: qsTr("Signal path")
                     framed: true
 

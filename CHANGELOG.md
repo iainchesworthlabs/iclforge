@@ -135,6 +135,14 @@ The sections below contain the complete change list and fixes.
   bitstream output, a network group, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
   is kept across starts, the one decoder setting that is. The Decoder page shows it in a line with
   a button to the page.
+- **Hearth shows lyrics, word by word.** The Karaoke page has a Lyrics card for the `.lrc` file
+  beside the stream: the line being sung with its neighbours, each word sung, being sung (filled
+  left to right by time and underlined) or not yet sung, from a clock that follows the output's
+  position and cannot run more than two polls ahead of it. A file that times only lines has the
+  whole line emphasised, a file with no times is shown whole, and a missing or unreadable file is
+  said in words. `F11` opens the lyrics full screen (`Esc` leaves) with the transport and the
+  vocals chooser kept at the bottom, and Settings has a lyric delay of -1,000 to +1,000 ms that is
+  kept across starts.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
