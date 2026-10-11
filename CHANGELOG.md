@@ -83,6 +83,13 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **Hearth's Karaoke page sets the level of the melody and of each vocal.** Under the capable
+  reproduction, three sliders move M, V1 and V2 from 24 dB below Table C.2.3 (off) to 12 dB above
+  it, with **Reset levels**; a part that is off is listed as muted and a vocal the stream lacks or
+  the Vocals choice leaves out has its slider closed. The levels are kept across starts with the
+  choice, and show in the diagnostics only when they are not 0 dB. `DecoderSettings` carries them
+  as `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db`, which become the library's
+  linear gains where the settings meet the decoder (planning/karaoke-phase2.md, W10).
 - **The karaoke-capable decoder can re-level the melody and the vocals.** `OutputConfig` gains
   `karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, linear and 1.0 by
   default, which multiply the Table C.2.3 coefficients of M, V1 and V2 (Annex C.2.3's "additional

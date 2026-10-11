@@ -49,7 +49,8 @@ come out of the rear speakers. Annex C defines two kinds of decoder that do bett
   centre, and the vocals mixed in at the surround level the stream carries.
 - A **karaoke-capable** decoder (Table C.2.3) does the same and lets the listener choose which
   vocals play: none, V1, V2 or both. With none, what is left is the backing and the guide melody,
-  for singing along to.
+  for singing along to. Annex C also leaves it room to move the level of each part, which
+  iclforge's capable decoder offers.
 
 E-AC-3 and AC-4 have no karaoke mode in their specifications; this is AC-3 only.
 
@@ -68,7 +69,13 @@ track) and choose the **Karaoke** page (`Ctrl+7`).
 |---|---|
 | **As coded** | The channels as the stream codes them: the vocals come from the surround speakers. |
 | **Aware** (the default) | L, C and R, with the vocals at the stream's own level. On two speakers this is the ordinary Lo/Ro fold, which Annex C says is the same thing. |
-| **Capable** | As aware, with **Vocals** set to None, V1, V2 or Both. A single vocal plays in the centre with the melody; Both is V1 on the left and V2 on the right, so a stream with only V1 plays it on the left. |
+| **Capable** | As aware, with **Vocals** set to None, V1, V2 or Both. A single vocal plays in the centre with the melody; Both is V1 on the left and V2 on the right, so a stream with only V1 plays it on the left. A **level** for the melody and for each vocal moves it against the table, from 24 dB down (which is off) to 12 dB up. |
+
+The levels are the capable decoder's alone, 0 dB each is the table as it stands, and they are
+kept across starts with the choice. Raising a part far enough lowers the others a little, so that
+no speaker is driven past full scale. **Reset levels** puts all three back. A part at the bottom of
+its control is off, and the page lists it as muted. A level has nothing to act on for a vocal the
+stream lacks or the **Vocals** choice leaves out, and its control is closed.
 
 The page says which part each speaker plays under the choice made, and says in words when the
 choice does not apply:
@@ -204,8 +211,9 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
 
 - **An LFE channel in a karaoke stream** made here: the flow carries none, and a file that has one
   is named, not dropped.
-- **Re-levelling the melody or the vocals** (Annex C's optional extra flexibility): the library
-  offers none.
+- **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
+  (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
+  player do not offer them.
 - **Making or timing a lyrics file.** Hearth reads `.lrc` files; nothing here writes one or times
   the words of one that has only lines. A file in an encoding other than UTF-8 is not read.
 - **Karaoke in E-AC-3 or AC-4**, and **a microphone, scoring or recording**.
