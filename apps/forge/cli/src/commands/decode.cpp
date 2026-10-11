@@ -107,6 +107,20 @@ bool folding(const forge_cli::Options& meta, iclforge::ac3::Acmod acmod) {
            acmod != iclforge::ac3::Acmod::kDualMono;
 }
 
+// Whether the output stage is going to leave this frame as Annex C's karaoke
+// 3/0 reproduction - L, C, R and the LFE, in place of the coded layout - which
+// is what the sink is then opened for, as it is for a fold. The stage is the
+// one that decides (a frame that is not karaoke, an acmod with nothing to
+// reproduce, and a stereo or mono target all leave the layout alone), so this
+// asks it by its own channel count rather than restating its rules.
+bool karaoke_reproduced(const forge_cli::Options& meta, const iclforge::ac3::DecodedFrame& frame) {
+    const bool karaoke = iclforge::ac3::meta::is_karaoke(
+        static_cast<iclforge::ac3::meta::BitstreamMode>(frame.bsmod), frame.acmod);
+    return meta.output.karaoke == iclforge::ac3::KaraokeReproduction::kMultichannel &&
+           iclforge::ac3::output_channel_count(meta.output, frame.acmod, frame.lfe, karaoke) !=
+               iclforge::ac3::output_channel_count(meta.output, frame.acmod, frame.lfe, false);
+}
+
 // The one-line name for whatever the fold produced, for the status report.
 std::string_view fold_name(iclforge::ac3::DownmixTarget target) {
     switch (target) {
@@ -526,6 +540,10 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
                      joined(meta.eac3_decode_tokens),
                      meta.eac3_decode_tokens.size() == 1 ? "is" : "are");
     }
+    if (meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff) {
+        fmt::println(stderr, "warning: {} is AC-4: karaoke is AC-3's (Annex C), and ignored",
+                     in_path);
+    }
     const iclforge::ac4::ScanResult scan = iclforge::ac4::scan(stream);
     if (scan.frames.empty()) {
         fmt::println(stderr, "error: {} holds no AC-4 sync frame", in_path);
@@ -839,6 +857,11 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     if (ids->size() > 1) {
         status_println(status_stream(out_path), "  programme {} of {} ({})", *programme,
                        ids->size(), format_programme_ids(*ids));
+    }
+    if (meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff) {
+        // Annex C is AC-3's: the E-AC-3 decoder takes no karaoke flag from
+        // bsi, and its dependent-substream programmes have no karaoke layout.
+        fmt::println(stderr, "warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored");
     }
     // Same convention as the AC-3 path below: null unless bap-census= asked
     // for it, so an ordinary decode pays nothing.
@@ -1361,6 +1384,15 @@ int run_decode(std::string_view in_path, std::string_view out_path,
                      joined(requested.ac4_decode_tokens),
                      requested.ac4_decode_tokens.size() == 1 ? "is" : "are");
     }
+    if (requested.output.karaoke == iclforge::ac3::KaraokeReproduction::kMultichannel &&
+        requested.output.target == iclforge::ac3::DownmixTarget::kLtRt) {
+        // Annex C defines a 2/0 reproduction as Lo/Ro and a 3/0 one; there is
+        // no Lt/Rt karaoke. Said rather than quietly taking the one or the other.
+        fmt::println(stderr,
+                     "error: karaoke reproduces through the 3/0 or the Lo/Ro downmix (Annex C); "
+                     "it defines no Lt/Rt - drop karaoke or use downmix=loro");
+        return kExitUsage;
+    }
     // downmix=auto becomes a concrete fold here, once, from what the stream
     // itself prefers; everything below sees only the fold it settled on.
     auto meta = requested;
@@ -1467,15 +1499,19 @@ int run_decode(std::string_view in_path, std::string_view out_path,
             // L then R, or the one mono channel - so it takes the identity
             // permutation rather than the coded layout's.
             const bool folded = folding(meta, decoded->acmod);
+            // Annex C's karaoke 3/0 reproduction replaces the coded layout
+            // with L, C, R (and the LFE): written channels that are a 3/0
+            // layout, named and ordered as one whatever the stream coded.
+            const bool reproduced = !folded && karaoke_reproduced(meta, *decoded);
+            const auto written = reproduced ? iclforge::ac3::Acmod::k3_0 : decoded->acmod;
             // Which speaker each WAV position is, for three channels or more
             // (see the E-AC-3 path's note); dual mono has no speakers to name.
             std::uint32_t mask = 0;
             if (!folded && decoded->acmod != iclforge::ac3::Acmod::kDualMono) {
                 const auto coded = iclforge::ac3::eac3::chanmap::expand(
-                    iclforge::ac3::eac3::chanmap::acmod_map(decoded->acmod, decoded->lfe));
+                    iclforge::ac3::eac3::chanmap::acmod_map(written, decoded->lfe));
                 std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
-                for (const auto slot :
-                     iclforge::ac3::io::wav_channel_order(decoded->acmod, decoded->lfe)) {
+                for (const auto slot : iclforge::ac3::io::wav_channel_order(written, decoded->lfe)) {
                     in_wav_order.push_back(coded[static_cast<int>(slot)]);
                 }
                 mask = plan::wav_channel_mask(in_wav_order);
@@ -1483,7 +1519,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
             if (!sink.open(
                     out_path, sample_rate_hz(decoded->sample_rate), decoded->channels.size(),
                     folded ? std::vector<std::size_t>{}
-                           : iclforge::ac3::io::wav_channel_order(decoded->acmod, decoded->lfe),
+                           : iclforge::ac3::io::wav_channel_order(written, decoded->lfe),
                     mask)) {
                 fmt::println(stderr, "error: cannot open {} for writing", out_path);
                 return kExitOutput;
@@ -1492,10 +1528,20 @@ int run_decode(std::string_view in_path, std::string_view out_path,
             // fold rather than the coded layout it no longer carries.
             meter.emplace(folded ? (decoded->channels.size() == 1 ? iclforge::ac3::Acmod::k1_0
                                                                  : iclforge::ac3::Acmod::k2_0)
-                                 : decoded->acmod,
+                                 : written,
                           folded ? false : decoded->lfe,
                           sample_rate_hz(decoded->sample_rate));
             have_first = true;
+        }
+        // The sink was opened for the first frame's width. A stream whose
+        // layout changes after it (an acmod change, or bsmod switching a
+        // karaoke reproduction on or off) cannot be written into it.
+        if (decoded->channels.size() != first.channels.size()) {
+            fmt::println(stderr,
+                         "error: {}: the channel layout changes mid-stream ({} channels, then {})",
+                         in_path, first.channels.size(), decoded->channels.size());
+            sink.abort();
+            return kExitInput;
         }
         std::vector<std::span<const float>> views;
         views.reserve(decoded->channels.size());
@@ -1531,13 +1577,47 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // and this report must not land in the middle of them.
     const auto status = status_stream(out_path);
     const bool folded = folding(meta, first.acmod);
+    const bool reproduced = !folded && karaoke_reproduced(meta, first);
     status_println(
         status, "decoded {} frames -> {} ({}, {} Hz)", frames->size(), out_path,
         folded
             ? fmt::format("{} -> {}", iclforge::ac3::analysis::layout_name(first.acmod, first.lfe),
                           fold_name(meta.output.target))
-            : std::string{iclforge::ac3::analysis::layout_name(first.acmod, first.lfe)},
+            : reproduced
+                  ? fmt::format("{} -> karaoke {}",
+                                iclforge::ac3::analysis::layout_name(first.acmod, first.lfe),
+                                iclforge::ac3::analysis::layout_name(iclforge::ac3::Acmod::k3_0,
+                                                                     first.lfe))
+                  : std::string{iclforge::ac3::analysis::layout_name(first.acmod, first.lfe)},
         sample_rate_hz(first.sample_rate));
+    if (meta.output.karaoke == iclforge::ac3::KaraokeReproduction::kMultichannel) {
+        const bool karaoke_stream = iclforge::ac3::meta::is_karaoke(
+            static_cast<iclforge::ac3::meta::BitstreamMode>(first.bsmod), first.acmod);
+        if (reproduced) {
+            const auto levels = iclforge::ac3::mix_levels(first.acmod, first.cmixlev,
+                                                          first.surmixlev, first.alternate_bsi);
+            status_println(status,
+                           "  karaoke (Annex C.2.3.1): melody M to the centre, the vocals at the "
+                           "stream's surround level ({:.1f} dB)",
+                           iclforge::ac3::meta::to_db(meta.output.mix_override.loro_slev.value_or(
+                               levels.loro_slev)));
+        } else if (!karaoke_stream) {
+            status_println(status,
+                           "note: karaoke applies to a stream with bsmod 7 above 1/0 (Annex C.2.1); "
+                           "this one is bsmod {} at {}, and was decoded as coded",
+                           first.bsmod,
+                           iclforge::ac3::analysis::layout_name(first.acmod, first.lfe));
+        } else if (folded) {
+            status_println(status,
+                           "note: karaoke at a stereo or mono target is Annex C's 2/0 "
+                           "reproduction, which is this Lo/Ro downmix");
+        } else {
+            status_println(status,
+                           "note: a karaoke stream at {} is already what Annex C's reproduction "
+                           "gives; decoded as coded",
+                           iclforge::ac3::analysis::layout_name(first.acmod, first.lfe));
+        }
+    }
     status_println(status, "metadata: dialnorm {} (dialogue at -{} dBFS){}", first.dialnorm,
                    first.dialnorm, dialnorm_note(meta, first.dialnorm));
     if (first.dialnorm2.has_value()) {

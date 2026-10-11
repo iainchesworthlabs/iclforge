@@ -919,3 +919,137 @@ TEST_CASE("levels names a WAV's channels by the speakers it states", "[cli][leve
     CHECK(without.find("as 3/0") != std::string::npos);
     CHECK(without.find("  S ") == std::string::npos);
 }
+
+// ---------------------------------------------------------------------------
+// Annex C karaoke: `decode ... karaoke`
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A 3/2 stream - L, M, R, V1, V2 as five tones - flagged `bsmod` and with the
+// surround level -6 dB (0.5), the one the karaoke vocals are mixed at.
+fs::path write_karaoke_candidate(const fs::path& dir, const std::string& name,
+                                 const std::string& bsmod_option) {
+    const auto source = write_wav(dir / (name + "_src.wav"), 5);
+    const auto stream = dir / (name + ".ac3");
+    fs::remove(stream);
+    const auto log = dir / (name + "_encode.log");
+    REQUIRE(run_cli("encode " + quoted(source) + " " + quoted(stream) +
+                        " 448 L,C,R,Ls,Rs surmixlev=-6 cmixlev=-3 " + bsmod_option,
+                    log) == 0);
+    return stream;
+}
+
+iclforge::ac3::io::WavData decode_to_wav(const fs::path& stream, const fs::path& wav,
+                                         const std::string& options, std::string* report = nullptr) {
+    fs::remove(wav);
+    const auto log = wav.parent_path() / (wav.stem().string() + ".log");
+    REQUIRE(run_cli("decode " + quoted(stream) + " " + quoted(wav) + " " + options, log) == 0);
+    if (report != nullptr) {
+        *report = read_log(log);
+    }
+    const auto read = iclforge::ac3::io::read_wav(wav.string());
+    REQUIRE(read.has_value());
+    return *read;
+}
+
+}  // namespace
+
+TEST_CASE("decode karaoke writes a karaoke stream as L C R at Table C.2.2's levels",
+          "[cli][decode][karaoke]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_karaoke_candidate(dir, "k32", "bsmod=7");
+
+    std::string report;
+    const auto coded = decode_to_wav(stream, dir / "k32_coded.wav", "");
+    const auto heard = decode_to_wav(stream, dir / "k32_heard.wav", "karaoke", &report);
+    INFO(report);
+
+    // Three channels where five were coded, and the file says which: FL FR FC,
+    // which is L, R, C in a WAV and Lk, Rk, Ck here.
+    REQUIRE(coded.channels.size() == 5);
+    REQUIRE(heard.channels.size() == 3);
+    CHECK(heard.channel_mask == (kFL | kFR | kFC));
+    CHECK(report.find("karaoke 3/0") != std::string::npos);
+
+    // The coded WAV is FL FR FC BL BR = L R M V1 V2. Table C.2.2, 3/0: the
+    // pair of vocals into the left and the right at the stream's surround
+    // level (0.5), the melody into the centre, all scaled by 1 / (1 + 0.5).
+    constexpr double kScale = 1.0 / 1.5;
+    REQUIRE(heard.frame_count() == coded.frame_count());
+    double worst = 0.0;
+    double loudest = 0.0;
+    for (std::size_t i = 0; i < heard.frame_count(); ++i) {
+        const double l = coded.channels[0][i];
+        const double r = coded.channels[1][i];
+        const double m = coded.channels[2][i];
+        const double v1 = coded.channels[3][i];
+        const double v2 = coded.channels[4][i];
+        worst = std::max(worst, std::abs(heard.channels[0][i] - (l + 0.5 * v1) * kScale));
+        worst = std::max(worst, std::abs(heard.channels[1][i] - (r + 0.5 * v2) * kScale));
+        worst = std::max(worst, std::abs(heard.channels[2][i] - m * kScale));
+        loudest = std::max(loudest, std::abs(static_cast<double>(heard.channels[2][i])));
+    }
+    CHECK(worst < 1e-6);
+    CHECK(loudest > 0.05);  // a real signal in the centre, not silence agreeing with silence
+}
+
+TEST_CASE("decode karaoke at a stereo or mono target is the Lo/Ro downmix it always was",
+          "[cli][decode][karaoke]") {
+    // Annex C: the 2/0 reproduction IS the Lo/Ro downmix, so asking for
+    // karaoke at channels=2 changes nothing, and the report says why.
+    const auto dir = scratch_dir();
+    const auto stream = write_karaoke_candidate(dir, "k32s", "bsmod=7");
+    std::string report;
+    const auto plain = decode_to_wav(stream, dir / "k32s_plain.wav", "channels=2");
+    const auto karaoke = decode_to_wav(stream, dir / "k32s_karaoke.wav", "channels=2 karaoke", &report);
+    INFO(report);
+    REQUIRE(plain.channels.size() == 2);
+    CHECK(karaoke.channels == plain.channels);
+    CHECK(report.find("2/0 reproduction") != std::string::npos);
+
+    // There is no Lt/Rt karaoke in Annex C, so the combination is refused
+    // rather than quietly taking one or the other.
+    const auto log = dir / "k32s_ltrt.log";
+    const auto refused = dir / "k32s_ltrt.wav";
+    fs::remove(refused);
+    CHECK(run_cli("decode " + quoted(stream) + " " + quoted(refused) + " downmix=ltrt karaoke",
+                  log) != 0);
+    CHECK(read_log(log).find("Lt/Rt") != std::string::npos);
+    CHECK_FALSE(fs::exists(refused));
+}
+
+TEST_CASE("decode karaoke leaves a stream that is not karaoke as it was, and says so",
+          "[cli][decode][karaoke]") {
+    const auto dir = scratch_dir();
+    // The same five tones as a complete main service: bsmod 0.
+    const auto stream = write_karaoke_candidate(dir, "k32n", "bsmod=0");
+    std::string report;
+    const auto plain = decode_to_wav(stream, dir / "k32n_plain.wav", "");
+    const auto asked = decode_to_wav(stream, dir / "k32n_asked.wav", "karaoke", &report);
+    INFO(report);
+    REQUIRE(plain.channels.size() == 5);
+    CHECK(asked.channels == plain.channels);
+    CHECK(asked.channel_mask == plain.channel_mask);
+    CHECK(report.find("bsmod 0") != std::string::npos);
+    CHECK(report.find("decoded as coded") != std::string::npos);
+
+    // karaoke=off is the default spelled out; anything else is not a value.
+    const auto off = decode_to_wav(stream, dir / "k32n_off.wav", "karaoke=off");
+    CHECK(off.channels == plain.channels);
+    const auto log = dir / "k32n_bad.log";
+    CHECK(run_cli("decode " + quoted(stream) + " " + quoted(dir / "k32n_bad.wav") + " karaoke=maybe",
+                  log) != 0);
+    CHECK(read_log(log).find("'on' or 'off'") != std::string::npos);
+}
+
+TEST_CASE("karaoke is decode's option and AC-3's: other commands refuse it", "[cli][decode][karaoke]") {
+    const auto dir = scratch_dir();
+    const auto log = dir / "k_other.log";
+    // monitor and play name channels by the coded layout the reproduction
+    // replaces, so the option is not theirs; an unknown option is refused.
+    CHECK(run_cli("levels " + quoted(write_karaoke_candidate(dir, "k_other", "bsmod=7")) +
+                      " karaoke",
+                  log) != 0);
+    CHECK(read_log(log).find("unknown option") != std::string::npos);
+}

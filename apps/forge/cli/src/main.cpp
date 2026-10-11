@@ -670,7 +670,7 @@ int run_main(int argc, char** argv) {
                                token == "bed-only" ||
                                token == "keep-partial" || token == "fast-mdct" ||
                                token == "fast-imdct" || token == "mix-lfe" ||
-                               token == "headphones" ||
+                               token == "karaoke" || token == "headphones" ||
                                token == "fallback-51" || token == "insert" ||
                                token == "annexd" ||
                                token == "infomdat" || token == "encinfo" ||

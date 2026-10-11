@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 103> kOptionTokens{{
+constexpr std::array<OptionToken, 105> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -51,6 +51,8 @@ constexpr std::array<OptionToken, 103> kOptionTokens{{
     {"verify-objects", "check each frame's EMDF object signature instead of just decoding"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
+    {"karaoke", "decode: an AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R"},
+    {"karaoke=", "decode: on, or off (the default: a karaoke stream decodes like any other)"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
     {"fast-imdct", "names the default inverse MDCT (the fast §7.9.4 step 3)"},
     {"quiet", "no status output at all - errors and the payload only"},
@@ -444,6 +446,16 @@ void print_decode_topic() {
     fmt::println("       not decode from the previous block's overlap instead of failing the");
     fmt::println("       command; monitor also folds on its own initiative when the output");
     fmt::println("       endpoint renders fewer channels than the programme.");
+    fmt::println("");
+    fmt::println("decode alone takes karaoke (or karaoke=on) for an AC-3 karaoke stream,");
+    fmt::println("       bsmod 7 with an acmod above 1/0 (Annex C): it writes what a");
+    fmt::println("       karaoke-aware multi-channel decoder reproduces - L, C, R (and the LFE) -");
+    fmt::println("       with the guide melody M in the centre and the vocals V1, V2 mixed at");
+    fmt::println("       the stream's own surround level: a single V1 into the centre, a pair");
+    fmt::println("       into the left and the right (Table C.2.2). With channels=2 or 1 it is");
+    fmt::println("       the Lo/Ro downmix, which is Annex C's 2/0 reproduction. downmix=ltrt");
+    fmt::println("       is refused: Annex C defines no Lt/Rt. A stream that is not karaoke");
+    fmt::println("       is decoded as coded, and the report says so.");
 }
 
 void print_ac4_decode_topic() {

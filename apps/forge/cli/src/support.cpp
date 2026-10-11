@@ -1891,6 +1891,22 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                          token);
             return false;
         }
+        if (command == "decode" && (token == "karaoke" || key == "karaoke")) {
+            // Annex C's karaoke-aware 3/0 reproduction, for a decode: its
+            // output has fewer channels than the stream codes and is named by
+            // a layout (L C R) the other commands that read this stage's
+            // output do not know, so it is `decode`'s alone.
+            if (token == "karaoke" || value == "on") {
+                out.output.karaoke = iclforge::ac3::KaraokeReproduction::kMultichannel;
+                continue;
+            }
+            if (value == "off") {
+                out.output.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+                continue;
+            }
+            fmt::println(stderr, "error: karaoke is 'on' or 'off', or bare (got '{}')", token);
+            return false;
+        }
         if (token == "mix-lfe") {
             out.output.mix_lfe = true;
             continue;
