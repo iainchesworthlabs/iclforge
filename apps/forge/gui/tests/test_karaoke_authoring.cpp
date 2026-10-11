@@ -50,6 +50,19 @@ const KaraokeCheck* find(const KaraokePlan& plan, const std::string& code) {
     return nullptr;
 }
 
+// The check with this code. The case ends where there is none, so a caller
+// holds a reference, not a pointer a REQUIRE has only argued is not null.
+const KaraokeCheck& check_of(const KaraokePlan& plan, const std::string& code) {
+    for (const KaraokeCheck& check : plan.checks) {
+        if (check.code == code) {
+            return check;
+        }
+    }
+    FAIL("no check named " << code);
+    static const KaraokeCheck none;  // not reached: FAIL ends the case
+    return none;
+}
+
 std::string positions(const KaraokePlan& plan) {
     std::string out;
     for (const auto& channel : plan.channels) {
@@ -133,25 +146,25 @@ TEST_CASE("karaoke authoring: what cannot be used is named, not fixed",
     KaraokePlan plan = plan_of({melody(), lead()});
     CHECK_FALSE(plan.buildable);
     REQUIRE(find(plan, "no-backing") != nullptr);
-    CHECK(find(plan, "no-backing")->level == KaraokeCheckLevel::kProblem);
+    CHECK(check_of(plan, "no-backing").level == KaraokeCheckLevel::kProblem);
 
     // A backing that is one channel is not L and R.
     plan = plan_of({part(KaraokePart::kBacking, "mono.wav", 1), melody()});
     CHECK_FALSE(plan.buildable);
     REQUIRE(find(plan, "backing-not-stereo") != nullptr);
-    CHECK(find(plan, "backing-not-stereo")->args == std::vector<std::string>{"mono.wav", "1"});
+    CHECK(check_of(plan, "backing-not-stereo").args == std::vector<std::string>{"mono.wav", "1"});
 
     // One that is already a 5.1 bed is not a backing either.
     plan = plan_of({part(KaraokePart::kBacking, "bed.wav", 6), lead()});
     CHECK_FALSE(plan.buildable);
     REQUIRE(find(plan, "backing-is-a-bed") != nullptr);
-    CHECK(find(plan, "backing-is-a-bed")->args == std::vector<std::string>{"bed.wav", "6"});
+    CHECK(check_of(plan, "backing-is-a-bed").args == std::vector<std::string>{"bed.wav", "6"});
 
     // A melody or a vocal that is a pair of channels asks which one.
     plan = plan_of({backing(), part(KaraokePart::kVocal1, "duet.wav", 2)});
     CHECK_FALSE(plan.buildable);
     REQUIRE(find(plan, "part-not-mono") != nullptr);
-    CHECK(find(plan, "part-not-mono")->args == std::vector<std::string>{"duet.wav", "2", "vocal1"});
+    CHECK(check_of(plan, "part-not-mono").args == std::vector<std::string>{"duet.wav", "2", "vocal1"});
 
     // A second vocal with no first has no mode in Annex C.
     plan = plan_of({backing(), harmony()});
@@ -172,23 +185,20 @@ TEST_CASE("karaoke authoring: a rate or a length that differs is a warning that 
     const KaraokePlan plan = plan_of({backing(), part(KaraokePart::kMelody, "melody.wav", 1, 44100, 222.0),
           part(KaraokePart::kVocal1, "lead.wav", 1, 48000, 212.0)});
     CHECK(plan.buildable);
-    const KaraokeCheck* rate = find(plan, "rate-differs");
-    REQUIRE(rate != nullptr);
-    CHECK(rate->level == KaraokeCheckLevel::kWarning);
-    CHECK(rate->args == std::vector<std::string>{"melody.wav", "44.1", "48"});
-    const KaraokeCheck* length = find(plan, "length-differs");
-    REQUIRE(length != nullptr);
-    CHECK(length->level == KaraokeCheckLevel::kWarning);
-    CHECK(length->args == std::vector<std::string>{"lead.wav", "3:32", "3:42"});
+    const KaraokeCheck& rate = check_of(plan, "rate-differs");
+    CHECK(rate.level == KaraokeCheckLevel::kWarning);
+    CHECK(rate.args == std::vector<std::string>{"melody.wav", "44.1", "48"});
+    const KaraokeCheck& length = check_of(plan, "length-differs");
+    CHECK(length.level == KaraokeCheckLevel::kWarning);
+    CHECK(length.args == std::vector<std::string>{"lead.wav", "3:32", "3:42"});
     // And so the "all aligned" line is not claimed.
     CHECK(find(plan, "parts-aligned") == nullptr);
 
     // A tail that differs by less than an AC-3 frame's worth is the same length.
     const KaraokePlan same = plan_of({backing(), part(KaraokePart::kMelody, "melody.wav", 1, 48000, 222.03)});
     CHECK(find(same, "length-differs") == nullptr);
-    const KaraokeCheck* aligned = find(same, "parts-aligned");
-    REQUIRE(aligned != nullptr);
-    CHECK(aligned->args == std::vector<std::string>{"3:42", "48"});
+    const KaraokeCheck& aligned = check_of(same, "parts-aligned");
+    CHECK(aligned.args == std::vector<std::string>{"3:42", "48"});
 }
 
 TEST_CASE("karaoke authoring: one file's own speakers name its parts",
@@ -241,7 +251,7 @@ TEST_CASE("karaoke authoring: a file that does not fit says why",
     plan = forge_gui::plan_karaoke_speakers(unnamed);
     CHECK_FALSE(plan.buildable);
     REQUIRE(find(plan, "speakers-unnamed") != nullptr);
-    CHECK(find(plan, "speakers-unnamed")->args == std::vector<std::string>{"three.wav", "3"});
+    CHECK(check_of(plan, "speakers-unnamed").args == std::vector<std::string>{"three.wav", "3"});
 
     // A layout that is not one of the five.
     plan = forge_gui::plan_karaoke_speakers(speakers_of({"L", "R", "C", "Ls", "Rs", "Lc", "Rc"}));
