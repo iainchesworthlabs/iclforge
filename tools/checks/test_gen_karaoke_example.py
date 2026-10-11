@@ -9,7 +9,7 @@ as the syntax of ETSI TS 102 366 5.4.1 gives them.
 
 That a built `forge` writes the committed stream from the committed parts, and probes it as
 karaoke 3/2, is iclforge-forge-cli-tests (test_cli_karaoke_example.cpp); that Hearth's reader
-takes the words is iclforge-hearth-tests (test_lyrics.cpp); that the Forge GUI opens the project
+takes the words is iclforge-hearth-tests (test_karaoke_example.cpp); that the Forge GUI opens the project
 and writes the same stream is tst_projects.qml.
 
 Standard library only, as the rest of this directory.

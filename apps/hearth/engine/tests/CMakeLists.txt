@@ -16,7 +16,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_engine.cpp
     test_engine_queue_commands.cpp
     test_item_loader.cpp
-    test_lyrics.cpp
+    test_karaoke_example.cpp
     test_media_info.cpp
     test_media_info_json.cpp
     test_network_view.cpp
@@ -32,7 +32,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_stream_decoder.cpp
     test_transport.cpp)
 target_link_libraries(iclforge-hearth-tests PRIVATE hearth_engine)
-# test_lyrics.cpp reads the karaoke example's words (examples/karaoke/auld-lang-syne/) where the
+# test_karaoke_example.cpp reads the karaoke example's words (examples/karaoke/auld-lang-syne/) where the
 # example ships them, beside the stream they go with.
 target_compile_definitions(iclforge-hearth-tests PRIVATE
     "ICLFORGE_KARAOKE_EXAMPLE_DIR=\"${CMAKE_SOURCE_DIR}/examples/karaoke/auld-lang-syne\"")
