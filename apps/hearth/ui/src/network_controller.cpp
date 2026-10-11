@@ -571,6 +571,8 @@ NetworkController::~NetworkController() {
     // group the engine still holds just finds no members once the host has
     // gone - iclforge::sendspin::Group's own comment).
     NetworkOutputStatus::instance().set_groups({});
+    // Before the NetworkSinks it reaches goes, and waits for a plan in flight.
+    NetworkOutputStatus::instance().set_planner({});
     sinks_engine_.reset();
 }
 
@@ -597,6 +599,12 @@ void NetworkController::start() {
     const iclforge::hearth::NetworkSinksOptions options{.browse = g_network_discovery};
     sinks_engine_ = std::make_unique<iclforge::hearth::NetworkSinks>(*identity, settings.network.name, *pairing_store_,
                                                                 options);
+    // What the engine's group sink asks as a group opens: each member's form for the item.
+    iclforge::hearth::NetworkSinks* const sinks = sinks_engine_.get();
+    NetworkOutputStatus::instance().set_planner(
+        [sinks](const iclforge::hearth::GroupPlanRequest& request) {
+            return sinks->plan_group(request);
+        });
     poll_timer_.start();
     poll();
 }

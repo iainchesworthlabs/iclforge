@@ -1,10 +1,14 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <utility>
+#include <vector>
+
+#include "network_group_sink.hpp"
 
 namespace iclforge::sendspin {
 class Group;
@@ -80,11 +84,30 @@ public:
         return found != groups_.end() ? found->second.group : nullptr;
     }
 
+    // What decides each member's form when a group opens (NetworkSinks::plan_group()), handed
+    // across the same way the groups are: NetworkController sets it once its NetworkSinks
+    // exists and clears it before that goes, and the engine's group sink calls plan() as the
+    // group opens, on the engine's own thread. With none set, plan() answers nothing and the
+    // group plays as it did before there was one.
+    //
+    // plan() runs the planner with the lock held, so clearing it waits for a plan in flight
+    // and the NetworkSinks it reaches is never used after set_planner({}) returns.
+    void set_planner(iclforge::hearth::MemberPlanner planner) {
+        const std::lock_guard lock(mutex_);
+        planner_ = std::move(planner);
+    }
+    [[nodiscard]] std::vector<iclforge::render::OutputLayout> plan(
+        const iclforge::hearth::GroupPlanRequest& request) const {
+        const std::lock_guard lock(mutex_);
+        return planner_ ? planner_(request) : std::vector<iclforge::render::OutputLayout>{};
+    }
+
 private:
     NetworkOutputStatus() = default;
 
     mutable std::mutex mutex_;
     std::map<std::string, Entry> groups_;
+    iclforge::hearth::MemberPlanner planner_;
 };
 
 }  // namespace iclforge::hearth::ui
