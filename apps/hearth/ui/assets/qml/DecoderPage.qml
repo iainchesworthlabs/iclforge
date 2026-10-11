@@ -13,6 +13,8 @@ Item {
     id: root
 
     property string format: "eac3"
+    // Asked for by the karaoke line below; Main.qml shows the Karaoke page.
+    signal karaokePageRequested()
 
     // The playing item's format, once its media information has been read:
     // "ac4", or "eac3" for AC-3 and E-AC-3; "" while nothing is known.
@@ -52,6 +54,23 @@ Item {
                 font.pixelSize: Theme.fontSmall
             }
             Item { Layout.fillWidth: true }
+            // The karaoke reproduction is chosen on its own page; this is
+            // where it shows beside the decoder's other options.
+            Text {
+                objectName: "karaokeSummary"
+                text: {
+                    const choice = HearthController.decoderSettings.karaoke ?? "aware";
+                    return choice === "asCoded" ? qsTr("Karaoke: as coded")
+                         : (choice === "capable" ? qsTr("Karaoke: capable") : qsTr("Karaoke: aware"));
+                }
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSmall
+            }
+            Button {
+                objectName: "karaokePageButton"
+                text: qsTr("Karaoke page")
+                onClicked: root.karaokePageRequested()
+            }
         }
 
         StackLayout {
