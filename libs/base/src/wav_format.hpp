@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <expected>
 #include <optional>
+#include <ostream>
 #include <span>
 #include <string_view>
 
@@ -58,6 +59,10 @@ struct WavFormat {
     SampleFormat format = SampleFormat::kPcm16;
     // Bytes per interleaved frame: channels * sample_bytes(format).
     std::size_t stride = 0;
+    // dwChannelMask of a WAVE_FORMAT_EXTENSIBLE header, 0 for any other (and
+    // for an extensible one that states none). Carried verbatim: whether it
+    // names exactly `channels` speakers is the consumer's to decide.
+    std::uint32_t channel_mask = 0;
 };
 
 // One chunk located in a RIFF/RF64 file: where its payload starts and how
@@ -112,5 +117,27 @@ struct Chunk {
 // One sample, normalized to [-1, 1). `at` is a byte offset into `raw`, and
 // the caller has already checked that sample_bytes(format) bytes are there.
 [[nodiscard]] float convert_sample(std::span<const char> raw, std::size_t at, SampleFormat format);
+
+// --- the float32 header both writers share ---------------------------------
+
+// Whether a header for `channels` channels states `channel_mask`: it must set
+// exactly that many bits. A mask that sets more or fewer is not a description
+// of this file, and writing it would hand a reader a contradiction to resolve,
+// so the writers fall back to the plain header instead.
+[[nodiscard]] bool states_mask(std::uint16_t channels, std::uint32_t channel_mask);
+
+// Bytes ahead of the sample data in a float32 header: the 44 of a plain
+// WAVEFORMAT, or 68 when the fmt chunk is WAVE_FORMAT_EXTENSIBLE (a 40-byte
+// fmt chunk where the plain one is 16).
+[[nodiscard]] constexpr std::size_t f32_header_bytes(bool extensible) {
+    return extensible ? 68 : 44;
+}
+
+// Writes the whole header: RIFF, fmt (plain, or extensible when
+// states_mask(channels, channel_mask)) and the data chunk's id and size. The
+// RIFF size is what the file will be once `data_bytes` of samples follow;
+// WavStreamWriter calls this with 0 and patches both sizes afterwards.
+void write_f32_header(std::ostream& out, std::uint16_t channels, std::uint32_t sample_rate,
+                      std::uint32_t data_bytes, std::uint32_t channel_mask);
 
 }  // namespace iclforge::base::detail

@@ -303,3 +303,33 @@ TEST_CASE("WavStreamReader clamps a data chunk that claims more than the file ho
     REQUIRE(done.has_value());
     CHECK(*done == 0);
 }
+
+TEST_CASE("WavStreamReader reports the header's channel mask", "[wav][channel_mask]") {
+    const auto channels = tone_channels(3, 1000);
+    constexpr std::uint32_t kMask = 0x1 | 0x2 | 0x100;  // FL FR BC
+
+    SECTION("an extensible file states it") {
+        TempWav wav{"stream_mask.wav"};
+        REQUIRE(iclforge::ac3::io::write_wav_f32(wav.path, channels, 48000, {}, kMask).has_value());
+        iclforge::ac3::io::WavStreamReader reader;
+        REQUIRE(reader.open(wav.path).has_value());
+        CHECK(reader.channels() == 3);
+        CHECK(reader.channel_mask() == kMask);
+        CHECK(reader.frame_count() == 1000);
+    }
+    SECTION("a plain file states none") {
+        TempWav wav{"stream_nomask.wav"};
+        REQUIRE(iclforge::ac3::io::write_wav_f32(wav.path, channels, 48000).has_value());
+        iclforge::ac3::io::WavStreamReader reader;
+        REQUIRE(reader.open(wav.path).has_value());
+        CHECK(reader.channel_mask() == 0);
+    }
+    SECTION("closing forgets it") {
+        TempWav wav{"stream_mask_closed.wav"};
+        REQUIRE(iclforge::ac3::io::write_wav_f32(wav.path, channels, 48000, {}, kMask).has_value());
+        iclforge::ac3::io::WavStreamReader reader;
+        REQUIRE(reader.open(wav.path).has_value());
+        reader.close();
+        CHECK(reader.channel_mask() == 0);
+    }
+}

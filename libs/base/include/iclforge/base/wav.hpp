@@ -50,6 +50,13 @@ struct WavData {
     std::uint32_t sample_rate = 0;
     // One vector per channel, samples normalized to [-1, 1).
     std::vector<std::vector<float>> channels;
+    // dwChannelMask of a WAVE_FORMAT_EXTENSIBLE header: the SPEAKER_* bits
+    // (mmreg.h) naming which speaker each channel is, in increasing bit order
+    // down the interleave. 0 when the file states none - a plain WAVEFORMATEX
+    // header, or an extensible one whose mask is 0 - and a consumer then has
+    // the channel COUNT and nothing else to go on. Carried as the file wrote
+    // it; it is not checked against channels.size().
+    std::uint32_t channel_mask = 0;
 
     [[nodiscard]] std::size_t frame_count() const {
         return channels.empty() ? 0 : channels.front().size();
@@ -80,6 +87,25 @@ struct WavData {
     std::ostream& out, std::span<const std::vector<float>> channels, std::uint32_t sample_rate,
     std::span<const std::size_t> channel_order = {});
 
+// The same two writes, stating which speaker each output channel is: a
+// non-zero `channel_mask` (SPEAKER_* bits, one per OUTPUT channel, which sit
+// down the interleave in increasing bit order - so `channel_order` has already
+// put the channels where that order wants them) makes the header
+// WAVE_FORMAT_EXTENSIBLE with that dwChannelMask and the IEEE-float
+// SubFormat. That is what lets a reader tell a 2/1 file (FL FR BC) from a 3/0
+// one (FL FR FC) of the same width. A mask that does not set exactly as many
+// bits as there are output channels is not written - the header is the plain
+// one, as for 0 - because a reader is entitled to refuse or ignore it. The
+// samples are the same either way.
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<void, WavError> write_wav_f32(
+    const std::string& path, std::span<const std::vector<float>> channels,
+    std::uint32_t sample_rate, std::span<const std::size_t> channel_order,
+    std::uint32_t channel_mask);
+
+[[nodiscard]] ICLFORGE_BASE_EXPORT std::expected<void, WavError> write_wav_f32(
+    std::ostream& out, std::span<const std::vector<float>> channels, std::uint32_t sample_rate,
+    std::span<const std::size_t> channel_order, std::uint32_t channel_mask);
+
 // PCM16 WAV wrapping already-formed little-endian 16-bit payload bytes. Used
 // for the IEC 61937 burst carrier, where the payload must pass through
 // untouched.
@@ -108,6 +134,15 @@ class ICLFORGE_BASE_EXPORT WavStreamWriter {
     [[nodiscard]] std::expected<void, WavError> open(const std::string& path,
                                                        std::uint32_t sample_rate,
                                                        std::uint16_t channels);
+
+    // As above, with a WAVE_FORMAT_EXTENSIBLE header stating `channel_mask`
+    // when it sets exactly `channels` bits (write_wav_f32's overload says why
+    // a mask that does not is left out). The samples, flush_header() and
+    // close() are unchanged; only the header is longer, by 24 bytes.
+    [[nodiscard]] std::expected<void, WavError> open(const std::string& path,
+                                                       std::uint32_t sample_rate,
+                                                       std::uint16_t channels,
+                                                       std::uint32_t channel_mask);
 
     // Appends interleaved float samples - a multiple of channels() long, in
     // the caller's own channel order (this writer does not permute; a live
@@ -213,6 +248,8 @@ class ICLFORGE_BASE_EXPORT WavStreamReader {
     [[nodiscard]] bool is_open() const;
     [[nodiscard]] std::uint32_t sample_rate() const;
     [[nodiscard]] std::uint16_t channels() const;
+    // The header's dwChannelMask, 0 when it states none - WavData::channel_mask.
+    [[nodiscard]] std::uint32_t channel_mask() const;
     // Frames in the data chunk (its declared size clamped to what the file
     // actually holds, same as read_wav).
     [[nodiscard]] std::uint64_t frame_count() const;

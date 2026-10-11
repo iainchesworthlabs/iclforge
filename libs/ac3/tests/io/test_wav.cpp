@@ -7,6 +7,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -105,7 +106,7 @@ std::string canonical_wav(std::uint16_t format_tag, std::uint16_t channels,
 // fmt_at + 32 read.
 std::string extensible_wav(std::uint16_t real_format_tag, std::uint16_t channels,
                            std::uint32_t sample_rate, std::uint16_t bits,
-                           const std::string& payload) {
+                           const std::string& payload, std::uint32_t channel_mask = 0) {
     const std::uint16_t block_align = static_cast<std::uint16_t>(channels * (bits / 8));
     const std::uint32_t byte_rate = sample_rate * block_align;
 
@@ -118,7 +119,7 @@ std::string extensible_wav(std::uint16_t real_format_tag, std::uint16_t channels
     put_le16(fmt, bits);
     put_le16(fmt, 22);    // cbSize: 22 bytes follow (valid bits + mask + GUID)
     put_le16(fmt, bits);  // wValidBitsPerSample
-    put_le32(fmt, 0);     // dwChannelMask: not indicated
+    put_le32(fmt, channel_mask);  // dwChannelMask: 0 is "not indicated"
     put_le16(fmt, real_format_tag);
     // The rest of the 16-byte SubFormat GUID (KSDATAFORMAT_SUBTYPE_PCM/IEEE_
     // FLOAT's fixed tail) - parse_wav never reads past the leading 2 bytes,
@@ -660,4 +661,158 @@ TEST_CASE("describe() gives every WavError a distinct, non-empty message", "[wav
             CHECK(iclforge::ac3::io::describe(errors[i]) != iclforge::ac3::io::describe(errors[j]));
         }
     }
+}
+
+// --- dwChannelMask -----------------------------------------------------------
+//
+// A file's channel COUNT says how wide it is and nothing about which speakers
+// the channels are: three channels are 3/0 as FL FR FC and 2/1 as FL FR BC.
+// The mask is the only thing in the file that tells them apart, so the reader
+// has to hand it over and the writer has to be able to state it.
+
+namespace {
+
+constexpr std::uint32_t kFl = 0x1;
+constexpr std::uint32_t kFr = 0x2;
+constexpr std::uint32_t kFc = 0x4;
+constexpr std::uint32_t kBc = 0x100;
+
+std::uint32_t le32_at(const std::string& bytes, std::size_t at) {
+    return static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at])) |
+           (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at + 1])) << 8) |
+           (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at + 2])) << 16) |
+           (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at + 3])) << 24);
+}
+
+std::uint32_t le16_at(const std::string& bytes, std::size_t at) {
+    return static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at])) |
+           (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at + 1])) << 8);
+}
+
+std::string slurp(const fs::path& path) {
+    std::ifstream in{path, std::ios::binary};
+    return {std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+}
+
+std::vector<std::vector<float>> three_channels() {
+    return {{0.25f, -0.5f, 0.75f, 0.125f}, {-0.25f, 0.5f, -0.75f, -0.125f}, {0.1f, 0.2f, 0.3f, 0.4f}};
+}
+
+}  // namespace
+
+TEST_CASE("read_wav hands over an extensible header's dwChannelMask", "[wav][channel_mask]") {
+    std::string payload;
+    for (int i = 0; i < 6; ++i) {
+        const float v = 0.1f * static_cast<float>(i);
+        payload.append(reinterpret_cast<const char*>(&v), 4);
+    }
+    const auto path = write_raw("mask_stated.wav", extensible_wav(3, 3, 48000, 32, payload, kFl | kFr | kBc));
+    const auto data = iclforge::ac3::io::read_wav(path.string());
+    REQUIRE(data.has_value());
+    CHECK(data->channels.size() == 3);
+    CHECK(data->channel_mask == (kFl | kFr | kBc));
+
+    SECTION("a plain header states none") {
+        const auto plain = write_raw("mask_plain.wav", canonical_wav(3, 3, 48000, 32, payload));
+        const auto read = iclforge::ac3::io::read_wav(plain.string());
+        REQUIRE(read.has_value());
+        CHECK(read->channel_mask == 0);
+    }
+    SECTION("an extensible header whose mask is 0 states none either") {
+        const auto zero = write_raw("mask_zero.wav", extensible_wav(3, 3, 48000, 32, payload, 0));
+        const auto read = iclforge::ac3::io::read_wav(zero.string());
+        REQUIRE(read.has_value());
+        CHECK(read->channel_mask == 0);
+    }
+}
+
+TEST_CASE("write_wav_f32 states a channel mask as WAVE_FORMAT_EXTENSIBLE", "[wav][channel_mask]") {
+    const auto channels = three_channels();
+    const auto path = scratch_dir() / "write_mask.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(path.string(), channels, 48000, {}, kFl | kFr | kBc)
+                .has_value());
+
+    // The header, byte for byte where it matters: the extensible tag, a 40-byte
+    // fmt chunk, the mask where dwChannelMask lives, the IEEE-float SubFormat,
+    // and sizes that agree with the file.
+    const auto bytes = slurp(path);
+    REQUIRE(bytes.size() == 68 + 3 * 4 * 4);
+    CHECK(le16_at(bytes, 20) == 0xFFFE);
+    CHECK(le32_at(bytes, 16) == 40);
+    CHECK(le16_at(bytes, 22) == 3);    // channels
+    CHECK(le16_at(bytes, 36) == 22);   // cbSize
+    CHECK(le32_at(bytes, 40) == (kFl | kFr | kBc));
+    CHECK(le16_at(bytes, 44) == 3);    // SubFormat: IEEE float
+    CHECK(bytes.substr(60, 4) == "data");
+    CHECK(le32_at(bytes, 64) == 3 * 4 * 4);
+    CHECK(le32_at(bytes, 4) == bytes.size() - 8);
+
+    // And it reads back as what it was, samples and mask.
+    const auto read = iclforge::ac3::io::read_wav(path.string());
+    REQUIRE(read.has_value());
+    CHECK(read->channel_mask == (kFl | kFr | kBc));
+    REQUIRE(read->channels.size() == 3);
+    for (std::size_t c = 0; c < 3; ++c) {
+        CHECK(read->channels[c] == channels[c]);
+    }
+}
+
+TEST_CASE("write_wav_f32 leaves the header plain when the mask does not describe the file",
+          "[wav][channel_mask]") {
+    const auto channels = three_channels();
+
+    // No mask, or one naming a different number of speakers than there are
+    // channels: the header is the 44-byte one every earlier version wrote, and
+    // a reader gets no mask rather than a contradiction.
+    for (const std::uint32_t mask : {0u, kFl | kFr, kFl | kFr | kFc | kBc}) {
+        CAPTURE(mask);
+        const auto path = scratch_dir() / "write_plain.wav";
+        REQUIRE(iclforge::ac3::io::write_wav_f32(path.string(), channels, 48000, {}, mask)
+                    .has_value());
+        const auto bytes = slurp(path);
+        CHECK(bytes.size() == 44 + 3 * 4 * 4);
+        CHECK(le16_at(bytes, 20) == 3);  // IEEE float, not extensible
+        const auto read = iclforge::ac3::io::read_wav(path.string());
+        REQUIRE(read.has_value());
+        CHECK(read->channel_mask == 0);
+    }
+
+    // The 4-argument overloads are the same write with no mask.
+    const auto path = scratch_dir() / "write_plain_old.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(path.string(), channels, 48000).has_value());
+    CHECK(slurp(path).size() == 44 + 3 * 4 * 4);
+}
+
+TEST_CASE("the ostream overload states a channel mask the same way", "[wav][channel_mask]") {
+    const auto channels = three_channels();
+    std::ostringstream out;
+    REQUIRE(iclforge::ac3::io::write_wav_f32(out, channels, 48000, {}, kFl | kFr | kFc)
+                .has_value());
+    const auto bytes = out.str();
+    REQUIRE(bytes.size() == 68 + 3 * 4 * 4);
+    CHECK(le16_at(bytes, 20) == 0xFFFE);
+    CHECK(le32_at(bytes, 40) == (kFl | kFr | kFc));
+
+    std::istringstream in{bytes};
+    const auto read = iclforge::ac3::io::read_wav(in);
+    REQUIRE(read.has_value());
+    CHECK(read->channel_mask == (kFl | kFr | kFc));
+}
+
+TEST_CASE("a channel mask follows the channel order write_wav_f32 was given", "[wav][channel_mask]") {
+    // The order permutes the SAMPLES; the mask names the speakers of the
+    // interleave that results, so a caller that passes both is saying "these
+    // positions are these speakers" and the file must agree with that.
+    const auto channels = three_channels();
+    const std::array<std::size_t, 3> order = {2, 0, 1};
+    const auto path = scratch_dir() / "write_mask_order.wav";
+    REQUIRE(iclforge::ac3::io::write_wav_f32(path.string(), channels, 48000, order,
+                                             kFl | kFr | kBc)
+                .has_value());
+    const auto read = iclforge::ac3::io::read_wav(path.string());
+    REQUIRE(read.has_value());
+    CHECK(read->channel_mask == (kFl | kFr | kBc));
+    CHECK(read->channels[0] == channels[2]);
+    CHECK(read->channels[1] == channels[0]);
+    CHECK(read->channels[2] == channels[1]);
 }
