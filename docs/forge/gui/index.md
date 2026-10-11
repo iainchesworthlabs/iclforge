@@ -40,8 +40,8 @@ Minimum size 1280×900. Two panes, divided by a vertical rule:
 
 ![The workbench: a 5.1 source loaded, Advanced tier](screenshots/overview-default.png)
 
-- **Header** (top): the `iclforge` wordmark and subtitle, a **Guided / Advanced / Expert**
-  segmented control, a **QC a stream…** button (a separate dialog that measures an
+- **Header** (top): the `iclforge` wordmark and subtitle, a **Guided / Advanced / Expert /
+  Karaoke** segmented control, a **QC a stream…** button (a separate dialog that measures an
   already-encoded file — see [QC a stream](qc.md)), an **Inspect objects…** button (its decode-side
   counterpart for Dolby Atmos object metadata/audio — see [Inspect objects](inspect-objects.md)),
   an **Open stream…** button (plays an already-encoded file and exports its decode — see
@@ -140,6 +140,12 @@ Minimum size 1280×900. Two panes, divided by a vertical rule:
   has no AC-4 tab. [Live session](live-session.md)
   joins the tab bar in Advanced and Expert whenever the live source is selected in the rail —
   sessions running or not — and carries a `live` badge while one runs.
+
+- **Karaoke** is a fourth surface, like Guided's, for one kind of programme: four steps —
+  **Parts**, **Levels**, **Hear** and **Save** — that build a karaoke AC-3 (ETSI TS 102 366 Annex
+  C) from a backing, an optional melody guide and one or two vocals, over the same draft the other
+  tiers edit, and play the encoded stream back as a singer's player decodes it. See
+  [Karaoke](karaoke.md).
 
 Switching tiers never discards anything already set — it only changes what's visible (and, for
 Guided, how it's presented: one question at a time instead of a page of controls). Leaving Expert

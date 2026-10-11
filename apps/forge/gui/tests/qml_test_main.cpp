@@ -14,6 +14,11 @@
 #include <QTemporaryDir>
 #include <QUrl>
 
+#include <QVariantList>
+
+#include <cmath>
+#include <cstdint>
+#include <numbers>
 #include <optional>
 
 #include "../../../shared/preferences/src/language_manager.hpp"
@@ -101,6 +106,65 @@ private:
     [[nodiscard]] static QString program() { return QStringLiteral(ICLFORGE_GUI_TEST_CLI); }
 };
 
+// Generated audio for the suites that need parts of a known sound: a WAV of one
+// sine tone a channel, so that what a stream carries on each output can be named
+// by its frequencies. 16-bit PCM, at most two channels (more would need
+// WAVE_FORMAT_EXTENSIBLE, which the fixtures/ directory has real files for).
+class AudioFixtures : public QObject {
+    Q_OBJECT
+
+public:
+    explicit AudioFixtures(QString folder) : folder_(std::move(folder)) {}
+
+    // `tones`: the frequency of each channel in Hz. The file's URL, or an empty
+    // one where it could not be written.
+    [[nodiscard]] Q_INVOKABLE QUrl writeTones(const QString& name, int rate, double seconds,
+                                              const QVariantList& tones) const {
+        const int channels = static_cast<int>(tones.size());
+        if (channels < 1 || channels > 2 || rate <= 0 || seconds <= 0.0) {
+            return {};
+        }
+        const auto frames = static_cast<std::uint32_t>(seconds * rate);
+        const std::uint32_t data_bytes = frames * static_cast<std::uint32_t>(channels) * 2U;
+        QByteArray out;
+        const auto put32 = [&out](std::uint32_t v) {
+            for (int i = 0; i < 4; ++i) out.append(static_cast<char>((v >> (8 * i)) & 0xFF));
+        };
+        const auto put16 = [&out](std::uint16_t v) {
+            out.append(static_cast<char>(v & 0xFF));
+            out.append(static_cast<char>((v >> 8) & 0xFF));
+        };
+        out.append("RIFF", 4);
+        put32(36U + data_bytes);
+        out.append("WAVEfmt ", 8);
+        put32(16U);
+        put16(1);  // PCM
+        put16(static_cast<std::uint16_t>(channels));
+        put32(static_cast<std::uint32_t>(rate));
+        put32(static_cast<std::uint32_t>(rate) * static_cast<std::uint32_t>(channels) * 2U);
+        put16(static_cast<std::uint16_t>(channels * 2));
+        put16(16);
+        out.append("data", 4);
+        put32(data_bytes);
+        for (std::uint32_t f = 0; f < frames; ++f) {
+            for (int c = 0; c < channels; ++c) {
+                const double hz = tones.at(c).toDouble();
+                const double v = 0.1 * std::sin(2.0 * std::numbers::pi * hz * f / rate);
+                put16(static_cast<std::uint16_t>(static_cast<std::int16_t>(std::lround(v * 32767.0))));
+            }
+        }
+        const QString path = QDir(folder_).filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) || file.write(out) != out.size()) {
+            return {};
+        }
+        return QUrl::fromLocalFile(path);
+    }
+
+private:
+    QString folder_;
+};
+
 // The setup object exists for one reason: Main.qml's QML Settings must be
 // HERMETIC here. With no organization/application identifiers, Qt 6.8's
 // Settings failed to initialise and every window saw in-memory defaults -
@@ -181,11 +245,14 @@ public slots:
             QStringLiteral("appVersionDetails"),
             QString::fromStdString(iclforge::ac3::version_details()));
         engine->rootContext()->setContextProperty(QStringLiteral("cliRunner"), &cli_runner_);
+        audio_fixtures_.emplace(scratch_->path());
+        engine->rootContext()->setContextProperty(QStringLiteral("audioFixtures"), &*audio_fixtures_);
     }
 
 private:
     std::optional<QTemporaryDir> scratch_;
     std::optional<LanguageManager> language_manager_;
+    std::optional<AudioFixtures> audio_fixtures_;
     CliRunner cli_runner_;
 };
 

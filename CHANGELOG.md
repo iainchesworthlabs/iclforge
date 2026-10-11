@@ -106,6 +106,20 @@ The sections below contain the complete change list and fixes.
   the coded surrounds were. `output_mode(config, acmod, lfe, karaoke)` returns an `OutputMode` (a
   coding mode and an LFE flag): 3/0 with the LFE after R for the reproduction, 2/0 or 1/0 for a
   fold, the coded mode otherwise. `output_channel_count()` is now its channel count, one rule.
+- **The Forge GUI has a Karaoke flow.** A fourth entry of the Controls switch, beside Guided,
+  Advanced and Expert, builds a karaoke AC-3 from a stereo backing, an optional melody guide and
+  one or two vocals, or from one multichannel file whose speakers name them: Parts, Levels, Hear
+  and Save. The coding mode is Table C.2.1's for what was supplied (3/0, 2/1, 3/1, 2/2 or 3/2),
+  written into the same draft the other tiers edit - the bed, `bsmod` 7 and one assignment for
+  each coded channel - so the command line the last step shows writes the same bytes. A part that
+  cannot be used (a backing that is not stereo, a part that is not one channel, a second vocal
+  with no first, an LFE) is named, and a rate or a length that differs is a warning that says
+  what will happen. Hear plays the stream just built as a karaoke player decodes it: as coded,
+  aware, or capable with none, V1, V2 or both vocals, with a table of which part reaches which
+  speaker that is held to what the decoder does for every mode and choice. The stream player
+  gains `karaokeReproduction` and `karaokeVocals` (as coded by default, as it has always played),
+  a karaoke stream's summary line says so, and `sourceModel` rows carry the file's stated
+  `speakers`.
 - **Hearth reproduces a karaoke stream.** `DecoderSettings` gains `karaoke` (aware by default,
   or capable, or off) and `karaoke_vocals`, which `decoder_setup()` hands to the output stage, and
   the stream decoder lays an AC-3 unit out from `output_mode()`: a karaoke stream played to a 5.1

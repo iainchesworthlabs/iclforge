@@ -10,9 +10,12 @@
 iclforge_add_test_binary(iclforge-forge-gui-tests PROJECT forge-gui SOURCES
     test_gui_diagnostics.cpp
     test_ac4_encode_settings.cpp
+    test_karaoke_authoring.cpp
+    test_karaoke_outputs.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/gui_diagnostics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_encode_settings.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ac4_presentations.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/karaoke_authoring.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_encode_core.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/media/src/ac4_objects_core.cpp")
 target_include_directories(iclforge-forge-gui-tests PRIVATE

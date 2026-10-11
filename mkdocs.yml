@@ -136,6 +136,7 @@ nav:
           - Objects & motion: forge/gui/objects-and-motion.md
           - Live capture & session: forge/gui/live-session.md
           - Multi-source & assignment: forge/gui/source-assignment.md
+          - Karaoke: forge/gui/karaoke.md
           - Coding tools: forge/gui/coding-tools.md
           - Metadata: forge/gui/metadata.md
           - QC a stream: forge/gui/qc.md
