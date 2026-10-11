@@ -133,10 +133,12 @@ TEST_CASE("AC-4 page options are read back from the tokens they echo", "[gui]") 
     CHECK(back.dialogue_right);
     CHECK_FALSE(back.dialogue_centre);
 
-    const auto objects = forge_gui::ac4_object_cli_tokens(Ac4EncodeSettings{.dialnorm_db = 24.0,
-                                                                            .crc = false,
-                                                                            .object_coding = 1},
-                                                          false);
+    // Assigned, not designated: GCC's -Werror=missing-field-initializers refuses a partial one.
+    Ac4EncodeSettings object_settings;
+    object_settings.dialnorm_db = 24.0;
+    object_settings.crc = false;
+    object_settings.object_coding = 1;
+    const auto objects = forge_gui::ac4_object_cli_tokens(object_settings, false);
     CHECK(joined(objects) == "coding=direct dialnorm=24 crc=off");
     const Ac4EncodeSettings objects_back = applied(objects);
     CHECK(objects_back.object_coding == 1);
