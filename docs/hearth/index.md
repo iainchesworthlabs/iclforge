@@ -26,7 +26,7 @@ The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 | **Decoder** | The decoder's controls on an AC-3 and E-AC-3 tab and an AC-4 tab. The page turns to the tab of the item that is playing, and a change reaches that item at its next access unit or frame |
 | **Network** | The Sendspin players found on the network, pairing, groups and their volumes, and each paired Hearth sink's own settings and firmware |
 | **Settings** | Playback, the network name and discovery, pairing records, appearance, language and diagnostics |
-| **Karaoke** | What a karaoke AC-3 stream is (its coding mode and which of the melody and the vocals it carries), the reproduction chosen for it, and which part each speaker carries. See [Karaoke](#karaoke) |
+| **Karaoke** | What a karaoke AC-3 stream is (its coding mode and which of the melody and the vocals it carries), the reproduction chosen for it, which part each speaker carries, and the lyrics. See [Karaoke](#karaoke) |
 
 The header says where playback goes. Clicking it, or **Choose…** in the signal path, opens the
 output picker: this computer's outputs for decoded audio, the outputs that take AC-3 and E-AC-3 as
@@ -56,6 +56,33 @@ reproduction is its to make, and a stereo fold of Lt/Rt, for which Annex C defin
 The choice is kept across starts, the only decoder setting that is. The Decoder page shows it in
 one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
 Annex C's own tables.
+
+#### Lyrics
+
+Beside a stream, `name.lrc` (the extension in any case) is its lyrics. The Karaoke page shows the
+line being sung, the lines before it and after it, and a word at a time where the file times its
+words:
+
+- a word that has been **sung** is in the accent colour, a word **not yet sung** is muted, and the
+  word **being sung** is underlined and fills in the accent from left to right as it is sung;
+- a file that times lines and not words has each whole line emphasised as it is sung, and no word
+  times are invented;
+- a file with no times is shown whole and is not followed;
+- with no file, the page says which name it looks for; a file that is not UTF-8 is not shown, and
+  playback is not affected.
+
+The format is LRC: `[mm:ss.xx]` for a line, the enhanced `<mm:ss.xx>` tag before a word, and
+`[offset:]`, `[ti:]`, `[ar:]`, `[al:]`, `[by:]` and `[length:]`. The text is UTF-8, with or
+without a byte-order mark.
+
+**Lyric delay** in Settings (Playback), from -1,000 to +1,000 ms in steps of 10, is added to the
+file's own timing; a positive value shows the words later. A bluetooth speaker or a receiver with
+a long path is where it is needed, because what Hearth follows is the output's own delay-corrected
+position, and a file's times are rarely right to the frame.
+
+**Full screen** (`F11`, or the button on the page; `Esc` leaves) is the singer view: dark, with
+larger type and more lines, and Previous, Play/Pause, Next and the vocals chooser kept at the
+bottom. `Space` pauses. Choosing a vocal there chooses the capable reproduction with it.
 
 ### AC-4
 
@@ -177,7 +204,8 @@ Raspberry Pi 4B without an underrun. See
 - **Play every track of a container.** An MP4, Matroska or MPEG-TS file plays its first AC-3,
   E-AC-3 or AC-4 track; the others are not offered, and a Matroska file's codec delay is not
   trimmed.
-- **Show lyrics.** The Karaoke page has no lyric view yet.
+- **Make or time a lyrics file.** Hearth reads `.lrc` files beside a stream; it does not write
+  them, fetch them, or time the words of one that has only lines.
 - **List AC-4 objects on the Play page.** The Objects card shows the positions of E-AC-3 objects.
   An AC-4 item's objects are rendered into the speaker layout, and the Media page says an A-JOC
   stream carries object metadata without listing it.
