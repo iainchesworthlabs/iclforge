@@ -1323,4 +1323,20 @@ run_ac4_fmp4_check i1_ac4_fmp4 ac4_51_192.ac4
 run fmp4 ac4_stereo_2997.mp4 i1_ac4_fmp4_2997 20
 run_ac4_fmp4_check i1_ac4_fmp4_2997 ac4_stereo_2997.mp4
 
+# --- A Forge project file, run as the commands it stands for (apps/shared/project) --------------
+# `forge project` reads a .forgeproj and runs the line the Forge GUI's command bar shows for it, so
+# its own code is the file's reader and the translation, and everything after is the encoder this
+# matrix has already run. The one project in the repository is the karaoke example's (its four parts
+# beside it, and the stream it makes committed next to it): the matrix asks for that stream again,
+# holds it to the committed bytes, and to FFmpeg's strict decode. `print` shows the commands and
+# runs none of them.
+PROJECT_EXAMPLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../examples/karaoke/auld-lang-syne" && pwd)"
+run project "$PROJECT_EXAMPLE/auld-lang-syne.forgeproj" project_karaoke.ac3
+cmp -s "$PROJECT_EXAMPLE/auld-lang-syne.ac3" project_karaoke.ac3 || {
+    echo "forge project did not reproduce examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 byte for byte" >&2
+    exit 1
+}
+run_ffmpeg_check project_karaoke.ac3
+run project "$PROJECT_EXAMPLE/auld-lang-syne.forgeproj" print
+
 echo "codec matrix: $count commands completed cleanly in $WORKDIR"
