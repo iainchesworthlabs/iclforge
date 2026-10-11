@@ -159,6 +159,14 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **MIDI karaoke files are lyrics, with word times.** The lyric reader takes a `.kar` (a Standard
+  MIDI File) for its words: the Text or Lyric events (the track called `Words` where there is one),
+  each syllable at its tick turned into milliseconds through the file's tempo map, so the fill moves
+  by syllable; `@T` lines are the title and the artist, a `/` or a backslash begins a line, and the
+  music in the file is not read. The words must be UTF-8 (a MIDI file declares no encoding, and
+  code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
+  `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
+  (planning/karaoke-phase2.md, W13e).
 - **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
   `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
   (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override

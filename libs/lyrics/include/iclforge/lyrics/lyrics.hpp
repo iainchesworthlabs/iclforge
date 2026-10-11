@@ -127,9 +127,22 @@ struct Lyrics {
 [[nodiscard]] std::expected<Lyrics, std::string> parse_ass(
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
 
-// Any of the above, by what the file is: ASS where it has a `Dialogue:` event, SubRip where it
-// has a cue's `-->` line between two times, LRC otherwise. What a program that is handed a
-// timed-text file by a person, whose extension may be anything, calls.
+// The words of a MIDI karaoke file (`.kar`, a Standard MIDI File; planning/karaoke-phase2.md, W13e),
+// whose BYTES are given: syllables as Text (or Lyric) meta events, each at its tick, turned into
+// milliseconds through the file's tempo map. The words are taken from the track named "Words" where
+// there is one, else from the Lyric events, else from the Text events; the `@T` lines are the title
+// and the artist (the first and the second) and the other `@` lines are not words. A `/` begins a new
+// line and a `\` a new verse (a line too, here), and a syllable that begins with a space is
+// joined to the one before it, so a word is a syllable, with its own start and end, and the fill
+// moves by syllable. A line ends where the next begins. Only the words are read: the music in the
+// file is not, and a file with SMPTE time, no words, or words that are not UTF-8 (a MIDI file
+// carries no word of its encoding; Latin-1 and code pages are not guessed at) says so.
+[[nodiscard]] std::expected<Lyrics, std::string> parse_midi_karaoke(
+    std::string_view bytes, std::optional<std::int64_t> duration_ms = std::nullopt);
+
+// Any of the above, by what the file is: MIDI karaoke where it begins `MThd`, ASS where it has a
+// `Dialogue:` event, SubRip where it has a cue's `-->` line between two times, LRC otherwise. What a
+// program that is handed a timed-text file by a person, whose extension may be anything, calls.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_timed_text(
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
 
@@ -139,8 +152,8 @@ struct Lyrics {
     const std::filesystem::path& file, std::optional<std::int64_t> duration_ms = std::nullopt);
 
 // The lyrics file of a media item (L1): `name.lrc` in the item's folder, the
-// extension in any case, and where there is none `name.srt`, then `name.ass`. `item_path` is the
-// item's path as the queue holds it.
+// extension in any case, and where there is none `name.srt`, then `name.ass`, then `name.kar`.
+// `item_path` is the item's path as the queue holds it.
 [[nodiscard]] std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path);
 
 enum class WordState : std::uint8_t { kSung, kBeingSung, kNotYetSung };

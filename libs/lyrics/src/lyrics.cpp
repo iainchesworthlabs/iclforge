@@ -461,6 +461,83 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
     return folded;
 }
 
+// ---- MIDI karaoke -----------------------------------------------------------------------------
+
+// A cursor over the bytes of a Standard MIDI File, which is not valid until it has run off the end.
+struct MidiReader {
+    std::string_view data;
+    std::size_t at = 0;
+    bool ok = true;
+
+    [[nodiscard]] bool has(std::size_t count) const { return at + count <= data.size(); }
+    std::uint32_t u8() {
+        if (!has(1)) {
+            ok = false;
+            return 0;
+        }
+        return static_cast<unsigned char>(data[at++]);
+    }
+    std::uint32_t u16() {
+        const std::uint32_t high = u8();
+        const std::uint32_t low = u8();
+        return (high << 8U) | low;
+    }
+    std::uint32_t u32() {
+        const std::uint32_t high = u16();
+        const std::uint32_t low = u16();
+        return (high << 16U) | low;
+    }
+    // A variable-length quantity: seven bits a byte, the high bit set on all but the last, four bytes
+    // at most.
+    std::uint32_t vlq() {
+        std::uint32_t value = 0;
+        for (int i = 0; i < 4; ++i) {
+            const std::uint32_t byte = u8();
+            if (!ok) {
+                return 0;
+            }
+            value = (value << 7U) | (byte & 0x7FU);
+            if ((byte & 0x80U) == 0) {
+                return value;
+            }
+        }
+        ok = false;
+        return 0;
+    }
+    std::string_view take(std::size_t count) {
+        if (!has(count)) {
+            ok = false;
+            return {};
+        }
+        const std::string_view out = data.substr(at, count);
+        at += count;
+        return out;
+    }
+};
+
+// A Text or Lyric meta event, with the name of the track it is on.
+struct MidiText {
+    std::uint64_t tick = 0;
+    int type = 0;
+    std::string text;
+    bool on_words_track = false;
+};
+
+struct MidiTempo {
+    std::uint64_t tick = 0;
+    std::uint32_t micros_per_quarter = 500000;
+};
+
+// A syllable and where it starts.
+struct MidiSyllable {
+    std::uint64_t tick = 0;
+    std::string text;
+};
+
+[[nodiscard]] bool equals_nocase(std::string_view a, std::string_view b) {
+    return lowercase(a) == lowercase(b);
+}
+
 // ---- Advanced SubStation Alpha ---------------------------------------------------------------
 
 // "h:mm:ss.cc" (hours of one or two digits, hundredths of one to three), in milliseconds.
@@ -1025,8 +1102,253 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
     return lyrics;
 }
 
+std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
+                                                      std::optional<std::int64_t> duration_ms) {
+    const std::string damaged = "The MIDI file is damaged.";
+    if (!bytes.starts_with("MThd")) {
+        return std::unexpected(std::string{"The file is not a MIDI file."});
+    }
+    MidiReader reader{bytes};
+    reader.at = 4;
+    const std::uint32_t header_length = reader.u32();
+    reader.u16();  // the format, 0, 1 or 2: the tracks are read the same way
+    const std::uint32_t track_count = reader.u16();
+    const std::uint32_t division = reader.u16();
+    if (!reader.ok || header_length < 6) {
+        return std::unexpected(damaged);
+    }
+    if ((division & 0x8000U) != 0) {
+        return std::unexpected(std::string{"The MIDI file counts time in SMPTE frames, which is not read."});
+    }
+    if (division == 0) {
+        return std::unexpected(damaged);
+    }
+    reader.at = 8 + header_length;
+
+    std::vector<MidiTempo> tempos;
+    std::vector<MidiText> texts;
+    for (std::uint32_t track = 0; track < track_count && reader.has(8); ++track) {
+        const std::string_view id = reader.take(4);
+        const std::uint32_t length = reader.u32();
+        if (!reader.ok) {
+            return std::unexpected(damaged);
+        }
+        const std::size_t end = std::min<std::size_t>(reader.at + length, bytes.size());
+        if (id != "MTrk") {
+            reader.at = end;
+            continue;
+        }
+        const std::size_t first_text = texts.size();
+        std::string name;
+        std::uint64_t tick = 0;
+        std::uint32_t running = 0;
+        while (reader.at < end && reader.ok) {
+            tick += reader.vlq();
+            if (!reader.ok || reader.at >= end) {
+                break;
+            }
+            std::uint32_t status = static_cast<unsigned char>(bytes[reader.at]);
+            if ((status & 0x80U) != 0) {
+                ++reader.at;
+            } else {
+                // Running status: the data bytes follow the status of the event before.
+                if (running == 0) {
+                    return std::unexpected(damaged);
+                }
+                status = running;
+            }
+            if (status == 0xFF) {
+                const std::uint32_t type = reader.u8();
+                const std::uint32_t meta_length = reader.vlq();
+                const std::string_view payload = reader.take(meta_length);
+                if (!reader.ok) {
+                    return std::unexpected(damaged);
+                }
+                running = 0;
+                if (type == 0x2F) {
+                    break;
+                }
+                if (type == 0x51 && payload.size() == 3) {
+                    const auto byte = [&](std::size_t i) {
+                        return static_cast<std::uint32_t>(static_cast<unsigned char>(payload[i]));
+                    };
+                    const std::uint32_t micros = (byte(0) << 16U) | (byte(1) << 8U) | byte(2);
+                    if (micros > 0) {
+                        tempos.push_back({.tick = tick, .micros_per_quarter = micros});
+                    }
+                } else if (type == 0x03) {
+                    name = std::string{payload};
+                } else if (type == 0x01 || type == 0x05) {
+                    texts.push_back({.tick = tick, .type = static_cast<int>(type), .text = std::string{payload}});
+                }
+            } else if (status == 0xF0 || status == 0xF7) {
+                const std::uint32_t sysex_length = reader.vlq();
+                reader.take(sysex_length);
+                running = 0;
+            } else {
+                // A channel message: one data byte for a program change or a channel pressure, two
+                // for the rest. (The first data byte of a running-status event is already at hand.)
+                running = status;
+                const std::size_t data_bytes = ((status & 0xF0U) == 0xC0U || (status & 0xF0U) == 0xD0U) ? 1 : 2;
+                reader.take(data_bytes);
+            }
+            if (!reader.ok) {
+                return std::unexpected(damaged);
+            }
+        }
+        // The track's name is known only at its end: the words of a track called "Words" are marked.
+        if (equals_nocase(trim(name), "words")) {
+            for (std::size_t i = first_text; i < texts.size(); ++i) {
+                texts[i].on_words_track = true;
+            }
+        }
+        reader.at = end;
+    }
+
+    // Which events are the words: the Words track's, else the Lyric events, else the Text events.
+    const auto any_of_type = [&](int type) {
+        return std::any_of(texts.begin(), texts.end(), [type](const MidiText& t) { return t.type == type; });
+    };
+    const bool words_track = std::any_of(texts.begin(), texts.end(), [](const MidiText& t) { return t.on_words_track; });
+    const int wanted_type = any_of_type(5) ? 5 : 1;
+    std::vector<MidiText> chosen;
+    for (const MidiText& event : texts) {
+        if (words_track ? event.on_words_track : event.type == wanted_type) {
+            chosen.push_back(event);
+        }
+    }
+    std::stable_sort(chosen.begin(), chosen.end(),
+                     [](const MidiText& a, const MidiText& b) { return a.tick < b.tick; });
+    std::stable_sort(tempos.begin(), tempos.end(),
+                     [](const MidiTempo& a, const MidiTempo& b) { return a.tick < b.tick; });
+
+    // Milliseconds from a tick: the time of each stretch at its own tempo.
+    const auto to_ms = [&](std::uint64_t tick) -> std::int64_t {
+        std::uint64_t micros = 0;
+        std::uint64_t previous = 0;
+        std::uint64_t tempo = 500000;
+        for (const MidiTempo& change : tempos) {
+            if (change.tick >= tick) {
+                break;
+            }
+            micros += (change.tick - previous) * tempo / division;
+            previous = change.tick;
+            tempo = change.micros_per_quarter;
+        }
+        micros += (tick - previous) * tempo / division;
+        return static_cast<std::int64_t>((micros + 500) / 1000);
+    };
+
+    Lyrics lyrics;
+    std::vector<std::vector<MidiSyllable>> lines(1);
+    int titles = 0;
+    for (const MidiText& event : chosen) {
+        if (!valid_utf8(event.text)) {
+            return std::unexpected(std::string{"The words of the MIDI file are not UTF-8: they are probably in a "
+                                               "code page, which is not read. Save them as UTF-8."});
+        }
+        std::string_view text = event.text;
+        if (!text.empty() && text.front() == '@') {
+            if (text.size() > 2 && (text[1] == 'T' || text[1] == 't')) {
+                const std::string value{trim(text.substr(2))};
+                if (titles == 0) {
+                    lyrics.title = value;
+                } else if (titles == 1) {
+                    lyrics.artist = value;
+                }
+                ++titles;
+            }
+            continue;
+        }
+        // A `/` or a backslash begins a line wherever it is; so does a line end in the text.
+        std::string piece;
+        const auto flush = [&] {
+            if (!piece.empty()) {
+                lines.back().push_back({.tick = event.tick, .text = std::move(piece)});
+                piece.clear();
+            }
+        };
+        // (The characters are named, not written as escapes: this source is built by a script.)
+        constexpr char kBackslash = static_cast<char>(92);
+        constexpr char kCarriageReturn = static_cast<char>(13);
+        constexpr char kLineFeed = static_cast<char>(10);
+        for (const char c : text) {
+            if (c == '/' || c == kBackslash || c == kCarriageReturn || c == kLineFeed) {
+                flush();
+                if (!lines.back().empty()) {
+                    lines.emplace_back();
+                }
+            } else {
+                piece.push_back(c);
+            }
+        }
+        flush();
+    }
+
+    // A syllable that begins with a space is the start of a new word: the space goes to the end of the
+    // syllable before, where a view expects it, and a line shows without the spacing at its ends.
+    for (auto& line : lines) {
+        for (std::size_t i = 0; i < line.size(); ++i) {
+            std::size_t lead = 0;
+            while (lead < line[i].text.size() && is_space(line[i].text[lead])) {
+                ++lead;
+            }
+            if (lead > 0) {
+                line[i].text.erase(0, lead);
+                if (i > 0 && !line[i - 1].text.empty() && !is_space(line[i - 1].text.back())) {
+                    line[i - 1].text.push_back(' ');
+                }
+            }
+        }
+        std::erase_if(line, [](const MidiSyllable& s) { return s.text.empty(); });
+        if (!line.empty()) {
+            while (!line.back().text.empty() && is_space(line.back().text.back())) {
+                line.back().text.pop_back();
+            }
+        }
+    }
+    std::erase_if(lines, [](const std::vector<MidiSyllable>& line) { return line.empty(); });
+    if (lines.empty()) {
+        return std::unexpected(std::string{"The MIDI file has no words in it."});
+    }
+
+    lyrics.timed = true;
+    lyrics.lines.reserve(lines.size());
+    for (std::size_t l = 0; l < lines.size(); ++l) {
+        LyricLine line;
+        line.start_ms = to_ms(lines[l].front().tick);
+        if (l + 1 < lines.size()) {
+            line.end_ms = std::max(to_ms(lines[l + 1].front().tick), line.start_ms);
+        } else {
+            const std::int64_t last_start = to_ms(lines[l].back().tick);
+            std::int64_t last = last_start + kLastLineMs;
+            if (duration_ms && *duration_ms > last_start) {
+                last = *duration_ms;
+            }
+            line.end_ms = std::max(last, line.start_ms);
+        }
+        for (const MidiSyllable& syllable : lines[l]) {
+            LyricWord word;
+            word.start_ms = std::clamp(to_ms(syllable.tick), line.start_ms, line.end_ms);
+            word.text = syllable.text;
+            line.words.push_back(std::move(word));
+        }
+        for (std::size_t w = 0; w < line.words.size(); ++w) {
+            line.words[w].end_ms = w + 1 < line.words.size() ? std::max(line.words[w + 1].start_ms, line.words[w].start_ms)
+                                                             : line.end_ms;
+            line.text += line.words[w].text;
+        }
+        lyrics.lines.push_back(std::move(line));
+    }
+    return lyrics;
+}
+
 std::expected<Lyrics, std::string> parse_timed_text(std::string_view text,
                                                     std::optional<std::int64_t> duration_ms) {
+    // A MIDI file is bytes, not text: it is known by its header before anything decodes it.
+    if (text.starts_with("MThd")) {
+        return parse_midi_karaoke(text, duration_ms);
+    }
     const auto decoded = decode_text(text);
     if (!decoded) {
         return std::unexpected(decoded.error());
@@ -1072,7 +1394,8 @@ std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_pa
     // `.lrc` first and `.srt` where there is none: the usual spelling of each, which is also
     // the only one on a case-insensitive file system, then any case.
     for (const std::string_view extension :
-         {std::string_view{".lrc"}, std::string_view{".srt"}, std::string_view{".ass"}}) {
+         {std::string_view{".lrc"}, std::string_view{".srt"}, std::string_view{".ass"},
+          std::string_view{".kar"}}) {
         const std::filesystem::path usual = folder / (stem + std::string{extension});
         if (std::filesystem::is_regular_file(usual, error) && !error) {
             return usual;

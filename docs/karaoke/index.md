@@ -87,7 +87,8 @@ choice does not apply:
 Hearth shows the words of the stream playing from a **`.lrc` file with the same name** in the same
 folder: `Auld Lang Syne.ac3` is read with `Auld Lang Syne.lrc` (the extension in any case). Where
 there is no `.lrc`, a **SubRip `.srt`** of that name is read the same way (see [below](#subrip)),
-and failing that an **Advanced SubStation Alpha `.ass`** (see [below](#advanced-substation-alpha)).
+and failing that an **Advanced SubStation Alpha `.ass`** (see [below](#advanced-substation-alpha)),
+and then a **MIDI karaoke `.kar`** (see [below](#midi-karaoke)).
 
 ### The file
 
@@ -152,6 +153,28 @@ the script's own sweep does. Everything else is dropped: the other override tags
 `{\pos(...)}`), the styles, and any event that draws (`{\p1}`) or is a `Comment:`. `\N` is a
 space. The columns are the script's own `Format:` line, with the v4+ order where it has none, and
 an event with no karaoke tags is a line with no words.
+
+### MIDI karaoke
+
+A `.kar` file (a Standard MIDI File whose syllables are meta events) is read for its words, and only
+its words: the music in it is not played or read. What is taken:
+
+- the **words** from the track called `Words`, where there is one, else from the file's Lyric
+  events, else from its Text events;
+- the **title** and the **artist** from the first and second `@T` lines; the other `@` lines
+  (`@K`, `@L`, `@I`, `@V`) are not words;
+- a `/` begins a new line, and a backslash a new verse (a line too, here), and so does a line end in the
+  text;
+- every **syllable** is a word of the line with its own start, from its tick through the file's
+  **tempo map** (a tempo change on any track moves every later tick), so the fill moves by syllable. A
+  syllable that begins with a space is the start of the next word: the space is joined to the one
+  before it. A line ends where the next begins.
+
+A file whose time is in SMPTE frames, that has no words, or that is cut short says so. A MIDI file
+carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
+are not guessed at, so a Western karaoke file with accented letters saved in Latin-1 (and Hebrew in
+Windows-1255) is refused with the reason, as an LRC file in a code page is. Plain ASCII is UTF-8, and
+most are.
 
 ### What is shown
 

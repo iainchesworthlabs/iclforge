@@ -74,7 +74,8 @@ settings whole: what the sink's own page set is not kept.
 
 Beside a stream, `name.lrc` (the extension in any case) is its lyrics, and where there is none
 `name.srt`, a SubRip file, whose cues are lines with no words in them, and then `name.ass`, an
-Advanced SubStation Alpha script, whose karaoke tags give each syllable its time. The Karaoke page shows the
+Advanced SubStation Alpha script, whose karaoke tags give each syllable its time, and then
+`name.kar`, a MIDI karaoke file, whose syllables are timed through its tempo map. The Karaoke page shows the
 line being sung, the lines before it and after it, and a word at a time where the file times its
 words:
 
