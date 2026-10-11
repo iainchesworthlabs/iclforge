@@ -85,9 +85,12 @@ constexpr std::array<OptionToken, 103> kOptionTokens{{
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},
-    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service"},
+    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service; of "
+                    "E-AC-3: mix that programme (a substream id 0..7, or a service name its bsmod "
+                    "labels) into the one being decoded, §E3.10"},
     {"dialogue-gain=", "decode of AC-4: g_dialog, the dialogue against music and effects, dB"},
-    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less"},
+    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less; of "
+                         "E-AC-3: the same trim on the programme associated= mixes in"},
     {"headphones", "decode of AC-4: a listener on headphones - their DRC mode, pre-virtualized presentations"},
     {"md-compat=", "decode of AC-4: the md_compat level the decoder claims, 0 to 7 (default 7)"},
     {"syntax-trace=", "ac4-encode, and decode of AC-4: write every syntax element written or read"},

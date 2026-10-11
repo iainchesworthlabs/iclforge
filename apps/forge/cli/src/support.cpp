@@ -1576,11 +1576,13 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             constexpr std::array<std::string_view, 8> kEac3Only = {
                 "drc",  "heavy",     "ltrt-phase", "fast-imdct",
                 "mode", "programme", "bed-only",   "joc-domain"};
-            constexpr std::array<std::string_view, 10> kAc4Only = {
+            // associated= and associated-gain= are not here: AC-4 reads them
+            // for a presentation, E-AC-3 for a second programme to mix in,
+            // and run_decode says when a plain AC-3 stream has neither.
+            constexpr std::array<std::string_view, 8> kAc4Only = {
                 "output-level",  "dialogue-enhancement",
                 "presentation",  "presentation-id",
-                "language",      "associated",
-                "dialogue-gain", "associated-gain",
+                "language",      "dialogue-gain",
                 "headphones",    "md-compat"};
             const bool ac4_drcmode = key == "drcmode" && value != "line" && value != "rf" &&
                                      value != "none" && !value.empty();
@@ -2144,6 +2146,23 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             continue;
         }
         if (key == "associated") {
+            // A number is an E-AC-3 independent substream to mix in (§E3.10);
+            // a name is a service, which AC-4 reads as the presentation it
+            // prefers and E-AC-3 as the programme whose bsmod says it is one.
+            if (!value.empty() && std::ranges::all_of(value, [](char c) {
+                    return std::isdigit(static_cast<unsigned char>(c)) != 0;
+                })) {
+                const auto id = parse_u32_or(value, 8);
+                if (id > 7) {
+                    fmt::println(stderr,
+                                 "error: associated= needs a substream id 0..7 or a service name "
+                                 "(got '{}')",
+                                 token);
+                    return false;
+                }
+                out.eac3_associated_programme = static_cast<int>(id);
+                continue;
+            }
             // The associated audio service AC-4 presentation selection
             // prefers: a content_classifier of ETSI TS 103 190-1 Table 91 and
             // its Table 92 refinement.
@@ -2168,7 +2187,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 fmt::println(stderr,
                              "error: associated is visually-impaired, audio-description, "
                              "audio-description-subtitles, spoken-subtitles, emergency-information, "
-                             "hearing-impaired or commentary (got '{}')",
+                             "hearing-impaired or commentary, or an E-AC-3 substream id 0..7 "
+                             "(got '{}')",
                              token);
                 return false;
             }

@@ -3,6 +3,8 @@ cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH _ac3_root)
 
 iclforge_add_test_binary(iclforge-ac3-tests PROJECT ac3 SOURCES
     analysis/test_analysis.cpp
+    decoder/test_associated_service.cpp
+    decoder/test_associated_service_stream.cpp
     encoder/test_assignment.cpp
     encoder/test_bandwidth.cpp
     oba/test_atmos.cpp
