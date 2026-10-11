@@ -2972,6 +2972,21 @@ The sections below contain the complete change list and fixes.
   `channel_mask_of`, `layout_for_locations`, and a `route()` overload that takes the source's own
   locations. The two front ends share them, as they share every other layout rule there.
 
+**Forge GUI: the last frame of a source that is not whole frames**
+
+- **The window wrote silence into the end of a short final frame where `forge encode` holds the
+  last sample.** A source whose length is not a multiple of 1,536 samples (2.0 s is 62.5 frames)
+  has its last frame filled past the end of the audio, and the window filled it with zeros while
+  the command line has held each channel's last real sample since August, because a drop to zero
+  is a transient the encoder spends a block switch on. The same plan therefore gave two files
+  that differed in their last frame only (696 of 48,384 bytes for a 2.0 s stereo file). The
+  window now holds the last sample as `forge` does, for AC-3, E-AC-3 and the object encode and
+  their previews, and both fill every frame through one function (`fill_source_frame`,
+  `apps/shared/media`). Nothing `forge` writes changes. What it is worth depends on the audio:
+  over the last 1,536 real samples of the 5.1 reference file, holding gave the left, right and
+  LFE channels 4, 8 and 16 dB more than zero and lowered none; a two-tone stereo file came out
+  within 2 dB either way, the zero-padded one slightly higher.
+
 **ADM / BW64**
 
 - **`write_bw64` dropped an `audioObject`'s duration.** `AudioObject::duration` was read and never

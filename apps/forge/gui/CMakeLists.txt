@@ -44,6 +44,7 @@ qt_add_executable(forge-gui
     src/karaoke_authoring_controller.cpp
     src/karaoke_authoring_controller.hpp
     ../../shared/media/src/ac4_sync_word.hpp
+    ../../shared/media/src/source_frame.hpp
     ../../shared/media/src/fmp4_folder_writer.cpp
     ../../shared/media/src/fmp4_folder_writer.hpp
     ../../shared/media/src/recording_sink.cpp
