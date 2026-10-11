@@ -457,7 +457,10 @@ std::expected<DecodedFrame, DecodeError> FrameDecoder::decode_frame_by_block(
     // One or two slots after a fold, the coded channels otherwise - the
     // count the *_into caller reads its spans by.
     const std::size_t slots = std::min(
-        kChannels, output_channel_count(impl_->config_.output, decoded->acmod, decoded->lfe));
+        kChannels,
+        output_channel_count(
+            impl_->config_.output, decoded->acmod, decoded->lfe,
+            meta::is_karaoke(static_cast<meta::BitstreamMode>(decoded->bsmod), decoded->acmod)));
     std::array<std::span<const float>, kChannels> block_views{};
     {
         // Its own zone, so a caller's sink reads as the caller's time.
@@ -572,7 +575,9 @@ std::optional<DecodedFrame> FrameDecoder::conceal(DecodeError error,
         }
     }
 
-    const auto levels = mix_levels(out.acmod, out.cmixlev, out.surmixlev, out.alternate_bsi);
+    auto levels = mix_levels(out.acmod, out.cmixlev, out.surmixlev, out.alternate_bsi);
+    levels.karaoke =
+        meta::is_karaoke(static_cast<meta::BitstreamMode>(out.bsmod), out.acmod);
     if (external.empty()) {
         impl_->output_.apply(out.channels, out.acmod, out.lfe, levels, out.dialnorm, out.dialnorm2);
     } else {
@@ -1810,7 +1815,10 @@ std::expected<DecodedFrame, DecodeError> FrameDecoder::decode_frame_core(
         ICLFORGE_ZONE_SCOPED_N("ac3_output");
         // Annex D's xbsi1 levels when the frame carries them (§D3.1.2), bsi's
         // cmixlev/surmixlev otherwise - see mix_levels()'s own comment.
-        const auto levels = mix_levels(acmod, cmixlev, surmixlev, alternate_bsi);
+        auto levels = mix_levels(acmod, cmixlev, surmixlev, alternate_bsi);
+        // Annex C: bsmod 7 above 1/0 is a karaoke stream, which only
+        // OutputConfig::karaoke asks the stage to treat as one.
+        levels.karaoke = meta::is_karaoke(static_cast<meta::BitstreamMode>(bsmod), acmod);
         if (external.empty()) {
             impl_->output_.apply(out.channels, acmod, lfe, levels, dialnorm, dialnorm2);
         } else {

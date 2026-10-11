@@ -109,8 +109,8 @@ so a misrouted channel is identifiable by ear.)
 
 | Command | What it does |
 |---|---|
-| `encode` | WAV → AC-3. Without `[layout]`, follows the source channel count (1→mono, 2→stereo, 3–6→5.1); a wider source is refused, since no AC-3 coding mode is wider than 3/2 + LFE. |
-| `eac3-encode` | WAV → E-AC-3, with the Annex E `tools:` token and an optional `vbr:` token available (see [Options & grammars](metadata-options.md)). Without `[layout]`, follows the source channel count (1→mono, 2→stereo, 3–6→5.1, 8→7.1, 10→5.1.4, 12→7.1.4). |
+| `encode` | WAV → AC-3. Without `[layout]`, follows the source: the speakers its `WAVE_FORMAT_EXTENSIBLE` header states (FL FR BC is 2/1, FL FR FC BC is 3/1, `decode` writes them from three channels up so its own output encodes back into its mode), or, for a file that states none, its channel count (1→mono, 2→stereo, 3–6→5.1); a wider source is refused, since no AC-3 coding mode is wider than 3/2 + LFE. |
+| `eac3-encode` | WAV → E-AC-3, with the Annex E `tools:` token and an optional `vbr:` token available (see [Options & grammars](metadata-options.md)). Without `[layout]`, follows the source: the speakers its `WAVE_FORMAT_EXTENSIBLE` header states, or, for a file that states none, its channel count (1→mono, 2→stereo, 3–6→5.1, 8→7.1, 10→5.1.4, 12→7.1.4). |
 | `atmos-encode` | WAV → E-AC-3 Atmos, every source channel becomes its own object; optional `[paths.txt]` drives per-object motion from an authored scene file the same way `atmos-path` does, keyed by WAV channel index — an object it doesn't mention keeps its default (fanned-out) placement. With `codec=ac4` it writes AC-4 objects instead: see [AC-4 objects from a WAV](#ac-4-objects-from-a-wav) below |
 | `atmos-cbi` | WAV already mixed into a fixed channel-based-immersive (CBI) bed layout → E-AC-3 Atmos with `program.bed != 0` and 0 dynamic objects — Dolby's `dee_ddpjoc_encoder --input-format cbi_wav` shape, not free-floating objects |
 | `ac4-encode` | WAV → AC-4: mono, stereo, 5.0, 5.1, 5.0.4 or 5.1.4 (7.0, 7.1, 7.0.4, 7.1.4 and 3.0 experimental), at 48 kHz at every frame rate of Part 1 Table 83 or at 44.1 kHz at the native one, as raw sync frames with their CRC (or without, `crc=off`) or, for `.mp4`, `.m4a` or `.mov`, an MP4 file with the `ac-4` sample entry and its `dac4`. The codec mode follows the rate: SIMPLE from 96 kbps a channel (76.8 in 5.X), the ASPX mode below, in 5.X the A-CPL modes lower still, and in the immersive layouts ASPX_ACPL_2, ASPX_SCPL and SCPL by the rate. The frame rate, the rate mode, the I-frames, the metadata, and further substreams and the presentations that play them are options: see [`ac4-encode`](#ac4-encode) below |
@@ -119,7 +119,7 @@ so a misrouted channel is identifiable by ear.)
 forge encode in.wav out.ac3 448 couple
 ```
 
-448 kbps, channel coupling on, layout inferred from the WAV's channel count.
+448 kbps, channel coupling on, layout inferred from the WAV: its stated speakers, or its channel count when it states none.
 
 `1+1` (dual mono — two independent programmes, never inferred from a channel count, so it always
 has to be named explicitly) takes its two channels either as one two-channel file or as two mono
@@ -543,7 +543,7 @@ requirements ask for beside an Atmos one.
 
 | Command | What it does |
 |---|---|
-| `decode` | AC-3, E-AC-3 or AC-4 → WAV; the stream decides which decoder runs (for AC-4, mono, stereo, 3.0, 5.X and 7.X in the SIMPLE, ASPX and A-CPL codec modes, and 7.0.4 and 7.1.4 in every immersive codec mode, in [full or core decoding and to the layout `speakers=` names](#ac-4-immersive-speakers-and-decoding), written in WAV speaker order, and of a stream of several presentations the one [`presentation=`, `language=` and `associated=`](#ac-4-presentations-presentation-language-associated) choose, its substreams mixed; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded, 7.1.4 by default). The input may be a Matroska/MP4/MPEG-TS container as well as a bare elementary stream, sniffed by content rather than by name — the same three readers `demux` uses. For an Atmos E-AC-3 stream or an AC-4 stream with objects, reports the object count found and, with `objects_dir`, exports each decoded object as its own `object_NN.wav` there — JOC-reconstructed for E-AC-3, D10's own decoded objects for AC-4. With `adm_out` (needs `-DICLFORGE_BUILD_ADM=ON`), also writes a Dolby Atmos Master ADM Profile BW64 there: for E-AC-3, the bed's LFE plus every JOC-reconstructed channel (a channel-based-immersive bed's channels pinned to their speakers, a dynamic object positioned by its own decoded OAMD automation); for AC-4, every bed and dynamic object with its own decoded Annex F properties |
+| `decode` | AC-3, E-AC-3 or AC-4 → WAV (an AC-3 or E-AC-3 stream of three channels or more is written with its speaker mask, so `encode` reads the file back as the coding mode it came from); the stream decides which decoder runs (for AC-4, mono, stereo, 3.0, 5.X and 7.X in the SIMPLE, ASPX and A-CPL codec modes, and 7.0.4 and 7.1.4 in every immersive codec mode, in [full or core decoding and to the layout `speakers=` names](#ac-4-immersive-speakers-and-decoding), written in WAV speaker order, and of a stream of several presentations the one [`presentation=`, `language=` and `associated=`](#ac-4-presentations-presentation-language-associated) choose, its substreams mixed; a presentation with A-JOC or direct-coded objects renders them to the output's speakers as coded, 7.1.4 by default). The input may be a Matroska/MP4/MPEG-TS container as well as a bare elementary stream, sniffed by content rather than by name — the same three readers `demux` uses. For an Atmos E-AC-3 stream or an AC-4 stream with objects, reports the object count found and, with `objects_dir`, exports each decoded object as its own `object_NN.wav` there — JOC-reconstructed for E-AC-3, D10's own decoded objects for AC-4. With `adm_out` (needs `-DICLFORGE_BUILD_ADM=ON`), also writes a Dolby Atmos Master ADM Profile BW64 there: for E-AC-3, the bed's LFE plus every JOC-reconstructed channel (a channel-based-immersive bed's channels pinned to their speakers, a dynamic object positioned by its own decoded OAMD automation); for AC-4, every bed and dynamic object with its own decoded Annex F properties |
 | `probe` | What a stream *declares*, without rendering its audio: bsid, sample rate, layout, substream map, counts, duration, bit rate, metadata ranges, EMDF/OAMD/JOC, authenticity, per-frame CRC and coding-tool usage. Human table by default, or the `iclforge.probe/1` JSON document with `json=1`. An AC-4 stream gets its table of contents, frame rate, bit rate, I-frames and splices, and each presentation with the metadata the decoder reads of it. The input may be a Matroska, MP4 or MPEG-TS container, sniffed by content: the report then also says what the container declares of the track (codec ID, sample entry or descriptor, time scale, language), in the JSON document as `container`, which is `null` for a bare stream |
 | `levels` | Per-channel peak/RMS report — takes a WAV, a bare encoded stream, or a Matroska/MP4/MPEG-TS container carrying one; of an AC-4 stream, the presentation [`presentation=` and the rest](#ac-4-presentations-presentation-language-associated) choose, as coded |
 | `loudness` | BS.1770-4 gated loudness, reported as the `dialnorm` it implies: of a WAV; of an AC-3 or E-AC-3 stream's first programme, beside the `dialnorm` it carries; or of an AC-4 presentation as coded, in AC-4's steps of 0.25 dB, beside the stream's own. Bare or inside a container |
@@ -623,6 +623,39 @@ Lt/Rt (whose surround sum really is phase shifted 90°, costing 63 samples of ou
 matrix comes from the stream's own `cmixlev`/`surmixlev` or `mixmdate` levels, and §7.8.1's
 normalisation means the fold can never be louder than the loudest coded sample. `mix-lfe` folds
 the LFE in as well — §7.8 makes that optional and this decoder drops it by default.
+
+`karaoke` (or `karaoke=on`) decodes an AC-3 **karaoke** stream - `bsmod` 7 with an `acmod` above
+1/0 (Annex C, informative) - the way a karaoke-aware decoder with three outputs does. Such a
+stream carries L and R (the music), a guide melody M where a centre would be, and one or two
+vocal channels V1 and V2 where the surrounds would be (3/0 is L M R, 2/1 is L R V1, 3/1 is
+L M R V1, 2/2 is L R V1 V2, 3/2 is L M R V1 V2). The output is L, C, R and then the LFE when there
+is one: M at unity in the centre, a single V1 added to the centre, and a pair V1 and V2 added to
+the left and the right, each vocal at the stream's own surround level (`surmixlev`, §5.4.2.5 -
+under the programme provider's control, as Annex C intends) and the whole scaled down by the
+largest output's sum, §7.8.1's way (Table C.2.2's 3/0 columns). A 3/0 stream is already that,
+and a 2/0 one has nothing but L and R, so both decode as coded. At `channels=2` or `channels=1`
+the stereo or mono fold *is* Annex C's 2/0 reproduction - "any AC-3 decoder will produce the
+appropriate output if it is set to perform an Lo, Ro 2-channel downmix" - so `karaoke` changes
+nothing there, and `downmix=ltrt` is refused, since Annex C has no Lt/Rt. A stream that is not
+karaoke is decoded as coded and the report says so; E-AC-3 and AC-4 streams warn and ignore the
+option.
+
+`karaoke=none|v1|v2|v1+v2` is the karaoke-*capable* decoder (C.2.3.2, Table C.2.3): the same
+reproduction with the listener choosing which vocals are heard rather than the stream's own
+`surmixlev`. At the default layout it is L, C, R again - `none` leaves M alone in the centre, `v1`
+or `v2` adds that vocal to the centre, `v1+v2` puts V1 into the left and V2 into the right at unity -
+and at `channels=2` or `channels=1` it is the 2/0 reproduction: M at the stream's `cmixlev`, a single
+vocal at 0.7 in both channels, a pair left and right at unity, with mono the two summed. Every
+coefficient is scaled down together when an output's sum exceeds 1. `karaoke=off` (the default),
+`karaoke=on` and `karaoke=aware` are the spellings of no reproduction and of the bare option.
+
+```bash
+forge decode sing-along.ac3 karaoke.wav karaoke       # L C R: melody centre, vocals at surmixlev
+forge decode sing-along.ac3 stereo.wav channels=2     # the 2/0 reproduction, Lo/Ro
+forge decode sing-along.ac3 backing.wav karaoke=none  # L C R with the vocals muted
+forge decode sing-along.ac3 duet.wav karaoke=v1+v2    # V1 left, V2 right, melody centre
+forge decode sing-along.ac3 lead.wav channels=2 karaoke=v1   # stereo with V1 in the middle
+```
 
 `downmix=auto` lets the stream choose between the two stereo folds, the third option A/52
 §D3.1.1 describes. The stream's preference is its `dmixmod` (Table D2.2): in AC-3's Annex D

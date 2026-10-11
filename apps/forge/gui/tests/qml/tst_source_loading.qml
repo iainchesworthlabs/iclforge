@@ -44,6 +44,60 @@ TestCase {
         compare(win.sourceLabel, "roundtrip-stereo.wav");
     }
 
+    // Files whose header states which speakers their channels are (generated
+    // by tools/generators/gen_gui_speaker_mask_wavs.py). The two three-channel
+    // files are the pair a channel COUNT cannot tell apart: one is a 2/1
+    // programme, the other states nothing and is read as L R C.
+    readonly property url stated21Url: Qt.resolvedUrl("../fixtures/speakers-2-1.wav")
+    readonly property url stated30LfeUrl: Qt.resolvedUrl("../fixtures/speakers-3-0-lfe.wav")
+    readonly property url unstatedThreeUrl: Qt.resolvedUrl("../fixtures/speakers-none-3ch.wav")
+
+    function bedId() {
+        return EncoderController.bedChoices[EncoderController.bedIndex].id;
+    }
+
+    function test_aFileThatStatesItsSpeakersIsLoadedAsThatCodingMode() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        EncoderController.atmosEnabled = false;
+        EncoderController.codecIndex = 0;  // AC-3: no substream layer, so the bed is all there is
+
+        EncoderController.loadSourceFile(stated21Url);
+        tryCompare(EncoderController, "sourceReady", true);
+        // FL FR BC is 2/1 - a mode with no preset, which the width alone
+        // (three channels) would have made a 5.1 with silent surrounds.
+        compare(bedId(), "2/1");
+        compare(EncoderController.bedLfe, false);
+        compare(EncoderController.codedChannelCount, 3);
+    }
+
+    function test_aStatedLfeIsKeptNotMadeIntoAFifthFullBandwidthChannel() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        EncoderController.atmosEnabled = false;
+        EncoderController.codecIndex = 0;
+
+        EncoderController.loadSourceFile(stated30LfeUrl);
+        tryCompare(EncoderController, "sourceReady", true);
+        compare(bedId(), "3/0");
+        compare(EncoderController.bedLfe, true);
+        compare(EncoderController.codedChannelCount, 4);
+    }
+
+    function test_aFileThatStatesNoSpeakersKeepsTheReadingItsWidthGave() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        EncoderController.atmosEnabled = false;
+        EncoderController.codecIndex = 0;
+
+        EncoderController.loadSourceFile(unstatedThreeUrl);
+        tryCompare(EncoderController, "sourceReady", true);
+        // Three channels with no mask: L R C placed on a 5.1, as before.
+        compare(bedId(), "3/2");
+        compare(EncoderController.bedLfe, true);
+        compare(EncoderController.codedChannelCount, 6);
+    }
+
     function test_sourceLevelsIsAPerSourceLookupSeparateFromSourceModel() {
         const win = createTemporaryObject(mainWindowComponent, testCase);
         verify(win !== null);

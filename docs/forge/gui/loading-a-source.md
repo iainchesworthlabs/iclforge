@@ -34,7 +34,12 @@ so double-clicking an encoded file in the file manager does not start it (a Wind
 without Hearth is the one exception).
 
 The row reports the channel *count*, not a layout name — the output layout is chosen
-independently on the [Format tab](format-and-channels.md) and need not match the source. A source
+independently on the [Format tab](format-and-channels.md) and need not match the source. What a
+newly loaded file *starts* as is the file's own: a WAV whose header states which speakers its
+channels are (a `WAVE_FORMAT_EXTENSIBLE` channel mask — `forge decode` writes one from three
+channels up) selects exactly that bed, so a front-left, front-right, back-centre file is a 2/1
+bed and not a 5.1 with silent surrounds, and it folds by that mode's §7.8 coefficients; a file
+that states none is read by its width, as before. A source
 narrower than the chosen output layout leaves the missing channels silent; a wider one folds down
 per §7.8 using the centre/surround downmix levels on the [Metadata tab](metadata.md), *unless*
 more than one source is loaded — see below.

@@ -60,6 +60,26 @@ The sections below contain the complete change list and fixes.
   `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
   15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
 
+**AC-3 karaoke streams (Annex C)**
+
+- **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
+  outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
+  M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at
+  unity in the centre, a single V1 added to the centre and a pair added to the left and the right,
+  each vocal at the stream's own surround level and everything scaled down by the largest
+  output's sum (Table C.2.2). At `channels=2`/`1` it is the Lo/Ro downmix, which is Annex C's 2/0
+  reproduction, and `downmix=ltrt` is refused. A stream that is not karaoke is decoded as coded
+  and the report says so. The library form is `OutputConfig::karaoke`
+  (`KaraokeReproduction::kAware`), `MixLevels::karaoke`, `meta::is_karaoke()` and a
+  four-argument `output_channel_count()`; E-AC-3 and AC-4 streams ignore it.
+- **`karaoke=none|v1|v2|v1+v2` is the karaoke-capable decoder's listener choice of vocals
+  (C.2.3.2, Table C.2.3).** The same L, C, R with only the chosen vocals in it - V1 or V2 added to
+  the centre, or V1 into the left and V2 into the right at unity - and, at `channels=2`/`1`, the
+  2/0 reproduction: the melody at `cmixlev`, a single vocal at 0.7 in both channels, a pair left
+  and right, mono the two summed. The library form is `KaraokeReproduction::kCapable` with
+  `OutputConfig::karaoke_vocals` (`KaraokeVocals`). The table's cells were read from the
+  specification's own pages and are transcribed into the tests.
+
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
 - **An AC-3 core with E-AC-3 dependents is carried in MP4, fMP4 and MPEG-TS.** ETSI TS 102 366
@@ -2799,6 +2819,30 @@ The sections below contain the complete change list and fixes.
   (held to AC-3's tools, no dependents, a Table 5.18 code) and `DecodedSubstream`,
   `FrameHeader` and `forge probe` report the code it was converted from. The conversion to and
   from AC-3 itself is not built: the standard gives the signalling and no process.
+
+**AC-3 coding modes 3/0, 2/1, 3/1 and 2/2**
+
+- **A WAV's speakers were never read, so a 2/1 or 3/1 file was encoded as a different mode.** The
+  encoder took a source's width as its layout: three channels were L R C and four were L R Ls Rs
+  whatever the file said, so `forge decode`'s own output for a 2/1 stream encoded back with its
+  lone surround in the centre channel, a 3/1 stream's centre in a surround, and a 3/0 + LFE
+  stream's centre and LFE in the surrounds, all on a 5.1 with silent channels besides. `WavData::channel_mask`
+  (and `WavStreamReader::channel_mask()`) now carry a `WAVE_FORMAT_EXTENSIBLE` header's
+  `dwChannelMask`, and `encode`, `eac3-encode`, `programmeN=` and Forge GUI follow it for an unnamed
+  layout: FL FR BC is 2/1, FL FR FC BC is 3/1, FL FR BL BR or FL FR SL SR is 2/2, each with or
+  without the LFE. The same file named onto a narrower layout folds by that mode's §7.8
+  coefficients (a lone surround at 0.707 × `surmixlev`, where the width's guess used the centre
+  level), `dialnorm=auto` weights its channels by the speakers they are, and `transcode` keeps a
+  stream that is exactly one coding mode in that mode instead of widening it to 5.1.
+- **`forge decode` states its speakers.** An AC-3 or E-AC-3 decode of three channels or more is
+  written as `WAVE_FORMAT_EXTENSIBLE` with its channel mask (`write_wav_f32` and
+  `WavStreamWriter::open` take one; a mask that does not name exactly the channels written leaves
+  the plain header). Mono and stereo output, and any decode that cannot name its speakers, keep
+  the 44-byte header they always had. A WAV that states no speakers is read by its width exactly
+  as before: every checked-in fixture encodes to the same bytes.
+- **New in `iclforge::ac3::plan`:** `wav_mask_locations`, `wav_channel_mask`, `source_layout`,
+  `channel_mask_of`, `layout_for_locations`, and a `route()` overload that takes the source's own
+  locations. The two front ends share them, as they share every other layout rule there.
 
 **ADM / BW64**
 
