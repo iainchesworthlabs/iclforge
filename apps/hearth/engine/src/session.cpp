@@ -11,6 +11,7 @@
 #include "ac4_stream.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/io/probe.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/render/layout.hpp"
@@ -236,6 +237,10 @@ std::expected<Session, std::string> Session::open(
             lengths = session.scanned_.access_unit_samples;
         }
         session.facts_.stream = format_of(session.scanned_.kind);
+        session.facts_.karaoke =
+            session.scanned_.kind == ac3::io::StreamKind::kAc3 &&
+            ac3::meta::is_karaoke(static_cast<ac3::meta::BitstreamMode>(session.scanned_.bsmod),
+                                  session.scanned_.acmod);
         rate = sample_rate_hz(session.scanned_.sample_rate);
     }
     if (session.units_.empty()) {

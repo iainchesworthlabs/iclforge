@@ -72,6 +72,12 @@ class BurstOutput {
     BurstOutput(BurstOutput&&) = delete;
     BurstOutput& operator=(BurstOutput&&) = delete;
 
+    // Annex C's reproduction of a karaoke AC-3 stream, and which vocals the capable one plays, as
+    // a settings command's decoder object says; the decoders are made again with them, at the
+    // next burst. A karaoke stream is laid out from ac3::output_mode(), as a board does, since
+    // the reproduced frame is L, C, R and the LFE and not the coded layout.
+    void set_karaoke(sendspin::player::Karaoke reproduction, sendspin::player::KaraokeVocals vocals);
+
     // A stream began, or changed in place: new decoders, and a new file.
     bool start(const sendspin::player::StreamStart& stream);
     void clear();

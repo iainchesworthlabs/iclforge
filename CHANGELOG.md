@@ -140,7 +140,7 @@ The sections below contain the complete change list and fixes.
   karaoke AC-3 stream, its coding mode and which of M, V1 and V2 it carries - and chooses how it is
   reproduced: as coded, aware or capable, with none, V1, V2 or both vocals. It shows which part each
   speaker carries, and says in words when the choice cannot apply: a stream that is not karaoke, a
-  bitstream output, a network group, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
+  bitstream output, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
   is kept across starts, the one decoder setting that is. The Decoder page shows it in a line with
   a button to the page.
 - **Hearth shows lyrics, word by word.** The Karaoke page has a Lyrics card for the `.lrc` file
@@ -151,6 +151,14 @@ The sections below contain the complete change list and fixes.
   said in words. `F11` opens the lyrics full screen (`Esc` leaves) with the transport and the
   vocals chooser kept at the bottom, and Settings has a lyric delay of -1,000 to +1,000 ms that is
   kept across starts.
+- **A karaoke stream is one reproduction across a network group.** `_iclforge_player@v1` takes
+  two more decoder settings, `karaoke` (`off`, `aware`, `capable`) and `karaoke_vocals` (`none`,
+  `v1`, `v2`, `both`), which a sink lists when it has them. Hearth sends a karaoke AC-3 stream as
+  it is to a sink that lists them, and tells it the singer's choice before the stream starts and
+  when it changes while the item plays; the sink's decoder reproduces it (L, C, R and the LFE, so
+  its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
+  firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
+  reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
