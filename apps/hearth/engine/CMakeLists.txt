@@ -12,6 +12,7 @@ add_library(hearth_engine STATIC
     src/diagnostic_log.cpp
     src/diagnostics_report.cpp
     src/engine_thread.cpp
+    src/lyrics.cpp
     src/media_info.cpp
     src/media_inspector.cpp
     src/network_view.cpp
