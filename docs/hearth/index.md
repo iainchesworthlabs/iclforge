@@ -90,6 +90,15 @@ without a byte-order mark, or UTF-16 with one, in either byte order (what an edi
 "Unicode"), so Hebrew and Yiddish files read as they are. A file in an 8-bit code page such as
 Windows-1255 is not read: save it as UTF-8 or UTF-16.
 
+**Duets.** A line that starts `V1:`, `V2:` or `V1+V2:` (after its time) is sung by the first
+vocal of the stream, the second, or both together; the marker is not shown as text. The two singers'
+names are `[v1:Shantyman]` and `[v2:Crew]` in the file. Where the file marks its lines the Karaoke
+page shows two name fields (typed for this run of Hearth, never kept for a song; a typed name comes
+before the file's, which comes before "V1" and "V2"), and each line says who sings it: by name, by
+side (the second singer's lines are indented) and by colour, which is never the only cue. On a
+karaoke stream it also says **guide** where the vocal that is playing sings the line, and **you**
+where it does not, with a sentence under the names for what the Vocals choice leaves you to sing.
+
 **Lyric delay** in Settings (Playback), from -1,000 to +1,000 ms in steps of 10, is added to the
 file's own timing; a positive value shows the words later. A bluetooth speaker or a receiver with
 a long path is where it is needed, because what Hearth follows is the output's own delay-corrected

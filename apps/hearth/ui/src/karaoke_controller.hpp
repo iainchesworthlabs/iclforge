@@ -47,6 +47,20 @@ class KaraokeController : public QObject {
     // spacing). Empty unless the status is "timed" or "plain".
     Q_PROPERTY(QVariantList lines READ lines NOTIFY lyricsChanged)
     Q_PROPERTY(int lineCount READ lineCount NOTIFY lyricsChanged)
+    // A duet (planning/karaoke-phase2.md, W11b). Each line also carries `singer`: "" for a
+    // line that says nothing, else "v1", "v2" or "both". hasSingers is whether any does.
+    Q_PROPERTY(bool hasSingers READ hasSingers NOTIFY lyricsChanged)
+    // The two singers' names as a person typed them: for this run of the app, not for a song
+    // and not kept (D7), and empty until typed. A typed name comes before the file's
+    // `[v1:]` / `[v2:]` tag, which comes before "V1" and "V2".
+    Q_PROPERTY(QString firstSingerName READ firstSingerName WRITE setFirstSingerName NOTIFY singerNamesChanged)
+    Q_PROPERTY(QString secondSingerName READ secondSingerName WRITE setSecondSingerName NOTIFY singerNamesChanged)
+    // What the file calls them, and what a view shows: the typed name, else the file's, else
+    // the vocal's own name.
+    Q_PROPERTY(QString fileFirstSingerName READ fileFirstSingerName NOTIFY lyricsChanged)
+    Q_PROPERTY(QString fileSecondSingerName READ fileSecondSingerName NOTIFY lyricsChanged)
+    Q_PROPERTY(QString firstSingerLabel READ firstSingerLabel NOTIFY singerNamesChanged)
+    Q_PROPERTY(QString secondSingerLabel READ secondSingerLabel NOTIFY singerNamesChanged)
     // The singer's nudge, in milliseconds, added to the file's own [offset:]:
     // positive shows the words later. Kept across starts, clamped to
     // +/-kMaxDelayMs.
@@ -102,6 +116,15 @@ public:
     [[nodiscard]] int delayMs() const { return delay_ms_; }
     [[nodiscard]] int maxDelayMs() const { return kMaxDelayMs; }
     void setDelayMs(int delay_ms);
+    [[nodiscard]] bool hasSingers() const { return has_singers_; }
+    [[nodiscard]] QString firstSingerName() const { return first_name_; }
+    [[nodiscard]] QString secondSingerName() const { return second_name_; }
+    [[nodiscard]] QString fileFirstSingerName() const { return file_first_name_; }
+    [[nodiscard]] QString fileSecondSingerName() const { return file_second_name_; }
+    [[nodiscard]] QString firstSingerLabel() const;
+    [[nodiscard]] QString secondSingerLabel() const;
+    void setFirstSingerName(const QString& name);
+    void setSecondSingerName(const QString& name);
 
     [[nodiscard]] bool timing() const { return timing_; }
     [[nodiscard]] QVariantList timingLines() const { return timing_lines_; }
@@ -155,6 +178,7 @@ signals:
     void delayChanged();
     void timingChanged();
     void reactionChanged();
+    void singerNamesChanged();
 
 private:
     struct State;
@@ -171,6 +195,11 @@ private:
     QString title_;
     QString artist_;
     bool word_timed_ = false;
+    bool has_singers_ = false;
+    QString first_name_;
+    QString second_name_;
+    QString file_first_name_;
+    QString file_second_name_;
     QVariantList lines_;
     QString item_path_;
     qlonglong duration_ms_ = 0;

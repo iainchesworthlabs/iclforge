@@ -220,6 +220,55 @@ TEST_CASE("KaraokeController: no file, a plain file and an unreadable one each s
     CHECK(controller.status().toStdString() == "timed");
 }
 
+TEST_CASE("KaraokeController: a duet's lines carry their singer, and the names come typed, then filed, then V1 and V2",
+          "[hearth][hearth-controller][karaoke][lyrics][duet]") {
+    Room room;
+    room.write("duet.lrc",
+               "[ti:Leave Her, Johnny]\n[v1:Shantyman]\n[v2:Crew]\n"
+               "[00:01.00]V1: Oh the times are hard\n"
+               "[00:04.00]V2: Leave her, Johnny\n"
+               "[00:07.00]V1+V2: Leave her\n"
+               "[00:09.00]For nobody in particular\n");
+    KaraokeController controller;
+    CHECK_FALSE(controller.hasSingers());
+    controller.load(room.path("duet.ac3"), 12000);
+    REQUIRE(controller.status().toStdString() == "timed");
+    CHECK(controller.hasSingers());
+    REQUIRE(controller.lineCount() == 4);
+    CHECK(line_at(controller, 0).value("singer").toString().toStdString() == "v1");
+    CHECK(line_at(controller, 0).value("text").toString().toStdString() == "Oh the times are hard");
+    CHECK(line_at(controller, 1).value("singer").toString().toStdString() == "v2");
+    CHECK(line_at(controller, 2).value("singer").toString().toStdString() == "both");
+    CHECK(line_at(controller, 3).value("singer").toString().toStdString().empty());
+
+    // The file's names, until a person types one: typed comes first, per singer.
+    CHECK(controller.fileFirstSingerName().toStdString() == "Shantyman");
+    CHECK(controller.firstSingerLabel().toStdString() == "Shantyman");
+    CHECK(controller.secondSingerLabel().toStdString() == "Crew");
+    int changes = 0;
+    QObject::connect(&controller, &KaraokeController::singerNamesChanged, [&changes] { ++changes; });
+    controller.setFirstSingerName(QStringLiteral("  Anna "));
+    CHECK(controller.firstSingerName().toStdString() == "Anna");
+    CHECK(controller.firstSingerLabel().toStdString() == "Anna");
+    CHECK(controller.secondSingerLabel().toStdString() == "Crew");
+    CHECK(changes == 1);
+    // The same name again is not a change, and an empty one gives the file's back.
+    controller.setFirstSingerName(QStringLiteral("Anna"));
+    CHECK(changes == 1);
+    controller.setFirstSingerName(QString());
+    CHECK(controller.firstSingerLabel().toStdString() == "Shantyman");
+
+    // A typed name is for the run, not for the song: the next item's lyrics keep it, and a file
+    // without names falls to V1 and V2.
+    controller.setSecondSingerName(QStringLiteral("Ben"));
+    room.write("solo.lrc", "[00:01.00]Should auld acquaintance\n");
+    controller.load(room.path("solo.ac3"), 12000);
+    CHECK_FALSE(controller.hasSingers());
+    CHECK(controller.secondSingerLabel().toStdString() == "Ben");
+    CHECK(controller.firstSingerLabel().toStdString() == "V1");
+    CHECK(line_at(controller, 0).value("singer").toString().isEmpty());
+}
+
 TEST_CASE("KaraokeController: the same item and length again is not read again",
           "[hearth][hearth-controller][karaoke][lyrics]") {
     Room room;

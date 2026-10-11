@@ -64,6 +64,25 @@ ScrollView {
         HearthController.setDecoderSettings(next);
     }
 
+    // A duet (planning/karaoke-phase2.md, W11b): which lines the vocal that is playing sings,
+    // and so which are left for you.
+    function duetSummary() {
+        const first = KaraokeController.firstSingerLabel;
+        const second = KaraokeController.secondSingerLabel;
+        if (!root.isKaraoke) {
+            return qsTr("The lines are marked for %1 and for %2.").arg(first).arg(second);
+        }
+        if (root.reproduction !== "capable" || root.vocals === "both") {
+            return qsTr("Both vocals play, so %1 and %2 are both in the mix.").arg(first).arg(second);
+        }
+        if (root.vocals === "none") {
+            return qsTr("No vocal plays: you sing the lines of %1 and of %2.").arg(first).arg(second);
+        }
+        return root.vocals === "v1"
+            ? qsTr("The vocal of %1 plays: you sing the lines of %2.").arg(first).arg(second)
+            : qsTr("The vocal of %1 plays: you sing the lines of %2.").arg(second).arg(first);
+    }
+
     function clock(ms) {
         const seconds = Math.max(0, Math.floor(ms / 1000));
         return Math.floor(seconds / 60) + ":" + ("0" + (seconds % 60)).slice(-2);
@@ -452,6 +471,66 @@ ScrollView {
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
                         wrapMode: Text.WordWrap
+                    }
+
+                    // A duet: the file marks who sings which line. Two names, typed for this
+                    // run of the app and never kept for a song, say who V1 and V2 are, and one
+                    // sentence says which lines the vocal that is playing sings.
+                    ColumnLayout {
+                        objectName: "duetBlock"
+                        Layout.fillWidth: true
+                        visible: KaraokeController.hasSingers
+                        spacing: Theme.gap
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.gap
+                            Text { text: qsTr("First singer"); color: Theme.text; font.pixelSize: Theme.fontNormal
+                                   elide: Text.ElideRight; Layout.preferredWidth: Math.round(108 * Theme.fontScale) }
+                            AppTextField {
+                                id: firstSingerField
+                                objectName: "firstSingerField"
+                                Layout.fillWidth: true
+                                placeholderText: KaraokeController.fileFirstSingerName.length > 0
+                                                 ? KaraokeController.fileFirstSingerName : "V1"
+                                text: KaraokeController.firstSingerName
+                                Accessible.name: qsTr("Name of the first singer (V1)")
+                                onEditingFinished: KaraokeController.firstSingerName = text
+                            }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.gap
+                            Text { text: qsTr("Second singer"); color: Theme.text; font.pixelSize: Theme.fontNormal
+                                   elide: Text.ElideRight; Layout.preferredWidth: Math.round(108 * Theme.fontScale) }
+                            AppTextField {
+                                id: secondSingerField
+                                objectName: "secondSingerField"
+                                Layout.fillWidth: true
+                                placeholderText: KaraokeController.fileSecondSingerName.length > 0
+                                                 ? KaraokeController.fileSecondSingerName : "V2"
+                                text: KaraokeController.secondSingerName
+                                Accessible.name: qsTr("Name of the second singer (V2)")
+                                onEditingFinished: KaraokeController.secondSingerName = text
+                            }
+                        }
+                        Text {
+                            objectName: "duetSummary"
+                            Layout.fillWidth: true
+                            text: root.duetSummary()
+                            color: Theme.text
+                            font.pixelSize: Theme.fontSmall
+                            wrapMode: Text.WordWrap
+                        }
+                        // A drag or a keystroke broke the bindings above: the controller is the
+                        // one place the names are held.
+                        Connections {
+                            target: KaraokeController
+                            function onSingerNamesChanged() {
+                                firstSingerField.text = KaraokeController.firstSingerName;
+                                secondSingerField.text = KaraokeController.secondSingerName;
+                            }
+                        }
                     }
                 }
             }

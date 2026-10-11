@@ -63,6 +63,8 @@ TestCase {
         }
         tryVerify(function() { return HearthController.queue.length === 0; }, 10000);
         KaraokeController.delayMs = 0;
+        KaraokeController.firstSingerName = "";
+        KaraokeController.secondSingerName = "";
         KaraokeController.load("", 0);
     }
 
@@ -312,6 +314,172 @@ TestCase {
         tryCompare(view, "status", "none", 10000);
         const message = named(win, "lyricMessage");
         tryVerify(function() { return message.visible && message.text.indexOf("bare.lrc") >= 0; }, 5000);
+    }
+
+    // --- a duet (planning/karaoke-phase2.md, W11b) ---------------------------
+
+    function writeDuet() {
+        const file = TestServices.writeTextFile("duet.lrc", [
+            "[v1:Shantyman]", "[v2:Crew]",
+            "[00:01.00]V1: Oh the times are hard",
+            "[00:04.00]V2: Leave her, Johnny",
+            "[00:07.00]V1+V2: Leave her",
+            "[00:10.00]For nobody in particular",
+            ""].join("\n"));
+        verify(file.length > 0);
+        return file.replace(/[.]lrc$/, ".ac3");
+    }
+
+    function test_aDuetLineSaysWhoSingsItAndSitsOnItsSide() {
+        const duetItem = writeDuet();
+        KaraokeController.firstSingerName = "";
+        KaraokeController.secondSingerName = "";
+        KaraokeController.load(duetItem, 20000);
+        compare(KaraokeController.hasSingers, true);
+        const view = newView();
+        view.positionMs = 1500;
+        // The line being sung is the shantyman's, at the left; nothing is playing, so there is
+        // no guide to speak of and the tag is the name alone.
+        compare(view.currentLine, 0);
+        const current = named(view, "lyricCurrentSinger");
+        verify(current !== null);
+        tryVerify(function() { return current.visible; }, 5000);
+        compare(current.text, "Shantyman");
+        compare(named(view, "lyricCurrentLine").x, 0);
+        // The next rows: the crew's, indented, and the two together.
+        const tags = [];
+        H.find(view, function(item) {
+            if (item.objectName === "lyricNextSinger") { tags.push(item.text); }
+            return false;
+        });
+        compare(tags[0], "Crew");
+        compare(tags[1], "Shantyman + Crew");
+        const next = H.find(view, function(item) { return item.objectName === "lyricNext"; });
+        verify(next.x > 0, "the second singer's line is not indented");
+        // A line the file does not mark has no tag at all.
+        view.positionMs = 10500;
+        compare(named(view, "lyricCurrentSinger").visible, false);
+        // Typed names come first, per singer, and give the file's back when emptied.
+        KaraokeController.firstSingerName = "Anna";
+        view.positionMs = 1500;
+        compare(named(view, "lyricCurrentSinger").text, "Anna");
+        KaraokeController.firstSingerName = "";
+        compare(named(view, "lyricCurrentSinger").text, "Shantyman");
+    }
+
+    function test_aPlainDuetFileSaysWhoSingsEachLineInWords() {
+        const file = TestServices.writeTextFile("plainduet.lrc", [
+            "[v1:Shantyman]", "[v2:Crew]",
+            "V1: Oh the times are hard", "V2: Leave her, Johnny", "No one in particular", ""].join("\n"));
+        verify(file.length > 0);
+        KaraokeController.load(file.replace(/[.]lrc$/, ".ac3"), 20000);
+        const view = newView();
+        compare(view.status, "plain");
+        const shown = named(view, "lyricPlainText").text;
+        compare(shown, ["Shantyman: Oh the times are hard", "Crew: Leave her, Johnny", "No one in particular"].join("\n"));
+    }
+
+    function test_aSoloFileHasNoSingerTags() {
+        const view = loaded(newView(), 1500);
+        compare(KaraokeController.hasSingers, false);
+        compare(view.duet, false);
+        const current = named(view, "lyricCurrentSinger");
+        verify(current !== null);
+        compare(current.visible, false);
+    }
+
+    function test_theGuideAndYouFollowTheVocalsThatPlay() {
+        writeDuet();
+        const duetItem = TestServices.writeAc3Stream("duet.ac3", "karaoke-3/2");
+        verify(duetItem.length > 0, "the stream could not be written");
+        KaraokeController.firstSingerName = "";
+        KaraokeController.secondSingerName = "";
+        HearthController.setLayoutText("5.1");
+        tryVerify(function() { return HearthController.speakerLabels.length === 6; }, 10000);
+        HearthController.addFiles([duetItem]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000);
+        HearthController.playItem(0);
+        tryCompare(HearthController, "state", "playing", 10000);
+        tryVerify(function() { return HearthController.currentMedia.codec !== undefined; }, 10000);
+        KaraokeController.load(duetItem, 20000);
+        const view = newView();
+        view.positionMs = 1500;
+
+        function settle(values) {
+            const next = Object.assign({}, HearthController.decoderSettings, values);
+            HearthController.setDecoderSettings(next);
+            tryVerify(function() {
+                for (const key in values) {
+                    if (HearthController.decoderSettings[key] !== values[key]) { return false; }
+                }
+                return true;
+            }, 10000);
+        }
+        function cues() {
+            // The tags of the line being sung and the two after it.
+            const out = [named(view, "lyricCurrentSinger").text];
+            H.find(view, function(item) {
+                if (item.objectName === "lyricNextSinger") { out.push(item.text); }
+                return false;
+            });
+            return out;
+        }
+
+        // Aware plays every vocal the stream has: all are the guide's.
+        const win = openPage();
+        const summary = function() { return named(win, "duetSummary").text; };
+        settle({ karaoke: "aware", karaokeVocals: "both" });
+        tryCompare(view, "karaokeStream", true, 10000);
+        tryVerify(function() { return summary() === qsTr("Both vocals play, so %1 and %2 are both in the mix.")
+                                                      .arg("Shantyman").arg("Crew"); }, 5000);
+        tryVerify(function() { return cues()[0] === "Shantyman \u00b7 guide"; }, 5000);
+        // Capable with the first vocal: the shantyman's lines are the guide's, the crew's are yours.
+        settle({ karaoke: "capable", karaokeVocals: "v1" });
+        tryVerify(function() { return cues()[0] === "Shantyman \u00b7 guide"; }, 5000);
+        compare(cues()[1], "Crew \u00b7 you");
+        compare(cues()[2], "Shantyman + Crew \u00b7 shared");
+        tryVerify(function() { return summary() === qsTr("The vocal of %1 plays: you sing the lines of %2.")
+                                                      .arg("Shantyman").arg("Crew"); }, 5000);
+        // The second vocal: the other way round.
+        settle({ karaokeVocals: "v2" });
+        tryVerify(function() { return cues()[0] === "Shantyman \u00b7 you"; }, 5000);
+        compare(cues()[1], "Crew \u00b7 guide");
+        tryVerify(function() { return summary() === qsTr("The vocal of %1 plays: you sing the lines of %2.")
+                                                      .arg("Crew").arg("Shantyman"); }, 5000);
+        // No vocal: every line is yours.
+        settle({ karaokeVocals: "none" });
+        tryVerify(function() { return cues()[0] === "Shantyman \u00b7 you"; }, 5000);
+        compare(cues()[1], "Crew \u00b7 you");
+        compare(cues()[2], "Shantyman + Crew \u00b7 you");
+        tryVerify(function() { return summary() === qsTr("No vocal plays: you sing the lines of %1 and of %2.")
+                                                      .arg("Shantyman").arg("Crew"); }, 5000);
+        settle({ karaoke: "aware", karaokeVocals: "both" });
+    }
+
+    function test_theKaraokePageNamesTheSingersAndSaysWhatTheChoiceLeavesForYou() {
+        const duetItem = writeDuet();
+        KaraokeController.firstSingerName = "";
+        KaraokeController.secondSingerName = "";
+        const win = openPage();
+        KaraokeController.load(duetItem, 20000);
+        const block = named(win, "duetBlock");
+        verify(block !== null);
+        tryVerify(function() { return named(win, "duetBlock").visible; }, 5000);
+        // The file's names are what the fields suggest; nothing is typed.
+        compare(named(win, "firstSingerField").placeholderText, "Shantyman");
+        compare(named(win, "secondSingerField").placeholderText, "Crew");
+        compare(named(win, "firstSingerField").text, "");
+        // Typing a name is the controller's name, for the run.
+        const field = named(win, "firstSingerField");
+        field.text = "Anna";
+        field.editingFinished();
+        compare(KaraokeController.firstSingerName, "Anna");
+        compare(KaraokeController.firstSingerLabel, "Anna");
+        // Not a karaoke stream that is playing, so there is no guide to say anything of.
+        compare(named(win, "duetSummary").text,
+                qsTr("The lines are marked for %1 and for %2.").arg("Anna").arg("Crew"));
+        KaraokeController.firstSingerName = "";
+        compare(named(win, "firstSingerField").text, "");
     }
 
     // --- Settings ------------------------------------------------------------

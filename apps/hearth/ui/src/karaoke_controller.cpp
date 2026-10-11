@@ -80,6 +80,14 @@ constexpr auto kReactionKey = "karaoke/reactionMs";
     map.insert(QStringLiteral("startMs"), static_cast<qlonglong>(line.start_ms));
     map.insert(QStringLiteral("endMs"), static_cast<qlonglong>(line.end_ms));
     map.insert(QStringLiteral("wordTimed"), line.word_timed());
+    QString singer;
+    switch (line.singer) {
+        case iclforge::lyrics::Singer::kFirst: singer = QStringLiteral("v1"); break;
+        case iclforge::lyrics::Singer::kSecond: singer = QStringLiteral("v2"); break;
+        case iclforge::lyrics::Singer::kBoth: singer = QStringLiteral("both"); break;
+        case iclforge::lyrics::Singer::kUnmarked: break;
+    }
+    map.insert(QStringLiteral("singer"), singer);
     QVariantList words;
     words.reserve(static_cast<qsizetype>(line.words.size()));
     for (const LyricWord& word : line.words) {
@@ -143,7 +151,40 @@ void KaraokeController::clear_lyrics() {
     title_.clear();
     artist_.clear();
     word_timed_ = false;
+    has_singers_ = false;
+    file_first_name_.clear();
+    file_second_name_.clear();
     lines_.clear();
+}
+
+QString KaraokeController::firstSingerLabel() const {
+    return !first_name_.isEmpty() ? first_name_
+           : !file_first_name_.isEmpty() ? file_first_name_
+                                         : QStringLiteral("V1");
+}
+
+QString KaraokeController::secondSingerLabel() const {
+    return !second_name_.isEmpty() ? second_name_
+           : !file_second_name_.isEmpty() ? file_second_name_
+                                          : QStringLiteral("V2");
+}
+
+void KaraokeController::setFirstSingerName(const QString& name) {
+    const QString trimmed = name.trimmed();
+    if (trimmed == first_name_) {
+        return;
+    }
+    first_name_ = trimmed;
+    emit singerNamesChanged();
+}
+
+void KaraokeController::setSecondSingerName(const QString& name) {
+    const QString trimmed = name.trimmed();
+    if (trimmed == second_name_) {
+        return;
+    }
+    second_name_ = trimmed;
+    emit singerNamesChanged();
 }
 
 void KaraokeController::load(const QString& itemPath, qlonglong durationMs) {
@@ -167,6 +208,9 @@ void KaraokeController::load(const QString& itemPath, qlonglong durationMs) {
                 status_ = lyrics.timed ? QStringLiteral("timed") : QStringLiteral("plain");
                 title_ = from_utf8(lyrics.title);
                 artist_ = from_utf8(lyrics.artist);
+                file_first_name_ = from_utf8(lyrics.first_singer_name);
+                file_second_name_ = from_utf8(lyrics.second_singer_name);
+                has_singers_ = iclforge::lyrics::has_singers(lyrics);
                 lines_.reserve(static_cast<qsizetype>(lyrics.lines.size()));
                 for (const LyricLine& line : lyrics.lines) {
                     word_timed_ = word_timed_ || line.word_timed();
@@ -179,6 +223,7 @@ void KaraokeController::load(const QString& itemPath, qlonglong durationMs) {
         }
     }
     emit lyricsChanged();
+    emit singerNamesChanged();
 }
 
 QVariantMap KaraokeController::cursor(qlonglong positionMs) const {

@@ -105,9 +105,38 @@ LRC is an informal format; what Hearth reads is:
 | `<mm:ss.xx>` before a word | The **word-timed** form: the word starts at that time and runs to the next word's tag, and a line's last word runs to the next line. |
 | `[offset:+/-ms]` | Shifts every time. A positive value makes the lyrics appear sooner. |
 | `[ti:]` `[ar:]` `[al:]` `[by:]` `[length:mm:ss]` | Kept for display. |
+| `V1:` `V2:` `V1+V2:` at the start of a line | A **duet**: which vocal sings the line (see below). Not shown as text. |
+| `[v1:name]` `[v2:name]` | What the file calls the two singers. |
 
 The text is **UTF-8**, with or without a byte-order mark. A file in another encoding is not shown,
 and the page says so; playback is not affected.
+
+### A duet
+
+A karaoke stream has two vocals, and a duet's lines can say which sings each:
+
+```text
+[v1:Shantyman]
+[v2:Crew]
+[00:12.00]V1: Oh, the times are hard and the wages low
+[00:16.00]V2: Leave her, Johnny, leave her
+[00:20.00]V1+V2: It's time for us to leave her
+```
+
+The marker is the first thing after the time (before any `<mm:ss.xx>` word tag), in either case,
+with spaces allowed round the `+` and after the colon. A line with no marker is for nobody in
+particular. A plain file with no times may carry the markers too, so that a duet's text can be
+marked before it is timed.
+
+Where a file marks its lines, the Karaoke page has two name fields. A name typed there is for this
+run of Hearth only, never kept for a song, and comes before the file's `[v1:]` and `[v2:]`, which
+come before "V1" and "V2". Every line then says who sings it, three ways: the **name** above it, the
+**side** (the second singer's lines are indented, the first's are not) and the **colour**. On a
+karaoke stream the name also says whose line it is for you: **guide** when the vocal that is playing
+sings it, **you** when it does not, and **shared** when it is a line for both and only one of the
+two plays. A sentence under the names says the same for the whole file ("The vocal of Shantyman
+plays: you sing the lines of Crew."), which is what choosing **V1**, **V2**, **None** or **Both**
+under Capable changes.
 
 ### What is shown
 
