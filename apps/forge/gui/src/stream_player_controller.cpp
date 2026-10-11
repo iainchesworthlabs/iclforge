@@ -14,6 +14,8 @@
 
 #include "iclforge/audio/monitor.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/ac3/decoder/output.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
@@ -83,6 +85,30 @@ struct DecodeOutcome {
     QString error;  // empty on success
     std::shared_ptr<RawResult> result;
 };
+
+// How an AC-3 karaoke stream is to be reproduced (planning/karaoke.md, P2):
+// the decoder's OutputConfig fields, kOff being the coded channels.
+struct KaraokeChoice {
+    iclforge::ac3::KaraokeReproduction reproduction = iclforge::ac3::KaraokeReproduction::kOff;
+    iclforge::ac3::KaraokeVocals vocals = iclforge::ac3::KaraokeVocals::kBoth;
+};
+
+KaraokeChoice karaoke_choice_of(const QString& reproduction, const QString& vocals) {
+    KaraokeChoice out;
+    if (reproduction == QLatin1String("aware")) {
+        out.reproduction = iclforge::ac3::KaraokeReproduction::kAware;
+    } else if (reproduction == QLatin1String("capable")) {
+        out.reproduction = iclforge::ac3::KaraokeReproduction::kCapable;
+    }
+    if (vocals == QLatin1String("none")) {
+        out.vocals = iclforge::ac3::KaraokeVocals::kNone;
+    } else if (vocals == QLatin1String("v1")) {
+        out.vocals = iclforge::ac3::KaraokeVocals::kV1;
+    } else if (vocals == QLatin1String("v2")) {
+        out.vocals = iclforge::ac3::KaraokeVocals::kV2;
+    }
+    return out;
+}
 
 // AC-4 through iclforge::ac4::Decoder's public API, as `forge play` (monitor_ac4 in
 // apps/forge/cli/src/commands/live_audio.cpp) and Hearth's engine decode it: the
@@ -200,7 +226,8 @@ bool decode_ac4_to_memory(const QString& path, std::span<const std::byte> stream
 // thread, mirroring ObjectDecodeController::inspectFile/
 // QcController::measureFile.
 DecodeOutcome decode_stream_to_memory(const QString& path,
-                                      std::optional<std::size_t> presentation) {
+                                      std::optional<std::size_t> presentation,
+                                      const KaraokeChoice& karaoke_choice) {
     DecodeOutcome outcome;
     std::ifstream in{path.toStdString(), std::ios::binary};
     if (!in) {
@@ -352,7 +379,10 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
             return outcome;
         }
         result->codec_label = QStringLiteral("AC-3");
-        iclforge::ac3::FrameDecoder decoder;
+        iclforge::ac3::DecoderConfig config;
+        config.output.karaoke = karaoke_choice.reproduction;
+        config.output.karaoke_vocals = karaoke_choice.vocals;
+        iclforge::ac3::FrameDecoder decoder{config};
         std::vector<std::size_t> order;
         bool have_first = false;
         double time_s = 0.0;
@@ -367,8 +397,22 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
             if (!have_first) {
                 have_first = true;
                 result->sample_rate_hz = iclforge::ac3::sample_rate_hz(decoded->sample_rate);
-                result->acmod = decoded->acmod;
-                result->lfe = decoded->lfe;
+                // The layout the frame comes OUT in: for a karaoke stream under
+                // Annex C's reproduction that is 3/0 (L, C, R and the LFE), not
+                // the coded one, and the buffers below are that wide. The
+                // output stage is the one that decides, so this asks it, as
+                // `forge decode` does.
+                const bool karaoke = iclforge::ac3::meta::is_karaoke(
+                    static_cast<iclforge::ac3::meta::BitstreamMode>(decoded->bsmod), decoded->acmod);
+                const auto mode = iclforge::ac3::output_mode(config.output, decoded->acmod,
+                                                             decoded->lfe, karaoke);
+                result->karaoke = karaoke;
+                result->karaoke_reproduced =
+                    karaoke && config.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff;
+                result->coded_layout_label =
+                    to_qstring(iclforge::ac3::analysis::layout_name(decoded->acmod, decoded->lfe));
+                result->acmod = mode.acmod;
+                result->lfe = mode.lfe;
                 result->layout_label =
                     to_qstring(iclforge::ac3::analysis::layout_name(result->acmod, result->lfe));
                 result->locations = forge_gui::ac3_bed_locations(result->acmod, result->lfe);
@@ -378,7 +422,7 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
                         order[i] = i;
                     }
                 } else {
-                    order = iclforge::ac3::io::wav_channel_order(decoded->acmod, decoded->lfe);
+                    order = iclforge::ac3::io::wav_channel_order(result->acmod, result->lfe);
                 }
             }
             if (result->sample_rate_hz > 0) {
@@ -419,8 +463,17 @@ QString StreamPlayerController::summaryLine() const {
     if (!result_) {
         return QString();
     }
+    // A karaoke stream says so, and what the decode turned it into: its parts
+    // are not speakers until Annex C's reproduction puts them there.
+    QString layout = result_->layout_label;
+    if (result_->karaoke) {
+        layout = result_->karaoke_reproduced
+                     ? QStringLiteral("karaoke %1 coded, reproduced as %2")
+                           .arg(result_->coded_layout_label, result_->layout_label)
+                     : QStringLiteral("karaoke %1").arg(result_->layout_label);
+    }
     auto line = QStringLiteral("%1 · %2 · %3 Hz · %4 frame(s) · %5 s")
-                    .arg(result_->codec_label, result_->layout_label)
+                    .arg(result_->codec_label, layout)
                     .arg(result_->sample_rate_hz)
                     .arg(result_->unit_count)
                     .arg(result_->duration_seconds, 0, 'f', 2);
@@ -543,6 +596,43 @@ void StreamPlayerController::setPresentationIndex(int index) {
     }
 }
 
+void StreamPlayerController::setKaraokeReproduction(const QString& name) {
+    const bool known = name == QLatin1String("asCoded") || name == QLatin1String("aware") ||
+                       name == QLatin1String("capable");
+    if (!known || name == karaoke_reproduction_) {
+        return;
+    }
+    karaoke_reproduction_ = name;
+    emit karaokeChanged();
+    redecodeForKaraoke();
+}
+
+void StreamPlayerController::setKaraokeVocals(const QString& name) {
+    const bool known = name == QLatin1String("none") || name == QLatin1String("v1") ||
+                       name == QLatin1String("v2") || name == QLatin1String("both");
+    if (!known || name == karaoke_vocals_) {
+        return;
+    }
+    karaoke_vocals_ = name;
+    emit karaokeChanged();
+    redecodeForKaraoke();
+}
+
+void StreamPlayerController::redecodeForKaraoke() {
+    // Only a karaoke stream decodes to anything else for the choice; the
+    // others keep what is already in memory, and the position with it. A
+    // decode in flight is not interrupted, and the choice is not lost: it is
+    // decoded again when that one lands (see decodePath()).
+    if (busy_) {
+        karaoke_redecode_pending_ = true;
+        return;
+    }
+    if (result_ && result_->karaoke && !file_path_.isEmpty()) {
+        pause();
+        decodePath(file_path_);
+    }
+}
+
 void StreamPlayerController::decodePath(const QString& path) {
     busy_ = true;
     emit busyChanged();
@@ -550,8 +640,9 @@ void StreamPlayerController::decodePath(const QString& path) {
         presentation_index_ >= 0
             ? std::optional<std::size_t>{static_cast<std::size_t>(presentation_index_)}
             : std::nullopt;
-    jobs_.run([this, path, presentation] {
-        auto outcome = decode_stream_to_memory(path, presentation);
+    const KaraokeChoice choice = karaoke_choice_of(karaoke_reproduction_, karaoke_vocals_);
+    jobs_.run([this, path, presentation, choice] {
+        auto outcome = decode_stream_to_memory(path, presentation, choice);
         QMetaObject::invokeMethod(this, [this, outcome = std::move(outcome)]() mutable {
             busy_ = false;
             error_ = outcome.error;
@@ -564,6 +655,12 @@ void StreamPlayerController::decodePath(const QString& path) {
             emit resultChanged();
             emit positionChanged();
             emit levelsChanged();
+            if (karaoke_redecode_pending_) {
+                karaoke_redecode_pending_ = false;
+                if (result_ && result_->karaoke && !file_path_.isEmpty()) {
+                    decodePath(file_path_);
+                }
+            }
         });
     });
 }

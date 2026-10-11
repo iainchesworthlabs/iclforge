@@ -39,6 +39,10 @@ qt_add_executable(forge-gui
     src/ac4_encode_settings.hpp
     src/ac4_presentations.cpp
     src/ac4_presentations.hpp
+    src/karaoke_authoring.cpp
+    src/karaoke_authoring.hpp
+    src/karaoke_authoring_controller.cpp
+    src/karaoke_authoring_controller.hpp
     ../../shared/media/src/ac4_sync_word.hpp
     ../../shared/media/src/fmp4_folder_writer.cpp
     ../../shared/media/src/fmp4_folder_writer.hpp
@@ -124,6 +128,7 @@ set(AC3_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/VbrPanel.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Ac4Panel.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/GuidedWizard.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/KaraokeFlow.qml"
     "${ICLFORGE_GUI_SHARED_DIR}/RailBlock.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AssignmentPanel.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/FirstRunScreen.qml"

@@ -6763,6 +6763,15 @@ QVariantList EncoderController::sourceModel() const {
                                               .arg(static_cast<int>(seconds) % 60, 2, 10,
                                                    QLatin1Char('0'));
         row[QStringLiteral("offsetSeconds")] = offset_seconds;
+        // The speakers the file says its channels are (its WAVE_FORMAT_
+        // EXTENSIBLE mask), Table E2.5's short names in channel order -
+        // empty when it says none and the channel count is all there is to
+        // go on. The Karaoke flow's one-file path reads the mode from it.
+        QStringList speakers;
+        for (const auto location : stated_locations(wav)) {
+            speakers.append(to_qstring(iclforge::ac3::eac3::chanmap::name(location)));
+        }
+        row[QStringLiteral("speakers")] = speakers;
         // "44.1→48 k" when addSourceFile had to resample this source onto
         // the primary's rate, empty otherwise - see addSourceFile's own
         // comment.

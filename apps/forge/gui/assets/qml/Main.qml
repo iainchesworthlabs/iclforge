@@ -332,6 +332,10 @@ ApplicationWindow {
     // Guided is a step-by-step wrapper over the SAME rules — one more
     // StackLayout page, not a separate mode with its own draft state.
     property string tier: "guided"
+    // Guided and Karaoke are each a surface of their own - a step bar and a
+    // Back/Next footer pinned over the step's content - in place of the tab
+    // bar and the scrolling tab pages the other tiers share.
+    readonly property bool ownSurface: tier === "guided" || tier === "karaoke"
     property string currentTab: "format"
     // "coded" | "rendered" — the fourteen-rows-for-twelve-speakers question
     // turned into a mode rather than a puzzle.
@@ -343,6 +347,9 @@ ApplicationWindow {
     property bool everHadSource: EncoderController.sourceModel.length > 0
                                  || EncoderController.recording
                                  || EncoderController.liveActive
+                                 // The Karaoke flow is where its own first source
+                                 // is chosen, so its surface is the empty state.
+                                 || tier === "karaoke"
     // Guided's jump into the full assignment table keeps a way back — the
     // round trip is lossless because both surfaces edit the same state.
     property bool fromGuided: false
@@ -1568,6 +1575,9 @@ ApplicationWindow {
                     { value: "guided", label: qsTr("Guided") },
                     { value: "advanced", label: qsTr("Advanced") },
                     { value: "expert", label: qsTr("Expert") },
+                    // A flow for one kind of programme (Annex C karaoke), over
+                    // the same draft as the others.
+                    { value: "karaoke", label: qsTr("Karaoke") },
                 ]
                 currentValue: window.tier
                 onSelected: (value) => window.tier = value
@@ -2734,7 +2744,7 @@ ApplicationWindow {
                     // that a larger text size moves the rule rather than
                     // clipping the labels against it.
                     Layout.preferredHeight: Math.round(40 * Theme.fontScale)
-                    visible: window.tier !== "guided"
+                    visible: !window.ownSurface
                     spacing: 28
 
                     Repeater {
@@ -2819,7 +2829,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 2
                     color: Theme.divider
-                    visible: window.tier !== "guided"
+                    visible: !window.ownSurface
                 }
 
                 // ---- tab content ------------------------------------------
@@ -2829,7 +2839,7 @@ ApplicationWindow {
                 ScrollView {
                     id: tabScrollView
                     objectName: "tabScroll"
-                    visible: window.tier !== "guided"
+                    visible: !window.ownSurface
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     contentWidth: availableWidth
@@ -7214,6 +7224,17 @@ ApplicationWindow {
                 GuidedWizard {
                     id: guidedWizard
                     visible: window.tier === "guided"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                }
+
+                // =====================================================
+                // Karaoke flow - the same kind of surface (KaraokeFlow.qml):
+                // parts, levels, hear it, save.
+                // =====================================================
+                KaraokeFlow {
+                    id: karaokeFlow
+                    visible: window.tier === "karaoke"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
