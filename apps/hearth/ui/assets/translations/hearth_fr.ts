@@ -5126,12 +5126,12 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2388"/>
+        <location filename="../../src/hearth_controller.cpp" line="2391"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2391"/>
+        <location filename="../../src/hearth_controller.cpp" line="2394"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5139,12 +5139,12 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::NetworkController</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="914"/>
+        <location filename="../../src/network_controller.cpp" line="920"/>
         <source>it could not be read: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="917"/>
+        <location filename="../../src/network_controller.cpp" line="923"/>
         <source>it is %1 bytes, more than any sink&apos;s app slot holds</source>
         <translation type="unfinished"></translation>
     </message>

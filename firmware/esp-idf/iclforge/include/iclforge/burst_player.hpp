@@ -104,6 +104,15 @@ struct BurstPlayerConfig {
     // The decode task's stack, which the decoder needs most of
     // (PlayerConfig::decode_stack_bytes has the measurements).
     std::uint32_t stack_bytes = 32768;
+    // The decode task's stack in PSRAM where there is PSRAM, for a part whose internal RAM is what
+    // Wi-Fi leaves it: an ESP32-S3 with Wi-Fi and the player up has no internal block over 31,744
+    // bytes, which is less than `stack_bytes`, and a stack that fits one boot stops fitting when a
+    // few bytes more are allocated before the task starts (the Sendspin player's start is later than
+    // Wi-Fi's, mDNS's and the control server's). The stack is then read through the data cache
+    // (PlayerConfig::decode_stack_in_psram has the measurements). Needs
+    // CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM, and falls back to internal RAM without PSRAM. The
+    // task parks at its end and stop() deletes it with vTaskDeleteWithCaps().
+    bool stack_in_psram = false;
     // A sendspin.progress line on the console every this many chunks while a
     // stream plays, as well as the closing line; 0 for the closing line only.
     std::uint32_t report_every_chunks = 0;

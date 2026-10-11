@@ -677,3 +677,138 @@ TEST_CASE("iclforge_player: settings checked against the support object", "[send
               before_levels)
               .empty());
 }
+
+TEST_CASE("iclforge_player: the lyric document, as a command", "[sendspin][iclforge][lyrics]") {
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = ac::LyricsDocument{.item = 7, .text = "[00:01.00]Should auld\n[00:03.50]\"Be\" forgot\\\n"};
+    const std::string text = written(document, ac::write_command);
+    CHECK(text ==
+          R"({"command":"lyrics","lyrics":{"item":7,"text":"[00:01.00]Should auld\n[00:03.50]\"Be\" forgot\\\n"}})");
+    const Parsed parsed(text);
+    const auto read = ac::read_command(parsed.root());
+    REQUIRE(read.has_value());
+    CHECK(read->command == ac::Command::kLyrics);
+    CHECK(read->lyrics.item == 7);
+    CHECK(read->lyrics.text == document.lyrics.text);
+
+    // An empty text takes the item's lyrics away, and is a document like any other.
+    document.lyrics.text.clear();
+    const auto cleared = ac::read_command(Parsed(written(document, ac::write_command)).root());
+    REQUIRE(cleared.has_value());
+    CHECK(cleared->lyrics.text.empty());
+
+    // The text fits one message, or the command is refused.
+    document.lyrics.text.assign(ac::kMaxLyricsBytes, 'x');
+    CHECK(ac::read_command(Parsed(written(document, ac::write_command)).root()).has_value());
+    document.lyrics.text.assign(ac::kMaxLyricsBytes + 1, 'x');
+    CHECK_FALSE(ac::read_command(Parsed(written(document, ac::write_command)).root()).has_value());
+
+    const auto refused = [](std::string source) {
+        return !ac::read_command(Parsed(std::move(source)).root()).has_value();
+    };
+    CHECK(refused(R"({"command":"lyrics"})"));
+    CHECK(refused(R"({"command":"lyrics","lyrics":{"text":"x"}})"));
+    CHECK(refused(R"({"command":"lyrics","lyrics":{"item":-1,"text":"x"}})"));
+    CHECK(refused(R"({"command":"lyrics","lyrics":{"item":1}})"));
+    CHECK(refused(R"({"command":"lyrics","lyrics":{"item":1,"text":4}})"));
+}
+
+TEST_CASE("iclforge_player: where the sound is in the lyrics", "[sendspin][iclforge][lyrics]") {
+    ac::CommandMessage position;
+    position.command = ac::Command::kLyricsPosition;
+    position.lyrics_position =
+        ac::LyricsAnchor{.item = 7, .position_ms = 12500, .at_us = 9000000123, .speed = 1.0};
+    const std::string text = written(position, ac::write_command);
+    CHECK(text == R"({"command":"lyrics_position","lyrics_position":{"item":7,"position_ms":12500,)"
+                  R"("at_us":9000000123,"speed":1}})");
+    const auto read = ac::read_command(Parsed(text).root());
+    REQUIRE(read.has_value());
+    CHECK(read->command == ac::Command::kLyricsPosition);
+    CHECK(read->lyrics_position.item == 7);
+    CHECK(read->lyrics_position.position_ms == 12500);
+    CHECK(read->lyrics_position.at_us == 9000000123);
+    CHECK(read->lyrics_position.speed == 1.0);
+
+    // Held, as at a pause.
+    position.lyrics_position.speed = 0.0;
+    const auto held = ac::read_command(Parsed(written(position, ac::write_command)).root());
+    REQUIRE(held.has_value());
+    CHECK(held->lyrics_position.speed == 0.0);
+
+    const auto refused = [](std::string source) {
+        return !ac::read_command(Parsed(std::move(source)).root()).has_value();
+    };
+    const std::string good = R"({"command":"lyrics_position","lyrics_position":{"item":7,"position_ms":0,)"
+                             R"("at_us":1,"speed":1}})";
+    CHECK_FALSE(refused(good));
+    CHECK(refused(R"({"command":"lyrics_position"})"));
+    CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"item":7,"position_ms":-1,"at_us":1,"speed":1}})"));
+    CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"item":7,"position_ms":0,"at_us":-1,"speed":1}})"));
+    CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"item":-1,"position_ms":0,"at_us":1,"speed":1}})"));
+    CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"item":7,"position_ms":0,"at_us":1,"speed":-0.5}})"));
+    CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"item":7,"position_ms":0,"at_us":1,"speed":4.5}})"));
+    CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"item":7,"position_ms":4233600001,"at_us":1,"speed":1}})"));
+    CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"item":7,"position_ms":0,"at_us":1}})"));
+    CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"position_ms":0,"at_us":1,"speed":1}})"));
+}
+
+TEST_CASE("iclforge_player: what a sink says of the lyrics it holds", "[sendspin][iclforge][lyrics]") {
+    // The size the sink holds, in the support object, after the limits the other keys state.
+    ac::Support support = board_support();
+    CHECK(written(support, ac::write_support).find("\"lyrics\"") == std::string::npos);
+    support.lyrics_max_bytes = 16384;
+    const std::string text = written(support, ac::write_support);
+    CHECK(text.find(R"("lyrics":{"max_bytes":16384})") != std::string::npos);
+    const auto read = ac::read_support(Parsed(text).root());
+    REQUIRE(read.has_value());
+    CHECK(read->lyrics_max_bytes == 16384);
+    // A sink from before the key has none, which a server reads as "takes no lyrics".
+    const auto silent = ac::read_support(Parsed(written(board_support(), ac::write_support)).root());
+    REQUIRE(silent.has_value());
+    CHECK(silent->lyrics_max_bytes == 0);
+
+    const auto with_lyrics = [&](const std::string& value) {
+        std::string source = written(board_support(), ac::write_support);
+        source.pop_back();
+        return ac::read_support(Parsed(source + R"(,"lyrics":)" + value + "}").root());
+    };
+    CHECK(with_lyrics(R"({"max_bytes":1})").has_value());
+    CHECK(with_lyrics(R"({"max_bytes":60000})").has_value());
+    CHECK_FALSE(with_lyrics(R"({"max_bytes":0})"));
+    CHECK_FALSE(with_lyrics(R"({"max_bytes":60001})"));
+    CHECK_FALSE(with_lyrics(R"({})"));
+    CHECK_FALSE(with_lyrics("7"));
+
+    // The state: the item and the line, absent while the sink holds none.
+    ac::State state;
+    state.supported_commands = {ac::Command::kLyrics, ac::Command::kLyricsPosition};
+    CHECK(written(state, ac::write_state).find(R"("lyrics":{)") == std::string::npos);
+    CHECK(written(state, ac::write_state).find(R"("supported_commands":["lyrics","lyrics_position"])") !=
+          std::string::npos);
+    state.lyrics = ac::LyricsReport{.item = 7, .line = 3};
+    const std::string reported = written(state, ac::write_state);
+    CHECK(reported.ends_with(R"(,"lyrics":{"item":7,"line":3}})"));
+    const auto back = ac::read_state(Parsed(reported).root());
+    REQUIRE(back.has_value());
+    REQUIRE(back->lyrics.has_value());
+    CHECK(*back->lyrics == ac::LyricsReport{.item = 7, .line = 3});
+    CHECK(back->supported_commands.size() == 2);
+
+    // Before the first line is -1, and nothing below that is a line.
+    state.lyrics = ac::LyricsReport{.item = 7, .line = -1};
+    const auto before = ac::read_state(Parsed(written(state, ac::write_state)).root());
+    REQUIRE(before.has_value());
+    CHECK(before->lyrics->line == -1);
+    const auto with_state_lyrics = [&](const std::string& value) {
+        ac::State quiet;
+        quiet.supported_commands = {ac::Command::kLyrics};
+        std::string source = written(quiet, ac::write_state);
+        source.pop_back();
+        return ac::read_state(Parsed(source + R"(,"lyrics":)" + value + "}").root());
+    };
+    CHECK(with_state_lyrics(R"({"item":0,"line":0})").has_value());
+    CHECK_FALSE(with_state_lyrics(R"({"item":-1,"line":0})"));
+    CHECK_FALSE(with_state_lyrics(R"({"item":1,"line":-2})"));
+    CHECK_FALSE(with_state_lyrics(R"({"item":1})"));
+}

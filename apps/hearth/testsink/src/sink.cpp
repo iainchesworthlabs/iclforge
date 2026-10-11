@@ -18,6 +18,7 @@
 #include <variant>
 #include <vector>
 
+#include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
@@ -333,6 +334,33 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             case ac::Command::kIdentify:
                 // Not listed, so not sent.
                 break;
+            case ac::Command::kLyrics: {
+                // The document is parsed as a board would: held when it has lyrics, the item
+                // reported with the line -1 (this sink has no clock of its own to follow it by).
+                const bool held = !command.lyrics.text.empty() &&
+                                  iclforge::lyrics::parse_lyrics(command.lyrics.text).has_value();
+                if (held) {
+                    iclforge_state_.lyrics = ac::LyricsReport{.item = command.lyrics.item, .line = -1};
+                } else {
+                    iclforge_state_.lyrics.reset();
+                }
+                log("lyrics for item " + std::to_string(command.lyrics.item) + ": " +
+                    (held ? "held" : "none") + " (" + std::to_string(command.lyrics.text.size()) + " bytes)");
+                const std::lock_guard lock(sink_->roles_mutex_);
+                sink_->roles_.lyric_commands.push_back(command);
+                break;
+            }
+            case ac::Command::kLyricsPosition: {
+                const ac::LyricsAnchor& anchor = command.lyrics_position;
+                char text[96];
+                std::snprintf(text, sizeof text, "lyrics position item %lld: %lld ms, speed %.0f",
+                              static_cast<long long>(anchor.item), static_cast<long long>(anchor.position_ms),
+                              anchor.speed);
+                log(text);
+                const std::lock_guard lock(sink_->roles_mutex_);
+                sink_->roles_.lyric_commands.push_back(command);
+                break;
+            }
         }
         post_iclforge_state();
     }
@@ -613,6 +641,7 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         if (options_.max_objects) {
             support.max_objects.fill(options_.max_objects);
         }
+        support.lyrics_max_bytes = options_.lyrics_max_bytes;
         config.iclforge_support = std::move(support);
         // What the sink's streams are rendered to, as its own page would say.
         config.iclforge_state.layout = options_.layout;
@@ -623,6 +652,10 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         config.iclforge_state.supported_commands = {ac::Command::kVolume, ac::Command::kMute};
         if (options_.accept_settings || options_.karaoke) {
             config.iclforge_state.supported_commands.push_back(ac::Command::kSettings);
+        }
+        if (options_.lyrics_max_bytes != 0) {
+            config.iclforge_state.supported_commands.push_back(ac::Command::kLyrics);
+            config.iclforge_state.supported_commands.push_back(ac::Command::kLyricsPosition);
         }
     }
     for (const std::string& role : options_.other_roles) {
