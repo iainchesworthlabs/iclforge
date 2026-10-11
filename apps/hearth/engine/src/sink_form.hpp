@@ -32,6 +32,11 @@
 //      stream's type; its `sample_rates` list the stream's rate; and the
 //      stream has no more channels than the sink states it decodes of that
 //      type (`max_coded_channels`; none stated is no limit).
+//      Objects are a limit of their own: a sink that states how many it
+//      places (`max_objects`, per data type) and would place this stream's -
+//      its settings ask for objects, or leave it to its layout, which has
+//      height speakers - is sent PCM decoded here where that is possible, and
+//      the stream as it is, to be played as its bed, where it is not.
 //   2. Else PCM, if the sink offers `player@v1` with a PCM format that
 //      carries the stream's rate and if the policy allows it. The layout is
 //      the one the sink is configured to (its own reported `layout`, else the
@@ -69,6 +74,10 @@ struct StreamNeeds {
     // are its chosen presentation's). Zero when unknown, which is not compared
     // with the sink's limit.
     std::uint16_t coded_channels = 0;
+    // The most dynamic objects the programme places (ItemFacts::objects), which
+    // a sink's stated limit is compared with; 0 for a programme with none, or
+    // where it is not known.
+    std::uint16_t objects = 0;
     // The layout to send a sink that has said none of its own - a standard
     // player has none to say - which is the player's: such a sink then gets the
     // programme as the player renders it where it lists that width, and the

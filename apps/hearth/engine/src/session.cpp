@@ -8,16 +8,43 @@
 #include <span>
 #include <utility>
 
-#include "iclforge/ac3/core/tables.hpp"
-#include "iclforge/containers/iec61937/iec61937.hpp"
-#include "iclforge/render/layout.hpp"
 #include "ac4_stream.hpp"
+#include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/io/probe.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
+#include "iclforge/objects/oamd.hpp"
+#include "iclforge/render/layout.hpp"
 
 // See session.hpp.
 
 namespace iclforge::hearth {
 
 namespace {
+
+// The objects an E-AC-3 programme's JOC places: the count the decoder reconstructs, which is what a
+// sink's stated limit is about, and the figure a board enforces it on. Read from the object
+// metadata (OAMD) of the first units that carry any; the stream's declared complexity index less
+// its LFE where none of the first few does.
+constexpr std::size_t kUnitsToProbeForObjects = 8;
+
+[[nodiscard]] std::uint16_t objects_of(std::span<const std::span<const std::byte>> units,
+                                       std::optional<int> complexity_index) {
+    if (!complexity_index) {
+        return 0;
+    }
+    ac3::io::Prober prober;
+    const std::size_t count = std::min(units.size(), kUnitsToProbeForObjects);
+    for (std::size_t i = 0; i < count; ++i) {
+        if (!prober.push(units[i])) {
+            break;
+        }
+        if (const auto report = prober.report(); report.program) {
+            return static_cast<std::uint16_t>(
+                std::max(objects::oba::joc_object_count(*report.program), 0));
+        }
+    }
+    return static_cast<std::uint16_t>(std::max(*complexity_index - 1, 0));
+}
 
 // The link an AC-4 stream's bursts need: the smallest of IEC 61937-14's burst
 // types its largest frame fits at its frame rate, which the extension role
@@ -192,6 +219,7 @@ std::expected<Session, std::string> Session::open(
             session.programme_ = chosen->substreamid;
             session.first_programme_ = false;
             session.facts_.channels = static_cast<std::uint16_t>(std::max(chosen->channels, 0));
+            session.facts_.objects = objects_of(session.units_, chosen->oba_complexity_index);
             lengths.reserve(session.units_.size());
             for (const auto unit : session.units_) {
                 lengths.push_back(unit_samples(unit));
@@ -203,6 +231,8 @@ std::expected<Session, std::string> Session::open(
                                      : session.scanned_.programmes.front().substreamid;
             session.facts_.channels =
                 static_cast<std::uint16_t>(std::max(session.scanned_.channels, 0));
+            session.facts_.objects =
+                objects_of(session.units_, session.scanned_.oba_complexity_index);
             lengths = session.scanned_.access_unit_samples;
         }
         session.facts_.stream = format_of(session.scanned_.kind);
