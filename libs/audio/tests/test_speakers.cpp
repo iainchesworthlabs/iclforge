@@ -6,6 +6,7 @@
 
 #include "iclforge/audio/speakers.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
+#include "iclforge/ac3/encoder/plan.hpp"
 
 // iclforge::audio's speaker mask: WAVEFORMATEXTENSIBLE's positions against the
 // renderer's locations (libs/audio/src/speakers.cpp).
@@ -194,4 +195,56 @@ TEST_CASE("speakers: the routing grid's per-output names, in interleave order",
     CHECK(output_names(kSpeakers5_1, 2) == std::vector<std::string>{"FL", "FR"});
 
     CHECK(output_names(0, 0).empty());
+}
+
+// iclforge::ac3::plan reads and writes a WAV's dwChannelMask for the encoder
+// (plan::wav_mask_locations / wav_channel_mask), and cannot link this library:
+// iclforge::audio is the family's device layer, and the codec library stays
+// below it. The two must agree on every mask a file or a device actually
+// states - the SPEAKER_BACK_* pair above all - or a file read one way would be
+// played another.
+TEST_CASE("speakers: the encoder plan's reading of a mask is this library's",
+          "[audio-backend][speakers]") {
+    using namespace iclforge::audio;
+    namespace plan = iclforge::ac3::plan;
+
+    const std::uint32_t masks[] = {
+        kSpeakersMono,
+        kSpeakersStereo,
+        kSpeakerFrontLeft | kSpeakerFrontRight | kSpeakerFrontCentre,    // 3/0
+        kSpeakerFrontLeft | kSpeakerFrontRight | kSpeakerBackCentre,     // 2/1
+        kSpeakerFrontLeft | kSpeakerFrontRight | kSpeakerFrontCentre | kSpeakerBackCentre,  // 3/1
+        kSpeakersQuad,                                                   // 2/2, back pair
+        kSpeakerFrontLeft | kSpeakerFrontRight | kSpeakerSideLeft | kSpeakerSideRight,  // 2/2, sides
+        kSpeakerFrontLeft | kSpeakerFrontRight | kSpeakerFrontCentre | kSpeakerLowFrequency,
+        kSpeakers5_1,                                                    // back pair
+        kSpeakerFrontLeft | kSpeakerFrontRight | kSpeakerFrontCentre | kSpeakerLowFrequency |
+            kSpeakerSideLeft | kSpeakerSideRight,                        // sides
+        kSpeakers7_1,
+        kSpeakers5_1_2,
+        kSpeakers5_1_4,
+        kSpeakers7_1_2,
+        kSpeakers7_1_4,
+    };
+    for (const auto mask : masks) {
+        INFO("mask 0x" << std::hex << mask);
+        const auto here = locations_of(mask);
+        const auto there = plan::wav_mask_locations(mask, speaker_count(mask));
+        REQUIRE(there.has_value());
+        CHECK(*there == here);
+        // And what the plan writes for those locations is what this library
+        // writes - for the lists a file can actually carry in that order.
+        if (here.size() >= 3) {
+            const auto written = plan::wav_channel_mask(here);
+            if (written != 0) {
+                CHECK(written == speakers_of(here));
+            }
+        }
+    }
+
+    // A mask the plan cannot place, this library leaves a gap for: both say
+    // "no location" for SPEAKER_TOP_BACK_CENTRE.
+    const std::uint32_t with_tbc = kSpeakerFrontLeft | kSpeakerFrontRight | kSpeakerTopBackCentre;
+    CHECK(locations_of(with_tbc).size() == 2);
+    CHECK_FALSE(plan::wav_mask_locations(with_tbc, 3).has_value());
 }

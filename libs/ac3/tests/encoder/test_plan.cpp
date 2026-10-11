@@ -1578,3 +1578,400 @@ TEST_CASE("an AC-3 plan encodes real audio the AC-3 decoder reads back") {
         CHECK(decoded->lfe);
     }
 }
+
+// ---------------------------------------------------------------------------
+// A source that states where its channels are
+// ---------------------------------------------------------------------------
+//
+// A WAV's width is not its layout: three channels are 3/0 as L R C and 2/1 as
+// L R Cs, four are 2/2 as L R Ls Rs and 3/1 as L R C Cs, and a width-only
+// router has to pick one. route() with the source's own locations is told.
+
+namespace {
+
+namespace plan = iclforge::ac3::plan;
+namespace meta = iclforge::ac3::meta;
+
+// Which locations a named layout renders, each once: the bed's channels a
+// dependent replaces are one speaker, not two.
+std::vector<Location> rendered_once(plan::LayoutId id) {
+    std::vector<Location> out;
+    for (const auto& channel : plan::coded_channels(id)) {
+        if (std::ranges::find(out, channel.location) == out.end()) {
+            out.push_back(channel.location);
+        }
+    }
+    return out;
+}
+
+constexpr auto kClev = meta::CentreMixLevel::kMinus3dB;
+constexpr auto kSlev = meta::SurroundMixLevel::kMinus6dB;
+
+}  // namespace
+
+TEST_CASE("a list of locations names a layout when it renders exactly one",
+          "[locations][layout]") {
+    // Every named layout round-trips: its locations, as a mask, are that
+    // layout and no other. Dual mono is not a soundfield and is never one.
+    for (const auto& info : plan::kLayouts) {
+        if (info.id == plan::LayoutId::kDualMono) {
+            continue;
+        }
+        INFO(info.name);
+        const auto locations = rendered_once(info.id);
+        const auto mask = plan::channel_mask_of(locations);
+        REQUIRE(mask.has_value());
+        CHECK(plan::layout_for_locations(*mask) == info.id);
+    }
+
+    // The order a source lists them in does not matter to what they are.
+    const std::vector<Location> shuffled = {Location::kLfe,          Location::kRightSurround,
+                                            Location::kLeft,         Location::kLeftSurround,
+                                            Location::kCentre,       Location::kRight};
+    const auto mask = plan::channel_mask_of(shuffled);
+    REQUIRE(mask.has_value());
+    CHECK(plan::layout_for_locations(*mask) == plan::LayoutId::k51);
+
+    // Coding modes no preset names are still masks - they are the custom
+    // selections the encoder accepts - but are not a named layout.
+    for (const auto& modes : {std::vector<Location>{Location::kLeft, Location::kRight, Location::kCs},
+                              std::vector<Location>{Location::kLeft, Location::kCentre,
+                                                    Location::kRight, Location::kCs},
+                              std::vector<Location>{Location::kLeft, Location::kRight,
+                                                    Location::kLeftSurround,
+                                                    Location::kRightSurround},
+                              std::vector<Location>{Location::kLeft, Location::kCentre,
+                                                    Location::kRight}}) {
+        const auto custom = plan::channel_mask_of(modes);
+        REQUIRE(custom.has_value());
+        CHECK_FALSE(plan::layout_for_locations(*custom).has_value());
+    }
+}
+
+TEST_CASE("a list that is not a layout has no mask", "[locations][layout]") {
+    // A location named twice: which channel is "the" centre has no answer.
+    CHECK_FALSE(plan::channel_mask_of(std::vector<Location>{Location::kLeft, Location::kRight,
+                                                            Location::kLeft})
+                    .has_value());
+    // One half of a pair: Table E2.5 has a bit for both rear surrounds and none
+    // for either alone.
+    CHECK_FALSE(plan::channel_mask_of(std::vector<Location>{Location::kLeft, Location::kRight,
+                                                            Location::kLrs})
+                    .has_value());
+    CHECK_FALSE(plan::channel_mask_of(std::vector<Location>{Location::kVhl}).has_value());
+    // An empty list says nothing, and nothing is not a layout either.
+    const auto none = plan::channel_mask_of(std::vector<Location>{});
+    REQUIRE(none.has_value());
+    CHECK_FALSE(plan::layout_for_locations(*none).has_value());
+}
+
+TEST_CASE("a 2/1 source folds to stereo as 2/1, not as the 3/0 its width suggests",
+          "[locations][route]") {
+    const auto target = plan::channel_plan_for(plan::LayoutId::kStereo);
+    const std::vector<Location> stated = {Location::kLeft, Location::kRight, Location::kCs};
+    const auto routing = plan::route(target, stated, kClev, kSlev);
+    REQUIRE(routing.has_value());
+
+    // §7.8.2's own coefficients for 2/1: Lo = L + 0.707 * slev * S, Ro likewise.
+    const auto expected =
+        meta::stereo_downmix(iclforge::ac3::Acmod::k2_1, meta::coefficient(kClev),
+                             meta::coefficient(kSlev));
+    CHECK(routing->at(0, 0) == Approx(expected.left[0]));
+    CHECK(routing->at(1, 1) == Approx(expected.right[1]));
+    CHECK(routing->at(0, 2) == Approx(expected.left[2]));
+    CHECK(routing->at(1, 2) == Approx(expected.right[2]));
+    // Relative to L (both are normalised by the same 7.8.1 divisor): the lone
+    // surround sits at 0.707 * slev of a front channel.
+    CHECK(routing->at(0, 2) / routing->at(0, 0) ==
+          Approx(0.7071067811865476 * meta::coefficient(kSlev)));
+
+    // The width-only router can only call three channels L R C, so the same
+    // file's lone surround comes out at the CENTRE level - a different mix.
+    const auto by_count = plan::route(target, 3, kClev, kSlev);
+    REQUIRE(by_count.has_value());
+    CHECK(by_count->at(0, 2) / by_count->at(0, 0) == Approx(meta::coefficient(kClev)));
+    CHECK(by_count->at(0, 2) / by_count->at(0, 0) >
+          routing->at(0, 2) / routing->at(0, 0) * 1.5);
+}
+
+TEST_CASE("a 3/1 source keeps its centre a centre and its surround a surround",
+          "[locations][route]") {
+    const auto target = plan::channel_plan_for(plan::LayoutId::kStereo);
+    const std::vector<Location> stated = {Location::kLeft, Location::kCentre, Location::kRight,
+                                          Location::kCs};
+    const auto routing = plan::route(target, stated, kClev, kSlev);
+    REQUIRE(routing.has_value());
+    const auto expected =
+        meta::stereo_downmix(iclforge::ac3::Acmod::k3_1, meta::coefficient(kClev),
+                             meta::coefficient(kSlev));
+    // File order is L C R Cs; coded order for 3/1 is L C R S - the same.
+    for (int k = 0; k < 4; ++k) {
+        INFO("coded channel " << k);
+        CHECK(routing->at(0, k) == Approx(expected.left[static_cast<std::size_t>(k)]));
+        CHECK(routing->at(1, k) == Approx(expected.right[static_cast<std::size_t>(k)]));
+    }
+    // Relative to L: the centre at its level, the surround at 0.707 * slev.
+    CHECK(routing->at(0, 1) / routing->at(0, 0) == Approx(meta::coefficient(kClev)));
+    CHECK(routing->at(0, 3) / routing->at(0, 0) ==
+          Approx(0.7071067811865476 * meta::coefficient(kSlev)));
+}
+
+TEST_CASE("the stated locations decide where a file's channels sit, whatever order it lists them",
+          "[locations][route]") {
+    // The same four speakers as a 2/2 programme, listed R L Rs Ls: each file
+    // channel must still land on its own speaker.
+    const auto target = plan::channel_plan_for(plan::LayoutId::kStereo);
+    const std::vector<Location> stated = {Location::kRight, Location::kLeft,
+                                          Location::kRightSurround, Location::kLeftSurround};
+    const auto routing = plan::route(target, stated, kClev, kSlev);
+    REQUIRE(routing.has_value());
+    const auto expected =
+        meta::stereo_downmix(iclforge::ac3::Acmod::k2_2, meta::coefficient(kClev),
+                             meta::coefficient(kSlev));
+    // File channel 0 is R, so it feeds Ro at R's weight and Lo at L's (none).
+    CHECK(routing->at(1, 0) == Approx(expected.right[1]));
+    CHECK(routing->at(0, 0) == Approx(expected.left[1]));
+    CHECK(routing->at(0, 1) == Approx(expected.left[0]));
+    // File channel 3 is Ls: Lo only.
+    CHECK(routing->at(0, 3) == Approx(expected.left[2]));
+    CHECK(routing->at(1, 3) == Approx(expected.right[2]));
+}
+
+TEST_CASE("a 2/1 source reaches both surrounds of a 5.1 and not its centre",
+          "[locations][route]") {
+    const auto target = plan::channel_plan_for(plan::LayoutId::k51);
+    const std::vector<Location> stated = {Location::kLeft, Location::kRight, Location::kCs};
+    const auto routing = plan::route(target, stated, kClev, kSlev);
+    REQUIRE(routing.has_value());
+    // Coded order of a 5.1: L C R Ls Rs LFE.
+    CHECK(routing->at(1, 2) == Approx(0.0));  // C takes nothing of S
+    CHECK(routing->at(3, 2) > 0.0);           // Ls
+    CHECK(routing->at(4, 2) > 0.0);           // Rs
+    CHECK(routing->at(3, 2) == Approx(routing->at(4, 2)));
+    CHECK(routing->at(0, 0) == Approx(1.0));
+    CHECK(routing->at(2, 1) == Approx(1.0));
+
+    // By width the same file is L R C: its surround would be heard in the
+    // centre speaker.
+    const auto by_count = plan::route(target, 3, kClev, kSlev);
+    REQUIRE(by_count.has_value());
+    CHECK(by_count->at(1, 2) > 0.0);
+    CHECK(by_count->at(3, 2) == Approx(0.0));
+}
+
+TEST_CASE("two eight-channel files that state different speakers route differently",
+          "[locations][route]") {
+    // 7.1 and 5.1.2 are both eight channels. A width cannot tell them apart; a
+    // list of locations can, and the heights must not be read as rears.
+    const auto target = plan::channel_plan_for(plan::LayoutId::k71);
+    const std::vector<Location> seven_one = {
+        Location::kLeft,        Location::kRight, Location::kCentre, Location::kLfe,
+        Location::kLeftSurround, Location::kRightSurround, Location::kLrs, Location::kRrs};
+    const std::vector<Location> five_one_two = {
+        Location::kLeft,        Location::kRight, Location::kCentre, Location::kLfe,
+        Location::kLeftSurround, Location::kRightSurround, Location::kVhl, Location::kVhr};
+    const auto a = plan::route(target, seven_one, kClev, kSlev);
+    const auto b = plan::route(target, five_one_two, kClev, kSlev);
+    REQUIRE(a.has_value());
+    REQUIRE(b.has_value());
+    CHECK(a->source_channels == 8);
+    CHECK(b->source_channels == 8);
+    CHECK(a->gain != b->gain);
+
+    // The heights have no 7.1 speaker; they are folded in, not dropped.
+    double fed = 0.0;
+    for (int coded = 0; coded < b->coded_channels; ++coded) {
+        fed += b->at(coded, 6) + b->at(coded, 7);
+    }
+    CHECK(fed > 0.0);
+}
+
+TEST_CASE("a source that names a location twice, or none, is refused", "[locations][route]") {
+    const auto target = plan::channel_plan_for(plan::LayoutId::k51);
+    CHECK_FALSE(plan::route(target, std::span<const Location>{}, kClev, kSlev).has_value());
+    const std::vector<Location> twice = {Location::kLeft, Location::kRight, Location::kLeft};
+    CHECK_FALSE(plan::route(target, twice, kClev, kSlev).has_value());
+}
+
+TEST_CASE("dual mono takes two stated channels as Ch1 and Ch2 and no others", "[locations][route]") {
+    const auto target = plan::channel_plan_for(plan::LayoutId::kDualMono);
+    const std::vector<Location> two = {Location::kLeft, Location::kRight};
+    const auto routing = plan::route(target, two, kClev, kSlev);
+    REQUIRE(routing.has_value());
+    CHECK(routing->is_permutation());
+    const std::vector<Location> three = {Location::kLeft, Location::kRight, Location::kCentre};
+    CHECK_FALSE(plan::route(target, three, kClev, kSlev).has_value());
+}
+
+TEST_CASE("the count a width implies and the locations that say the same agree",
+          "[locations][route]") {
+    // For the widths where the count-based guess is right, naming the locations
+    // is the same routing: nothing about a file that was already read correctly
+    // may move.
+    struct Row {
+        std::size_t width;
+        std::vector<Location> stated;
+    };
+    const std::vector<Row> rows = {
+        {1, {Location::kCentre}},
+        {2, {Location::kLeft, Location::kRight}},
+        {3, {Location::kLeft, Location::kRight, Location::kCentre}},
+        {4, {Location::kLeft, Location::kRight, Location::kLeftSurround, Location::kRightSurround}},
+        {5, {Location::kLeft, Location::kRight, Location::kCentre, Location::kLeftSurround,
+             Location::kRightSurround}},
+        {6, {Location::kLeft, Location::kRight, Location::kCentre, Location::kLfe,
+             Location::kLeftSurround, Location::kRightSurround}},
+    };
+    for (const auto layout : {plan::LayoutId::kMono, plan::LayoutId::kStereo, plan::LayoutId::k51}) {
+        const auto target = plan::channel_plan_for(layout);
+        for (const auto& row : rows) {
+            INFO("width " << row.width << " onto " << plan::layout(layout).name);
+            const auto by_count = plan::route(target, row.width, kClev, kSlev);
+            const auto by_location = plan::route(target, row.stated, kClev, kSlev);
+            REQUIRE(by_count.has_value());
+            REQUIRE(by_location.has_value());
+            CHECK(by_count->gain == by_location->gain);
+        }
+    }
+}
+
+TEST_CASE("a channel mask names the locations its file interleaves", "[locations][wav_mask]") {
+    constexpr std::uint32_t kFl = 0x1;
+    constexpr std::uint32_t kFr = 0x2;
+    constexpr std::uint32_t kFc = 0x4;
+    constexpr std::uint32_t kLfe = 0x8;
+    constexpr std::uint32_t kBl = 0x10;
+    constexpr std::uint32_t kBr = 0x20;
+    constexpr std::uint32_t kBc = 0x100;
+    constexpr std::uint32_t kSl = 0x200;
+    constexpr std::uint32_t kSr = 0x400;
+    constexpr std::uint32_t kTfl = 0x1000;
+    constexpr std::uint32_t kTfr = 0x4000;
+
+    const auto read = [](std::uint32_t mask, std::size_t channels) {
+        return plan::wav_mask_locations(mask, channels);
+    };
+    using V = std::vector<Location>;
+
+    // The three-channel and four-channel files width cannot tell apart.
+    CHECK(read(kFl | kFr | kFc, 3) == V{Location::kLeft, Location::kRight, Location::kCentre});
+    CHECK(read(kFl | kFr | kBc, 3) == V{Location::kLeft, Location::kRight, Location::kCs});
+    CHECK(read(kFl | kFr | kFc | kBc, 4) ==
+          V{Location::kLeft, Location::kRight, Location::kCentre, Location::kCs});
+    CHECK(read(kFl | kFr | kBl | kBr, 4) ==
+          V{Location::kLeft, Location::kRight, Location::kLeftSurround, Location::kRightSurround});
+    CHECK(read(kFl | kFr | kSl | kSr, 4) ==
+          V{Location::kLeft, Location::kRight, Location::kLeftSurround, Location::kRightSurround});
+
+    // The back pair is the 5.1 surrounds on its own, the rear surrounds beside
+    // the sides.
+    CHECK(read(kFl | kFr | kFc | kLfe | kBl | kBr, 6) ==
+          V{Location::kLeft, Location::kRight, Location::kCentre, Location::kLfe,
+            Location::kLeftSurround, Location::kRightSurround});
+    CHECK(read(kFl | kFr | kFc | kLfe | kBl | kBr | kSl | kSr, 8) ==
+          V{Location::kLeft, Location::kRight, Location::kCentre, Location::kLfe, Location::kLrs,
+            Location::kRrs, Location::kLeftSurround, Location::kRightSurround});
+    CHECK(read(kFl | kFr | kFc | kLfe | kSl | kSr | kTfl | kTfr, 8) ==
+          V{Location::kLeft, Location::kRight, Location::kCentre, Location::kLfe,
+            Location::kLeftSurround, Location::kRightSurround, Location::kVhl, Location::kVhr});
+
+    // A mask that says nothing usable says nothing: none, the wrong number of
+    // speakers for the channels, SPEAKER_TOP_BACK_CENTER (no Table E2.5
+    // location) or a reserved bit.
+    CHECK_FALSE(read(0, 3).has_value());
+    CHECK_FALSE(read(kFl | kFr, 3).has_value());
+    CHECK_FALSE(read(kFl | kFr | kFc, 2).has_value());
+    CHECK_FALSE(read(kFl | kFr | 0x10000, 3).has_value());
+    CHECK_FALSE(read(kFl | kFr | 0x80000000u, 3).has_value());
+    CHECK_FALSE(read(kFl | kFr | kFc, 0).has_value());
+}
+
+TEST_CASE("a mask written for a file reads back as the file", "[locations][wav_mask]") {
+    // Every layout this library names, listed in the order a file interleaves
+    // it: the mask states exactly those speakers, and reading it back is the
+    // list. Fewer than three channels states nothing at all.
+    for (const auto& info : plan::kLayouts) {
+        if (info.id == plan::LayoutId::kDualMono) {
+            continue;
+        }
+        INFO(info.name);
+        const auto locations = rendered_once(info.id);
+        const auto order = plan::wav_order(locations);
+        std::vector<Location> in_wav_order;
+        for (const auto at : order) {
+            in_wav_order.push_back(locations[at]);
+        }
+        const auto mask = plan::wav_channel_mask(in_wav_order);
+        if (in_wav_order.size() < 3) {
+            CHECK(mask == 0);
+            continue;
+        }
+        REQUIRE(mask != 0);
+        CHECK(plan::wav_mask_locations(mask, in_wav_order.size()) == in_wav_order);
+    }
+
+    using V = std::vector<Location>;
+    // The 2/1 and 3/1 modes, which no named layout has, are the ones this
+    // exists for.
+    CHECK(plan::wav_channel_mask(V{Location::kLeft, Location::kRight, Location::kCs}) == 0x103);
+    CHECK(plan::wav_channel_mask(
+              V{Location::kLeft, Location::kRight, Location::kCentre, Location::kCs}) == 0x107);
+    CHECK(plan::wav_channel_mask(V{Location::kLeft, Location::kRight, Location::kCentre}) == 0x7);
+    CHECK(plan::wav_channel_mask(V{Location::kLeft, Location::kRight}) == 0);
+
+    // A list that would mislabel a channel is not given a mask: a repeat, a
+    // location with no speaker, or an order the file cannot have.
+    CHECK(plan::wav_channel_mask(V{Location::kLeft, Location::kRight, Location::kLeft}) == 0);
+    CHECK(plan::wav_channel_mask(V{Location::kLeft, Location::kRight, Location::kLw}) == 0);
+    CHECK(plan::wav_channel_mask(V{Location::kRight, Location::kLeft, Location::kCentre}) == 0);
+    // 6.1: the surrounds would take the back pair and sit before the back
+    // centre in the mask, where the file interleaves the back centre first.
+    CHECK(plan::wav_channel_mask(V{Location::kLeft, Location::kRight, Location::kCentre,
+                                   Location::kLfe, Location::kCs, Location::kLeftSurround,
+                                   Location::kRightSurround}) == 0);
+}
+
+TEST_CASE("a source's stated locations become a layout when this codec can carry one",
+          "[locations][layout]") {
+    using V = std::vector<Location>;
+    const V five_one = {Location::kLeft,        Location::kRight,        Location::kCentre,
+                        Location::kLfe,         Location::kLeftSurround, Location::kRightSurround};
+
+    SECTION("a named layout, when the locations are exactly one") {
+        const auto layout = plan::source_layout(plan::Codec::kAc3, five_one);
+        REQUIRE(layout.has_value());
+        CHECK(layout->layout == plan::LayoutId::k51);
+        CHECK_FALSE(layout->custom_locations.has_value());
+    }
+    SECTION("a custom selection for a coding mode no preset names") {
+        for (const auto& modes :
+             {V{Location::kLeft, Location::kRight, Location::kCs},
+              V{Location::kLeft, Location::kCentre, Location::kRight, Location::kCs},
+              V{Location::kLeft, Location::kCentre, Location::kRight, Location::kLfe}}) {
+            const auto layout = plan::source_layout(plan::Codec::kAc3, modes);
+            REQUIRE(layout.has_value());
+            CHECK_FALSE(layout->layout.has_value());
+            REQUIRE(layout->custom_locations.has_value());
+            CHECK(plan::channel_mask_of(modes) == layout->custom_locations);
+        }
+    }
+    SECTION("a layout that needs a dependent substream is E-AC-3's alone") {
+        const V seven_one = {Location::kLeft,         Location::kRight,        Location::kCentre,
+                             Location::kLfe,          Location::kLeftSurround, Location::kRightSurround,
+                             Location::kLrs,          Location::kRrs};
+        CHECK_FALSE(plan::source_layout(plan::Codec::kAc3, seven_one).has_value());
+        const auto layout = plan::source_layout(plan::Codec::kEac3, seven_one);
+        REQUIRE(layout.has_value());
+        CHECK(layout->layout == plan::LayoutId::k71);
+    }
+    SECTION("what is not a layout is refused, not narrowed") {
+        CHECK_FALSE(plan::source_layout(plan::Codec::kEac3,
+                                        V{Location::kLeft, Location::kRight, Location::kLeft})
+                        .has_value());
+        CHECK_FALSE(plan::source_layout(plan::Codec::kEac3, V{Location::kLfe}).has_value());
+        CHECK_FALSE(plan::source_layout(plan::Codec::kEac3, V{Location::kVhl, Location::kVhr})
+                        .has_value());
+        // AC-4 takes its layouts from the plan's own validation.
+        CHECK_FALSE(plan::source_layout(plan::Codec::kAc4, five_one).has_value());
+    }
+}
