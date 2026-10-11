@@ -42,7 +42,9 @@ struct FieldOffsets {
 // walk that finds the rewritable fields. Only meaningful when `eac3`.
 struct InsertPoints {
     bool eac3 = false;
-    bool independent = false;  // strmtyp 0; a convertible substream is refused before here
+    // Not a dependent: strmtyp 0, or strmtyp 2 (§E2.3.1.1), which is
+    // independent as well and begins its own access unit.
+    bool independent = false;
     // The flag bits in front of compr, compr2 and the infomdat group - where a
     // field is switched on and its payload goes in - and whether each is set.
     std::optional<std::size_t> compre_bit{};
@@ -197,7 +199,9 @@ void read_mixing_metadata(BitReader& r, const FrameMetadata& meta, int nblks,
     if (meta.lfe && r.read(1) != 0) {
         mix.lfemixlevcod = static_cast<int>(r.read(5));
     }
-    if (meta.strmtyp != static_cast<int>(eac3::StreamType::kDependent)) {
+    // Table E1.2's gate is `strmtyp == 0x0`; a type 2 substream sends none of
+    // the rest, as a dependent does not.
+    if (meta.strmtyp == static_cast<int>(eac3::StreamType::kIndependent)) {
         if (r.read(1) != 0) r.skip(6);                  // pgmscl
         if (acmod == 0x0 && r.read(1) != 0) r.skip(6);  // pgmscl2
         if (r.read(1) != 0) r.skip(6);                  // extpgmscl
@@ -404,10 +408,7 @@ std::expected<Parsed, EditError> parse_eac3(std::span<const std::byte> frame) {
     Parsed out;
     out.meta.kind = StreamKind::kEac3;
     out.meta.strmtyp = static_cast<int>(r.read(2));
-    if (out.meta.strmtyp == static_cast<int>(eac3::StreamType::kConvertible) ||
-        out.meta.strmtyp == 0x3) {
-        // strmtyp 2's own blkid/frmsizecod branch (and 3, which is reserved)
-        // - see this module's header comment.
+    if (out.meta.strmtyp == static_cast<int>(eac3::StreamType::kReserved)) {
         return std::unexpected(EditError::kReservedValue);
     }
     out.meta.substreamid = static_cast<int>(r.read(3));
@@ -520,6 +521,13 @@ std::expected<Parsed, EditError> parse_eac3(std::span<const std::byte> frame) {
         if (out.meta.strmtyp == static_cast<int>(eac3::StreamType::kIndependent) &&
             out.meta.numblkscod != 0x3) {
             r.skip(1);  // convsync
+        }
+        if (out.meta.strmtyp == static_cast<int>(eac3::StreamType::kConvertible)) {
+            // §E2.3.1.64-65: blkid is implied at six blocks, and frmsizecod
+            // follows it when set.
+            if (out.meta.numblkscod == 0x3 || r.read(1) != 0) {
+                r.skip(6);  // frmsizecod
+            }
         }
         if (r.read(1) != 0) {  // addbsie
             r.skip((static_cast<std::size_t>(r.read(6)) + 1) * 8);  // addbsil, addbsi

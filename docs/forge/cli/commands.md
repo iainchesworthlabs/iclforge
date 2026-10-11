@@ -569,7 +569,9 @@ A stream carrying more than one programme (a second independent substream — a 
 an audio description) is handled one programme at a time: `decode`, `levels` and `qc` all take
 `programme=<0..7>`, and without it take the first the stream carries while saying what else was
 there. See [Options & grammars](metadata-options.md) for the token, and `eac3-encode`'s
-`programme2=` for authoring such a stream.
+`programme2=` for authoring such a stream. `decode` can also mix an associated service (a
+description, a commentary) into the programme it decodes, with `associated=` — see
+[Options & grammars](metadata-options.md#programme-options-decode-qc-levels-programme).
 
 ```bash
 forge decode out.ec3 commentary.wav programme=1
@@ -789,8 +791,10 @@ Each format's decode reads options the other's does not. Given an AC-4 stream, `
 the AC-3 and E-AC-3 ones it was given (`drc=`, `heavy`, `ltrt-phase=`, `fast-imdct`, `mode=`,
 `programme=`, `bed-only`, `joc-domain=`) in a warning and ignores them, and given an AC-3 or
 E-AC-3 stream it does the same with AC-4's (`output-level=`, `dialogue-enhancement=`,
-`presentation=`, `presentation-id=`, `language=`, `associated=`, `dialogue-gain=`,
-`associated-gain=`, `headphones`, `md-compat=` and AC-4's `drcmode=` names). The options that
+`presentation=`, `presentation-id=`, `language=`, `dialogue-gain=`, `headphones`,
+`md-compat=` and AC-4's `drcmode=` names). `associated=` and `associated-gain=` are read by
+both: an AC-4 stream's choose a presentation and its mix, an E-AC-3 stream's [mix a second
+programme into the first](metadata-options.md#programme-options-decode-qc-levels-programme). The options that
 promise what the other format cannot give stop the run: `bap-census=`, `verify-objects` and
 `gate-objects` for AC-4, and `channels=5.1` and `syntax-trace=` for AC-3 and E-AC-3.
 
@@ -1287,9 +1291,12 @@ variadic. It refuses inputs whose codec, sample rate, coding mode, LFE presence,
 channel count or substream-per-unit count differ from the first — a decoder walking the join has
 no way to be told the format changed.
 
-**Out of scope for all five:** `strmtyp 2` convertible streams — the spec's own no-re-encode
-path to AC-3 — which `iclforge::ac3::plan::validate` already refuses. Nothing here produces or consumes
-one.
+**`strmtyp 2`, a convertible substream** (§E2.3.1.1, "previously coded in AC-3"), is an
+independent substream like any other to all five: `metadata` and `normalize` rewrite its fields
+and keep the `blkid` and `frmsizecod` it carries, `cut` and `cat` move its access units whole, and
+`probe` names the AC-3 frame size code it was converted from. What is not here is the conversion
+to or from AC-3 that gives the type its name: the standard specifies the signalling and no process,
+and nothing in this project produces or consumes a type 2 stream.
 
 **AC-4 and the four that copy.** `metadata`, `normalize`, `cut` and `cat` frame AC-3 and E-AC-3
 syncframes and do not read AC-4: given an AC-4 stream they stop with exit `2` (`lost sync:

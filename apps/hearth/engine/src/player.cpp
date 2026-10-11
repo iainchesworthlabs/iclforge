@@ -633,6 +633,34 @@ void Player::build_decoder(std::uint32_t rate, bool transcode) {
         reconfigure_identify(rate);
     }
     decoder_rate_ = rate;
+    attach_variants();
+}
+
+void Player::attach_variants() {
+    if (!decoder_) {
+        return;
+    }
+    // Not for a transcode, whose output is Ac3Transcoder's and not a room's.
+    if (group_variants_.empty() || transcoder_.has_value() || mode_ != OutputMode::kNetworkGroup) {
+        decoder_->set_variants({}, {});
+        variant_stash_.clear();
+        return;
+    }
+    variant_stash_.assign(group_variants_.size(), {});
+    decoder_->set_variants(
+        group_variants_, [this](std::size_t index, std::span<const std::span<const float>> slots,
+                                std::size_t frames) {
+            if (index >= variant_stash_.size()) {
+                return;
+            }
+            std::vector<float>& planar = variant_stash_[index];
+            planar.clear();
+            planar.reserve(slots.size() * frames);
+            for (const std::span<const float>& slot : slots) {
+                planar.insert(planar.end(), slot.begin(),
+                              slot.begin() + static_cast<std::ptrdiff_t>(frames));
+            }
+        });
 }
 
 void Player::reconfigure_trim_delay(std::uint32_t rate) {
@@ -1338,10 +1366,11 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
     } else if (choice_.mode == OutputMode::kNetworkGroup) {
         // A programme or presentation a member would not decode from the
         // stream whole goes as PCM alone.
-        opened = group_->open(
-            choice_.group_name,
-            NetworkGroupSink::Format{
-                .sample_rate = rate, .layout = layout_, .stream = sent_stream(*session_)});
+        opened = group_->open(choice_.group_name,
+                              NetworkGroupSink::Format{.sample_rate = rate,
+                                                       .layout = layout_,
+                                                       .stream = sent_stream(*session_),
+                                                       .coded_channels = facts.channels});
     } else {
         opened = sink_->open(
             PcmSink::Format{.sample_rate = rate, .layout = layout_, .endpoint_id = choice_.endpoint_id});
@@ -1357,6 +1386,10 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
     }
     mode_ = choice_.mode;
     ++opens_;
+    // What a network group's members were planned PCM at, beyond layout_.
+    group_variants_ = mode_ == OutputMode::kNetworkGroup ? group_->variants()
+                                                         : std::vector<render::OutputLayout>{};
+    attach_variants();
     if (transcode) {
         note(fmt::format("output opened: {} ({} transcoded), {} Hz (open {})",
                          describe(format.mode), stream_name(*facts.stream), format.sample_rate,
@@ -1422,6 +1455,8 @@ void Player::close_output() {
         note("output closed");
     }
     mode_ = OutputMode::kNone;
+    group_variants_.clear();
+    attach_variants();
     refollow_pending_ = false;
     transport_.clear_open_format();
     clear_pending();
@@ -1507,6 +1542,20 @@ void Player::take_block(std::span<const std::span<const float>> rendered, std::s
             std::fill_n(out, n, 0.0F);
         }
     }
+    // The layouts a network group's other members take, which the decoder
+    // delivered just ahead of this block. Not trimmed or delayed: those are
+    // this room's speakers', keyed to layout_'s slots.
+    block.variants.resize(variant_stash_.size());
+    for (std::size_t index = 0; index < variant_stash_.size(); ++index) {
+        const std::size_t wanted = group_variants_[index].slots() * n;
+        if (variant_stash_[index].size() == wanted) {
+            block.variants[index].assign(variant_stash_[index].begin(),
+                                         variant_stash_[index].end());
+        } else {
+            block.variants[index].clear();
+        }
+        variant_stash_[index].clear();
+    }
     // In place, on this player's own copy - never on `rendered`, which is
     // the decoder's reused buffer and, for a bitstream or a transcode, has
     // already returned above without reaching here.
@@ -1537,6 +1586,11 @@ void Player::take_block(std::span<const std::span<const float>> rendered, std::s
         // on active().
         for (float& sample : block.samples) {
             sample *= volume_gain_;
+        }
+        for (std::vector<float>& variant : block.variants) {
+            for (float& sample : variant) {
+                sample *= volume_gain_;
+            }
         }
     }
     pending_frames_ += n;
@@ -1657,8 +1711,36 @@ std::size_t Player::drain_group(std::size_t budget) {
             views[slot] = std::span<const float>(block.samples)
                               .subspan((slot * block.frames) + group_pcm_offset_, offered);
         }
-        const std::size_t taken =
-            group_->submit_pcm(std::span<const std::span<const float>>(views.data(), slots), offered);
+        std::size_t taken = 0;
+        if (group_variants_.empty()) {
+            taken = group_->submit_pcm(std::span<const std::span<const float>>(views.data(), slots),
+                                       offered);
+        } else {
+            // Each further layout's slots of the same frames: this block's
+            // own, or silence where it did not come.
+            if (group_zeros_.size() < offered) {
+                group_zeros_.assign(offered, 0.0F);
+            }
+            group_variant_views_.resize(group_variants_.size());
+            group_variant_spans_.clear();
+            for (std::size_t index = 0; index < group_variants_.size(); ++index) {
+                const std::size_t width = group_variants_[index].slots();
+                const std::vector<float>& planar =
+                    index < block.variants.size() ? block.variants[index] : group_zeros_;
+                const bool have =
+                    index < block.variants.size() && planar.size() == width * block.frames;
+                for (std::size_t slot = 0; slot < width; ++slot) {
+                    group_variant_views_[index][slot] =
+                        have ? std::span<const float>(planar).subspan(
+                                   (slot * block.frames) + group_pcm_offset_, offered)
+                             : std::span<const float>(group_zeros_).first(offered);
+                }
+                group_variant_spans_.emplace_back(group_variant_views_[index].data(), width);
+            }
+            taken = group_->submit_pcm_variants(
+                std::span<const std::span<const float>>(views.data(), slots), group_variant_spans_,
+                offered);
+        }
         if (taken == 0) {
             break;
         }
