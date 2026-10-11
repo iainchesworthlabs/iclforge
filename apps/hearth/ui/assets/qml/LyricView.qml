@@ -17,6 +17,10 @@ import Hearth
 // (muted); a file that times lines and not words emphasises the whole line, and
 // no word times are invented for it.
 //
+// A `.cdg` beside the item with no lyrics file is the picture of a karaoke disc
+// (planning/karaoke-phase2.md, W13f): it has no text to follow, so it is shown as
+// the picture it is, against the same position and the same delay.
+//
 // Nothing here owns a clock or reads a file: `positionMs` is the reading of a
 // LyricClock, and the words come from KaraokeController. The item playing is
 // told to the controller from here (`follow`), so that whichever view is shown
@@ -282,6 +286,18 @@ Item {
             font.pixelSize: root.unit
             wrapMode: Text.WordWrap
         }
+    }
+
+    // --- the picture of a CD+G disc: no text, so there are no words to follow --
+    CdgPicture {
+        id: picture
+        objectName: "lyricPicture"
+        anchors.fill: parent
+        visible: root.status === "picture"
+        controller: KaraokeController
+        positionMs: root.positionMs
+        Accessible.role: Accessible.Graphic
+        Accessible.name: qsTr("CD+G picture")
     }
 
     // --- no file, or one that could not be read ------------------------------

@@ -84,6 +84,11 @@ words:
 - with no file, the page says which name it looks for; a file that is not UTF-8 or UTF-16 is not shown,
   and playback is not affected.
 
+With no lyrics file, a `name.cdg` beside the stream, the picture of a karaoke disc ripped on its
+own, is shown instead: its words are part of the picture, so nothing in it is read as text, and
+it moves with the same position and the same lyric delay (see [A CD+G
+disc](../karaoke/index.md#a-cdg-disc)).
+
 The format is LRC: `[mm:ss.xx]` for a line, the enhanced `<mm:ss.xx>` tag before a word, and
 `[offset:]`, `[ti:]`, `[ar:]`, `[al:]`, `[by:]` and `[length:]`. The text is UTF-8, with or
 without a byte-order mark, or UTF-16 with one, in either byte order (what an editor saves as

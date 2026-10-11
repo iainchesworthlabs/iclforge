@@ -314,6 +314,109 @@ TestCase {
         tryVerify(function() { return message.visible && message.text.indexOf("bare.lrc") >= 0; }, 5000);
     }
 
+    // --- the picture of a CD+G disc ----------------------------------------------
+
+    // One 24-byte CD+G packet as a string of byte values: command 9, the instruction, two parity
+    // bytes, sixteen data bytes, four parity bytes.
+    function cdgPacket(instruction, data) {
+        const bytes = new Array(24).fill(0);
+        bytes[0] = 9;
+        bytes[1] = instruction;
+        for (let i = 0; i < data.length; ++i) {
+            bytes[4 + i] = data[i];
+        }
+        return String.fromCharCode.apply(null, bytes);
+    }
+
+    // Colour 1 is red and colour 2 green; the picture is red from the first packets and green from
+    // the packet at one second (300 packets in). Base64, for TestServices.writeBinaryFile().
+    function cdgDisc() {
+        const colours = new Array(16).fill(0);
+        colours[2] = 0x3C;
+        colours[4] = 0x03;
+        colours[5] = 0x30;
+        let disc = cdgPacket(30, colours) + cdgPacket(1, [1]);
+        for (let i = 2; i < 300; ++i) {
+            disc += cdgPacket(0, []);
+        }
+        disc += cdgPacket(1, [2]);
+        return Qt.btoa(disc);
+    }
+
+    function test_aCdgFileBesideAnItemIsShownAsItsPictureAgainstThePosition() {
+        const disc = TestServices.writeBinaryFile("disc.cdg", cdgDisc());
+        verify(disc.length > 0, "the CD+G file could not be written");
+        const view = newView();
+        KaraokeController.load(disc.replace(/\.cdg$/, ".ac3"), 10000);
+        compare(view.status, "picture");
+        const picture = H.find(view, function(item) { return item.objectName === "lyricPicture"; });
+        verify(picture !== null);
+        tryVerify(function() { return picture.visible; }, 5000);
+        verify(picture.ready);
+        // No words are drawn, and there is nothing to say: the picture is the lyrics.
+        const message = H.find(view, function(item) { return item.objectName === "lyricMessage"; });
+        verify(!message.visible);
+        const stage = H.find(view, function(item) { return item.objectName === "lyricStage"; });
+        verify(!stage.visible);
+
+        // The picture is drawn at the middle of the view in the colour of its packets: red before
+        // the packet at one second, green after it, and back to red on a seek back. The view
+        // is 900 by 400, so the 300 by 216 picture is drawn once over, centred, with black round it.
+        view.positionMs = 500;
+        waitForRendering(picture);
+        let image = grabImage(picture);
+        compare(image.red(450, 200), 255);
+        compare(image.green(450, 200), 0);
+        compare(image.red(20, 20), 0);
+        // Drawn once over (the view fits it at 1x, not 1.85x), so the picture spans x 300 to 599:
+        // red just inside it and black just outside.
+        compare(image.red(310, 200), 255);
+        compare(image.red(590, 200), 255);
+        compare(image.red(250, 200), 0);
+        compare(image.red(650, 200), 0);
+        view.positionMs = 1100;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(450, 200), 0);
+        compare(image.green(450, 200), 255);
+
+        // The delay shows it later, as it does the words: the position stands still at 1100 ms,
+        // and 400 ms of delay makes it the picture of 700 ms, which is red.
+        KaraokeController.delayMs = 400;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(450, 200), 255);
+        KaraokeController.delayMs = 0;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.green(450, 200), 255);
+        // And a seek back is a seek back.
+        view.positionMs = 500;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(450, 200), 255);
+    }
+
+    function test_theLyricsCardNamesTheCdgFileAndSaysThereIsNoTextToFollow() {
+        const disc = TestServices.writeAc3Stream("disc_song.ac3", "karaoke-3/2");
+        verify(disc.length > 0);
+        verify(TestServices.writeBinaryFile("disc_song.cdg", cdgDisc()).length > 0);
+        const win = openPage();
+        HearthController.setLayoutText("5.1");
+        tryVerify(function() { return HearthController.speakerLabels.length === 6; }, 10000);
+        HearthController.addFiles([disc]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000);
+        HearthController.playItem(0);
+        const view = named(win, "lyricsView");
+        tryCompare(view, "status", "picture", 10000);
+        compare(KaraokeController.fileName, "disc_song.cdg");
+        tryVerify(function() { return named(win, "lyricsFile").text === "disc_song.cdg"; }, 5000);
+        tryVerify(function() { return named(win, "lyricsNote").text.indexOf("CD+G disc") >= 0; }, 5000);
+        const picture = H.find(view, function(item) { return item.objectName === "lyricPicture"; });
+        verify(picture !== null);
+        verify(picture.visible);
+    }
+
     // --- Settings ------------------------------------------------------------
 
     function test_settingsHasALyricDelayThatIsKeptAndCanBeReset() {

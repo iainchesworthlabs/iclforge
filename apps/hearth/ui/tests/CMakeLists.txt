@@ -44,6 +44,8 @@ qt_add_executable(hearth_qmltests
     tests/test_room.cpp
     tests/test_room.hpp
     src/test_outputs.hpp
+    src/cdg_picture.cpp
+    src/cdg_picture.hpp
     src/hearth_controller.cpp
     src/hearth_controller.hpp
     src/item_loader.cpp
