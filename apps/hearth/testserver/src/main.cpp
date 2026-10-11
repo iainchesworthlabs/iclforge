@@ -968,6 +968,8 @@ int main(int argc, char** argv) {
 
     // The programme: a file's access units, or the tone.
     ProgrammeInfo info;
+    // The file's bytes, for as long as `stream` lives: its access units are views into them.
+    std::optional<std::vector<std::byte>> bytes;
     std::optional<iclforge::ac3::io::ScannedStream> stream;
     std::uint64_t pass_samples = 0;
     int passes = 1;
@@ -977,7 +979,7 @@ int main(int argc, char** argv) {
         }
         info = {.file = "tone", .codec = "PCM", .channels = 2};
     } else {
-        const std::optional<std::vector<std::byte>> bytes = read_file(programme);
+        bytes = read_file(programme);
         if (!bytes) {
             std::cerr << "cannot read " << programme.string() << "\n";
             return kExitUsage;
