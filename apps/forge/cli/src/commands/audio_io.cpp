@@ -1033,9 +1033,16 @@ int run_play(std::string_view in_path, int device_index, const Options& meta) {
         }
         played_programme = std::move(*selected);
         units = played_programme->units;
+        // select_receiver_units hands back no empty list and no unit shorter
+        // than a syncframe header, but that is across a translation unit; the
+        // rate is read from byte 4 of the first.
+        if (units.empty() || units.front().size() < 5) {
+            fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
+            return kExitInput;
+        }
         content_rate =
             sample_rate_hz(static_cast<iclforge::ac3::SampleRate>(
-                std::to_integer<std::uint32_t>(units[0][4]) >> 6));
+                std::to_integer<std::uint32_t>(units.front()[4]) >> 6));
     } else {
         const auto split = iclforge::ac3::split_frames(stream);
         if (!split.has_value() || split->empty()) {
