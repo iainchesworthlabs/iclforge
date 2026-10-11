@@ -40,6 +40,13 @@ For an Atmos-mode stream, playback is the **5.1 bed only** — like `forge monit
 what a legacy decoder hears, not unmixed objects. Use **Export objects…** below, or
 [Inspect objects](inspect-objects.md), for the object audio itself.
 
+An E-AC-3 stream with a second independent substream (a second language, an audio description) plays
+**one** programme: the first the stream carries, as `forge monitor` does without `programme=`. The
+programmes are alternatives, not layers, so they are never played one after the other. The summary
+line says which one it is and what else the stream holds
+(`E-AC-3 · 3/2 + LFE · 48000 Hz · 32 frame(s) · 1.02 s · programme 0 of 2 (0, 1)`). The dialog has no
+programme picker yet: `forge decode out.ec3 commentary.wav programme=1` writes another.
+
 ## AC-4
 
 A raw AC-4 file (`*.ac4`, which has a filter of its own) is recognised by its sync word and decoded
