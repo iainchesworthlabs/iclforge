@@ -1184,583 +1184,583 @@
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="32"/>
         <source>Parts</source>
-        <translation type="unfinished"></translation>
+        <translation>טיילן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="33"/>
         <source>Start with what you recorded. Everything after this follows from it.</source>
-        <translation type="unfinished"></translation>
+        <translation>הייבט אָן מיט דעם וואָס איר האָט אויפֿגענומען. אַלץ נאָך דעם קומט פֿון דעם.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="34"/>
         <source>Next: levels</source>
-        <translation type="unfinished"></translation>
+        <translation>קומענדיק: ניוואָען</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="35"/>
         <source>Levels</source>
-        <translation type="unfinished"></translation>
+        <translation>ניוואָען</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="36"/>
         <source>How loud the melody guide and the vocals sit when a player mixes them for you.</source>
-        <translation type="unfinished"></translation>
+        <translation>ווי הויך די גיד־מעלאָדיע און דער געזאַנג קלינגען ווען אַ שפּילער מישט זיי פֿאַר אײַך.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="37"/>
         <source>Next: hear it</source>
-        <translation type="unfinished"></translation>
+        <translation>קומענדיק: הערן עס</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="38"/>
         <source>Hear</source>
-        <translation type="unfinished"></translation>
+        <translation>הערן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="39"/>
         <source>If a part sounds wrong, go back to Levels: the centre and surround levels set how the aware decoder mixes them.</source>
-        <translation type="unfinished"></translation>
+        <translation>אויב אַ טייל קלינגט ניט ריכטיק, גייט צוריק צו ניוואָען: דער צענטער־ניוואָ און דער סעראַונד־ניוואָ באַשטימען ווי דער באַוווּסטער דעקאָדער מישט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="40"/>
         <source>Next: save</source>
-        <translation type="unfinished"></translation>
+        <translation>קומענדיק: שפּײַכערן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="41"/>
         <source>Save</source>
-        <translation type="unfinished">שפּײַכערן</translation>
+        <translation>שפּײַכערן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="42"/>
         <source>Nothing is written until you press the button.</source>
-        <translation type="unfinished"></translation>
+        <translation>גאָרנישט ווערט ניט געשריבן ביז איר דריקט דאָס קנעפּל.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="43"/>
         <source>Encode now</source>
-        <translation type="unfinished">קאָדירן איצט</translation>
+        <translation>קאָדירן איצט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="265"/>
         <source>The lyrics are beside the stream, as the same name with .lrc.</source>
-        <translation type="unfinished"></translation>
+        <translation>די ווערטער ליגן לעבן דעם סטרים, מיטן זעלבן נאָמען מיט .lrc.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="268"/>
         <source>The lyrics are already beside the stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>די ווערטער ליגן שוין לעבן דעם סטרים.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="271"/>
         <source>A lyrics file of that name was already beside the stream, and was left as it is.</source>
-        <translation type="unfinished"></translation>
+        <translation>אַ ווערטער־טעקע מיט דעם נאָמען איז שוין געלעגן לעבן דעם סטרים, און איז געבליבן ווי זי איז.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="275"/>
         <source>The lyrics file could not be read, so none was put beside the stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>מען האָט ניט געקענט לייענען די ווערטער־טעקע, דעריבער איז קיינע ניט געלייגט געווארן לעבן דעם סטרים.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="278"/>
         <source>The lyrics could not be written beside the stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>מען האָט ניט געקענט שרײַבן די ווערטער לעבן דעם סטרים.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="334"/>
         <source>Backing</source>
-        <translation type="unfinished"></translation>
+        <translation>באַגלײטונג</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="335"/>
         <source>Melody guide</source>
-        <translation type="unfinished"></translation>
+        <translation>גיד־מעלאָדיע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="336"/>
         <source>Vocal 1</source>
-        <translation type="unfinished"></translation>
+        <translation>געזאַנג 1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="337"/>
         <source>Vocal 2</source>
-        <translation type="unfinished"></translation>
+        <translation>געזאַנג 2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="339"/>
         <source>File</source>
-        <translation type="unfinished">טעקע</translation>
+        <translation>טעקע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="346"/>
         <source>A karaoke stream needs a backing: the music on the left and the right.</source>
-        <translation type="unfinished"></translation>
+        <translation>אַ קאַראַאָקע־סטרים דאַרף אַ באַגלײטונג: די מוזיק לינקס און רעכטס.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="348"/>
         <source>%1 has %2 channel(s); the backing is the left and the right, so it needs two.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 האָט %2 קאַנאַלן; די באַגלײטונג איז לינקס און רעכטס, דעריבער דאַרף עס צוויי.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="351"/>
         <source>%1 has %2 channels, already a surround bed. Give the backing as a stereo file, or use it as the one multichannel file whose speakers name the parts.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 האָט %2 קאַנאַלן, דאָס איז שוין אַ סעראַונד־בעט. גיט די באַגלײטונג ווי אַ סטערעאָ־טעקע, אָדער ניצט עס ווי די איין מערקאַנאַל־טעקע וועמענס רעדער נעמען די טיילן.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="355"/>
         <source>%1 has %2 channels; each melody and vocal is one channel.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 האָט %2 קאַנאַלן; יעדע מעלאָדיע און יעדער געזאַנג איז איין קאַנאַל.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="357"/>
         <source>%1 is Vocal 2, and a stream has no mode that carries Vocal 2 without Vocal 1. Use it as Vocal 1.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 איז געזאַנג 2, און אַ סטרים האָט ניט קיין מאָדוס וואָס טראָגט געזאַנג 2 אָן געזאַנג 1. ניצט עס ווי געזאַנג 1.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="360"/>
         <source>A backing alone is stereo, with nothing to sing along to. Add a melody guide or a vocal.</source>
-        <translation type="unfinished"></translation>
+        <translation>אַ באַגלײטונג אַליין איז סטערעאָ, אָן גאָרנישט צו זינגען מיט. לייגט צו אַ גיד־מעלאָדיע אָדער אַ געזאַנג.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="363"/>
         <source>%1 is %2 and the backing is %3: the shorter part is padded with silence.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 איז %2 און די באַגלײטונג %3: דער קירצערער טייל ווערט אָנגעפֿילט מיט שטילקייט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="366"/>
         <source>%1 is %2 kHz and the backing is %3 kHz: it is resampled to the backing&apos;s rate.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 איז %2 kHz און די באַגלײטונג %3 kHz: עס ווערט ריסאַמפּלט צו דער ראַטע פֿון דער באַגלײטונג.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="369"/>
         <source>All parts are %1 at %2 kHz.</source>
-        <translation type="unfinished"></translation>
+        <translation>אַלע טיילן זענען %1 ביי %2 kHz.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="371"/>
         <source>Each part is one place in the stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>יעדער טייל איז איין אָרט אין סטרים.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="373"/>
         <source>Choose a file.</source>
-        <translation type="unfinished"></translation>
+        <translation>קלײַבט אויס אַ טעקע.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="375"/>
         <source>%1 has %2 channels and does not say which speakers they are, so the parts cannot be told apart. Use separate parts, or a file whose speakers are named.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 האָט %2 קאַנאַלן און זאָגט ניט וועלכע רעדער זיי זענען, דעריבער קען מען ניט אונטערשיידן די טיילן. ניצט באַזונדערע טיילן, אָדער אַ טעקע וועמענס רעדער האָבן נעמען.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="379"/>
         <source>The speakers (%1) are not one of Annex C&apos;s five layouts: L C R, L R S, L C R S, L R Ls Rs or L C R Ls Rs.</source>
-        <translation type="unfinished"></translation>
+        <translation>די רעדער (%1) זענען ניט איינע פֿון די פֿינף אָרדענונגען פֿון אַנעקס C: L C R, L R S, L C R S, L R Ls Rs אָדער L C R Ls Rs.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="382"/>
         <source>%1 has an LFE channel. Karaoke streams made here carry none: use a file without it.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 האָט אַן LFE־קאַנאַל. קאַראַאָקע־סטרימס געמאַכט דאָ טראָגן קיינעם ניט: ניצט אַ טעקע אָן אים.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="394"/>
         <source>Chosen from what you supplied: a backing and a melody guide.</source>
-        <translation type="unfinished"></translation>
+        <translation>אויסגעקליבן לויט דעם וואָס איר האָט געגעבן: אַ באַגלײטונג און אַ גיד־מעלאָדיע.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="395"/>
         <source>Chosen from what you supplied: a backing and one vocal.</source>
-        <translation type="unfinished"></translation>
+        <translation>אויסגעקליבן לויט דעם וואָס איר האָט געגעבן: אַ באַגלײטונג און איין געזאַנג.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="396"/>
         <source>Chosen from what you supplied: a melody guide and one vocal.</source>
-        <translation type="unfinished"></translation>
+        <translation>אויסגעקליבן לויט דעם וואָס איר האָט געגעבן: אַ גיד־מעלאָדיע און איין געזאַנג.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="397"/>
         <source>Chosen from what you supplied: a backing and two vocals.</source>
-        <translation type="unfinished"></translation>
+        <translation>אויסגעקליבן לויט דעם וואָס איר האָט געגעבן: אַ באַגלײטונג און צוויי געזאַנגען.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="398"/>
         <source>Chosen from what you supplied: a melody guide and two vocals.</source>
-        <translation type="unfinished"></translation>
+        <translation>אויסגעקליבן לויט דעם וואָס איר האָט געגעבן: אַ גיד־מעלאָדיע און צוויי געזאַנגען.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="508"/>
         <source>silent</source>
-        <translation type="unfinished">שטיל</translation>
+        <translation>שטיל</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="513"/>
         <source>As a plain surround player plays it: the vocals come from the rear speakers.</source>
-        <translation type="unfinished"></translation>
+        <translation>ווי אַ געוויינטלעכער סעראַונד־שפּילער שפּילט עס: דער געזאַנג קומט פֿון די הינטערשטע רעדער.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="516"/>
         <source>As a karaoke-aware decoder plays it: the vocals at the surround level you chose (Table C.2.2).</source>
-        <translation type="unfinished"></translation>
+        <translation>ווי אַ קאַראַאָקע־באַוווּסטער דעקאָדער שפּילט עס: דער געזאַנג מיט דעם סעראַונד־ניוואָ וואָס איר האָט אויסגעקליבן (טאַבעלע C.2.2).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="520"/>
         <source>This stream has no vocals to choose between.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער סטרים האָט קיין געזאַנגען ניט צו קלײַבן צווישן.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="523"/>
         <source>No vocals: the backing and the melody guide, for singing along.</source>
-        <translation type="unfinished"></translation>
+        <translation>קיין געזאַנג ניט: די באַגלײטונג און די גיד־מעלאָדיע, צו זינגען מיט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="524"/>
         <source>Vocal 1 alone: a single vocal sits in the centre with the melody (Table C.2.3).</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָר געזאַנג 1: אַ איינציקער געזאַנג שטייט אין צענטער מיט דער מעלאָדיע (טאַבעלע C.2.3).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="526"/>
         <source>Vocal 2 alone: a single vocal sits in the centre with the melody (Table C.2.3).</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָר געזאַנג 2: אַ איינציקער געזאַנג שטייט אין צענטער מיט דער מעלאָדיע (טאַבעלע C.2.3).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="527"/>
         <source>This stream has no Vocal 2, so nothing is played.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער סטרים האָט ניט קיין געזאַנג 2, דעריבער שפּילט מען גאָרנישט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="529"/>
         <source>Both vocals: Vocal 1 on the left and Vocal 2 on the right.</source>
-        <translation type="unfinished"></translation>
+        <translation>ביידע געזאַנגען: געזאַנג 1 לינקס און געזאַנג 2 רעכטס.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="665"/>
         <source>Which recordings make the song?</source>
-        <translation type="unfinished"></translation>
+        <translation>וועלכע אויפֿנאַמען מאַכן דאָס ליד?</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="673"/>
         <source>Give each part its own file. The stream is built from what you supply: a melody guide and one or two vocals go in the places a centre and surrounds would be, and the backing stays left and right.</source>
-        <translation type="unfinished"></translation>
+        <translation>גיט יעדן טייל זײַן אײגענע טעקע. דער סטרים ווערט געבויט פֿון דעם וואָס איר גיט: אַ גיד־מעלאָדיע און איין אָדער צוויי געזאַנגען קומען אויף די ערטער וווּ דער צענטער און די סעראַונד וואָלטן געווען, און די באַגלײטונג בלײַבט לינקס און רעכטס.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="683"/>
         <source>Where the parts come from</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿון וואַנען די טיילן קומען</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="685"/>
         <source>Separate files</source>
-        <translation type="unfinished"></translation>
+        <translation>באַזונדערע טעקעס</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="686"/>
         <location filename="../qml/KaraokeFlow.qml" line="803"/>
         <source>One multichannel file</source>
-        <translation type="unfinished"></translation>
+        <translation>איין מערקאַנאַל־טעקע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="696"/>
         <source>stereo · L R</source>
-        <translation type="unfinished"></translation>
+        <translation>סטערעאָ · L R</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="697"/>
         <source>mono · M</source>
-        <translation type="unfinished"></translation>
+        <translation>מאָנאָ · M</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="698"/>
         <source>mono · V1</source>
-        <translation type="unfinished"></translation>
+        <translation>מאָנאָ · V1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="699"/>
         <source>mono · V2</source>
-        <translation type="unfinished"></translation>
+        <translation>מאָנאָ · V2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="738"/>
         <source>(optional) %1</source>
-        <translation type="unfinished"></translation>
+        <translation>(אָפּציאָנעל) %1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="751"/>
         <source>not chosen</source>
-        <translation type="unfinished"></translation>
+        <translation>ניט אויסגעקליבן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="761"/>
         <source>%1 kHz · %2 · %3 channel(s)</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 kHz · %2 · %3 קאַנאַלן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="772"/>
         <location filename="../qml/KaraokeFlow.qml" line="822"/>
         <location filename="../qml/KaraokeFlow.qml" line="1200"/>
         <source>Change</source>
-        <translation type="unfinished"></translation>
+        <translation>טוישן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="772"/>
         <location filename="../qml/KaraokeFlow.qml" line="822"/>
         <location filename="../qml/KaraokeFlow.qml" line="1200"/>
         <source>Choose…</source>
-        <translation type="unfinished">קלײַבן…</translation>
+        <translation>קלײַבן…</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="778"/>
         <location filename="../qml/KaraokeFlow.qml" line="1206"/>
         <source>Remove</source>
-        <translation type="unfinished">אַוועקנעמען</translation>
+        <translation>אַוועקנעמען</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="813"/>
         <source>A WAV whose speakers are already named L C R Ls Rs (or L R S, L C R S, L R Ls Rs).</source>
-        <translation type="unfinished"></translation>
+        <translation>אַ WAV וועמענס רעדער הייסן שוין L C R Ls Rs (אָדער L R S, L C R S, L R Ls Rs).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1183"/>
         <source>Lyrics</source>
-        <translation type="unfinished"></translation>
+        <translation>ווערטער</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1191"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation>קיינע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1215"/>
         <source>An .lrc file is put beside the stream under the stream&apos;s name, where Hearth finds it. One of the backing&apos;s name beside it is offered.</source>
-        <translation type="unfinished"></translation>
+        <translation>אַ .lrc־טעקע ווערט געלייגט לעבן דעם סטרים אונטער דעם נאָמען פֿונעם סטרים, וווּ Hearth געפֿינט זי. די וואָס טראָגט דעם נאָמען פֿון דער באַגלײטונג און ליגט לעבן איר ווערט אָנגעבאָטן.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1303"/>
         <source>CODING MODE</source>
-        <translation type="unfinished"></translation>
+        <translation>קאָדירונג־מאָדוס</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1311"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1312"/>
         <source>not yet</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָך ניט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1363"/>
         <source>No LFE: karaoke streams made here carry none.</source>
-        <translation type="unfinished"></translation>
+        <translation>קיין LFE ניט: קאַראַאָקע־סטרימס געמאַכט דאָ טראָגן קיינעם ניט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="837"/>
         <source>How loud do the melody and the vocals sit?</source>
-        <translation type="unfinished"></translation>
+        <translation>ווי הויך זענען די מעלאָדיע און דער געזאַנג?</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="845"/>
         <source>These are the two levels Annex C reads from the stream. A karaoke-aware decoder mixes the melody guide and the vocals with them; a karaoke-capable one lets the singer choose the vocals but still folds with them.</source>
-        <translation type="unfinished"></translation>
+        <translation>דאָס זענען די צוויי ניוואָען וואָס אַנעקס C לייענט פֿון סטרים. אַ קאַראַאָקע־באַוווּסטער דעקאָדער מישט מיט זיי די גיד־מעלאָדיע און דעם געזאַנג; אַ קאַראַאָקע־פֿעיִקער לאָזט דעם זינגער אויסקלײַבן דעם געזאַנג, אָבער פֿאַלדט נאָך אלץ מיט זיי.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="861"/>
         <source>Centre level (melody)</source>
-        <translation type="unfinished"></translation>
+        <translation>צענטער־ניוואָ (מעלאָדיע)</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="867"/>
         <source>Centre level</source>
-        <translation type="unfinished"></translation>
+        <translation>צענטער־ניוואָ</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="883"/>
         <source>cmixlev: how loud the melody guide M is in a stereo fold. The aware decoder applies it to M at 2/0 (Table C.2.2).</source>
-        <translation type="unfinished"></translation>
+        <translation>cmixlev: ווי הויך די גיד־מעלאָדיע M איז אין אַ סטערעאָ־פֿאַלד. דער באַוווּסטער דעקאָדער נוצט עס אויף M ביי 2/0 (טאַבעלע C.2.2).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="885"/>
         <source>This stream has no melody guide, so there is no centre level.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער סטרים האָט ניט קיין גיד־מעלאָדיע, דעריבער איז דאָ קיין צענטער־ניוואָ ניט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="898"/>
         <source>Surround level (vocals)</source>
-        <translation type="unfinished"></translation>
+        <translation>סעראַונד־ניוואָ (געזאַנג)</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="904"/>
         <source>Surround level</source>
-        <translation type="unfinished"></translation>
+        <translation>סעראַונד־ניוואָ</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="920"/>
         <source>surmixlev: how loud the vocals V1 and V2 are in the aware decoder&apos;s reproduction and in a stereo fold (Table C.2.2).</source>
-        <translation type="unfinished"></translation>
+        <translation>surmixlev: ווי הויך די געזאַנגען V1 און V2 זענען אין דער רעפּראָדוקציע פֿון דעם באַוווּסטן דעקאָדער און אין אַ סטערעאָ־פֿאַלד (טאַבעלע C.2.2).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="922"/>
         <source>This stream has no vocals, so there is no surround level.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער סטרים האָט קיין געזאַנגען ניט, דעריבער איז דאָ קיין סעראַונד־ניוואָ ניט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="937"/>
         <source>Hear it the way a singer will</source>
-        <translation type="unfinished"></translation>
+        <translation>הערט עס אַזוי ווי אַ זינגער וועט הערן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="945"/>
         <source>This plays the stream you just built, decoded the way a karaoke player decodes it: not your source files. Try each choice a singer has.</source>
-        <translation type="unfinished"></translation>
+        <translation>דאָס שפּילט דעם סטרים וואָס איר האָט אַנטקעגן געבויט, דעקאָדירט ווי אַ קאַראַאָקע־שפּילער דעקאָדירט אים: ניט אײַערע מקור־טעקעס. פּרובירט יעדע קלײַבונג וואָס אַ זינגער האָט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="957"/>
         <source>Building the stream…</source>
-        <translation type="unfinished"></translation>
+        <translation>דער סטרים ווערט געבויט…</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="959"/>
         <source>Could not build the stream: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>מען האָט ניט געקענט בויען דעם סטרים: %1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="960"/>
         <source>The stream is built when you reach this step.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער סטרים ווערט געבויט ווען איר דערגרייכט דעם שריט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="976"/>
         <location filename="../qml/KaraokeFlow.qml" line="982"/>
         <source>Player</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּילער</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="984"/>
         <source>As coded</source>
-        <translation type="unfinished"></translation>
+        <translation>ווי קאָדירט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="985"/>
         <source>Aware</source>
-        <translation type="unfinished"></translation>
+        <translation>באַוווּסט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="986"/>
         <source>Capable</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿעיִק</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="999"/>
         <location filename="../qml/KaraokeFlow.qml" line="1005"/>
         <source>Vocals</source>
-        <translation type="unfinished"></translation>
+        <translation>געזאַנג</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1007"/>
         <source>None</source>
-        <translation type="unfinished">קיינע</translation>
+        <translation>קיינע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1008"/>
         <source>V1</source>
-        <translation type="unfinished"></translation>
+        <translation>V1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1009"/>
         <source>V2</source>
-        <translation type="unfinished"></translation>
+        <translation>V2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1010"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation>ביידע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1022"/>
         <source>Pause</source>
-        <translation type="unfinished">פּויזירן</translation>
+        <translation>פּויזירן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1022"/>
         <source>Play</source>
-        <translation type="unfinished">שפּילן</translation>
+        <translation>שפּילן</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1029"/>
         <source>%1 / %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 / %2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1064"/>
         <source>WHAT PLAYS</source>
-        <translation type="unfinished"></translation>
+        <translation>וואָס שפּילט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1116"/>
         <source>Save the stream</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּײַכערט דעם סטרים</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1124"/>
         <source>%1 · karaoke %2 · %3 kbps</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 · קאַראַאָקע %2 · %3 kbps</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1124"/>
         <source>AC-3</source>
-        <translation type="unfinished"></translation>
+        <translation>AC-3</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1136"/>
         <location filename="../qml/KaraokeFlow.qml" line="1148"/>
         <source>File type</source>
-        <translation type="unfinished"></translation>
+        <translation>טעקע־סאָרט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1156"/>
         <location filename="../qml/KaraokeFlow.qml" line="1169"/>
         <source>Bit rate</source>
-        <translation type="unfinished">ביט־קורס</translation>
+        <translation>ביט־קורס</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1172"/>
         <source>kbps</source>
-        <translation type="unfinished"></translation>
+        <translation>kbps</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1245"/>
         <source>THE SAME FROM THE COMMAND LINE</source>
-        <translation type="unfinished"></translation>
+        <translation>דאָס זעלבע פֿון דער באַפֿעל־שורה</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1384"/>
         <source>Back</source>
-        <translation type="unfinished">צוריק</translation>
+        <translation>צוריק</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1427"/>
         <source>Choose the lyrics</source>
-        <translation type="unfinished"></translation>
+        <translation>קלײַבן די ווערטער</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1429"/>
         <source>Lyrics (*.lrc)</source>
-        <translation type="unfinished"></translation>
+        <translation>ווערטער (*.lrc)</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1438"/>
         <source>Choose %1</source>
-        <translation type="unfinished"></translation>
+        <translation>קלײַבן %1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1440"/>
         <source>WAV audio (*.wav)</source>
-        <translation type="unfinished">WAV אַודיאָ (*.wav)</translation>
+        <translation>WAV אַודיאָ (*.wav)</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1429"/>
         <location filename="../qml/KaraokeFlow.qml" line="1440"/>
         <source>All files (*)</source>
-        <translation type="unfinished">אַלע טעקעס (*)</translation>
+        <translation>אַלע טעקעס (*)</translation>
     </message>
 </context>
 <context>
@@ -2255,109 +2255,109 @@
     <message>
         <location filename="../qml/Main.qml" line="874"/>
         <source>Open a project</source>
-        <translation type="unfinished"></translation>
+        <translation>עפֿענען אַ פּראָיעקט</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="875"/>
         <location filename="../qml/Main.qml" line="885"/>
         <source>Forge projects (*.%1)</source>
-        <translation type="unfinished"></translation>
+        <translation>Forge־פּראָיעקטן (*.%1)</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="882"/>
         <source>Save the project</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּײַכערן דעם פּראָיעקט</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1180"/>
         <source>%1 could not be opened.</source>
-        <translation type="unfinished"></translation>
+        <translation>מען האָט ניט געקענט עפֿענען %1.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1182"/>
         <source>%1 is not a Forge project: it is not a JSON document.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 איז ניט קיין Forge־פּראָיעקט: עס איז ניט קיין JSON־דאָקומענט.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1184"/>
         <source>%1 is not a Forge project: it does not say it is one.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 איז ניט קיין Forge־פּראָיעקט: עס זאָגט ניט אַז עס איז איינס.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1186"/>
         <source>%1 does not say which version of the project format it is.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 זאָגט ניט וועלכע ווערסיע פֿון דעם פּראָיעקט־פֿאָרמאַט עס איז.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1188"/>
         <source>%1 was saved by a newer Forge (project version %2). This one reads up to version %3.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 איז געשפּײַכערט געווארן דורך אַ נײַערן Forge (פּראָיעקט־ווערסיע %2). דער דאָזיקער לייענט ביז ווערסיע %3.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1191"/>
         <source>%1 could not be written.</source>
-        <translation type="unfinished"></translation>
+        <translation>מען האָט ניט געקענט שרײַבן %1.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1193"/>
         <source>Source %1 has no path and was left out.</source>
-        <translation type="unfinished"></translation>
+        <translation>די מקור %1 האָט ניט קיין דרך און איז אויסגעלאָזט געווארן.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1195"/>
         <source>%1 was not found, so it was not loaded.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 איז ניט געפֿונען געווארן, דעריבער איז עס ניט געלאָדן.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1197"/>
         <source>%1 could not be loaded: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>מען האָט ניט געקענט לאָדן %1: %2</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1199"/>
         <source>%1 &quot;%2&quot; is not one this Forge knows. It was left as it was.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 &quot;%2&quot; איז ניט באַקאַנט דעם דאָזיקן Forge. עס איז געבליבן ווי עס איז געווען.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1201"/>
         <source>%1 %2 is out of range. It was left as it was.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 %2 איז אויסער דעם באַרייך. עס איז געבליבן ווי עס איז געווען.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1203"/>
         <source>%1 kbps is not a rate this codec offers. It was left as it was.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 kbps איז ניט קיין ראַטע וואָס דער דאָזיקער קאָדעק באָט אָן. עס איז געבליבן ווי עס איז געווען.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1205"/>
         <source>%1 could not be set.</source>
-        <translation type="unfinished"></translation>
+        <translation>מען האָט ניט געקענט אײַנשטעלן %1.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1213"/>
         <source>The channel layout &quot;%1&quot; is not one this Forge knows. It was left as it was.</source>
-        <translation type="unfinished"></translation>
+        <translation>די קאַנאַל־אָרדענונג &quot;%1&quot; איז ניט באַקאַנט דעם דאָזיקן Forge. זי איז געבליבן ווי זי איז געווען.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1215"/>
         <source>An encode is running. Open the project when it has finished.</source>
-        <translation type="unfinished"></translation>
+        <translation>אַן קאָדירונג לויפֿט. עפֿנט דעם פּראָיעקט ווען זי איז פֿאַרטיק.</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1425"/>
         <location filename="../qml/Main.qml" line="1430"/>
         <source>The project was not opened</source>
-        <translation type="unfinished"></translation>
+        <translation>דער פּראָיעקט איז ניט געעפֿנט געווארן</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1439"/>
         <source>The project was opened with notes</source>
-        <translation type="unfinished"></translation>
+        <translation>דער פּראָיעקט איז געעפֿנט געווארן מיט באַמערקונגען</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1448"/>
         <source>The project was not saved</source>
-        <translation type="unfinished"></translation>
+        <translation>דער פּראָיעקט איז ניט געשפּײַכערט געווארן</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1987"/>
@@ -2368,12 +2368,12 @@
     <message>
         <location filename="../qml/Main.qml" line="1994"/>
         <source>Karaoke</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1914"/>
         <source>Project…</source>
-        <translation type="unfinished"></translation>
+        <translation>פּראָיעקט…</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1207"/>
@@ -2393,12 +2393,12 @@
     <message>
         <location filename="../qml/Main.qml" line="1924"/>
         <source>Open project…</source>
-        <translation type="unfinished"></translation>
+        <translation>עפֿענען פּראָיעקט…</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="1929"/>
         <source>Save project…</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּײַכערן פּראָיעקט…</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="2074"/>
