@@ -13,7 +13,7 @@
     | Hearth UI design (A0) | No signed design record | Signed off on 2026-09-22 ([hearth-design.md](hearth-design.md)) |
     | Hearth ESP32-C6 sink | Not started | Built as a stereo player, with firmware images published from the next release; also an ESP32-P4 sink for silicon revision v1.x |
     | AC-4 audio decode | Syntax only, "produces no audio yet" | The decoder (D1 to D11), the encoder (E1 to E10) and the applications (I1 to I5b) are built; ESP32 sinks taking AC-4 in a group (I6) are not ([ac4.md](ac4.md)) |
-    | Multi-programme E-AC-3 | Authoring done; mixing-metadata reporting open | Reporting done (#797); combining an associated service with the main programme is not built ([the plan](eac3-programme-mixing-metadata.md)) |
+    | Multi-programme E-AC-3 | Authoring done; mixing-metadata reporting open | Reporting done (#797); combining an associated service with the main programme is built (`AssociatedServiceMixer`, `forge decode associated=`); live `monitor`, `play` and Hearth do not mix yet ([the plan](eac3-programme-mixing-metadata.md)) |
     | QC delivery report file, DAW host plugin, topology | Proposed | Unchanged: nothing is built ([qc-report.md](qc-report.md), [host-plugin.md](host-plugin.md), [topology.md](topology.md)) |
     | `AC3FORGE_BUILD_HEARTH` | Default OFF | Default ON; `AC3FORGE_BUILD_AC4` now builds the encoder as well as the inspector and decoder |
     | The "UX12 stale text" | To fix when rewriting | Fixed by the rewrite |

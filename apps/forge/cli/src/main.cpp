@@ -666,7 +666,8 @@ int run_main(int argc, char** argv) {
         const bool is_option = token.find('=') != std::string_view::npos ||
                                token == "couple" || token == "heavy" || token == "heavy2" ||
                                token == "mixmeta" || token == "sign-objects" ||
-                               token == "verify-objects" || token == "verify" ||
+                               token == "verify-objects" || token == "gate-objects" ||
+                               token == "verify" ||
                                token == "bed-only" ||
                                token == "keep-partial" || token == "fast-mdct" ||
                                token == "fast-imdct" || token == "mix-lfe" ||

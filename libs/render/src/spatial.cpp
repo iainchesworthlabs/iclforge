@@ -293,6 +293,73 @@ void pan_direction(Direction source, std::span<const Direction> targets,
     }
 }
 
+unsigned speaker_zones(base::Location location, bool wide_layout) {
+    using Location = base::Location;
+    switch (location) {
+        case Location::kCentre:
+            return zone_bit::kScreen | zone_bit::kCentre;
+        case Location::kLeft:
+        case Location::kRight:
+        case Location::kLc:
+        case Location::kRc:
+            return zone_bit::kScreen;
+        case Location::kLeftSurround:
+        case Location::kRightSurround:
+            return zone_bit::kSurround | (wide_layout ? zone_bit::kSide : zone_bit::kBack);
+        case Location::kLrs:
+        case Location::kRrs:
+            return zone_bit::kBack;
+        case Location::kCs:
+            return zone_bit::kSurround | zone_bit::kBack;
+        case Location::kLsd:
+        case Location::kRsd:
+            return zone_bit::kSurround | zone_bit::kSide;
+        case Location::kLw:
+        case Location::kRw:
+            return zone_bit::kSide;
+        case Location::kTs:
+        case Location::kVhl:
+        case Location::kVhr:
+        case Location::kVhc:
+        case Location::kLts:
+        case Location::kRts:
+            return zone_bit::kTopBottom;
+        case Location::kLfe:
+        case Location::kLfe2:
+            return 0;
+    }
+    return 0;
+}
+
+unsigned direction_zones(Direction direction) {
+    if (direction.elevation_deg >= kHeightThresholdDeg) {
+        return zone_bit::kTopBottom;
+    }
+    // The angle off straight ahead, 0 to 180.
+    const double off_front = std::abs(wrap360(direction.azimuth_deg + 180.0) - 180.0);
+    if (off_front <= 45.0) {
+        return zone_bit::kScreen;
+    }
+    if (off_front <= 100.0) {
+        return zone_bit::kSurround | zone_bit::kSide;
+    }
+    return zone_bit::kSurround | zone_bit::kBack;
+}
+
+bool zone_admits(unsigned zones, int zone_constraints_idx, bool enable_elevation) {
+    if ((zones & zone_bit::kTopBottom) != 0) {
+        return enable_elevation;
+    }
+    switch (zone_constraints_idx) {
+        case 1: return (zones & zone_bit::kBack) == 0;
+        case 2: return (zones & zone_bit::kSide) == 0;
+        case 3: return (zones & (zone_bit::kBack | zone_bit::kCentre)) != 0;
+        case 4: return (zones & zone_bit::kScreen) != 0;
+        case 5: return (zones & zone_bit::kSurround) != 0;
+        default: return true;  // 0, and the reserved 6 and 7
+    }
+}
+
 Direction position_direction(double x, double y, double z) {
     const double left = 0.5 - x;
     const double forward = 0.5 - y;
@@ -301,6 +368,113 @@ Direction position_direction(double x, double y, double z) {
         return {0.0, 0.0};
     }
     return {std::atan2(left, forward) / kDegToRad, std::atan2(z, horizontal) / kDegToRad};
+}
+
+void pan_constrained(double x, double y, double z, const ObjectConstraints& constraints,
+                     std::span<const Direction> targets, std::span<const std::uint8_t> zones,
+                     std::span<double> gains) {
+    assert(zones.size() == targets.size() && gains.size() == targets.size());
+    assert(targets.size() <= kMaxRing);
+    const Direction direction = position_direction(x, y, z);
+    if (constraints.is_default()) {
+        pan_direction(direction, targets, gains);
+        return;
+    }
+    std::ranges::fill(gains, 0.0);
+    const std::size_t count = std::min(targets.size(), kMaxRing);
+
+    // The speakers this object may use, in order.
+    std::array<Direction, kMaxRing> allowed_direction{};
+    std::array<std::size_t, kMaxRing> allowed_target{};
+    std::size_t allowed = 0;
+    for (std::size_t t = 0; t < count; ++t) {
+        if (zone_admits(zones[t], constraints.zone_constraints_idx, constraints.enable_elevation)) {
+            allowed_direction[allowed] = targets[t];
+            allowed_target[allowed] = t;
+            ++allowed;
+        }
+    }
+    if (allowed == 0) {
+        // The constraint leaves no speaker here - a stereo room asked for
+        // "surround only" - so it cannot be honoured, and silence is worse.
+        for (std::size_t t = 0; t < count; ++t) {
+            allowed_direction[t] = targets[t];
+            allowed_target[t] = t;
+        }
+        allowed = count;
+    }
+    if (allowed == 0) {
+        return;
+    }
+    const std::span<const Direction> candidates(allowed_direction.data(), allowed);
+    std::array<double, kMaxRing> over_storage{};
+    const std::span<double> over(over_storage.data(), allowed);
+
+    if (constraints.snap) {
+        // The speaker whose direction is closest to the object's, by the
+        // angle between them on the sphere.
+        const double sin_e = std::sin(direction.elevation_deg * kDegToRad);
+        const double cos_e = std::cos(direction.elevation_deg * kDegToRad);
+        std::size_t best = 0;
+        double best_dot = -2.0;
+        for (std::size_t a = 0; a < allowed; ++a) {
+            const double e = candidates[a].elevation_deg * kDegToRad;
+            const double dot =
+                sin_e * std::sin(e) +
+                cos_e * std::cos(e) *
+                    std::cos((direction.azimuth_deg - candidates[a].azimuth_deg) * kDegToRad);
+            if (dot > best_dot) {
+                best_dot = dot;
+                best = a;
+            }
+        }
+        over[best] = 1.0;
+    } else if (constraints.width <= 0.0 && constraints.depth <= 0.0 && constraints.height <= 0.0) {
+        pan_direction(direction, candidates, over);
+    } else {
+        // Offsets along each axis: the centre alone for a zero extent, the
+        // centre and both ends otherwise. z spans 2 room units.
+        struct Offsets {
+            std::array<double, 3> at{};
+            std::size_t count = 1;
+        };
+        const auto offsets = [](double extent) {
+            Offsets out;
+            if (extent > 0.0) {
+                out.at = {-extent / 2.0, 0.0, extent / 2.0};
+                out.count = 3;
+            }
+            return out;
+        };
+        const Offsets along_x = offsets(constraints.width);
+        const Offsets along_y = offsets(constraints.depth);
+        const Offsets along_z = offsets(2.0 * constraints.height);
+        std::array<double, kMaxRing> point_storage{};
+        std::array<double, kMaxRing> energy{};
+        const std::span<double> point(point_storage.data(), allowed);
+        std::size_t samples = 0;
+        for (std::size_t ix = 0; ix < along_x.count; ++ix) {
+            for (std::size_t iy = 0; iy < along_y.count; ++iy) {
+                for (std::size_t iz = 0; iz < along_z.count; ++iz) {
+                    const Direction sample =
+                        position_direction(std::clamp(x + along_x.at[ix], 0.0, 1.0),
+                                           std::clamp(y + along_y.at[iy], 0.0, 1.0),
+                                           std::clamp(z + along_z.at[iz], -1.0, 1.0));
+                    pan_direction(sample, candidates, point);
+                    for (std::size_t a = 0; a < allowed; ++a) {
+                        energy[a] += point[a] * point[a];
+                    }
+                    ++samples;
+                }
+            }
+        }
+        for (std::size_t a = 0; a < allowed; ++a) {
+            over[a] = std::sqrt(energy[a] / static_cast<double>(samples));
+        }
+    }
+    for (std::size_t a = 0; a < allowed; ++a) {
+        gains[allowed_target[a]] = over[a];
+    }
 }
 
 std::size_t BedRenderer::add_object(const ObjectState& initial) {

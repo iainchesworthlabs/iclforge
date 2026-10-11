@@ -89,6 +89,7 @@ iclforge_add_library(ac3
         src/core/mantissas.cpp
         src/core/mdct.cpp
         src/core/transform/reference/reference_transform.cpp
+        src/decoder/associated_service.cpp
         src/decoder/decoder.cpp
         src/decoder/diagnostics.cpp
         src/decoder/eac3_decoder.cpp

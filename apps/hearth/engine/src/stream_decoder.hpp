@@ -6,6 +6,7 @@
 #include <deque>
 #include <expected>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -215,6 +216,23 @@ public:
                                                                  const UnitFn& reported = {},
                                                                  std::uint32_t unit_samples = 0);
 
+    // One rendered block of a further layout: a span per slot of that layout,
+    // `frames` long, valid for the duration of the call.
+    using VariantFn = std::function<void(
+        std::size_t variant, std::span<const std::span<const float>> slots, std::size_t frames)>;
+    // Further layouts the same stream is rendered to, each by a decoder of its
+    // own: a stereo or mono room is the decoder's fold, with the stream's own
+    // mix levels and the listener's settings, which the placement of a wider
+    // layout's coded channels is not, so a layout cannot be got from another's
+    // blocks. Every block this delivers is preceded by one `deliver` call for
+    // each layout, in the order given, with that layout's rendering of the
+    // same samples; a layout whose decoder failed or ran short is delivered
+    // silence, so the layouts stay in step with the block they go with. The
+    // layouts are kept across reset() and finish(); an empty list drops them.
+    // Their units are not reported - only this decoder's are.
+    void set_variants(std::span<const render::OutputLayout> layouts, VariantFn deliver);
+    [[nodiscard]] std::size_t variant_count() const { return variants_.size(); }
+
     // `settings` from the next unit, without a new decoder: true where that
     // is how they take effect - an AC-4 stream, whose decoder takes its
     // output processing and presentation from its next frame and keeps what
@@ -265,6 +283,18 @@ private:
         bool dual_mono = false;
     };
 
+    // What decode() and finish() are for one layout: this decoder's own work,
+    // with no variants (set_variants()).
+    [[nodiscard]] std::expected<std::size_t, std::string> decode_unit(
+        std::span<const std::byte> unit, const BlockFn& deliver, const UnitFn& reported,
+        std::uint32_t unit_samples);
+    std::size_t finish_unit(const BlockFn& deliver, const UnitFn& reported);
+    // `deliver` for this decoder's blocks while it has variants: each block of
+    // theirs that goes with `frames` first, then the block.
+    void release_variants(std::size_t frames);
+    // Forgets the blocks the variants have waiting.
+    void discard_variant_blocks();
+
     void place(const ac3::PcmBlock& block, const BlockFn& deliver);
     std::size_t render_flushed(std::span<ac3::DecodedSubstream> substreams, const BlockFn& deliver,
                                const UnitFn& reported);
@@ -300,6 +330,17 @@ private:
     // call decoded, absent for render_flushed()'s own final unit - see
     // UnitReport::bitrate_kbps' own comment on why.
     void finish_report(UnitReport& out, std::optional<std::size_t> unit_bytes);
+
+    // The further layouts (set_variants()): a decoder each, and the blocks it
+    // has rendered of the unit being decoded, planar and `frames` long, until
+    // this decoder's own block of the same samples is delivered.
+    struct Variant {
+        std::unique_ptr<StreamDecoder> decoder;
+        std::deque<std::pair<std::vector<float>, std::size_t>> blocks;
+    };
+    std::vector<Variant> variants_;
+    VariantFn variant_fn_;
+    std::vector<float> variant_scratch_;
 
     render::OutputLayout layout_;
     std::uint32_t sample_rate_;

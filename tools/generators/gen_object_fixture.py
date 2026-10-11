@@ -1,10 +1,11 @@
-"""Local-only generator for the committed third-party Dolby Atmos fixture.
+"""Local-only generator for the committed third-party Dolby Atmos fixtures.
 
 `testdata/object-fixture/dee_joc_514.ec3` is a DD+ JOC bitstream produced
 by the Dolby Encoding Engine (bundled in "Dolby Media Encoder") from the
-synthetic 5.1.4 tone bed this script also writes. It is the ONLY Atmos stream
-in this repository that this project's own encoder did not make, and so the
-only check that the object layer reads syntax nobody here writes:
+synthetic 5.1.4 tone bed this script also writes. With `dee_joc_714.ec3` and
+`dee_joc_916.ec3` (below) these are the ONLY Atmos streams in this repository
+that this project's own encoder did not make, and so the only check that the
+object layer reads syntax nobody here writes:
 
   - a bed program (b_dyn_object_only_program 0) with a twelve-channel
     7.1.4 bed_channel_assignment and no dynamic objects at all;
@@ -28,6 +29,18 @@ authored with Dolby tools") and refuses a master this project authors, so the
 `cbi_wav` path is the only one available here. That is why the fixture has no
 dynamic objects and therefore no object size, zone or snap on the wire - the
 encode-side round trip in libs/ac3/tests/oba/test_oba.cpp covers those instead.
+
+The 7.1.4 and 9.1.6 fixtures (`dee_joc_714.ec3`, `dee_joc_916.ec3`) exist for
+the one thing the 5.1.4 one cannot say: whether the bed's channel ORDER holds
+past ten channels, where the standard's Table 12 order and the order a
+production tool takes its input in (L R C LFE Ls Rs Lrs Rrs [Lw Rw] heights...)
+are two different permutations - 9.1.6 puts the wides at the END of the OAMD
+bed but right after the rears at the input. A tone per channel, all at once,
+reconstructs too close to its neighbours to be named from a 16-object parametric
+downmix, so these beds play ONE channel at a time - channel k alone, for a tenth
+of a second, in slice k - and a reconstructed object is then identified by which
+slice it is loud in. That is unambiguous whatever the solver does with the rest,
+and it names the channel without trusting this project's order for it.
 
 DEE is licensed commercial software and must never run in CI, exactly as
 gen_external_baseline.py says of the same binary - hence the same
@@ -121,6 +134,53 @@ def invoke_dee(wav, out):
         check=True)
 
 
+# The channel-based-immersive layouts DEE's cbi_wav input takes beyond 5.1.4, in
+# the order it reads them (measured the way CHANNELS was, and written the same
+# way: the tone bed is time-multiplexed, see the header). Table 12's order for
+# the same layouts is libs/objects's bed_labels().
+TDM_LAYOUTS = {
+    "714": ["L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs", "Ltf", "Rtf", "Ltr", "Rtr"],
+    "916": ["L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs", "Lw", "Rw",
+            "Ltf", "Rtf", "Ltm", "Rtm", "Ltr", "Rtr"],
+}
+SLICE_SECONDS = 0.1
+
+
+def write_tdm_bed(path, channels):
+    """Channel k plays a 0.1 s tone, alone, in slice k; every other channel is silent."""
+    per_slice = int(SAMPLE_RATE * SLICE_SECONDS)
+    n = per_slice * len(channels)
+    pcm = np.zeros((n, len(channels)))
+    ramp = int(0.01 * SAMPLE_RATE)
+    for k in range(len(channels)):
+        frequency = 220.0 * (1.0 + 0.17 * k)
+        index = np.arange(per_slice)
+        fade = np.minimum(1.0, np.minimum(index, per_slice - 1 - index) / ramp) * 0.5
+        t = (k * per_slice + index) / SAMPLE_RATE
+        pcm[k * per_slice:(k + 1) * per_slice, k] = fade * np.sin(2 * np.pi * frequency * t)
+    samples = (np.clip(pcm, -1.0, 1.0) * 32767.0).astype(np.int16)
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(len(channels))
+        w.setsampwidth(2)
+        w.setframerate(SAMPLE_RATE)
+        w.writeframes(samples.tobytes())
+
+
+def invoke_dee_auto_rate(wav, out):
+    """As invoke_dee, with DEE choosing the data rate (448 kbps for both layouts
+    at the time of writing): a short stream with a fixed 768 would be mostly
+    padding."""
+    subprocess.run(
+        [str(DEE),
+         "--input-format", "cbi_wav",
+         "--input", str(wav),
+         "--encoder", "drc_profile=none",
+         "--loudness-management", "measure_only",
+         "--overwrite", "1",
+         "--output", str(out)],
+        check=True)
+
+
 def main():
     guard_not_ci()
     if not DEE.exists():
@@ -134,6 +194,14 @@ def main():
     # table above, and nothing in the repository reads it.
     wav.unlink()
     print(f"wrote {stream} ({stream.stat().st_size} bytes)")
+
+    for tag, channels in TDM_LAYOUTS.items():
+        wav = OUT_DIR / f"tdm_bed_{tag}.wav"
+        stream = OUT_DIR / f"dee_joc_{tag}.ec3"
+        write_tdm_bed(wav, channels)
+        invoke_dee_auto_rate(wav, stream)
+        wav.unlink()
+        print(f"wrote {stream} ({stream.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":

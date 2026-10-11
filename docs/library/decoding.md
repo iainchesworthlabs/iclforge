@@ -167,8 +167,10 @@ Stated as limits rather than left to be discovered:
 - A **dependent** E-AC-3 substream reports no `compr` whatever its `compre` bit says: §E3.8.5
   repurposes that bit to mark the last dependent of the programme. Its eight bits are still
   skipped correctly; they are simply not a `compr` word.
-- `strmtyp 2` (a convertible substream, §E2.3.1.1) is refused outright, matching
-  `iclforge::ac3::plan::validate`'s own stance.
+- `strmtyp 2` (a convertible substream, §E2.3.1.1: previously coded in AC-3) is edited as an
+  independent substream is. Its bsi swaps `convsync` for `blkid` and `frmsizecod`, which are
+  walked and left as they are, and it sends neither the programme-mixing group nor the converter
+  elements Table E1.2 and E1.3 gate on `strmtyp` 0. `strmtyp` 3 is reserved and refused.
 
 A field named in an edit that **no** syncframe in the stream carries fails before anything is
 written, so the stream is either fully rewritten or left byte-for-byte alone — a metadata option
@@ -597,7 +599,14 @@ and ramp duration; object size, zone constraints, elevation gating, snap, screen
 distance, explicit priority and Table 18's gain-reuse; positions coded differentially against
 the previous block; inactive objects; several bed instances, standard or non-standard;
 programmes carrying an intermediate spatial format; the `trim_element` and the
-`extended_object_element`. An `oa_element` with an id this decoder does not know is skipped by
+`extended_object_element` - object divergence, and the extended precision positions that refine
+x and y by up to two fifths of the standard 1/62 step and z by two fifths of 1/15 (§5.6.1.1.8-.14,
+Tables 43-46). A refinement belongs to the update block that carries it and is not what the next
+block's differential coding builds on, which the standard says is the standard-precision value;
+an object that is not active sends none. The extended precision positions are decoded from the
+text alone: no outside stream carries one (DEE's channel-based-immersive streams have no dynamic
+objects), so which axis a presence bit names follows the convention the other arrays of this
+payload were checked against, not a stream of its own. An `oa_element` with an id this decoder does not know is skipped by
 its own `oa_element_size` and named in `DecodedProgram::skipped_elements`, rather than costing
 the payload — which is exactly what that size field is for. On the JOC side: all five of
 Table 47's downmix configurations, any clip gain, and per-object band count, quantizer, sparse
@@ -632,8 +641,10 @@ post-multiply there covers all of them with no duplication.
 
 Separately, and permanently rather than as a gap: Table 47's two "90 degree phase shift" downmix
 configurations reconstruct like their unshifted siblings — the shift is a property of how the
-downmix was *built*, §6.6.6 says nothing about undoing it before matrixing, and there is no
-Hilbert filterbank here to undo it with.
+downmix was *built*, and §6.6.6 says nothing about undoing it before matrixing (the text mentions
+it only in the configurations' names), so nothing is undone. A DEE stream of configuration 3
+(`testdata/object-fixture/dee_joc_514.ec3`) reconstructs each object as its own channel through
+exactly this path.
 
 Reconstruction needs the downmix JOC asks for. Table 47's three widest configurations need a
 dependent substream's extra channel pair before they can reconstruct at all — `kDmxConfig7X` wants
@@ -863,6 +874,80 @@ before the field existed and is right for the single-programme case;
 `iclforge::ac3::io::scan` reports the same thing for a muxer: `ScannedStream::programmes` describes each
 programme's layout, channel count, `bsmod` and access units, and `ScannedStream::access_units`
 is the **first** programme's units alone rather than all of them spliced into one track.
+
+### Mixing an associated service: `iclforge::ac3::AssociatedServiceMixer`
+
+`iclforge/ac3/decoder/associated_service.hpp`. A main programme and an associated service — a
+visually impaired description, a commentary, a voice-over — are made to be heard together, and
+§E3.10 says what the stream controls about that: levels, per-channel trims and, for a mono
+service, where it sits among the main's speakers. Annex E leaves the mixing itself to the
+receiver, and this class is that receiver. It sits after the decoders rather than inside one:
+each programme is its own `Eac3Decoder`, the associated one chosen with `DecoderConfig::programme`,
+and what joins them is their PCM and the `mixing` group each `DecodedAccessUnit` reports.
+
+```cpp
+iclforge::ac3::Eac3Decoder main_decoder{{.programme = 0}};
+iclforge::ac3::Eac3Decoder description_decoder{{.programme = 1}};
+iclforge::ac3::AssociatedServiceMixer mixer;  // one per pair of programmes
+
+// For each frame period, once both programmes have produced their unit:
+auto main = main_decoder.decode_access_unit(main_unit);
+auto description = description_decoder.decode_access_unit(description_unit);
+const auto applied = mixer.mix(**main, **description);  // the description joins the main, in place
+// applied->main_gain_db, applied->associated_gain_db and applied->panmean say what was done
+```
+
+What the stream's metadata does, and the clause it comes from:
+
+| Field | Applied to | Clause |
+|---|---|---|
+| `pgmscl`, and `pgmscl2` for the second channel of a 1+1 service | the programme that carries it | §E3.10.1 |
+| `extpgmscl` | the **other** programme: the description's is how a broadcaster ducks the main under it; the main's scales the description | §E3.10.2 |
+| `extpgmlscl`, `extpgmcscl`, `extpgmrscl`, `extpgmlsscl`, `extpgmrsscl`, `extpgmlfescl`, `extpgmaux1scl`, `extpgmaux2scl` | one channel of the other programme, on top of `extpgmscl` (the gains add in dB) | §E3.10.6 |
+| `dmixscl` | the other programme **instead of** the per-channel scales, when it reached the mixer already folded to two channels | §E3.10.7 |
+| `panmean`, `panmean2` | a **mono** associated service, over a stereo main by Table E3.15 and over a 5.1 main by Tables E3.16 and E3.17; no pan is "centre" | §E3.10.8 |
+
+The two programmes' gains are in `MixMetadata` as codes; `meta::pgm_scale_gain()` and
+`meta::external_scale_gain()` turn them into linear gains, mute (`pgmscl` 0, Table E2.8's
+code 15) included. A change of gain from one access unit to the next ramps over the first block
+of the unit rather than stepping, which is what an audio description's fade needs.
+
+What is **not** applied, because Annex E gives it nothing to apply: `premixcmpsel`, `drcsrc` and
+`premixcmpscl` (§E2.3.1.21: "decoders are not required to use them", and §E3.10.3 says the
+compression model they were written for "is not supported by the E-AC-3 mixing model"); the
+speech enhancement words (§E2.3.1.45: "placeholders for as yet undefined data");
+`blkmixcfginfo`; and the reserved `paninfo` bits. They are all still decoded and reported in
+`DecodedAccessUnit::mixing`, and a test holds that setting them changes no sample.
+
+Three things go beyond the text, and are the mixer's own choices:
+
+- **Layouts the pan tables do not cover.** Tables E3.15 to E3.17 are for a stereo main and a
+  5.1 main. A 3.0, quad or 7.1 main is served by the 5.1 tables with the seats it lacks folded
+  into the nearest it has, by power; channels sharing a seat (Ls and Lrs) split its power; heights
+  and the LFEs receive none of the service; a main with a lone centre takes it unpanned.
+  `pan_weights(panmean, locations)` is the function, and it is constant power throughout.
+- **A stereo or wider associated service is not panned**, since it has a soundfield of its own.
+  Each of its channels goes to the main's channel at the same location, folded to the nearest
+  seat where the main has none.
+- **The level is the decoders'.** The mixer applies the metadata's gains and nothing else, so
+  dialnorm normalisation, `dynrng`/`compr` and the §7.8 fold are whatever each decoder was
+  configured with, and the sum is not limited. `AssociatedServiceMixConfig` says which fold each
+  programme's decoder made, because a folded unit's `channels` are L and R (or C) while its
+  `layout` still names the programme it was folded from; the associated programme is best
+  decoded as coded, so that a mono description reaches the mixer as the one channel its pan
+  places. `associated_trim_db` is the listener's own control of the description's volume.
+
+Two programmes of one stream always share a sample rate and a block count (§E2.3.1.2), which is
+what lets the units pair frame for frame; `mix()` refuses units of different lengths or rates
+(`MixError`) rather than mixing them misaligned.
+
+Nothing outside this project decodes two programmes at once, so there is no external oracle for
+the mix: FFmpeg refuses a second independent substream and ignores `mixmdate`'s scales. What is
+checked is the spec's own arithmetic — Tables E3.15 to E3.17 written out independently of the
+implementation and compared at every `panmean` — and an encode, decode and mix of a 5.1 main with
+a mono description through this project's own encoder, measured tone by tone
+(`tests/decoder/test_associated_service*.cpp`). `forge decode ... associated=` applies it from the
+command line; see [Programme options](../forge/cli/metadata-options.md#programme-options-decode-qc-levels-programme).
 
 ## Decoding bytes you do not control
 

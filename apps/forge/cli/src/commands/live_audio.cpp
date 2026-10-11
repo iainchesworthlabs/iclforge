@@ -118,11 +118,10 @@ std::expected<MonitorTarget, int> monitor_target(int device_index) {
 // element's 5.X.
 int monitor_ac4(std::span<const std::byte> stream, std::string_view in_path,
                 const MonitorTarget& target, const Options& meta) {
-    if (meta.verify_objects) {
+    if (meta.verify_objects || meta.gate_objects) {
         fmt::println(stderr,
-                     "error: {} is AC-4: verify-objects checks the EMDF object signatures of AC-3 "
-                     "and E-AC-3",
-                     in_path);
+                     "error: {} is AC-4: {} checks the EMDF object signatures of AC-3 and E-AC-3",
+                     in_path, meta.verify_objects ? "verify-objects" : "gate-objects");
         return kExitUsage;
     }
     if (!meta.ac4_drc_mode.empty() && meta.ac4_drc_mode != "off" &&
@@ -230,22 +229,35 @@ int monitor_ac4(std::span<const std::byte> stream, std::string_view in_path,
 }  // namespace
 
 int run_monitor(std::string_view in_path, int device_index, const Options& meta) {
-    const auto stream = read_elementary_stream(in_path);
-    if (stream.empty()) {
+    const auto raw = read_elementary_stream(in_path);
+    if (raw.empty()) {
         return kExitInput;
     }
     // AC-4's sync word, 0xAC40 or 0xAC41, where A/52's is 0x0B77: its own
     // decoder, and none of the A/52 checks below.
-    if (is_ac4_stream(stream)) {
+    if (is_ac4_stream(raw)) {
         const auto target = monitor_target(device_index);
         if (!target.has_value()) {
             return target.error();
         }
-        return monitor_ac4(stream, in_path, *target, meta);
+        return monitor_ac4(raw, in_path, *target, meta);
     }
-    if (!apply_object_verification(stream, meta, status_stream())) {
+    if (!apply_object_verification(raw, meta, status_stream())) {
         return kExitInput;
     }
+    // gate-objects plays a copy in which every frame that did not verify is
+    // already its bed (see apply_object_gate); `stream` is that copy, or the
+    // stream as read - no copy - when the option was not given.
+    std::vector<std::byte> gated;
+    if (meta.gate_objects) {
+        auto result = apply_object_gate(raw, meta, status_stream());
+        if (!result) {
+            return kExitInput;
+        }
+        gated = std::move(*result);
+    }
+    const std::span<const std::byte> stream =
+        meta.gate_objects ? std::span<const std::byte>{gated} : std::span<const std::byte>{raw};
     if (!iclforge::ac3::stream_bsid(stream).has_value()) {
         fmt::println(stderr, "error: {} is too short to hold a syncframe", in_path);
         return kExitInput;
@@ -520,14 +532,26 @@ SpatialXyz to_windows_spatial(const iclforge::objects::oba::Position& p) {
 }  // namespace
 
 int run_spatial(std::string_view in_path, int device_index, const Options& meta) {
-    const auto stream = read_all(in_path);
-    if (stream.empty()) {
+    const auto raw = read_all(in_path);
+    if (raw.empty()) {
         fmt::println(stderr, "error: cannot read {}", in_path);
         return kExitInput;
     }
-    if (!apply_object_verification(stream, meta, status_stream())) {
+    if (!apply_object_verification(raw, meta, status_stream())) {
         return kExitInput;
     }
+    // As run_monitor: with gate-objects, the objects are the ones that
+    // verified and the rest of the programme is its bed.
+    std::vector<std::byte> gated;
+    if (meta.gate_objects) {
+        auto result = apply_object_gate(raw, meta, status_stream());
+        if (!result) {
+            return kExitInput;
+        }
+        gated = std::move(*result);
+    }
+    const std::span<const std::byte> stream =
+        meta.gate_objects ? std::span<const std::byte>{gated} : std::span<const std::byte>{raw};
     if (!iclforge::ac3::stream_bsid(stream).has_value()) {
         fmt::println(stderr, "error: {} is too short to hold a syncframe", in_path);
         return kExitInput;

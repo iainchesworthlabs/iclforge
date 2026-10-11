@@ -669,8 +669,10 @@ TEST_CASE("reserved and foreign syncframe headers are refused before anything is
     patched[5] = std::byte{12U << 3} | (patched[5] & std::byte{0x07});  // bsid 12
     refused(patched, EditError::kUnsupportedBsid);
 
+    // strmtyp 3 is reserved. strmtyp 2 is a stream type (§E2.3.1.1) and is
+    // edited like any independent substream: see test_eac3_convertible.cpp.
     patched = eac3_frame;
-    patched[2] = (patched[2] & std::byte{0x3F}) | std::byte{0x80};  // strmtyp 2
+    patched[2] = (patched[2] & std::byte{0x3F}) | std::byte{0xC0};  // strmtyp 3
     refused(patched, EditError::kReservedValue);
     patched = eac3_frame;
     patched[4] |= std::byte{0xF0};  // fscod '11' and fscod2 '11'

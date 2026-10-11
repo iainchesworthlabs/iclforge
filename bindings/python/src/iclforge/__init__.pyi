@@ -1171,6 +1171,31 @@ class signing:
     @staticmethod
     def verify_atmos_stream(stream: bytes, key: signing.SigningKey) -> signing.VerifySummary: ...
 
+    class KeyringSummary:
+        @property
+        def totals(self) -> signing.VerifySummary: ...
+        @property
+        def per_key(self) -> list[int]: ...
+
+    class GateSummary:
+        @property
+        def passed(self) -> int: ...
+        @property
+        def gated(self) -> int: ...
+        @property
+        def no_objects(self) -> int: ...
+        @property
+        def per_key(self) -> list[int]: ...
+
+    @staticmethod
+    def verify_atmos_stream_any(
+        stream: bytes, keys: list[signing.SigningKey]
+    ) -> signing.KeyringSummary: ...
+    @staticmethod
+    def gate_atmos_stream(
+        stream: bytes, keys: list[signing.SigningKey]
+    ) -> tuple[bytes, signing.GateSummary]: ...
+
 # Matroska/MP4/MPEG-TS carriage (Python bindings completeness). Same submodule-as-class convention.
 class containers:
     class MatroskaTrack:

@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 103> kOptionTokens{{
+constexpr std::array<OptionToken, 104> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -49,6 +49,7 @@ constexpr std::array<OptionToken, 103> kOptionTokens{{
     {"keep-partial", "keep a failed run's already-encoded frames as <name>.partial.<ext>"},
     {"sign-objects", "write a keyed EMDF object signature (needs signing-key=)"},
     {"verify-objects", "check each frame's EMDF object signature instead of just decoding"},
+    {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
@@ -85,9 +86,12 @@ constexpr std::array<OptionToken, 103> kOptionTokens{{
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},
-    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service"},
+    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service; of "
+                    "E-AC-3: mix that programme (a substream id 0..7, or a service name its bsmod "
+                    "labels) into the one being decoded, §E3.10"},
     {"dialogue-gain=", "decode of AC-4: g_dialog, the dialogue against music and effects, dB"},
-    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less"},
+    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less; of "
+                         "E-AC-3: the same trim on the programme associated= mixes in"},
     {"headphones", "decode of AC-4: a listener on headphones - their DRC mode, pre-virtualized presentations"},
     {"md-compat=", "decode of AC-4: the md_compat level the decoder claims, 0 to 7 (default 7)"},
     {"syntax-trace=", "ac4-encode, and decode of AC-4: write every syntax element written or read"},
@@ -677,8 +681,9 @@ void print_stream_tools_topic() {
     fmt::println("across rather than resetting them, and folds a layout AC-3 cannot code down");
     fmt::println("to 5.1 per §7.8. The other four never touch a coded coefficient:");
     fmt::println("metadata/normalize rewrite bsi fields in place and re-stamp the CRCs, cut/cat");
-    fmt::println("move whole access units. Convertible substreams (strmtyp 2) are out of scope");
-    fmt::println("for all five, the same way 'validate' already refuses them.");
+    fmt::println("move whole access units. A convertible substream (strmtyp 2, §E2.3.1.1:");
+    fmt::println("previously coded in AC-3) is an independent one and goes through all five;");
+    fmt::println("transcode reads it as the E-AC-3 it is.");
     fmt::println("");
     fmt::println("metadata can only overwrite a field the stream already transmits. A field it");
     fmt::println("does not (compr behind a clear compre, bsmod and dsurmod behind a clear");
@@ -690,11 +695,13 @@ void print_stream_tools_topic() {
 
 void print_objects_topic() {
     fmt::println("");
-    fmt::println("sign-objects/verify-objects carry a keyed signature over the EMDF object");
-    fmt::println("       container: the encode side writes one, a decode or monitor checks it");
-    fmt::println("       and refuses the whole command on a mismatch. Both need a key -");
-    fmt::println("       signing-key=<path>, or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY");
-    fmt::println("       - which this tool never stores. See docs/concepts/object-signing.md.");
+    fmt::println("sign-objects/verify-objects/gate-objects carry a keyed signature over the EMDF");
+    fmt::println("       object container: the encode side writes one, a decode or monitor checks");
+    fmt::println("       it - verify-objects refuses the whole command on a mismatch, gate-objects");
+    fmt::println("       plays the bed for the frames that do not verify and the objects for the");
+    fmt::println("       rest. All need a key - signing-key=<path> (repeat it for a keyring when");
+    fmt::println("       checking), or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY - which");
+    fmt::println("       this tool never stores. See docs/concepts/object-signing.md.");
 }
 
 // The per-topic sections, in the order both the full listing and a single
@@ -843,8 +850,15 @@ void print_option_blocks(std::uint32_t mask) {
                      "against signing-key= instead of just playing it - a mismatch refuses the "
                      "command; omitted (the default) decodes signed and unsigned streams alike, "
                      "unchecked");
-        fmt::println("  signing-key=<path>      the key file sign-objects/verify-objects use "
-                     "(or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY)");
+        fmt::println("  gate-objects      decode/monitor/spatial: the licensed policy - frames whose "
+                     "object signature verifies against signing-key= play as objects, any other "
+                     "(unsigned, another key's, altered) plays as its 5.1 bed and the decode "
+                     "carries on; where verify-objects would refuse. Not combinable with "
+                     "verify-objects");
+        fmt::println("  signing-key=<path>      the key file sign-objects/verify-objects/gate-objects "
+                     "use (or ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY). Repeat it to give "
+                     "verify-objects and gate-objects several keys - a frame is good under any of "
+                     "them; sign-objects takes one");
     }
     if ((mask & topic::kMulti) != 0) {
         fmt::println("");

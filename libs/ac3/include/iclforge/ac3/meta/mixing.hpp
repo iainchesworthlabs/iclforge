@@ -327,6 +327,19 @@ inline constexpr int kPgmScaleMax = 63;
     return static_cast<double>(code) - 51.0;
 }
 
+// The linear gain of a programme scale factor code (§E2.3.1.13): 0 is mute and
+// returns exactly 0.0, 1..63 are pgm_scale_db(code). A code outside 0..63 was
+// never read from the wire and is treated as unity, as dialnorm_gain() treats
+// one it cannot trust.
+[[nodiscard]] ICLFORGE_AC3_EXPORT double pgm_scale_gain(int code);
+
+// The linear gain of a Table E2.8 external-programme scale code (extpgmlscl and
+// its siblings, dmixscl, extpgmaux1scl/2scl). Code 15 is the table's -infinity
+// row and returns exactly 0.0, which kExternalScaleDb cannot say: it holds that
+// row as 0.0 dB, so reading it as a level reads mute as unity. Outside 0..15
+// returns unity, for the same reason as pgm_scale_gain().
+[[nodiscard]] ICLFORGE_AC3_EXPORT double external_scale_gain(int code);
+
 // Every value fits the bits Table E1.2 gives its field, and neither dmixmod nor
 // a surround level is one of the reserved codes. Same reasoning as
 // valid_bsi_info(): a value one bit too wide does not record the wrong level,

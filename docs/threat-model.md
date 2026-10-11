@@ -378,13 +378,17 @@ advisory job, and deciding a document-size policy; neither has been done.
 
 ### Object signing is authentication, not integrity of the stream
 
-`iclforge::ac3::signing::verify_atmos_frame`/`verify_atmos_stream` check an HMAC tag over the EMDF object
-container. This tells you the object metadata came from someone holding the key. It does **not**
-authenticate the audio, the bed, or anything outside the container, and a stream with no
-container at all has nothing to verify — see
+`iclforge::ac3::signing::verify_atmos_frame`/`verify_atmos_stream` (and their keyring forms,
+`verify_atmos_frame_any`/`verify_atmos_stream_any`) check an HMAC tag over the frame's audio and its
+EMDF object container together. This tells you the frame's object metadata and the audio it was
+signed with came from someone holding a key of the set. What the tag leaves out is the framing
+words, a few metadata flags, every skip field's own bytes and the CRC — which is why a frame is
+reported valid only when the container is the *whole* of its object layer: a second payload in
+another skip field, or bytes trailing the container, would be unauthenticated and so is a mismatch.
+A stream with no container at all has nothing to verify — see
 [Object signing](concepts/object-signing.md). Verification is opt-in
-(`forge decode ... verify-objects`); a signed-but-unchecked stream decodes exactly like an
-unsigned one. This project ships no key.
+(`forge decode ... verify-objects`, or `gate-objects` to play the bed where it does not verify); a
+signed-but-unchecked stream decodes exactly like an unsigned one. This project ships no key.
 
 ### OSC live-position input has no authentication or encryption
 

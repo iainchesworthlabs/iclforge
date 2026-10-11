@@ -432,9 +432,10 @@ ICLFORGE_C_EXPORT void iclforge_decoded_frame_destroy(iclforge_decoded_frame_t* 
  * --------------------------------------------------------------------- */
 
 /* Mirrors iclforge::ac3::eac3::StreamType (Table E1.2, §E2.3.1.2). This encoder only
- * ever emits kIndependent/kDependent; kConvertible/kReserved are accepted
- * here for a faithful mirror but never produced by anything below, the same
- * way iclforge::ac3::eac3::FrameEncoder's own validate() refuses them. */
+ * ever emits kIndependent/kDependent. kConvertible (a type 2 substream, §E2.3.1.1)
+ * needs the AC-3 frame size code the C++ FrameConfig carries and this struct does
+ * not, so the C++ encoder's validate() refuses it from here; kReserved it refuses
+ * outright. Decoded substreams report either. */
 typedef enum iclforge_stream_type {
     ICLFORGE_STREAM_TYPE_INDEPENDENT = 0,
     ICLFORGE_STREAM_TYPE_DEPENDENT = 1,

@@ -253,6 +253,10 @@ StreamDecoder::StreamDecoder(const render::OutputLayout& layout, std::uint32_t s
 }
 
 void StreamDecoder::reset() {
+    for (Variant& variant : variants_) {
+        variant.decoder->reset();
+    }
+    discard_variant_blocks();
     ac3_decoder_.reset();
     eac3_decoder_.reset();
     if (ac4_decoder_) {
@@ -284,6 +288,9 @@ bool StreamDecoder::set_crossover_hz(double hz) {
         return false;
     }
     crossover_hz_ = hz;
+    for (Variant& variant : variants_) {
+        variant.decoder->set_crossover_hz(hz);
+    }
     return true;
 }
 
@@ -302,10 +309,95 @@ void StreamDecoder::finish_report(UnitReport& out, std::optional<std::size_t> un
                             : std::nullopt;
 }
 
+void StreamDecoder::set_variants(std::span<const render::OutputLayout> layouts, VariantFn deliver) {
+    variants_.clear();
+    variant_fn_ = std::move(deliver);
+    if (!variant_fn_) {
+        return;
+    }
+    for (const render::OutputLayout& layout : layouts) {
+        Variant variant;
+        variant.decoder =
+            std::make_unique<StreamDecoder>(layout, sample_rate_, settings_, substreams_);
+        variant.decoder->set_crossover_hz(crossover_hz_);
+        variants_.push_back(std::move(variant));
+    }
+}
+
+void StreamDecoder::discard_variant_blocks() {
+    for (Variant& variant : variants_) {
+        variant.blocks.clear();
+    }
+}
+
+void StreamDecoder::release_variants(std::size_t frames) {
+    for (std::size_t index = 0; index < variants_.size(); ++index) {
+        Variant& variant = variants_[index];
+        const std::size_t slots = variant.decoder->layout().slots();
+        std::array<std::span<const float>, render::OutputLayout::kMaxSlots> views{};
+        std::vector<float> block;
+        std::size_t block_frames = 0;
+        if (!variant.blocks.empty()) {
+            block = std::move(variant.blocks.front().first);
+            block_frames = variant.blocks.front().second;
+            variant.blocks.pop_front();
+        }
+        if (block_frames != frames || block.size() != slots * frames) {
+            // Failed or short of this block, or not the one it goes with:
+            // silence of the right length, so the layouts stay in step.
+            variant_scratch_.assign(slots * frames, 0.0F);
+            for (std::size_t slot = 0; slot < slots; ++slot) {
+                views[slot] =
+                    std::span<const float>(variant_scratch_).subspan(slot * frames, frames);
+            }
+        } else {
+            for (std::size_t slot = 0; slot < slots; ++slot) {
+                views[slot] = std::span<const float>(block).subspan(slot * frames, frames);
+            }
+        }
+        variant_fn_(index, std::span<const std::span<const float>>(views.data(), slots), frames);
+    }
+}
+
 std::expected<std::size_t, std::string> StreamDecoder::decode(std::span<const std::byte> whole,
                                                               const BlockFn& deliver,
                                                               const UnitFn& reported,
                                                               std::uint32_t unit_samples) {
+    if (variants_.empty()) {
+        return decode_unit(whole, deliver, reported, unit_samples);
+    }
+    // Every layout's decoder takes the unit first and keeps its blocks; this
+    // decoder's own then go out one at a time, each with its layouts' ahead of
+    // it. All of them hold units back the same way, so the blocks pair up.
+    discard_variant_blocks();
+    for (Variant& variant : variants_) {
+        Variant* const mine = &variant;
+        const BlockFn keep = [mine](std::span<const std::span<const float>> slots,
+                                    std::size_t frames) {
+            std::vector<float> planar;
+            planar.reserve(slots.size() * frames);
+            for (const std::span<const float>& slot : slots) {
+                planar.insert(planar.end(), slot.begin(),
+                              slot.begin() + static_cast<std::ptrdiff_t>(frames));
+            }
+            mine->blocks.emplace_back(std::move(planar), frames);
+        };
+        // An error resets that decoder and leaves the next unit clean; this
+        // decoder's own result is the one that is reported.
+        (void)variant.decoder->decode(whole, keep, {}, unit_samples);
+    }
+    const BlockFn merged = [this, &deliver](std::span<const std::span<const float>> slots,
+                                            std::size_t frames) {
+        release_variants(frames);
+        deliver(slots, frames);
+    };
+    return decode_unit(whole, merged, reported, unit_samples);
+}
+
+std::expected<std::size_t, std::string> StreamDecoder::decode_unit(std::span<const std::byte> whole,
+                                                                   const BlockFn& deliver,
+                                                                   const UnitFn& reported,
+                                                                   std::uint32_t unit_samples) {
     delivered_ = 0;
     if (starts_ac4(whole)) {
         return decode_ac4(whole, deliver, reported, unit_samples);
@@ -430,6 +522,33 @@ void StreamDecoder::place(const ac3::PcmBlock& block, const BlockFn& deliver) {
 }
 
 std::size_t StreamDecoder::finish(const BlockFn& deliver, const UnitFn& reported) {
+    if (variants_.empty()) {
+        return finish_unit(deliver, reported);
+    }
+    discard_variant_blocks();
+    for (Variant& variant : variants_) {
+        Variant* const mine = &variant;
+        const BlockFn keep = [mine](std::span<const std::span<const float>> slots,
+                                    std::size_t frames) {
+            std::vector<float> planar;
+            planar.reserve(slots.size() * frames);
+            for (const std::span<const float>& slot : slots) {
+                planar.insert(planar.end(), slot.begin(),
+                              slot.begin() + static_cast<std::ptrdiff_t>(frames));
+            }
+            mine->blocks.emplace_back(std::move(planar), frames);
+        };
+        (void)variant.decoder->finish(keep, {});
+    }
+    const BlockFn merged = [this, &deliver](std::span<const std::span<const float>> slots,
+                                            std::size_t frames) {
+        release_variants(frames);
+        deliver(slots, frames);
+    };
+    return finish_unit(merged, reported);
+}
+
+std::size_t StreamDecoder::finish_unit(const BlockFn& deliver, const UnitFn& reported) {
     std::size_t frames = 0;
     if (eac3_decoder_) {
         std::vector<ac3::DecodedSubstream> released = eac3_decoder_->flush();
@@ -455,6 +574,11 @@ bool StreamDecoder::apply(const DecoderSettings& settings) {
     // output and presentation change in place.
     if (ac4_decoder_ && setup.ac4.concealment != ac4_config_.concealment) {
         return false;
+    }
+    for (Variant& variant : variants_) {
+        if (!variant.decoder->apply(settings)) {
+            return false;
+        }
     }
     settings_ = settings;
     serving_ = setup.serving;

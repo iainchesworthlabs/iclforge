@@ -127,6 +127,9 @@ struct Bsi {
     // Table E1.2's two optional metadata elements, exactly as read.
     std::optional<meta::MixMetadata> mixing;
     std::optional<meta::BsiInfo> info;
+    // §E2.3.1.65: a type 2 substream's frmsizecod, present when its blkid says
+    // this syncframe holds the first block of the AC-3 syncframe it came from.
+    std::optional<int> converted_frmsizecod;
 };
 
 // Table E1.2's mixdef element (§E2.3.1.18-52). mixdef 0x3's mixdeflen sizes
@@ -211,9 +214,13 @@ meta::MixingParameters read_mixing_parameters(BitReader& r) {
 // Table E1.2's mixing-metadata payload. None of it changes how the audio is
 // coded, but every field still has to be walked exactly: one bit out of place
 // shifts audfrm along and the rest of the frame decodes as a different stream.
-// The two strmtyp gates here are the point - an independent substream carries
-// the program-scaling and mixing-configuration block that a dependent, which
-// is only ever part of someone else's program, does not.
+// The two strmtyp gates here are the point - a type 0 independent substream
+// carries the program-scaling and mixing-configuration block that a dependent,
+// which is only ever part of someone else's program, does not, and that a
+// type 2 substream does not either: Table E1.2 writes the gate as
+// `strmtyp == 0x0`, and a stream "previously coded in AC-3" has no mixing
+// metadata to carry across beyond the levels above it, which is what AC-3's
+// bsi can say.
 meta::MixMetadata read_mixing_metadata(BitReader& r, const Bsi& bsi, int nblks) {
     const auto acmod = static_cast<std::uint8_t>(bsi.acmod);
     meta::MixMetadata mix;
@@ -241,7 +248,7 @@ meta::MixMetadata read_mixing_metadata(BitReader& r, const Bsi& bsi, int nblks) 
     if (bsi.lfe && r.read(1) != 0) {  // lfemixlevcode
         mix.lfemixlevcod = static_cast<int>(r.read(5));
     }
-    if (bsi.strmtyp != StreamType::kDependent) {
+    if (bsi.strmtyp == StreamType::kIndependent) {
         const auto read_scale = [&r]() -> std::optional<int> {
             if (r.read(1) == 0) {
                 return std::nullopt;
@@ -428,7 +435,8 @@ std::expected<Bsi, DecodeError> parse_bsi(BitReader& r, std::size_t frame_bytes)
     if (bsi.strmtyp == StreamType::kConvertible) {
         const bool blkid = bsi.numblkscod == 0x3 || r.read(1) != 0;
         if (blkid) {
-            r.skip(6);  // frmsizecod, describing the AC-3 frame this came from
+            // frmsizecod, describing the AC-3 frame this came from
+            bsi.converted_frmsizecod = static_cast<int>(r.read(6));
         }
     }
     if (r.read(1) != 0) {  // addbsie
@@ -569,11 +577,13 @@ std::expected<AudFrm, DecodeError> parse_audfrm(BitReader& r, const Bsi& bsi, in
                 r.read(1) != 0 ? ExpStrategy::kD15 : ExpStrategy::kReuse;
         }
     }
-    // The whole converter-exponent element is gated on strmtyp == 0x0: only an
-    // independent substream can be converted back to AC-3, so a dependent
-    // sends none of it. These strategies describe how such a converter would
-    // code the frame and have no bearing on decoding it.
-    if (bsi.strmtyp != StreamType::kDependent) {
+    // The whole converter-exponent element is gated on strmtyp == 0x0 (Table
+    // E1.3): it is how a type 0 stream tells an E-AC-3-to-AC-3 converter what
+    // strategies to code with, and a dependent has no AC-3 form to convert to
+    // while a type 2 substream already carries its own (blkid and
+    // frmsizecod), so neither sends it. These strategies describe how such a
+    // converter would code the frame and have no bearing on decoding it.
+    if (bsi.strmtyp == StreamType::kIndependent) {
         const bool convexpstre = bsi.numblkscod == 0x3 || r.read(1) != 0;
         if (convexpstre) {
             r.skip(static_cast<std::size_t>(nfchans) * 5);  // convexpstr[ch]
@@ -1783,7 +1793,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     verify::Eac3SubstreamTrace* trace = nullptr;
     if (impl_->config_.eac3_trace != nullptr) {
         trace =
-            &impl_->config_.eac3_trace->begin_substream(bsi->strmtyp == StreamType::kIndependent);
+            &impl_->config_.eac3_trace->begin_substream(bsi->strmtyp != StreamType::kDependent);
         trace->strmtyp = bsi->strmtyp;
         trace->substreamid = bsi->substreamid;
         trace->blocks_coded = nblks;
@@ -1828,6 +1838,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     out.mixing = bsi->mixing;
     out.info = bsi->info;
     out.chanmap = bsi->chanmap;
+    out.converted_frmsizecod = bsi->converted_frmsizecod;
     out.last_dependent = bsi->strmtyp == StreamType::kDependent && bsi->compre;
     out.blksw.assign(static_cast<std::size_t>(nfchans), {});
     // impl_->config_.skip_reconstruction stops before the second pass below, so
@@ -2777,7 +2788,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
             // already covers.
             fgaincod.fill(kBamode0Codes.fgaincod);
         }
-        if (bsi->strmtyp != StreamType::kDependent && r.read(1) != 0) {  // convsnroffste
+        if (bsi->strmtyp == StreamType::kIndependent && r.read(1) != 0) {  // convsnroffste
             r.skip(10);  // convsnroffst: for a converter's allocation, not ours
         }
         // Coupling leak seeds. firstcplleak starts at 1: the seeds are

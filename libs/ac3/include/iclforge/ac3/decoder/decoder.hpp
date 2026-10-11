@@ -561,6 +561,12 @@ struct DecodedSubstream {
     std::optional<meta::BsiInfo> info = std::nullopt;
     // §E2.3.1.8: only a dependent substream may carry one.
     std::optional<std::uint16_t> chanmap;
+    // §E2.3.1.65: a type 2 (strmtyp 2, "previously coded in AC-3") substream's
+    // frmsizecod - the Table 5.18 frame size code of the AC-3 syncframe whose
+    // blocks this syncframe holds. std::nullopt for every other substream,
+    // and for a type 2 syncframe whose blkid says it holds a later block of
+    // that AC-3 syncframe than the first.
+    std::optional<int> converted_frmsizecod;
     // §E3.8.5: in a dependent substream compre does not announce a compression
     // word so much as mark the LAST dependent of the program — the point at
     // which a decoder knows every channel has arrived.

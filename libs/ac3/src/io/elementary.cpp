@@ -225,7 +225,9 @@ void skip_mixing_metadata(BitReader& r, FrameHeader& s, int nblks) {
     if (s.lfe && r.read(1) != 0) {
         r.skip(5);  // lfemixlevcod
     }
-    if (s.strmtyp != eac3::StreamType::kDependent) {
+    // Table E1.2's gate is `strmtyp == 0x0`: a type 2 substream, which AC-3's
+    // bsi could not have carried this for, sends none of it either.
+    if (s.strmtyp == eac3::StreamType::kIndependent) {
         // pgmscle, extpgmscle, mixdef > 0 and paninfoe are exactly the four
         // conditions A/52 Annex G §3.5 lists for mixinfoexists (and ETSI
         // EN 300 468 D.5 words as "contains metadata ... to control mixing
@@ -370,7 +372,8 @@ std::expected<FrameHeader, ScanError> read_eac3_header(std::span<const std::byte
     if (s.strmtyp == eac3::StreamType::kConvertible) {
         const bool blkid = s.numblkscod == 0x3 || r.read(1) != 0;
         if (blkid) {
-            r.skip(6);  // frmsizecod, describing the AC-3 frame this came from
+            // frmsizecod, describing the AC-3 frame this came from
+            s.converted_frmsizecod = static_cast<int>(r.read(6));
         }
     }
     if (r.read(1)) {  // addbsie
@@ -480,8 +483,10 @@ std::expected<ScannedStream, ScanError> scan_eac3(std::span<const std::byte> str
         // PROGRAMME; dependents join the one in progress. Which programme
         // that is comes from substreamid (§E2.3.1.2) - not from position in
         // the stream, which is what made a two-programme stream look like one
-        // programme running at twice the frame rate.
-        if (sub->strmtyp == eac3::StreamType::kIndependent) {
+        // programme running at twice the frame rate. A type 2 substream
+        // (§E2.3.1.1, previously coded in AC-3) is an independent one that may
+        // have no dependents, and begins a unit exactly as a type 0 does.
+        if (sub->strmtyp != eac3::StreamType::kDependent) {
             // Close whichever programme's unit was open, not this one's: a
             // programme's access unit ends at the next INDEPENDENT substream
             // of ANY programme, because that is where its own dependents stop
@@ -892,7 +897,7 @@ std::optional<std::vector<std::byte>> extract_programme(const ScannedStream& str
         if (!header.has_value() || offset + header->bytes > out.size()) {
             return std::nullopt;
         }
-        if (header->strmtyp == eac3::StreamType::kIndependent && header->bsid >= 11) {
+        if (header->strmtyp != eac3::StreamType::kDependent && header->bsid >= 11) {
             auto frame = std::span<std::byte>{out}.subspan(offset, header->bytes);
             frame[2] = static_cast<std::byte>(std::to_integer<unsigned>(frame[2]) & ~0x38U);
             if (!restamp_crc(frame).has_value()) {

@@ -62,6 +62,46 @@ assets and delivery QC. It says nothing about whether a licensed decoder would a
 because that decoder's own check uses a key and scheme this library does not have. See
 [Object signing](../concepts/object-signing.md).
 
+A tag vouches for the container it covers, so a frame is `kValid` only when that container is the
+whole of its object layer: a payload in another block's skip field or bytes trailing the container
+are outside the tag, and a container with no primary protection field has no tag to match. Both
+are `kMismatch`.
+
+## Several keys
+
+`verify_atmos_frame_any(frame, keys)` and `verify_atmos_stream_any(stream, keys)` take a
+`std::span<const SigningKey>` and call a frame valid when any key reproduces its tag. The frame form
+returns a `KeyringVerdict` (`result`, and `key_index` — the first accepting key — when `kValid`);
+the stream form a `KeyringSummary` (`totals`, a `VerifySummary` whose `valid` means "under some
+key", and `per_key`, how many frames each key accepted, summing to `totals.valid`). An empty key in
+the list is skipped, and a list with no usable key accepts nothing — a frame that has a container
+is a mismatch, never a pass. They are named apart from the single-key functions rather than
+overloaded on a span, because `verify_atmos_frame(frame, {})` would otherwise be ambiguous.
+
+## The licensed gate
+
+`gate_atmos_stream(stream, keys)` returns the stream a licensed decoder would play: every frame
+whose object layer verifies under some key is copied through byte for byte, and every other frame
+has its object layer removed with `iclforge::ac3::io::strip_objects`'s own rewrite, so it plays as
+its 5.1 bed — bit-identically, with no re-encode. The result is an `std::expected<GatedStream,
+io::StripError>`: `GatedStream::bytes` and a `GateSummary` (`passed`, `gated`, `no_objects` and
+`per_key`).
+
+```cpp
+const std::vector<iclforge::base::crypto::SigningKey> ring{key_2025, key_2026};
+const auto gated = iclforge::ac3::signing::gate_atmos_stream(stream, ring);
+if (gated) {
+    // decode gated->bytes with any decoder: objects where the tag was good, the bed elsewhere
+}
+```
+
+The gate fails closed. A frame with an object layer this build can neither verify nor remove (a
+shape outside the frame walker's scope) is returned as the error (`kUnsupportedFrame`, ...), never
+as a pass; a stream with no object layer at all is not an error and comes back unchanged. An
+AC-3 syncframe cannot carry one and passes as it is. Like the verifier, the gate reaches the
+frame shapes this project's encoder writes — a third-party DD+ JOC stream is outside what the
+signer's walk maps, and is refused rather than guessed at.
+
 ## In the CLI
 
 `atmos`, `atmos-path`, `atmos-encode` and `atmos-cbi` accept `sign-objects` and `signing-key=<path>`
@@ -72,8 +112,11 @@ forge atmos-encode in.wav out.ec3 448 0 paths.json sign-objects signing-key=/pat
 ```
 
 `decode`, `monitor` and `spatial` accept `verify-objects`, which checks every frame against the key
-and refuses the whole command on a mismatch. `forge probe` reports whether an authenticity tag is
-present, with no key. There is no CLI command that signs an existing stream after encoding.
+and refuses the whole command on a mismatch, and `gate-objects`, which plays the objects of the
+frames that verify and the bed of those that do not, and carries on. `signing-key=` repeats for
+either, and a frame is good under any of the keys; `sign-objects` takes one. The two options
+cannot be combined. `forge probe` reports whether an authenticity tag is present, with no key.
+There is no CLI command that signs an existing stream after encoding.
 
 Signing is E-AC-3 only: it protects the EMDF container of a DD+ JOC stream. AC-4 objects are not
 signed, and both `sign-objects` with `codec=ac4` and `verify-objects` on an AC-4 stream are usage

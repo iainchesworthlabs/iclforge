@@ -1576,11 +1576,13 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             constexpr std::array<std::string_view, 8> kEac3Only = {
                 "drc",  "heavy",     "ltrt-phase", "fast-imdct",
                 "mode", "programme", "bed-only",   "joc-domain"};
-            constexpr std::array<std::string_view, 10> kAc4Only = {
+            // associated= and associated-gain= are not here: AC-4 reads them
+            // for a presentation, E-AC-3 for a second programme to mix in,
+            // and run_decode says when a plain AC-3 stream has neither.
+            constexpr std::array<std::string_view, 8> kAc4Only = {
                 "output-level",  "dialogue-enhancement",
                 "presentation",  "presentation-id",
-                "language",      "associated",
-                "dialogue-gain", "associated-gain",
+                "language",      "dialogue-gain",
                 "headphones",    "md-compat"};
             const bool ac4_drcmode = key == "drcmode" && value != "line" && value != "rf" &&
                                      value != "none" && !value.empty();
@@ -1725,6 +1727,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         if (token == "verify-objects") {
             out.verify_objects = true;
+            continue;
+        }
+        if (token == "gate-objects") {
+            out.gate_objects = true;
             continue;
         }
         if (token == "verify") {
@@ -2144,6 +2150,23 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             continue;
         }
         if (key == "associated") {
+            // A number is an E-AC-3 independent substream to mix in (§E3.10);
+            // a name is a service, which AC-4 reads as the presentation it
+            // prefers and E-AC-3 as the programme whose bsmod says it is one.
+            if (!value.empty() && std::ranges::all_of(value, [](char c) {
+                    return std::isdigit(static_cast<unsigned char>(c)) != 0;
+                })) {
+                const auto id = parse_u32_or(value, 8);
+                if (id > 7) {
+                    fmt::println(stderr,
+                                 "error: associated= needs a substream id 0..7 or a service name "
+                                 "(got '{}')",
+                                 token);
+                    return false;
+                }
+                out.eac3_associated_programme = static_cast<int>(id);
+                continue;
+            }
             // The associated audio service AC-4 presentation selection
             // prefers: a content_classifier of ETSI TS 103 190-1 Table 91 and
             // its Table 92 refinement.
@@ -2168,7 +2191,8 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 fmt::println(stderr,
                              "error: associated is visually-impaired, audio-description, "
                              "audio-description-subtitles, spoken-subtitles, emergency-information, "
-                             "hearing-impaired or commentary (got '{}')",
+                             "hearing-impaired or commentary, or an E-AC-3 substream id 0..7 "
+                             "(got '{}')",
                              token);
                 return false;
             }
@@ -3052,7 +3076,7 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 fmt::println(stderr, "error: signing-key= needs a key file path");
                 return false;
             }
-            out.signing_key = std::string{value};
+            out.signing_keys.emplace_back(value);
             continue;
         }
         if (key == "programme") {
@@ -3120,6 +3144,15 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
         }
         fmt::println(stderr, "error: unknown option '{}'", token);
         print_meta_usage();
+        return false;
+    }
+    // One says "refuse the command on a mismatch", the other "play the bed on
+    // one": asking for both has no answer, and silently preferring either
+    // would make the other's promise a lie.
+    if (out.verify_objects && out.gate_objects) {
+        fmt::println(stderr,
+                     "error: verify-objects refuses a stream whose objects do not verify and "
+                     "gate-objects plays it as its bed - give one, not both");
         return false;
     }
     return true;
@@ -4486,33 +4519,102 @@ iclforge::ac4::DecoderConfig ac4_coded_config(const Options& meta) {
     return config;
 }
 
+std::optional<std::vector<iclforge::base::crypto::SigningKey>> load_object_keyring(
+    const Options& meta, std::string_view option) {
+    std::vector<iclforge::base::crypto::SigningKey> keys;
+    // No signing-key= at all: the environment's one key, if any. With paths
+    // given the environment is not consulted - an explicit list is the whole
+    // set, so an exported ICLFORGE_SIGNING_KEY cannot quietly widen it.
+    const std::vector<std::string> sources =
+        meta.signing_keys.empty() ? std::vector<std::string>{std::string{}} : meta.signing_keys;
+    for (const auto& path : sources) {
+        auto key = iclforge::base::crypto::load_signing_key(path);
+        if (!key.has_value()) {
+            if (key.error().kind == iclforge::base::crypto::KeyErrorKind::kAbsent) {
+                fmt::println(stderr,
+                             "error: {} needs a key — pass signing-key=<path> (repeat it for more "
+                             "than one), or set ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY",
+                             option);
+            } else {
+                fmt::println(stderr, "error: {}", key.error().message);
+            }
+            return std::nullopt;
+        }
+        keys.push_back(std::move(*key));
+    }
+    return keys;
+}
+
+namespace {
+
+// "key 1 (a.key) verified 40, key 2 (b.key) verified 10" - which of several
+// keys a stream's frames were signed under, for the status line. Empty for a
+// single key, where there is nothing to tell apart.
+std::string per_key_breakdown(const Options& meta, std::span<const int> per_key) {
+    if (per_key.size() < 2) {
+        return {};
+    }
+    std::string out;
+    for (std::size_t i = 0; i < per_key.size(); ++i) {
+        if (!out.empty()) {
+            out += ", ";
+        }
+        const std::string_view name =
+            i < meta.signing_keys.size() ? std::string_view{meta.signing_keys[i]} : std::string_view{};
+        out += fmt::format("key {}{} {}", i + 1,
+                           name.empty() ? std::string{} : fmt::format(" ({})", name), per_key[i]);
+    }
+    return out;
+}
+
+}  // namespace
+
 std::optional<iclforge::ac3::signing::VerifySummary> apply_object_verification(
     std::span<const std::byte> stream, const Options& meta, FILE* status) {
     if (!meta.verify_objects) {
         return iclforge::ac3::signing::VerifySummary{};
     }
-    const auto key = iclforge::base::crypto::load_signing_key(meta.signing_key.value_or(""));
-    if (!key.has_value()) {
-        if (key.error().kind == iclforge::base::crypto::KeyErrorKind::kAbsent) {
-            fmt::println(stderr,
-                         "error: verify-objects needs a key — pass signing-key=<path>, or set "
-                         "ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY");
-        } else {
-            fmt::println(stderr, "error: {}", key.error().message);
-        }
+    const auto keys = load_object_keyring(meta, "verify-objects");
+    if (!keys.has_value()) {
         return std::nullopt;
     }
-    const auto summary = iclforge::ac3::signing::verify_atmos_stream(stream, *key);
-    status_println(status, "  object signature: {} valid, {} mismatched, {} unsigned frame(s)",
-                   summary.valid, summary.mismatch, summary.no_container);
+    const auto result = iclforge::ac3::signing::verify_atmos_stream_any(stream, *keys);
+    const auto& summary = result.totals;
+    const std::string breakdown = per_key_breakdown(meta, result.per_key);
+    status_println(status, "  object signature: {} valid{}, {} mismatched, {} unsigned frame(s)",
+                   summary.valid, breakdown.empty() ? std::string{} : " (" + breakdown + ")",
+                   summary.mismatch, summary.no_container);
     if (summary.mismatch > 0) {
         fmt::println(stderr,
                      "error: object signature verification failed ({} of {} signed frames did "
-                     "not match the supplied key)",
-                     summary.mismatch, summary.valid + summary.mismatch);
+                     "not match {})",
+                     summary.mismatch, summary.valid + summary.mismatch,
+                     keys->size() == 1 ? "the supplied key" : "any of the supplied keys");
         return std::nullopt;
     }
     return summary;
+}
+
+std::optional<std::vector<std::byte>> apply_object_gate(std::span<const std::byte> stream,
+                                                        const Options& meta, FILE* status) {
+    const auto keys = load_object_keyring(meta, "gate-objects");
+    if (!keys.has_value()) {
+        return std::nullopt;
+    }
+    auto gated = iclforge::ac3::signing::gate_atmos_stream(stream, *keys);
+    if (!gated.has_value()) {
+        fmt::println(stderr,
+                     "error: gate-objects: {} - refusing to play an object layer that could be "
+                     "neither verified nor removed",
+                     iclforge::ac3::io::describe(gated.error()));
+        return std::nullopt;
+    }
+    const auto& summary = gated->summary;
+    const std::string breakdown = per_key_breakdown(meta, summary.per_key);
+    status_println(status, "  object gate: {} frame(s) kept their objects{}, {} played as the bed, {} had none",
+                   summary.passed, breakdown.empty() ? std::string{} : " (" + breakdown + ")",
+                   summary.gated, summary.no_objects);
+    return std::move(gated->bytes);
 }
 
 void print_object_summary(FILE* status,
