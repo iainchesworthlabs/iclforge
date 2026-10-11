@@ -327,13 +327,20 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
 
 ## What it does not do
 
-- **An LFE channel in a karaoke stream** made here: the flow carries none, and a file that has one
-  is named, not dropped.
 - **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
   (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
   player do not offer them.
-- **Making or timing a lyrics file.** Hearth reads `.lrc` files; nothing here writes one or times
-  the words of one that has only lines. A file in an encoding other than UTF-8 is not read.
+- **Finding the times of a file's words.** Hearth's timing window ([Timing the
+  lyrics](../hearth/index.md#timing-the-lyrics)) takes them from your presses, and an estimate by
+  the letters of a word is only where a press starts from; nothing here aligns words to the sound.
+- **Reading a lyrics file in a code page.** UTF-8 and UTF-16 are read; Latin-1, Windows-1255 and the
+  other 8-bit encodings are named and not guessed at. A MIDI karaoke file has no way to say its
+  encoding, so its words must be UTF-8.
+- **Text from a CD+G disc.** Its words are pixels, so Hearth shows the picture and cannot follow the
+  words.
+- **A screen on a sink.** A board that decodes for itself is sent the lyrics and where the sound is
+  in them, follows them on its own clock and reports the line; the panel that would draw them waits
+  for a board with a display.
 - **Karaoke in E-AC-3 or AC-4**, and **a microphone, scoring or recording**.
 
 ## How it is checked
