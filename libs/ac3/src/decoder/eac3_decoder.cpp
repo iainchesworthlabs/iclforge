@@ -990,16 +990,44 @@ struct Eac3Decoder::Impl {
     // overwritten before being read, so nothing needs to persist beyond one
     // decode_substream call - unlike delay_ above, these don't need to be
     // keyed by substream identity.
-    // One per lane (lanes.hpp): the channels of a block's transform are the unit a second lane takes.
-    std::array<std::array<internal::decode_scalar_t, 512>, internal::kMaxLanes> imdct_scratch_{};
+    // The channels of a block's transform are the unit a second lane takes (lanes.hpp), and each
+    // lane has a scratch of its own. The first is a member, as it always was; the second is made
+    // when a decode first has a second lane (imdct_scratch()), and a decoder that never has one
+    // does not carry it: 2,048 bytes at float, on a part whose internal RAM is what the player
+    // and its network share.
+    std::array<internal::decode_scalar_t, 512> imdct_scratch_{};
+    std::unique_ptr<std::array<internal::decode_scalar_t, 512>> imdct_scratch_lane1_;
+    [[nodiscard]] std::array<internal::decode_scalar_t, 512>& imdct_scratch(std::size_t lane) {
+        if (lane == 0) {
+            return imdct_scratch_;
+        }
+        if (!imdct_scratch_lane1_) {
+            imdct_scratch_lane1_ = std::make_unique<std::array<internal::decode_scalar_t, 512>>();
+        }
+        return *imdct_scratch_lane1_;
+    }
     // Enhanced coupling's spectrum, in the store's own type: eac3_tools
     // carries the §3.5.5 routines in both scalars (the double forms are the
     // encoder's), so nothing round-trips through double on the way to
     // `coeffs` - the coefficients are written into the store directly.
-    // Two of each: with a second lane the next block's spectrum is made while this block's
-    // channels are reconstructed from the other (decode_substream_core's second pass).
-    std::array<std::array<internal::decode_scalar_t, 256>, 2> ecpl_spectrum_real_{};
-    std::array<std::array<internal::decode_scalar_t, 256>, 2> ecpl_spectrum_imag_{};
+    // Two sides: with a second lane the next block's spectrum is made while this block's
+    // channels are reconstructed from the other (decode_substream_core's second pass). The
+    // second side is made when a decode first asks for it, for the reason imdct_scratch_lane1_ is.
+    struct EcplSpectrum {
+        std::array<internal::decode_scalar_t, 256> real{};
+        std::array<internal::decode_scalar_t, 256> imag{};
+    };
+    EcplSpectrum ecpl_spectrum_side0_{};
+    std::unique_ptr<EcplSpectrum> ecpl_spectrum_side1_;
+    [[nodiscard]] EcplSpectrum& ecpl_spectrum(std::size_t side) {
+        if (side == 0) {
+            return ecpl_spectrum_side0_;
+        }
+        if (!ecpl_spectrum_side1_) {
+            ecpl_spectrum_side1_ = std::make_unique<EcplSpectrum>();
+        }
+        return *ecpl_spectrum_side1_;
+    }
     // §3.5.5.2/.3's per-bin amplitude and angle, for one channel of one block.
     //
     // Members rather than locals in the reconstruction loop, which is where
@@ -1313,6 +1341,22 @@ template <typename Scalar>
         return nullptr;
     } else {
         return &ecpl_spectrum_task<Scalar>;
+    }
+}
+
+// The executor a block's enhanced coupling spectrum is made on while the block before it is
+// reconstructed, or none: the floating tiers only, and only given a second lane. A template
+// function, and not a `const` local initialised from the same condition: in the fixed tier that
+// initialiser is the constant null pointer, which the front end folds into every call made
+// through the local, and GCC's -Wnonnull then reports each one ("'this' pointer is null") in code
+// the `if` ahead of it never reaches (the arm-none-eabi fixed-point probe's -Werror).
+template <typename Scalar>
+[[nodiscard]] iclforge::base::Executor* ecpl_spectrum_lane_for(iclforge::base::Executor* executor) {
+    if constexpr (internal::kNormalisedStore<Scalar>) {
+        (void)executor;
+        return nullptr;
+    } else {
+        return (executor != nullptr && executor->lanes() >= 2) ? executor : nullptr;
     }
 }
 
@@ -3758,10 +3802,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     // reconstructed here, into the other of the two buffers; the floating tiers only, the fixed
     // tier's has its exponents to carry. The bits are the same whichever lane makes them.
     iclforge::base::Executor* const spectrum_lane =
-        (!internal::kNormalisedStore<internal::decode_scalar_t> &&
-         impl_->config_.executor != nullptr && impl_->config_.executor->lanes() >= 2)
-            ? impl_->config_.executor
-            : nullptr;
+        ecpl_spectrum_lane_for<internal::decode_scalar_t>(impl_->config_.executor);
     EcplSpectrumJob<internal::decode_scalar_t> spectrum_job{};
     int spectrum_pending = -1;        // the block whose spectrum the other lane is making
     std::size_t spectrum_side = 0;    // the buffer it is making it in
@@ -3838,8 +3879,9 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                                                 ? &tails[ul + 1].coeffs[ucpl]
                                                 : &kZero;
                         spectrum_side = 1 - spectrum_used;
-                        spectrum_job.real = &impl_->ecpl_spectrum_real_[spectrum_side];
-                        spectrum_job.imag = &impl_->ecpl_spectrum_imag_[spectrum_side];
+                        auto& side = impl_->ecpl_spectrum(spectrum_side);
+                        spectrum_job.real = &side.real;
+                        spectrum_job.imag = &side.imag;
                         spectrum_job.fast = impl_->config_.fast_imdct;
                         spectrum_lane->run_async(
                             ecpl_spectrum_task_for<internal::decode_scalar_t>(), &spectrum_job);
@@ -3847,9 +3889,9 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                     }
                 }
             }
+            auto& spectrum = impl_->ecpl_spectrum(spectrum_used);
             ecpl_reconstruct_block(tail, prev, coeffs[ucpl], next, prev_norm, next_norm, nfchans,
-                                   ecpl_noise, impl_->ecpl_spectrum_real_[spectrum_used],
-                                   impl_->ecpl_spectrum_imag_[spectrum_used],
+                                   ecpl_noise, spectrum.real, spectrum.imag,
                                    impl_->ecpl_amp_scratch_, impl_->ecpl_angle_scratch_,
                                    impl_->config_.fast_imdct, coeffs, spectrum_ready);
         }
@@ -4083,8 +4125,12 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     // as the block-by-block loop this replaced, for every channel.
     {
         ICLFORGE_ZONE_SCOPED_N("eac3_imdct_overlap");
+        // The second lane's scratch is made here, on this thread, before the lane is handed work.
+        if (impl_->config_.executor != nullptr && impl_->config_.executor->lanes() >= 2) {
+            (void)impl_->imdct_scratch(1);
+        }
         const auto transform_channel = [&](std::size_t index, std::size_t lane) {
-            auto& x = impl_->imdct_scratch_[lane];
+            auto& x = impl_->imdct_scratch(lane);
             auto& history = delay[index];
             auto& pcm = out.channels[index];
             for (int blk = 0; blk < nblks; ++blk) {

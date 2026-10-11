@@ -469,7 +469,7 @@ config ICLFORGE_EXAMPLE_AC4_PARALLEL
 
 config ICLFORGE_EXAMPLE_DECODE_LANE
     int "AC-3 and E-AC-3: decode a frame's per-channel and per-object stages on both cores (1) or one (0)"
-    default 1 if IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32P4
+    default 1 if SPIRAM && (IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32P4)
     default 0
     range 0 1
     help
@@ -480,6 +480,12 @@ config ICLFORGE_EXAMPLE_DECODE_LANE
         there is PSRAM, at the decode task's priority. The PCM is the same bit for bit.
         Measured on an ESP32-S3 (planning/esp32-714-realtime.md): objects 7.1.4 ... see the
         board page for the figures.
+
+        On by default only where there is PSRAM. Without it the task's stack (12 KB) and its
+        control block come out of internal RAM, which is what the player, the decoder and Wi-Fi
+        share. Under QEMU (no PSRAM) CI's object render has 10 KB of internal RAM left at its
+        worst moment, and its 7.1.4 stream set 28 KB against a floor of 20,480 bytes; the
+        lane fits in neither. Set it to 1 on a part with no PSRAM that has the room.
 
 config ICLFORGE_EXAMPLE_AC4_PCM_HASH
     int "AC-4: hash every decoded sample (1) or not (0)"
