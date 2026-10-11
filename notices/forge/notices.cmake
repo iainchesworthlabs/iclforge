@@ -101,6 +101,13 @@ if(fmt_VERSION)
 else()
     set(ICLFORGE_NOTICES_FMT_VERSION "${ICLFORGE_FMT_VERSION}")
 endif()
+# nlohmann/json's, the same way (cmake/NlohmannJson.cmake): both programs compile in the project
+# file's reader, so it is named for the same users {fmt} is.
+if(nlohmann_json_VERSION)
+    set(ICLFORGE_NOTICES_JSON_VERSION "${nlohmann_json_VERSION}")
+else()
+    set(ICLFORGE_NOTICES_JSON_VERSION "${ICLFORGE_NLOHMANN_JSON_VERSION}")
+endif()
 # Tracy's version, from its package - the same Tracy_VERSION/"not reported" choice
 # notices/crucible/notices.cmake makes for the identical shared fragment.
 if(Tracy_VERSION)
@@ -146,6 +153,8 @@ ac3_generate_notices("${ICLFORGE_NOTICES_FILE}"
         "QT_SERIES=${ICLFORGE_NOTICES_QT_SERIES}"
         "FMT_VERSION=${ICLFORGE_NOTICES_FMT_VERSION}"
         "FMT_USERS=${ICLFORGE_NOTICES_FMT_USERS}"
+        "JSON_VERSION=${ICLFORGE_NOTICES_JSON_VERSION}"
+        "JSON_USERS=${ICLFORGE_NOTICES_FMT_USERS}"
         "FONT_USER=forge-gui"
         "TRACY_VERSION=${ICLFORGE_NOTICES_TRACY_VERSION}"
         # Always forge-gui, unlike FMT_USERS above: forge links no iclforge::tracy in any
@@ -155,6 +164,7 @@ ac3_generate_notices("${ICLFORGE_NOTICES_FILE}"
         "LGPL3=${CMAKE_SOURCE_DIR}/notices/licences/LGPL-3.0.txt"
         "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
         "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
+        "JSON_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-nlohmann-json.txt"
         "MESA_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-mesa.txt"
         "DXC_NCSA=${CMAKE_SOURCE_DIR}/notices/licences/NCSA-dxc.txt"
         "TRACY_BSD=${CMAKE_SOURCE_DIR}/notices/licences/BSD-3-Clause-Tracy.txt")

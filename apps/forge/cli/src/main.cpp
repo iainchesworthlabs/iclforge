@@ -7,6 +7,7 @@
 #include <fmt/base.h>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <system_error>
 #include <vector>
@@ -22,12 +23,15 @@
 #include "commands/encode.hpp"
 #include "commands/live_audio.hpp"
 #include "commands/probe.hpp"
+#include "commands/project.hpp"
 #include "commands/stream_tools.hpp"
 #include "commands/synth.hpp"
 #include "exit_codes.hpp"
 #include "platform/console_encoding.hpp"
 #include "support.hpp"
 #include "usage.hpp"
+
+int run_main(int argc, char** argv);
 
 namespace {
 
@@ -193,13 +197,27 @@ int run_help(const Args& x);
 int run_man();
 int run_completions(std::string_view shell);
 
-// 44 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
+// One command, given as the words after `forge`, through the same entry point a shell's line goes
+// through: `forge project` runs the commands a project stands for this way, so that they are
+// parsed, refused and run by exactly the code a person's own line would meet.
+int run_words(const std::vector<std::string>& words) {
+    std::vector<std::string> storage{"forge"};
+    storage.insert(storage.end(), words.begin(), words.end());
+    std::vector<char*> pointers;
+    pointers.reserve(storage.size());
+    for (auto& word : storage) {
+        pointers.push_back(word.data());
+    }
+    return run_main(static_cast<int>(pointers.size()), pointers.data());
+}
+
+// 45 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
 // linked iclforge::adm into this particular build (see Needs::kAdm/unmet()
 // above and run_atmos_adm's own comment): a command this build cannot run is listed with Needs
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 44> kCommands{{
+constexpr std::array<Command, 45> kCommands{{
     {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -448,6 +466,26 @@ constexpr std::array<Command, 44> kCommands{{
      topic::kStdio,
      Needs::kNothing,
      [](const Args& x) { return run_unspdif(x.str(1), x.str(2), x.meta.keep_partial); }},
+    {"project", 2, "<project.forgeproj> [out] [print]",
+     "encode what a Forge project file says, by running the commands it stands for: the line the "
+     "Forge GUI's command bar shows for the same settings. out is where the result goes (beside "
+     "the project, named for it, by default); print shows the commands and runs none of them",
+     topic::kNone,
+     Needs::kNothing,
+     [](const Args& x) {
+         // out and print may come in either order: a file is never called print.
+         std::string_view out;
+         bool print = false;
+         for (std::size_t i = 2; i < 4; ++i) {
+             const auto word = x.str(i);
+             if (word == "print") {
+                 print = true;
+             } else if (!word.empty()) {
+                 out = word;
+             }
+         }
+         return run_project(x.str(1), out, print, run_words);
+     }},
     {"mkv", 3, "<in.ac3|in.ec3> <out.mkv>",
      "wrap as a playable Matroska file; AC-4 is refused, Matroska registering no codec ID for it",
      topic::kMkv,

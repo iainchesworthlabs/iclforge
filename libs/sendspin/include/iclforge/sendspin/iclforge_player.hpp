@@ -67,7 +67,7 @@ struct Management {
 };
 
 // The decoder keys of a settings command, as a sink lists them in decoder_settings.
-inline constexpr std::array<std::string_view, 11> kDecoderSettingNames{
+inline constexpr std::array<std::string_view, 13> kDecoderSettingNames{
     "mode",
     "drc_cut",
     "drc_boost",
@@ -79,6 +79,8 @@ inline constexpr std::array<std::string_view, 11> kDecoderSettingNames{
     "programme",
     "objects",
     "concealment",
+    "karaoke",
+    "karaoke_vocals",
 };
 
 struct Support {
@@ -206,6 +208,14 @@ enum class DecoderMode : std::uint8_t { kLine, kRf, kCustom };
 enum class Downmix : std::uint8_t { kLoRo, kLtRt };
 enum class ObjectsPolicy : std::uint8_t { kAuto, kAlways, kNever };
 enum class Concealment : std::uint8_t { kNone, kRepeatFade, kMute };
+// Annex C of ETSI TS 102 366, for an AC-3 stream flagged bsmod 7 (a karaoke stream): "off" plays
+// the coded channels, "aware" reproduces L, C and R with the vocals at the stream's own level, and
+// "capable" lets `karaoke_vocals` choose which of the stream's vocals are heard. A sink that does
+// not list the keys plays a karaoke stream as coded, which is why a server that wants the
+// reproduction sends such a sink PCM it has decoded itself.
+enum class Karaoke : std::uint8_t { kOff, kAware, kCapable };
+// Which vocals the capable reproduction plays; ignored by the other two.
+enum class KaraokeVocals : std::uint8_t { kNone, kV1, kV2, kBoth };
 
 // The decoder keys of a settings command; each absent key leaves the library's default.
 struct DecoderSettings {
@@ -222,6 +232,8 @@ struct DecoderSettings {
     std::optional<std::int32_t> programme;
     std::optional<ObjectsPolicy> objects;
     std::optional<Concealment> concealment;
+    std::optional<Karaoke> karaoke;
+    std::optional<KaraokeVocals> karaoke_vocals;
 };
 
 // A settings command's object, which replaces the sink's settings whole.

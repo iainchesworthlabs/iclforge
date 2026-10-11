@@ -167,15 +167,19 @@ The sections below contain the complete change list and fixes.
   enhanced word tags and keeps the first file there once as `.lrc.bak`; an item with no words
   takes a text file in UTF-8 or UTF-16. The writer, the estimate and the edits are in
   `iclforge::lyrics` (planning/karaoke-phase2.md, W6).
-- **The Forge GUI opens and saves projects.** A `.forgeproj` is a JSON file holding the sources
-  (with their paths relative to it and, in the Karaoke flow, which part each is), the channel plan,
-  the assignments, a table of encode settings (`codec`, `container`, `bitrateKbps`, `bsmod`,
-  `cmixlev`, `surmixlev`, each an id or a code and not a position in a list) and the Karaoke
-  flow's choices, with the flow it was made in. A **Project…** menu in the title strip
-  (**Open project…**, **Save project…**), a file dropped on the window and
-  `forge-gui file.forgeproj` read it. The format is versioned and meant to be added to: a newer
-  file is refused by naming its version, a key this version does not know is written back
-  unchanged, and a setting is one row of a table. [Projects](docs/forge/gui/projects.md) has the
+- **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
+  JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
+  part each is), the channel plan, the assignments, the objects' placements and motion, the
+  encode settings - codec, container, bit rate, coding tools, VBR and the metadata, loudness and
+  compression, in the command line's own words (`dialnorm`, `drc`, `bsmod`, ...) - and the Karaoke
+  flow's choices, with the flow it was made in. A **Project…** menu in the title strip (**Open
+  project…**, **Save project…**), a file dropped on the window and `forge-gui file.forgeproj` read
+  it; `forge project file.forgeproj [out]` runs the commands it stands for, which are the line the
+  window's command bar shows, and `print` shows them. The format is versioned and meant to be added
+  to: a newer file is refused by naming its version, a key this version does not know is written
+  back unchanged and in its place, and a setting is one row of a table. It is read and written with
+  nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
+  by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
 - **A karaoke example, "Auld Lang Syne"** (`examples/karaoke/auld-lang-syne/`): four parts, the
   `.forgeproj` that opens them in the Karaoke flow, the 3/2 `bsmod` 7 stream they make and a

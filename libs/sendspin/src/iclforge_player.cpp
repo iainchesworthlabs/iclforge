@@ -82,6 +82,19 @@ constexpr std::array<Named<Concealment>, 3> kConcealments{{
     {Concealment::kMute, "mute"},
 }};
 
+constexpr std::array<Named<Karaoke>, 3> kKaraokes{{
+    {Karaoke::kOff, "off"},
+    {Karaoke::kAware, "aware"},
+    {Karaoke::kCapable, "capable"},
+}};
+
+constexpr std::array<Named<KaraokeVocals>, 4> kKaraokeVocals{{
+    {KaraokeVocals::kNone, "none"},
+    {KaraokeVocals::kV1, "v1"},
+    {KaraokeVocals::kV2, "v2"},
+    {KaraokeVocals::kBoth, "both"},
+}};
+
 constexpr std::int32_t kMaxOutputDelay = 5000;
 // The largest chunk limit a sink may state: past AC-4's longest burst chunk (17 + 131,056 bytes)
 // and one WebSocket message's 65,518 (planning/hearth-sendspin-extension.md, Encryption).
@@ -650,6 +663,12 @@ void write_command(json::Writer& w, const CommandMessage& command) {
             if (decoder.concealment) {
                 w.member("concealment", name_of(kConcealments, *decoder.concealment));
             }
+            if (decoder.karaoke) {
+                w.member("karaoke", name_of(kKaraokes, *decoder.karaoke));
+            }
+            if (decoder.karaoke_vocals) {
+                w.member("karaoke_vocals", name_of(kKaraokeVocals, *decoder.karaoke_vocals));
+            }
             w.end_object().end_object();
             break;
         }
@@ -772,6 +791,12 @@ namespace {
     if (!named("concealment", kConcealments, out.concealment)) {
         return refuse("decoder.concealment is not none, repeat_fade or mute");
     }
+    if (!named("karaoke", kKaraokes, out.karaoke)) {
+        return refuse("decoder.karaoke is not off, aware or capable");
+    }
+    if (!named("karaoke_vocals", kKaraokeVocals, out.karaoke_vocals)) {
+        return refuse("decoder.karaoke_vocals is not none, v1, v2 or both");
+    }
     return settings;
 }
 
@@ -881,6 +906,8 @@ std::optional<std::string> check_settings(const Settings& settings, const Suppor
         decoder.has_programme,
         decoder.objects.has_value(),
         decoder.concealment.has_value(),
+        decoder.karaoke.has_value(),
+        decoder.karaoke_vocals.has_value(),
     };
     for (std::size_t i = 0; i < present.size(); ++i) {
         if (present[i] && std::find(support.decoder_settings.begin(), support.decoder_settings.end(),

@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -90,6 +91,8 @@ template <class T, class Write>
     decoder.has_programme = true;
     decoder.objects = ac::ObjectsPolicy::kNever;
     decoder.concealment = ac::Concealment::kRepeatFade;
+    decoder.karaoke = ac::Karaoke::kCapable;
+    decoder.karaoke_vocals = ac::KaraokeVocals::kV2;
     return command;
 }
 
@@ -128,7 +131,8 @@ TEST_CASE("iclforge_player: the support object", "[sendspin][iclforge]") {
                   R"("outputs":{"count":6,"bit_depth":32,"bit_depths":[16,24,32]},"layout_grammar":1,)"
                   R"("management":{"routing":true,"trim_db":[-12,12],"delay_ms":[0,50],"crossover_hz":[40,250],"identify":true},)"
                   R"("decoder_settings":["mode","drc_cut","drc_boost","heavy_compression","dialnorm","downmix",)"
-                  R"("ltrt_phase_shift","mix_lfe","programme","objects","concealment"],"buffer_capacity":1048576})");
+                  R"("ltrt_phase_shift","mix_lfe","programme","objects","concealment","karaoke","karaoke_vocals"],)"
+                  R"("buffer_capacity":1048576})");
 
     const Parsed parsed(text);
     const std::optional<ac::Support> read = ac::read_support(parsed.root());
@@ -503,7 +507,7 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
                   R"("routing":"0,1,2,3,4,5","trim_db":[0,-1.5,0,-3,-3,2],"delay_ms":[0,0,0,12.5,12.5,0],"crossover_hz":80,)"
                   R"("decoder":{"mode":"rf","drc_cut":0.25,"drc_boost":1,"heavy_compression":false,"dialnorm":true,)"
                   R"("downmix":"ltrt","ltrt_phase_shift":true,"mix_lfe":false,"programme":null,"objects":"never",)"
-                  R"("concealment":"repeat_fade"}}})");
+                  R"("concealment":"repeat_fade","karaoke":"capable","karaoke_vocals":"v2"}}})");
 
     const Parsed parsed(text);
     const auto read = ac::read_command(parsed.root());
@@ -527,6 +531,8 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
     CHECK_FALSE(settings.decoder.programme.has_value());
     CHECK(settings.decoder.objects == ac::ObjectsPolicy::kNever);
     CHECK(settings.decoder.concealment == ac::Concealment::kRepeatFade);
+    CHECK(settings.decoder.karaoke == ac::Karaoke::kCapable);
+    CHECK(settings.decoder.karaoke_vocals == ac::KaraokeVocals::kV2);
 
     const auto read_settings = [](const std::string& object) {
         return ac::read_command(Parsed(R"({"command":"settings","settings":)" + object + "}").root());
@@ -537,6 +543,9 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
     CHECK_FALSE(sparse->settings.layout.has_value());
     CHECK_FALSE(sparse->settings.trim_db.has_value());
     CHECK_FALSE(sparse->settings.decoder.mode.has_value());
+    // A sink is told nothing about karaoke unless it is told, and then takes its own default.
+    CHECK_FALSE(sparse->settings.decoder.karaoke.has_value());
+    CHECK_FALSE(sparse->settings.decoder.karaoke_vocals.has_value());
     CHECK(sparse->settings.decoder.has_programme);
     CHECK(sparse->settings.decoder.programme == 1);
     const auto bare = read_settings(R"({"revision":3})");
@@ -560,6 +569,10 @@ TEST_CASE("iclforge_player: settings", "[sendspin][iclforge]") {
     CHECK(refused(R"({"revision":16,"layout":51})") == 16);
     CHECK(refused(R"({"revision":17,"decoder":[]})") == 17);
     CHECK(refused(R"({"revision":18,"decoder":{"objects":"sometimes"}})") == 18);
+    CHECK(refused(R"({"revision":22,"decoder":{"karaoke":"on"}})") == 22);
+    CHECK(refused(R"({"revision":23,"decoder":{"karaoke":true}})") == 23);
+    CHECK(refused(R"({"revision":24,"decoder":{"karaoke_vocals":"all"}})") == 24);
+    CHECK(refused(R"({"revision":25,"decoder":{"karaoke":"aware","karaoke_vocals":1}})") == 25);
     // A number the writer could not write back, and a crossover that its tenth of a hertz rounds to
     // nothing (libs/sendspin/fuzz/regressions/fuzz_sendspin_messages).
     CHECK(refused(R"({"revision":19,"trim_db":[7.7e62,0]})") == 19);
@@ -595,7 +608,27 @@ TEST_CASE("iclforge_player: settings checked against the support object", "[send
 
     ac::Support simple = board_support();
     simple.decoder_settings = {"mode", "drc_cut", "drc_boost", "heavy_compression", "dialnorm", "downmix",
-                               "ltrt_phase_shift", "mix_lfe", "objects", "concealment"};
+                               "ltrt_phase_shift", "mix_lfe", "objects", "concealment", "karaoke",
+                               "karaoke_vocals"};
     CHECK(why([](ac::Settings&) {}, simple) == "decoder.programme is not a setting this sink takes");
     CHECK(why([](ac::Settings& s) { s.decoder.has_programme = false; }, simple).empty());
+
+    // A sink from before karaoke lists the other keys and not these: asking it for the
+    // reproduction is refused by name, which is how a server learns to decode for it instead.
+    ac::Support before_karaoke = board_support();
+    before_karaoke.decoder_settings.erase(
+        std::remove(before_karaoke.decoder_settings.begin(), before_karaoke.decoder_settings.end(), "karaoke"),
+        before_karaoke.decoder_settings.end());
+    CHECK(why([](ac::Settings&) {}, before_karaoke) == "decoder.karaoke is not a setting this sink takes");
+    before_karaoke.decoder_settings.erase(std::remove(before_karaoke.decoder_settings.begin(),
+                                                      before_karaoke.decoder_settings.end(), "karaoke_vocals"),
+                                          before_karaoke.decoder_settings.end());
+    CHECK(why([](ac::Settings& s) { s.decoder.karaoke.reset(); }, before_karaoke) ==
+          "decoder.karaoke_vocals is not a setting this sink takes");
+    CHECK(why([](ac::Settings& s) {
+               s.decoder.karaoke.reset();
+               s.decoder.karaoke_vocals.reset();
+           },
+              before_karaoke)
+              .empty());
 }
