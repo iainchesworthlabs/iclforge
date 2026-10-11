@@ -2185,9 +2185,10 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             const auto service = std::ranges::find(kServices, value, &Service::name);
             if (service == kServices.end()) {
                 fmt::println(stderr,
-                             "error: associated is a substream id 0..7, or visually-impaired, "
-                             "audio-description, audio-description-subtitles, spoken-subtitles, "
-                             "emergency-information, hearing-impaired or commentary (got '{}')",
+                             "error: associated is visually-impaired, audio-description, "
+                             "audio-description-subtitles, spoken-subtitles, emergency-information, "
+                             "hearing-impaired or commentary, or an E-AC-3 substream id 0..7 "
+                             "(got '{}')",
                              token);
                 return false;
             }
