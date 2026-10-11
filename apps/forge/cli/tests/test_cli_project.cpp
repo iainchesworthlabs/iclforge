@@ -116,6 +116,93 @@ TEST_CASE("forge project wraps the stream in the container the project names",
     CHECK_FALSE(fs::exists(dir / "wrapped.ac3"));
 }
 
+TEST_CASE("forge project lays named parts out as Annex C does, to the example's own stream",
+          "[cli][project]") {
+    const auto dir = scratch_dir();
+    const auto project = dir / "parts-only.forgeproj";
+    // The example's four parts and nothing else of its layout: no bed, no assignments, no service.
+    // The parts name themselves, and the stream is the committed one.
+    const fs::path parts = fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "parts";
+    {
+        std::ofstream out{project, std::ios::binary | std::ios::trunc};
+        out << R"({
+  "format": "iclforge-project",
+  "version": 1,
+  "sources": [
+    {"path": ")" << (parts / "backing.wav").generic_string() << R"(", "part": "backing"},
+    {"path": ")" << (parts / "melody-guide.wav").generic_string() << R"(", "part": "melody"},
+    {"path": ")" << (parts / "vocal-1-lead.wav").generic_string() << R"(", "part": "vocal1"},
+    {"path": ")" << (parts / "vocal-2-harmony.wav").generic_string() << R"(", "part": "vocal2"}
+  ],
+  "encode": {"codec": "ac3", "bitrateKbps": 384}
+})";
+    }
+    const auto out = dir / "from-parts.ac3";
+    fs::remove(out);
+    const auto log = dir / "parts.log";
+    REQUIRE(run_cli("project " + quoted(project) + " " + quoted(out), log) == 0);
+    INFO(read_bytes(log));
+    const std::string made = read_bytes(out);
+    REQUIRE_FALSE(made.empty());
+    CHECK(made == read_bytes(fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "auld-lang-syne.ac3"));
+}
+
+TEST_CASE("forge project names what is wrong with parts that cannot be laid out",
+          "[cli][project]") {
+    const auto dir = scratch_dir();
+    const fs::path parts = fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "parts";
+    const auto project = dir / "no-backing.forgeproj";
+    {
+        std::ofstream out{project, std::ios::binary | std::ios::trunc};
+        out << R"({
+  "format": "iclforge-project",
+  "version": 1,
+  "sources": [
+    {"path": ")" << (parts / "melody-guide.wav").generic_string() << R"(", "part": "melody"},
+    {"path": ")" << (parts / "vocal-1-lead.wav").generic_string() << R"(", "part": "vocal1"}
+  ]
+})";
+    }
+    const auto log = dir / "no-backing.log";
+    CHECK(run_cli("project " + quoted(project), log) == 1);
+    CHECK(read_bytes(log).find("needs a backing") != std::string::npos);
+}
+
+TEST_CASE("forge project writes AC-4 with its own options, in an MP4 file by itself",
+          "[cli][project]") {
+    const auto dir = scratch_dir();
+    const auto project = dir / "ac4.forgeproj";
+    const fs::path parts = fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "parts";
+    {
+        std::ofstream out{project, std::ios::binary | std::ios::trunc};
+        out << R"({
+  "format": "iclforge-project",
+  "version": 1,
+  "sources": [ {"path": ")" << (parts / "backing.wav").generic_string() << R"("} ],
+  "encode": {"codec": "ac4", "container": "mp4", "bitrateKbps": 128,
+             "options": {"dialnorm": 27.5, "codec-mode": "simple", "iframe-interval": 12}}
+})";
+    }
+    const auto result = dir / "ac4.mp4";
+    fs::remove(result);
+    const auto log = dir / "ac4.log";
+    REQUIRE(run_cli("project " + quoted(project), log) == 0);
+    INFO(read_bytes(log));
+    const std::string bytes = read_bytes(result);
+    REQUIRE(bytes.size() > 12);
+    // An MP4 file's first box is its ftyp; and there is no raw stream beside it.
+    CHECK(bytes.substr(4, 4) == "ftyp");
+    CHECK_FALSE(fs::exists(dir / "ac4.ac4"));
+
+    // The line it printed is the command's own, with the options as its parser reads them.
+    const auto print_log = dir / "ac4-print.log";
+    REQUIRE(run_cli("project " + quoted(project) + " print", print_log) == 0);
+    const std::string line = read_bytes(print_log);
+    CHECK(line.find("ac4-encode ") != std::string::npos);
+    CHECK(line.find("dialnorm=27.5 codec-mode=simple iframe-interval=12") != std::string::npos);
+    CHECK(line.find(" && ") == std::string::npos);
+}
+
 TEST_CASE("forge project says what is wrong with a file that is not a project",
           "[cli][project]") {
     const auto dir = scratch_dir();

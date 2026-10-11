@@ -77,6 +77,11 @@ public:
     // project has there is another version's, or the command line's, and is carried through.
     Q_INVOKABLE QStringList optionKeys() const;
 
+    // The same for an AC-4 project: `forge ac4-encode`'s own keys, which the AC-4 tab holds
+    // (frame-rate, rate-mode, codec-mode, dialnorm, loudness, drc, cmixlev, surmixlev, dmixmod,
+    // dialogue-*, iframe-interval, crc), and `coding`, which AC-4 objects add.
+    Q_INVOKABLE QStringList ac4OptionKeys() const;
+
     // Applies `encode` to `controller` in two parts, so that the rest of the draft can be set
     // up between them. Phase 0 puts every setting to the command line's default
     // (EncoderController::resetEncodeSettings) and sets the codec and the container, which the

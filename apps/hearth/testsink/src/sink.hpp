@@ -69,6 +69,16 @@ struct SinkOptions {
     // applied") - for a server-side test of a sink that takes settings.
     // Off by default: the sink manages nothing (see Sink's config).
     bool accept_settings = false;
+    // Lists karaoke and karaoke_vocals in the extension role's decoder settings, takes the
+    // settings command (as accept_settings does), and reproduces a karaoke AC-3 stream as the
+    // settings say, laying its speakers out from ac3::output_mode(): a sink with a decoder that
+    // does what a board's does (planning/karaoke-phase2.md, W7). Without it a karaoke stream is
+    // played as coded, as a sink from before the keys plays it.
+    bool karaoke = false;
+    // With `karaoke`: also lists karaoke_melody_db, karaoke_vocal1_db and karaoke_vocal2_db and
+    // applies them (W10), as a board with the part levels does. Off, it is a board from before
+    // them: it reproduces karaoke and has no way to be told a level.
+    bool karaoke_levels = true;
     // The speaker layout the extension role's streams are rendered to, in iclforge::render::OutputLayout's
     // grammar.
     std::string layout = "7.1.4";

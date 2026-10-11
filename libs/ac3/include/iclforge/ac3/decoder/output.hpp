@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -209,7 +211,43 @@ struct OutputConfig {
     KaraokeReproduction karaoke = KaraokeReproduction::kOff;
     // The listener's choice of vocals under kCapable; read for no other mode.
     KaraokeVocals karaoke_vocals = KaraokeVocals::kBoth;
+    // Annex C.2.3's "additional flexibility", the karaoke-capable decoder's: the
+    // listener moves the level of each part. Linear gains on M, V1 and V2, where
+    // 1.0 is Table C.2.3 as it stands (bit for bit) and 0.0 mutes the part. They
+    // are read under kCapable alone, at the 3/0 and at the 2/0 (stereo and mono)
+    // reproductions: the aware column is Table C.2.2 and ignores them, whatever
+    // they hold. They multiply the table's coefficients before the scale-down
+    // that holds every output's sum to 1 (§7.8.1), so raising one part lowers
+    // the rest, the music included, by the same factor, and a muted part is out
+    // of the sums as an absent one is. L and R are not moved, and a part the
+    // stream does not code has nothing for its gain to act on. A value that is
+    // not a finite number of 0 or more is a mute.
+    double karaoke_melody_gain = 1.0;
+    double karaoke_vocal1_gain = 1.0;
+    double karaoke_vocal2_gain = 1.0;
 };
+
+// What a person-facing level control for a karaoke part spans, in dB against Table C.2.3
+// (OutputConfig::karaoke_*_gain are the same levels in linear terms). The bottom of the span
+// is off - a singer who pulls the melody all the way down wants it gone, not 24 dB quieter -
+// and the top is 12 dB over the table. Hearth's Karaoke page, its settings, the wire's
+// karaoke_*_db keys and a sink's decoder all use this one span and this one conversion, so a
+// level means the same on every one of them.
+inline constexpr double kKaraokeMinLevelDb = -24.0;
+inline constexpr double kKaraokeMaxLevelDb = 12.0;
+
+// A level in dB held to that span. A value that is not a number is 0 dB, the table's: the
+// gains above mute one, and a stray NaN from a settings file must not silence the melody.
+[[nodiscard]] inline double karaoke_level_db(double db) {
+    return std::isnan(db) ? 0.0 : std::clamp(db, kKaraokeMinLevelDb, kKaraokeMaxLevelDb);
+}
+
+// That level as the linear gain OutputConfig takes: 0.0 (off) at the bottom of the span, and
+// exactly 1.0 for 0 dB.
+[[nodiscard]] inline double karaoke_gain_from_db(double db) {
+    const double held = karaoke_level_db(db);
+    return held <= kKaraokeMinLevelDb ? 0.0 : std::pow(10.0, held / 20.0);
+}
 
 // What the stream itself says about folding down, resolved from whichever
 // syntax carried it. AC-3 carries two coarse levels in bsi and nothing about

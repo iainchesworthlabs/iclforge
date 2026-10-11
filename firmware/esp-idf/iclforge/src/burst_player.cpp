@@ -29,7 +29,9 @@
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/render/identify.hpp"
 #include "iclforge/render/render.hpp"
@@ -439,6 +441,28 @@ struct BurstPlayer::Impl {
             decoder.concealment = *d.concealment == ac::Concealment::kRepeatFade ? iclforge::ac3::ConcealmentPolicy::kRepeatFade
                                   : *d.concealment == ac::Concealment::kMute     ? iclforge::ac3::ConcealmentPolicy::kMute
                                                                                   : iclforge::ac3::ConcealmentPolicy::kNone;
+        }
+        if (d.karaoke) {
+            decoder.output.karaoke = *d.karaoke == ac::Karaoke::kCapable ? iclforge::ac3::KaraokeReproduction::kCapable
+                                     : *d.karaoke == ac::Karaoke::kAware ? iclforge::ac3::KaraokeReproduction::kAware
+                                                                         : iclforge::ac3::KaraokeReproduction::kOff;
+        }
+        if (d.karaoke_vocals) {
+            decoder.output.karaoke_vocals = *d.karaoke_vocals == ac::KaraokeVocals::kNone ? iclforge::ac3::KaraokeVocals::kNone
+                                            : *d.karaoke_vocals == ac::KaraokeVocals::kV1 ? iclforge::ac3::KaraokeVocals::kV1
+                                            : *d.karaoke_vocals == ac::KaraokeVocals::kV2 ? iclforge::ac3::KaraokeVocals::kV2
+                                                                                          : iclforge::ac3::KaraokeVocals::kBoth;
+        }
+        // The capable reproduction's part levels, in dB against Table C.2.3; the library's own
+        // span and conversion, so a level is what Hearth's page and its decode mean by it.
+        if (d.karaoke_melody_db) {
+            decoder.output.karaoke_melody_gain = iclforge::ac3::karaoke_gain_from_db(*d.karaoke_melody_db);
+        }
+        if (d.karaoke_vocal1_db) {
+            decoder.output.karaoke_vocal1_gain = iclforge::ac3::karaoke_gain_from_db(*d.karaoke_vocal1_db);
+        }
+        if (d.karaoke_vocal2_db) {
+            decoder.output.karaoke_vocal2_gain = iclforge::ac3::karaoke_gain_from_db(*d.karaoke_vocal2_db);
         }
         iclforge::ac3::DownmixTarget fold = config.stereo_fold;
         if (d.downmix) {
@@ -898,7 +922,23 @@ struct BurstPlayer::Impl {
                 restart_after_error();
                 return;
             }
-            push_bed(*bed);
+            // The bed is the layout the decoder's channels are in, which for an AC-3 syncframe is
+            // the coded one except under Annex C's reproduction: a karaoke stream comes out as L,
+            // C, R and the LFE, three or four channels for the four to six coded, and laid out
+            // from the coded acmod its vocals would sit where the surrounds were. (A fold has no
+            // bed: the renderer takes its channels as they come.)
+            iclforge::ac3::eac3::chanmap::Layout unit_bed = *bed;
+            if (header->kind == iclforge::ac3::io::StreamKind::kAc3 && header->bytes == unit.size()) {
+                const bool karaoke = iclforge::ac3::meta::is_karaoke(
+                    static_cast<iclforge::ac3::meta::BitstreamMode>(header->bsmod), header->acmod);
+                const iclforge::ac3::OutputMode mode =
+                    iclforge::ac3::output_mode(decoder_config.output, header->acmod, header->lfe, karaoke);
+                if (mode.acmod != header->acmod) {
+                    unit_bed = iclforge::ac3::eac3::chanmap::expand(
+                        iclforge::ac3::eac3::chanmap::acmod_map(mode.acmod, mode.lfe));
+                }
+            }
+            push_bed(unit_bed);
         }
         const auto deliver_block = [this](const iclforge::ac3::PcmBlock& block) { deliver(block); };
         if (header->kind == iclforge::ac3::io::StreamKind::kAc3 && header->bytes == unit.size()) {

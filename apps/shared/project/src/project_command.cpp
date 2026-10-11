@@ -1,5 +1,6 @@
 #include "project_command.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -9,6 +10,7 @@
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
+#include "karaoke_parts.hpp"
 
 namespace iclforge::apps::project {
 
@@ -91,6 +93,8 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
 
     // ---- the sources -------------------------------------------------------------------------
     std::vector<std::string> sources;
+    // What each source says it is (`part`), empty where it does not say.
+    std::vector<std::string> parts;
     std::vector<double> offsets;
     if (const Json* given = member(project, "sources"); given != nullptr && given->is_array()) {
         for (const auto& source : *given) {
@@ -104,6 +108,7 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
                 return std::unexpected(Message{"source-missing", {stored}});
             }
             sources.push_back(utf8(absolute));
+            parts.push_back(string_of(source, "part"));
             offsets.push_back(number_of(source, "offsetSeconds", 0.0));
         }
     }
@@ -140,12 +145,10 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
     if (!known) {
         return std::unexpected(Message{"unknown-container", {container}});
     }
-    if (codec == "ac4" && atmos) {
-        return std::unexpected(Message{"unsupported", {"AC-4 objects"}});
-    }
-    if (atmos && sources.size() > 1) {
-        return std::unexpected(Message{"unsupported", {"objects from several sources"}});
-    }
+    const bool ac4_objects = atmos && codec == "ac4";
+    // AC-4 is written into an MP4 file by ac4-encode and atmos-encode themselves, as the window's
+    // line says (`... out.mp4`), and not wrapped from a stream: the sample has no CRC.
+    const bool direct_mp4 = codec == "ac4" && container == "mp4";
 
     // Where the result goes, and where the stream is written on the way to it.
     if (request.output) {
@@ -158,7 +161,7 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
                                                   : container_suffix(container)));
     }
     fs::path stream = out.output;
-    if (container != "elementary") {
+    if (container != "elementary" && !direct_mp4) {
         stream = request.scratch / path_of(stem + stream_suffix);
         out.scratch_files.push_back(stream);
     }
@@ -171,8 +174,80 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
         }
     }
 
+    // Where each channel goes: the project's own `bed` and `assignments`, or, for a karaoke
+    // project that names its sources' parts and nothing else, where Annex C puts them.
+    std::string bed = string_of(project, "bed");
+    std::string map;
+    const Json* assignments = member(project, "assignments");
+    const bool has_assignments =
+        assignments != nullptr && assignments->is_array() && assignments->size() > 0;
+    bool karaoke_layout = false;
+    const bool all_named = !parts.empty() &&
+                           std::all_of(parts.begin(), parts.end(),
+                                       [](const std::string& part) { return !part.empty(); });
+    if (!has_assignments && bed.empty() && sources.size() > 1 && all_named && !atmos) {
+        std::array<std::optional<std::size_t>, 4> at;  // backing, melody, vocal 1, vocal 2
+        for (std::size_t i = 0; i < parts.size(); ++i) {
+            const std::array<std::string_view, 4> names{kPartBacking, kPartMelody, kPartVocal1,
+                                                        kPartVocal2};
+            std::size_t slot = names.size();
+            for (std::size_t n = 0; n < names.size(); ++n) {
+                if (names[n] == parts[i]) {
+                    slot = n;
+                }
+            }
+            if (slot == names.size()) {
+                return std::unexpected(Message{"karaoke-unknown-part", {parts[i]}});
+            }
+            if (at[slot]) {
+                return std::unexpected(Message{"karaoke-duplicate-part", {parts[i]}});
+            }
+            at[slot] = i;
+        }
+        if (!at[0]) {
+            return std::unexpected(Message{"karaoke-no-backing", {}});
+        }
+        if (at[3] && !at[2]) {
+            return std::unexpected(Message{"karaoke-vocal2-needs-vocal1", {}});
+        }
+        const KaraokeMode* mode =
+            karaoke_mode(at[1].has_value(), (at[2] ? 1 : 0) + (at[3] ? 1 : 0));
+        if (mode == nullptr) {
+            return std::unexpected(Message{"karaoke-nothing-to-sing", {}});
+        }
+        bed = std::string{mode->bed};
+        // Written in the order the window writes a map= in: by source, then by channel.
+        struct Placed {
+            std::size_t source;
+            std::size_t channel;
+            std::string_view position;
+        };
+        std::vector<Placed> placed;
+        for (std::size_t i = 0; i < mode->count; ++i) {
+            const std::string_view part = mode->slots[i].part;
+            if (part == "L" || part == "R") {
+                placed.push_back({*at[0], part == "L" ? std::size_t{0} : std::size_t{1},
+                                  mode->slots[i].position});
+            } else {
+                const std::size_t source = part == "M" ? *at[1] : (part == "V1" ? *at[2] : *at[3]);
+                placed.push_back({source, 0, mode->slots[i].position});
+            }
+        }
+        std::sort(placed.begin(), placed.end(), [](const Placed& a, const Placed& b) {
+            return a.source != b.source ? a.source < b.source : a.channel < b.channel;
+        });
+        for (const Placed& entry : placed) {
+            if (!map.empty()) {
+                map += ",";
+            }
+            map += std::to_string(entry.source) + "." + std::to_string(entry.channel) + ":" +
+                   std::string{entry.position};
+        }
+        karaoke_layout = true;
+    }
+
     std::string layout;
-    if (const std::string bed = string_of(project, "bed"); !bed.empty()) {
+    if (!bed.empty()) {
         std::size_t at = kBeds.size();
         for (std::size_t i = 0; i < kBeds.size(); ++i) {
             if (kBeds[i] == bed) {
@@ -207,9 +282,7 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
     for (std::size_t i = 1; i < sources.size(); ++i) {
         trailing.push_back("src=" + sources[i]);
     }
-    if (const Json* assignments = member(project, "assignments");
-        assignments != nullptr && assignments->is_array() && assignments->size() > 0) {
-        std::string map;
+    if (has_assignments) {
         for (std::size_t i = 0; i < assignments->size(); ++i) {
             const Json& entry = (*assignments)[i];
             const auto source = member(entry, "source") ? int_of(*member(entry, "source"))
@@ -226,12 +299,14 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
             }
             map += std::to_string(*source) + "." + std::to_string(*channel) + ":" + to;
         }
+    }
+    if (!map.empty()) {
         trailing.push_back("map=" + map);
     }
     // Several sources are routed by name or not at all: the commands refuse a second source with
-    // no map=, since a channel nobody placed is a mistake and not a default.
-    const bool has_map = !trailing.empty() && trailing.back().rfind("map=", 0) == 0;
-    if (sources.size() > 1 && !atmos && !has_map) {
+    // no map=, since a channel nobody placed is a mistake and not a default. (The window says the
+    // same of them: "unassigned".) A karaoke project's parts are named, so they are placed above.
+    if (sources.size() > 1 && !atmos && map.empty()) {
         return std::unexpected(Message{"no-assignments", {std::to_string(sources.size())}});
     }
     for (std::size_t i = 0; i < offsets.size(); ++i) {
@@ -242,31 +317,67 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
     }
 
     std::vector<std::string> options;
+    bool names_service = false;
     if (const Json* given = member(encode, "options"); given != nullptr && given->is_object()) {
         for (auto it = given->begin(); it != given->end(); ++it) {
+            names_service = names_service || it.key() == "bsmod";
             if (const auto token = option_token(it.key(), it.value())) {
                 options.push_back(*token);
+            }
+        }
+    }
+    // A karaoke stream is a main service with bsmod 7 (Annex C): laying the parts out says so,
+    // as the Karaoke flow does, unless the project has a service of its own to name.
+    if (karaoke_layout && !names_service && (codec == "ac3" || codec == "eac3")) {
+        options.emplace_back("bsmod=voiceover");
+    }
+
+    // ---- the scene of an object session -------------------------------------------------------
+    // The file the command bar's line names, written where the steps can read it.
+    std::string count_text;
+    std::string scene_path;
+    if (atmos) {
+        if (const Json* objects = member(project, "objects"); objects != nullptr) {
+            const std::int64_t count =
+                member(*objects, "count") ? int_of(*member(*objects, "count")).value_or(0) : 0;
+            if (count > 0) {
+                count_text = std::to_string(count);
+            }
+            if (const Json* scene = member(*objects, "scene"); scene != nullptr && count > 0) {
+                const fs::path file = request.scratch / path_of(stem + "-objects.json");
+                out.files.emplace_back(file, scene->dump(2) + "\n");
+                out.scratch_files.push_back(file);
+                scene_path = utf8(file);
             }
         }
     }
 
     // ---- the stream's command ----------------------------------------------------------------
     Step first;
-    if (atmos) {
+    if (ac4_objects) {
+        // atmos-encode with codec=ac4 takes the sources, the assignment and the offsets the way
+        // the window's line writes them, and the AC-4 tab's words after codec=ac4. Several sources
+        // or a map= state their own channels, so [objects] is 0 then.
         first.argv = {"atmos-encode", sources.front(), utf8(stream), rate};
-        if (const Json* objects = member(project, "objects"); objects != nullptr) {
-            const std::int64_t count =
-                member(*objects, "count") ? int_of(*member(*objects, "count")).value_or(0) : 0;
-            if (count > 0) {
-                first.argv.push_back(std::to_string(count));
-                if (const Json* scene = member(*objects, "scene"); scene != nullptr) {
-                    // The scene file the command bar's line names, written where the steps can
-                    // read it.
-                    const fs::path file = request.scratch / path_of(stem + "-objects.json");
-                    out.files.emplace_back(file, scene->dump(2) + "\n");
-                    out.scratch_files.push_back(file);
-                    first.argv.push_back(utf8(file));
-                }
+        const bool routed = sources.size() > 1 || !map.empty();
+        if (routed || !count_text.empty() || !scene_path.empty()) {
+            first.argv.push_back(routed || count_text.empty() ? "0" : count_text);
+            if (!scene_path.empty()) {
+                first.argv.push_back(scene_path);
+            }
+        }
+        first.argv.insert(first.argv.end(), trailing.begin(), trailing.end());
+        first.argv.emplace_back("codec=ac4");
+        first.argv.insert(first.argv.end(), options.begin(), options.end());
+    } else if (atmos) {
+        first.argv = {"atmos-encode", sources.front(), utf8(stream), rate};
+        // Several sources or a map= state their own channels, and [objects] is then 0 (the
+        // command refuses both).
+        const bool routed = sources.size() > 1 || !map.empty();
+        if (routed || !count_text.empty()) {
+            first.argv.push_back(routed || count_text.empty() ? "0" : count_text);
+            if (!scene_path.empty()) {
+                first.argv.push_back(scene_path);
             }
         }
         // Object mode takes the loudness and nothing else of the metadata group.
@@ -275,9 +386,13 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
                 first.argv.push_back(token);
             }
         }
-        for (const auto& token : trailing) {
-            if (token.rfind("offset=", 0) == 0) {
-                first.argv.push_back(token);
+        if (routed) {
+            first.argv.insert(first.argv.end(), trailing.begin(), trailing.end());
+        } else {
+            for (const auto& token : trailing) {
+                if (token.rfind("offset=", 0) == 0) {
+                    first.argv.push_back(token);
+                }
             }
         }
     } else if (codec == "ac3") {
@@ -306,7 +421,7 @@ std::expected<CommandPlan, Message> command_plan(const Json& project, const Requ
     out.steps.push_back(std::move(first));
 
     // ---- the container -----------------------------------------------------------------------
-    if (container != "elementary") {
+    if (container != "elementary" && !direct_mp4) {
         static constexpr std::array<std::pair<std::string_view, std::string_view>, 5> kCommands{{
             {"matroska", "mkv"},
             {"spdif", "spdif"},

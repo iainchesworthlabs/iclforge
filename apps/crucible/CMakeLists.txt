@@ -99,7 +99,10 @@ elseif(UNIX AND NOT APPLE)
     pkg_check_modules(ICLFORGE_CRUCIBLE_PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
     target_include_directories(crucible_engine
         PRIVATE "${CMAKE_SOURCE_DIR}/libs/audio/src/backend/pipewire")
-    target_link_libraries(crucible_engine PRIVATE PkgConfig::ICLFORGE_CRUCIBLE_PIPEWIRE)
+    # iclforge::json (cmake/NlohmannJson.cmake) reads and writes the JSON PipeWire keeps the
+    # default sink in (engine/src/platform/linux/default_device.cpp).
+    target_link_libraries(crucible_engine PRIVATE PkgConfig::ICLFORGE_CRUCIBLE_PIPEWIRE
+                                                  iclforge::json)
     # X11 full-screen detection (docs/crucible/design/promotion.md, Phase 4's X11
     # addendum). libxcb, not libX11: thread-safe, no global error handler,
     # and already on every machine that runs Qt's xcb platform plugin, so
@@ -342,6 +345,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/RoomKeys.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/RoomWords.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/A11y.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/LyricStrip.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/AppRow.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/BedChip.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/Monogram.qml"
@@ -376,6 +380,8 @@ else()
         ui/src/main.cpp
         ui/src/crucible_controller.cpp
         ui/src/crucible_controller.hpp
+        ui/src/lyrics_controller.cpp
+        ui/src/lyrics_controller.hpp
         ../shared/theme/src/system_theme.cpp
         ../shared/theme/src/system_theme.hpp
         ../shared/preferences/src/language_manager.cpp
@@ -444,6 +450,7 @@ else()
     # be compiled under it (apps/forge/gui carries a workaround for exactly that).
     target_link_libraries(crucible PRIVATE
         iclforge::crucible_engine
+        iclforge::lyrics
         iclforge::coverage
         Qt6::Core Qt6::Gui Qt6::Qml Qt6::Widgets Qt6::Quick Qt6::QuickControls2 ${ICLFORGE_CRUCIBLE_QUICK3D_LIB})
     if(Qt6Svg_FOUND)

@@ -44,6 +44,7 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "ac4_channels.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "stream_playback.hpp"
 
 namespace forge_cli::commands {
 

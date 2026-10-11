@@ -286,15 +286,15 @@ struct SceneContents {
 
 // --- Serialisation --------------------------------------------------------
 
-// JSON, not YAML. {fmt} (linked into this library already, for text formatting
-// generally - see CONTRIBUTING.md) formats a number; it is not a document
-// parser for either format, so whichever this is still has to be read and
-// written by code in this repository. RFC 8259 is a grammar small enough to
-// implement completely and to be sure of; YAML 1.2's is not, and a hand-rolled
-// "YAML subset" would accept and reject files no other YAML tool agrees with,
-// which is worse than not offering YAML at all. Both other front ends already
-// have a JSON reader to hand (Qt's, Python's) if they ever want to read a
-// scene without linking this library.
+// JSON, not YAML. RFC 8259 has a mature reader in nlohmann/json, which this
+// library compiles in privately (cmake/NlohmannJson.cmake: header-only, named
+// by no header and no export) to tokenise the file; the schema is checked here.
+// YAML 1.2's grammar is not one to settle for with a hand-rolled "YAML subset",
+// which would accept and reject files no other YAML tool agrees with, and that
+// is worse than not offering YAML at all. {fmt} (linked into this library already,
+// for text formatting generally - see CONTRIBUTING.md) lays the file out and
+// formats its numbers. Both other front ends already have a JSON reader to hand
+// (Qt's, Python's) if they ever want to read a scene without linking this library.
 //
 // The written form is stable and diffable: members in a fixed order, one
 // automation point per line, numbers short-round-tripped (the shortest decimal

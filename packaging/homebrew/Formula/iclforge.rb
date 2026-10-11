@@ -27,8 +27,9 @@ class Iclforge < Formula
   head "https://github.com/iainchesworthlabs/iclforge.git", branch: "main"
 
   depends_on "cmake" => :build
-  # The project file's reader (apps/shared/project). Header-only; without it cmake/NlohmannJson.cmake
-  # fetches it from GitHub at configure time, as cmake/Fmt.cmake does {fmt}.
+  # The project file's reader (apps/shared/project) and the scene file's (libs/objects). Header-only,
+  # 3.12.0 or newer; without it cmake/NlohmannJson.cmake fetches it from GitHub at configure time,
+  # as cmake/Fmt.cmake does {fmt}.
   depends_on "nlohmann-json" => :build
 
   def install

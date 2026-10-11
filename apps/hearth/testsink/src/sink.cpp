@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdio>
 #include <expected>
 #include <functional>
 #include <map>
@@ -292,12 +293,42 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                 log("output delay " + std::to_string(command.output_delay_ms) + " ms");
                 break;
             case ac::Command::kSettings:
-                // Listed only with accept_settings; nothing here renders, so
-                // "applied" is the revision reported back, which is all a
-                // server can read.
+                // Listed only with accept_settings or karaoke. Settings replace the last whole,
+                // so a key left out is the sink's own default again. Nothing else renders from
+                // them: "applied" is the revision reported back, which is all a server can read.
                 iclforge_state_.settings_revision = command.settings.revision;
                 iclforge_state_.settings_error.reset();
-                log("settings " + std::to_string(command.settings.revision) + " applied");
+                if (sink_->options_.karaoke) {
+                    const ac::DecoderSettings& decoder = command.settings.decoder;
+                    const ac::Karaoke karaoke = decoder.karaoke.value_or(ac::Karaoke::kOff);
+                    const ac::KaraokeVocals vocals = decoder.karaoke_vocals.value_or(ac::KaraokeVocals::kBoth);
+                    const std::array<double, 3> levels{decoder.karaoke_melody_db.value_or(0.0),
+                                                       decoder.karaoke_vocal1_db.value_or(0.0),
+                                                       decoder.karaoke_vocal2_db.value_or(0.0)};
+                    bursts_.set_karaoke(karaoke, vocals, levels);
+                    // The levels that are not the table's, as "melody -6 dB": a test reads them.
+                    std::string moved;
+                    constexpr std::array<const char*, 3> kParts{"melody", "vocal 1", "vocal 2"};
+                    for (std::size_t part = 0; part < levels.size(); ++part) {
+                        if (levels[part] != 0.0) {
+                            char text[48];
+                            std::snprintf(text, sizeof text, ", %s %+.0f dB", kParts[part], levels[part]);
+                            moved += text;
+                        }
+                    }
+                    log("settings " + std::to_string(command.settings.revision) + " applied (karaoke " +
+                        std::string(karaoke == ac::Karaoke::kOff       ? "off"
+                                    : karaoke == ac::Karaoke::kAware   ? "aware"
+                                                                       : "capable") +
+                        ", vocals " +
+                        std::string(vocals == ac::KaraokeVocals::kNone   ? "none"
+                                    : vocals == ac::KaraokeVocals::kV1   ? "v1"
+                                    : vocals == ac::KaraokeVocals::kV2   ? "v2"
+                                                                         : "both") +
+                        moved + ")");
+                } else {
+                    log("settings " + std::to_string(command.settings.revision) + " applied");
+                }
                 break;
             case ac::Command::kIdentify:
                 // Not listed, so not sent.
@@ -563,6 +594,15 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         support.outputs.bit_depths = {32};
         support.layout_grammar = 1;
         // Nothing the server can manage: no routing, trims, delays, settings or identify tone.
+        // Except the karaoke choice, when the sink is asked to take it.
+        if (options_.karaoke) {
+            support.decoder_settings = {"karaoke", "karaoke_vocals"};
+            if (options_.karaoke_levels) {
+                support.decoder_settings.insert(support.decoder_settings.end(),
+                                                {"karaoke_melody_db", "karaoke_vocal1_db",
+                                                 "karaoke_vocal2_db"});
+            }
+        }
         support.management.crossover_hz = {render::LayoutRenderer::kMinCrossoverHz,
                                            render::LayoutRenderer::kMaxCrossoverHz};
         support.buffer_capacity = options_.buffer_capacity;
@@ -581,7 +621,7 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         config.iclforge_state.required_lead_time_ms = 500;
         config.iclforge_state.min_buffer_ms = 200;
         config.iclforge_state.supported_commands = {ac::Command::kVolume, ac::Command::kMute};
-        if (options_.accept_settings) {
+        if (options_.accept_settings || options_.karaoke) {
             config.iclforge_state.supported_commands.push_back(ac::Command::kSettings);
         }
     }

@@ -1017,6 +1017,10 @@
             <translation>[Võcàl 2 ~~~]</translation>
         </message>
         <message>
+            <source>LFE</source>
+            <translation>[LFÉ ~]</translation>
+        </message>
+        <message>
             <source>File</source>
             <translation>[Fîlé ~~]</translation>
         </message>
@@ -1061,6 +1065,10 @@
             <translation>[Éàch pàrt îs õné plàcé în thé stréàm. ~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
+            <source>%1 is the LFE channel: the encoder band-limits it as it does any LFE.</source>
+            <translation>[%1 îs thé LFÉ chànnél: thé éncõdér bànd-lîmîts ît às ît dõés àny LFÉ. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>Choose a file.</source>
             <translation>[Chõõsé à fîlé. ~~~~~~]</translation>
         </message>
@@ -1071,10 +1079,6 @@
         <message>
             <source>The speakers (%1) are not one of Annex C's five layouts: L C R, L R S, L C R S, L R Ls Rs or L C R Ls Rs.</source>
             <translation>[Thé spéàkérs (%1) àré nõt õné õf Ànnéx C's fîvé làyõûts: L C R, L R S, L C R S, L R Ls Rs õr L C R Ls Rs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
-        </message>
-        <message>
-            <source>%1 has an LFE channel. Karaoke streams made here carry none: use a file without it.</source>
-            <translation>[%1 hàs àn LFÉ chànnél. Kàràõké stréàms màdé héré càrry nõné: ûsé à fîlé wîthõût ît. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>Chosen from what you supplied: a backing and a melody guide.</source>
@@ -1169,6 +1173,10 @@
             <translation>[mõnõ · V2 ~~~~]</translation>
         </message>
         <message>
+            <source>mono · LFE</source>
+            <translation>[mõnõ · LFÉ ~~~~]</translation>
+        </message>
+        <message>
             <source>(optional) %1</source>
             <translation>[(õptîõnàl) %1 ~~~~~]</translation>
         </message>
@@ -1191,10 +1199,6 @@
         <message>
             <source>Remove</source>
             <translation>[Rémõvé ~~]</translation>
-        </message>
-        <message>
-            <source>A WAV whose speakers are already named L C R Ls Rs (or L R S, L C R S, L R Ls Rs).</source>
-            <translation>[À WÀV whõsé spéàkérs àré àlréàdy nàméd L C R Ls Rs (õr L R S, L C R S, L R Ls Rs). ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>Lyrics</source>
@@ -1221,8 +1225,8 @@
             <translation>[nõt yét ~~~]</translation>
         </message>
         <message>
-            <source>No LFE: karaoke streams made here carry none.</source>
-            <translation>[Nõ LFÉ: kàràõké stréàms màdé héré càrry nõné. ~~~~~~~~~~~~~~~~~~]</translation>
+            <source>A WAV whose speakers are already named L C R Ls Rs (or L R S, L C R S, L R Ls Rs), with an LFE if it has one.</source>
+            <translation>[À WÀV whõsé spéàkérs àré àlréàdy nàméd L C R Ls Rs (õr L R S, L C R S, L R Ls Rs), wîth àn LFÉ îf ît hàs õné. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>How loud do the melody and the vocals sit?</source>
@@ -1363,6 +1367,10 @@
         <message>
             <source>THE SAME FROM THE COMMAND LINE</source>
             <translation>[THÉ SÀMÉ FRÕM THÉ CÕMMÀND LÎNÉ ~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>No LFE part: the stream carries none. An LFE part is optional.</source>
+            <translation>[Nõ LFÉ pàrt: thé stréàm càrrîés nõné. Àn LFÉ pàrt îs õptîõnàl. ~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>Back</source>

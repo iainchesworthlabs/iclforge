@@ -201,6 +201,26 @@ public:
         return path;
     }
 
+    // Writes the bytes `base64` decodes to into this process's scratch folder as `name` and
+    // returns its path, or empty if it could not be written: a file that is not text, such as a
+    // CD+G picture (the suite builds the bytes with String.fromCharCode and Qt.btoa).
+    Q_INVOKABLE QString writeBinaryFile(const QString& name, const QString& base64) {
+        if (!scratch_.isValid()) {
+            return {};
+        }
+        const QString path = QDir(scratch_.path()).filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            qWarning("writeBinaryFile: cannot open %s", qPrintable(path));
+            return {};
+        }
+        const QByteArray bytes = QByteArray::fromBase64(base64.toLatin1());
+        if (file.write(bytes) != bytes.size()) {
+            return {};
+        }
+        return path;
+    }
+
     // Copies `source` (a path, or a file: URL) into this process's scratch
     // folder as `name`, so a suite can queue several distinctly named items
     // from the repository's small golden streams, and returns the copy's
@@ -224,6 +244,14 @@ public:
     // A fresh folder under the scratch folder, for a suite's own output files
     // (a diagnostics export, a media JSON export).
     Q_INVOKABLE QString scratchPath(const QString& name) const { return QDir(scratch_.path()).filePath(name); }
+
+    // What the controller has written under `key` into the app's settings (a
+    // fresh read of the file, so what a restart would find), or null.
+    Q_INVOKABLE QVariant storedSetting(const QString& key) const {
+        const QSettings settings(QSettings::defaultFormat(), QSettings::UserScope,
+                                 QStringLiteral("iclforge"), QStringLiteral("Hearth"));
+        return settings.value(key);
+    }
 
     Q_INVOKABLE bool removeFile(const QString& path) const {
         return QFile::remove(path.startsWith(QStringLiteral("file:")) ? QUrl(path).toLocalFile() : path);

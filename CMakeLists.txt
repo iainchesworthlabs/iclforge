@@ -393,12 +393,12 @@ include(MinimalDecoder)
 # further down, so resolving it here is still early enough.
 if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
     include(Fmt)
-    # iclforge::json - nlohmann/json, which apps/shared/project reads and writes the project file
-    # with (cmake/NlohmannJson.cmake). No library links it: only what compiles that code in, which
-    # is forge, forge-gui and the shared tests, so a build of none of them resolves nothing.
-    if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS)
-        include(NlohmannJson)
-    endif()
+    # iclforge::json - nlohmann/json (cmake/NlohmannJson.cmake): the project file's reader and
+    # writer (apps/shared/project) and iclforge::objects' scene file reader. Header-only and
+    # linked PRIVATE through $<BUILD_INTERFACE:...> the way iclforge::fmt_private is, so no export
+    # graph names it; it is resolved wherever iclforge::objects is built, which is everywhere this
+    # block is reached.
+    include(NlohmannJson)
 endif()
 
 # iclforge::adm (libs/adm) is a READER, not a writer like the three container modules above -
@@ -473,6 +473,17 @@ add_subdirectory(libs/render)
 # The device-side logic of the ESP32 sinks and players that needs no SDK: headers the ESP-IDF
 # component, Hearth's engine and their tests share (libs/device/CMakeLists.txt).
 add_subdirectory(libs/device)
+# Timed lyrics (an LRC file read, and the cursor over it): standard library only, for Hearth,
+# Crucible and the sink firmware alike (libs/lyrics/CMakeLists.txt). The minimum-footprint profile
+# carries none, and the ESP-IDF component's archive does not stage the directory, so it is not
+# reached there (tools/packaging/pack_esp_component.py).
+#
+# EXCLUDE_FROM_ALL: it is built when a program links it (Hearth, the tests) and not otherwise. It
+# reads files through std::filesystem, which the Python wheel's Intel macOS target (10.9) does not
+# have, and the wheel links nothing of it (bindings/python/pyproject.toml).
+if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
+    add_subdirectory(libs/lyrics EXCLUDE_FROM_ALL)
+endif()
 add_subdirectory(libs/ac3)
 
 # The containers, codec-blind and one library: IEC 61937 burst packing, always, and the Matroska,
@@ -630,7 +641,7 @@ if(ICLFORGE_BUILD_TESTS)
         add_subdirectory(apps/hearth/engine/tests)
     endif()
     add_subdirectory(apps/crucible/engine/tests)
-    foreach(_iclforge_lib IN ITEMS base dsp objects render device ac3 containers audio ac4 iab adm capi sendspin)
+    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics ac3 containers audio ac4 iab adm capi sendspin)
         set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
         if(_iclforge_lib STREQUAL "capi")
             set(_iclforge_lib_target "iclforge::c")

@@ -63,6 +63,8 @@ TestCase {
         }
         tryVerify(function() { return HearthController.queue.length === 0; }, 10000);
         KaraokeController.delayMs = 0;
+        KaraokeController.firstSingerName = "";
+        KaraokeController.secondSingerName = "";
         KaraokeController.load("", 0);
     }
 
@@ -312,6 +314,275 @@ TestCase {
         tryCompare(view, "status", "none", 10000);
         const message = named(win, "lyricMessage");
         tryVerify(function() { return message.visible && message.text.indexOf("bare.lrc") >= 0; }, 5000);
+    }
+
+    // --- a duet (planning/karaoke-phase2.md, W11b) ---------------------------
+
+    function writeDuet() {
+        const file = TestServices.writeTextFile("duet.lrc", [
+            "[v1:Shantyman]", "[v2:Crew]",
+            "[00:01.00]V1: Oh the times are hard",
+            "[00:04.00]V2: Leave her, Johnny",
+            "[00:07.00]V1+V2: Leave her",
+            "[00:10.00]For nobody in particular",
+            ""].join("\n"));
+        verify(file.length > 0);
+        return file.replace(/[.]lrc$/, ".ac3");
+    }
+
+    function test_aDuetLineSaysWhoSingsItAndSitsOnItsSide() {
+        const duetItem = writeDuet();
+        KaraokeController.firstSingerName = "";
+        KaraokeController.secondSingerName = "";
+        KaraokeController.load(duetItem, 20000);
+        compare(KaraokeController.hasSingers, true);
+        const view = newView();
+        view.positionMs = 1500;
+        // The line being sung is the shantyman's, at the left; nothing is playing, so there is
+        // no guide to speak of and the tag is the name alone.
+        compare(view.currentLine, 0);
+        const current = named(view, "lyricCurrentSinger");
+        verify(current !== null);
+        tryVerify(function() { return current.visible; }, 5000);
+        compare(current.text, "Shantyman");
+        compare(named(view, "lyricCurrentLine").x, 0);
+        // The next rows: the crew's, indented, and the two together.
+        const tags = [];
+        H.find(view, function(item) {
+            if (item.objectName === "lyricNextSinger") { tags.push(item.text); }
+            return false;
+        });
+        compare(tags[0], "Crew");
+        compare(tags[1], "Shantyman + Crew");
+        const next = H.find(view, function(item) { return item.objectName === "lyricNext"; });
+        verify(next.x > 0, "the second singer's line is not indented");
+        // A line the file does not mark has no tag at all.
+        view.positionMs = 10500;
+        compare(named(view, "lyricCurrentSinger").visible, false);
+        // Typed names come first, per singer, and give the file's back when emptied.
+        KaraokeController.firstSingerName = "Anna";
+        view.positionMs = 1500;
+        compare(named(view, "lyricCurrentSinger").text, "Anna");
+        KaraokeController.firstSingerName = "";
+        compare(named(view, "lyricCurrentSinger").text, "Shantyman");
+    }
+
+    function test_aPlainDuetFileSaysWhoSingsEachLineInWords() {
+        const file = TestServices.writeTextFile("plainduet.lrc", [
+            "[v1:Shantyman]", "[v2:Crew]",
+            "V1: Oh the times are hard", "V2: Leave her, Johnny", "No one in particular", ""].join("\n"));
+        verify(file.length > 0);
+        KaraokeController.load(file.replace(/[.]lrc$/, ".ac3"), 20000);
+        const view = newView();
+        compare(view.status, "plain");
+        const shown = named(view, "lyricPlainText").text;
+        compare(shown, ["Shantyman: Oh the times are hard", "Crew: Leave her, Johnny", "No one in particular"].join("\n"));
+    }
+
+    function test_aSoloFileHasNoSingerTags() {
+        const view = loaded(newView(), 1500);
+        compare(KaraokeController.hasSingers, false);
+        compare(view.duet, false);
+        const current = named(view, "lyricCurrentSinger");
+        verify(current !== null);
+        compare(current.visible, false);
+    }
+
+    function test_theGuideAndYouFollowTheVocalsThatPlay() {
+        writeDuet();
+        const duetItem = TestServices.writeAc3Stream("duet.ac3", "karaoke-3/2");
+        verify(duetItem.length > 0, "the stream could not be written");
+        KaraokeController.firstSingerName = "";
+        KaraokeController.secondSingerName = "";
+        HearthController.setLayoutText("5.1");
+        tryVerify(function() { return HearthController.speakerLabels.length === 6; }, 10000);
+        HearthController.addFiles([duetItem]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000);
+        HearthController.playItem(0);
+        tryCompare(HearthController, "state", "playing", 10000);
+        tryVerify(function() { return HearthController.currentMedia.codec !== undefined; }, 10000);
+        KaraokeController.load(duetItem, 20000);
+        const view = newView();
+        view.positionMs = 1500;
+
+        function settle(values) {
+            const next = Object.assign({}, HearthController.decoderSettings, values);
+            HearthController.setDecoderSettings(next);
+            tryVerify(function() {
+                for (const key in values) {
+                    if (HearthController.decoderSettings[key] !== values[key]) { return false; }
+                }
+                return true;
+            }, 10000);
+        }
+        function cues() {
+            // The tags of the line being sung and the two after it.
+            const out = [named(view, "lyricCurrentSinger").text];
+            H.find(view, function(item) {
+                if (item.objectName === "lyricNextSinger") { out.push(item.text); }
+                return false;
+            });
+            return out;
+        }
+
+        // Aware plays every vocal the stream has: all are the guide's.
+        const win = openPage();
+        const summary = function() { return named(win, "duetSummary").text; };
+        settle({ karaoke: "aware", karaokeVocals: "both" });
+        tryCompare(view, "karaokeStream", true, 10000);
+        tryVerify(function() { return summary() === qsTr("Both vocals play, so %1 and %2 are both in the mix.")
+                                                      .arg("Shantyman").arg("Crew"); }, 5000);
+        tryVerify(function() { return cues()[0] === "Shantyman \u00b7 guide"; }, 5000);
+        // Capable with the first vocal: the shantyman's lines are the guide's, the crew's are yours.
+        settle({ karaoke: "capable", karaokeVocals: "v1" });
+        tryVerify(function() { return cues()[0] === "Shantyman \u00b7 guide"; }, 5000);
+        compare(cues()[1], "Crew \u00b7 you");
+        compare(cues()[2], "Shantyman + Crew \u00b7 shared");
+        tryVerify(function() { return summary() === qsTr("The vocal of %1 plays: you sing the lines of %2.")
+                                                      .arg("Shantyman").arg("Crew"); }, 5000);
+        // The second vocal: the other way round.
+        settle({ karaokeVocals: "v2" });
+        tryVerify(function() { return cues()[0] === "Shantyman \u00b7 you"; }, 5000);
+        compare(cues()[1], "Crew \u00b7 guide");
+        tryVerify(function() { return summary() === qsTr("The vocal of %1 plays: you sing the lines of %2.")
+                                                      .arg("Crew").arg("Shantyman"); }, 5000);
+        // No vocal: every line is yours.
+        settle({ karaokeVocals: "none" });
+        tryVerify(function() { return cues()[0] === "Shantyman \u00b7 you"; }, 5000);
+        compare(cues()[1], "Crew \u00b7 you");
+        compare(cues()[2], "Shantyman + Crew \u00b7 you");
+        tryVerify(function() { return summary() === qsTr("No vocal plays: you sing the lines of %1 and of %2.")
+                                                      .arg("Shantyman").arg("Crew"); }, 5000);
+        settle({ karaoke: "aware", karaokeVocals: "both" });
+    }
+
+    function test_theKaraokePageNamesTheSingersAndSaysWhatTheChoiceLeavesForYou() {
+        const duetItem = writeDuet();
+        KaraokeController.firstSingerName = "";
+        KaraokeController.secondSingerName = "";
+        const win = openPage();
+        KaraokeController.load(duetItem, 20000);
+        const block = named(win, "duetBlock");
+        verify(block !== null);
+        tryVerify(function() { return named(win, "duetBlock").visible; }, 5000);
+        // The file's names are what the fields suggest; nothing is typed.
+        compare(named(win, "firstSingerField").placeholderText, "Shantyman");
+        compare(named(win, "secondSingerField").placeholderText, "Crew");
+        compare(named(win, "firstSingerField").text, "");
+        // Typing a name is the controller's name, for the run.
+        const field = named(win, "firstSingerField");
+        field.text = "Anna";
+        field.editingFinished();
+        compare(KaraokeController.firstSingerName, "Anna");
+        compare(KaraokeController.firstSingerLabel, "Anna");
+        // Not a karaoke stream that is playing, so there is no guide to say anything of.
+        compare(named(win, "duetSummary").text,
+                qsTr("The lines are marked for %1 and for %2.").arg("Anna").arg("Crew"));
+        KaraokeController.firstSingerName = "";
+        compare(named(win, "firstSingerField").text, "");
+    }
+
+    // --- the picture of a CD+G disc ----------------------------------------------
+
+    // One 24-byte CD+G packet as a string of byte values: command 9, the instruction, two parity
+    // bytes, sixteen data bytes, four parity bytes.
+    function cdgPacket(instruction, data) {
+        const bytes = new Array(24).fill(0);
+        bytes[0] = 9;
+        bytes[1] = instruction;
+        for (let i = 0; i < data.length; ++i) {
+            bytes[4 + i] = data[i];
+        }
+        return String.fromCharCode.apply(null, bytes);
+    }
+
+    // Colour 1 is red and colour 2 green; the picture is red from the first packets and green from
+    // the packet at one second (300 packets in). Base64, for TestServices.writeBinaryFile().
+    function cdgDisc() {
+        const colours = new Array(16).fill(0);
+        colours[2] = 0x3C;
+        colours[4] = 0x03;
+        colours[5] = 0x30;
+        let disc = cdgPacket(30, colours) + cdgPacket(1, [1]);
+        for (let i = 2; i < 300; ++i) {
+            disc += cdgPacket(0, []);
+        }
+        disc += cdgPacket(1, [2]);
+        return Qt.btoa(disc);
+    }
+
+    function test_aCdgFileBesideAnItemIsShownAsItsPictureAgainstThePosition() {
+        const disc = TestServices.writeBinaryFile("disc.cdg", cdgDisc());
+        verify(disc.length > 0, "the CD+G file could not be written");
+        const view = newView();
+        KaraokeController.load(disc.replace(/\.cdg$/, ".ac3"), 10000);
+        compare(view.status, "picture");
+        const picture = H.find(view, function(item) { return item.objectName === "lyricPicture"; });
+        verify(picture !== null);
+        tryVerify(function() { return picture.visible; }, 5000);
+        verify(picture.ready);
+        // No words are drawn, and there is nothing to say: the picture is the lyrics.
+        const message = H.find(view, function(item) { return item.objectName === "lyricMessage"; });
+        verify(!message.visible);
+        const stage = H.find(view, function(item) { return item.objectName === "lyricStage"; });
+        verify(!stage.visible);
+
+        // The picture is drawn at the middle of the view in the colour of its packets: red before
+        // the packet at one second, green after it, and back to red on a seek back. The view
+        // is 900 by 400, so the 300 by 216 picture is drawn once over, centred, with black round it.
+        view.positionMs = 500;
+        waitForRendering(picture);
+        let image = grabImage(picture);
+        compare(image.red(450, 200), 255);
+        compare(image.green(450, 200), 0);
+        compare(image.red(20, 20), 0);
+        // Drawn once over (the view fits it at 1x, not 1.85x), so the picture spans x 300 to 599:
+        // red just inside it and black just outside.
+        compare(image.red(310, 200), 255);
+        compare(image.red(590, 200), 255);
+        compare(image.red(250, 200), 0);
+        compare(image.red(650, 200), 0);
+        view.positionMs = 1100;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(450, 200), 0);
+        compare(image.green(450, 200), 255);
+
+        // The delay shows it later, as it does the words: the position stands still at 1100 ms,
+        // and 400 ms of delay makes it the picture of 700 ms, which is red.
+        KaraokeController.delayMs = 400;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(450, 200), 255);
+        KaraokeController.delayMs = 0;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.green(450, 200), 255);
+        // And a seek back is a seek back.
+        view.positionMs = 500;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(450, 200), 255);
+    }
+
+    function test_theLyricsCardNamesTheCdgFileAndSaysThereIsNoTextToFollow() {
+        const disc = TestServices.writeAc3Stream("disc_song.ac3", "karaoke-3/2");
+        verify(disc.length > 0);
+        verify(TestServices.writeBinaryFile("disc_song.cdg", cdgDisc()).length > 0);
+        const win = openPage();
+        HearthController.setLayoutText("5.1");
+        tryVerify(function() { return HearthController.speakerLabels.length === 6; }, 10000);
+        HearthController.addFiles([disc]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000);
+        HearthController.playItem(0);
+        const view = named(win, "lyricsView");
+        tryCompare(view, "status", "picture", 10000);
+        compare(KaraokeController.fileName, "disc_song.cdg");
+        tryVerify(function() { return named(win, "lyricsFile").text === "disc_song.cdg"; }, 5000);
+        tryVerify(function() { return named(win, "lyricsNote").text.indexOf("CD+G disc") >= 0; }, 5000);
+        const picture = H.find(view, function(item) { return item.objectName === "lyricPicture"; });
+        verify(picture !== null);
+        verify(picture.visible);
     }
 
     // --- Settings ------------------------------------------------------------

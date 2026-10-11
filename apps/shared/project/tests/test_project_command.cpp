@@ -222,11 +222,201 @@ TEST_CASE("project command: what cannot be run says why", "[project][command]") 
     const auto several = fails(R"({"sources": [{"path": "a.wav"}, {"path": "b.wav"}]})");
     CHECK(several.code == "no-assignments");
     CHECK(several.args.at(0) == "2");
-    CHECK(fails(R"({"sources": [{"path": "a.wav"}], "atmos": true,
-                    "encode": {"codec": "ac4"}})")
-              .code == "unsupported");
-    CHECK(fails(R"({"sources": [{"path": "a.wav"}, {"path": "b.wav"}], "atmos": true})").code ==
-          "unsupported");
+}
+
+TEST_CASE("project command: E-AC-3 objects from several sources are routed by name",
+          "[project][command]") {
+    const Folder folder;
+    folder.touch("a.wav");
+    folder.touch("b.wav");
+    const auto doc = Json::parse(R"({
+        "sources": [{"path": "a.wav"}, {"path": "b.wav", "offsetSeconds": 0.25}], "atmos": true,
+        "assignments": [ {"source": 0, "channel": 0, "to": "obj"},
+                         {"source": 1, "channel": 0, "to": "objm"} ],
+        "objects": {"count": 2, "scene": {"objects": [{"name": "o"}]}},
+        "encode": {"bitrateKbps": 448, "options": {"dialnorm": 26, "drc": "film-standard"}}
+    })");
+    const auto plan = project::command_plan(doc, request(folder));
+    REQUIRE(plan.has_value());
+    REQUIRE(plan->files.size() == 1);
+    // [objects] is 0 where the map states the channels, and the loudness is all the metadata.
+    CHECK(plan->steps[0].argv ==
+          std::vector<std::string>{"atmos-encode", g(folder.path() / "a.wav"),
+                                   g(folder.path() / "song.ec3"), "448", "0",
+                                   g(plan->files[0].first), "dialnorm=26",
+                                   "src=" + g(folder.path() / "b.wav"), "map=0.0:obj,1.0:objm",
+                                   "offset=1:0.25"});
+}
+
+TEST_CASE("project command: AC-4 is ac4-encode with its own words, and MP4 is written by it",
+          "[project][command]") {
+    const Folder folder;
+    folder.touch("a.wav");
+    const auto doc = Json::parse(R"({
+        "sources": [{"path": "a.wav"}],
+        "encode": {"codec": "ac4", "container": "mp4", "bitrateKbps": 256,
+                   "options": {"frame-rate": 24, "codec-mode": "simple", "dialnorm": 27.5,
+                               "cmixlev": "+3", "dialogue-channels": "l,c",
+                               "drc": "speech", "iframe-interval": 12} }
+    })");
+    const auto plan = project::command_plan(doc, request(folder));
+    REQUIRE(plan.has_value());
+    // One command that writes the MP4 file itself: there is no stream to wrap.
+    REQUIRE(plan->steps.size() == 1);
+    CHECK(plan->scratch_files.empty());
+    CHECK(plan->output == folder.path() / "song.mp4");
+    const auto& argv = plan->steps[0].argv;
+    CHECK(argv[0] == "ac4-encode");
+    CHECK(argv[2] == g(folder.path() / "song.mp4"));
+    CHECK(argv[3] == "256");
+    CHECK(std::vector<std::string>(argv.begin() + 4, argv.end()) ==
+          std::vector<std::string>{"frame-rate=24", "codec-mode=simple", "dialnorm=27.5",
+                                   "cmixlev=+3", "dialogue-channels=l,c", "drc=speech",
+                                   "iframe-interval=12"});
+}
+
+TEST_CASE("project command: AC-4 objects are atmos-encode with codec=ac4, as the window's line is",
+          "[project][command]") {
+    const Folder folder;
+    folder.touch("a.wav");
+    folder.touch("b.wav");
+    // One file: its channels are the objects, counted by [objects].
+    const auto one = Json::parse(R"({
+        "sources": [{"path": "a.wav"}], "atmos": true,
+        "objects": {"count": 3, "scene": {"objects": [{"name": "o"}]}},
+        "encode": {"codec": "ac4", "bitrateKbps": 384,
+                   "options": {"coding": "direct", "dialnorm": 27, "crc": "off"}}
+    })");
+    auto plan = project::command_plan(one, request(folder));
+    REQUIRE(plan.has_value());
+    REQUIRE(plan->steps.size() == 1);
+    REQUIRE(plan->files.size() == 1);
+    CHECK(plan->steps[0].argv ==
+          std::vector<std::string>{"atmos-encode", g(folder.path() / "a.wav"),
+                                   g(folder.path() / "song.ac4"), "384", "3",
+                                   g(plan->files[0].first), "codec=ac4", "coding=direct",
+                                   "dialnorm=27", "crc=off"});
+
+    // Several files, each channel placed by name: [objects] is 0, and src=, map= and the offsets
+    // follow in the order the line writes them.
+    const auto several = Json::parse(R"({
+        "sources": [{"path": "a.wav"}, {"path": "b.wav", "offsetSeconds": 0.5}],
+        "atmos": true, "bed": "3/2", "lfe": true,
+        "assignments": [ {"source": 0, "channel": 0, "to": "obj"},
+                         {"source": 1, "channel": 0, "to": "objm"} ],
+        "objects": {"count": 2, "scene": {"objects": [{"name": "o"}]}},
+        "encode": {"codec": "ac4", "container": "mp4", "bitrateKbps": 448}
+    })");
+    plan = project::command_plan(several, request(folder));
+    REQUIRE(plan.has_value());
+    REQUIRE(plan->steps.size() == 1);
+    CHECK(plan->output == folder.path() / "song.mp4");
+    CHECK(plan->steps[0].argv ==
+          std::vector<std::string>{"atmos-encode", g(folder.path() / "a.wav"),
+                                   g(folder.path() / "song.mp4"), "448", "0",
+                                   g(plan->files[0].first), "src=" + g(folder.path() / "b.wav"),
+                                   "map=0.0:obj,1.0:objm", "offset=1:0.5", "codec=ac4"});
+}
+
+TEST_CASE("project command: parts that are named are laid out where Annex C puts them",
+          "[project][command]") {
+    const Folder folder;
+    for (const char* name : {"backing.wav", "melody.wav", "lead.wav", "harmony.wav"}) {
+        folder.touch(name);
+    }
+    const auto run = [&](const char* sources, const char* encode = "{}") {
+        const auto doc = Json::parse(std::string{R"({"sources": )"} + sources +
+                                     R"(, "encode": )" + encode + "}");
+        return project::command_plan(doc, request(folder));
+    };
+    const std::string base = g(folder.path());
+    const auto tail = [](const std::vector<std::string>& argv, std::size_t from) {
+        return std::vector<std::string>(argv.begin() + static_cast<std::ptrdiff_t>(from),
+                                        argv.end());
+    };
+
+    // The whole set: 3/2, the melody in the centre and the vocals where the surrounds would be.
+    auto plan = run(R"([{"path": "backing.wav", "part": "backing"},
+                        {"path": "harmony.wav", "part": "vocal2"},
+                        {"path": "melody.wav", "part": "melody"},
+                        {"path": "lead.wav", "part": "vocal1"}])");
+    REQUIRE(plan.has_value());
+    auto argv = plan->steps[0].argv;
+    CHECK(argv[4] == "L,C,R,Ls,Rs");
+    // The files are numbered in the order the project lists them, whatever their parts.
+    CHECK(tail(argv, 5) == std::vector<std::string>{"src=" + base + "/harmony.wav",
+                                                    "src=" + base + "/melody.wav",
+                                                    "src=" + base + "/lead.wav",
+                                                    "map=0.0:L,0.1:R,1.0:Rs,2.0:C,3.0:Ls",
+                                                    "bsmod=voiceover"});
+
+    // One vocal and no melody guide: 2/1, the vocal in the one surround.
+    plan = run(R"([{"path": "backing.wav", "part": "backing"},
+                   {"path": "lead.wav", "part": "vocal1"}])");
+    REQUIRE(plan.has_value());
+    argv = plan->steps[0].argv;
+    CHECK(argv[4] == "L,R,Cs");
+    CHECK(argv.back() == "bsmod=voiceover");
+    CHECK(argv[argv.size() - 2] == "map=0.0:L,0.1:R,1.0:Cs");
+
+    // The backing and a melody guide alone: 3/0, for singing along.
+    plan = run(R"([{"path": "backing.wav", "part": "backing"},
+                   {"path": "melody.wav", "part": "melody"}])");
+    REQUIRE(plan.has_value());
+    CHECK(plan->steps[0].argv[4] == "L,C,R");
+
+    // A service the project names is not overwritten.
+    plan = run(R"([{"path": "backing.wav", "part": "backing"},
+                   {"path": "melody.wav", "part": "melody"}])",
+               R"({"options": {"bsmod": "commentary"}})");
+    REQUIRE(plan.has_value());
+    argv = plan->steps[0].argv;
+    CHECK(std::count(argv.begin(), argv.end(), "bsmod=commentary") == 1);
+    CHECK(std::count(argv.begin(), argv.end(), "bsmod=voiceover") == 0);
+
+    // A project that says where the channels go is not laid out again.
+    const auto stated = Json::parse(R"({
+        "sources": [{"path": "backing.wav", "part": "backing"},
+                    {"path": "melody.wav", "part": "melody"}],
+        "bed": "3/0",
+        "assignments": [ {"source": 0, "channel": 1, "to": "L"},
+                         {"source": 0, "channel": 0, "to": "R"},
+                         {"source": 1, "channel": 0, "to": "C"} ]
+    })");
+    plan = project::command_plan(stated, request(folder));
+    REQUIRE(plan.has_value());
+    argv = plan->steps[0].argv;
+    CHECK(std::count(argv.begin(), argv.end(), "map=0.1:L,0.0:R,1.0:C") == 1);
+    CHECK(std::count(argv.begin(), argv.end(), "bsmod=voiceover") == 0);
+}
+
+TEST_CASE("project command: parts that cannot make a karaoke stream say which", "[project][command]") {
+    const Folder folder;
+    for (const char* name : {"backing.wav", "melody.wav", "lead.wav", "harmony.wav"}) {
+        folder.touch(name);
+    }
+    const auto fails = [&](const char* sources) {
+        const auto plan = project::command_plan(
+            Json::parse(std::string{R"({"sources": )"} + sources + "}"), request(folder));
+        REQUIRE_FALSE(plan.has_value());
+        return plan.error();
+    };
+    CHECK(fails(R"([{"path": "melody.wav", "part": "melody"},
+                    {"path": "lead.wav", "part": "vocal1"}])")
+              .code == "karaoke-no-backing");
+    CHECK(fails(R"([{"path": "backing.wav", "part": "backing"},
+                    {"path": "harmony.wav", "part": "vocal2"}])")
+              .code == "karaoke-vocal2-needs-vocal1");
+    CHECK(fails(R"([{"path": "backing.wav", "part": "backing"},
+                    {"path": "melody.wav", "part": "backing"}])")
+              .code == "karaoke-duplicate-part");
+    CHECK(fails(R"([{"path": "backing.wav", "part": "backing"},
+                    {"path": "melody.wav", "part": "bass"}])")
+              .args.at(0) == "bass");
+    // Only some of the sources naming a part is not a karaoke project: the routing is asked for.
+    CHECK(fails(R"([{"path": "backing.wav", "part": "backing"},
+                    {"path": "melody.wav"}])")
+              .code == "no-assignments");
 }
 
 TEST_CASE("project command: a line is quoted where a person would have to", "[project][command]") {

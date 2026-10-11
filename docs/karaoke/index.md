@@ -28,6 +28,13 @@ is a karaoke stream with everything it is made of, so that nothing has to be bui
 
 The example's own README gives each step, and the `forge encode` line that writes the same stream.
 
+A second example is built for **duets**:
+[`examples/karaoke/leave-her-johnny/`](https://github.com/iainchesworthlabs/iclforge/tree/main/examples/karaoke/leave-her-johnny)
+is a traditional capstan shanty, one verse, 19.2 s, in which the shantyman and the crew sing
+*different* lines and each is silent while the other sings, so that "V1 only", "V2 only" and
+"both" each sound different and leave a different part for you to sing. Its project names the four
+parts and nothing of how they are laid out; the Karaoke flow and `forge project` work that out.
+
 ## What a karaoke stream is
 
 It is a main service with `bsmod` 7 and a coding mode above 1/0. L and R carry the backing; the
@@ -49,7 +56,8 @@ come out of the rear speakers. Annex C defines two kinds of decoder that do bett
   centre, and the vocals mixed in at the surround level the stream carries.
 - A **karaoke-capable** decoder (Table C.2.3) does the same and lets the listener choose which
   vocals play: none, V1, V2 or both. With none, what is left is the backing and the guide melody,
-  for singing along to.
+  for singing along to. Annex C also leaves it room to move the level of each part, which
+  iclforge's capable decoder offers.
 
 E-AC-3 and AC-4 have no karaoke mode in their specifications; this is AC-3 only.
 
@@ -68,7 +76,13 @@ track) and choose the **Karaoke** page (`Ctrl+7`).
 |---|---|
 | **As coded** | The channels as the stream codes them: the vocals come from the surround speakers. |
 | **Aware** (the default) | L, C and R, with the vocals at the stream's own level. On two speakers this is the ordinary Lo/Ro fold, which Annex C says is the same thing. |
-| **Capable** | As aware, with **Vocals** set to None, V1, V2 or Both. A single vocal plays in the centre with the melody; Both is V1 on the left and V2 on the right, so a stream with only V1 plays it on the left. |
+| **Capable** | As aware, with **Vocals** set to None, V1, V2 or Both. A single vocal plays in the centre with the melody; Both is V1 on the left and V2 on the right, so a stream with only V1 plays it on the left. A **level** for the melody and for each vocal moves it against the table, from 24 dB down (which is off) to 12 dB up. |
+
+The levels are the capable decoder's alone, 0 dB each is the table as it stands, and they are
+kept across starts with the choice. Raising a part far enough lowers the others a little, so that
+no speaker is driven past full scale. **Reset levels** puts all three back. A part at the bottom of
+its control is off, and the page lists it as muted. A level has nothing to act on for a vocal the
+stream lacks or the **Vocals** choice leaves out, and its control is closed.
 
 The page says which part each speaker plays under the choice made, and says in words when the
 choice does not apply:
@@ -77,15 +91,20 @@ choice does not apply:
 - The output is a **bitstream** to a receiver. The receiver decodes it, so the choice is not
   applied; unless it is karaoke-capable, V1 and V2 play from its surround speakers. The page has a
   button to choose another output.
-- The output is a **network group**: a sink that is sent PCM plays the reproduction, and one that
-  is sent coded AC-3 decodes and plays it as coded.
+- The output is a **network group**: a sink that lists the karaoke settings is sent the stream as
+  it is and told your choice, and decodes it itself; one that does not is sent PCM that Hearth has
+  decoded with the choice applied. Every member plays one reproduction, at the same levels (see
+  [the Hearth page](../hearth/index.md#karaoke)).
 - The stereo fold is **Lt/Rt**, for which Annex C defines no reproduction. The page has a button to
   use Lo/Ro, which does.
 
 ## Lyrics
 
 Hearth shows the words of the stream playing from a **`.lrc` file with the same name** in the same
-folder: `Auld Lang Syne.ac3` is read with `Auld Lang Syne.lrc` (the extension in any case).
+folder: `Auld Lang Syne.ac3` is read with `Auld Lang Syne.lrc` (the extension in any case). Where
+there is no `.lrc`, a **SubRip `.srt`** of that name is read the same way (see [below](#subrip)),
+and failing that an **Advanced SubStation Alpha `.ass`** (see [below](#advanced-substation-alpha)),
+and then a **MIDI karaoke `.kar`** (see [below](#midi-karaoke)).
 
 ### The file
 
@@ -105,9 +124,102 @@ LRC is an informal format; what Hearth reads is:
 | `<mm:ss.xx>` before a word | The **word-timed** form: the word starts at that time and runs to the next word's tag, and a line's last word runs to the next line. |
 | `[offset:+/-ms]` | Shifts every time. A positive value makes the lyrics appear sooner. |
 | `[ti:]` `[ar:]` `[al:]` `[by:]` `[length:mm:ss]` | Kept for display. |
+| `V1:` `V2:` `V1+V2:` at the start of a line | A **duet**: which vocal sings the line (see below). Not shown as text. |
+| `[v1:name]` `[v2:name]` | What the file calls the two singers. |
 
 The text is **UTF-8**, with or without a byte-order mark. A file in another encoding is not shown,
 and the page says so; playback is not affected.
+
+### A duet
+
+A karaoke stream has two vocals, and a duet's lines can say which sings each:
+
+```text
+[v1:Shantyman]
+[v2:Crew]
+[00:12.00]V1: Oh, the times are hard and the wages low
+[00:16.00]V2: Leave her, Johnny, leave her
+[00:20.00]V1+V2: It's time for us to leave her
+```
+
+The marker is the first thing after the time (before any `<mm:ss.xx>` word tag), in either case,
+with spaces allowed round the `+` and after the colon. A line with no marker is for nobody in
+particular. A plain file with no times may carry the markers too, so that a duet's text can be
+marked before it is timed. Hearth's timing window sets each line's singer and the two names as the
+file is timed, and saves them in the file (see [Timing the lyrics](../hearth/index.md#timing-the-lyrics)).
+
+Where a file marks its lines, the Karaoke page has two name fields. A name typed there is for this
+run of Hearth only, never kept for a song, and comes before the file's `[v1:]` and `[v2:]`, which
+come before "V1" and "V2". Every line then says who sings it, three ways: the **name** above it, the
+**side** (the second singer's lines are indented, the first's are not) and the **colour**. On a
+karaoke stream the name also says whose line it is for you: **guide** when the vocal that is playing
+sings it, **you** when it does not, and **shared** when it is a line for both and only one of the
+two plays. A sentence under the names says the same for the whole file ("The vocal of Shantyman
+plays: you sing the lines of Crew."), which is what choosing **V1**, **V2**, **None** or **Both**
+under Capable changes.
+### SubRip
+
+A `.srt` file is read as lyrics too, which is what subtitle tools and ripped karaoke subtitles write:
+
+```text
+1
+00:00:12,000 --> 00:00:15,500
+Should auld acquaintance
+be forgot
+
+2
+00:00:20,250 --> 00:00:22,000
+And never brought to mind?
+```
+
+Each cue is a line, and it ends where its cue ends, so the gap between two cues is a stretch where
+nothing is being sung (which an LRC file, whose lines end where the next begins, cannot say). The
+text lines of a cue are joined with a space; styling (`<i>`, `<b>`, `<font ...>`) and `{...}`
+override blocks are dropped, and a position after the end time is ignored. The number above a cue
+is not needed, a `.` is read for a `,` in a time, and cues out of order are put in order. There are
+no words in a SubRip file, so there is no word fill: the whole line is emphasised as it is sung.
+The encodings are the LRC reader's: UTF-8 with or without a byte-order mark, or UTF-16 with one.
+
+### Advanced SubStation Alpha
+
+A `.ass` script is read as lyrics too, which is what subtitle-karaoke tools write, and its
+karaoke tags are **word times**:
+
+```text
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:12.00,0:00:15.50,Default,,0,0,0,,{\k50}Should {\k30}auld {\k80}acquaint{\k20}ance
+```
+
+Each `Dialogue:` event is a line from its start to its end. Each `{\k50}` (and `\kf`, `\K`, `\ko`:
+the same duration, drawn differently) begins a **syllable** that lasts that many hundredths of a
+second after the one before; a syllable is a word of the line, so the fill moves by syllable, as
+the script's own sweep does. Everything else is dropped: the other override tags (`{\an8}`,
+`{\pos(...)}`), the styles, and any event that draws (`{\p1}`) or is a `Comment:`. `\N` is a
+space. The columns are the script's own `Format:` line, with the v4+ order where it has none, and
+an event with no karaoke tags is a line with no words.
+
+### MIDI karaoke
+
+A `.kar` file (a Standard MIDI File whose syllables are meta events) is read for its words, and only
+its words: the music in it is not played or read. What is taken:
+
+- the **words** from the track called `Words`, where there is one, else from the file's Lyric
+  events, else from its Text events;
+- the **title** and the **artist** from the first and second `@T` lines; the other `@` lines
+  (`@K`, `@L`, `@I`, `@V`) are not words;
+- a `/` begins a new line, and a backslash a new verse (a line too, here), and so does a line end in the
+  text;
+- every **syllable** is a word of the line with its own start, from its tick through the file's
+  **tempo map** (a tempo change on any track moves every later tick), so the fill moves by syllable. A
+  syllable that begins with a space is the start of the next word: the space is joined to the one
+  before it. A line ends where the next begins.
+
+A file whose time is in SMPTE frames, that has no words, or that is cut short says so. A MIDI file
+carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
+are not guessed at, so a Western karaoke file with accented letters saved in Latin-1 (and Hebrew in
+Windows-1255) is refused with the reason, as an LRC file in a code page is. Plain ASCII is UTF-8, and
+most are.
 
 ### What is shown
 
@@ -121,6 +233,26 @@ and the page says so; playback is not affected.
 
 The words follow the position of what is *heard*: the output device's own clock less its path's
 delay, so they stay with the sound on a Bluetooth speaker or a receiver with a long path.
+
+### A CD+G disc
+
+A **`.cdg` file with the same name** is the picture of a karaoke disc that was ripped on its own,
+the other half of an "MP3+G" pair: `Song.mp3` and `Song.cdg`. When there is **no lyrics file**,
+Hearth shows that picture where the words would be, with the proportions of the disc's 300 by 216
+and as large as fits (in whole steps, so the small type stays crisp), drawn against the position of
+what is *heard* and moved by the lyric delay as the words are.
+
+The words of a disc are **part of the picture**. Nothing is read from it as text, so there is no
+fill, no line to follow and nothing to translate or copy, and the page says so. A lyrics file beside
+the stream is shown in its place, since it is what a word-by-word fill and the delay can follow.
+
+What is drawn is what the disc's own player draws: the screen preset and the border preset, the
+tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form
+brings back what left), and the 12-bit colour table of 16 colours. The smooth scrolling offsets
+within a tile and the transparent colour are read and not drawn. A packet that is not CD+G is skipped
+and keeps its place in time, and a file that is not a whole number of 24-byte packets, or has no
+CD+G packet in it, is refused with the reason (playback is not affected). The packets are not checked
+for parity: a rip has already been through the drive's error correction.
 
 ### Keeping the words in sync
 
@@ -202,12 +334,20 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
 
 ## What it does not do
 
-- **An LFE channel in a karaoke stream** made here: the flow carries none, and a file that has one
-  is named, not dropped.
-- **Re-levelling the melody or the vocals** (Annex C's optional extra flexibility): the library
-  offers none.
-- **Making or timing a lyrics file.** Hearth reads `.lrc` files; nothing here writes one or times
-  the words of one that has only lines. A file in an encoding other than UTF-8 is not read.
+- **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
+  (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
+  player do not offer them.
+- **Finding the times of a file's words.** Hearth's timing window ([Timing the
+  lyrics](../hearth/index.md#timing-the-lyrics)) takes them from your presses, and an estimate by
+  the letters of a word is only where a press starts from; nothing here aligns words to the sound.
+- **Reading a lyrics file in a code page.** UTF-8 and UTF-16 are read; Latin-1, Windows-1255 and the
+  other 8-bit encodings are named and not guessed at. A MIDI karaoke file has no way to say its
+  encoding, so its words must be UTF-8.
+- **Text from a CD+G disc.** Its words are pixels, so Hearth shows the picture and cannot follow the
+  words.
+- **A screen on a sink.** A board that decodes for itself is sent the lyrics and where the sound is
+  in them, follows them on its own clock and reports the line; the panel that would draw them waits
+  for a board with a display.
 - **Karaoke in E-AC-3 or AC-4**, and **a microphone, scoring or recording**.
 
 ## How it is checked

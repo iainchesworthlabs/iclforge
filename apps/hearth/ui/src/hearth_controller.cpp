@@ -762,6 +762,39 @@ constexpr int kPollMs = 60;
     return iclforge::ac3::KaraokeVocals::kBoth;
 }
 
+// The karaoke choice and the levels of its parts are the one decoder setting kept
+// across starts (planning/karaoke.md, P9; planning/karaoke-phase2.md, W10): a
+// singer who chose "no vocals" expects it still chosen, and the melody as quiet
+// as they left it. The constructor reads them into the settings it starts the
+// engine with, and setDecoderSettings() writes them back.
+void read_kept_karaoke(const QSettings& store, iclforge::hearth::DecoderSettings& into) {
+    into.karaoke = karaoke_from_name(
+        store.value(QStringLiteral("karaoke/reproduction"), QStringLiteral("aware")).toString());
+    into.karaoke_vocals = karaoke_vocals_from_name(
+        store.value(QStringLiteral("karaoke/vocals"), QStringLiteral("both")).toString());
+    into.karaoke_melody_db = store.value(QStringLiteral("karaoke/melodyDb"), 0.0).toDouble();
+    into.karaoke_vocal1_db = store.value(QStringLiteral("karaoke/vocal1Db"), 0.0).toDouble();
+    into.karaoke_vocal2_db = store.value(QStringLiteral("karaoke/vocal2Db"), 0.0).toDouble();
+}
+
+// Writes them if any differs from what is kept, and says whether it did.
+bool write_kept_karaoke(QSettings& store, const iclforge::hearth::DecoderSettings& from) {
+    iclforge::hearth::DecoderSettings kept;
+    read_kept_karaoke(store, kept);
+    if (kept.karaoke == from.karaoke && kept.karaoke_vocals == from.karaoke_vocals &&
+        kept.karaoke_melody_db == from.karaoke_melody_db &&
+        kept.karaoke_vocal1_db == from.karaoke_vocal1_db &&
+        kept.karaoke_vocal2_db == from.karaoke_vocal2_db) {
+        return false;
+    }
+    store.setValue(QStringLiteral("karaoke/reproduction"), karaoke_name(from.karaoke));
+    store.setValue(QStringLiteral("karaoke/vocals"), karaoke_vocals_name(from.karaoke_vocals));
+    store.setValue(QStringLiteral("karaoke/melodyDb"), from.karaoke_melody_db);
+    store.setValue(QStringLiteral("karaoke/vocal1Db"), from.karaoke_vocal1_db);
+    store.setValue(QStringLiteral("karaoke/vocal2Db"), from.karaoke_vocal2_db);
+    return true;
+}
+
 [[nodiscard]] QString dual_mono_name(iclforge::hearth::DualMonoChoice choice) {
     switch (choice) {
         case iclforge::hearth::DualMonoChoice::kFirst:
@@ -946,6 +979,9 @@ constexpr int kPollMs = 60;
     // Annex C's karaoke reproduction (KaraokePage.qml).
     map[QStringLiteral("karaoke")] = karaoke_name(settings.karaoke);
     map[QStringLiteral("karaokeVocals")] = karaoke_vocals_name(settings.karaoke_vocals);
+    map[QStringLiteral("karaokeMelodyDb")] = settings.karaoke_melody_db;
+    map[QStringLiteral("karaokeVocal1Db")] = settings.karaoke_vocal1_db;
+    map[QStringLiteral("karaokeVocal2Db")] = settings.karaoke_vocal2_db;
     // AC-4's own (DecoderAc4.qml).
     const iclforge::hearth::Ac4Settings& ac4 = settings.ac4;
     map[QStringLiteral("ac4PresentationId")] = ac4.presentation_id.value_or(-1);
@@ -1019,6 +1055,15 @@ constexpr int kPollMs = 60;
     if (map.contains(QStringLiteral("karaokeVocals"))) {
         out.karaoke_vocals =
             karaoke_vocals_from_name(map[QStringLiteral("karaokeVocals")].toString());
+    }
+    if (map.contains(QStringLiteral("karaokeMelodyDb"))) {
+        out.karaoke_melody_db = map[QStringLiteral("karaokeMelodyDb")].toDouble();
+    }
+    if (map.contains(QStringLiteral("karaokeVocal1Db"))) {
+        out.karaoke_vocal1_db = map[QStringLiteral("karaokeVocal1Db")].toDouble();
+    }
+    if (map.contains(QStringLiteral("karaokeVocal2Db"))) {
+        out.karaoke_vocal2_db = map[QStringLiteral("karaokeVocal2Db")].toDouble();
     }
     iclforge::hearth::Ac4Settings& ac4 = out.ac4;
     if (map.contains(QStringLiteral("ac4PresentationId"))) {
@@ -1331,6 +1376,9 @@ void HearthController::start() {
             },
             [](const iclforge::hearth::GroupPlanRequest& request) {
                 return iclforge::hearth::ui::NetworkOutputStatus::instance().plan(request);
+            },
+            [](const std::string& group_id, const iclforge::hearth::KaraokeChoice& choice) {
+                iclforge::hearth::ui::NetworkOutputStatus::instance().apply_karaoke(group_id, choice);
             }),
         .endpoints =
             test_outputs_ ? test_outputs_->endpoints : iclforge::hearth::device_endpoints()};
@@ -1340,13 +1388,9 @@ void HearthController::start() {
     // Presentation"): the language this window runs in.
     iclforge::hearth::DecoderSettings decoder_settings;
     decoder_settings.ac4.language = QLocale().bcp47Name().toStdString();
-    // The karaoke choice is the one decoder setting kept across starts: a singer
-    // who chose "no vocals" expects it still chosen. (The other decoder
-    // settings are for the session; planning/karaoke.md, P9.)
-    decoder_settings.karaoke = karaoke_from_name(
-        settings_.value(QStringLiteral("karaoke/reproduction"), QStringLiteral("aware")).toString());
-    decoder_settings.karaoke_vocals = karaoke_vocals_from_name(
-        settings_.value(QStringLiteral("karaoke/vocals"), QStringLiteral("both")).toString());
+    // The karaoke choice and the levels of its parts are the one decoder setting
+    // kept across starts. (The other decoder settings are for the session.)
+    read_kept_karaoke(settings_, decoder_settings);
     engine_ = std::make_unique<iclforge::hearth::Engine>(
         std::move(outputs), iclforge::hearth::ui::make_file_item_loader(), layout, decoder_settings,
         iclforge::hearth::EngineTiming{}, &log_);
@@ -1924,15 +1968,9 @@ void HearthController::setDecoderSettings(const QVariantMap& settings) {
     const iclforge::hearth::DecoderSettings next = decoder_settings_from_map(settings, base);
     engine_->set_decoder_settings(next);
     requested_decoder_settings_ = decoder_settings_to_map(next);
-    // Kept across starts: only the karaoke choice (see the constructor).
-    const QString reproduction = karaoke_name(next.karaoke);
-    const QString vocals = karaoke_vocals_name(next.karaoke_vocals);
-    if (settings_.value(QStringLiteral("karaoke/reproduction"), QStringLiteral("aware")).toString() !=
-            reproduction ||
-        settings_.value(QStringLiteral("karaoke/vocals"), QStringLiteral("both")).toString() !=
-            vocals) {
-        settings_.setValue(QStringLiteral("karaoke/reproduction"), reproduction);
-        settings_.setValue(QStringLiteral("karaoke/vocals"), vocals);
+    // Kept across starts: only the karaoke choice and its levels (see the
+    // constructor).
+    if (write_kept_karaoke(settings_, next)) {
         settings_.sync();  // survive a hard exit
     }
     if (requested_decoder_settings_ != decoder_settings_) {
