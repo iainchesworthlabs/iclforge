@@ -1,12 +1,15 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "platform/process.hpp"
 
@@ -223,6 +226,569 @@ TEST_CASE("lyrics: what is not lyrics says why", "[lyrics]") {
     const auto tags_only = iclforge::lyrics::parse_lyrics("[ti:x]\n[ar:y]\n");
     REQUIRE_FALSE(tags_only.has_value());
     CHECK(tags_only.error().find("no lyrics") != std::string::npos);
+}
+
+// ---- SubRip (planning/karaoke-phase2.md, W13c) -------------------------------------------------
+
+TEST_CASE("subrip: cues are lines that end where their cue does, with the gap between them",
+          "[lyrics][subrip]") {
+    const std::string text =
+        "1\n00:00:12,000 --> 00:00:15,500\nShould auld acquaintance\nbe forgot\n\n"
+        "2\n00:00:20,250 --> 00:00:22,000\nAnd never brought to mind?\n";
+    const auto lyrics = iclforge::lyrics::parse_subrip(text);
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->timed);
+    REQUIRE(lyrics->lines.size() == 2);
+    CHECK(lyrics->lines[0].start_ms == 12000);
+    CHECK(lyrics->lines[0].end_ms == 15500);
+    // A cue's text lines are one line of lyrics.
+    CHECK(lyrics->lines[0].text == "Should auld acquaintance be forgot");
+    CHECK_FALSE(lyrics->lines[0].word_timed());
+    CHECK(lyrics->lines[1].start_ms == 20250);
+    CHECK(lyrics->lines[1].end_ms == 22000);
+
+    // The gap between the cues is nothing being sung, which an LRC file cannot say.
+    const auto in_gap = iclforge::lyrics::lyric_position(*lyrics, 17000);
+    REQUIRE(in_gap.line.has_value());
+    CHECK(*in_gap.line == 0);
+    CHECK_FALSE(in_gap.in_line);
+    const auto in_cue = iclforge::lyrics::lyric_position(*lyrics, 21000);
+    REQUIRE(in_cue.line.has_value());
+    CHECK(*in_cue.line == 1);
+    CHECK(in_cue.in_line);
+}
+
+TEST_CASE("subrip: styling and position tags are dropped, and what is not a tag stays",
+          "[lyrics][subrip]") {
+    const std::string text =
+        "1\n00:00:01,000 --> 00:00:02,000 X1:63 X2:223 Y1:43 Y2:58\n"
+        "<i>Should</i> <b>auld</b> {\\an8}acquaintance <font color=\"#ff0000\">be</font>\n"
+        "\n"
+        "2\n00:00:03,000 --> 00:00:04,000\n"
+        "Mind 1 < 2 and 3 > 2 {\\i1}fine\n";
+    const auto lyrics = iclforge::lyrics::parse_subrip(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 2);
+    CHECK(lyrics->lines[0].text == "Should auld acquaintance be");
+    CHECK(lyrics->lines[0].end_ms == 2000);
+    // A lone angle bracket is a character; the override block is not.
+    CHECK(lyrics->lines[1].text == "Mind 1 < 2 and 3 > 2 fine");
+}
+
+TEST_CASE("subrip: numbers are not needed, a dot is a comma, and cues out of order are put in order",
+          "[lyrics][subrip]") {
+    const std::string text =
+        "00:01:00.5 --> 00:01:02.25\nLate\n\n"
+        "00:00:05,000 --> 00:00:06,000\nEarly\n\n"
+        "\n\n"
+        "00:10:00,000 --> 00:10:01,000\nVery late\n";
+    const auto lyrics = iclforge::lyrics::parse_subrip(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 3);
+    CHECK(lyrics->lines[0].text == "Early");
+    CHECK(lyrics->lines[1].text == "Late");
+    // ".5" is half a second and ".25" a quarter.
+    CHECK(lyrics->lines[1].start_ms == 60500);
+    CHECK(lyrics->lines[1].end_ms == 62250);
+    CHECK(lyrics->lines[2].start_ms == 600000);
+}
+
+TEST_CASE("subrip: a cue with no blank line after it, a cue that ends before it starts, and one with no text",
+          "[lyrics][subrip]") {
+    const std::string text =
+        "00:00:01,000 --> 00:00:02,000\nOne\n"
+        "00:00:03,000 --> 00:00:02,000\nBackwards\n"
+        "00:00:05,000 --> 00:00:06,000\n\n"
+        "00:00:07,000 --> 00:00:08,000\nLast\n";
+    const auto lyrics = iclforge::lyrics::parse_subrip(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 4);
+    CHECK(lyrics->lines[0].text == "One");
+    CHECK(lyrics->lines[0].end_ms == 2000);
+    // An end before the start is the start.
+    CHECK(lyrics->lines[1].start_ms == 3000);
+    CHECK(lyrics->lines[1].end_ms == 3000);
+    // A cue with no text is a time that marks nothing, kept as an empty line.
+    CHECK(lyrics->lines[2].text.empty());
+    CHECK(lyrics->lines[3].text == "Last");
+}
+
+TEST_CASE("subrip: the encodings are the LRC reader's, and what is not subtitles says so",
+          "[lyrics][subrip]") {
+    const std::string cue = "1\n00:00:01,000 --> 00:00:02,000\nShalom \xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D\n";
+    // A UTF-8 byte-order mark, and CR LF line ends.
+    std::string crlf = "\xEF\xBB\xBF";
+    for (const char c : cue) {
+        if (c == '\n') {
+            crlf += "\r\n";
+        } else {
+            crlf.push_back(c);
+        }
+    }
+    const auto with_mark = iclforge::lyrics::parse_subrip(crlf);
+    REQUIRE(with_mark.has_value());
+    REQUIRE(with_mark->lines.size() == 1);
+    CHECK(with_mark->lines[0].text == "Shalom \xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D");
+
+    // UTF-16 with a mark, in both byte orders.
+    const auto utf16 = [](const std::string& ascii, bool big_endian) {
+        std::string out = big_endian ? std::string{"\xFE\xFF"} : std::string{"\xFF\xFE"};
+        for (const char c : ascii) {
+            out.push_back(big_endian ? '\0' : c);
+            out.push_back(big_endian ? c : '\0');
+        }
+        return out;
+    };
+    const std::string ascii = "1\n00:00:01,000 --> 00:00:02,000\nHello\n";
+    for (const bool big : {false, true}) {
+        const auto read = iclforge::lyrics::parse_subrip(utf16(ascii, big));
+        REQUIRE(read.has_value());
+        CHECK(read->lines[0].text == "Hello");
+    }
+
+    CHECK(iclforge::lyrics::parse_subrip("[00:01.00]Not subtitles\n").error() ==
+          "The subtitle file has no cues in it.");
+    CHECK(iclforge::lyrics::parse_subrip("   \n").error() == "The lyrics file is empty.");
+    CHECK(iclforge::lyrics::parse_subrip("\xFF\x00\xFF").has_value() == false);
+}
+
+TEST_CASE("subrip: a file is read as subtitles or as LRC by what it holds", "[lyrics][subrip]") {
+    const auto srt = iclforge::lyrics::parse_timed_text("1\n00:00:01,000 --> 00:00:02,000\nHello there\n");
+    REQUIRE(srt.has_value());
+    REQUIRE(srt->lines.size() == 1);
+    CHECK(srt->lines[0].end_ms == 2000);
+    const auto lrc = iclforge::lyrics::parse_timed_text("[00:01.00]Hello there\n[00:03.00]Again\n");
+    REQUIRE(lrc.has_value());
+    REQUIRE(lrc->lines.size() == 2);
+    // An LRC line's end is the next line's start: it has no end of its own.
+    CHECK(lrc->lines[0].end_ms == 3000);
+    // A lyric that has an arrow in it is not a cue.
+    const auto arrow = iclforge::lyrics::parse_timed_text("[00:01.00]go --> there now\n");
+    REQUIRE(arrow.has_value());
+    CHECK(arrow->lines[0].text == "go --> there now");
+    // Neither, and the reader's own reason.
+    CHECK(iclforge::lyrics::parse_timed_text("").error() == "The lyrics file is empty.");
+}
+
+TEST_CASE("subrip: the file beside an item is its .lrc, and its .srt where there is no .lrc",
+          "[lyrics][subrip]") {
+    Folder folder;
+    folder.write("song.mp3", "x");
+    CHECK_FALSE(iclforge::lyrics::find_lyrics_file((folder.path() / "song.mp3").string()).has_value());
+    folder.write("song.SRT", "1\n00:00:01,000 --> 00:00:02,000\nHello\n");
+    const auto subtitles = iclforge::lyrics::find_lyrics_file((folder.path() / "song.mp3").string());
+    REQUIRE(subtitles.has_value());
+    // The extension in any case, as for the .lrc; on a case-insensitive file system the usual
+    // spelling is what comes back, so the name is compared in lower case.
+    std::string name = subtitles->filename().string();
+    std::transform(name.begin(), name.end(), name.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    CHECK(name == "song.srt");
+    // A file read by its path is read as what it is.
+    const auto read = iclforge::lyrics::read_lyrics(*subtitles);
+    REQUIRE(read.has_value());
+    CHECK(read->lines[0].text == "Hello");
+    // The .lrc is the one when there are both.
+    folder.write("song.lrc", "[00:01.00]From the lrc\n");
+    const auto both = iclforge::lyrics::find_lyrics_file((folder.path() / "song.mp3").string());
+    REQUIRE(both.has_value());
+    CHECK(both->filename().string() == "song.lrc");
+}
+
+// ---- Advanced SubStation Alpha (planning/karaoke-phase2.md, W13d) -------------------------------
+
+namespace {
+
+// A script with the usual sections and one karaoke event and one plain one.
+const std::string kAssHeader =
+    "[Script Info]\nTitle: Song\nScriptType: v4.00+\n\n"
+    "[V4+ Styles]\nFormat: Name, Fontname\nStyle: Default,Arial\n\n"
+    "[Events]\n"
+    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+
+}  // namespace
+
+TEST_CASE("ass: karaoke tags give each syllable its start and end", "[lyrics][ass]") {
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:12.00,0:00:15.50,Default,,0,0,0,,{\\k50}Should {\\k30}auld {\\k80}acquaint{\\k20}ance\n"
+        "Dialogue: 0,0:00:20.00,0:00:22.00,Default,,0,0,0,,And never brought to mind\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->timed);
+    REQUIRE(lyrics->lines.size() == 2);
+
+    const auto& first = lyrics->lines[0];
+    CHECK(first.start_ms == 12000);
+    CHECK(first.end_ms == 15500);
+    CHECK(first.text == "Should auld acquaintance");
+    REQUIRE(first.words.size() == 4);
+    CHECK(first.words[0].text == "Should ");
+    CHECK(first.words[0].start_ms == 12000);
+    CHECK(first.words[0].end_ms == 12500);
+    CHECK(first.words[1].text == "auld ");
+    CHECK(first.words[1].start_ms == 12500);
+    CHECK(first.words[1].end_ms == 12800);
+    // A word is a syllable: the fill moves by syllable.
+    CHECK(first.words[2].text == "acquaint");
+    CHECK(first.words[2].start_ms == 12800);
+    CHECK(first.words[2].end_ms == 13600);
+    CHECK(first.words[3].text == "ance");
+    CHECK(first.words[3].start_ms == 13600);
+    CHECK(first.words[3].end_ms == 13800);
+
+    // An event with no karaoke tags is a line, with its own end and no words.
+    CHECK(lyrics->lines[1].text == "And never brought to mind");
+    CHECK_FALSE(lyrics->lines[1].word_timed());
+    CHECK(lyrics->lines[1].end_ms == 22000);
+
+    // The cursor is the word's: a quarter of the way through "auld" at 12575 ms.
+    const auto at = iclforge::lyrics::lyric_position(*lyrics, 12575);
+    REQUIRE(at.line.has_value());
+    CHECK(*at.line == 0);
+    REQUIRE(at.word.has_value());
+    CHECK(*at.word == 1);
+    CHECK(at.fraction == Catch::Approx(0.25));
+}
+
+TEST_CASE("ass: the other karaoke tags are the same duration, and text before the first is a word of no length",
+          "[lyrics][ass]") {
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\kf40}A {\\K30}B {\\ko20}C\n"
+        "Dialogue: 0,0:00:05.00,0:00:07.00,Default,,0,0,0,,Hi {\\k50}there {\\k0}{\\k25}friend\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 2);
+    const auto& tags = lyrics->lines[0];
+    REQUIRE(tags.words.size() == 3);
+    CHECK(tags.words[0].start_ms == 1000);
+    CHECK(tags.words[0].end_ms == 1400);
+    CHECK(tags.words[1].start_ms == 1400);
+    CHECK(tags.words[1].end_ms == 1700);
+    CHECK(tags.words[2].start_ms == 1700);
+    CHECK(tags.words[2].end_ms == 1900);
+
+    const auto& lead = lyrics->lines[1];
+    REQUIRE(lead.words.size() == 3);
+    CHECK(lead.text == "Hi there friend");
+    // "Hi " has no tag of its own: it starts with the line and runs to the next word.
+    CHECK(lead.words[0].text == "Hi ");
+    CHECK(lead.words[0].start_ms == 5000);
+    CHECK(lead.words[0].end_ms == 5000);
+    CHECK(lead.words[1].text == "there ");
+    CHECK(lead.words[1].start_ms == 5000);
+    CHECK(lead.words[1].end_ms == 5500);
+    // A {\\k0} between two words has no length and no text.
+    CHECK(lead.words[2].text == "friend");
+    CHECK(lead.words[2].start_ms == 5500);
+    CHECK(lead.words[2].end_ms == 5750);
+
+    // A last word of no length runs to the end of its line, so that it can be filled.
+    const auto closing = iclforge::lyrics::parse_ass(
+        "[Events]\nDialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,{\\k50}One {\\k0}two\n");
+    REQUIRE(closing.has_value());
+    REQUIRE(closing->lines[0].words.size() == 2);
+    CHECK(closing->lines[0].words[1].start_ms == 1500);
+    CHECK(closing->lines[0].words[1].end_ms == 4000);
+}
+
+TEST_CASE("ass: override blocks, line breaks, drawings and comments", "[lyrics][ass]") {
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\an8}{\\pos(10,20)}Hello, there\\Nfriend\n"
+        "Dialogue: 0,0:00:03.00,0:00:04.00,Default,,0,0,0,,{\\p1}m 0 0 l 10 10 l 0 10{\\p0}\n"
+        "Comment: 0,0:00:05.00,0:00:06.00,Default,,0,0,0,,not a lyric\n"
+        "Dialogue: 0,0:00:07.00,0:00:08.00,Default,,0,0,0,,Two\\hspaces\\nhere\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 2);
+    // The commas of the text are the text's: it is the rest of the line.
+    CHECK(lyrics->lines[0].text == "Hello, there friend");
+    CHECK(lyrics->lines[1].text == "Two spaces here");
+}
+
+TEST_CASE("ass: the columns are the file's own Format line", "[lyrics][ass]") {
+    const std::string text =
+        "[Events]\nFormat: Start, End, Text\n"
+        "Dialogue: 0:00:09.50,0:00:10.00,Late, but there\n"
+        "Dialogue: 1:02:03.45,1:02:04.00,An hour in\n"
+        "Dialogue: 0:00:01.5,0:00:02.00,Early\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 3);
+    // In order of start, with the hour and the fractions as the format writes them.
+    CHECK(lyrics->lines[0].text == "Early");
+    CHECK(lyrics->lines[0].start_ms == 1500);
+    CHECK(lyrics->lines[1].text == "Late, but there");
+    CHECK(lyrics->lines[1].start_ms == 9500);
+    CHECK(lyrics->lines[2].start_ms == 3723450);
+
+    // No Format line at all: the v4+ order.
+    const auto bare = iclforge::lyrics::parse_ass(
+        "[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,No format line\n");
+    REQUIRE(bare.has_value());
+    CHECK(bare->lines[0].text == "No format line");
+}
+
+TEST_CASE("ass: what is not a script says so, and a file is read as one by what it holds",
+          "[lyrics][ass]") {
+    CHECK(iclforge::lyrics::parse_ass("[Script Info]\nTitle: Nothing\n").error() ==
+          "The subtitle file has no dialogue in it.");
+    CHECK(iclforge::lyrics::parse_ass("").error() == "The lyrics file is empty.");
+
+    // UTF-16 with a mark, as an editor that saves "Unicode" writes it.
+    const std::string ascii = kAssHeader + "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\k100}Hello\n";
+    std::string utf16 = std::string{"\xFF\xFE"};
+    for (const char c : ascii) {
+        utf16.push_back(c);
+        utf16.push_back('\0');
+    }
+    const auto wide = iclforge::lyrics::parse_ass(utf16);
+    REQUIRE(wide.has_value());
+    CHECK(wide->lines[0].text == "Hello");
+    const auto detected = iclforge::lyrics::parse_timed_text(
+        kAssHeader + "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\k100}Hello\n");
+    REQUIRE(detected.has_value());
+    REQUIRE(detected->lines.size() == 1);
+    CHECK(detected->lines[0].word_timed());
+    // An LRC lyric that says "Dialogue:" in its words is not a script.
+    const auto lrc = iclforge::lyrics::parse_timed_text("[00:01.00]Dialogue: a play in three acts\n");
+    REQUIRE(lrc.has_value());
+    CHECK(lrc->lines[0].text == "Dialogue: a play in three acts");
+}
+
+TEST_CASE("ass: the file beside an item is its .lrc, then its .srt, then its .ass", "[lyrics][ass]") {
+    Folder folder;
+    folder.write("song.mp3", "x");
+    folder.write("song.ass", kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\k100}From the script\n");
+    const std::string item = (folder.path() / "song.mp3").string();
+    const auto script = iclforge::lyrics::find_lyrics_file(item);
+    REQUIRE(script.has_value());
+    CHECK(script->extension().string() == ".ass");
+    const auto read = iclforge::lyrics::read_lyrics(*script);
+    REQUIRE(read.has_value());
+    CHECK(read->lines[0].text == "From the script");
+    CHECK(read->lines[0].word_timed());
+    folder.write("song.srt", "1\n00:00:01,000 --> 00:00:02,000\nFrom the subtitles\n");
+    CHECK(iclforge::lyrics::find_lyrics_file(item)->extension().string() == ".srt");
+    folder.write("song.lrc", "[00:01.00]From the lrc\n");
+    CHECK(iclforge::lyrics::find_lyrics_file(item)->extension().string() == ".lrc");
+}
+
+// ---- MIDI karaoke (planning/karaoke-phase2.md, W13e) --------------------------------------------
+
+namespace {
+
+// A Standard MIDI File built by hand, for the karaoke reader's tests: every byte is a number.
+std::string midi_byte(int value) { return std::string(1, static_cast<char>(value)); }
+
+std::string midi_vlq(std::uint32_t value) {
+    std::string out = midi_byte(static_cast<int>(value & 0x7F));
+    value >>= 7U;
+    while (value > 0) {
+        out.insert(out.begin(), static_cast<char>(0x80 | (value & 0x7F)));
+        value >>= 7U;
+    }
+    return out;
+}
+
+// delta, FF, type, length, payload
+std::string midi_meta(std::uint32_t delta, int type, const std::string& payload) {
+    return midi_vlq(delta) + midi_byte(0xFF) + midi_byte(type) + midi_vlq(static_cast<std::uint32_t>(payload.size())) +
+           payload;
+}
+
+std::string midi_text(std::uint32_t delta, const std::string& text, int type = 0x01) {
+    return midi_meta(delta, type, text);
+}
+
+std::string midi_tempo(std::uint32_t delta, std::uint32_t micros) {
+    return midi_meta(delta, 0x51,
+                     midi_byte(static_cast<int>(micros >> 16U)) + midi_byte(static_cast<int>((micros >> 8U) & 0xFF)) +
+                         midi_byte(static_cast<int>(micros & 0xFF)));
+}
+
+std::string midi_track(const std::string& events) {
+    const std::string body = events + midi_vlq(0) + midi_byte(0xFF) + midi_byte(0x2F) + midi_byte(0);
+    const auto length = static_cast<std::uint32_t>(body.size());
+    return std::string("MTrk") + midi_byte(static_cast<int>(length >> 24U)) +
+           midi_byte(static_cast<int>((length >> 16U) & 0xFF)) + midi_byte(static_cast<int>((length >> 8U) & 0xFF)) +
+           midi_byte(static_cast<int>(length & 0xFF)) + body;
+}
+
+std::string midi_file(const std::vector<std::string>& tracks, int division = 500, int format = 1) {
+    std::string out = "MThd";
+    out += midi_byte(0) + midi_byte(0) + midi_byte(0) + midi_byte(6);
+    out += midi_byte(0) + midi_byte(format);
+    out += midi_byte(0) + midi_byte(static_cast<int>(tracks.size()));
+    out += midi_byte(division >> 8) + midi_byte(division & 0xFF);
+    for (const std::string& track : tracks) {
+        out += track;
+    }
+    return out;
+}
+
+// "Words": the track name a karaoke file's syllables are on.
+std::string midi_words_track(const std::string& events) {
+    return midi_track(midi_meta(0, 0x03, "Words") + events);
+}
+
+}  // namespace
+
+TEST_CASE("midi karaoke: syllables are words with their ticks in milliseconds, and a slash begins a line",
+          "[lyrics][midi]") {
+    // Division 500 and the default tempo (500000 microseconds a quarter): one tick is one millisecond.
+    const std::string words = midi_words_track(
+        midi_text(0, "@KMIDI KARAOKE FILE") + midi_text(0, "@TLeave Her, Johnny") + midi_text(0, "@TTraditional") +
+        midi_text(0, "@LENGL") + midi_text(1000, "Oh") + midi_text(300, " the") + midi_text(300, " times") +
+        midi_text(400, "/Are") + midi_text(300, " hard"));
+    const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({midi_track(""), words}));
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->timed);
+    CHECK(lyrics->title == "Leave Her, Johnny");
+    CHECK(lyrics->artist == "Traditional");
+    REQUIRE(lyrics->lines.size() == 2);
+
+    const auto& first = lyrics->lines[0];
+    CHECK(first.text == "Oh the times");
+    CHECK(first.start_ms == 1000);
+    CHECK(first.end_ms == 2000);
+    REQUIRE(first.words.size() == 3);
+    // The space that began a syllable is the end of the one before, where a view expects it.
+    CHECK(first.words[0].text == "Oh ");
+    CHECK(first.words[0].start_ms == 1000);
+    CHECK(first.words[0].end_ms == 1300);
+    CHECK(first.words[1].text == "the ");
+    CHECK(first.words[1].end_ms == 1600);
+    CHECK(first.words[2].text == "times");
+    CHECK(first.words[2].start_ms == 1600);
+    CHECK(first.words[2].end_ms == 2000);
+
+    const auto& second = lyrics->lines[1];
+    CHECK(second.text == "Are hard");
+    CHECK(second.start_ms == 2000);
+    REQUIRE(second.words.size() == 2);
+    CHECK(second.words[1].start_ms == 2300);
+    // The last line has no line after it: it ends a while on, as the other readers' do.
+    CHECK(second.end_ms == 2300 + 5000);
+}
+
+TEST_CASE("midi karaoke: a tempo change moves every later tick", "[lyrics][midi]") {
+    // At tick 2000 the tempo doubles in speed (250000 microseconds a quarter): half a millisecond a
+    // tick from there. The tempo may be on any track; here it is on the first, as format 1 has it.
+    const std::string conductor = midi_track(midi_tempo(0, 500000) + midi_tempo(2000, 250000));
+    const std::string words = midi_words_track(midi_text(1000, "A") + midi_text(1000, " b") + midi_text(2000, " c"));
+    const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({conductor, words}));
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    const auto& line = lyrics->lines[0];
+    REQUIRE(line.words.size() == 3);
+    CHECK(line.words[0].start_ms == 1000);
+    // Tick 2000 is where the change is: still the old rate up to it.
+    CHECK(line.words[1].start_ms == 2000);
+    // Tick 4000 is 2000 ticks at 0.5 ms after it.
+    CHECK(line.words[2].start_ms == 3000);
+}
+
+TEST_CASE("midi karaoke: the words are the Words track's, else the Lyric events, else the Text events",
+          "[lyrics][midi]") {
+    // Lyric events (type 5) beat Text events (type 1) when there is no Words track.
+    const std::string with_lyric_events = midi_track(
+        midi_text(0, "A comment, not the words") + midi_text(500, "Hello", 0x05) + midi_text(500, " world", 0x05));
+    const auto lyric = iclforge::lyrics::parse_midi_karaoke(midi_file({with_lyric_events}));
+    REQUIRE(lyric.has_value());
+    CHECK(lyric->lines[0].text == "Hello world");
+
+    // Text events only, on a track that is not called Words.
+    const std::string text_only = midi_track(midi_text(100, "Only") + midi_text(100, " text"));
+    const auto text = iclforge::lyrics::parse_midi_karaoke(midi_file({text_only}));
+    REQUIRE(text.has_value());
+    CHECK(text->lines[0].text == "Only text");
+
+    // The Words track wins over Lyric events elsewhere, and "words" is the name in any case.
+    const std::string other = midi_track(midi_text(0, "Not these", 0x05));
+    const std::string named = midi_track(midi_meta(0, 0x03, "WORDS") + midi_text(50, "These"));
+    const auto chosen = iclforge::lyrics::parse_midi_karaoke(midi_file({other, named}));
+    REQUIRE(chosen.has_value());
+    CHECK(chosen->lines[0].text == "These");
+}
+
+TEST_CASE("midi karaoke: a backslash and a line end begin lines too, and the music is skipped over",
+          "[lyrics][midi]") {
+    const std::string backslash = midi_byte(92);
+    const std::string line_feed = midi_byte(10);
+    // Notes in running status, a program change, a pitch bend and a system exclusive message
+    // between the syllables: none of it is words, and all of it has to be stepped over exactly.
+    const std::string music = midi_vlq(0) + midi_byte(0x90) + midi_byte(60) + midi_byte(64) +  // note on
+                              midi_vlq(10) + midi_byte(62) + midi_byte(64) +                    // running status
+                              midi_vlq(0) + midi_byte(0xC0) + midi_byte(5) +                    // program change
+                              midi_vlq(0) + midi_byte(0xE0) + midi_byte(0) + midi_byte(64) +    // pitch bend
+                              midi_vlq(0) + midi_byte(0xF0) + midi_vlq(3) + midi_byte(1) + midi_byte(2) + midi_byte(0xF7) +
+                              // channel pressure: one data byte, and the last thing before the next syllable
+                              midi_vlq(0) + midi_byte(0xD0) + midi_byte(30);
+    const std::string words = midi_words_track(
+        midi_text(100, "One") + music + midi_text(100, backslash + "Two") + midi_text(100, line_feed + "Three") +
+        midi_text(100, "/") + midi_text(100, "Four"));
+    const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({words}, 1000, 0));
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 4);
+    CHECK(lyrics->lines[0].text == "One");
+    CHECK(lyrics->lines[1].text == "Two");
+    CHECK(lyrics->lines[2].text == "Three");
+    CHECK(lyrics->lines[3].text == "Four");
+    // Division 1000 at the default tempo is half a millisecond a tick.
+    CHECK(lyrics->lines[0].start_ms == 50);
+}
+
+TEST_CASE("midi karaoke: what cannot be read says why", "[lyrics][midi]") {
+    CHECK(iclforge::lyrics::parse_midi_karaoke("[00:01.00]Not MIDI").error() == "The file is not a MIDI file.");
+
+    // SMPTE time, no words, and a file cut short.
+    const std::string words = midi_words_track(midi_text(0, "Hello"));
+    std::string smpte = midi_file({words});
+    smpte[12] = static_cast<char>(0xE7);
+    CHECK(iclforge::lyrics::parse_midi_karaoke(smpte).error() ==
+          "The MIDI file counts time in SMPTE frames, which is not read.");
+    CHECK(iclforge::lyrics::parse_midi_karaoke(midi_file({midi_track(midi_text(0, "@TTitle only"))})).error() ==
+          "The MIDI file has no words in it.");
+    const std::string whole = midi_file({words});
+    CHECK(iclforge::lyrics::parse_midi_karaoke(whole.substr(0, whole.size() - 6)).error() ==
+          "The MIDI file is damaged.");
+
+    // Words that are Latin-1 are a code page, and are not guessed at: the reason says what to do.
+    const std::string latin1 = midi_words_track(midi_text(0, "Caf" + midi_byte(0xE9)));
+    const auto coded = iclforge::lyrics::parse_midi_karaoke(midi_file({latin1}));
+    REQUIRE_FALSE(coded.has_value());
+    CHECK(coded.error().find("not UTF-8") != std::string::npos);
+    // The same word in UTF-8 reads, and so does Hebrew.
+    const std::string utf8 = midi_words_track(midi_text(0, "Caf" + midi_byte(0xC3) + midi_byte(0xA9)) +
+                                              midi_text(100, " " + midi_byte(0xD7) + midi_byte(0xA9) + midi_byte(0xD7) +
+                                                                midi_byte(0x9C) + midi_byte(0xD7) + midi_byte(0x95) +
+                                                                midi_byte(0xD7) + midi_byte(0x9D)));
+    const auto fine = iclforge::lyrics::parse_midi_karaoke(midi_file({utf8}));
+    REQUIRE(fine.has_value());
+    CHECK(fine->lines[0].words.size() == 2);
+}
+
+TEST_CASE("midi karaoke: a file is read as MIDI by its header, and a .kar is found beside an item",
+          "[lyrics][midi]") {
+    const std::string file = midi_file({midi_words_track(midi_text(200, "Sing") + midi_text(200, " along"))});
+    const auto detected = iclforge::lyrics::parse_timed_text(file);
+    REQUIRE(detected.has_value());
+    CHECK(detected->lines[0].text == "Sing along");
+
+    Folder folder;
+    folder.write("song.mp3", "x");
+    folder.write("song.kar", file);
+    const std::string item = (folder.path() / "song.mp3").string();
+    const auto found = iclforge::lyrics::find_lyrics_file(item);
+    REQUIRE(found.has_value());
+    CHECK(found->extension().string() == ".kar");
+    const auto read = iclforge::lyrics::read_lyrics(*found);
+    REQUIRE(read.has_value());
+    CHECK(read->lines[0].words[1].start_ms == 400);
+    // The other formats come first where a stem has more than one.
+    folder.write("song.srt", "1" + midi_byte(10) + "00:00:01,000 --> 00:00:02,000" + midi_byte(10) + "Subtitles" + midi_byte(10));
+    CHECK(iclforge::lyrics::find_lyrics_file(item)->extension().string() == ".srt");
 }
 
 TEST_CASE("lyrics: the cursor finds the line, the word and how far through it",

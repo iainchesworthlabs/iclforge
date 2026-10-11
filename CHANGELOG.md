@@ -167,6 +167,25 @@ The sections below contain the complete change list and fixes.
   position; a media-session source is a later change. Lyrics go with the application when it
   leaves the list. The reader is `libs/lyrics`, the one Hearth reads with
   (planning/karaoke-phase2.md, W13b).
+- **MIDI karaoke files are lyrics, with word times.** The lyric reader takes a `.kar` (a Standard
+  MIDI File) for its words: the Text or Lyric events (the track called `Words` where there is one),
+  each syllable at its tick turned into milliseconds through the file's tempo map, so the fill moves
+  by syllable; `@T` lines are the title and the artist, a `/` or a backslash begins a line, and the
+  music in the file is not read. The words must be UTF-8 (a MIDI file declares no encoding, and
+  code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
+  `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
+  (planning/karaoke-phase2.md, W13e).
+- **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
+  `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
+  (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
+  blocks, drawings and comments are dropped and the columns are the script's own `Format:` line.
+  A file is recognised by what it holds, and Hearth finds `name.ass` beside an item when there is
+  no `.lrc` or `.srt` (planning/karaoke-phase2.md, W13d).
+- **SubRip files are lyrics.** The lyric reader takes a `.srt` as lines that end where their cue
+  does (so the gap between cues is nothing being sung), with the cue's text lines joined, its styling
+  and `{...}` override blocks dropped, and no word times invented. A file is read as SubRip or as LRC
+  by what it holds, and Hearth finds `name.srt` beside an item when there is no `name.lrc`
+  (planning/karaoke-phase2.md, W13c).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
