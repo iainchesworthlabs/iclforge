@@ -15,7 +15,7 @@ The queue marks a file it cannot read as not playable, with the reason, when it 
 skips it or stops there as Settings > Playback > **An item fails** says. Every MP4, Matroska and
 MPEG-TS file is one of those today.
 
-The window has six pages, chosen in the header or with `Ctrl+1` to `Ctrl+6`.
+The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 
 | Page | What it holds |
 |---|---|
@@ -25,6 +25,7 @@ The window has six pages, chosen in the header or with `Ctrl+1` to `Ctrl+6`.
 | **Decoder** | The decoder's controls on an AC-3 and E-AC-3 tab and an AC-4 tab. The page turns to the tab of the item that is playing, and a change reaches that item at its next access unit or frame |
 | **Network** | The Sendspin players found on the network, pairing, groups and their volumes, and each paired Hearth sink's own settings and firmware |
 | **Settings** | Playback, the network name and discovery, pairing records, appearance, language and diagnostics |
+| **Karaoke** | What a karaoke AC-3 stream is (its coding mode and which of the melody and the vocals it carries), the reproduction chosen for it, and which part each speaker carries. See [Karaoke](#karaoke) |
 
 The header says where playback goes. Clicking it, or **Choose…** in the signal path, opens the
 output picker: this computer's outputs for decoded audio, the outputs that take AC-3 and E-AC-3 as
@@ -34,6 +35,26 @@ another server, with a **Take it back** button. From a paired ESP32 sink's setti
 updates that sink's firmware. The engine and the Sendspin protocol are tested in CI, including
 against `hearth-testsink` and the aiosendspin 9.1.1 server library that Music Assistant uses;
 Music Assistant itself has not been tested.
+
+### Karaoke
+
+A karaoke AC-3 stream (`bsmod` 7 with a layout wider than mono; ETSI TS 102 366 Annex C) codes L and
+R, a guide melody M where a centre would be, and one or two vocals V1 and V2 where the surrounds
+would be. Played as coded, the vocals come from the surround speakers. The Karaoke page chooses
+how the decoder reproduces it:
+
+- **As coded** plays the channels as the stream codes them.
+- **Aware** (the default) reproduces L, C and R, with the vocals at the level the programme set
+  (Table C.2.2). On two speakers it is the Lo/Ro fold, which Annex C says is the same thing.
+- **Capable** lets you choose the vocals: none, V1, V2 or both (Table C.2.3). A single vocal joins
+  the melody in the centre; a pair goes to the left and the right.
+
+The page says in words when the choice cannot apply: a stream that is not karaoke (E-AC-3 and
+AC-4 have no karaoke mode), a bitstream output, where the receiver decodes the stream and the
+reproduction is its to make, and a stereo fold of Lt/Rt, for which Annex C defines no reproduction.
+The choice is kept across starts, the only decoder setting that is. The Decoder page shows it in
+one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
+Annex C's own tables.
 
 ### AC-4
 
@@ -153,11 +174,7 @@ Raspberry Pi 4B without an underrun. See
 
 - **Send AC-4 to an ESP32 sink in a group.** [ESP32 sinks](#esp32-sinks) has the detail.
 - **Play from a container.** Only raw `.ac3`, `.ec3` and `.ac4` streams play.
-- **Offer the karaoke reproduction as a control.** An AC-3 stream flagged karaoke (`bsmod` 7 with
-  a layout wider than mono) is reproduced as Annex C's karaoke-aware decoder does, whatever the
-  layout: L, C, R and the LFE reach those speakers and the surrounds are silent. The window has no
-  page for choosing none, one or both vocals yet, and a bitstream output leaves the reproduction
-  to the receiver.
+- **Show lyrics.** The Karaoke page has no lyric view yet.
 - **List AC-4 objects on the Play page.** The Objects card shows the positions of E-AC-3 objects.
   An AC-4 item's objects are rendered into the speaker layout, and the Media page says an A-JOC
   stream carries object metadata without listing it.

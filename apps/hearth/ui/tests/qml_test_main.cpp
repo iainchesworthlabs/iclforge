@@ -163,6 +163,23 @@ public:
         return path;
     }
 
+    // Writes an AC-3 stream of tones of `kind` (test_room.hpp's write_ac3_stream())
+    // into this process's scratch folder as `name`, and returns its path - empty if
+    // it could not be written.
+    Q_INVOKABLE QString writeAc3Stream(const QString& name, const QString& kind) {
+        if (!scratch_.isValid()) {
+            return {};
+        }
+        const QString path = QDir(scratch_.path()).filePath(name);
+        std::string error;
+        if (!iclforge::hearth::uitest::write_ac3_stream(path.toStdString(), kind.toStdString(),
+                                                   &error)) {
+            qWarning("writeAc3Stream: %s", error.c_str());
+            return {};
+        }
+        return path;
+    }
+
     // Copies `source` (a path, or a file: URL) into this process's scratch
     // folder as `name`, so a suite can queue several distinctly named items
     // from the repository's small golden streams, and returns the copy's
