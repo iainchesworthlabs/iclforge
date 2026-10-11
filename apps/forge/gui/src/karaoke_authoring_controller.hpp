@@ -42,4 +42,15 @@ public:
 
     // "3:42".
     Q_INVOKABLE QString durationText(double seconds) const;
+
+    // The kbps a stream of `mode` ("3/2") starts at (karaoke_default_bitrate_kbps()).
+    Q_INVOKABLE int defaultBitrateKbps(const QString& mode) const;
+
+    // The `.lrc` of the same name beside a file, as a file URL, or "" (karaoke_lyrics_beside()).
+    // `url` is a file URL or a path.
+    Q_INVOKABLE QString lyricsBeside(const QString& url) const;
+
+    // Puts a lyrics file beside a saved stream (karaoke_copy_lyrics()): "copied",
+    // "already-there", "exists" (one was there and is left alone), "unreadable" or "failed".
+    Q_INVOKABLE QString copyLyrics(const QString& lyricsUrl, const QString& streamPath) const;
 };

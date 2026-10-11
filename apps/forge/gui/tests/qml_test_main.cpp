@@ -178,6 +178,13 @@ public:
     // parts beside it by their names.
     [[nodiscard]] Q_INVOKABLE QUrl folder() const { return QUrl::fromLocalFile(folder_); }
 
+    // Whether `file` is gone: a run's output removed before it is made again, so that a file
+    // left by an earlier run is not mistaken for this one's.
+    [[nodiscard]] Q_INVOKABLE bool remove(const QUrl& file) const {
+        const QString path = file.toLocalFile();
+        return !QFileInfo::exists(path) || QFile::remove(path);
+    }
+
 private:
     QString folder_;
 };
