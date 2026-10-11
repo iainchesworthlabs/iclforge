@@ -193,6 +193,8 @@ KaraokePlan plan_karaoke_parts(std::span<const KaraokeFile> files) {
     const KaraokeFile* melody = find_part(files, KaraokePart::kMelody, &melody_at);
     const KaraokeFile* vocal1 = find_part(files, KaraokePart::kVocal1, &vocal1_at);
     const KaraokeFile* vocal2 = find_part(files, KaraokePart::kVocal2, &vocal2_at);
+    std::size_t lfe_at = 0;
+    const KaraokeFile* lfe = find_part(files, KaraokePart::kLfe, &lfe_at);
 
     // What each place asks of its file.
     bool backing_usable = false;
@@ -207,8 +209,8 @@ KaraokePlan plan_karaoke_parts(std::span<const KaraokeFile> files) {
     } else {
         add(plan, KaraokeCheckLevel::kProblem, "backing-not-stereo", {backing->name, number(backing->channels)});
     }
-    const std::array<std::pair<const KaraokeFile*, const char*>, 3> monos{{
-        {melody, "melody"}, {vocal1, "vocal1"}, {vocal2, "vocal2"}}};
+    const std::array<std::pair<const KaraokeFile*, const char*>, 4> monos{{
+        {melody, "melody"}, {vocal1, "vocal1"}, {vocal2, "vocal2"}, {lfe, "lfe"}}};
     for (const auto& [file, place] : monos) {
         if (file != nullptr && file->channels != 1) {
             add(plan, KaraokeCheckLevel::kProblem, "part-not-mono", {file->name, number(file->channels), place});
@@ -221,6 +223,7 @@ KaraokePlan plan_karaoke_parts(std::span<const KaraokeFile> files) {
 
     plan.melody = melody != nullptr;
     plan.vocals = (vocal1 != nullptr ? 1 : 0) + (vocal2 != nullptr ? 1 : 0);
+    plan.lfe = lfe != nullptr;
     Acmod acmod = Acmod::k2_0;
     const bool have_mode = mode_for(plan.melody, plan.vocals, &acmod);
     if (!have_mode && backing != nullptr) {
@@ -252,12 +255,20 @@ KaraokePlan plan_karaoke_parts(std::span<const KaraokeFile> files) {
             }
             plan.channels.push_back(std::move(channel));
         }
+        if (lfe != nullptr) {
+            // After the full-bandwidth channels, as the coded order has it.
+            KaraokeChannel channel;
+            channel.position = "LFE";
+            channel.part = "LFE";
+            channel.file = lfe_at;
+            plan.channels.push_back(std::move(channel));
+        }
     }
 
     // What the encoder will absorb, named rather than done quietly.
     bool aligned = backing != nullptr;
     if (backing != nullptr) {
-        for (const KaraokeFile* file : {melody, vocal1, vocal2}) {
+        for (const KaraokeFile* file : {melody, vocal1, vocal2, lfe}) {
             if (file == nullptr) {
                 continue;
             }
@@ -281,6 +292,10 @@ KaraokePlan plan_karaoke_parts(std::span<const KaraokeFile> files) {
                 {karaoke_duration_text(backing->seconds), khz(backing->sample_rate)});
         }
         add(plan, KaraokeCheckLevel::kOk, "each-part-one-place");
+        if (plan.lfe) {
+            // The encoder's own LFE band-limiting, which the part is not asked to have done.
+            add(plan, KaraokeCheckLevel::kOk, "lfe-part", {lfe->name});
+        }
     }
     return plan;
 }
@@ -344,22 +359,34 @@ KaraokePlan plan_karaoke_speakers(const KaraokeSpeakerFile& file) {
         plan.channels.push_back(std::move(channel));
     }
     if (lfe) {
-        // Karaoke streams made here carry none, and the file's is not dropped
-        // in silence.
-        add(plan, KaraokeCheckLevel::kProblem, "lfe-present", {file.name});
+        // The file's own LFE is the stream's, in the place after the full-bandwidth channels.
+        const auto at = std::find(file.speakers.begin(), file.speakers.end(), std::string{"LFE"});
+        KaraokeChannel channel;
+        channel.position = "LFE";
+        channel.part = "LFE";
+        channel.file = 0;
+        channel.channel = static_cast<std::size_t>(at - file.speakers.begin());
+        plan.channels.push_back(std::move(channel));
+        plan.lfe = true;
     }
     plan.buildable = !plan.has_problem();
     if (plan.buildable) {
         add(plan, KaraokeCheckLevel::kOk, "each-part-one-place");
+        if (plan.lfe) {
+            add(plan, KaraokeCheckLevel::kOk, "lfe-part", {file.name});
+        }
     }
     return plan;
 }
 
 KaraokeOutputs karaoke_outputs(bool melody, int vocals, KaraokeListening listening,
-                               KaraokeVocalsChoice choice, bool folded) {
+                               KaraokeVocalsChoice choice, bool folded, bool lfe) {
     KaraokeOutputs out;
     out.l = {"L"};
     out.r = {"R"};
+    if (lfe && !folded) {
+        out.lfe = {"LFE"};
+    }
     const bool v1 = vocals >= 1;
     const bool v2 = vocals >= 2;
     if (folded) {

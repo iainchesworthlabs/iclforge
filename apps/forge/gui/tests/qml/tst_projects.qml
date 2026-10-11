@@ -22,6 +22,7 @@ TestCase {
     property url backing
     property url melody
     property url lead
+    property url effects
     readonly property url exampleProject:
         Qt.resolvedUrl("../../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj")
     readonly property url exampleStream:
@@ -35,6 +36,7 @@ TestCase {
         backing = audioFixtures.writeTones("kp-backing.wav", 48000, 1.024, [440, 620]);
         melody = audioFixtures.writeTones("kp-melody.wav", 48000, 1.024, [800]);
         lead = audioFixtures.writeTones("kp-lead.wav", 48000, 1.024, [1030]);
+        effects = audioFixtures.writeTones("kp-effects.wav", 48000, 1.024, [60]);
         verify(backing.toString().length > 0 && lead.toString().length > 0, "the parts could not be written");
         defaultCmix = EncoderController.cmixIndex;
         defaultSurmix = EncoderController.surmixIndex;
@@ -187,6 +189,36 @@ TestCase {
         compare(flow.listening, "capable");
         compare(flow.vocalsChoice, "v1");
         compare(win.projectUrl, file.toString());
+    }
+
+    // An LFE part is a part like the others: named in the project, and the same stream on opening.
+    function test_anLfePartIsKeptInTheProjectAndComesBack() {
+        const win = openWindow();
+        win.tier = "karaoke";
+        const flow = findByName(win, "karaokeFlow");
+        flow.setUrl("backing", backing.toString());
+        flow.setUrl("melody", melody.toString());
+        flow.setUrl("vocal1", lead.toString());
+        flow.setUrl("lfe", effects.toString());
+        tryCompare(flow.plan, "lfe", true, 5000);
+        const file = inTheFolder("kp-lfe.forgeproj");
+        verify(win.saveProjectFile(file), "the project could not be saved");
+        const project = readProject(file);
+        compare(project.sources.length, 4);
+        compare(project.sources[3].part, "lfe");
+        compare(project.sources[3].path, "kp-effects.wav");
+        compare(project.bed, "3/1");
+        cleanup();
+
+        const again = openWindow();
+        verify(again.openProjectFile(file));
+        const reopened = findByName(again, "karaokeFlow");
+        compare(EncoderController.sourceModel.length, 4);
+        verify(reopened.lfeUrl.endsWith("kp-effects.wav"), reopened.lfeUrl);
+        compare(reopened.plan.lfe, true);
+        compare(reopened.plan.mode, "3/1");
+        compare(EncoderController.bedLfe, true);
+        compare(reopened.failedParts.length, 0);
     }
 
     // The flow keeps an offset and a trim set on a part across the parts changing; a project

@@ -35,7 +35,7 @@ the stream they make and its words.
 | `format`, `version` | `"iclforge-project"` and the format's revision, 1. |
 | `title` | A name for the project. Kept, never required. |
 | `flow` | The surface the project was made in: `guided`, `advanced`, `expert` or `karaoke`. |
-| `sources` | The source files, in order. Each has a `path`, and optionally a `part` (the Karaoke flow's `backing`, `melody`, `vocal1`, `vocal2` or `file`) and an `offsetSeconds`. |
+| `sources` | The source files, in order. Each has a `path`, and optionally a `part` (the Karaoke flow's `backing`, `melody`, `vocal1`, `vocal2`, `lfe` or `file`) and an `offsetSeconds`. |
 | `bed`, `lfe`, `extras`, `atmos` | The channel plan: the layout (`"3/2"`), whether it has an LFE, the extra channels (`"wide"`, `"rear"`, `"topf"`, `"topr"`, `"lfe2"`) and whether it is an object (Atmos) session. |
 | `assignments` | Where each source channel goes: `source`, `channel` and `to` (`"L"`, `"C"`, `"Ls"`, `"obj"`, `"none"`, with `@-3.5` for a trim). Every channel, when there is one: it is the command line's `map=`. |
 | `objects` | An object session's placements and motion: `count` and `scene`, the scene file `forge atmos-encode` reads. |
