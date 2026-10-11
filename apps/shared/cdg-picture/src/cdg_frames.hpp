@@ -6,6 +6,7 @@
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -55,5 +56,11 @@ private:
     struct State;
     std::unique_ptr<State> state_;
 };
+
+// The `name.cdg` beside a media item (the MP3+G convention: a ripped disc is `name.mp3` and
+// `name.cdg`), the extension in any case, or nullopt. `item_path` is the item's path as the
+// program holds it. A thin wrapper on the library's find_cdg_file, so that a program with a disc
+// to show needs this project and not `lyrics` as well.
+[[nodiscard]] std::optional<std::filesystem::path> find_cdg_beside(const std::string& item_path);
 
 }  // namespace iclforge::apps

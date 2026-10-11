@@ -78,6 +78,10 @@ std::int64_t CdgFrames::duration_ms() const {
     return state_->file ? state_->file->duration_ms() : 0;
 }
 
+std::optional<std::filesystem::path> find_cdg_beside(const std::string& item_path) {
+    return iclforge::lyrics::find_cdg_file(item_path);
+}
+
 QImage CdgFrames::frame(std::int64_t position_ms) {
     if (!state_->screen) {
         return {};

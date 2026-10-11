@@ -163,6 +163,29 @@ TEST_CASE("CdgFrames: a disc is read from a file, and a file that is missing is 
     fs::remove_all(folder);
 }
 
+TEST_CASE("find_cdg_beside: the name.cdg beside an item, in any case", "[app-cdg-picture][cdg]") {
+    const fs::path folder =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("cdg_beside_" + iclforge::test::platform::process_id());
+    fs::remove_all(folder);
+    fs::create_directories(folder);
+    for (const char* name : {"disc.cdg", "SHOUT.CDG"}) {
+        std::ofstream out(folder / name, std::ios::binary);
+        out << disc();
+    }
+
+    const auto lower = iclforge::apps::find_cdg_beside((folder / "disc.mp3").string());
+    REQUIRE(lower.has_value());
+    CHECK(lower->filename().string() == "disc.cdg");
+    const auto upper = iclforge::apps::find_cdg_beside((folder / "SHOUT.ac3").string());
+    REQUIRE(upper.has_value());
+    CHECK(upper->filename().string() == "SHOUT.CDG");
+    // Nothing beside an item with no disc, and nothing for an empty path.
+    CHECK_FALSE(iclforge::apps::find_cdg_beside((folder / "other.mp3").string()).has_value());
+    CHECK_FALSE(iclforge::apps::find_cdg_beside("").has_value());
+
+    fs::remove_all(folder);
+}
+
 TEST_CASE("CdgFrames: moving one carries the disc and its screen", "[app-cdg-picture][cdg]") {
     CdgFrames first;
     REQUIRE(first.load_bytes(disc()).has_value());
