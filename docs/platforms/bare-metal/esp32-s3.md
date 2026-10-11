@@ -1249,6 +1249,75 @@ ESP-IDF v6.1 installs (`esp_develop_9.2.2_20260417`) does, quad or octal with 32
 probe runs on it ([AC-4](#ac-4)). The Hearth Sendspin sink is a separate networked shape and
 requires the board's 8 MB of PSRAM.
 
+## AC-3 and E-AC-3 in the Hearth player
+
+The Hearth player's decode of AC-3 and E-AC-3, as `hearth_sink` plays it from an HTTP source on a
+board with Wi-Fi up and a null sink, measured on 2026-10-11 on an ESP32-S3-DevKitC-1-N16R8 (the
+release image: `sdkconfig.s3-fast`, QIO flash, 64 byte lines, the code in PSRAM). Figures are the
+decode, render and sink of a 32 ms frame against its duration, so below 1.0 is faster than real
+time. The first column is `main` before this work on the image it was built as then (DIO flash);
+the QIO flash and the 64 byte lines are worth 8 to 25% of it by themselves
+([the AC-4 table](#what-the-boards-timers-leave) has them separately).
+
+| Stream | To | `main`, DIO | release image, one core | release image, second core |
+|---|---|---:|---:|---:|
+| `714-walk`, every coding tool in turn | 7.1.4 | 1.18 | 0.76 | 0.68 |
+| `714-none`, no tool | 7.1.4 | 1.10 | 0.70 | 0.61 |
+| `714-all`, every tool at once | 7.1.4 | 1.34 | 0.89 | 0.80 |
+| `714-aht` | 7.1.4 | 1.19 | 0.81 | 0.73 |
+| `714-ecpl`, enhanced coupling on all three substreams | 7.1.4 | 2.18 | 1.58 | **1.25** |
+| `714-walk` | 2.0 | 1.12 | 0.74 | 0.66 |
+| `dee-eac3-51`, E-AC-3 | 5.1 | 0.50 | 0.35 | 0.31 |
+| `dee-ac3-51`, AC-3 | 5.1 | 0.45 | 0.32 | 0.32 |
+| `51-ecpl` | 5.1 | 0.77 | 0.58 | 0.48 |
+| `demo`, 4 objects | 7.1.4 | | 1.11 | 0.92 |
+| `objects-mdct`, 5 objects | 7.1.4 | | 1.20 | **1.02** |
+| `height`, 6 objects | 7.1.4 | | 1.41 | **1.15** |
+| `514-joc-dee`, 12 objects | 7.1.4 | | 2.57 | **1.95** |
+
+What changed, in the order it was found:
+
+- **The decoder stopped zeroing what it was about to overwrite.** An E-AC-3 substream's six blocks
+  were each cleared to 7 KB of coefficients and the pooled PCM to its full length, 4.1 ms and 2.9
+  ms of a 37 ms 7.1.4 frame (`eac3_decoder.cpp`'s `clear_unwritten` clears only the bins parse and
+  decoupling did not write). The PCM is the same bit for bit (21 streams, hashed on the board
+  before and after).
+- **A play no longer makes a decoder.** `FrameDecoder::reset()` and `Eac3Decoder::reset()` put
+  one back to what a new one is, with its scratch still allocated, and the Sendspin burst player
+  calls them at a track change where it used to destroy and re-make the decoder. The AC-3 decoder's
+  per-block scratch is one buffer per channel it needs where it was six channels' worth in one
+  36,864 byte block; the largest free block on a Wi-Fi board can be smaller than that.
+- **JOC runs in single precision.** `oba::joc::reconstruct` ran its 64-band QMF banks in
+  `double`, a software routine per operation on this part's single-precision FPU: 12 to 28
+  times real time. `dsp::QmfAnalysisF` and `dsp::QmfSynthesisF` are the same banks in `float`
+  (140 dB against the double bank on programme material, `test_joc_single.cpp`), run bank by bank
+  so a bank's 2.5 and 5 KB of state stay in the data cache across its twenty-four slots, and
+  `qmf.cpp` is in the `-O2` list. A silent object (nothing coded for ten slots) is not run.
+- **The second core takes what is independent** (`DecoderConfig::executor`,
+  `iclforge::base::Executor`, the `decode-lane` task of `lane_executor.hpp`, which the AC-4
+  player already used for its transforms). The E-AC-3 inverse transforms of a substream's
+  channels, the bed's five QMF analyses and each JOC object's reconstruction are tasks the other
+  core takes up; so is the next enhanced coupling block's spectrum while this block's channels are
+  rebuilt. Every task does what the loop's iteration did to state no other task touches, so the PCM
+  is the same on one core, on two and on a test executor that runs them backwards
+  (`libs/ac3/tests/decoder/test_lanes.cpp`; on the P4 the per-channel RMS of six streams is
+  identical with and without it). The lane's task is 12 KB of internal RAM (16 KB with the
+  decode stack in PSRAM) of which 5 to 6 KB were ever used, and 23 KB of PSRAM for its enhanced
+  coupling scratch; `CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE` switches it off, and a part with one core
+  (the C6) never makes it.
+
+**What is still over 1.0.** The three object streams above 1.0 and enhanced coupling at 7.1.4.
+The second core takes a fifth off the JOC reconstruction on this part (22.4 to 17.9 ms of
+`demo`'s frame) where it takes 44% off the whole frame on the P4: both cores read the same PSRAM
+through the same cache, and each object's bank is 4 to 5 KB of state and 2.5 KB of window against a
+32 KB cache. An object costs 3.1 to 3.7 ms of a frame here
+(1.0 to 1.1 on the P4), so **four objects is what the S3 decodes in real time with a margin**
+(0.92); a fifth takes it to 1.02. Enhanced coupling's spectrum (three inverse transforms and a DFT
+per block, 14 ms of the 46 ms frame before the lane) is bound by the same PSRAM; each block's
+transforms are computed three times, once for itself and once for each neighbour, and sharing
+them is not done. The C6 is not in this table:
+its limit is memory, not time (see [ESP32-C6](esp32-c6.md)).
+
 ## AC-4
 
 The component's AC-4 decoder (`CONFIG_ICLFORGE_AC4`, in `float`) builds for this part and decodes

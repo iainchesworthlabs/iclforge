@@ -22,6 +22,7 @@
 #include "soc/soc_caps.h"
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
+#include "lane_executor.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/serving.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
@@ -192,6 +193,9 @@ struct Player::Impl {
     // through Eac3Decoder under a fold.
     std::optional<iclforge::ac3::FrameDecoder> ac3_decoder;
     std::optional<iclforge::ac3::Eac3Decoder> eac3_decoder;
+    // The AC-3 and E-AC-3 decode's second lane (PlayerConfig::decode_lane), made when the decode
+    // loop starts and given back when it ends; the decoders are made with a pointer to it.
+    std::optional<lanes::TaskExecutor> decode_lane;
 
 #if CONFIG_ICLFORGE_AC4
     // The AC-4 decoder, constructed when the play's first bytes say the stream
@@ -648,6 +652,16 @@ struct Player::Impl {
         }
     }
 
+    // The decoder's configuration for this play: the configured one, with the decode lane
+    // where there is one.
+    iclforge::ac3::DecoderConfig decoder_config() {
+        iclforge::ac3::DecoderConfig cfg = config.decoder;
+        if (decode_lane.has_value()) {
+            cfg.executor = &*decode_lane;
+        }
+        return cfg;
+    }
+
     // True when the unit produced audio, false when the decoder held it back
     // (§3.7's transient pre-noise processing releases each frame one call late).
     std::expected<bool, iclforge::ac3::DecodeError> decode_unit(std::span<const std::byte> unit) {
@@ -663,7 +677,7 @@ struct Player::Impl {
         };
         if (one_ac3_syncframe) {
             if (!ac3_decoder.has_value()) {
-                ac3_decoder.emplace(config.decoder);
+                ac3_decoder.emplace(decoder_config());
             }
             const auto decoded = ac3_decoder->decode_frame_by_block(unit, deliver_block);
             if (!decoded) {
@@ -685,7 +699,7 @@ struct Player::Impl {
             return delivered;
         }
         if (!eac3_decoder.has_value()) {
-            eac3_decoder.emplace(config.decoder);
+            eac3_decoder.emplace(decoder_config());
         }
         const auto decoded = eac3_decoder->decode_access_unit_by_block(unit, deliver_block);
         if (!decoded) {
@@ -1051,6 +1065,33 @@ struct Player::Impl {
             accumulator.commit(lead_bytes);
         }
 #endif
+
+#if SOC_CPU_CORES_NUM > 1
+        // A second lane on the core the decode task is not on, at its priority: the decoder hands it
+        // a substream's channels' transforms and a JOC reconstruction's banks and objects
+        // (iclforge/base/executor.hpp). Its stack in PSRAM where there is PSRAM: what it runs used
+        // under 8 KB of it on the boards, and internal RAM is what Wi-Fi leaves.
+        if (config.decode_lane && (config.decode_core == 0 || config.decode_core == 1)) {
+            decode_lane.emplace();
+            const bool in_psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+            if (decode_lane->start(1 - config.decode_core, config.decode_priority,
+                                   in_psram ? 16384 : 12288, in_psram)) {
+                std::printf("player: decode stages on cores %d and %d\n",
+                            static_cast<int>(config.decode_core),
+                            static_cast<int>(1 - config.decode_core));
+            } else {
+                std::printf("player: no second lane for the decode, one core\n");
+                decode_lane.reset();
+            }
+        }
+#endif
+        // The lane's task and its stack go back when this play's decode ends; the decoders are
+        // not used after the loop (they are made again for the next play).
+        struct DecodeLaneRelease {
+            std::optional<lanes::TaskExecutor>& lane;
+            ~DecodeLaneRelease() { lane.reset(); }
+        };
+        const DecodeLaneRelease release_decode_lane{decode_lane};
 
         while (!stopping()) {
             const auto unit = accumulator.next();

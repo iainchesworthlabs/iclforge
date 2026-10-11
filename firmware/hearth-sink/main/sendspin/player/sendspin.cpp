@@ -522,6 +522,7 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     config.max_coded_channels = kMaxCodedChannels;
     config.core = kDecodeCore;
     config.stack_bytes = kDecodeStackBytes;
+    config.decode_lane = CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE != 0;
     config.report_every_chunks = kReportEveryChunks;
     config.local_time = [](std::int64_t server_us) -> std::optional<std::int64_t> {
         const iclforge::SendspinHost* const clock = g_clock.load();

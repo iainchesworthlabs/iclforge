@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -76,9 +77,11 @@ namespace sp = sendspin::player;
 }
 
 // The layout a sink is configured to, as the sink itself says before this
-// app's own record of what it last sent it, and 2.0 for a sink that has not
-// said (a standard player has no layout at all).
-[[nodiscard]] render::OutputLayout configured_layout(const SinkFacts& sink) {
+// app's own record of what it last sent it, then the player's own for a sink
+// that has said none (a standard player has no layout at all), and 2.0
+// failing that.
+[[nodiscard]] render::OutputLayout configured_layout(const SinkFacts& sink,
+                                                     const StreamNeeds& needs) {
     const auto parsed =
         [](const std::optional<std::string>& text) -> std::optional<render::OutputLayout> {
         return text ? render::OutputLayout::parse(*text) : std::nullopt;
@@ -93,7 +96,7 @@ namespace sp = sendspin::player;
             return *layout;
         }
     }
-    return render::OutputLayout::stereo();
+    return needs.default_layout.value_or(render::OutputLayout::stereo());
 }
 
 struct Folded {
@@ -165,7 +168,7 @@ SinkChoice choose_sink_form(const StreamNeeds& stream, const SinkFacts& sink,
 
     // A source with no coded form is PCM already, and is not decoded here.
     const std::string_view decoded = stream.stream ? "decoded here and " : "";
-    const render::OutputLayout wanted = configured_layout(sink);
+    const render::OutputLayout wanted = configured_layout(sink, stream);
     if (lists(wanted.slots())) {
         return {.form = SinkForm::kPcm,
                 .layout = wanted,
@@ -189,6 +192,69 @@ SinkChoice choose_sink_form(const StreamNeeds& stream, const SinkFacts& sink,
         .form = SinkForm::kNone,
         .reason = fmt::format("{}, and none of its PCM formats takes the {} layout it is set to.",
                               *refusal, wanted.text())};
+}
+
+SinkFormPolicy form_policy(const SinkFacts& sink) {
+    SinkFormPolicy policy;
+    std::string hardware = sink.hardware;
+    std::ranges::transform(hardware, hardware.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (hardware.find("esp32-c6") != std::string::npos) {
+        policy.pcm_fallback = false;
+    }
+    return policy;
+}
+
+GroupFormPlan plan_group_forms(const StreamNeeds& stream, const render::OutputLayout& master,
+                               std::span<const SinkFacts> sinks) {
+    StreamNeeds needs = stream;
+    if (!needs.default_layout) {
+        needs.default_layout = master;
+    }
+    GroupFormPlan plan;
+    // The layouts the group renders: the player's first, then each variant in the order the
+    // sinks asked for it.
+    std::vector<render::OutputLayout> taken{master};
+    for (const SinkFacts& sink : sinks) {
+        MemberForm member;
+        member.choice = choose_sink_form(needs, sink, form_policy(sink));
+        switch (member.choice.form) {
+            case SinkForm::kCoded:
+                member.action = MemberAction::kCoded;
+                break;
+            case SinkForm::kNone:
+                member.action = MemberAction::kHold;
+                break;
+            case SinkForm::kPcm: {
+                const render::OutputLayout layout = *member.choice.layout;
+                member.channels = static_cast<std::int32_t>(layout.slots());
+                const auto same =
+                    std::ranges::find_if(taken, [&](const render::OutputLayout& other) {
+                        return other.slots() == layout.slots();
+                    });
+                if (same == taken.end()) {
+                    taken.push_back(layout);
+                    plan.variants.push_back(layout);
+                    member.action = MemberAction::kPcm;
+                } else if (same->text() == layout.text()) {
+                    member.action = MemberAction::kPcm;
+                } else {
+                    member.action = MemberAction::kHold;
+                    member.channels = 0;
+                    member.choice.form = SinkForm::kNone;
+                    member.choice.layout.reset();
+                    member.choice.reason += fmt::format(
+                        " The group is already sent {} at that width, and sends one layout of "
+                        "each, "
+                        "so this sink is held back.",
+                        same->text());
+                }
+                break;
+            }
+        }
+        plan.members.push_back(std::move(member));
+    }
+    return plan;
 }
 
 }  // namespace iclforge::hearth

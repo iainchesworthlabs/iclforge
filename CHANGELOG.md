@@ -56,9 +56,21 @@ The sections below contain the complete change list and fixes.
   block. `premixcmp*`, the speech enhancement words and `blkmixcfginfo` are not applied, because
   Annex E gives them no processing (§E2.3.1.21: "decoders are not required to use them").
   `associated=1` or `associated=visually-impaired`, with `associated-gain=<dB>` as the listener's
-  own trim; `monitor`, `play` and Hearth do not mix yet. `meta::pgm_scale_gain()` and
+  own trim; `play` and Hearth do not mix. `meta::pgm_scale_gain()` and
   `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
   15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
+- **`forge monitor associated=` mixes the service as it plays.** `monitor` runs a second decoder
+  for the associated programme in step with the main's and plays the main with the service mixed
+  in, with the same tokens and the same report as `decode`. `decode` and `monitor` share one choice
+  of the service (`associated=<0..7>` or a service name against each programme's `bsmod`, a 1+1
+  main refused) and one pairing of the two decoders' units, which hold frames back for transient
+  pre-noise independently and are cut to the shorter where they differ
+  (`apps/shared/media/src/associated_mix.*`, held sample for sample against decoding both and
+  mixing by hand in `iclforge-app-media-tests`); `forge decode`'s output is unchanged. A stream
+  that cannot give the service is refused before the output is opened, in `decode`'s words. A
+  main folded to a narrower endpoint takes the service by `dmixscl`, as `decode channels=2` does.
+  `play` hands a coded programme to a receiver and `spatial` places one programme's objects: both
+  now say that `associated=` is ignored, where they ignored it silently.
 
 **AC-3 karaoke streams (Annex C)**
 
@@ -600,6 +612,36 @@ The sections below contain the complete change list and fixes.
       leave it.
     - **Tested.** An overnight soak of the four boards, with faults injected, found no board
       left stuck.
+- **E-AC-3 7.1.4 and Atmos JOC decode faster on the ESP32-S3 and ESP32-P4, and a track change
+  no longer re-makes the decoder on the ESP32-C6.** Measured on boards with Wi-Fi up, a null
+  sink and the HTTP player, a frame's decode, render and sink against its duration
+  ([ESP32-S3](docs/platforms/bare-metal/esp32-s3.md#ac-3-and-e-ac-3-in-the-hearth-player),
+  [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md#ac-3-and-e-ac-3-in-the-hearth-player)).
+    - **JOC reconstruction runs in single precision on the parts whose FPU is.**
+      `oba::joc::reconstruct` ran its 64-band QMF banks in `double`, a software routine per
+      operation there, at 12 to 28 times real time. `dsp::QmfAnalysisF` and `QmfSynthesisF` are the
+      same banks in `float` (140 dB against the double bank on programme material), run bank by
+      bank so a bank's state stays in the data cache, and a silent object is not run at all.
+      `ReconstructionState::qmf_single_precision` picks it, which the float tier sets.
+    - **The second core takes the independent work.** `DecoderConfig::executor` (an
+      `iclforge::base::Executor`, which `iclforge::ac4::Executor` now names) hands the E-AC-3
+      inverse transforms of a substream's channels, JOC's bed analyses and objects, and the next
+      enhanced coupling block's spectrum to the caller's second lane. The PCM and the object audio
+      are the same bit for bit with no executor, one that runs the tasks backwards and one that
+      runs them on two threads. `hearth_sink` and the Sendspin burst player make the lane on a
+      part with two cores (`CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE`, on by default there).
+    - **The decoders stopped zeroing what they were about to overwrite, and stopped being made
+      again.** An E-AC-3 substream no longer clears six 7 KB coefficient stores and its PCM at the
+      start of every frame (3.2 ms of 37 on the S3), and the AC-3 decoder's per-block scratch is
+      one buffer per channel it needs, not a 36,864 byte block. `FrameDecoder::reset()` and
+      `Eac3Decoder::reset()` put a decoder back to what a new one is with its scratch kept, and the
+      Sendspin burst player calls them at a track change: the C6 had aborted on an allocation
+      that the re-made decoder's scratch no longer fitted in.
+    - **Results.** ESP32-P4: every AC-3 and E-AC-3 stream measured is faster than real time,
+      7.1.4 with 4 to 12 objects at 0.42 to 0.79 (0.76 to 1.59 on one core). ESP32-S3, release
+      image: 7.1.4 with a coding tool 0.61 to 0.80 (1.10 to 1.34 on `main` before the image
+      change), 5.1 0.31 and 0.32, JOC with four objects 0.92 (12 to 28 on the double bank), five
+      1.02, six 1.15, twelve 1.95; enhanced coupling at 7.1.4 1.25.
 
 **Crucible desktop application**
 
@@ -2891,6 +2933,20 @@ The sections below contain the complete change list and fixes.
 
 **Command line and GUI**
 
+- **`forge monitor` crashed on a stream with a second independent substream, and `spatial` and
+  `play` spliced one.** A stream carrying two programmes (a second language, an audio description)
+  comes back from `split_access_units` with their units interleaved, one frame period of each in
+  turn; `monitor` and `spatial` handed all of them to an `Eac3Decoder` given no `programme`, and
+  sized each unit's output from the first unit's width. A 5.1 main followed by a mono description
+  read channels that were not there, and `monitor` died with an access violation. `play`'s
+  passthrough wrapped each programme's unit in a burst of its own, so a receiver was sent the main
+  at half speed with the description between. They now play one programme, as `decode` does:
+  `programme=<0..7>`, or the first the stream carries, said as `programme 0 of 2 (0, 1)`. A
+  programme the stream lacks is refused by name before a device is touched. `play` cuts a programme
+  other than 0 out and renumbers it as substream 0, which a receiver takes; the AC-3 leg of
+  `play` and `forge transcode` now take `programme=` too (they always transcoded the first).
+  `iclforge::apps::select_programme()` and `cut_programme()` in `apps/shared/media` do the
+  choosing without any printing, for a player that is not the CLI.
 - **`ac3cli monitor` refused a §E2.3.1.2 legacy-core stream and dropped every stream's last
   unit.** It picked its decode path from the first frame's bsid alone, so a stream whose 5.1
   bed is a plain AC-3 syncframe with Annex E dependents extending it went to `FrameDecoder`,

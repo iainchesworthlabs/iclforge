@@ -74,6 +74,33 @@ consteval Turns make_turns() {
 
 constexpr Turns kTurns = make_turns();
 
+// The single-precision bank's constants: the double ones, rounded once.
+struct WindowsF {
+    std::array<float, kTapCount> analysis{};
+    std::array<float, kTapCount> synthesis{};
+    std::array<float, kSubbandCount> analysis_re{};
+    std::array<float, kSubbandCount> analysis_im{};
+    std::array<float, kSubbandCount> synthesis_re{};
+    std::array<float, kSubbandCount> synthesis_im{};
+};
+
+consteval WindowsF make_single() {
+    WindowsF f{};
+    for (std::size_t j = 0; j < kTapCount; ++j) {
+        f.analysis[j] = static_cast<float>(kAnalysisWindow[j]);
+        f.synthesis[j] = static_cast<float>(kSynthesisWindow[j]);
+    }
+    for (std::size_t k = 0; k < kSubbandCount; ++k) {
+        f.analysis_re[k] = static_cast<float>(kTurns.analysis_re[k]);
+        f.analysis_im[k] = static_cast<float>(kTurns.analysis_im[k]);
+        f.synthesis_re[k] = static_cast<float>(kTurns.synthesis_re[k]);
+        f.synthesis_im[k] = static_cast<float>(kTurns.synthesis_im[k]);
+    }
+    return f;
+}
+
+constexpr WindowsF kSingle = make_single();
+
 }  // namespace
 
 std::span<const double, kQmfTaps> qmf_prototype() {
@@ -125,6 +152,44 @@ void QmfSynthesis::pull(std::span<const double, kQmfSubbands> real,
     for (std::size_t n = 0; n < kSubbandCount; ++n) {
         out[n] = static_cast<float>(pcm[n]);
     }
+}
+
+void QmfAnalysisF::reset() {
+    history_.fill(0.0F);
+    head_ = 0;
+}
+
+void QmfAnalysisF::push(std::span<const float, kQmfHop> block, std::span<float, kQmfSubbands> real,
+                        std::span<float, kQmfSubbands> imag) {
+    std::array<tiered::Complex<float>, kSubbandCount> slot;
+    tiered::QmfScratch<float> scratch;
+    tiered::qmf::analysis_slot(history_.data(), head_, block.data(), kSingle.analysis.data(),
+                               slot.data(), scratch);
+    for (std::size_t k = 0; k < kSubbandCount; ++k) {
+        const float wr = kSingle.analysis_re[k];
+        const float wi = kSingle.analysis_im[k];
+        real[k] = slot[k].re * wr - slot[k].im * wi;
+        imag[k] = slot[k].re * wi + slot[k].im * wr;
+    }
+}
+
+void QmfSynthesisF::reset() {
+    overlap_.fill(0.0F);
+    head_ = 0;
+}
+
+void QmfSynthesisF::pull(std::span<const float, kQmfSubbands> real,
+                         std::span<const float, kQmfSubbands> imag,
+                         std::span<float, kQmfHop> out) {
+    std::array<tiered::Complex<float>, kSubbandCount> slot;
+    for (std::size_t k = 0; k < kSubbandCount; ++k) {
+        const float wr = kSingle.synthesis_re[k];
+        const float wi = kSingle.synthesis_im[k];
+        slot[k] = tiered::Complex<float>{real[k] * wr - imag[k] * wi, real[k] * wi + imag[k] * wr};
+    }
+    tiered::QmfScratch<float> scratch;
+    tiered::qmf::synthesis_slot(slot.data(), overlap_.data(), head_, kSingle.synthesis.data(),
+                                out.data(), scratch);
 }
 
 }  // namespace iclforge::dsp
