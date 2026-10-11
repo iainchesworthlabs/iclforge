@@ -43,6 +43,8 @@ qt_add_executable(forge-gui
     src/karaoke_authoring.hpp
     src/karaoke_authoring_controller.cpp
     src/karaoke_authoring_controller.hpp
+    src/project_file.cpp
+    src/project_file.hpp
     ../../shared/media/src/ac4_sync_word.hpp
     ../../shared/media/src/fmp4_folder_writer.cpp
     ../../shared/media/src/fmp4_folder_writer.hpp

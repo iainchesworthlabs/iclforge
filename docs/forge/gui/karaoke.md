@@ -63,6 +63,14 @@ sounds wrong, go back to Levels.
 Format tab offers) and the bit rate, see the equivalent `forge encode …` command, and encode. The
 save picker and the run strip are the ones Guided uses.
 
+## A project of the parts
+
+**Project…**, **Save project…** keeps which file is which part, the levels, the bit rate and how
+the stream is heard in a `.forgeproj`, and **Open project…** (or dropping it on the window)
+puts the flow back as it was; see [Projects](projects.md). The
+[Auld Lang Syne example](https://github.com/iainchesworthlabs/iclforge/tree/main/examples/karaoke/auld-lang-syne)
+is four generated parts, a project that opens them here, the stream they make and its words.
+
 ## The same from the command line
 
 The command the last step shows is the whole of it, for example a 3/1 stream (backing, melody,
