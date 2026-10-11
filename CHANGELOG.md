@@ -2760,6 +2760,20 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**E-AC-3: a type 2 substream, read and written as the standard has it**
+
+- **`strmtyp` 2 (§E2.3.1.1, "previously coded in AC-3") is a whole stream type now, not a
+  half-parsed one.** Table E1.2 and E1.3 gate the programme-mixing group, the converter exponent
+  strategies and the converter SNR offset on `strmtyp == 0x0`; the decoder, the EMDF walker, the
+  scanner and the metadata editor read them for any substream that was not dependent, so a real
+  type 2 stream would have been decoded from the wrong bit offset (FFmpeg and the Python reference
+  parser read it as the table says). The encoder refused it, `scan` and the access unit
+  accumulator did not start an access unit at one, and `forge metadata` refused it by name. All
+  now treat it as the independent substream it is. `FrameConfig::ac3_frmsizecod` writes one
+  (held to AC-3's tools, no dependents, a Table 5.18 code) and `DecodedSubstream`,
+  `FrameHeader` and `forge probe` report the code it was converted from. The conversion to and
+  from AC-3 itself is not built: the standard gives the signalling and no process.
+
 **AC-3 coding modes 3/0, 2/1, 3/1 and 2/2**
 
 - **A WAV's speakers were never read, so a 2/1 or 3/1 file was encoded as a different mode.** The
@@ -2783,20 +2797,6 @@ The sections below contain the complete change list and fixes.
 - **New in `iclforge::ac3::plan`:** `wav_mask_locations`, `wav_channel_mask`, `source_layout`,
   `channel_mask_of`, `layout_for_locations`, and a `route()` overload that takes the source's own
   locations. The two front ends share them, as they share every other layout rule there.
-
-**E-AC-3: a type 2 substream, read and written as the standard has it**
-
-- **`strmtyp` 2 (§E2.3.1.1, "previously coded in AC-3") is a whole stream type now, not a
-  half-parsed one.** Table E1.2 and E1.3 gate the programme-mixing group, the converter exponent
-  strategies and the converter SNR offset on `strmtyp == 0x0`; the decoder, the EMDF walker, the
-  scanner and the metadata editor read them for any substream that was not dependent, so a real
-  type 2 stream would have been decoded from the wrong bit offset (FFmpeg and the Python reference
-  parser read it as the table says). The encoder refused it, `scan` and the access unit
-  accumulator did not start an access unit at one, and `forge metadata` refused it by name. All
-  now treat it as the independent substream it is. `FrameConfig::ac3_frmsizecod` writes one
-  (held to AC-3's tools, no dependents, a Table 5.18 code) and `DecodedSubstream`,
-  `FrameHeader` and `forge probe` report the code it was converted from. The conversion to and
-  from AC-3 itself is not built: the standard gives the signalling and no process.
 
 **ADM / BW64**
 
