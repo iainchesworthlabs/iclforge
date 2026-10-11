@@ -951,6 +951,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
                 static_cast<std::size_t>(unit.layout.count));
             order = plan::wav_order(placed);
             std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
+            in_wav_order.reserve(order.size());
             for (const auto slot : order) {
                 in_wav_order.push_back(placed[slot]);
             }

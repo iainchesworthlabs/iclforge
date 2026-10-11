@@ -40,6 +40,7 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/encoder/silent_frame.hpp"
+#include "iclforge/ac3/io/object_strip.hpp"
 #include "iclforge/ac4/decoder/config.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/decoder/frame.hpp"
@@ -4626,9 +4627,11 @@ bool plan_from_locations(iclforge::ac3::plan::Plan& p, std::string& label,
         p.layout = *chosen->layout;
         p.custom_locations = std::nullopt;
         label = std::string(plan::layout(*chosen->layout).label);
-    } else {
+    } else if (chosen->custom_locations.has_value()) {
         p.custom_locations = chosen->custom_locations;
         label = plan::format_channels(*chosen->custom_locations);
+    } else {
+        return false;  // source_layout names a layout or the locations; this names neither
     }
     return true;
 }

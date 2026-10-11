@@ -1382,8 +1382,8 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
             fmt::println(stderr, "error: {} is 1+1 but carries no dialnorm2", in_path);
             return kExitInput;  // both bsi syntaxes always send it for 1+1
         }
-    } else if (!to_ac4 && own_coding_mode(loaded->scan, source_channels) &&
-               plan_from_locations(p, label, *own_coding_mode(loaded->scan, source_channels))) {
+    } else if (const auto own = to_ac4 ? std::nullopt : own_coding_mode(loaded->scan, source_channels);
+               own.has_value() && plan_from_locations(p, label, *own)) {
         // A stream that is exactly one Table 5.8 coding mode - 3/0, 2/1, 3/1 or
         // 2/2 among them - goes out in that mode. Following the channel COUNT
         // would put three channels on a 5.1 as L R C whatever they were, so a
