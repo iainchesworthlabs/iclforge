@@ -10,8 +10,8 @@
     | Step | What | State |
     |---|---|---|
     | 0 | This page: scope, order, decisions | Drafted 2026-10-11, for sign-off |
-    | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1's cause is found and reproduced; W2 and W3 follow |
-    | 2 | Research W4 and W5 (lyrics for a network group; Android and a browser page) | Read from the code; written up beside this page |
+    | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1 fixed in PR #1290; W2 and W3 follow |
+    | 2 | Research W4 and W5 (lyrics for a network group; Android and a browser page) | Read from the code; written up in [the findings](karaoke-phase2-findings.md) |
     | 3 | Builds W6 to W11, one pull request each | After sign-off |
     | 4 | W12, the ESP32-P4 with a panel | **Parked** until the board arrives; only its questions are kept |
 
@@ -50,11 +50,11 @@ tests, **L** is two to four stacked PRs. "Needs" is what the item cannot start w
 
 | ID | Item | Size | Needs | State |
 |---|---|---|---|---|
-| W1 | **The last frame.** The Forge GUI and `forge encode` write a different last frame for a source that is not whole AC-3 frames; fix the side that is wrong | S | Nothing | Reproduced on a stereo WAV with no karaoke in it; cause found ([below](#w1-the-last-frame)); the GUI is the side that is wrong |
+| W1 | **The last frame.** The Forge GUI and `forge encode` write a different last frame for a source that is not whole AC-3 frames; fix the side that is wrong | S | Nothing | **Fixed, PR #1290**: the GUI was the side that is wrong ([below](#w1-the-last-frame)) |
 | W2 | **Flow polish.** The header and rail say "5.0"; 192 kbps where the sheet showed 384; the mode card below the fold at 900 px; the Hear preview a run; Expert edits overwritten when a part changes; no `.lrc` beside a saved stream | M | Catalogue regeneration | Items read from `KaraokeFlow.qml`, `Main.qml` and `encoder_controller.cpp` ([below](#w2-flow-polish)) |
-| W3 | **Word timing, as a design.** Which of a tap editor, an estimate and an alignment, and where it lives | S | The owner's choice of shape | Evaluated in the findings; recommendation [below](#w3-word-timing) |
-| W4 | **Findings: lyrics for a network group.** Which position the lyric clock follows for a group, how a sink with a screen would get the line and the word, and how the choice reaches a sink that decodes for itself | S | Nothing | Read from `NetworkGroupSink`, `choose_sink_form` and the Sendspin roles; written up beside this page |
-| W5 | **Findings: Android and a browser page.** What the C API, the bindings and WebAssembly lack, and the smallest first slice | S | Nothing | Read from `libs/capi`, `bindings/*`, `apps/demos/*`; written up beside this page |
+| W3 | **Word timing, as a design.** Which of a tap editor, an estimate and an alignment, and where it lives | S | The owner's choice of shape | Evaluated in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes); recommendation [below](#w3-word-timing) |
+| W4 | **Findings: lyrics for a network group.** Which position the lyric clock follows for a group, how a sink with a screen would get the line and the word, and how the choice reaches a sink that decodes for itself | S | Nothing | Read from `NetworkGroupSink`, `choose_sink_form` and the Sendspin roles: [the findings](karaoke-phase2-findings.md#w4-lyrics-for-a-network-group) |
+| W5 | **Findings: Android and a browser page.** What the C API, the bindings and WebAssembly lack, and the smallest first slice | S | Nothing | Read from `libs/capi`, `bindings/*`, `apps/demos/*`: [the findings](karaoke-phase2-findings.md#w5-android-and-a-browser-page) |
 | W6 | **Word timing, built** (shape per W3) | L | W3 decided | After sign-off |
 | W7 | **The choice reaches a network sink** (the smallest slice W4 finds) | S to M | W4 accepted | After sign-off |
 | W8 | **Karaoke in the browser decode demo** (the smallest slice W5 finds) | S to M | W5 accepted | After sign-off |
@@ -91,21 +91,36 @@ file, and `forge encode` of the WAV with its last sample appended 768 times is b
 `forge`'s own. The library's `FrameEncoder` pads nothing: it takes 1,536 samples, and the caller
 decides what the tail is.
 
-**Which side is wrong.** The GUI. The command line's padding is a measured fix (commit
-`e89f5f6c7`, August 2026): a hard drop to silence at the end of a file is itself a transient the
-encoder's §8.2.2 detector spends a block switch on, which starved the last frame's mantissa
-budget and put every channel's last-frame SNR at 23 to 28 dB on the 5.1 reference file, against
-67 to 88 dB with the last sample held. The GUI zero-pads, so it has the defect that fix removed,
-for any file that ends mid-frame on a sample that is not zero. It is not karaoke's, and it
-applies to AC-3 and E-AC-3 and to the Atmos object encode alike.
+**Which side is wrong.** The GUI. The command line's padding was a deliberate, measured fix
+(commit `e89f5f6c7`, August 2026): a hard drop to silence at the end of a file is itself a
+transient the encoder's §8.2.2 detector spends a block switch on, which starved the last frame's
+mantissa budget (that commit measured 23 to 28 dB a channel zero-padded against 67 to 88 dB held
+on the 5.1 reference file). The GUI has no such reasoning for its zeros, and it is not karaoke's:
+it applies to AC-3 and E-AC-3 and to the Atmos object encode alike.
 
-**The fix.** One function for "what a source supplies at sample `n`" (silence before its offset,
-its own samples, then its last sample held), in `apps/shared/media` so that `forge`, which already
-compiles that library, and the GUI cannot drift again; the GUI's four loops and `gather_frame`
-call it. A test holds the function to the three cases and to an empty source, and a GUI suite
-compares the window's bytes with `forge`'s for a source that is not whole frames, which is the
-case the suites avoided. One decision for the owner ([D1](#decisions-for-the-owner)): the GUI's
-files for such sources change by their last frame.
+**What it is worth, measured here** (source against decode over the last 1,536 real samples, the
+decoder's 256-sample delay removed), because the commit's figures are one file's:
+
+| Source | Zero-padded | Held |
+|---|---|---|
+| 5.1 reference file (78.125 frames), L / R / C / LFE / Ls / Rs, dB | 41.7 / 43.9 / 50.0 / 32.9 / 21.1 / 22.3 | 45.5 / 52.1 / 50.1 / 49.3 / 21.2 / 22.3 |
+| Two-tone stereo, 2.0 s, L / R, dB | 72.4 / 68.2 | 71.4 / 66.5 |
+
+Holding is never lower on the multichannel music file and up to 16 dB higher (the LFE); on a
+pure-tone stereo file the two are within 2 dB, the zero-padded one slightly higher. So the case is
+one policy for both programs, with a measured reason, and a real gain on the material it was found
+on: not a claim that every file improves.
+
+**The fix, built as PR #1290.** One function for "what a source supplies at sample `n`" (silence
+before its offset, its own samples, then its last sample held), `fill_source_frame()` in
+`apps/shared/media`, which `forge` and the GUI both compile. The GUI's four loops and `forge`'s four
+whole-file copies call it, so they cannot drift again; `forge`'s streaming read paths are
+untouched, and eight `forge` encodes (single, offset, multi-source, E-AC-3) are byte-identical to
+the build before. The tests that hold it, and why the earlier suites missed it:
+`test_source_frame.cpp` holds the function to its cases and fails with a zero hold; the karaoke flow
+suite compares the window's bytes with `forge`'s for 2.0 s parts and fails with the GUI's encode
+loop put back to zeros, while its 1.024 s parts pass either way. One decision for the owner
+([D1](#decisions-for-the-owner)): the GUI's files for such sources change by their last frame.
 
 ### W2: flow polish
 
@@ -170,7 +185,7 @@ The answer assumed is the one the plan is written to; each can be reversed befor
 
 | # | Decision | Assumed | Alternatives |
 |---|---|---|---|
-| D1 | The GUI pads a short last frame as `forge` does (holds the last sample), so the GUI's files for such a source change by their last frame | **Yes**: it is the measured fix, and the GUI has the defect it removed | Leave the GUI alone and document the difference: two programs of one family write different bytes from one plan, with the worse quality in the window |
+| D1 | The GUI pads a short last frame as `forge` does (holds the last sample), so the GUI's files for such a source change by their last frame (PR #1290, built; it is a fix, asked because it changes bytes) | **Yes**: one policy for both, with a measured reason | Leave the GUI alone and document the difference: two programs of one family write different bytes from one plan, and the window's last frame is lower on some material |
 | D2 | Word timing's shape: a Hearth tap editor, lines then words, with an estimate as the starting point; the aligner as a recipe | **Yes** | The editor in the Forge GUI (needs the lyrics module in `apps/shared` first); an estimate with no editor; nothing |
 | D3 | How the choice reaches a sink: Hearth decodes a karaoke stream for a sink and sends PCM, so the group hears one reproduction | **Yes, as the first slice**; the sink-side keys stay an option for the P4 | The role's decoder settings carry `karaoke` and `karaoke_vocals` now, so a sink that decodes coded AC-3 applies them itself |
 | D4 | Browser first, then nothing for Android until there is a player to put it in | **Yes**: the WebAssembly decoder demo gets the two fields and a panel; lyrics after | Skip the browser; or an Android player as a phase of its own |
