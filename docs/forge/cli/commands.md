@@ -828,8 +828,8 @@ E-AC-3 stream it does the same with AC-4's (`output-level=`, `dialogue-enhanceme
 `md-compat=` and AC-4's `drcmode=` names). `associated=` and `associated-gain=` are read by
 both: an AC-4 stream's choose a presentation and its mix, an E-AC-3 stream's [mix a second
 programme into the first](metadata-options.md#programme-options-decode-qc-levels-programme). The options that
-promise what the other format cannot give stop the run: `bap-census=` and `verify-objects` for
-AC-4, and `channels=5.1` and `syntax-trace=` for AC-3 and E-AC-3.
+promise what the other format cannot give stop the run: `bap-census=`, `verify-objects` and
+`gate-objects` for AC-4, and `channels=5.1` and `syntax-trace=` for AC-3 and E-AC-3.
 
 ```text
 warning: stream.ac4 is AC-4: heavy is AC-3's and E-AC-3's, and ignored
@@ -1602,7 +1602,8 @@ and the access units played, active dynamic objects and underruns at the end.
 
 `spatial` builds its `iclforge::ac3::DecoderConfig` from the same options `decode` and `monitor` do, so the
 decode-side tokens above (`drc=`, `heavy`, `conceal=`, `fast-imdct=off`) reach it, and
-`verify-objects` checks each frame's object signature here as it does there. Two do not reach it:
+`verify-objects` checks each frame's object signature here as it does there, and `gate-objects`
+renders the objects of the frames that verify and the bed of the rest. Two do not reach it:
 `run_spatial` leaves `fast-mdct=off` and `joc-domain=` out of the config it builds, so the JOC
 reconstruction on this path always takes the defaults — the fast forward MDCT, in the QMF domain.
 

@@ -124,13 +124,13 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | Complexity index / addbsi marker (§8.3) | 🟢 | High | Essential | Probe, `dec3`, HLS `CHANNELS="…/JOC"` |
 | | Scene timeline (`ObjectScene`) | 🟢 | Medium | Important | Shared by CLI / GUI / live |
 | | Live OSC object positions | 🟢 | Low | Optional | Scheme-prefixed; OSC only today |
-| **Signing** | EMDF protection HMAC | 🟡 | High | Essential | Mechanism ships; no project key — unsigned streams fall back to 5.1 in Dolby decoders |
-| | Authenticity-tag detect / verify | 🟢 | High | Essential | Probe and `signing::verify_*` (single key) |
+| **Signing** | EMDF protection HMAC | 🟡🔵 | High | Essential | Mechanism ships; the project ships no key and will not — unsigned streams fall back to 5.1 in Dolby decoders. A key is the operator's own (a personal-use path), never in the repository: [Object signing](../concepts/object-signing.md) |
+| | Authenticity-tag detect / verify | 🟢 | High | Essential | Probe and `signing::verify_*`, one key or a keyring. A frame is valid only when its container is the whole of its object layer |
 | | Unchecked object decode (default) | 🟢 | High | Essential | Reconstruct without MAC check — FOSS-style |
-| | Multi-key verify (keyring) | 🔴 | Medium | Important | Roadmap Partial / Proposed — [Object signing](../concepts/object-signing.md#planned-decode-modes) |
-| | Licensed soft-gate (bed on fail) | 🔴 | Medium | Important | AVR-like: mismatch → bed-only; decode continues |
+| | Multi-key verify (keyring) | 🟢 | Medium | Important | `signing::verify_atmos_stream_any`, `verify-objects` with `signing-key=` repeated: a frame is valid under any key, with per-key counts — [Object signing](../concepts/object-signing.md#several-keys-the-keyring) |
+| | Licensed soft-gate (bed on fail) | 🟢 | Medium | Important | AVR-like: `signing::gate_atmos_stream`, `gate-objects` — mismatch or unsigned → bed only, decode continues; refuses an object layer it can neither verify nor remove |
 | **Tools** | Strip object layer (bitstream) | 🟢 | Medium | Important | Bit-identical bed; no re-encode |
-| | Object unlock in Dolby decoder | 🟡 | High | Essential | Spec-correct streams; proprietary key gate — see [Object signing](signing.md) |
+| | Object unlock in Dolby decoder | 🟡🔵 | High | Essential | Spec-correct streams; the proprietary key gate has no shipped key and will not — see [Object signing](signing.md) |
 
 ---
 

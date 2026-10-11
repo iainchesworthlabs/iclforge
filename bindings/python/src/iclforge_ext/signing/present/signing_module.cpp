@@ -1,5 +1,10 @@
 #include "optional_modules.hpp"
 
+#include <expected>
+#include <string>
+#include <vector>
+
+#include "iclforge/ac3/io/object_strip.hpp"
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 
@@ -99,6 +104,61 @@ void register_signing(py::module_& m) {
         },
         py::arg("stream"), py::arg("key"),
         "Verify every frame's tag against `key`. See VerifySummary.");
+
+    // --- Several keys, and the licensed gate ---------------------------------------------------
+    py::class_<iclforge::ac3::signing::KeyringSummary>(
+        signing, "KeyringSummary",
+        "verify_atmos_stream_any's result: `totals` is the VerifySummary (`valid` meaning valid "
+        "under some key), `per_key[i]` how many frames key i accepted - the first accepting key "
+        "wins, so the entries add up to totals.valid.")
+        .def_readonly("totals", &iclforge::ac3::signing::KeyringSummary::totals)
+        .def_readonly("per_key", &iclforge::ac3::signing::KeyringSummary::per_key);
+
+    signing.def(
+        "verify_atmos_stream_any",
+        [](const py::buffer& stream,
+           const std::vector<iclforge::base::crypto::SigningKey>& keys) {
+            const auto bytes = to_bytes(stream);
+            py::gil_scoped_release release;
+            return iclforge::ac3::signing::verify_atmos_stream_any(bytes, keys);
+        },
+        py::arg("stream"), py::arg("keys"),
+        "Verify every frame's tag against a list of keys: a frame is valid when ANY of them "
+        "reproduces its tag. An empty list, or one of empty keys, accepts nothing.");
+
+    py::class_<iclforge::ac3::signing::GateSummary>(
+        signing, "GateSummary",
+        "gate_atmos_stream's counts: `passed` frames kept their object layer, `gated` frames had "
+        "it removed (a container no key reproduced, unsigned included), `no_objects` had none to "
+        "gate; `per_key` credits the passed frames as KeyringSummary does.")
+        .def_readonly("passed", &iclforge::ac3::signing::GateSummary::passed)
+        .def_readonly("gated", &iclforge::ac3::signing::GateSummary::gated)
+        .def_readonly("no_objects", &iclforge::ac3::signing::GateSummary::no_objects)
+        .def_readonly("per_key", &iclforge::ac3::signing::GateSummary::per_key);
+
+    signing.def(
+        "gate_atmos_stream",
+        [](const py::buffer& stream,
+           const std::vector<iclforge::base::crypto::SigningKey>& keys) {
+            const auto bytes = to_bytes(stream);
+            std::expected<iclforge::ac3::signing::GatedStream, iclforge::ac3::io::StripError> result;
+            {
+                py::gil_scoped_release release;
+                result = iclforge::ac3::signing::gate_atmos_stream(bytes, keys);
+            }
+            if (!result) {
+                throw py::value_error(std::string{iclforge::ac3::io::describe(result.error())});
+            }
+            return py::make_tuple(
+                py::bytes(reinterpret_cast<const char*>(result->bytes.data()), result->bytes.size()),
+                result->summary);
+        },
+        py::arg("stream"), py::arg("keys"),
+        "The licensed decode policy: returns (stream, GateSummary) where every frame whose object "
+        "layer verifies under some key is kept as it was and every other one has its object layer "
+        "removed, so the result plays as objects where the tag was good and as the 5.1 bed "
+        "elsewhere. Raises ValueError for a stream it cannot walk, or one carrying an object "
+        "layer that can be neither verified nor removed - it fails closed.");
 }
 
 }  // namespace iclforge::python

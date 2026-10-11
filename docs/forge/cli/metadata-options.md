@@ -160,8 +160,15 @@ metadata options (any order, after the positional arguments):
   verify-objects    decode/monitor: check each frame's EMDF object signature against
                     signing-key= instead of just playing it - a mismatch refuses the command;
                     omitted (the default) decodes signed and unsigned streams alike, unchecked
-  signing-key=<path>  the key file sign-objects/verify-objects use (or
-                    ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY)
+  gate-objects      decode/monitor/spatial: the licensed policy - frames whose object
+                    signature verifies against signing-key= play as objects, any other
+                    (unsigned, another key's, altered) plays as its 5.1 bed and the decode
+                    carries on, where verify-objects would refuse. Not combinable with
+                    verify-objects
+  signing-key=<path>  the key file sign-objects/verify-objects/gate-objects use (or
+                    ICLFORGE_SIGNING_KEY_FILE / ICLFORGE_SIGNING_KEY). Repeat it to give
+                    verify-objects and gate-objects several keys - a frame is good under any
+                    of them; sign-objects takes one
   verify            eac3-encode: decode every access unit as it is encoded and diff the
                     decoder's model against the encoder's own, refusing the run at the first
                     disagreement - off by default, since it roughly doubles the work
@@ -997,8 +1004,8 @@ presentation the same way; the rest belong to the three that play or write the d
 
 `decode` also takes AC-4's objects out as `objects_dir` and `adm_out`. The options only AC-3 and
 E-AC-3 read (`drc=`, `heavy`, `ltrt-phase=`, `fast-imdct`, `mode=`, `programme=`, `bed-only`,
-`joc-domain=`) are named and ignored by `decode` for an AC-4 stream, and `bap-census=` and
-`verify-objects` refuse it; AC-4's own are named and ignored for AC-3 and E-AC-3, and
+`joc-domain=`) are named and ignored by `decode` for an AC-4 stream, and `bap-census=`,
+`verify-objects` and `gate-objects` refuse it; AC-4's own are named and ignored for AC-3 and E-AC-3, and
 `channels=5.1` and `syntax-trace=` refuse them.
 
 **Writing AC-4.** `ac4-encode` takes every key below; the other commands that write AC-4 take the

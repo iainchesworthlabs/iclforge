@@ -30,9 +30,12 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <span>
+#include <vector>
 
 #include "iclforge/ac3/export.hpp"
+#include "iclforge/ac3/io/object_strip.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
 
 namespace iclforge::ac3::signing {
@@ -107,5 +110,103 @@ verify_atmos_stream(std::span<const std::byte> stream, const base::crypto::Signi
 // bits instead of writing computed ones, and compares.
 [[nodiscard]] ICLFORGE_AC3_EXPORT VerifyResult
 verify_atmos_frame(std::span<const std::byte> frame, const base::crypto::SigningKey& key);
+
+// --- Several keys: the keyring ------------------------------------------------
+//
+// One operator rarely holds one key. A facility signs with a key per show, per
+// year or per customer, and a QC pass over a delivery has to accept a stream
+// signed by any of them - and, because signing is per frame, a stream that was
+// spliced from material signed by different ones. A keyring is nothing more
+// than that: an ordered set of keys, tried in turn, where a frame is valid when
+// ANY of them reproduces the tag it carries. It adds no authority: every key
+// in it is one the operator provisioned, exactly as for a single key, and a
+// tag none of them reproduces is a mismatch exactly as before.
+//
+// The functions are named apart from the single-key ones above rather than
+// overloaded on a span of keys, deliberately: `verify_atmos_frame(frame, {})`
+// would be ambiguous between a default key and an empty span, which is a
+// compile error in a caller that wrote neither.
+//
+// An empty key (SigningKey{}) in the set is skipped - it can authenticate
+// nothing - and a set with no usable key accepts nothing: every frame that
+// carries a container is a mismatch, never a pass.
+
+struct KeyringVerdict {
+    VerifyResult result = VerifyResult::kNoContainer;
+    // Which key of the set accepted the frame - the first, in order, that
+    // reproduced its tag. Meaningful only when `result` is kValid.
+    std::size_t key_index = 0;
+};
+
+// One syncframe against every key in `keys`. kNoContainer when the frame has
+// nothing to check (whatever the keys), kValid with the accepting key's index,
+// kMismatch when it has a container and none of the keys reproduces its tag.
+[[nodiscard]] ICLFORGE_AC3_EXPORT KeyringVerdict
+verify_atmos_frame_any(std::span<const std::byte> frame,
+                       std::span<const base::crypto::SigningKey> keys);
+
+struct KeyringSummary {
+    // The same three counts verify_atmos_stream gives, with `valid` meaning
+    // "valid under some key of the set".
+    VerifySummary totals;
+    // per_key[i] is how many frames key i accepted - first accepting key
+    // wins, so the entries add up to totals.valid. Sized to the key set (an
+    // empty key's entry stays 0).
+    std::vector<int> per_key;
+};
+
+[[nodiscard]] ICLFORGE_AC3_EXPORT KeyringSummary
+verify_atmos_stream_any(std::span<const std::byte> stream,
+                        std::span<const base::crypto::SigningKey> keys);
+
+// --- The licensed decode policy: objects only where the tag is good -----------
+//
+// What a licensed AVR does: a stream whose object layer authenticates is
+// reconstructed as objects, and one that does not - signed with another key,
+// unsigned, or altered after signing - is not refused but played as its 5.1
+// bed, the decode carrying on. verify_atmos_stream's policy is the other one
+// (a mismatch fails the whole job); this is the permissive half of the pair.
+//
+// It is built from what already exists, not from a second path into the
+// decoder: a frame that does not verify has its object layer REMOVED, by
+// iclforge::ac3::io::strip_objects's own per-frame rewrite, and the result is
+// an ordinary stream any decoder - this project's or anyone's - plays as the
+// bed, bit-identically (that tool's guarantee). A frame that does verify is
+// copied through byte for byte. So the gate is a pure function of (stream,
+// keys), testable without a decoder, and Eac3Decoder still never learns that
+// signing exists.
+//
+// The decision is per syncframe, like the tag. A stream with a good first half
+// and an unsigned second half therefore plays as objects and then as its bed;
+// the reconstruction state simply finds no object layer from there on.
+//
+// FAIL CLOSED. A frame that carries an object layer this build can neither
+// verify nor remove - an object-bearing shape outside the walker's scope
+// (emdf/frame_layout.hpp) - is an error, not a pass: handing it on would play
+// objects nothing authenticated. The error is strip_objects's own
+// (kUnsupportedFrame, kFrameSizeDependentField), and so are the framing ones
+// (kEmpty, kLostSync, kTruncated). A stream with no object layer in it at all
+// is not an error; it comes back byte-identical with every frame counted
+// under `no_objects`. An AC-3 syncframe cannot carry one, and passes as is.
+struct GateSummary {
+    // Frames whose object container verified under some key: kept as they were.
+    int passed = 0;
+    // Frames whose object layer was removed: a container no key reproduced
+    // (unsigned frames included), or an object marker with no readable
+    // container to verify.
+    int gated = 0;
+    // Frames with no object layer to gate: plain E-AC-3, a bed51 stream, AC-3.
+    int no_objects = 0;
+    // As KeyringSummary::per_key, over the `passed` frames.
+    std::vector<int> per_key;
+};
+
+struct GatedStream {
+    std::vector<std::byte> bytes;
+    GateSummary summary;
+};
+
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::expected<GatedStream, io::StripError> gate_atmos_stream(
+    std::span<const std::byte> stream, std::span<const base::crypto::SigningKey> keys);
 
 }  // namespace iclforge::ac3::signing

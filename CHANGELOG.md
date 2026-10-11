@@ -29,6 +29,22 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Atmos object signing: several keys, and the licensed gate**
+
+- **`verify-objects` takes a keyring.** `signing-key=` repeats, and a frame is valid when any of the
+  keys reproduces its tag; the summary says which key accepted how many frames. The library gains
+  `signing::verify_atmos_frame_any` and `verify_atmos_stream_any` (a `KeyringVerdict` and a
+  `KeyringSummary` with `per_key` counts) and Python `signing.verify_atmos_stream_any`. An empty
+  set accepts nothing; with paths given the environment key is not consulted. `sign-objects` stays
+  single-key and refuses a second `signing-key=`.
+- **`gate-objects` is the AVR-like policy.** `decode`, `monitor` and `spatial` play the objects of
+  every frame whose tag verifies and the 5.1 bed of every other (unsigned, another key's, altered),
+  and carry on, where `verify-objects` refuses. `signing::gate_atmos_stream` (Python
+  `signing.gate_atmos_stream`) removes the object layer from the frames that do not verify with the
+  same lossless rewrite `strip_objects` does, so the bed is bit-identical and the result plays in
+  any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
+  combined with `verify-objects`, and is a usage error on AC-4.
+
 **E-AC-3: an associated service mixed into the main**
 
 - **`iclforge::ac3::AssociatedServiceMixer` and `forge decode associated=`.** A description or a
@@ -2779,6 +2795,16 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**Object signing**
+
+- **A signed frame could carry unauthenticated object data and still verify.** The tag hashes the
+  container and the audio, and every skip field is excised from the message, so a second payload in
+  another block's skip field, or bytes trailing the container in its own, were outside it.
+  `verify_atmos_frame` now reports such a frame as a mismatch, and likewise a container that
+  declares no primary protection field (`protection_length_primary` `00`, reserved), for which
+  comparing zero bits used to read as a match. `sign_atmos_frame` no longer reports having signed
+  one. The docs' claim that the tag does not cover the audio was wrong and is corrected.
 
 **E-AC-3: a type 2 substream, read and written as the standard has it**
 
