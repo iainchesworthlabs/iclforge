@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <chrono>
 #include <cmath>
@@ -19,12 +20,16 @@
 #include <vector>
 
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
+#include "iclforge/ac3/encoder/encoder.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
+#include "iclforge/render/routing.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/sendspin/noise.hpp"
 #include "engine_thread.hpp"
 #include "network_group_sink.hpp"
 #include "network_sinks.hpp"
 #include "settings_model.hpp"
+#include "stream_decoder.hpp"
 
 // Last: on Windows it brings windows.h, whose macros would break the headers above.
 #include <httplib.h>
@@ -373,4 +378,306 @@ TEST_CASE("network sinks live: the sinks on this network are found, paired, play
             });
         },
         30s));
+}
+
+// ---- a karaoke stream on a board that decodes it ------------------------------------------------
+//
+// planning/karaoke-phase2.md, W7: a board that lists the karaoke keys is sent the stream as it is,
+// told how to reproduce it, and lays its speakers out from the reproduction. This is that against a
+// real board, hidden (it needs the board): it pairs the one sink named, sets it to a 3.0 layout (so
+// that the reproduced frame is not a fold, and the layout comes from ac3::output_mode()), plays a
+// 3/2 karaoke programme to it as the engine would, once per reproduction, and compares what the
+// board reports at its outputs with the same programme decoded here.
+//
+//   ICLFORGE_HEARTH_LIVE_KARAOKE_SINK  the board's mDNS instance name (hearth-eb2c64); the case is
+//                                      skipped without it
+//   ICLFORGE_HEARTH_LIVE_SECONDS       how long each play runs (default 10)
+
+namespace {
+
+// `frames` AC-3 syncframes of a karaoke 3/2+LFE stream with a tone in each channel, each its own
+// pitch and level.
+std::vector<std::vector<std::byte>> karaoke_units(int frames) {
+    iclforge::ac3::EncoderConfig config;
+    config.sample_rate = iclforge::ac3::SampleRate::k48000;
+    config.bitrate_kbps = 448;
+    config.acmod = iclforge::ac3::Acmod::k3_2;
+    config.lfe = true;
+    config.info.bsmod = iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke;
+    iclforge::ac3::FrameEncoder encoder{config};
+    // Coded order: L, C, R, Ls, Rs, then the LFE.
+    constexpr std::array<double, 6> kHz = {440.0, 800.0, 620.0, 1030.0, 1270.0, 90.0};
+    constexpr std::array<double, 6> kLevel = {0.20, 0.10, 0.20, 0.25, 0.15, 0.10};
+    std::vector<std::vector<std::byte>> units;
+    for (int f = 0; f < frames; ++f) {
+        std::vector<std::vector<float>> by_channel;
+        for (int channel = 0; channel < encoder.channel_count(); ++channel) {
+            std::vector<float> samples(iclforge::ac3::kSamplesPerFrame);
+            for (std::size_t n = 0; n < samples.size(); ++n) {
+                const double t = static_cast<double>(n + (static_cast<std::size_t>(f) * 1536)) / 48000.0;
+                samples[n] = static_cast<float>(
+                    kLevel[static_cast<std::size_t>(channel)] *
+                    std::sin(2.0 * std::numbers::pi * kHz[static_cast<std::size_t>(channel)] * t));
+            }
+            by_channel.push_back(std::move(samples));
+        }
+        const std::vector<std::span<const float>> views(by_channel.begin(), by_channel.end());
+        const auto frame = encoder.encode_frame(views);
+        REQUIRE(frame.has_value());
+        units.push_back(*frame);
+    }
+    return units;
+}
+
+[[nodiscard]] double to_db(double mean_square) {
+    return mean_square > 1e-12 ? 10.0 * std::log10(mean_square) : -120.0;
+}
+
+// The median of what a board reported for one output, windows of silence apart.
+[[nodiscard]] double median_db(std::vector<double> reported) {
+    reported.erase(std::remove_if(reported.begin(), reported.end(), [](double db) { return db < -100.0; }),
+                   reported.end());
+    if (reported.empty()) {
+        return -120.0;
+    }
+    std::sort(reported.begin(), reported.end());
+    return reported[reported.size() / 2];
+}
+
+}  // namespace
+
+TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that decodes it",
+          "[.][hearth-network-live]") {
+    const std::optional<std::string> named = environment("ICLFORGE_HEARTH_LIVE_KARAOKE_SINK");
+    if (!named) {
+        SKIP("ICLFORGE_HEARTH_LIVE_KARAOKE_SINK names no sink");
+    }
+    const std::string id = *named;
+    const int seconds = environment("ICLFORGE_HEARTH_LIVE_SECONDS")
+                            ? std::atoi(environment("ICLFORGE_HEARTH_LIVE_SECONDS")->c_str())
+                            : 10;
+    REQUIRE(seconds > 0);
+
+    iclforge::hearth::MemorySettingsStore settings;
+    iclforge::hearth::PairingStore store{settings, [] { return std::string("live"); }};
+    const auto identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    iclforge::hearth::NetworkSinks sinks{*identity, "Hearth live test", store, {.request_firewall_exception = false}};
+    REQUIRE(sinks.started());
+
+    REQUIRE(drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const iclforge::hearth::SinkFacts* facts = row(status, id);
+            return facts != nullptr && !facts->roles.empty();
+        },
+        60s));
+
+    // Paired by the code the board shows on its own page, and withdrawn however the case ends.
+    Unpair unpair(sinks);
+    {
+        const iclforge::hearth::NetworkStatus listed = sinks.status();
+        const iclforge::hearth::SinkFacts* const found = row(listed, id);
+        REQUIRE(found != nullptr);
+        const std::string address = found->address;
+        const std::optional<std::string> before = board_status(address);
+        const std::string stale = before ? sendspin_field(*before, "pairing_code").value_or("") : "";
+        sinks.select_sink(id);
+        sinks.pair_sink(id);
+        std::optional<std::string> code;
+        REQUIRE(drive(
+            sinks,
+            [&](const iclforge::hearth::NetworkStatus& status) {
+                const iclforge::hearth::SinkFacts* facts = row(status, id);
+                if (facts == nullptr || !facts->wants_code) {
+                    return false;
+                }
+                if (const std::optional<std::string> text = board_status(address)) {
+                    code = sendspin_field(*text, "pairing_code");
+                }
+                return code.has_value() && code->size() == 6 && *code != stale;
+            },
+            45s));
+        sinks.submit_pairing_code(id, *code);
+        unpair.paired(id);
+        REQUIRE(drive(
+            sinks,
+            [&](const iclforge::hearth::NetworkStatus& status) {
+                const iclforge::hearth::SinkFacts* facts = row(status, id);
+                return facts != nullptr && facts->pair_state == iclforge::hearth::PairState::kPaired &&
+                       facts->link == iclforge::hearth::SinkLink::kConnected &&
+                       facts->iclforge_support.has_value() && facts->clock_converged;
+            },
+            45s));
+    }
+
+    // The board says it takes the keys, and has the settings command.
+    const iclforge::hearth::SinkFacts support_facts = *row(sinks.status(), id);
+    REQUIRE(support_facts.iclforge_support.has_value());
+    const auto& takes = support_facts.iclforge_support->decoder_settings;
+    REQUIRE(std::find(takes.begin(), takes.end(), "karaoke") != takes.end());
+    REQUIRE(std::find(takes.begin(), takes.end(), "karaoke_vocals") != takes.end());
+    const std::size_t outputs = static_cast<std::size_t>(support_facts.iclforge_support->outputs.count);
+    REQUIRE(outputs >= 3);
+
+    // A 3.0 layout, so that the board does not fold and lays out from the reproduction.
+    const auto layout = iclforge::render::OutputLayout::parse("3.0");
+    REQUIRE(layout.has_value());
+    ss::player::Settings base;
+    base.layout = "3.0";
+    if (support_facts.iclforge_support->management.routing) {
+        std::array<char, iclforge::render::Routing::kTextBytes> text{};
+        const auto identity_routing = iclforge::render::Routing::identity(layout->slots(), outputs);
+        REQUIRE(identity_routing.has_value());
+        REQUIRE(identity_routing->format(text) > 0);
+        base.routing = std::string(text.data());
+    }
+    base.trim_db = std::vector<double>(outputs, 0.0);
+    base.delay_ms = std::vector<double>(outputs, 0.0);
+    base.crossover_hz = 80.0;
+    REQUIRE(sinks.push_sink_settings(id, base));
+
+    const std::string group_id = sinks.create_group("Live karaoke");
+    REQUIRE_FALSE(group_id.empty());
+    sinks.add_group_member(group_id, id);
+
+    const int frames = seconds * 48000 / 1536;
+    const std::vector<std::vector<std::byte>> units = karaoke_units(frames);
+    std::vector<std::byte> programme;
+    for (const auto& unit : units) {
+        programme.insert(programme.end(), unit.begin(), unit.end());
+    }
+    const iclforge::hearth::ItemLoader loader =
+        [&programme](const std::string& path) -> std::expected<iclforge::hearth::LoadedItem, std::string> {
+        if (path != "programme") {
+            return std::unexpected("no such item: " + path);
+        }
+        return iclforge::hearth::LoadedItem{.bytes = programme};
+    };
+    iclforge::hearth::NetworkSinks* const planner = &sinks;
+    iclforge::hearth::EngineOutputs outputs_for_engine{
+        .group = iclforge::hearth::make_group_sink(
+            [planner](const std::string& group) { return planner->group(group); },
+            [planner](const iclforge::hearth::GroupPlanRequest& request) { return planner->plan_group(request); },
+            [planner](const std::string& group, const iclforge::hearth::KaraokeChoice& choice) {
+                planner->apply_karaoke(group, choice);
+            })};
+    iclforge::hearth::Engine engine(std::move(outputs_for_engine), loader, *layout,
+                                    iclforge::hearth::DecoderSettings{}, iclforge::hearth::EngineTiming{});
+    engine.set_output_preferences(
+        iclforge::hearth::OutputPreferences{.pinned = iclforge::hearth::OutputMode::kNetworkGroup,
+                                            .follow_sink = true,
+                                            .group_name = group_id,
+                                            .group_ready = true});
+
+    struct Case {
+        const char* name;
+        iclforge::ac3::KaraokeReproduction reproduction;
+        iclforge::ac3::KaraokeVocals vocals;
+    };
+    const std::array<Case, 4> cases{{
+        {"as coded", iclforge::ac3::KaraokeReproduction::kOff, iclforge::ac3::KaraokeVocals::kBoth},
+        {"aware", iclforge::ac3::KaraokeReproduction::kAware, iclforge::ac3::KaraokeVocals::kBoth},
+        {"capable, vocal 1", iclforge::ac3::KaraokeReproduction::kCapable, iclforge::ac3::KaraokeVocals::kV1},
+        {"capable, no vocals", iclforge::ac3::KaraokeReproduction::kCapable, iclforge::ac3::KaraokeVocals::kNone},
+    }};
+
+    // The host's own decode of the programme, as the same settings would have it, at each slot.
+    const auto host_db = [&](const Case& c) {
+        iclforge::hearth::DecoderSettings reference_settings;
+        reference_settings.karaoke = c.reproduction;
+        reference_settings.karaoke_vocals = c.vocals;
+        iclforge::hearth::StreamDecoder reference{*layout, 48000, reference_settings};
+        std::vector<double> sum(layout->slots(), 0.0);
+        std::size_t count = 0;
+        const auto deliver = [&](std::span<const std::span<const float>> slots, std::size_t n) {
+            for (std::size_t slot = 0; slot < slots.size() && slot < sum.size(); ++slot) {
+                for (std::size_t k = 0; k < n; ++k) {
+                    sum[slot] += static_cast<double>(slots[slot][k]) * static_cast<double>(slots[slot][k]);
+                }
+            }
+            count += n;
+        };
+        for (const auto& unit : units) {
+            REQUIRE(reference.decode(unit, deliver).has_value());
+        }
+        reference.finish(deliver);
+        std::vector<double> db;
+        for (const double s : sum) {
+            db.push_back(to_db(count > 0 ? s / static_cast<double>(count) : 0.0));
+        }
+        return db;
+    };
+
+    std::vector<std::vector<double>> board_results;
+    std::size_t plays = 0;
+    for (const Case& c : cases) {
+        iclforge::hearth::DecoderSettings wanted;
+        wanted.karaoke = c.reproduction;
+        wanted.karaoke_vocals = c.vocals;
+        engine.set_decoder_settings(wanted);
+        engine.add({iclforge::hearth::QueueItem{.path = "programme", .title = "Live karaoke"}});
+        ++plays;
+        // The queue holds the earlier plays too: play this one, the last added.
+        engine.play_item(plays - 1);
+        std::printf("playing %d s, %s\n", seconds, c.name);
+
+        std::vector<std::vector<double>> reported(outputs);
+        std::vector<ss::player::Level> last;
+        REQUIRE(drive(
+            sinks,
+            [&](const iclforge::hearth::NetworkStatus& status) {
+                if (const iclforge::hearth::SinkFacts* facts = row(status, id);
+                    facts != nullptr && facts->iclforge_state && facts->iclforge_state->levels) {
+                    const std::vector<ss::player::Level>& levels = *facts->iclforge_state->levels;
+                    const bool changed =
+                        levels.size() != last.size() ||
+                        !std::equal(levels.begin(), levels.end(), last.begin(),
+                                    [](const ss::player::Level& a, const ss::player::Level& b) {
+                                        return a.rms_db == b.rms_db && a.peak_db == b.peak_db;
+                                    });
+                    if (changed) {
+                        last = levels;
+                        for (const ss::player::Level& level : levels) {
+                            if (level.output >= 0 && static_cast<std::size_t>(level.output) < outputs) {
+                                reported[static_cast<std::size_t>(level.output)].push_back(level.rms_db);
+                            }
+                        }
+                    }
+                }
+                const iclforge::hearth::EngineStatus status_now = engine.status();
+                return status_now.state == iclforge::hearth::TransportState::kStopped &&
+                       status_now.history.size() >= plays;
+            },
+            std::chrono::seconds(seconds + 60)));
+        std::vector<double> board;
+        for (std::size_t o = 0; o < layout->slots(); ++o) {
+            board.push_back(median_db(reported[o]));
+        }
+        const std::vector<double> host = host_db(c);
+        std::printf("  %-20s", c.name);
+        for (std::size_t slot = 0; slot < layout->slots(); ++slot) {
+            std::printf("  slot %zu: board %7.2f dB  host %7.2f dB", slot, board[slot], host[slot]);
+        }
+        std::printf("\n");
+        std::fflush(stdout);
+        for (std::size_t slot = 0; slot < layout->slots(); ++slot) {
+            // A slot with something in it is where the board says the same, to a level meter's
+            // window and a float's rounding; one with nothing in it stays silent.
+            if (host[slot] > -80.0) {
+                CHECK(std::abs(board[slot] - host[slot]) < 1.5);
+            } else {
+                CHECK(board[slot] < -80.0);
+            }
+        }
+        board_results.push_back(board);
+    }
+
+    // Reproducing it made a difference the board's outputs show.
+    REQUIRE(board_results.size() == cases.size());
+    double moved = 0.0;
+    for (std::size_t slot = 0; slot < layout->slots(); ++slot) {
+        moved = std::max(moved, std::abs(board_results[0][slot] - board_results[1][slot]));
+    }
+    CHECK(moved > 1.0);
 }
