@@ -323,9 +323,8 @@ this register is the checklist that those bounds appear here too.
 |---|---|---|
 | Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | Named-layout / CLI encode coverage | 🟡 |
 | Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams: the stream type is supported; the conversion to and from AC-3 is not built | 🟡🔵 |
-| Annex E §E2.3.1.2 I0–I7 | Associated-service labelling; receiver mixer | 🟡 / 🔴 |
-| Annex E §E3.5 / §3.7 | In `auto`; external oracle; TPN EOF hold-back | 🟢 tools / 🟡 policy |
-| Annex E `fscod2` | External PCM oracle | 🟢 code / validation gap |
+| Annex E §E3.5 / §3.7 | Enhanced coupling stays out of `auto` because FFmpeg cannot read it, and no outside decoder reads it to check against; transient pre-noise stays out of `auto` on measured loss and holds 1536 samples back, so a decoder calls `flush()` at end of stream | 🟡🔵 |
+| Annex E `fscod2` | The half rates (24, 22.05, 16 kHz) encode and decode, and no outside decoder reads their audio (FFmpeg reads the header only), so they are checked against this project's own encoder and the spec's tables | 🟡🔵 |
 | Annex H §H.2.2 | Reserved EMDF variants | 🔴 |
 
 ### ETSI TS 103 420 (Atmos / JOC / OAMD)
