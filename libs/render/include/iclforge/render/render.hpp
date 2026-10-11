@@ -117,11 +117,31 @@ class LayoutRenderer {
         : layout_(layout), sample_rate_hz_(sample_rate_hz), crossover_hz_(crossover_hz) {
         int lfe_slot = -1;
         int any_lfe_slot = -1;
+        // Table A.7's note 2: a surround pair is Back in a 5.X layout or
+        // smaller and Side in a larger one, so the zones of a speaker depend
+        // on the room it is in - settled once, here, for the objects'
+        // zone constraints (set_objects).
+        bool wide_layout = false;
+        for (std::size_t slot = 0; slot < layout_.slots(); ++slot) {
+            const Speaker& speaker = layout_.slot(slot);
+            if (speaker.kind == Speaker::Kind::kSpeaker && speaker.location.has_value()) {
+                const Location where = *speaker.location;
+                wide_layout = wide_layout || where == Location::kLrs || where == Location::kRrs ||
+                              where == Location::kLsd || where == Location::kRsd ||
+                              where == Location::kLw || where == Location::kRw;
+            }
+        }
         for (std::size_t slot = 0; slot < layout_.slots(); ++slot) {
             const Speaker& speaker = layout_.slot(slot);
             if (speaker.kind == Speaker::Kind::kSpeaker) {
                 target_directions_[targets_] = speaker.direction;
                 target_slots_[targets_] = slot;
+                target_zones_[targets_] =
+                    static_cast<std::uint8_t>(speaker.location.has_value()
+                                                  ? iclforge::spatial::speaker_zones(
+                                                        *speaker.location, wide_layout)
+                                                  : iclforge::spatial::direction_zones(
+                                                        speaker.direction));
                 ++targets_;
                 if (speaker.small) {
                     small_slots_.push_back(slot);
@@ -276,11 +296,7 @@ class LayoutRenderer {
             if (!objects[i].active || targets_ == 0) {
                 continue;
             }
-            const auto direction = iclforge::spatial::position_direction(
-                objects[i].position.x, objects[i].position.y, objects[i].position.z);
-            iclforge::spatial::pan_direction(
-                direction, std::span<const iclforge::spatial::Direction>(target_directions_.data(), targets_),
-                std::span<double>(gains.data(), targets_));
+            pan_object(objects[i], std::span<double>(gains.data(), targets_));
             const double linear = std::pow(10.0, objects[i].gain_db / 20.0);
             for (std::size_t t = 0; t < targets_; ++t) {
                 // Double until here, float from here: the probe's arithmetic.
@@ -481,6 +497,32 @@ class LayoutRenderer {
     }
 
    private:
+    // The unit-power gains of one object over the layout's speakers
+    // (`gains` is sized to targets_ and overwritten, sum of squares 1).
+    //
+    // An object that says nothing about HOW it may be rendered - a point, no
+    // lock, no zone, elevation allowed - is pan_direction of its direction
+    // over every speaker, exactly what set_objects did before it knew of the
+    // rest. The rest is spatial::pan_constrained: channel lock, zone
+    // constraints and extent (§5.2.5, §5.2.6, §5.2.2), which §4.3 leaves to
+    // the renderer but whose meaning §5.2 fixes. Object divergence (§5.2.7) is
+    // not applied: the standard gives the amount and nothing about where the
+    // two objects it makes should be.
+    void pan_object(const iclforge::objects::oba::DisplayObject& object,
+                    std::span<double> gains) const {
+        const iclforge::spatial::ObjectConstraints constraints{
+            .zone_constraints_idx = static_cast<int>(object.zone),
+            .enable_elevation = object.enable_elevation,
+            .snap = object.snap,
+            .width = object.size.width,
+            .depth = object.size.depth,
+            .height = object.size.height};
+        iclforge::spatial::pan_constrained(
+            object.position.x, object.position.y, object.position.z, constraints,
+            std::span<const iclforge::spatial::Direction>(target_directions_.data(), targets_),
+            std::span<const std::uint8_t>(target_zones_.data(), targets_), gains);
+    }
+
     // Every small slot's filter pair at the current corner: a matched
     // high-pass and low-pass, same frequency and Q, as the header comment
     // says. Their state is left alone.
@@ -633,6 +675,9 @@ class LayoutRenderer {
     double crossover_hz_ = kDefaultCrossoverHz;
     std::array<iclforge::spatial::Direction, kMaxSlots> target_directions_{};
     std::array<std::size_t, kMaxSlots> target_slots_{};
+    // Per target, for an object's zone constraints: the zone_bit:: mask of
+    // the speaker (the centre speaker carries zone_bit::kCentre).
+    std::array<std::uint8_t, kMaxSlots> target_zones_{};
     std::size_t targets_ = 0;
     iclforge::base::Layout coded_{};
     std::size_t bed_channels_ = 0;

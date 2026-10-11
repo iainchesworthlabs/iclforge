@@ -597,7 +597,14 @@ and ramp duration; object size, zone constraints, elevation gating, snap, screen
 distance, explicit priority and Table 18's gain-reuse; positions coded differentially against
 the previous block; inactive objects; several bed instances, standard or non-standard;
 programmes carrying an intermediate spatial format; the `trim_element` and the
-`extended_object_element`. An `oa_element` with an id this decoder does not know is skipped by
+`extended_object_element` - object divergence, and the extended precision positions that refine
+x and y by up to two fifths of the standard 1/62 step and z by two fifths of 1/15 (§5.6.1.1.8-.14,
+Tables 43-46). A refinement belongs to the update block that carries it and is not what the next
+block's differential coding builds on, which the standard says is the standard-precision value;
+an object that is not active sends none. The extended precision positions are decoded from the
+text alone: no outside stream carries one (DEE's channel-based-immersive streams have no dynamic
+objects), so which axis a presence bit names follows the convention the other arrays of this
+payload were checked against, not a stream of its own. An `oa_element` with an id this decoder does not know is skipped by
 its own `oa_element_size` and named in `DecodedProgram::skipped_elements`, rather than costing
 the payload — which is exactly what that size field is for. On the JOC side: all five of
 Table 47's downmix configurations, any clip gain, and per-object band count, quantizer, sparse
@@ -632,8 +639,10 @@ post-multiply there covers all of them with no duplication.
 
 Separately, and permanently rather than as a gap: Table 47's two "90 degree phase shift" downmix
 configurations reconstruct like their unshifted siblings — the shift is a property of how the
-downmix was *built*, §6.6.6 says nothing about undoing it before matrixing, and there is no
-Hilbert filterbank here to undo it with.
+downmix was *built*, and §6.6.6 says nothing about undoing it before matrixing (the text mentions
+it only in the configurations' names), so nothing is undone. A DEE stream of configuration 3
+(`testdata/object-fixture/dee_joc_514.ec3`) reconstructs each object as its own channel through
+exactly this path.
 
 Reconstruction needs the downmix JOC asks for. Table 47's three widest configurations need a
 dependent substream's extra channel pair before they can reconstruct at all — `kDmxConfig7X` wants

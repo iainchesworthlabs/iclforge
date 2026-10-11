@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <span>
 #include <vector>
 
@@ -169,6 +170,92 @@ ICLFORGE_RENDER_EXPORT void pan_direction(Direction source, std::span<const Dire
 // at kHeightElevationDeg for a source at the room's outer edge, which is
 // where every named height location in Table E2.5 sits.
 [[nodiscard]] ICLFORGE_RENDER_EXPORT Direction position_direction(double x, double y, double z);
+
+// --- zone constraints (TS 103 420 §5.2.6, Annex A.2) -------------------------
+//
+// An object can carry a constraint on WHERE a renderer may put it: which of
+// the horizontal zones, and whether the Top-Bottom one. The standard defines
+// the zones by the speakers in them (Table A.7), so the rule is exact for a
+// speaker layout and needs no geometry of the renderer's own. `zone_bit::`
+// values are OR-ed into the mask speaker_zones() returns.
+namespace zone_bit {
+inline constexpr unsigned kScreen = 1U << 0;
+inline constexpr unsigned kSide = 1U << 1;
+inline constexpr unsigned kSurround = 1U << 2;
+inline constexpr unsigned kBack = 1U << 3;
+inline constexpr unsigned kTopBottom = 1U << 4;
+// Not a zone: the centre speaker, the one Table A.7's note 1 adds to the back
+// zone for the centre-and-back preset. Carried in the same mask so a speaker
+// is one byte.
+inline constexpr unsigned kCentre = 1U << 5;
+}  // namespace zone_bit
+
+// Table A.7: the zones the speaker at `location` is in, with kCentre set for
+// the centre speaker. A surround pair
+// (Ls/Rs) is Surround and, by the table's note 2, Back in a 5.X layout or
+// smaller and Side in a larger one: `wide_layout` says which, true when the
+// layout also has rear surrounds, discrete side surrounds or wides.
+// LFE-type locations are in no zone - they take no panned audio.
+[[nodiscard]] ICLFORGE_RENDER_EXPORT unsigned speaker_zones(base::Location location,
+                                                            bool wide_layout);
+
+// The same for a speaker placed by angle alone, which Table A.7 cannot name:
+// above the listener's plane is Top-Bottom; on it, within the front arc
+// Screen, abeam Side, and behind Back, with every horizontal speaker beyond
+// the front also Surround - the room's own sense of the words.
+[[nodiscard]] ICLFORGE_RENDER_EXPORT unsigned direction_zones(Direction direction);
+
+// Tables 20 and 21: whether a speaker in `zones` may take an object whose
+// zone_constraints_idx is `zone_constraints_idx` (0 none, 1 back excluded,
+// 2 side excluded, 3 centre-and-back only, 4 screen only, 5 surround only;
+// the reserved 6 and 7 constrain nothing) and whose b_enable_elevation is
+// `enable_elevation`. A Top-Bottom speaker answers to the elevation flag
+// alone - the table makes that zone independent of the horizontal ones. The
+// centre-and-back preset also takes the speaker marked zone_bit::kCentre
+// (Table A.7's note 1).
+[[nodiscard]] ICLFORGE_RENDER_EXPORT bool zone_admits(unsigned zones, int zone_constraints_idx,
+                                                      bool enable_elevation);
+
+// What an object asks of the renderer beyond where it is (§5.2): every field
+// at its default is the point source with no constraint the panner has always
+// rendered, which is how a caller tells there is nothing to apply.
+struct ObjectConstraints {
+    int zone_constraints_idx = 0;  // Table 20
+    bool enable_elevation = true;  // Table 21
+    bool snap = false;             // §5.2.5, channel lock
+    // §5.2.2, each in [0, 1] of the room's own extent along that axis (the
+    // room is 2 units high, z -1 to +1, so a height of 1 is the whole of it).
+    double width = 0.0;
+    double depth = 0.0;
+    double height = 0.0;
+
+    [[nodiscard]] bool is_default() const {
+        return zone_constraints_idx == 0 && enable_elevation && !snap && width == 0.0 &&
+               depth == 0.0 && height == 0.0;
+    }
+};
+
+// One object's gains over `targets`, a room-anchored position (§4.2.1) and its
+// constraints applied. `zones[i]` is the zone mask of targets[i] (speaker_zones
+// or direction_zones), and `gains` is sized to `targets` and OVERWRITTEN with
+// sum of squares 1.
+//
+//   ZONES take the speakers the object may not use out of the set it is
+//   panned over, so it still sounds at full level - it moves, it does not get
+//   quieter. When no speaker satisfies the constraint it cannot be honoured
+//   and the object is panned over all of them.
+//   SNAP is the nearest of the speakers left, at unit gain.
+//   EXTENT is the cuboid the size describes, centred on the position,
+//   sampled at the centre and both ends of each axis it extends along (27
+//   points at most), each point panned and their powers averaged - more
+//   speakers at the same level, never louder. Snap wins over extent.
+//
+// With default constraints this is pan_direction of position_direction.
+ICLFORGE_RENDER_EXPORT void pan_constrained(double x, double y, double z,
+                                            const ObjectConstraints& constraints,
+                                            std::span<const Direction> targets,
+                                            std::span<const std::uint8_t> zones,
+                                            std::span<double> gains);
 
 struct ObjectState {
     double azimuth_deg = 0.0;
