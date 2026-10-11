@@ -910,24 +910,26 @@ only the second programme — see
 ## Programme options (`decode`, `qc`, `levels`): `programme=`
 
 ```text
-programme options (decode, qc, levels, mkv, mp4, fmp4, ts; any order, after the positional
-arguments):
+programme options (decode, qc, levels, monitor, spatial, play, transcode, mkv, mp4, fmp4, ts; any
+order, after the positional arguments):
   programme=<0..7>  which programme of a multi-programme stream to work on, by the §E2.3.1.2
                     substreamid of its independent substream; omitted takes the first the
                     stream carries (mp4, fmp4 and ts omit it to carry every programme)
 ```
 
-The decode-side half of `programme2=` above. All three commands work on exactly one programme —
-never a fold of several, since two programmes are alternatives rather than layers and mixing them
-would give a WAV that splices unrelated audio, or a loudness figure neither programme has.
+The decode-side half of `programme2=` above, and the same token for the commands that play or
+re-code a stream (`monitor`, `spatial`, `play`, `transcode`). Every one of them works on exactly one
+programme — never a fold of several, since two programmes are alternatives rather than layers and
+mixing them would give a WAV that splices unrelated audio, a loudness figure neither programme has,
+or, from `monitor`, a main and then its audio description one frame period at a time.
 
-`decode` alone can also mix one programme into another when the second is an **associated service**
-(§E3.10): a description, a commentary, a voice-over, carried beside the main with the gains and pan
-the stream gives it.
+`decode` and `monitor` can also mix one programme into another when the second is an **associated
+service** (§E3.10): a description, a commentary, a voice-over, carried beside the main with the
+gains and pan the stream gives it.
 
 ```text
-  associated=<0..7>|<service>  mix this programme into the one being decoded: a substream id, or a
-                    service name (visually-impaired, audio-description, hearing-impaired,
+  associated=<0..7>|<service>  mix this programme into the one being decoded or played: a substream
+                    id, or a service name (visually-impaired, audio-description, hearing-impaired,
                     commentary, emergency-information, spoken-subtitles) that the stream's own
                     bsmod labels
   associated-gain=<dB>  the listener's level for it, 0 dB or less, on top of the stream's own
@@ -936,6 +938,8 @@ the stream gives it.
 ```bash
 forge decode broadcast.ec3 mixed.wav associated=visually-impaired
 forge decode broadcast.ec3 mixed.wav programme=0 associated=1 associated-gain=-3
+forge monitor broadcast.ec3 associated=audio-description
+forge monitor broadcast.ec3 programme=0 associated=1 associated-gain=-6
 ```
 
 The main is `programme=` as above, and the status output names what was mixed and the range of
@@ -944,15 +948,35 @@ per-channel scales to the main (or `dmixscl`, when `channels=2` or `1` folded th
 own `pgmscl`, and for a mono service its `paninfo` by Tables E3.15 to E3.17 — see
 [Mixing an associated service](../../library/decoding.md#mixing-an-associated-service-iclforgeac3associatedservicemixer)
 for the rules and for what Annex E gives no processing. A stream with no such programme, or
-whose main is 1+1 dual mono, is refused rather than decoded without it. `monitor` and `play` do not
-mix a second programme yet.
+whose main is 1+1 dual mono, is refused rather than decoded without it.
+
+`monitor` mixes as it plays, from a second decoder run in step with the main's, so a stream that
+cannot give the service is refused before the output is touched and `decode`'s words and exit code
+are the ones it refuses in. The main is folded to the endpoint's width first, as `monitor` always
+does when the endpoint renders fewer channels than the programme, and the mix then takes `dmixscl`
+in place of the per-channel scales exactly as `decode channels=2` does; the service is never folded,
+so a mono description is still placed by its pan. `play` mixes nothing: it hands one coded programme
+to a receiver (or to the AC-3 transcode that does), without decoding it, so it names `associated=`
+as ignored — except where the endpoint takes PCM only and `play` decodes the stream through
+`monitor`, which mixes. `spatial` places one programme's objects and ignores `associated=` the same
+way.
 
 ```bash
 forge decode out.ec3 main.wav                # programme 0
 forge decode out.ec3 commentary.wav programme=1
 forge levels out.ec3 programme=1
 forge qc out.ec3 programme=1 preset=atsc-a85
+forge monitor out.ec3 -1 programme=1         # hear the commentary
+forge transcode out.ec3 commentary.ac3 192 programme=1
 ```
+
+`monitor` and `spatial` play the programme they chose and say so before they touch a device; a
+programme the stream does not carry is refused by name (exit `1`) on a machine with no output at
+all. `play` sends a receiver that programme alone: a receiver takes independent substream 0 and
+ignores the rest, so a programme other than 0 is cut out and renumbered as substream 0 first, as the
+containers do. Where `play` has to fall back, the PCM leg is `monitor` and the AC-3 leg is
+`transcode`, and both honour `programme=` the same way. `transcode` without it takes the first
+programme, as it always has.
 
 On `mkv`, `mp4`, `fmp4` and `ts` the chosen programme is written alone, renumbered as independent
 substream 0 with its CRC re-stamped (a player takes substream 0 and ignores the rest, so another
@@ -964,7 +988,8 @@ command says which it picked and what else was there (`programme 0 of 2 (0, 1)`)
 multi-programme stream is never handled silently. Asking for a programme the stream does not
 carry is an error that lists the ones it does. Ignored for AC-3, which has no substream layer.
 AC-4 has no programmes: it chooses a presentation instead (below), and `decode` given `programme=`
-with an AC-4 stream names it in a warning and ignores it.
+with an AC-4 stream names it in a warning and ignores it; `monitor` and `play` ignore it for AC-4
+without saying so.
 
 ## AC-4 options
 

@@ -946,8 +946,19 @@ the mix: FFmpeg refuses a second independent substream and ignores `mixmdate`'s 
 checked is the spec's own arithmetic — Tables E3.15 to E3.17 written out independently of the
 implementation and compared at every `panmean` — and an encode, decode and mix of a 5.1 main with
 a mono description through this project's own encoder, measured tone by tone
-(`tests/decoder/test_associated_service*.cpp`). `forge decode ... associated=` applies it from the
-command line; see [Programme options](../forge/cli/metadata-options.md#programme-options-decode-qc-levels-programme).
+(`tests/decoder/test_associated_service*.cpp`). `forge decode ... associated=` and
+`forge monitor ... associated=` apply it from the command line; see
+[Programme options](../forge/cli/metadata-options.md#programme-options-decode-qc-levels-programme).
+
+One thing a caller of the mixer has to do for itself is pair the two decoders' units. They are not
+released in step: an `Eac3Decoder` holding frames back for transient pre-noise (§3.7) releases its
+first unit a frame or more late, and a main and a service need not hold the same number back. Count
+the units each decoder releases rather than the calls made to it, queue each side's until its
+partner has one, and when the service ends play what is left of the main as it is.
+`forge decode` and `forge monitor` do this through one piece of code
+(`apps/shared/media/src/associated_mix.hpp`, which also resolves a service name against each
+programme's `bsmod`), whose `iclforge-app-media-tests` cases compare it, sample for sample, with
+decoding both programmes and mixing the k-th unit of each by hand.
 
 ## Decoding bytes you do not control
 

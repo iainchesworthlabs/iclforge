@@ -566,15 +566,17 @@ It decodes on the fast (FFT) inverse-transform path by default; `mode=reference`
 for what each mode is for, and [Options & grammars](metadata-options.md) for the token rules.
 
 A stream carrying more than one programme (a second independent substream — a second language,
-an audio description) is handled one programme at a time: `decode`, `levels` and `qc` all take
-`programme=<0..7>`, and without it take the first the stream carries while saying what else was
-there. See [Options & grammars](metadata-options.md) for the token, and `eac3-encode`'s
-`programme2=` for authoring such a stream. `decode` can also mix an associated service (a
-description, a commentary) into the programme it decodes, with `associated=` — see
+an audio description) is handled one programme at a time: `decode`, `levels`, `qc`, `monitor`,
+`spatial`, `play` and `transcode` all take `programme=<0..7>`, and without it take the first the
+stream carries while saying what else was there. See [Options & grammars](metadata-options.md) for
+the token, and `eac3-encode`'s `programme2=` for authoring such a stream. `decode` and `monitor`
+can also mix an associated service (a description, a commentary) into the programme they decode,
+with `associated=` — see
 [Options & grammars](metadata-options.md#programme-options-decode-qc-levels-programme).
 
 ```bash
 forge decode out.ec3 commentary.wav programme=1
+forge monitor broadcast.ec3 associated=audio-description   # the main with its description mixed in
 ```
 
 For an Atmos stream, add `objects_dir` to also export each object's reconstructed audio:
@@ -1376,7 +1378,7 @@ each OS.
 | `identify` | Walks the identify tone across an output's speakers: pink noise on one rendered channel at a time, placed by the routing patch, so which speaker each channel reaches can be heard rather than assumed. The stream is opened at the device's own channel count and each rendered channel placed by the patch — see [`identify`](#identify-hearing-which-speaker-a-channel-reaches) below |
 | `record` | Captures from a device straight to a file, metering live. `layout=`/`codec=` choose the shape (any layout up to 7.1.4, AC-3 or E-AC-3; with `codec=ac4`, AC-4 in mono, stereo, 5.0 or 5.1), `container=` the wrapper (`raw`, `mkv`, `ts`, `spdif`, `fmp4`), `watchdog=` how long a silent device is tolerated. If the endpoint turns out to be bitstreaming IEC 61937 rather than delivering PCM (an HDMI/S/PDIF capture card, or a loopback of a player set to bitstream), `record` recognises that within about a quarter of a second and writes the **elementary stream** instead of encoding the bursts as if they were audio — see [passthrough capture](#passthrough-capture) below |
 | `play` | Exclusive-mode IEC 61937 passthrough of an existing file, bare or inside a container — `bsid` decides AC-3 vs. E-AC-3. When a `device_index` is named, `play` follows the sink: a source format it rejects gets transcoded to AC-3 or decoded to PCM automatically instead of refused — see [Following the sink](#following-the-sink) below. AC-4, which no receiver found takes over IEC 61937, is decoded and played as PCM, as `monitor` plays it (`follow=off`, which asks for passthrough alone, refuses it with exit `4`) |
-| `monitor` | Decodes an existing file, bare or inside a container, and plays it on an ordinary, non-bitstreamed output — the shared-mode preview path. For an Atmos-mode stream, this plays the 5.1 **bed** and reports the object count found: the decoder reads TS 103 420's object layer (OAMD/JOC) but this path does not render or export objects, so this is what a legacy decoder hears, not unmixed objects — use `decode` with `objects_dir` for the object audio itself. An AC-4 stream plays the presentation `presentation=` and the rest choose, with `decode`'s output level, DRC, dialogue enhancement and downmix options; on an endpoint with fewer channels than the presentation it folds by the stream's own downmix. It plays the channels a presentation decodes to: the layout renderer that puts a presentation's objects on speakers belongs to `decode` (and to Hearth), not to `monitor` or `play`. |
+| `monitor` | Decodes an existing file, bare or inside a container, and plays it on an ordinary, non-bitstreamed output — the shared-mode preview path. For an Atmos-mode stream, this plays the 5.1 **bed** and reports the object count found: the decoder reads TS 103 420's object layer (OAMD/JOC) but this path does not render or export objects, so this is what a legacy decoder hears, not unmixed objects — use `decode` with `objects_dir` for the object audio itself. An AC-4 stream plays the presentation `presentation=` and the rest choose, with `decode`'s output level, DRC, dialogue enhancement and downmix options; on an endpoint with fewer channels than the presentation it folds by the stream's own downmix. It plays the channels a presentation decodes to: the layout renderer that puts a presentation's objects on speakers belongs to `decode` (and to Hearth), not to `monitor` or `play`. An E-AC-3 stream with a second independent substream (a second language, an audio description) plays one programme, as `decode` does: `programme=<0..7>`, or the first the stream carries, said as `programme 0 of 2 (0, 1)`. `play` sends a receiver that programme alone, cut out and renumbered as substream 0 when it is not already. |
 | `spatial` | Decodes an E-AC-3 stream's object layer and hands the objects to the platform's spatial renderer, each at its own OAMD position — the one playback path that renders objects as objects rather than as a bed. Windows only today; see [`spatial`](#spatial-objects-on-the-platform-renderer) below |
 | `live` | Capture → encode → optional live monitor and/or IEC 61937 passthrough, running continuously, still writing the file `record` always has. Everything `record` takes, plus a second clock-conformed capture device (`capture2=`), an object-slot budget and `map=` binding (`objects=`, `mode=atmos`), and a parallel 5.1 AC-3 leg for an AC-3-only receiver (`downmix=`) |
 

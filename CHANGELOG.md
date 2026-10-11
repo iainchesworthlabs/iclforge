@@ -56,9 +56,21 @@ The sections below contain the complete change list and fixes.
   block. `premixcmp*`, the speech enhancement words and `blkmixcfginfo` are not applied, because
   Annex E gives them no processing (§E2.3.1.21: "decoders are not required to use them").
   `associated=1` or `associated=visually-impaired`, with `associated-gain=<dB>` as the listener's
-  own trim; `monitor`, `play` and Hearth do not mix yet. `meta::pgm_scale_gain()` and
+  own trim; `play` and Hearth do not mix. `meta::pgm_scale_gain()` and
   `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
   15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
+- **`forge monitor associated=` mixes the service as it plays.** `monitor` runs a second decoder
+  for the associated programme in step with the main's and plays the main with the service mixed
+  in, with the same tokens and the same report as `decode`. `decode` and `monitor` share one choice
+  of the service (`associated=<0..7>` or a service name against each programme's `bsmod`, a 1+1
+  main refused) and one pairing of the two decoders' units, which hold frames back for transient
+  pre-noise independently and are cut to the shorter where they differ
+  (`apps/shared/media/src/associated_mix.*`, held sample for sample against decoding both and
+  mixing by hand in `iclforge-app-media-tests`); `forge decode`'s output is unchanged. A stream
+  that cannot give the service is refused before the output is opened, in `decode`'s words. A
+  main folded to a narrower endpoint takes the service by `dmixscl`, as `decode channels=2` does.
+  `play` hands a coded programme to a receiver and `spatial` places one programme's objects: both
+  now say that `associated=` is ignored, where they ignored it silently.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
@@ -2823,6 +2835,20 @@ The sections below contain the complete change list and fixes.
 
 **Command line and GUI**
 
+- **`forge monitor` crashed on a stream with a second independent substream, and `spatial` and
+  `play` spliced one.** A stream carrying two programmes (a second language, an audio description)
+  comes back from `split_access_units` with their units interleaved, one frame period of each in
+  turn; `monitor` and `spatial` handed all of them to an `Eac3Decoder` given no `programme`, and
+  sized each unit's output from the first unit's width. A 5.1 main followed by a mono description
+  read channels that were not there, and `monitor` died with an access violation. `play`'s
+  passthrough wrapped each programme's unit in a burst of its own, so a receiver was sent the main
+  at half speed with the description between. They now play one programme, as `decode` does:
+  `programme=<0..7>`, or the first the stream carries, said as `programme 0 of 2 (0, 1)`. A
+  programme the stream lacks is refused by name before a device is touched. `play` cuts a programme
+  other than 0 out and renumbers it as substream 0, which a receiver takes; the AC-3 leg of
+  `play` and `forge transcode` now take `programme=` too (they always transcoded the first).
+  `iclforge::apps::select_programme()` and `cut_programme()` in `apps/shared/media` do the
+  choosing without any printing, for a player that is not the CLI.
 - **`ac3cli monitor` refused a §E2.3.1.2 legacy-core stream and dropped every stream's last
   unit.** It picked its decode path from the first frame's bsid alone, so a stream whose 5.1
   bed is a plain AC-3 syncframe with Annex E dependents extending it went to `FrameDecoder`,

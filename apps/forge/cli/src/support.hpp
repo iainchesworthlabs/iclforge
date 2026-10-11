@@ -43,6 +43,8 @@
 #include "iclforge/containers/mp4/hls.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "recording_sink.hpp"
+#include "associated_mix.hpp"
+#include "stream_playback.hpp"
 
 // The CLI-wide support layer: option/metadata parsing, path/stdio conventions, frame and WAV I/O,
 // and level reporting shared by nearly every command in main.cpp's kCommands table. Split out of
@@ -635,9 +637,9 @@ struct Options {
     // second language, an audio description), not layers, and the only
     // combination §E3.10 defines is a main with an associated service.
     std::optional<int> programme;
-    // 'decode' of E-AC-3: the independent substream (§E2.3.1.2's substreamid,
-    // 0..7) of an associated service to mix into `programme`, by associated=
-    // given a number. associated= given a service name selects by bsmod
+    // 'decode' and 'monitor' of E-AC-3: the independent substream
+    // (§E2.3.1.2's substreamid, 0..7) of an associated service to mix into
+    // `programme`, by associated= given a number. associated= given a service name selects by bsmod
     // instead, through ac4_associated's classifier, which is the same code
     // (Table 5.7 and TS 103 190-1 Table 91 number the services alike).
     // associated-gain= is the listener's trim on it (ac4_associated_gain).
@@ -801,6 +803,75 @@ std::string format_programme_ids(std::span<const int> ids);
 // iclforge::ac3::programme_ids() returned and must not be empty. Shared by decode, qc
 // and levels so all three answer a bad programme= the same way.
 std::optional<int> choose_programme(std::span<const int> ids, std::optional<int> wanted);
+
+// What monitor, spatial and play do first with an E-AC-3 stream: choose the one
+// programme they play (`wanted` is programme=; omitted takes the first the
+// stream carries, as decode does) and split out its units - see
+// iclforge::apps::select_programme, which does the choosing without any
+// printing, for why it is one and never a fold of several.
+//
+// On failure the reason is already on stderr and the value is the exit code:
+// kExitInput for a stream that does not frame (`in_path` is named, as these
+// commands always have), kExitUsage for a programme= the stream does not carry
+// (choose_programme lists the ones it does). Not decode's own wording - decode
+// keeps its `stream framing failed` messages and its codes, which a script may
+// already gate on.
+[[nodiscard]] std::expected<iclforge::apps::ProgrammeUnits, int> select_programme_units(
+    std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path);
+
+// `  programme 1 of 2 (0, 1)` on `status`, only when the stream carries more
+// than one - the line decode prints, so a multi-programme stream is never
+// played without saying which programme it was.
+void report_programme(FILE* status, const iclforge::apps::ProgrammeUnits& selected);
+
+// §E3.10: the programme associated= names beside `main` - a substream number
+// (`meta.eac3_associated_programme`) or a service name (`meta.ac4_associated`,
+// which labels the programme through its bsmod) - or std::nullopt after saying
+// on stderr why there is none. `ids` is what iclforge::ac3::programme_ids()
+// found. decode and monitor both ask this, so a stream that cannot give one is
+// refused the same way, in the same words, by both before anything decodes;
+// the caller picks the exit code.
+[[nodiscard]] std::optional<iclforge::apps::AssociatedChoice> choose_associated_programme(
+    std::span<const std::byte> stream, std::span<const int> ids, int main, const Options& meta);
+
+// True when associated= asked for a second programme, by number or by name.
+[[nodiscard]] bool wants_associated(const Options& meta);
+
+// What decode and monitor say of an associated-gain= with no associated= to
+// scale: the gain is ignored, and the command goes on.
+void warn_associated_gain_unused();
+
+// associated= (or associated-gain=) given to a command that decodes nothing to
+// mix a second programme into: `play` hands a coded programme to a receiver, and
+// `spatial` places one programme's objects. Said once on stderr, and ignored -
+// silently dropping it would play the main alone and read as the service
+// having been mixed. `command` and `why` complete the line.
+void warn_associated_not_mixed(const Options& meta, std::string_view command,
+                               std::string_view why);
+
+// `programme 1 (associated service: visually impaired, mono)`: the programme as
+// the stream labels it.
+[[nodiscard]] std::string describe_associated(const iclforge::apps::AssociatedChoice& choice);
+
+// What the mix did, on `status`: which programme went into which, the range
+// each gain took and, for a mono service, where it sat.
+void print_mix_report(FILE* status, const iclforge::apps::AssociatedChoice& choice, int main,
+                      const iclforge::apps::MixReport& report);
+
+// The reason an AssociatedMix stopped, on stderr: the service's decoder refused
+// a unit, or the mixer refused the pair.
+void report_mix_error(const iclforge::apps::AssociatedMixError& error);
+
+// programme=N on a command that wraps or re-codes a stream: the stream becomes
+// that programme alone, as a stream of its own (iclforge::ac3::io::
+// extract_programme renumbers it as independent substream 0, which is what a
+// player takes). Without it the command's own default stands - every programme
+// carried (MP4, fMP4, MPEG-TS), the first one (Matroska, transcode). A stream
+// with no programme of that id is refused by name (false, the reason on
+// stderr), and one this reader does not scan (AC-4, say) is left for the
+// command to report as it always did.
+[[nodiscard]] bool apply_programme_option(std::vector<std::byte>& raw, const Options& meta,
+                                          std::string_view in_path);
 
 // The output stage a decode/monitor run actually uses: `meta.output`, with
 // downmix=auto settled into a concrete fold. §D3.1.1's automatic Lt/Rt-or-

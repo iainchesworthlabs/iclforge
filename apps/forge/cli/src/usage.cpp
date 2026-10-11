@@ -86,12 +86,13 @@ constexpr std::array<OptionToken, 104> kOptionTokens{{
     {"presentation=", "decode of AC-4: the presentation at this position of the table of contents"},
     {"presentation-id=", "decode of AC-4: the presentation with this presentation_id"},
     {"language=", "decode of AC-4: prefer the presentation in this language, a BCP 47 tag"},
-    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service; of "
-                    "E-AC-3: mix that programme (a substream id 0..7, or a service name its bsmod "
-                    "labels) into the one being decoded, §E3.10"},
+    {"associated=", "decode of AC-4: prefer the presentation with this associated audio service; "
+                    "decode and monitor of E-AC-3: mix that programme (a substream id 0..7, or a "
+                    "service name its bsmod labels) into the one being decoded or played, §E3.10"},
     {"dialogue-gain=", "decode of AC-4: g_dialog, the dialogue against music and effects, dB"},
-    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less; of "
-                         "E-AC-3: the same trim on the programme associated= mixes in"},
+    {"associated-gain=", "decode of AC-4: g_assoc, the associated audio's level, 0 dB or less; "
+                         "decode and monitor of E-AC-3: the same trim on the programme "
+                         "associated= mixes in"},
     {"headphones", "decode of AC-4: a listener on headphones - their DRC mode, pre-virtualized presentations"},
     {"md-compat=", "decode of AC-4: the md_compat level the decoder claims, 0 to 7 (default 7)"},
     {"syntax-trace=", "ac4-encode, and decode of AC-4: write every syntax element written or read"},
@@ -161,10 +162,10 @@ constexpr std::array<OptionToken, 104> kOptionTokens{{
     {"mainid=", "ts: this service's A/52 Annex A main-service number"},
     {"asvc=", "ts: the main service(s) this one is associated with (A/52 Annex A) - a raw "
              "0-255/0x00-0xFF mask, or a comma list of main-service numbers, e.g. asvc=0,2"},
-    {"programme=", "decode/qc/levels: which independent substream (0..7) of a multi-programme "
-                   "stream; mkv/mp4/fmp4/ts: carry that programme alone, renumbered as "
-                   "substream 0 (without it mp4, fmp4 and ts keep every programme and mkv the "
-                   "first)"},
+    {"programme=", "decode/qc/levels/monitor/spatial/play/transcode: which independent substream "
+                   "(0..7) of a multi-programme stream, the first when omitted; mkv/mp4/fmp4/ts: "
+                   "carry that programme alone, renumbered as substream 0 (without it mp4, fmp4 "
+                   "and ts keep every programme and mkv the first)"},
     {"programme2=", "eac3-encode: another input file, encoded as its own independent substream "
                    "(§E2.3.1.2's I1); programme3= up to programme8= work the same way, for I2-I7"},
     {"programme2-layout=", "eac3-encode: that programme's own layout (default stereo; not 1+1) - "
