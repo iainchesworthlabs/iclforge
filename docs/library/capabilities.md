@@ -42,6 +42,16 @@ This table is AC-3 and E-AC-3. The AC-4 encoder is the `iclforge::ac4`, the enco
 | Annex E tools | — | spectral extension (§E3.6), enhanced coupling (§E3.5), adaptive hybrid transform with GAQ (§E3.4), transient pre-noise processing (§3.7) |
 | Objects | panned to a 5.1 bed (no metadata survives) | OAMD + JOC in an EMDF container (TS 103 420) |
 
+**Which coding mode a WAV is.** A channel count does not say: three channels are 3/0 as FL FR FC
+and 2/1 as FL FR BC, four are 2/2 as FL FR BL BR and 3/1 as FL FR FC BC. The header's
+`dwChannelMask` does, and an unnamed `[layout]` follows it: those four encode as 3/0, 2/1, 2/2
+and 3/1, with or without the LFE, and fold to a narrower layout by §7.8's coefficients for the
+mode they are (a 2/1 file's lone surround at 0.707 × `surmixlev`, not at the centre level its
+width would suggest). `decode` writes the mask from three channels up, so its own output
+encodes back into the mode it came from, and a transcode keeps a stream's own mode. A file with
+no mask is read by its width as it always was (3: L R C, 4: L R Ls Rs, 5: L R C Ls Rs, 6: 5.1),
+and a 2/1 or 3/1 programme in one is named with a Table E2.5 list (`layout=L,R,Cs`).
+
 At 44.1 kHz, CBR needs non-integral frame sizes; the AC-3 encoder alternates between the two
 Table 5.18 lengths on a Bresenham accumulator so the long-run rate is exact. E-AC-3 signals
 `frmsiz` directly and needs no such alternation.

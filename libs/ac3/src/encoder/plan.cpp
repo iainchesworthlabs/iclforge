@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cerrno>
 #include <charconv>
 #include <cmath>
@@ -157,6 +158,38 @@ constexpr std::array<Location, 17> kWavSpeakerOrder = {
     }
 }
 
+// The Table E2.5 map bit a location belongs to. Both halves of a pair share
+// one, which is why a mask built from these can say a pair is present without
+// saying that BOTH of its halves are (channel_mask_of() is what checks that).
+[[nodiscard]] constexpr std::uint16_t map_bit(Location location) {
+    namespace cm = eac3::chanmap;
+    switch (location) {
+        case Location::kLeft: return cm::kLeftBit;
+        case Location::kCentre: return cm::kCentreBit;
+        case Location::kRight: return cm::kRightBit;
+        case Location::kLeftSurround: return cm::kLeftSurroundBit;
+        case Location::kRightSurround: return cm::kRightSurroundBit;
+        case Location::kLc:
+        case Location::kRc: return cm::kLcRcBit;
+        case Location::kLrs:
+        case Location::kRrs: return cm::kLrsRrsBit;
+        case Location::kCs: return cm::kCsBit;
+        case Location::kTs: return cm::kTsBit;
+        case Location::kLsd:
+        case Location::kRsd: return cm::kLsdRsdBit;
+        case Location::kLw:
+        case Location::kRw: return cm::kLwRwBit;
+        case Location::kVhl:
+        case Location::kVhr: return cm::kVhlVhrBit;
+        case Location::kVhc: return cm::kVhcBit;
+        case Location::kLts:
+        case Location::kRts: return cm::kLtsRtsBit;
+        case Location::kLfe2: return cm::kLfe2Bit;
+        case Location::kLfe: return cm::kLfeBit;
+    }
+    return 0;
+}
+
 // --- fold-down --------------------------------------------------------------
 
 // Folding a wide source into one or two channels has a specified answer
@@ -178,28 +211,58 @@ constexpr std::array<Location, 17> kWavSpeakerOrder = {
     if (!mono && !stereo) {
         return false;
     }
-    const auto source_layout = io::ac3_layout_for(source.size());
-    if (!source_layout.has_value()) {
+    // The source's own acmod, read off WHICH locations it holds rather than
+    // how many: three channels are 3/0 as L R C and 2/1 as L R Cs, and §7.8's
+    // coefficients are different for the two (the lone surround is a surround
+    // at -3 dB, not a centre). A source whose locations are not exactly one
+    // Table 5.8 mode (with or without LFE) has no entry here.
+    std::uint16_t held = 0;
+    for (const auto location : source) {
+        held = static_cast<std::uint16_t>(held | map_bit(location));
+    }
+    // Searched rather than asked of acmod_for_chanmap(), which breaks a tie
+    // between modes of one width by a fixed preference (3/0 over 2/1) because
+    // it answers for a dependent's channel map, where only the count matters.
+    std::optional<Acmod> found;
+    for (const auto candidate : {Acmod::k1_0, Acmod::k2_0, Acmod::k3_0, Acmod::k2_1, Acmod::k3_1,
+                                 Acmod::k2_2, Acmod::k3_2}) {
+        for (const bool lfe : {false, true}) {
+            if (eac3::chanmap::acmod_map(candidate, lfe) == held) {
+                found = candidate;
+            }
+        }
+    }
+    if (!found.has_value()) {
         return false;  // §7.8 is defined per acmod; a wider source has no entry
     }
-    const int fbw = fullbw_channel_count(source_layout->acmod);
+    const Acmod source_acmod = *found;
+    const int fbw = fullbw_channel_count(source_acmod);
     if (fbw <= (mono ? 1 : 2)) {
         return false;  // nothing to fold; the panner's identity is fine
+    }
+    // Coded order (Table 5.8) is Table E2.5's bit order for every acmod, so
+    // the k-th location of the mode's own map is its k-th coded channel; its
+    // slot in the source is wherever the file put that location.
+    const auto coded = eac3::chanmap::expand(eac3::chanmap::acmod_map(source_acmod, false));
+    std::array<std::size_t, 5> slot{};
+    for (int k = 0; k < fbw; ++k) {
+        const auto at = std::ranges::find(source, coded[k]);
+        slot[static_cast<std::size_t>(k)] =
+            static_cast<std::size_t>(std::distance(source.begin(), at));
     }
 
     const double c = meta::coefficient(clev);
     const double s = meta::coefficient(slev);
     if (mono) {
-        const auto mono_gains = meta::mono_downmix(source_layout->acmod, c, s);
+        const auto mono_gains = meta::mono_downmix(source_acmod, c, s);
         for (int k = 0; k < fbw; ++k) {
-            const auto wav = source_layout->wav_index[static_cast<std::size_t>(k)];
-            out.gain[wav] = mono_gains[static_cast<std::size_t>(k)];
+            out.gain[slot[static_cast<std::size_t>(k)]] = mono_gains[static_cast<std::size_t>(k)];
         }
         return true;
     }
-    const auto stereo_gains = meta::stereo_downmix(source_layout->acmod, c, s);
+    const auto stereo_gains = meta::stereo_downmix(source_acmod, c, s);
     for (int k = 0; k < fbw; ++k) {
-        const auto wav = source_layout->wav_index[static_cast<std::size_t>(k)];
+        const auto wav = slot[static_cast<std::size_t>(k)];
         out.gain[wav] = stereo_gains.left[static_cast<std::size_t>(k)];
         out.gain[static_cast<std::size_t>(out.source_channels) + wav] =
             stereo_gains.right[static_cast<std::size_t>(k)];
@@ -236,6 +299,189 @@ std::optional<LayoutId> layout_for_source(std::size_t wav_channels) {
         case 12: return LayoutId::k714;
         default: return std::nullopt;
     }
+}
+
+std::optional<std::uint16_t> channel_mask_of(std::span<const Location> locations) {
+    std::array<bool, eac3::chanmap::kMaxChannels> seen{};
+    std::uint16_t mask = 0;
+    for (const auto location : locations) {
+        auto& slot = seen[static_cast<std::size_t>(location)];
+        if (slot) {
+            return std::nullopt;  // named twice
+        }
+        slot = true;
+        mask = static_cast<std::uint16_t>(mask | map_bit(location));
+    }
+    // A pair's bit stands for BOTH members, so a bit whose expansion is not
+    // entirely present means one half was named alone.
+    for (int bit = 0; bit < 16; ++bit) {
+        const auto one = static_cast<std::uint16_t>(0x8000u >> bit);
+        if ((mask & one) == 0) {
+            continue;
+        }
+        for (const auto member : eac3::chanmap::expand(one)) {
+            if (!seen[static_cast<std::size_t>(member)]) {
+                return std::nullopt;
+            }
+        }
+    }
+    return mask;
+}
+
+std::optional<LayoutId> layout_for_locations(std::uint16_t locations) {
+    for (const auto& info : kLayouts) {
+        if (info.id == LayoutId::kDualMono) {
+            continue;
+        }
+        const auto cp = channel_plan_for(info.id);
+        auto occupied = eac3::chanmap::acmod_map(cp.bed_acmod, cp.bed_lfe);
+        for (const auto dependent : cp.dependents) {
+            occupied = static_cast<std::uint16_t>(occupied | dependent);
+        }
+        if (occupied == locations) {
+            return info.id;
+        }
+    }
+    return std::nullopt;
+}
+
+namespace {
+
+// ksmedia.h's SPEAKER_* bits.
+constexpr std::uint32_t kSpkFrontLeft = 0x1;
+constexpr std::uint32_t kSpkFrontRight = 0x2;
+constexpr std::uint32_t kSpkFrontCentre = 0x4;
+constexpr std::uint32_t kSpkLowFrequency = 0x8;
+constexpr std::uint32_t kSpkBackLeft = 0x10;
+constexpr std::uint32_t kSpkBackRight = 0x20;
+constexpr std::uint32_t kSpkFrontLeftOfCentre = 0x40;
+constexpr std::uint32_t kSpkFrontRightOfCentre = 0x80;
+constexpr std::uint32_t kSpkBackCentre = 0x100;
+constexpr std::uint32_t kSpkSideLeft = 0x200;
+constexpr std::uint32_t kSpkSideRight = 0x400;
+constexpr std::uint32_t kSpkTopCentre = 0x800;
+constexpr std::uint32_t kSpkTopFrontLeft = 0x1000;
+constexpr std::uint32_t kSpkTopFrontCentre = 0x2000;
+constexpr std::uint32_t kSpkTopFrontRight = 0x4000;
+constexpr std::uint32_t kSpkTopBackLeft = 0x8000;
+constexpr std::uint32_t kSpkTopBackCentre = 0x10000;  // no Table E2.5 location
+constexpr std::uint32_t kSpkTopBackRight = 0x20000;
+constexpr std::uint32_t kSpkNamed = 0x3FFFF;
+
+// One SPEAKER_* bit and the location it names. SPEAKER_BACK_LEFT/RIGHT are the
+// surrounds of a 5.1 ring on their own and the rear surrounds beside the
+// sides, so those two carry the location they take in that company as well.
+struct SpeakerSlot {
+    std::uint32_t bit;
+    Location location;
+    Location beside_sides;
+};
+
+// Ascending bit order, which is the interleave order of a file with the mask.
+constexpr std::array<SpeakerSlot, 17> kSpeakerSlots = {{
+    {kSpkFrontLeft, Location::kLeft, Location::kLeft},
+    {kSpkFrontRight, Location::kRight, Location::kRight},
+    {kSpkFrontCentre, Location::kCentre, Location::kCentre},
+    {kSpkLowFrequency, Location::kLfe, Location::kLfe},
+    {kSpkBackLeft, Location::kLeftSurround, Location::kLrs},
+    {kSpkBackRight, Location::kRightSurround, Location::kRrs},
+    {kSpkFrontLeftOfCentre, Location::kLc, Location::kLc},
+    {kSpkFrontRightOfCentre, Location::kRc, Location::kRc},
+    {kSpkBackCentre, Location::kCs, Location::kCs},
+    {kSpkSideLeft, Location::kLeftSurround, Location::kLeftSurround},
+    {kSpkSideRight, Location::kRightSurround, Location::kRightSurround},
+    {kSpkTopCentre, Location::kTs, Location::kTs},
+    {kSpkTopFrontLeft, Location::kVhl, Location::kVhl},
+    {kSpkTopFrontCentre, Location::kVhc, Location::kVhc},
+    {kSpkTopFrontRight, Location::kVhr, Location::kVhr},
+    {kSpkTopBackLeft, Location::kLts, Location::kLts},
+    {kSpkTopBackRight, Location::kRts, Location::kRts},
+}};
+
+}  // namespace
+
+std::optional<std::vector<Location>> wav_mask_locations(std::uint32_t channel_mask,
+                                                        std::size_t channels) {
+    if (channel_mask == 0 || channels == 0 || (channel_mask & ~kSpkNamed) != 0 ||
+        (channel_mask & kSpkTopBackCentre) != 0 ||
+        static_cast<std::size_t>(std::popcount(channel_mask)) != channels) {
+        return std::nullopt;
+    }
+    const bool sides = (channel_mask & (kSpkSideLeft | kSpkSideRight)) != 0;
+    std::vector<Location> out;
+    out.reserve(channels);
+    for (const auto& slot : kSpeakerSlots) {
+        if ((channel_mask & slot.bit) != 0) {
+            out.push_back(sides ? slot.beside_sides : slot.location);
+        }
+    }
+    return out;
+}
+
+std::uint32_t wav_channel_mask(std::span<const Location> in_wav_order) {
+    if (in_wav_order.size() < 3) {
+        return 0;
+    }
+    const auto holds = [&](Location location) {
+        return std::ranges::find(in_wav_order, location) != in_wav_order.end();
+    };
+    // The surrounds take the back pair of a 5.1 ring, unless the rears are
+    // there too, when they move to the sides - wav_mask_locations() reads
+    // exactly this back.
+    const bool rears = holds(Location::kLrs) || holds(Location::kRrs);
+    std::uint32_t mask = 0;
+    std::uint32_t previous = 0;
+    for (const auto location : in_wav_order) {
+        std::uint32_t bit = 0;
+        switch (location) {
+            case Location::kLeft: bit = kSpkFrontLeft; break;
+            case Location::kRight: bit = kSpkFrontRight; break;
+            case Location::kCentre: bit = kSpkFrontCentre; break;
+            case Location::kLfe: bit = kSpkLowFrequency; break;
+            case Location::kLeftSurround: bit = rears ? kSpkSideLeft : kSpkBackLeft; break;
+            case Location::kRightSurround: bit = rears ? kSpkSideRight : kSpkBackRight; break;
+            case Location::kLrs: bit = kSpkBackLeft; break;
+            case Location::kRrs: bit = kSpkBackRight; break;
+            case Location::kLc: bit = kSpkFrontLeftOfCentre; break;
+            case Location::kRc: bit = kSpkFrontRightOfCentre; break;
+            case Location::kCs: bit = kSpkBackCentre; break;
+            case Location::kTs: bit = kSpkTopCentre; break;
+            case Location::kVhl: bit = kSpkTopFrontLeft; break;
+            case Location::kVhc: bit = kSpkTopFrontCentre; break;
+            case Location::kVhr: bit = kSpkTopFrontRight; break;
+            case Location::kLts: bit = kSpkTopBackLeft; break;
+            case Location::kRts: bit = kSpkTopBackRight; break;
+            case Location::kLsd:
+            case Location::kRsd:
+            case Location::kLw:
+            case Location::kRw:
+            case Location::kLfe2: return 0;  // WAVEFORMATEXTENSIBLE has no speaker for it
+        }
+        if (bit <= previous) {
+            return 0;  // repeated, or out of the order the file will carry them in
+        }
+        previous = bit;
+        mask |= bit;
+    }
+    return mask;
+}
+
+std::optional<SourceLayout> source_layout(Codec codec, std::span<const Location> locations) {
+    if (codec == Codec::kAc4) {
+        return std::nullopt;
+    }
+    const auto mask = channel_mask_of(locations);
+    if (!mask.has_value()) {
+        return std::nullopt;
+    }
+    const auto allocated = eac3::chanmap::allocate(*mask);
+    if (!allocated.has_value() || (codec == Codec::kAc3 && !allocated->dependents.empty())) {
+        return std::nullopt;
+    }
+    if (const auto id = layout_for_locations(*mask)) {
+        return SourceLayout{.layout = *id, .custom_locations = std::nullopt};
+    }
+    return SourceLayout{.layout = std::nullopt, .custom_locations = *mask};
 }
 
 std::string layout_names(Codec codec) {
@@ -1224,6 +1470,32 @@ std::optional<Routing> route(const ChannelPlan& target, std::size_t wav_channels
         }
         source = *generic;
     }
+    return route(target, std::span<const Location>{source}, clev, slev);
+}
+
+std::optional<Routing> route(const ChannelPlan& target, std::span<const Location> source_locations,
+                             meta::CentreMixLevel clev, meta::SurroundMixLevel slev) {
+    if (source_locations.empty()) {
+        return std::nullopt;
+    }
+    // Dual mono again, for a source that states its locations: Ch1 and Ch2 are
+    // not directions, so there is nothing for a location to say about either,
+    // and the identity over exactly two channels is the only routing it has.
+    if (target.bed_acmod == Acmod::kDualMono) {
+        if (source_locations.size() != 2) {
+            return std::nullopt;
+        }
+        return Routing{.source_channels = 2, .coded_channels = 2, .gain = {1.0, 0.0, 0.0, 1.0}};
+    }
+    // A location named twice is not a layout: which of the two channels is "the"
+    // centre has no answer, and a panner would quietly sum them.
+    for (std::size_t i = 0; i < source_locations.size(); ++i) {
+        const auto rest = source_locations.subspan(i + 1);
+        if (std::ranges::find(rest, source_locations[i]) != rest.end()) {
+            return std::nullopt;
+        }
+    }
+    const std::vector<Location> source(source_locations.begin(), source_locations.end());
 
     const auto coded = coded_channels(target);
     Routing out{.source_channels = static_cast<int>(source.size()),

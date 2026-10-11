@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <span>
 #include <string>
 #include <vector>
@@ -196,4 +197,53 @@ TEST_CASE("WavPcm16StreamWriter open() refuses zero channels and uncreatable pat
     REQUIRE_FALSE(bad.has_value());
     CHECK(bad.error() == iclforge::ac3::io::WavError::kCannotOpen);
     CHECK_FALSE(writer.is_open());
+}
+
+TEST_CASE("WavStreamWriter states a channel mask and patches the longer header's sizes",
+          "[wav][channel_mask]") {
+    constexpr std::uint32_t kMask = 0x1 | 0x2 | 0x100;  // FL FR BC: a 2/1 file
+    const auto path = scratch_dir() / "stream_mask.wav";
+    iclforge::ac3::io::WavStreamWriter writer;
+    REQUIRE(writer.open(path.string(), 44100, kChannels, kMask).has_value());
+    REQUIRE(writer.write(std::span{kInterleaved}.subspan(0, 6)));
+    // A mid-stream patch lands on the right offset of the 68-byte header, not
+    // the 44-byte one's: it would otherwise overwrite the mask.
+    writer.flush_header();
+    REQUIRE(writer.write(std::span{kInterleaved}.subspan(6, 6)));
+    writer.close();
+
+    check_round_trip(path);
+    const auto read = iclforge::ac3::io::read_wav(path.string());
+    REQUIRE(read.has_value());
+    CHECK(read->channel_mask == kMask);
+
+    std::ifstream in{path, std::ios::binary};
+    const std::string bytes{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    REQUIRE(bytes.size() == 68 + 12 * 4);
+    const auto le32 = [&](std::size_t at) {
+        return static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at])) |
+               (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at + 1])) << 8) |
+               (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at + 2])) << 16) |
+               (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes[at + 3])) << 24);
+    };
+    CHECK(le32(4) == bytes.size() - 8);
+    CHECK(le32(40) == kMask);
+    CHECK(bytes.substr(60, 4) == "data");
+    CHECK(le32(64) == 12 * 4);
+}
+
+TEST_CASE("WavStreamWriter keeps the plain header for a mask that does not fit",
+          "[wav][channel_mask]") {
+    const auto path = scratch_dir() / "stream_mask_misfit.wav";
+    iclforge::ac3::io::WavStreamWriter writer;
+    // Two bits for three channels.
+    REQUIRE(writer.open(path.string(), 44100, kChannels, 0x3).has_value());
+    REQUIRE(writer.write(kInterleaved));
+    writer.close();
+
+    check_round_trip(path);
+    const auto read = iclforge::ac3::io::read_wav(path.string());
+    REQUIRE(read.has_value());
+    CHECK(read->channel_mask == 0);
+    CHECK(fs::file_size(path) == 44 + 12 * 4);
 }

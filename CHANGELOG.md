@@ -2774,6 +2774,30 @@ The sections below contain the complete change list and fixes.
   `FrameHeader` and `forge probe` report the code it was converted from. The conversion to and
   from AC-3 itself is not built: the standard gives the signalling and no process.
 
+**AC-3 coding modes 3/0, 2/1, 3/1 and 2/2**
+
+- **A WAV's speakers were never read, so a 2/1 or 3/1 file was encoded as a different mode.** The
+  encoder took a source's width as its layout: three channels were L R C and four were L R Ls Rs
+  whatever the file said, so `forge decode`'s own output for a 2/1 stream encoded back with its
+  lone surround in the centre channel, a 3/1 stream's centre in a surround, and a 3/0 + LFE
+  stream's centre and LFE in the surrounds, all on a 5.1 with silent channels besides. `WavData::channel_mask`
+  (and `WavStreamReader::channel_mask()`) now carry a `WAVE_FORMAT_EXTENSIBLE` header's
+  `dwChannelMask`, and `encode`, `eac3-encode`, `programmeN=` and Forge GUI follow it for an unnamed
+  layout: FL FR BC is 2/1, FL FR FC BC is 3/1, FL FR BL BR or FL FR SL SR is 2/2, each with or
+  without the LFE. The same file named onto a narrower layout folds by that mode's §7.8
+  coefficients (a lone surround at 0.707 × `surmixlev`, where the width's guess used the centre
+  level), `dialnorm=auto` weights its channels by the speakers they are, and `transcode` keeps a
+  stream that is exactly one coding mode in that mode instead of widening it to 5.1.
+- **`forge decode` states its speakers.** An AC-3 or E-AC-3 decode of three channels or more is
+  written as `WAVE_FORMAT_EXTENSIBLE` with its channel mask (`write_wav_f32` and
+  `WavStreamWriter::open` take one; a mask that does not name exactly the channels written leaves
+  the plain header). Mono and stereo output, and any decode that cannot name its speakers, keep
+  the 44-byte header they always had. A WAV that states no speakers is read by its width exactly
+  as before: every checked-in fixture encodes to the same bytes.
+- **New in `iclforge::ac3::plan`:** `wav_mask_locations`, `wav_channel_mask`, `source_layout`,
+  `channel_mask_of`, `layout_for_locations`, and a `route()` overload that takes the source's own
+  locations. The two front ends share them, as they share every other layout rule there.
+
 **ADM / BW64**
 
 - **`write_bw64` dropped an `audioObject`'s duration.** `AudioObject::duration` was read and never

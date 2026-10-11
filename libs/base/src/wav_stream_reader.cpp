@@ -39,6 +39,7 @@ struct WavStreamReader::Impl {
     std::ifstream file;
     std::uint32_t sample_rate = 0;
     std::uint16_t channels = 0;
+    std::uint32_t channel_mask = 0;
     detail::SampleFormat format = detail::SampleFormat::kPcm16;
     std::size_t stride = 0;
     std::uint64_t frames_total = 0;
@@ -108,6 +109,7 @@ std::expected<void, WavError> WavStreamReader::open(const std::string& path) {
     }
     im.sample_rate = format->sample_rate;
     im.channels = format->channels;
+    im.channel_mask = format->channel_mask;
     im.format = format->format;
     im.stride = format->stride;
 
@@ -130,6 +132,8 @@ bool WavStreamReader::is_open() const { return impl_->open; }
 std::uint32_t WavStreamReader::sample_rate() const { return impl_->sample_rate; }
 
 std::uint16_t WavStreamReader::channels() const { return impl_->channels; }
+
+std::uint32_t WavStreamReader::channel_mask() const { return impl_->channel_mask; }
 
 std::uint64_t WavStreamReader::frame_count() const { return impl_->frames_total; }
 
@@ -180,6 +184,7 @@ void WavStreamReader::close() noexcept {
     im.frames_total = 0;
     im.frames_read = 0;
     im.channels = 0;
+    im.channel_mask = 0;
     im.sample_rate = 0;
     im.stride = 0;
     im.format = detail::SampleFormat::kPcm16;
