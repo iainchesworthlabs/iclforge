@@ -65,7 +65,7 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | | §7.8 / dialnorm output stage | 🟢 | High | Essential | Opt-in; Lo/Ro, Lt/Rt, mono, RF |
 | | §7.10 error concealment | 🟢 | Medium | Important | Opt-in repeat / mute |
 | | Consumer diagnostics sink | 🟢 | Low | Optional | CRC fail and unknown EMDF id |
-| | Karaoke mode (Annex C, informative) | 🟡🔵 | Low | Optional | `bsmod` 7 with `acmod` above 1/0 is read and reported as a karaoke main service by `probe`. Both of a karaoke-aware decoder's reproductions (C.2.3.1, Table C.2.2): the 2/0 one is §7.8's Lo/Ro downmix, which the output stage gives, and the 3/0 one - L, C, R from L M R V1 V2 with the vocals at the stream's surround level, melody in the centre - is `OutputConfig::karaoke` and `forge decode ... karaoke`, held to the annex's coefficients by impulse and over a coded stream, since no outside decoder reproduces karaoke. Not done: C.2.3.2's karaoke-capable decoder, whose listener picks none, one or both vocals (Table C.2.3). Accepted: it is a player's control rather than a decoder's, and Table C.2.3's cells did not survive the specification's text extraction (its two pages' columns interleave), so they were not guessed at |
+| | Karaoke mode (Annex C, informative) | 🟢 | Low | Optional | `bsmod` 7 with `acmod` above 1/0 is read and reported as a karaoke main service by `probe`. Both decoders Annex C describes: the karaoke-aware one (C.2.3.1, Table C.2.2) - the 2/0 reproduction is §7.8's Lo/Ro downmix, which the output stage gives, and the 3/0 one (L, C, R from L M R V1 V2, the vocals at the stream's surround level, melody in the centre) is `OutputConfig::karaoke = kAware` and `forge decode ... karaoke` - and the karaoke-capable one (C.2.3.2, Table C.2.3), whose listener chooses none, one or both vocals (`kCapable` with `karaoke_vocals`; `karaoke=none|v1|v2|v1+v2`) in the 3/0 and 2/0 reproductions. Held to the annex's coefficients, transcribed from the specification's PDF, by impulse in every karaoke `acmod` and over a coded stream, since no outside decoder reproduces karaoke. The annex's optional further controls (re-levelling or moving V1, V2 and M) are left to the implementation and are not offered |
 
 ---
 
@@ -325,7 +325,6 @@ this register is the checklist that those bounds appear here too.
 |---|---|---|
 | Table 5.8 acmods 3/0, 2/1, 3/1, 2/2 | No preset token names them (a Table E2.5 list or a stated-speaker WAV does); a WAV with no mask is read by its width | 🟡🔵 |
 | §5.4.2.31 `addbsi`, §5.4.4 `auxdata` | Read past and written clear; no user-data surface | 🔴🔵 |
-| Annex C karaoke | Karaoke-capable decoder's V1/V2 listener controls (C.2.3.2) | 🟡🔵 |
 | Annex E §E2.3.1.1 `strmtyp` 2 | Convertible substreams | 🔴 |
 | Annex E §E2.3.1.2 I0–I7 | Associated-service labelling; receiver mixer | 🟡 / 🔴 |
 | Annex E §E3.5 / §3.7 | In `auto`; external oracle; TPN EOF hold-back | 🟢 tools / 🟡 policy |

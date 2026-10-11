@@ -584,8 +584,12 @@ project can run implements it, and there is no karaoke stream from anyone else. 
 the annex's own tables instead - Table C.2.2's 3/0 columns coefficient by coefficient off an
 impulse in every karaoke `acmod` (and its 2/0 column against the Lo/Ro fold), then a coded 3/2
 stream flagged `bsmod` 7 decoded as coded and as Lk, Ck, Rk, sample for sample, and a 3/2 stream
-flagged as a main service shown to ignore the request. That checks the code against the reading
-of the table, not the reading against anyone's decoder.
+flagged as a main service shown to ignore the request. The karaoke-capable decoder's Table C.2.3
+is held the same way: its four listener choices, in both the 3/0 and the 2/0 reproduction (and the
+mono sum), are transcribed from the specification's page 105-106 into the tests and compared
+coefficient by coefficient, with a level pair (clev 0.5, slev 0.25) no cell could be mistaken for,
+and again over a coded stream through the decoder and through `forge decode`. That checks the code
+against the reading of the table, not the reading against anyone's decoder.
 
 The four modes with no preset were measured the same way against FFmpeg's decode of this
 encoder's own streams (a tone per channel, 192 kbit/s): 3/0 at 98.7 to 101.1 dB, 2/1 at 98.7 to

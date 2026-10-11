@@ -636,12 +636,23 @@ the stereo or mono fold *is* Annex C's 2/0 reproduction - "any AC-3 decoder will
 appropriate output if it is set to perform an Lo, Ro 2-channel downmix" - so `karaoke` changes
 nothing there, and `downmix=ltrt` is refused, since Annex C has no Lt/Rt. A stream that is not
 karaoke is decoded as coded and the report says so; E-AC-3 and AC-4 streams warn and ignore the
-option. The karaoke-*capable* decoder's listener controls over which vocals to hear (C.2.3.2)
-are not offered.
+option.
+
+`karaoke=none|v1|v2|v1+v2` is the karaoke-*capable* decoder (C.2.3.2, Table C.2.3): the same
+reproduction with the listener choosing which vocals are heard rather than the stream's own
+`surmixlev`. At the default layout it is L, C, R again - `none` leaves M alone in the centre, `v1`
+or `v2` adds that vocal to the centre, `v1+v2` puts V1 into the left and V2 into the right at unity -
+and at `channels=2` or `channels=1` it is the 2/0 reproduction: M at the stream's `cmixlev`, a single
+vocal at 0.7 in both channels, a pair left and right at unity, with mono the two summed. Every
+coefficient is scaled down together when an output's sum exceeds 1. `karaoke=off` (the default),
+`karaoke=on` and `karaoke=aware` are the spellings of no reproduction and of the bare option.
 
 ```bash
 forge decode sing-along.ac3 karaoke.wav karaoke       # L C R: melody centre, vocals at surmixlev
 forge decode sing-along.ac3 stereo.wav channels=2     # the 2/0 reproduction, Lo/Ro
+forge decode sing-along.ac3 backing.wav karaoke=none  # L C R with the vocals muted
+forge decode sing-along.ac3 duet.wav karaoke=v1+v2    # V1 left, V2 right, melody centre
+forge decode sing-along.ac3 lead.wav channels=2 karaoke=v1   # stereo with V1 in the middle
 ```
 
 `downmix=auto` lets the stream choose between the two stereo folds, the third option A/52
