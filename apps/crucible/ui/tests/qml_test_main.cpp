@@ -1,6 +1,8 @@
 #include <QtQuickTest/quicktest.h>
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
 #include <QGuiApplication>
 #include <QObject>
 #include <QQmlEngine>
@@ -251,6 +253,21 @@ public:
         const QSettings store(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("iclforge"),
                               QStringLiteral("Crucible"));
         return store.value(key);
+    }
+
+    // `text` (UTF-8) as a file called `name` in a folder of this harness's own under the
+    // temporary directory, and its path; empty when it could not be written. For the lyrics
+    // suite, which imports a file by its path.
+    Q_INVOKABLE QString writeTextFile(const QString& name, const QString& text) const {
+        const QString folder = QDir(QDir::tempPath()).filePath(QStringLiteral("crucible_qmltests_files"));
+        QDir().mkpath(folder);
+        const QString path = QDir(folder).filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            return {};
+        }
+        file.write(text.toUtf8());
+        return path;
     }
 
     // The machine back. Every scripted suite calls this in cleanup(),

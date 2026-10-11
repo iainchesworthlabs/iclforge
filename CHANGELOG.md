@@ -159,6 +159,14 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **Crucible shows the lyrics of an application.** The Room page has a sixth block, **06 LYRICS**:
+  import an `.lrc` (UTF-8 or UTF-16) against the selected application, press **Start** as the song
+  begins and the strip shows the line being sung with the lines around it, a word at a time where the
+  file times its words. The position is start-and-nudge (Start, Start again, and 0.1 s nudges up to
+  10 s either way), because Crucible taps an application's sound and has no way to read its media
+  position; a media-session source is a later change. Lyrics go with the application when it
+  leaves the list. The reader is `libs/lyrics`, the one Hearth reads with
+  (planning/karaoke-phase2.md, W13b).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
