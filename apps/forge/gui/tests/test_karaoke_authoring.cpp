@@ -6,9 +6,15 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
+#include "iclforge/ac3/core/tables.hpp"
 #include "karaoke_authoring.hpp"
 
 using forge_gui::KaraokeCheck;
@@ -275,4 +281,109 @@ TEST_CASE("karaoke authoring: a duration is printed as the window prints one",
     CHECK(forge_gui::karaoke_duration_text(59.99) == "0:59");
     CHECK(forge_gui::karaoke_duration_text(0.0) == "0:00");
     CHECK(forge_gui::karaoke_duration_text(3600.0) == "60:00");
+}
+
+TEST_CASE("karaoke authoring: a mode starts at about 77 kbps a channel, on a rate Table 5.18 has",
+          "[forge-gui][karaoke]") {
+    // The design sheet's figure for the five channels of 3/2.
+    CHECK(forge_gui::karaoke_default_bitrate_kbps("3/2") == 384);
+    CHECK(forge_gui::karaoke_default_bitrate_kbps("3/1") == 320);
+    CHECK(forge_gui::karaoke_default_bitrate_kbps("2/2") == 320);
+    CHECK(forge_gui::karaoke_default_bitrate_kbps("3/0") == 256);
+    CHECK(forge_gui::karaoke_default_bitrate_kbps("2/1") == 256);
+    // No mode, or one that is not Annex C's: the encoder's own start.
+    CHECK(forge_gui::karaoke_default_bitrate_kbps("") == 192);
+    CHECK(forge_gui::karaoke_default_bitrate_kbps("2/0") == 192);
+
+    // Each is a rate the AC-3 encoder takes, and more channels never take less.
+    int previous = 0;
+    for (const char* mode : {"3/0", "3/1", "3/2"}) {
+        const int rate = forge_gui::karaoke_default_bitrate_kbps(mode);
+        CHECK(std::ranges::find(iclforge::ac3::kBitratesKbps, static_cast<std::uint16_t>(rate)) !=
+              iclforge::ac3::kBitratesKbps.end());
+        CHECK(rate >= previous);
+        previous = rate;
+    }
+}
+
+namespace {
+
+// A folder of its own under the temporary directory, removed with the test.
+class ScratchFolder {
+public:
+    ScratchFolder() {
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        path_ = std::filesystem::temp_directory_path() /
+                ("forge-gui-karaoke-lyrics-" + std::to_string(stamp));
+        std::filesystem::create_directories(path_);
+    }
+    ~ScratchFolder() {
+        std::error_code ignored;
+        std::filesystem::remove_all(path_, ignored);
+    }
+    ScratchFolder(const ScratchFolder&) = delete;
+    ScratchFolder& operator=(const ScratchFolder&) = delete;
+
+    // Writes `text` to a file of this name here, and returns its path.
+    [[nodiscard]] std::string file(const std::string& name, const std::string& text) const {
+        const auto full = path_ / name;
+        std::ofstream out(full, std::ios::binary);
+        out << text;
+        return full.string();
+    }
+
+private:
+    std::filesystem::path path_;
+};
+
+std::string read_all(const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+}  // namespace
+
+TEST_CASE("karaoke authoring: the lyrics beside a file are the .lrc of its name, in any case",
+          "[forge-gui][karaoke]") {
+    const ScratchFolder folder;
+    const std::string song = folder.file("song.wav", "x");
+    // Nothing there yet; another name's lyrics are not this song's.
+    CHECK(forge_gui::karaoke_lyrics_beside(song).empty());
+    static_cast<void>(folder.file("other.lrc", "[00:01.00]no"));
+    CHECK(forge_gui::karaoke_lyrics_beside(song).empty());
+
+    const std::string lyrics = folder.file("song.lrc", "[00:01.00]hello");
+    CHECK(forge_gui::karaoke_lyrics_beside(song) == lyrics);
+    // The extension is matched without regard to case, as Hearth finds it.
+    const ScratchFolder upper;
+    const std::string loud = upper.file("Song.LRC", "[00:01.00]hello");
+    CHECK(forge_gui::karaoke_lyrics_beside(upper.file("Song.wav", "x")) == loud);
+}
+
+TEST_CASE("karaoke authoring: lyrics are copied beside the stream under its name, and never over another",
+          "[forge-gui][karaoke]") {
+    using forge_gui::KaraokeLyricsCopy;
+    const ScratchFolder source_folder;
+    const ScratchFolder stream_folder;
+    const std::string lyrics = source_folder.file("my words.lrc", "[00:01.00]hello");
+
+    // The stream's name with .lrc, so that Hearth finds it as it finds any sidecar.
+    const std::string stream = stream_folder.file("out.ac3", "x");
+    CHECK(forge_gui::karaoke_copy_lyrics(lyrics, stream) == KaraokeLyricsCopy::kCopied);
+    const std::string beside = forge_gui::karaoke_lyrics_beside(stream);
+    REQUIRE_FALSE(beside.empty());
+    CHECK(read_all(beside) == "[00:01.00]hello");
+
+    // A lyrics file already there is left as it was, not replaced by this one.
+    const std::string other = source_folder.file("other words.lrc", "[00:01.00]different");
+    CHECK(forge_gui::karaoke_copy_lyrics(other, stream) == KaraokeLyricsCopy::kExists);
+    CHECK(read_all(beside) == "[00:01.00]hello");
+
+    // The file offered is the one already there: nothing to do, and nothing wrong.
+    CHECK(forge_gui::karaoke_copy_lyrics(beside, stream) == KaraokeLyricsCopy::kAlreadyThere);
+
+    // A file that is not there says so.
+    CHECK(forge_gui::karaoke_copy_lyrics((std::filesystem::path(stream).parent_path() / "none.lrc").string(),
+                                         stream_folder.file("second.ac3", "x")) ==
+          KaraokeLyricsCopy::kUnreadable);
 }

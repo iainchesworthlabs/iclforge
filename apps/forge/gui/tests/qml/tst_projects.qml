@@ -175,6 +175,30 @@ TestCase {
         compare(win.projectUrl, file.toString());
     }
 
+    // The flow keeps an offset and a trim set on a part across the parts changing; a project
+    // is another state altogether, and must not inherit what the session had set.
+    function test_aProjectOpensWithoutTheSessionsOffsetsAndTrims() {
+        const win = openWindow();
+        win.tier = "karaoke";
+        const flow = findByName(win, "karaokeFlow");
+        flow.setUrl("backing", backing.toString());
+        flow.setUrl("melody", melody.toString());
+        flow.setUrl("vocal1", lead.toString());
+        tryCompare(flow.plan, "mode", "3/1", 5000);
+        const file = inTheFolder("kp-clean.forgeproj");
+        verify(win.saveProjectFile(file), "the project could not be saved");
+
+        // The same session, with its parts nudged and trimmed.
+        EncoderController.setSourceOffset(0, 0.5);
+        EncoderController.setAssignmentTrim(0, 0, -6.0);
+        compare(EncoderController.sourceModel[0].offsetSeconds, 0.5);
+
+        verify(win.openProjectFile(file));
+        compare(EncoderController.sourceModel.length, 3);
+        compare(EncoderController.sourceModel[0].offsetSeconds, 0);
+        compare(EncoderController.assignmentRows[0].trimDb, 0);
+    }
+
     function test_theHeaderOffersOpenAndSaveAndThePickersRunTheSameCode() {
         const file = saveThreeParts("kp-picker.forgeproj");
         cleanup();
