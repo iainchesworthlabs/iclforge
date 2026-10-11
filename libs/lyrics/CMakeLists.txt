@@ -15,7 +15,7 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     return()
 endif()
 
-add_library(iclforge_lyrics STATIC src/lyrics.cpp)
+add_library(iclforge_lyrics STATIC src/lyrics.cpp src/timing.cpp)
 add_library(iclforge::lyrics ALIAS iclforge_lyrics)
 target_include_directories(iclforge_lyrics PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")

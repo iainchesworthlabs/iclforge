@@ -2,7 +2,7 @@
 
 # lyrics
 
-Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words, the file's place beside a media item, and the stateless cursor that says which line and word a playing position is in. Standard library only, so that Hearth, Crucible, the sink firmware and the browser can all link it. Internal; never installed.
+Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words and written back, the file's place beside a media item, the stateless cursor that says which line and word a playing position is in, and the editing a tap timer needs (a line's start, a word's start, an estimate by letters). Standard library only, so that Hearth, Crucible, the sink firmware and the browser can all link it. Internal; never installed.
 
 A library, internal to the repository.
 
