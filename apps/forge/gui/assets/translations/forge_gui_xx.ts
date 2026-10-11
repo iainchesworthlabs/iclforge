@@ -1727,12 +1727,108 @@
             <translation>[ÀC-4 ~~]</translation>
         </message>
         <message>
+            <source>Open a project</source>
+            <translation>[Õpén à prõjéct ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Forge projects (*.%1)</source>
+            <translation>[Fõrgé prõjécts (*.%1) ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Save the project</source>
+            <translation>[Sàvé thé prõjéct ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 could not be opened.</source>
+            <translation>[%1 cõûld nõt bé õpénéd. ~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 is not a Forge project: it is not a JSON document.</source>
+            <translation>[%1 îs nõt à Fõrgé prõjéct: ît îs nõt à JSÕN dõcûmént. ~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 is not a Forge project: it does not say it is one.</source>
+            <translation>[%1 îs nõt à Fõrgé prõjéct: ît dõés nõt sày ît îs õné. ~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 does not say which version of the project format it is.</source>
+            <translation>[%1 dõés nõt sày whîch vérsîõn õf thé prõjéct fõrmàt ît îs. ~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 was saved by a newer Forge (project version %2). This one reads up to version %3.</source>
+            <translation>[%1 wàs sàvéd by à néwér Fõrgé (prõjéct vérsîõn %2). Thîs õné réàds ûp tõ vérsîõn %3. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 could not be written.</source>
+            <translation>[%1 cõûld nõt bé wrîttén. ~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Source %1 has no path and was left out.</source>
+            <translation>[Sõûrcé %1 hàs nõ pàth ànd wàs léft õût. ~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 was not found, so it was not loaded.</source>
+            <translation>[%1 wàs nõt fõûnd, sõ ît wàs nõt lõàdéd. ~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 could not be loaded: %2</source>
+            <translation>[%1 cõûld nõt bé lõàdéd: %2 ~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 "%2" is not one this Forge knows. It was left as it was.</source>
+            <translation>[%1 "%2" îs nõt õné thîs Fõrgé knõws. Ît wàs léft às ît wàs. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 %2 is out of range. It was left as it was.</source>
+            <translation>[%1 %2 îs õût õf ràngé. Ît wàs léft às ît wàs. ~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 kbps is not a rate this codec offers. It was left as it was.</source>
+            <translation>[%1 kbps îs nõt à ràté thîs cõdéc õfférs. Ît wàs léft às ît wàs. ~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 could not be set.</source>
+            <translation>[%1 cõûld nõt bé sét. ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The channel layout "%1" is not one this Forge knows. It was left as it was.</source>
+            <translation>[Thé chànnél làyõût "%1" îs nõt õné thîs Fõrgé knõws. Ît wàs léft às ît wàs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>An encode is running. Open the project when it has finished.</source>
+            <translation>[Àn éncõdé îs rûnnîng. Õpén thé prõjéct whén ît hàs fînîshéd. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The project was not opened</source>
+            <translation>[Thé prõjéct wàs nõt õpénéd ~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The project was opened with notes</source>
+            <translation>[Thé prõjéct wàs õpénéd wîth nõtés ~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The project was not saved</source>
+            <translation>[Thé prõjéct wàs nõt sàvéd ~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>Controls</source>
             <translation>[Cõntrõls ~~~]</translation>
         </message>
         <message>
             <source>Karaoke</source>
             <translation>[Kàràõké ~~~]</translation>
+        </message>
+        <message>
+            <source>Project…</source>
+            <translation>[Prõjéct… ~~~]</translation>
+        </message>
+        <message>
+            <source>Open project…</source>
+            <translation>[Õpén prõjéct… ~~~~~]</translation>
+        </message>
+        <message>
+            <source>Save project…</source>
+            <translation>[Sàvé prõjéct… ~~~~~]</translation>
         </message>
         <message>
             <source>Where the sound comes from</source>

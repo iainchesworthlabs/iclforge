@@ -161,6 +161,23 @@ public:
         return QUrl::fromLocalFile(path);
     }
 
+    // A text file of the test's own beside the generated audio: a project that another
+    // version wrote, say. The file's URL, or an empty one where it could not be written.
+    [[nodiscard]] Q_INVOKABLE QUrl writeText(const QString& name, const QString& text) const {
+        const QString path = QDir(folder_).filePath(name);
+        QFile file(path);
+        const QByteArray bytes = text.toUtf8();
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+            file.write(bytes) != bytes.size()) {
+            return {};
+        }
+        return QUrl::fromLocalFile(path);
+    }
+
+    // The folder the generated files go in, as a URL: a project written there refers to the
+    // parts beside it by their names.
+    [[nodiscard]] Q_INVOKABLE QUrl folder() const { return QUrl::fromLocalFile(folder_); }
+
 private:
     QString folder_;
 };

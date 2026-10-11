@@ -23,7 +23,7 @@ iclforge_add_test_binary(iclforge-forge-cli-tests PROJECT forge-cli SOURCES
     test_cli_live.cpp test_cli_probe.cpp test_cli_stream_tools.cpp
     test_cli_options.cpp test_cli_synth.cpp test_cli_analysis.cpp
     test_cli_encode_paths.cpp test_cli_stream_edges.cpp
-    test_cli_inspect_edges.cpp test_cli_atmos_edges.cpp)
+    test_cli_inspect_edges.cpp test_cli_atmos_edges.cpp test_cli_karaoke_example.cpp)
 # The same device-facing commands with a device to find: software ALSA
 # devices (tests/support/alsa_null_device.hpp), so only in the ALSA configuration.
 if(ICLFORGE_AUDIO_BACKEND STREQUAL "alsa")
@@ -45,6 +45,11 @@ target_compile_definitions(iclforge-forge-cli-tests PRIVATE
 # not. A path for the same reason ICLFORGE_EXTERNAL_BASELINE_DIR is one.
 target_compile_definitions(iclforge-forge-cli-tests PRIVATE
     "ICLFORGE_FUZZ_SEED_DIR=\"${CMAKE_SOURCE_DIR}/libs/ac3/fuzz/seeds\"")
+# test_cli_karaoke_example.cpp probes the karaoke example's committed stream and encodes its
+# committed parts, which it reads from the example's own folder: the folder is what the example
+# ships, so it is read in place and not copied to testdata/.
+target_compile_definitions(iclforge-forge-cli-tests PRIVATE
+    "ICLFORGE_KARAOKE_EXAMPLE_DIR=\"${CMAKE_SOURCE_DIR}/examples/karaoke/auld-lang-syne\"")
 # test_cli_atmos_encode_ac4.cpp calls the steps of the AC-4 encode that Forge's front ends share
 # (apps/shared/media), which compile straight into this binary as they do into forge.
 target_sources(iclforge-forge-cli-tests PRIVATE
