@@ -887,28 +887,48 @@
 <context>
     <name>DecoderPage</name>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="39"/>
+        <location filename="../qml/DecoderPage.qml" line="41"/>
         <source>Decoder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="42"/>
+        <location filename="../qml/DecoderPage.qml" line="44"/>
         <source>AC-3 and E-AC-3</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="43"/>
+        <location filename="../qml/DecoderPage.qml" line="45"/>
         <source>AC-4</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="49"/>
+        <location filename="../qml/DecoderPage.qml" line="51"/>
         <source>Changes reach the playing item at its next frame.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/DecoderPage.qml" line="50"/>
+        <location filename="../qml/DecoderPage.qml" line="52"/>
         <source>Changes reach the playing item at its next access unit.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderPage.qml" line="63"/>
+        <source>Karaoke: as coded</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderPage.qml" line="64"/>
+        <source>Karaoke: capable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderPage.qml" line="64"/>
+        <source>Karaoke: aware</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DecoderPage.qml" line="71"/>
+        <source>Karaoke page</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -972,6 +992,261 @@
     </message>
 </context>
 <context>
+    <name>KaraokePage</name>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="175"/>
+        <source>the LFE, as coded</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="179"/>
+        <source>silent</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="212"/>
+        <source>Karaoke</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="218"/>
+        <source>Nothing is playing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="229"/>
+        <source>Add a karaoke stream to the queue and play it. What you choose here applies to it.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="233"/>
+        <source>Karaoke, %1 coded: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="238"/>
+        <source>An AC-3 stream, but not a karaoke one: its service is %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="240"/>
+        <source>Karaoke is an AC-3 mode (Annex C of ETSI TS 102 366). This is not an AC-3 stream.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="251"/>
+        <source>Reproduction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="252"/>
+        <source>Annex C, ETSI TS 102 366</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="258"/>
+        <location filename="../qml/KaraokePage.qml" line="262"/>
+        <source>Decoder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="266"/>
+        <source>As coded</source>
+        <translation type="unfinished">Wie codiert</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="267"/>
+        <source>Aware</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="268"/>
+        <source>Capable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="276"/>
+        <source>The channels as the stream codes them: the vocals come from the surround speakers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="279"/>
+        <source>L, C and R, with the vocals at the level the programme set (Table C.2.2).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="281"/>
+        <source>L, C and R, with the vocals you choose (Table C.2.3).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="290"/>
+        <location filename="../qml/KaraokePage.qml" line="294"/>
+        <source>Vocals</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="298"/>
+        <source>None</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="299"/>
+        <source>V1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="300"/>
+        <source>V2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="301"/>
+        <source>Both</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="313"/>
+        <source>These controls do not apply to the stream that is playing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="326"/>
+        <source>This is going out as a bitstream, so the receiver decodes it and the choice above is not applied. Unless the receiver is karaoke-capable, V1 and V2 play from its surround speakers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="335"/>
+        <source>Choose output…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="344"/>
+        <source>This is going to a network group. A sink that is sent PCM plays the reproduction; one that is sent coded AC-3 decodes it itself and plays it as coded.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="359"/>
+        <source>The stereo fold is Lt/Rt. Annex C defines no Lt/Rt reproduction, so the stream plays as its Lt/Rt fold and the choice above has no effect. The Lo/Ro fold reproduces karaoke.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="368"/>
+        <source>Use Lo/Ro</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="384"/>
+        <source>The stream</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="389"/>
+        <source>Backing left</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="390"/>
+        <source>Backing right</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="391"/>
+        <source>Melody guide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="392"/>
+        <source>Vocal 1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="393"/>
+        <source>Vocal 2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="410"/>
+        <source>not in this stream</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="411"/>
+        <source>heard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="411"/>
+        <source>muted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="421"/>
+        <source>What plays</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="459"/>
+        <source>Nothing karaoke is playing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="467"/>
+        <source>Signal path</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="475"/>
+        <source>Decoded as the stream says.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="478"/>
+        <source>as coded</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="479"/>
+        <source>aware</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="480"/>
+        <source>capable, vocals: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="481"/>
+        <source>none</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="482"/>
+        <source>both</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="485"/>
+        <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="486"/>
+        <source>AC-3 karaoke, %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="498"/>
+        <source>Nothing is playing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="500"/>
+        <source>%1 · %2 ch at %3 Hz</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>LicencesDialog</name>
     <message>
         <location filename="../qml/LicencesDialog.qml" line="34"/>
@@ -993,57 +1268,62 @@
     <name>Main</name>
     <message>
         <location filename="../qml/Main.qml" line="22"/>
-        <location filename="../qml/Main.qml" line="156"/>
+        <location filename="../qml/Main.qml" line="158"/>
         <source>Hearth</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="185"/>
+        <location filename="../qml/Main.qml" line="187"/>
         <source>Opens where Hearth plays</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="213"/>
+        <location filename="../qml/Main.qml" line="215"/>
         <source>no output chosen yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="238"/>
+        <location filename="../qml/Main.qml" line="240"/>
         <source>Page</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="241"/>
+        <location filename="../qml/Main.qml" line="243"/>
         <source>Play</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="242"/>
+        <location filename="../qml/Main.qml" line="244"/>
         <source>Media</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="243"/>
+        <location filename="../qml/Main.qml" line="245"/>
         <source>Speakers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="244"/>
+        <location filename="../qml/Main.qml" line="246"/>
         <source>Decoder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="245"/>
+        <location filename="../qml/Main.qml" line="247"/>
         <source>Network</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="246"/>
+        <location filename="../qml/Main.qml" line="248"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="258"/>
+        <location filename="../qml/Main.qml" line="249"/>
+        <source>Karaoke</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Main.qml" line="261"/>
         <source>Keyboard shortcuts</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3916,32 +4196,37 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ShortcutsDialog.qml" line="88"/>
-        <source>TRANSPORT AND QUEUE</source>
+        <location filename="../qml/ShortcutsDialog.qml" line="87"/>
+        <source>Karaoke</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="90"/>
+        <source>TRANSPORT AND QUEUE</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/ShortcutsDialog.qml" line="92"/>
         <source>Previous, Play/Pause, Stop, Next and Gapless are in the transport bar at the bottom of every page; Add files… and the queue are on Play. Tab reaches each control in turn, and Space or Return activates whichever one has focus.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ShortcutsDialog.qml" line="93"/>
+        <location filename="../qml/ShortcutsDialog.qml" line="95"/>
         <source>THIS WINDOW</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ShortcutsDialog.qml" line="100"/>
+        <location filename="../qml/ShortcutsDialog.qml" line="102"/>
         <source>Open this reference</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ShortcutsDialog.qml" line="106"/>
+        <location filename="../qml/ShortcutsDialog.qml" line="108"/>
         <source>About…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ShortcutsDialog.qml" line="110"/>
+        <location filename="../qml/ShortcutsDialog.qml" line="112"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4373,17 +4658,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1177"/>
+        <location filename="../../src/hearth_controller.cpp" line="1287"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2219"/>
+        <location filename="../../src/hearth_controller.cpp" line="2350"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2222"/>
+        <location filename="../../src/hearth_controller.cpp" line="2353"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>

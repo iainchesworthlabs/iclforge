@@ -25,6 +25,8 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
 #include "iclforge/sendspin/discovery.hpp"
+#include "iclforge/ac3/encoder/encoder.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "network_sinks.hpp"
 #include "output_selector.hpp"
@@ -485,6 +487,60 @@ bool write_ac4_stream(const std::string& path, const std::string& kind, std::str
         return fail("the encoder could not flush");
     }
     write(*rest);
+    return out.good() ? true : fail("could not write " + path);
+}
+
+bool write_ac3_stream(const std::string& path, const std::string& kind, std::string* error) {
+    const auto fail = [error](std::string why) {
+        if (error != nullptr) {
+            *error = std::move(why);
+        }
+        return false;
+    };
+    const bool karaoke = kind.starts_with("karaoke-");
+    if (!karaoke && !kind.starts_with("main-")) {
+        return fail("no such kind of stream: " + kind);
+    }
+    const std::string mode = kind.substr(kind.find('-') + 1);
+    iclforge::ac3::EncoderConfig config;
+    config.sample_rate = iclforge::ac3::SampleRate::k48000;
+    config.bitrate_kbps = 448;
+    if (mode == "3/2") {
+        config.acmod = iclforge::ac3::Acmod::k3_2;
+        config.lfe = true;
+    } else if (mode == "2/1") {
+        config.acmod = iclforge::ac3::Acmod::k2_1;
+    } else {
+        return fail("no such coding mode: " + mode);
+    }
+    config.info.bsmod = karaoke ? iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke
+                                : iclforge::ac3::meta::BitstreamMode::kCompleteMain;
+    iclforge::ac3::FrameEncoder encoder{config};
+    const auto channels = static_cast<std::size_t>(encoder.channel_count());
+    // Coded order: L, C, R, Ls, Rs, then the LFE.
+    constexpr std::array<double, 6> kHz = {440.0, 800.0, 620.0, 1030.0, 1270.0, 90.0};
+    std::vector<std::vector<float>> input;
+    for (std::size_t c = 0; c < channels; ++c) {
+        input.push_back(tone(kHz[c]));
+    }
+    std::ofstream out(std::filesystem::path(path), std::ios::binary);
+    if (!out) {
+        return fail("could not open " + path);
+    }
+    const std::size_t frame = iclforge::ac3::kSamplesPerFrame;
+    const std::size_t frames = (10 * 48000) / frame;
+    for (std::size_t f = 0; f < frames; ++f) {
+        std::vector<std::span<const float>> views;
+        for (const auto& channel : input) {
+            views.emplace_back(channel.data() + (f * frame), frame);
+        }
+        const auto encoded = encoder.encode_frame(views);
+        if (!encoded) {
+            return fail("the encoder refused a frame");
+        }
+        out.write(reinterpret_cast<const char*>(encoded->data()),
+                  static_cast<std::streamsize>(encoded->size()));
+    }
     return out.good() ? true : fail("could not write " + path);
 }
 

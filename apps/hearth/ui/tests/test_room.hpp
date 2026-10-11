@@ -87,6 +87,15 @@ inline constexpr std::size_t kToneWindow = 16384;
 //                    presentation 2 all three.
 bool write_ac4_stream(const std::string& path, const std::string& kind, std::string* error);
 
+// An AC-3 stream of tones as iclforge::ac3::FrameEncoder writes it, 10 seconds at
+// 48 kHz, at `path`, for the karaoke page's suite; false, with `error` set, where it
+// could not be written. `kind` is "karaoke-" or "main-" and then the coding mode:
+// "karaoke-3/2" is bsmod 7 (Annex C's karaoke type), "main-3/2" the same audio flagged
+// a complete main service. 3/2 carries an LFE, the other modes none. One tone a coded
+// channel, in Table 5.8's order with the LFE last: L 440, C 800, R 620, Ls 1030,
+// Rs 1270, LFE 90 Hz - so for a karaoke stream L, M, R, V1 and V2 - at -20 dBFS.
+bool write_ac3_stream(const std::string& path, const std::string& kind, std::string* error);
+
 // An in-process apps/hearth/testsink Sink on 127.0.0.1, dynamic six-digit
 // codes, no mDNS advertisement, its state and output directories under
 // `directory`.

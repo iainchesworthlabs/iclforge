@@ -118,6 +118,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderPage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderEac3.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DecoderAc4.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/KaraokePage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Network.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkList.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkPairing.qml"

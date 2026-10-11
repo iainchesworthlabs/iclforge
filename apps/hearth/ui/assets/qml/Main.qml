@@ -63,7 +63,8 @@ ApplicationWindow {
     LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
     LayoutMirroring.childrenInherit: true
 
-    readonly property var pageOrder: ["play", "media", "speakers", "decoder", "network", "settings"]
+    readonly property var pageOrder: ["play", "media", "speakers", "decoder", "network", "settings",
+                                      "karaoke"]
     property string page: "play"
     // A capture run (main.cpp, --shot) sets this before the first event-loop
     // turn, so the first-run dialog never lands in a screenshot that did not
@@ -134,6 +135,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+4"; onActivated: window.page = "decoder" }
     Shortcut { sequence: "Ctrl+5"; onActivated: window.page = "network" }
     Shortcut { sequence: "Ctrl+6"; onActivated: window.page = "settings" }
+    Shortcut { sequence: "Ctrl+7"; onActivated: window.page = "karaoke" }
     // The Speakers page's IDENTIFY card says this stops it. A harmless no-op
     // when nothing is sounding the tone, so this needs no guard on which
     // page is showing.
@@ -243,7 +245,8 @@ ApplicationWindow {
                     { value: "speakers", label: qsTr("Speakers") },
                     { value: "decoder", label: qsTr("Decoder") },
                     { value: "network", label: qsTr("Network") },
-                    { value: "settings", label: qsTr("Settings") }
+                    { value: "settings", label: qsTr("Settings") },
+                    { value: "karaoke", label: qsTr("Karaoke") }
                 ]
                 onSelected: function(value) { window.page = value; }
             }
@@ -282,9 +285,10 @@ ApplicationWindow {
         PlayPage { }
         Media { }
         Speakers { }
-        DecoderPage { format: window.decoderFormat }
+        DecoderPage { format: window.decoderFormat; onKaraokePageRequested: window.page = "karaoke" }
         Network { }
         Settings { }
+        KaraokePage { onOutputPickerRequested: window.openOutputPicker() }
     }
 
     footer: TransportBar { }

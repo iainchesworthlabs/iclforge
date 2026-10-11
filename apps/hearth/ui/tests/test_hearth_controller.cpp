@@ -824,3 +824,98 @@ TEST_CASE("media_info_to_map: error and note strings only appear when non-empty"
     CHECK(map.value(QStringLiteral("error")).toString().toStdString() == "could not open file");
     CHECK_FALSE(map.contains(QStringLiteral("note")));
 }
+
+// --- Annex C's karaoke (KaraokePage.qml) ------------------------------------
+
+TEST_CASE("decoder settings: the karaoke choice round-trips through the map",
+          "[hearth][hearth-controller][karaoke]") {
+    // Aware, with both vocals, is what a fresh start has.
+    const QVariantMap fresh = iclforge::hearth::ui::decoder_settings_to_map(DecoderSettings{});
+    CHECK(fresh.value(QStringLiteral("karaoke")).toString().toStdString() == "aware");
+    CHECK(fresh.value(QStringLiteral("karaokeVocals")).toString().toStdString() == "both");
+
+    struct Choice {
+        iclforge::ac3::KaraokeReproduction reproduction;
+        iclforge::ac3::KaraokeVocals vocals;
+        const char* reproduction_name;
+        const char* vocals_name;
+    };
+    const Choice choices[] = {
+        {iclforge::ac3::KaraokeReproduction::kOff, iclforge::ac3::KaraokeVocals::kNone, "asCoded", "none"},
+        {iclforge::ac3::KaraokeReproduction::kAware, iclforge::ac3::KaraokeVocals::kV1, "aware", "v1"},
+        {iclforge::ac3::KaraokeReproduction::kCapable, iclforge::ac3::KaraokeVocals::kV2, "capable", "v2"},
+        {iclforge::ac3::KaraokeReproduction::kCapable, iclforge::ac3::KaraokeVocals::kBoth, "capable", "both"},
+    };
+    for (const Choice& choice : choices) {
+        DecoderSettings settings;
+        settings.karaoke = choice.reproduction;
+        settings.karaoke_vocals = choice.vocals;
+        const QVariantMap map = iclforge::hearth::ui::decoder_settings_to_map(settings);
+        CHECK(map.value(QStringLiteral("karaoke")).toString().toStdString() == choice.reproduction_name);
+        CHECK(map.value(QStringLiteral("karaokeVocals")).toString().toStdString() == choice.vocals_name);
+        const DecoderSettings back =
+            iclforge::hearth::ui::decoder_settings_from_map(map, DecoderSettings{});
+        CHECK(back.karaoke == choice.reproduction);
+        CHECK(back.karaoke_vocals == choice.vocals);
+    }
+
+    // A map without the keys leaves the base alone, and an unknown name is the default.
+    DecoderSettings base;
+    base.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    base.karaoke_vocals = iclforge::ac3::KaraokeVocals::kNone;
+    const DecoderSettings unchanged =
+        iclforge::hearth::ui::decoder_settings_from_map(QVariantMap{}, base);
+    CHECK(unchanged.karaoke == iclforge::ac3::KaraokeReproduction::kCapable);
+    CHECK(unchanged.karaoke_vocals == iclforge::ac3::KaraokeVocals::kNone);
+    QVariantMap odd;
+    odd.insert(QStringLiteral("karaoke"), QStringLiteral("nonsense"));
+    odd.insert(QStringLiteral("karaokeVocals"), QStringLiteral("nonsense"));
+    const DecoderSettings defaults = iclforge::hearth::ui::decoder_settings_from_map(odd, base);
+    CHECK(defaults.karaoke == iclforge::ac3::KaraokeReproduction::kAware);
+    CHECK(defaults.karaoke_vocals == iclforge::ac3::KaraokeVocals::kBoth);
+}
+
+TEST_CASE("media_info_to_map: a karaoke programme names its coding mode and its parts",
+          "[hearth][hearth-controller][karaoke]") {
+    iclforge::hearth::MediaInfo info;
+    const auto programme = [](iclforge::ac3::Acmod acmod, int bsmod) {
+        MediaProgramme row;
+        row.substreamid = 0;
+        row.acmod = acmod;
+        row.bsmod = bsmod;
+        return row;
+    };
+    // Annex C's Table C.2.1: 3/0 is L M R, 2/1 L R V1, 3/1 L M R V1, 2/2 L R V1 V2 and
+    // 3/2 L M R V1 V2 - L and R first, then the parts the layout adds.
+    info.programmes = {programme(iclforge::ac3::Acmod::k3_0, 7), programme(iclforge::ac3::Acmod::k2_1, 7),
+                       programme(iclforge::ac3::Acmod::k3_1, 7), programme(iclforge::ac3::Acmod::k2_2, 7),
+                       programme(iclforge::ac3::Acmod::k3_2, 7)};
+    const char* const expected[] = {"L R M", "L R V1", "L R M V1", "L R V1 V2", "L R M V1 V2"};
+    const char* const labels[] = {"3/0", "2/1", "3/1", "2/2", "3/2"};
+    const QVariantMap map = iclforge::hearth::ui::media_info_to_map(info);
+    const QVariantList rows = map.value(QStringLiteral("programmes")).toList();
+    REQUIRE(rows.size() == 5);
+    for (qsizetype i = 0; i < rows.size(); ++i) {
+        const QVariantMap row = rows[i].toMap();
+        CHECK(row.value(QStringLiteral("karaoke")).toBool());
+        CHECK(row.value(QStringLiteral("acmodLabel")).toString().toStdString() == labels[i]);
+        QStringList parts;
+        for (const QVariant& part : row.value(QStringLiteral("karaokeParts")).toList()) {
+            parts.push_back(part.toString());
+        }
+        CHECK(parts.join(QLatin1Char(' ')).toStdString() == expected[i]);
+    }
+
+    // bsmod 7 at 1/0 is a voice-over, and any other bsmod is not karaoke at any layout.
+    info.programmes = {programme(iclforge::ac3::Acmod::k1_0, 7), programme(iclforge::ac3::Acmod::k3_2, 0),
+                       programme(iclforge::ac3::Acmod::k2_0, 7)};
+    const QVariantList others =
+        iclforge::hearth::ui::media_info_to_map(info).value(QStringLiteral("programmes")).toList();
+    REQUIRE(others.size() == 3);
+    // 2/0 with bsmod 7 is above 1/0, so Annex C's own rule makes it karaoke, with L and R only.
+    CHECK_FALSE(others[0].toMap().value(QStringLiteral("karaoke")).toBool());
+    CHECK_FALSE(others[1].toMap().value(QStringLiteral("karaoke")).toBool());
+    CHECK(others[1].toMap().value(QStringLiteral("karaokeParts")).toList().isEmpty());
+    CHECK(others[2].toMap().value(QStringLiteral("karaoke")).toBool());
+    CHECK(others[2].toMap().value(QStringLiteral("karaokeParts")).toList().size() == 2);
+}

@@ -83,6 +83,8 @@ Dialog {
             Action { text: qsTr("Network") }
             Key { text: "Ctrl+6" }
             Action { text: qsTr("Settings") }
+            Key { text: "Ctrl+7" }
+            Action { text: qsTr("Karaoke") }
         }
 
         Kicker { text: qsTr("TRANSPORT AND QUEUE") }

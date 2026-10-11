@@ -46,6 +46,7 @@
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/audio/speakers.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/render/layout.hpp"
@@ -181,6 +182,47 @@ constexpr int kPollMs = 60;
     return map;
 }
 
+// Table 5.8's coding mode as the stream's own spelling: "3/2".
+[[nodiscard]] QString acmod_label(ac3::Acmod acmod) {
+    // clang-format off
+    switch (acmod) {
+        case ac3::Acmod::kDualMono: return QStringLiteral("1+1");
+        case ac3::Acmod::k1_0: return QStringLiteral("1/0");
+        case ac3::Acmod::k2_0: return QStringLiteral("2/0");
+        case ac3::Acmod::k3_0: return QStringLiteral("3/0");
+        case ac3::Acmod::k2_1: return QStringLiteral("2/1");
+        case ac3::Acmod::k3_1: return QStringLiteral("3/1");
+        case ac3::Acmod::k2_2: return QStringLiteral("2/2");
+        case ac3::Acmod::k3_2: return QStringLiteral("3/2");
+    }
+    // clang-format on
+    return {};
+}
+
+// What a karaoke stream's channels are (Annex C Table C.2.1): L and R, then a
+// guide melody M where a centre would be and one or two vocals V1 and V2 where
+// the surrounds would be.
+[[nodiscard]] QVariantList karaoke_parts(ac3::Acmod acmod) {
+    QVariantList parts;
+    parts.push_back(QStringLiteral("L"));
+    parts.push_back(QStringLiteral("R"));
+    const bool melody = acmod == ac3::Acmod::k3_0 || acmod == ac3::Acmod::k3_1 ||
+                        acmod == ac3::Acmod::k3_2;
+    const bool vocal1 = acmod == ac3::Acmod::k2_1 || acmod == ac3::Acmod::k3_1 ||
+                        acmod == ac3::Acmod::k2_2 || acmod == ac3::Acmod::k3_2;
+    const bool vocal2 = acmod == ac3::Acmod::k2_2 || acmod == ac3::Acmod::k3_2;
+    if (melody) {
+        parts.push_back(QStringLiteral("M"));
+    }
+    if (vocal1) {
+        parts.push_back(QStringLiteral("V1"));
+    }
+    if (vocal2) {
+        parts.push_back(QStringLiteral("V2"));
+    }
+    return parts;
+}
+
 [[nodiscard]] QVariantList media_programmes_to_list(
     const std::vector<iclforge::hearth::MediaProgramme>& programmes) {
     QVariantList list;
@@ -193,6 +235,13 @@ constexpr int kPollMs = 60;
         row[QStringLiteral("bsid")] = programme.bsid;
         row[QStringLiteral("bsmodLabel")] =
             to_qstring(apps::probe_json::bsmod_label(programme.bsmod, programme.acmod));
+        // Annex C's karaoke type, and what its channels are, for the Karaoke
+        // page: bsmod 7 with an acmod above 1/0.
+        row[QStringLiteral("acmodLabel")] = acmod_label(programme.acmod);
+        const bool karaoke = ac3::meta::is_karaoke(
+            static_cast<ac3::meta::BitstreamMode>(programme.bsmod), programme.acmod);
+        row[QStringLiteral("karaoke")] = karaoke;
+        row[QStringLiteral("karaokeParts")] = karaoke ? karaoke_parts(programme.acmod) : QVariantList{};
         row[QStringLiteral("accessUnits")] = static_cast<qlonglong>(programme.access_units);
         if (programme.complexity_index) {
             row[QStringLiteral("complexityIndex")] = *programme.complexity_index;
@@ -662,6 +711,57 @@ constexpr int kPollMs = 60;
                                          : iclforge::ac3::DownmixTarget::kLoRo;
 }
 
+// Annex C's reproduction as QML names it: "asCoded", "aware" or "capable", and
+// the listener's choice of vocals "none", "v1", "v2" or "both".
+[[nodiscard]] QString karaoke_name(iclforge::ac3::KaraokeReproduction mode) {
+    switch (mode) {
+        case iclforge::ac3::KaraokeReproduction::kOff:
+            return QStringLiteral("asCoded");
+        case iclforge::ac3::KaraokeReproduction::kCapable:
+            return QStringLiteral("capable");
+        case iclforge::ac3::KaraokeReproduction::kAware:
+        default:
+            return QStringLiteral("aware");
+    }
+}
+
+[[nodiscard]] iclforge::ac3::KaraokeReproduction karaoke_from_name(const QString& name) {
+    if (name == QLatin1String("asCoded")) {
+        return iclforge::ac3::KaraokeReproduction::kOff;
+    }
+    if (name == QLatin1String("capable")) {
+        return iclforge::ac3::KaraokeReproduction::kCapable;
+    }
+    return iclforge::ac3::KaraokeReproduction::kAware;
+}
+
+[[nodiscard]] QString karaoke_vocals_name(iclforge::ac3::KaraokeVocals vocals) {
+    switch (vocals) {
+        case iclforge::ac3::KaraokeVocals::kNone:
+            return QStringLiteral("none");
+        case iclforge::ac3::KaraokeVocals::kV1:
+            return QStringLiteral("v1");
+        case iclforge::ac3::KaraokeVocals::kV2:
+            return QStringLiteral("v2");
+        case iclforge::ac3::KaraokeVocals::kBoth:
+        default:
+            return QStringLiteral("both");
+    }
+}
+
+[[nodiscard]] iclforge::ac3::KaraokeVocals karaoke_vocals_from_name(const QString& name) {
+    if (name == QLatin1String("none")) {
+        return iclforge::ac3::KaraokeVocals::kNone;
+    }
+    if (name == QLatin1String("v1")) {
+        return iclforge::ac3::KaraokeVocals::kV1;
+    }
+    if (name == QLatin1String("v2")) {
+        return iclforge::ac3::KaraokeVocals::kV2;
+    }
+    return iclforge::ac3::KaraokeVocals::kBoth;
+}
+
 [[nodiscard]] QString dual_mono_name(iclforge::hearth::DualMonoChoice choice) {
     switch (choice) {
         case iclforge::hearth::DualMonoChoice::kFirst:
@@ -843,6 +943,9 @@ constexpr int kPollMs = 60;
     map[QStringLiteral("jocDomain")] = joc_domain_name(settings.joc_domain);
     map[QStringLiteral("concealment")] = concealment_name(settings.concealment);
     map[QStringLiteral("fastInverseTransform")] = settings.fast_inverse_transform;
+    // Annex C's karaoke reproduction (KaraokePage.qml).
+    map[QStringLiteral("karaoke")] = karaoke_name(settings.karaoke);
+    map[QStringLiteral("karaokeVocals")] = karaoke_vocals_name(settings.karaoke_vocals);
     // AC-4's own (DecoderAc4.qml).
     const iclforge::hearth::Ac4Settings& ac4 = settings.ac4;
     map[QStringLiteral("ac4PresentationId")] = ac4.presentation_id.value_or(-1);
@@ -909,6 +1012,13 @@ constexpr int kPollMs = 60;
     }
     if (map.contains(QStringLiteral("fastInverseTransform"))) {
         out.fast_inverse_transform = map[QStringLiteral("fastInverseTransform")].toBool();
+    }
+    if (map.contains(QStringLiteral("karaoke"))) {
+        out.karaoke = karaoke_from_name(map[QStringLiteral("karaoke")].toString());
+    }
+    if (map.contains(QStringLiteral("karaokeVocals"))) {
+        out.karaoke_vocals =
+            karaoke_vocals_from_name(map[QStringLiteral("karaokeVocals")].toString());
     }
     iclforge::hearth::Ac4Settings& ac4 = out.ac4;
     if (map.contains(QStringLiteral("ac4PresentationId"))) {
@@ -1230,6 +1340,13 @@ void HearthController::start() {
     // Presentation"): the language this window runs in.
     iclforge::hearth::DecoderSettings decoder_settings;
     decoder_settings.ac4.language = QLocale().bcp47Name().toStdString();
+    // The karaoke choice is the one decoder setting kept across starts: a singer
+    // who chose "no vocals" expects it still chosen. (The other decoder
+    // settings are for the session; planning/karaoke.md, P9.)
+    decoder_settings.karaoke = karaoke_from_name(
+        settings_.value(QStringLiteral("karaoke/reproduction"), QStringLiteral("aware")).toString());
+    decoder_settings.karaoke_vocals = karaoke_vocals_from_name(
+        settings_.value(QStringLiteral("karaoke/vocals"), QStringLiteral("both")).toString());
     engine_ = std::make_unique<iclforge::hearth::Engine>(
         std::move(outputs), iclforge::hearth::ui::make_file_item_loader(), layout, decoder_settings,
         iclforge::hearth::EngineTiming{}, &log_);
@@ -1756,6 +1873,9 @@ void HearthController::poll() {
             new_this_frame[QStringLiteral("bitrateKbps")] = *report->bitrate_kbps;
         }
         new_this_frame[QStringLiteral("sequence")] = static_cast<qlonglong>(report->sequence);
+        // Annex C: the stream is karaoke, and the settings reproduced it.
+        new_this_frame[QStringLiteral("karaoke")] = report->karaoke;
+        new_this_frame[QStringLiteral("karaokeReproduced")] = report->karaoke_reproduced;
 
         if (report->objects) {
             new_has_object_metadata = true;
@@ -1804,6 +1924,17 @@ void HearthController::setDecoderSettings(const QVariantMap& settings) {
     const iclforge::hearth::DecoderSettings next = decoder_settings_from_map(settings, base);
     engine_->set_decoder_settings(next);
     requested_decoder_settings_ = decoder_settings_to_map(next);
+    // Kept across starts: only the karaoke choice (see the constructor).
+    const QString reproduction = karaoke_name(next.karaoke);
+    const QString vocals = karaoke_vocals_name(next.karaoke_vocals);
+    if (settings_.value(QStringLiteral("karaoke/reproduction"), QStringLiteral("aware")).toString() !=
+            reproduction ||
+        settings_.value(QStringLiteral("karaoke/vocals"), QStringLiteral("both")).toString() !=
+            vocals) {
+        settings_.setValue(QStringLiteral("karaoke/reproduction"), reproduction);
+        settings_.setValue(QStringLiteral("karaoke/vocals"), vocals);
+        settings_.sync();  // survive a hard exit
+    }
     if (requested_decoder_settings_ != decoder_settings_) {
         decoder_settings_ = requested_decoder_settings_;
         emit decoderSettingsChanged();

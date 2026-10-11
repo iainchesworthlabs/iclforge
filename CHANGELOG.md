@@ -112,9 +112,15 @@ The sections below contain the complete change list and fixes.
   layout now puts L, C, R and the LFE on those speakers and nothing on the surrounds, where
   played as coded its vocals came from them. Each unit's report says whether the stream is
   karaoke and whether it was reproduced; an Lt/Rt fold is left as the fold it is, as Annex C
-  defines none, and the decode a transcode re-encodes is as coded. The window has no control for
-  the choice yet. The diagnostics note's length limit is 768 bytes, from 512, so that the
-  settings line is not cut.
+  defines none, and the decode a transcode re-encodes is as coded. The diagnostics note's length
+  limit is 768 bytes, from 512, so that the settings line is not cut.
+- **Hearth has a Karaoke page.** A seventh page (`Ctrl+7`) says what the playing stream is - a
+  karaoke AC-3 stream, its coding mode and which of M, V1 and V2 it carries - and chooses how it is
+  reproduced: as coded, aware or capable, with none, V1, V2 or both vocals. It shows which part each
+  speaker carries, and says in words when the choice cannot apply: a stream that is not karaoke, a
+  bitstream output, a network group, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
+  is kept across starts, the one decoder setting that is. The Decoder page shows it in a line with
+  a button to the page.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
