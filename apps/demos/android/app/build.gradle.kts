@@ -280,9 +280,9 @@ configurations.all {
             // One release of all three so the set stays matched; 1.85 is the highest fix of
             // GHSA-9pwp-9qqc-pr26, GHSA-qp49-qgx5-5m26 and GHSA-c3fc-8qff-9hwx (bcprov) and
             // is past GHSA-wg6q-6289-32hp (bcpkix, fixed in 1.84).
-            "org.bouncycastle:bcprov-jdk18on:1.85",
-            "org.bouncycastle:bcpkix-jdk18on:1.85",
-            "org.bouncycastle:bcutil-jdk18on:1.85"
+            "org.bouncycastle:bcprov-jdk18on:1.86",
+            "org.bouncycastle:bcpkix-jdk18on:1.86",
+            "org.bouncycastle:bcutil-jdk18on:1.86"
         )
     }
 }
