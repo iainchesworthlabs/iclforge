@@ -24,9 +24,17 @@
 //                         [map=...] [offset=...] <options>
 //   codec ac4        forge ac4-encode <source> <stream> <rate> <options>
 //   atmos: true      forge atmos-encode <source> <stream> <rate> [objects] [scene] <dialnorm>
+//   atmos, codec ac4 forge atmos-encode <source> <stream> <rate> <objects> [scene] [src=...]
+//                         [map=...] [offset=...] codec=ac4 <options>
 //
 // and then, for a container other than the bare stream, `forge mkv|spdif|mp4|fmp4|ts <stream>
-// <out>`.
+// <out>`. AC-4 in MP4 is one command, not two: ac4-encode and atmos-encode write the MP4 file
+// themselves when the output is named .mp4, as the window's line has them do.
+//
+// A project of several sources that names each one's `part` (backing, melody, vocal1, vocal2) and
+// gives no `bed` and no `assignments` is laid out where Annex C's Table C.2.1 puts the parts
+// (karaoke_parts.hpp), with the service set to bsmod 7 unless the options name one; that is what the
+// Karaoke flow writes for the same parts, so the flow's project and the bare parts are one stream.
 
 namespace iclforge::apps::project {
 
@@ -63,7 +71,8 @@ struct CommandPlan {
 // The commands of a project, or why it has none. The codes: no-sources, source-missing (path),
 // unknown-codec (value), unknown-container (value), unknown-bed (value), bad-assignment (the
 // entry's number), no-assignments (how many sources: several are routed by name or not at all),
-// unsupported (what).
+// karaoke-unknown-part (the part), karaoke-duplicate-part (the part), karaoke-no-backing,
+// karaoke-vocal2-needs-vocal1, karaoke-nothing-to-sing, unsupported (what).
 [[nodiscard]] std::expected<CommandPlan, Message> command_plan(const Json& project,
                                                                const Request& request);
 

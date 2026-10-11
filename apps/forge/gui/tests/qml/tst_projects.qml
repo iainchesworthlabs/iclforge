@@ -363,6 +363,9 @@ TestCase {
 
     function test_theMetadataAndTheLoudnessAreKeptInTheCommandLinesOwnWords() {
         EncoderController.resetEncodeSettings();
+        // The LFE mix and the preferred downmix ride E-AC-3's mixing metadata, and are kept with it.
+        EncoderController.codecIndex = 1;
+        EncoderController.mixmeta = true;
         EncoderController.drcIndex = 2;
         EncoderController.heavy = true;
         EncoderController.ceilingDb = -2.0;
@@ -386,6 +389,7 @@ TestCase {
         compare(kept.dialnorm, "auto");
         compare(kept.cmixlev, -3);
         compare(kept.surmixlev, "off");
+        compare(kept.mixmeta, true);
         compare(kept.lfemix, "off");
         compare(kept.dmixmod, "ltrt");
         compare(kept.bsmod, "commentary");
@@ -396,7 +400,7 @@ TestCase {
         // The same words the window's own command line says them in.
         const line = EncoderController.metaTokens;
         for (const word of ["drc=" + names[2], "heavy", "ceiling=-2", "dialogue=-24",
-                            "dialnorm=auto", "cmixlev=-3", "surmixlev=off", "lfemix=off",
+                            "dialnorm=auto", "cmixlev=-3", "surmixlev=off", "mixmeta", "lfemix=off",
                             "dmixmod=ltrt", "bsmod=commentary", "mixlevel=105", "roomtyp=large",
                             "copyright", "origbs=off"]) {
             verify(line.split(" ").indexOf(word) >= 0, word + " is not in: " + line);
@@ -413,6 +417,101 @@ TestCase {
         compare(ProjectFile.applyEncode(EncoderController, encode, 1).length, 0);
         compare(ProjectFile.captureEncode(EncoderController), text);
         compare(EncoderController.metaTokens, line);
+    }
+
+    function test_aValueHeldUnderAGroupThatIsOffIsNeitherInTheLineNorInTheProject() {
+        // The LFE mix and the preferred downmix are written only inside E-AC-3's mixing metadata
+        // (and the downmix in AC-3's Annex D). `forge` reads either word as asking for its group,
+        // so held under one that is off - which the encode leaves out - they would make the line a
+        // stream the window does not write. They are left out of the line and the project alike.
+        EncoderController.resetEncodeSettings();
+        EncoderController.codecIndex = 1;
+        EncoderController.lfeMix = -1;
+        EncoderController.dmixIndex = 1;
+        compare(EncoderController.mixmeta, false);
+        compare(EncoderController.metaTokens, "");
+        compare(Object.keys(JSON.parse(ProjectFile.captureEncode(EncoderController)).options).length, 0);
+
+        EncoderController.mixmeta = true;
+        compare(EncoderController.metaTokens.split(" ").sort().join(" "), "dmixmod=ltrt lfemix=off mixmeta");
+
+        // AC-3: the downmix needs Annex D, and the LFE mix has no place in AC-3 at all.
+        EncoderController.codecIndex = 0;
+        EncoderController.mixmeta = false;
+        compare(EncoderController.metaTokens, "");
+        EncoderController.annexD = true;
+        compare(EncoderController.metaTokens, "dmixmod=ltrt");
+
+        // And a project that names either word has asked for its group, as the command line does.
+        EncoderController.resetEncodeSettings();
+        compare(ProjectFile.applyEncode(EncoderController, { codec: "eac3" }, 0).length, 0);
+        compare(ProjectFile.applyEncode(EncoderController, { options: { lfemix: 3 } }, 1).length, 0);
+        compare(EncoderController.mixmeta, true);
+        compare(EncoderController.lfeMix, 3);
+        compare(EncoderController.metaTokens, "mixmeta lfemix=3");
+        compare(ProjectFile.applyEncode(EncoderController, { codec: "ac3" }, 0).length, 0);
+        compare(ProjectFile.applyEncode(EncoderController, { options: { dmixmod: "loro" } }, 1).length, 0);
+        compare(EncoderController.annexD, true);
+        compare(EncoderController.dmixIndex, 2);
+    }
+
+    function test_theAc4TabsChoicesAreKeptInAc4EncodesOwnWords() {
+        EncoderController.resetEncodeSettings();
+        EncoderController.codecIndex = 2;
+        // A fresh AC-4 draft has nothing to say.
+        compare(Object.keys(JSON.parse(ProjectFile.captureEncode(EncoderController)).options).length, 0);
+        compare(ProjectFile.ac4OptionKeys().indexOf("frame-rate") >= 0, true);
+
+        EncoderController.ac4FrameRateIndex = 2;
+        EncoderController.ac4RateModeIndex = 1;
+        EncoderController.ac4CodecModeIndex = 1;
+        EncoderController.ac4Dialnorm = 27.5;
+        EncoderController.ac4LoudnessIndex = 1;
+        EncoderController.ac4DrcIndex = 5;
+        EncoderController.ac4DialogueLeft = true;
+        EncoderController.ac4DialogueCentre = true;
+        EncoderController.ac4IframeInterval = 12;
+        EncoderController.ac4Crc = false;
+        const line = EncoderController.ac4Tokens;
+        verify(line.length > 0);
+        const text = ProjectFile.captureEncode(EncoderController);
+        const kept = JSON.parse(text).options;
+        compare(kept["frame-rate"], 25);
+        compare(kept["rate-mode"], "average");
+        compare(kept["codec-mode"], "simple");
+        compare(kept.dialnorm, 27.5);
+        compare(kept.drc, "speech");
+        compare(kept["dialogue-channels"], "l,c");
+        compare(kept["iframe-interval"], 12);
+        compare(kept.crc, "off");
+        // The same words the tab's own command line says them in.
+        compare(Object.keys(kept).length, line.split(" ").length);
+
+        // And put back, over a tab that held something else.
+        cleanup();
+        EncoderController.codecIndex = 2;
+        EncoderController.ac4Dialnorm = 20;
+        EncoderController.ac4DialogueRight = true;
+        const encode = JSON.parse(text);
+        compare(ProjectFile.applyEncode(EncoderController, encode, 0).length, 0);
+        compare(ProjectFile.applyEncode(EncoderController, encode, 1).length, 0);
+        compare(EncoderController.ac4Tokens, line);
+        compare(ProjectFile.captureEncode(EncoderController), text);
+    }
+
+    function test_anAc4OptionTheTabCannotTakeOrHasNoControlForIsSaid() {
+        EncoderController.resetEncodeSettings();
+        EncoderController.codecIndex = 2;
+        let notes = ProjectFile.applyEncode(
+            EncoderController,
+            { options: { "frame-rate": 26, lfemix: -4.5, "codec-mode": "scpl", dialnorm: 27 } }, 1);
+        compare(notes.length, 3);
+        const codes = notes.map((n) => n.code + ":" + n.args[0]).sort();
+        compare(codes.join(" "),
+                "setting-not-held:codec-mode setting-not-held:lfemix setting-out-of-range:frame-rate");
+        // What it could take, it took.
+        compare(EncoderController.ac4Dialnorm, 27);
+        compare(EncoderController.ac4FrameRateIndex, 13);
     }
 
     function test_theCodingToolsAndTheVbrAreKeptAsTheTokensTheCommandLineTakes() {
@@ -676,6 +775,127 @@ TestCase {
             EncoderController.setObjectPosition(1, 0.3, 0.6, 0.0);
             EncoderController.dialnorm = 26;
         });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnEac3WithItsMixingMetadata() {
+        windowAndForgeWriteTheSameBytes("eq-eac3-mix", ".ec3", () => {
+            EncoderController.codecIndex = 1;
+            EncoderController.bitrateKbps = 192;
+            EncoderController.mixmeta = true;
+            EncoderController.lfeMix = -1;
+            EncoderController.dmixIndex = 1;
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnEac3WithItsMixingMetadataOff() {
+        // The LFE mix and the downmix are held, and the group they ride in is not on: the stream has
+        // neither, and the project, which `forge` reads as asking for the group, must not either.
+        windowAndForgeWriteTheSameBytes("eq-eac3-held", ".ec3", () => {
+            EncoderController.codecIndex = 1;
+            EncoderController.bitrateKbps = 192;
+            EncoderController.lfeMix = -1;
+            EncoderController.dmixIndex = 1;
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnAc3WithItsDownmix() {
+        windowAndForgeWriteTheSameBytes("eq-ac3-annexd", ".ac3", () => {
+            EncoderController.bitrateKbps = 256;
+            EncoderController.annexD = true;
+            EncoderController.dmixIndex = 1;
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnAc4() {
+        windowAndForgeWriteTheSameBytes("eq-ac4", ".ac4", () => {
+            EncoderController.codecIndex = 2;
+            EncoderController.bitrateKbps = 128;
+            EncoderController.ac4CodecModeIndex = 1;
+            EncoderController.ac4Dialnorm = 27.5;
+            EncoderController.ac4IframeInterval = 12;
+            EncoderController.ac4DrcIndex = 5;
+            EncoderController.ac4Crc = false;
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnAc4InAnMp4File() {
+        windowAndForgeWriteTheSameBytes("eq-ac4-mp4", ".mp4", () => {
+            EncoderController.codecIndex = 2;
+            EncoderController.containerIndex = 3;
+            EncoderController.bitrateKbps = 128;
+            EncoderController.ac4Dialnorm = 24;
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnAc4ObjectSession() {
+        windowAndForgeWriteTheSameBytes("eq-ac4-objects", ".ac4", () => {
+            EncoderController.atmosEnabled = true;
+            EncoderController.codecIndex = 2;
+            EncoderController.bitrateKbps = 384;
+            EncoderController.setObjectPathKeyframes(0, [
+                { time: 0.0, x: 0.1, y: 0.1, z: 0.0, gain: 0.5, lfeSend: 0.0 },
+                { time: 0.5, x: 0.9, y: 0.9, z: 0.2, gain: 0.5, lfeSend: 0.0 }
+            ], "");
+            EncoderController.setObjectPosition(1, 0.3, 0.6, 0.0);
+            EncoderController.ac4Dialnorm = 26;
+            EncoderController.ac4ObjectCodingIndex = 1;
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnAc4ObjectSessionOfSeveralFiles() {
+        windowAndForgeWriteTheSameBytes("eq-ac4-objects-routed", ".ac4", () => {
+            EncoderController.atmosEnabled = true;
+            EncoderController.codecIndex = 2;
+            EncoderController.bitrateKbps = 384;
+            EncoderController.addSourceFile(melody);
+            EncoderController.setAssignment(0, 0, "obj");
+            EncoderController.setAssignment(0, 1, "obj@-3");
+            EncoderController.setAssignment(1, 0, "objm");
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnEac3ObjectSessionOfSeveralFiles() {
+        windowAndForgeWriteTheSameBytes("eq-eac3-objects-routed", ".ec3", () => {
+            EncoderController.atmosEnabled = true;
+            EncoderController.bitrateKbps = 448;
+            EncoderController.addSourceFile(melody);
+            EncoderController.setAssignment(0, 0, "obj");
+            EncoderController.setAssignment(0, 1, "obj");
+            EncoderController.setAssignment(1, 0, "objm");
+        });
+    }
+
+    function test_aProjectOfNamedPartsIsOneStreamInTheWindowAndInForge() {
+        if (!cliRunner.available()) {
+            skip("this build has no forge to run");
+        }
+        // Parts and nothing of how they are laid out: no bed, no assignments, no service. The
+        // Karaoke flow lays them out where Annex C puts them and `forge project` does the same.
+        const file = writeProject("kp-parts-only.forgeproj", {
+            format: "iclforge-project",
+            version: 1,
+            flow: "karaoke",
+            sources: [
+                { path: ProjectFile.localPath(backing), part: "backing" },
+                { path: ProjectFile.localPath(melody), part: "melody" },
+                { path: ProjectFile.localPath(lead), part: "vocal1" }
+            ],
+            encode: { codec: "ac3", bitrateKbps: 192 }
+        });
+        const win = openWindow();
+        verify(win.openProjectFile(file));
+        compare(findByName(win, "karaokeFlow").plan.mode, "3/1");
+
+        const fromWindow = Qt.resolvedUrl("_test_output/tst_projects_parts_only.ac3");
+        EncoderController.encodeTo(fromWindow);
+        tryCompare(EncoderController, "busy", false, 120000);
+        verify(cliRunner.size(fromWindow) > 0, "the window wrote nothing");
+
+        const line = "forge project " + ProjectFile.localPath(file) + " "
+                     + ProjectFile.localPath(inTheFolder("from-forge-parts-only.ac3"));
+        compare(cliRunner.run(line, audioFixtures.folder()), 0, line);
+        verify(cliRunner.sameBytes(fromWindow, inTheFolder("from-forge-parts-only.ac3")),
+               "forge project wrote a different stream than the window: " + line);
     }
 
     // ---- the example ----------------------------------------------------------

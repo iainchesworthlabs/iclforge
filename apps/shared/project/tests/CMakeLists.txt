@@ -8,6 +8,7 @@
 iclforge_add_test_binary(iclforge-app-project-tests PROJECT app-project SOURCES
     test_project_command.cpp
     test_project_document.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/karaoke_parts.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/project_command.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/project_document.cpp")
 target_include_directories(iclforge-app-project-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")

@@ -10,11 +10,14 @@
 #include <system_error>
 #include <utility>
 
+#include "karaoke_parts.hpp"
+
 namespace forge_gui {
 
 namespace {
 
 using iclforge::ac3::Acmod;
+namespace project = iclforge::apps::project;
 
 // Two parts whose lengths differ by less than this are the same length: a
 // recording's tail is rarely cut to the frame, and the encoder's own padding
@@ -63,45 +66,50 @@ void add(KaraokePlan& plan, KaraokeCheckLevel level, std::string code, std::vect
     plan.checks.push_back(KaraokeCheck{level, std::move(code), std::move(args)});
 }
 
-// Table C.2.1: which mode a set of parts is, or nothing where Annex C has none
-// (a backing alone is plain stereo, with nothing to sing along to).
+// Table C.2.1's five modes, from the one table the project file's `forge project` lays parts out
+// by too (apps/shared/project/src/karaoke_parts.hpp), each with the Acmod this window names it by.
+constexpr std::array<Acmod, 5> kAcmods{Acmod::k3_0, Acmod::k2_1, Acmod::k3_1, Acmod::k2_2,
+                                       Acmod::k3_2};
+
+// Which mode a set of parts is, or nothing where Annex C has none (a backing alone is plain
+// stereo, with nothing to sing along to).
 bool mode_for(bool melody, int vocals, Acmod* acmod) {
-    if (vocals == 0) {
-        if (!melody) {
-            return false;
+    const project::KaraokeMode* mode = project::karaoke_mode(melody, vocals);
+    if (mode == nullptr) {
+        return false;
+    }
+    for (const Acmod candidate : kAcmods) {
+        if (mode_name(candidate) == mode->bed) {
+            *acmod = candidate;
         }
-        *acmod = Acmod::k3_0;
-    } else if (vocals == 1) {
-        *acmod = melody ? Acmod::k3_1 : Acmod::k2_1;
-    } else {
-        *acmod = melody ? Acmod::k3_2 : Acmod::k2_2;
     }
     return true;
 }
 
-// The five modes' speakers in coded order, with the part each carries.
+// One of the five modes: its speakers in coded order, with the part each carries.
 struct ModeRow {
     Acmod acmod;
-    std::array<std::string_view, 5> positions;
-    std::array<std::string_view, 5> parts;
-    std::size_t count;
+    const project::KaraokeMode* mode;
 };
 
-constexpr std::array<ModeRow, 5> kModes{{
-    {Acmod::k3_0, {"L", "C", "R", "", ""}, {"L", "M", "R", "", ""}, 3},
-    {Acmod::k2_1, {"L", "R", "Cs", "", ""}, {"L", "R", "V1", "", ""}, 3},
-    {Acmod::k3_1, {"L", "C", "R", "Cs", ""}, {"L", "M", "R", "V1", ""}, 4},
-    {Acmod::k2_2, {"L", "R", "Ls", "Rs", ""}, {"L", "R", "V1", "V2", ""}, 4},
-    {Acmod::k3_2, {"L", "C", "R", "Ls", "Rs"}, {"L", "M", "R", "V1", "V2"}, 5},
-}};
+std::array<ModeRow, 5> mode_rows() {
+    // The combinations of parts that make the five modes, in kAcmods' order.
+    constexpr std::array<std::pair<bool, int>, 5> kParts{
+        {{true, 0}, {false, 1}, {true, 1}, {false, 2}, {true, 2}}};
+    std::array<ModeRow, 5> rows{};
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        rows[i] = ModeRow{kAcmods[i], project::karaoke_mode(kParts[i].first, kParts[i].second)};
+    }
+    return rows;
+}
 
-const ModeRow& row_for(Acmod acmod) {
-    for (const ModeRow& row : kModes) {
+const project::KaraokeMode& row_for(Acmod acmod) {
+    for (const ModeRow& row : mode_rows()) {
         if (row.acmod == acmod) {
-            return row;
+            return *row.mode;
         }
     }
-    return kModes.front();
+    return *mode_rows().front().mode;
 }
 
 std::string join(const std::vector<std::string>& words) {
@@ -233,11 +241,11 @@ KaraokePlan plan_karaoke_parts(std::span<const KaraokeFile> files) {
 
     // The coded channels, where the backing can give the two it owns.
     if (have_mode && backing_usable) {
-        const ModeRow& row = row_for(acmod);
+        const project::KaraokeMode& row = row_for(acmod);
         for (std::size_t i = 0; i < row.count; ++i) {
-            const std::string_view part = row.parts[i];
+            const std::string_view part = row.slots[i].part;
             KaraokeChannel channel;
-            channel.position = std::string{row.positions[i]};
+            channel.position = std::string{row.slots[i].position};
             channel.part = std::string{part};
             if (part == "L" || part == "R") {
                 channel.file = backing_at;
@@ -310,12 +318,15 @@ KaraokePlan plan_karaoke_speakers(const KaraokeSpeakerFile& file) {
         return std::find(fullband.begin(), fullband.end(), name) != fullband.end();
     };
     const ModeRow* match = nullptr;
-    for (const ModeRow& row : kModes) {
-        if (row.count != fullband.size()) {
+    const std::array<ModeRow, 5> rows = mode_rows();
+    for (const ModeRow& row : rows) {
+        if (row.mode->count != fullband.size()) {
             continue;
         }
-        const bool same = std::all_of(row.positions.begin(), row.positions.begin() + static_cast<long>(row.count),
-                                      [&has](std::string_view p) { return has(p); });
+        const bool same =
+            std::all_of(row.mode->slots.begin(),
+                        row.mode->slots.begin() + static_cast<long>(row.mode->count),
+                        [&has](const project::KaraokeSlot& slot) { return has(slot.position); });
         if (same) {
             match = &row;
             break;
@@ -333,12 +344,13 @@ KaraokePlan plan_karaoke_speakers(const KaraokeSpeakerFile& file) {
     plan.mode = mode_name(match->acmod);
     plan.melody = has("C");
     plan.vocals = has("Rs") ? 2 : (has("Cs") || has("Ls") ? 1 : 0);
-    for (std::size_t i = 0; i < match->count; ++i) {
+    for (std::size_t i = 0; i < match->mode->count; ++i) {
         // Where the file keeps the speaker this place is.
-        const auto at = std::find(file.speakers.begin(), file.speakers.end(), std::string{match->positions[i]});
+        const auto at = std::find(file.speakers.begin(), file.speakers.end(),
+                                  std::string{match->mode->slots[i].position});
         KaraokeChannel channel;
-        channel.position = std::string{match->positions[i]};
-        channel.part = std::string{match->parts[i]};
+        channel.position = std::string{match->mode->slots[i].position};
+        channel.part = std::string{match->mode->slots[i].part};
         channel.file = 0;
         channel.channel = static_cast<std::size_t>(at - file.speakers.begin());
         plan.channels.push_back(std::move(channel));

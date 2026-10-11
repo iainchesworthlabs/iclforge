@@ -88,6 +88,98 @@ TEST_CASE("each AC-4 page option echoes the token ac4-encode parses", "[gui]") {
           "dialnorm=31 loudness=not-indicated");
 }
 
+namespace {
+
+// What a line of tokens does to a fresh page, word by word, as a project's options do.
+Ac4EncodeSettings applied(const std::vector<std::string>& tokens) {
+    Ac4EncodeSettings s;
+    for (const std::string& token : tokens) {
+        const auto equals = token.find('=');
+        REQUIRE(equals != std::string::npos);
+        CAPTURE(token);
+        REQUIRE(forge_gui::ac4_apply_option(s, token.substr(0, equals), token.substr(equals + 1)) ==
+                forge_gui::Ac4OptionResult::kApplied);
+    }
+    return s;
+}
+
+}  // namespace
+
+TEST_CASE("AC-4 page options are read back from the tokens they echo", "[gui]") {
+    // Every setting through the other direction: the tokens of the page, applied to a fresh one,
+    // are the page, and echo the same tokens - for the channels' encode, with and without a CRC,
+    // and for objects.
+    Ac4EncodeSettings s;
+    s.frame_rate = 2;
+    s.rate_mode = 1;
+    s.codec_mode = 2;
+    s.dialnorm_db = 27.25;
+    s.loudness = 0;
+    s.drc = 1;
+    s.centre_level = 0;
+    s.surround_level = 5;
+    s.preferred_downmix = 3;
+    s.dialogue_left = true;
+    s.dialogue_right = true;
+    s.dialogue_mid = true;
+    s.dialogue_max_gain = 0;
+    s.iframe_interval = 7;
+    s.crc = false;
+    s.object_coding = 1;
+    const auto channels = forge_gui::ac4_cli_tokens(s, false);
+    const Ac4EncodeSettings back = applied(channels);
+    CHECK(forge_gui::ac4_cli_tokens(back, false) == channels);
+    CHECK(back.dialnorm_db == 27.25);
+    CHECK(back.dialogue_right);
+    CHECK_FALSE(back.dialogue_centre);
+
+    // Assigned, not designated: GCC's -Werror=missing-field-initializers refuses a partial one.
+    Ac4EncodeSettings object_settings;
+    object_settings.dialnorm_db = 24.0;
+    object_settings.crc = false;
+    object_settings.object_coding = 1;
+    const auto objects = forge_gui::ac4_object_cli_tokens(object_settings, false);
+    CHECK(joined(objects) == "coding=direct dialnorm=24 crc=off");
+    const Ac4EncodeSettings objects_back = applied(objects);
+    CHECK(objects_back.object_coding == 1);
+    CHECK(objects_back.dialnorm_db == 24.0);
+    CHECK_FALSE(objects_back.crc);
+
+    // The page's own keys are the ones listed, and each is one the parser above has a case for.
+    for (const std::string_view key : forge_gui::ac4_option_keys()) {
+        CAPTURE(key);
+        Ac4EncodeSettings scratch;
+        CHECK(forge_gui::ac4_apply_option(scratch, key, "not-a-value-of-anything") !=
+              forge_gui::Ac4OptionResult::kNotHeld);
+    }
+}
+
+TEST_CASE("AC-4 page options say what they cannot take and what they have no control for", "[gui]") {
+    using forge_gui::Ac4OptionResult;
+    Ac4EncodeSettings s;
+    // A value the command would refuse, for a key the page holds: nothing changes.
+    CHECK(forge_gui::ac4_apply_option(s, "frame-rate", "26") == Ac4OptionResult::kBadValue);
+    CHECK(forge_gui::ac4_apply_option(s, "dialnorm", "31.8") == Ac4OptionResult::kBadValue);
+    CHECK(forge_gui::ac4_apply_option(s, "dialnorm", "27.1") == Ac4OptionResult::kBadValue);
+    CHECK(forge_gui::ac4_apply_option(s, "cmixlev", "1.5") == Ac4OptionResult::kBadValue);
+    CHECK(forge_gui::ac4_apply_option(s, "dialogue-channels", "l,x") == Ac4OptionResult::kBadValue);
+    CHECK(forge_gui::ac4_apply_option(s, "dialogue-max-gain", "5") == Ac4OptionResult::kBadValue);
+    CHECK(forge_gui::ac4_apply_option(s, "iframe-interval", "0") == Ac4OptionResult::kBadValue);
+    CHECK(forge_gui::ac4_apply_option(s, "crc", "maybe") == Ac4OptionResult::kBadValue);
+    CHECK(forge_gui::ac4_cli_tokens(s, false).empty());
+    // What the command takes and the page has no control for.
+    CHECK(forge_gui::ac4_apply_option(s, "lfemix", "-4.5") == Ac4OptionResult::kNotHeld);
+    CHECK(forge_gui::ac4_apply_option(s, "programme2-dialnorm", "20") == Ac4OptionResult::kNotHeld);
+    CHECK(forge_gui::ac4_apply_option(s, "codec-mode", "scpl") == Ac4OptionResult::kNotHeld);
+    CHECK(forge_gui::ac4_apply_option(s, "dialogue-method", "cross") == Ac4OptionResult::kNotHeld);
+    CHECK(forge_gui::ac4_apply_option(s, "from-a-newer-forge", "1") == Ac4OptionResult::kNotHeld);
+    CHECK(forge_gui::ac4_cli_tokens(s, false).empty());
+    // drc=none is the command's way of saying no DRC, which is the page's "Off".
+    CHECK(forge_gui::ac4_apply_option(s, "drc", "speech") == Ac4OptionResult::kApplied);
+    CHECK(forge_gui::ac4_apply_option(s, "drc", "none") == Ac4OptionResult::kApplied);
+    CHECK_FALSE(s.drc.has_value());
+}
+
 TEST_CASE("AC-4 page configuration follows its tokens", "[gui]") {
     Ac4EncodeSettings s;
     s.frame_rate = 2;

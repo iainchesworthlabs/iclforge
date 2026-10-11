@@ -181,6 +181,18 @@ The sections below contain the complete change list and fixes.
   nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
   by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
+- **A project holds the AC-4 tab and AC-4 objects, and a karaoke project's parts lay themselves
+  out.** `encode.options` of an AC-4 project is `ac4-encode`'s own words (`frame-rate`, `codec-mode`,
+  `dialnorm`, `drc`, `cmixlev`, `dialogue-channels`, ... and `coding` for objects), and
+  `forge project` runs an AC-4 object session as `atmos-encode ... codec=ac4` with its scene, its
+  `src=`, `map=` and offsets, and AC-4 into an MP4 file as the one command that writes it. Sources
+  that each name a `part` (backing, melody, vocal1, vocal2) and a project with no `bed` and no
+  `assignments` are laid out where Annex C's Table C.2.1 puts them, by the Karaoke flow and by
+  `forge project` from one table, so the example's four parts alone are its stream byte for byte.
+  Fixed: the window's LFE mix and preferred downmix were written to the command line (and so to a
+  project) when E-AC-3's mixing metadata, or AC-3's Annex D, was off and the stream had neither, so
+  the line and the project were a different stream than the window encoded; they are now written
+  with their group, and a project that names either asks for it, as `forge` reads it.
 - **The browser decode demo reproduces karaoke streams.** `PushDecoder` and the npm package's
   `FoldOptions` take `karaoke` (as coded, aware, capable) and `karaokeVocals` (none, V1, V2, both),
   and every push says whether the unit is Annex C karaoke type. The demo page shows a control for
