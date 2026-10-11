@@ -264,7 +264,7 @@ TEST_CASE("sink form: a group's plan sends each member its own form and one rend
 
     SinkFacts decodes = hearth_sink({sp::DataType::kAc3, sp::DataType::kEac3});
     decodes.name = "Decodes";
-    // A C6 build: it decodes 2.0 of AC-3 and cannot sustain PCM, which is read from its hardware.
+    // A C6 build: it decodes 2.0 of AC-3 and is sent PCM with a caveat, read from its hardware.
     SinkFacts c6 = hearth_sink({sp::DataType::kAc3, sp::DataType::kEac3});
     c6.name = "C6";
     c6.hardware = "ESP32-C6";
@@ -285,13 +285,14 @@ TEST_CASE("sink form: a group's plan sends each member its own form and one rend
 
     CHECK(plan.members[0].action == MemberAction::kCoded);
     CHECK(plan.members[0].label == "AC-3 as it is");
+    CHECK(plan.members[1].label == "PCM · 2.0");
     CHECK(plan.members[2].label == "PCM · 2.0");
     CHECK(plan.members[3].label == "PCM · 5.1");
-    CHECK(plan.members[1].label == "Nothing · held back");
-    // Past what it decodes, and not to be sent PCM: held back, and the reason says both.
-    CHECK(plan.members[1].action == MemberAction::kHold);
+    // Past what it decodes: sent PCM at 2.0, the stereo player's render, with the caveat.
+    CHECK(plan.members[1].action == MemberAction::kPcm);
+    CHECK(plan.members[1].channels == 2);
     CHECK(mentions(plan.members[1].choice.reason, "up to 2 channels"));
-    CHECK(mentions(plan.members[1].choice.reason, "switched off"));
+    CHECK(mentions(plan.members[1].choice.reason, "drop out"));
     // A stereo player: the 2.0 fold, a render of its own.
     CHECK(plan.members[2].action == MemberAction::kPcm);
     CHECK(plan.members[2].channels == 2);
@@ -337,17 +338,40 @@ TEST_CASE("sink form: a layout of a width another has is held back and not sent 
     CHECK(shared.variants.size() == 1);
 }
 
-TEST_CASE("sink form: only an ESP32-C6 is not offered PCM decoded here", "[hearth][sink_form]") {
+TEST_CASE("sink form: only an ESP32-C6 is offered PCM decoded here with a caveat",
+          "[hearth][sink_form]") {
     SinkFacts sink;
     CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
     sink.hardware = "ESP32-S3";
     CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
     sink.hardware = "ESP32-P4";
     CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
     sink.hardware = "esp32-c6";
-    CHECK_FALSE(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK_FALSE(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
     sink.hardware = "ESP32-C6-DevKitC";
-    CHECK_FALSE(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK(iclforge::hearth::form_policy(sink).pcm_fallback);
+    CHECK_FALSE(iclforge::hearth::form_policy(sink).pcm_caveat.empty());
+}
+
+TEST_CASE("sink form: a caveat is added to the reason of a sink sent PCM, and to no other",
+          "[hearth][sink_form]") {
+    SinkFacts c6 = hearth_sink({sp::DataType::kAc3});
+    c6.hardware = "ESP32-C6";
+    limit(c6, sp::DataType::kAc3, 2);
+    c6.pcm_formats.push_back({.channels = 2, .sample_rate = k48k, .bit_depth = 16});
+    const auto policy = iclforge::hearth::form_policy(c6);
+    const auto sent = choose_sink_form(ac3(6), c6, policy);
+    REQUIRE(sent.form == SinkForm::kPcm);
+    CHECK(mentions(sent.reason, "up to 2 channels"));
+    CHECK(mentions(sent.reason, "drop out"));
+    // A stream it takes as it is carries no caveat: nothing about it is at risk.
+    const auto coded = choose_sink_form(ac3(2), c6, policy);
+    REQUIRE(coded.form == SinkForm::kCoded);
+    CHECK_FALSE(mentions(coded.reason, "drop out"));
 }
 
 TEST_CASE("sink form: a layout the sink's PCM cannot carry is folded to the widest it can",

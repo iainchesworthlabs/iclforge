@@ -1247,6 +1247,14 @@ The sections below contain the complete change list and fixes.
     when it was due on each board (its own `worst_error_us`). A hidden `ac3tests` case,
     `[hearth-network-live]`, repeats that against the sinks named in `AC3HEARTH_LIVE_SINKS`, and
     withdraws its pairings afterwards.
+- **A network group is planned by what each of its members takes** (`NetworkSinks::plan_group`,
+  `sink_form.cpp`): a member that decodes the stream keeps it coded; one that cannot is sent PCM
+  decoded here at the layout it takes, one render for each width the group needs; one that can be
+  sent neither is held back, and its reason is in the log and the group editor. A sink whose
+  buffer holds under a second of the stream is sent PCM in units of at most 10 ms (a long unit
+  stalls a shallow buffer more often: on an ESP32-C6, a median of 2 drop-outs in 15 s against
+  22 at 21 ms), and an ESP32-C6 is offered the PCM fallback with a caveat in its reason, since
+  its 48 KB buffer holds under a fifth of a second and a busy WiFi drops the stream out.
 
 **Audio outputs**
 

@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <array>
@@ -1334,9 +1335,15 @@ TEST_CASE("group: a sink that states its chunk limit and layout is played PCM in
 // played. The group then sent at real time's rate but each chunk after its play time, by the
 // difference between that 150 ms and what the sink's buffer holds, and a board skips every chunk
 // that arrives late.
+//
+// The same play is made to a sink whose buffer is deep (1 MiB, 5.5 s of 16-bit stereo), which is
+// sent the default 20 ms units where the small one is sent 10 ms: a long unit stalls a shallow
+// buffer more often than a short one.
 TEST_CASE("group: a PCM sink with a small buffer is fed before play and not after",
           "[hearth][group][websocket]") {
     namespace ss = iclforge::sendspin;
+    const std::size_t buffer_bytes = GENERATE(std::size_t{24} * 1024, std::size_t{1024} * 1024);
+    CAPTURE(buffer_bytes);
     const fs::path scratch =
         fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_small_buffer_" + scratch_pid_suffix());
     fs::remove_all(scratch);
@@ -1352,7 +1359,7 @@ TEST_CASE("group: a PCM sink with a small buffer is fed before play and not afte
     options.codecs = {m::Codec::kPcm};
     options.extension_role = false;
     // 24 KB: three quarters of it, which the group fills to, is 96 ms of 16-bit stereo.
-    options.buffer_capacity = 24 * 1024;
+    options.buffer_capacity = buffer_bytes;
     auto started = testsink::Sink::start(options, log);
     REQUIRE(started.has_value());
     const std::unique_ptr<testsink::Sink> sink = std::move(*started);
@@ -1431,6 +1438,15 @@ TEST_CASE("group: a PCM sink with a small buffer is fed before play and not afte
         std::this_thread::sleep_for(20ms);
     }
     CHECK(sink->totals().frames == kFrames);
+    // A buffer under a second is sent units of at most 10 ms (480 frames), one over it 20 ms.
+    const std::size_t largest =
+        largest_chunk_frames(only_file(scratch / "out", "stream-", ".times.csv"));
+    if (buffer_bytes < 256 * 1024) {
+        CHECK(largest <= 480);
+    } else {
+        CHECK(largest > 480);
+        CHECK(largest <= 960);
+    }
     group.reset();
     host->reset();
 }
