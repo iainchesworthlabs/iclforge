@@ -106,6 +106,15 @@ The sections below contain the complete change list and fixes.
   the coded surrounds were. `output_mode(config, acmod, lfe, karaoke)` returns an `OutputMode` (a
   coding mode and an LFE flag): 3/0 with the LFE after R for the reproduction, 2/0 or 1/0 for a
   fold, the coded mode otherwise. `output_channel_count()` is now its channel count, one rule.
+- **Hearth reproduces a karaoke stream.** `DecoderSettings` gains `karaoke` (aware by default,
+  or capable, or off) and `karaoke_vocals`, which `decoder_setup()` hands to the output stage, and
+  the stream decoder lays an AC-3 unit out from `output_mode()`: a karaoke stream played to a 5.1
+  layout now puts L, C, R and the LFE on those speakers and nothing on the surrounds, where
+  played as coded its vocals came from them. Each unit's report says whether the stream is
+  karaoke and whether it was reproduced; an Lt/Rt fold is left as the fold it is, as Annex C
+  defines none, and the decode a transcode re-encodes is as coded. The window has no control for
+  the choice yet. The diagnostics note's length limit is 768 bytes, from 512, so that the
+  settings line is not cut.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 

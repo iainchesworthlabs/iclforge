@@ -21,6 +21,7 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/io/dec3.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/render/identify.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
@@ -2567,4 +2568,90 @@ TEST_CASE("player: set_volume_db refuses outside [kMinVolumeDb, kMaxVolumeDb], a
     player->play();
     REQUIRE(play_out(*player, *log));
     CHECK(player->volume_db() == -9.0);
+}
+
+namespace {
+
+// A 3/2 AC-3 stream with an LFE, flagged bsmod 7: L, M, R, V1 and V2 as five tones and a low
+// one for the LFE. Dither is off, so a decoder taking over part-way through draws the same
+// values an unbroken decode does and the handover can be compared sample for sample.
+std::vector<std::byte> karaoke_ac3_stream(int frames) {
+    iclforge::ac3::EncoderConfig config;
+    config.sample_rate = iclforge::ac3::SampleRate::k48000;
+    config.bitrate_kbps = 448;
+    config.acmod = iclforge::ac3::Acmod::k3_2;
+    config.lfe = true;
+    config.dither = false;
+    config.info.bsmod = iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke;
+    iclforge::ac3::FrameEncoder encoder{config};
+    const std::array<double, 6> hz = {200.0, 400.0, 800.0, 1600.0, 3200.0, 80.0};
+    std::vector<std::byte> out;
+    for (int f = 0; f < frames; ++f) {
+        std::vector<std::vector<float>> pcm;
+        for (const double tone_hz : hz) {
+            pcm.push_back(tone(tone_hz, 48000,
+                               static_cast<std::size_t>(f) * iclforge::ac3::kSamplesPerFrame));
+        }
+        std::vector<std::span<const float>> views;
+        for (const auto& channel : pcm) {
+            views.emplace_back(channel);
+        }
+        const auto frame = encoder.encode_frame(views);
+        REQUIRE(frame.has_value());
+        out.insert(out.end(), frame->begin(), frame->end());
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("player: choosing another karaoke reproduction reaches the playing item at a unit, "
+          "losing and repeating nothing",
+          "[hearth][player][karaoke]") {
+    Library library;
+    library.files["song.ac3"] = karaoke_ac3_stream(30);
+    const std::size_t total = 30 * 1536;
+    const DecoderSettings aware;  // the default
+    DecoderSettings coded;
+    coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+
+    // Each choice's decode of the whole item, on the layout a karaoke stream most needs: 5.1,
+    // where played as coded the vocals come from the surround speakers.
+    const Slots aware_whole = played_alone(library, "song.ac3", "5.1", aware);
+    const Slots coded_whole = played_alone(library, "song.ac3", "5.1", coded);
+    REQUIRE(first_difference(aware_whole, coded_whole) != kSame);
+
+    auto log = std::make_shared<FakeDevice::Log>();
+    log->keep = true;
+    const auto player = make_player(library, log, 8192, "5.1", aware);
+    player->queue().add(item("song.ac3"));
+    player->play();
+    for (int step = 0; step < 6; ++step) {
+        player->pump();
+        advance(*log, 480);
+    }
+    const std::uint64_t submitted = log->submitted;
+    player->set_decoder_settings(coded);
+    REQUIRE(play_out(*player, *log));
+    REQUIRE(player->history().size() == 1);
+    CHECK(player->history()[0].frames == total);
+
+    // Where the output stops being the aware decode and becomes the as-coded one, at a unit
+    // boundary, with nothing lost or repeated.
+    REQUIRE(log->kept.size() == aware_whole.size());
+    REQUIRE(log->kept[0].size() == total);
+    std::optional<std::size_t> boundary;
+    for (std::size_t unit = 0; unit <= 30 && !boundary; ++unit) {
+        const std::size_t at = unit * 1536;
+        if (first_difference(part(log->kept, 0, at), part(aware_whole, 0, at)) == kSame &&
+            first_difference(part(log->kept, at, total - at), part(coded_whole, at, total - at)) ==
+                kSame) {
+            boundary = at;
+        }
+    }
+    REQUIRE(boundary.has_value());
+    // What was decoded when the change came plays out as it was, and the change lands after it.
+    CHECK(*boundary >= submitted);
+    CHECK(*boundary > 0);
+    CHECK(*boundary < total);
 }

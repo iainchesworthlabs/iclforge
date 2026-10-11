@@ -344,7 +344,7 @@ TEST_CASE("diagnostics: decoder settings and items read as the pages name them",
           "[hearth][diagnostics]") {
     CHECK(describe(DecoderSettings{}) ==
           "line mode, stereo fold Lo/Ro, LFE in AC-4's folds only, the stream's mix levels, "
-          "dual mono: both, the first programme, objects for height layouts, "
+          "dual mono: both, karaoke: aware, the first programme, objects for height layouts, "
           "objects reconstructed in the QMF domain, concealment: repeat and fade, "
           "fast inverse transform, AC-4: the stream's presentation, dialogue to -31 dBFS, "
           "the DRC mode for the output level, dialogue enhancement 0 dB, dialogue +0.0 dB, "
@@ -379,7 +379,7 @@ TEST_CASE("diagnostics: decoder settings and items read as the pages name them",
           "custom mode (cut 0.50, boost 0.25, compr on, dialogue as coded), "
           "stereo fold Lt/Rt (phase shift off), LFE in folds, "
           "mix levels Lo/Ro centre 0.500, Lt/Rt surround 0.707, LFE -3.0 dB, "
-          "dual mono: channel 2, programme 2, objects never, "
+          "dual mono: channel 2, karaoke: aware, programme 2, objects never, "
           "objects reconstructed in the QMF domain, no concealment, "
           "reference inverse transform, AC-4: presentation_id 7, dialogue to -20 dBFS, "
           "portable headphones DRC, dialogue enhancement 6 dB, dialogue -3.0 dB, "
@@ -398,7 +398,7 @@ TEST_CASE("diagnostics: decoder settings and items read as the pages name them",
     CHECK(describe(rf) ==
           "RF mode (ceiling 0.0 dBFS), stereo fold Lo/Ro, no LFE in folds, "
           "mix levels Lo/Ro surround 0.000, Lt/Rt centre 1.000, "
-          "dual mono: channel 1, the first programme, objects always, "
+          "dual mono: channel 1, karaoke: aware, the first programme, objects always, "
           "objects reconstructed in the QMF domain, concealment: mute, "
           "fast inverse transform, AC-4: a presentation in fr, the coded level, no compression, "
           "dialogue enhancement 0 dB, dialogue +0.0 dB, no audio description, the stereo fold's "

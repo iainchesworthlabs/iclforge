@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <optional>
+#include <string>
 
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
@@ -242,4 +243,45 @@ TEST_CASE("decoder settings: a transcode decodes the programme as coded, whateve
     CHECK(config.skip_object_reconstruction);
     CHECK(config.concealment == iclforge::ac3::ConcealmentPolicy::kMute);
     CHECK(config.fast_imdct);
+}
+
+TEST_CASE("decoder settings: Annex C's karaoke reproduction reaches the output stage",
+          "[hearth][decoder-settings][karaoke]") {
+    // On by default: the library ignores it for a stream that is not karaoke, and a karaoke
+    // stream played as coded sends its vocals to the surround speakers.
+    const auto wide = decoder_setup(DecoderSettings{}, layout("5.1"));
+    CHECK(wide.config.output.karaoke == iclforge::ac3::KaraokeReproduction::kAware);
+    CHECK(wide.config.output.karaoke_vocals == iclforge::ac3::KaraokeVocals::kBoth);
+
+    DecoderSettings chosen;
+    chosen.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    chosen.karaoke_vocals = iclforge::ac3::KaraokeVocals::kV2;
+    const auto capable = decoder_setup(chosen, layout("5.1"));
+    CHECK(capable.config.output.karaoke == iclforge::ac3::KaraokeReproduction::kCapable);
+    CHECK(capable.config.output.karaoke_vocals == iclforge::ac3::KaraokeVocals::kV2);
+
+    // A two-speaker layout's fold carries the choice too: the library applies the 2/0 column.
+    const auto stereo = decoder_setup(chosen, layout("2.0"));
+    CHECK(stereo.config.output.target == iclforge::ac3::DownmixTarget::kLoRo);
+    CHECK(stereo.config.output.karaoke == iclforge::ac3::KaraokeReproduction::kCapable);
+    CHECK(stereo.config.output.karaoke_vocals == iclforge::ac3::KaraokeVocals::kV2);
+
+    // What a receiver cannot do is not asked of the decode that is re-encoded.
+    CHECK(iclforge::hearth::transcode_settings(chosen).karaoke ==
+          iclforge::ac3::KaraokeReproduction::kOff);
+
+    // Every choice reads back in the diagnostics.
+    CHECK(iclforge::hearth::describe(DecoderSettings{}).find("karaoke: aware") !=
+          std::string::npos);
+    DecoderSettings coded;
+    coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+    CHECK(iclforge::hearth::describe(coded).find("karaoke: as coded") != std::string::npos);
+    CHECK(iclforge::hearth::describe(chosen).find("karaoke: capable, vocal 2") !=
+          std::string::npos);
+    chosen.karaoke_vocals = iclforge::ac3::KaraokeVocals::kNone;
+    CHECK(iclforge::hearth::describe(chosen).find("karaoke: capable, no vocals") !=
+          std::string::npos);
+
+    // Two settings that differ only here are different settings.
+    CHECK_FALSE(DecoderSettings{} == coded);
 }
