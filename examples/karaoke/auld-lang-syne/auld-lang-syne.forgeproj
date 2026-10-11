@@ -1,0 +1,37 @@
+{
+  "format": "iclforge-project",
+  "version": 1,
+  "title": "Auld Lang Syne (karaoke example)",
+  "flow": "karaoke",
+  "sources": [
+    {
+      "path": "parts/backing.wav",
+      "part": "backing"
+    },
+    {
+      "path": "parts/melody-guide.wav",
+      "part": "melody"
+    },
+    {
+      "path": "parts/vocal-1-lead.wav",
+      "part": "vocal1"
+    },
+    {
+      "path": "parts/vocal-2-harmony.wav",
+      "part": "vocal2"
+    }
+  ],
+  "encode": {
+    "codec": "ac3",
+    "container": "elementary",
+    "bitrateKbps": 384,
+    "bsmod": 7,
+    "cmixlev": 1,
+    "surmixlev": 1
+  },
+  "karaoke": {
+    "input": "parts",
+    "listening": "aware",
+    "vocals": "both"
+  }
+}
