@@ -65,6 +65,7 @@
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "container_input.hpp"
+#include "exit_codes.hpp"
 #include "platform/stdio_binary.hpp"
 #include "recording_sink.hpp"
 #include "usage.hpp"
@@ -3299,6 +3300,52 @@ std::optional<int> choose_programme(std::span<const int> ids, std::optional<int>
         return std::nullopt;
     }
     return wanted;
+}
+
+std::expected<iclforge::apps::ProgrammeUnits, int> select_programme_units(
+    std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path) {
+    auto selected = iclforge::apps::select_programme(stream, wanted);
+    if (selected.has_value()) {
+        return std::move(*selected);
+    }
+    if (selected.error().not_carried) {
+        // choose_programme says which ones it does carry, in the wording
+        // decode, qc and levels answer a bad programme= with.
+        (void)choose_programme(selected.error().carried, wanted);
+        return std::unexpected(kExitUsage);
+    }
+    fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
+    return std::unexpected(kExitInput);
+}
+
+void report_programme(FILE* status, const iclforge::apps::ProgrammeUnits& selected) {
+    if (selected.ids.size() > 1) {
+        status_println(status, "  programme {} of {} ({})", selected.programme,
+                       selected.ids.size(), format_programme_ids(selected.ids));
+    }
+}
+
+bool apply_programme_option(std::vector<std::byte>& raw, const Options& meta,
+                            std::string_view in_path) {
+    if (!meta.programme.has_value()) {
+        return true;
+    }
+    const auto scanned = iclforge::ac3::io::scan(raw);
+    if (!scanned.has_value()) {
+        return true;
+    }
+    auto selected = iclforge::ac3::io::extract_programme(*scanned, *meta.programme);
+    if (!selected.has_value()) {
+        std::string carried;
+        for (const auto& programme : scanned->programmes) {
+            carried += (carried.empty() ? "" : ", ") + std::to_string(programme.substreamid);
+        }
+        fmt::println(stderr, "error: {}: no programme {} in this stream (it carries {})", in_path,
+                     *meta.programme, carried);
+        return false;
+    }
+    raw = std::move(*selected);
+    return true;
 }
 
 namespace {
