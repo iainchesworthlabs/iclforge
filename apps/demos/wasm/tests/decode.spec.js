@@ -127,7 +127,23 @@ test('a karaoke AC-3 stream is said to be one, and which vocals are heard is a c
         const coded = decode({ target: DownmixTarget.AsCoded });
         const aware = decode({ target: DownmixTarget.AsCoded, karaoke: KaraokeReproduction.Aware });
         const stereo = decode({ target: lo });
-        const choice = (vocals) => energy(decode({ target: lo, karaoke: capable, karaokeVocals: vocals }), 0);
+        const mix = (vocals) => decode({ target: lo, karaoke: capable, karaokeVocals: vocals });
+        const choice = (vocals) => energy(mix(vocals), 0);
+        // How far apart two mixes are: the mean square of their left channels' difference, as a share
+        // of the louder one's energy. Their energies alone can agree by coincidence: the reproduction is
+        // scaled so that no output sums past 1, and with the vocals out it is scaled less, so a mix with
+        // the lead vocal in and one without can be the same loudness and not the same mix.
+        const apart = (a, b) => {
+            const x = a.fold[0];
+            const y = b.fold[0];
+            const n = Math.min(x.length, y.length);
+            let sum = 0;
+            for (let i = 0; i < n; i++) {
+                const d = x[i] - y[i];
+                sum += d * d;
+            }
+            return sum / n / Math.max(energy(a, 0), energy(b, 0));
+        };
         return {
             karaoke: coded.karaoke,
             codedFold: coded.fold.length,
@@ -137,8 +153,7 @@ test('a karaoke AC-3 stream is said to be one, and which vocals are heard is a c
             stereo: energy(stereo, 0),
             v1: choice(KaraokeVocals.V1),
             v2: choice(KaraokeVocals.V2),
-            both: choice(KaraokeVocals.Both),
-            none: choice(KaraokeVocals.None),
+            noneFromBoth: apart(mix(KaraokeVocals.None), mix(KaraokeVocals.Both)),
         };
     }, bytes);
 
@@ -153,7 +168,9 @@ test('a karaoke AC-3 stream is said to be one, and which vocals are heard is a c
     const differs = (a, b) => Math.abs(a - b) > 0.01 * Math.max(a, b);
     expect(differs(result.v1, result.v2)).toBe(true);
     expect(differs(result.v1, result.stereo)).toBe(true);
-    expect(differs(result.none, result.both)).toBe(true);
+    // With none of the vocals and with both of them the left channel is not the same mix, though its
+    // energy is within a percent of it.
+    expect(result.noneFromBoth).toBeGreaterThan(0.1);
     expect(pageErrors).toEqual([]);
 });
 
