@@ -704,6 +704,21 @@ void rekey_after_source_removed(Map& map, std::size_t removed_source) {
 
 }  // namespace
 
+namespace {
+
+// Where a file says its channels are (its WAVE_FORMAT_EXTENSIBLE
+// dwChannelMask, read by plan::wav_mask_locations as forge's encode reads
+// it), one Table E2.5 location per channel in file order; empty when it states
+// none and the channel COUNT is all there is to go on. A 2/1 file and a 3/0
+// one are both three channels wide, and only the speakers tell them apart.
+std::vector<iclforge::ac3::eac3::chanmap::Location> stated_locations(
+    const iclforge::ac3::io::WavData& wav) {
+    return plan::wav_mask_locations(wav.channel_mask, wav.channels.size())
+        .value_or(std::vector<iclforge::ac3::eac3::chanmap::Location>{});
+}
+
+}  // namespace
+
 struct EncoderController::Source {
     iclforge::ac3::io::WavData wav;
     // "orbit51.wav" (or the raw path if it was never a local file) - what
@@ -3511,6 +3526,11 @@ std::optional<plan::Routing> EncoderController::routingForSources(const plan::Ch
             // routing_for_sources) rather than inventing an automatic
             // multi-file blend nothing else here defines.
             return std::nullopt;
+        }
+        // A file that states its speakers is routed from them; one that does
+        // not is read by its width, as it always was.
+        if (const auto stated = stated_locations(source_->wav); !stated.empty()) {
+            return plan::route(target, stated, p.meta.cmixlev, p.meta.surmixlev);
         }
         return plan::route(target, source_->wav.channels.size(), p.meta.cmixlev,
                            p.meta.surmixlev);
@@ -6581,6 +6601,12 @@ void EncoderController::loadSourceFile(const QUrl& url) {
     const auto rate = wav->sample_rate;
     const double seconds =
         rate > 0 ? static_cast<double>(wav->frame_count()) / static_cast<double>(rate) : 0.0;
+    // The layout the file's own speakers make, when it states them and this
+    // codec can carry it (3/0, 2/1, 3/1 and 2/2 among them); the width's
+    // guess below is for the files that do not.
+    const auto stated = stated_locations(*wav);
+    const auto stated_layout =
+        stated.empty() ? std::optional<plan::SourceLayout>{} : plan::source_layout(codec_, stated);
 
     const auto sample_rate_for_encode = to_sample_rate_for_file(rate, codec_);
     QString problem;
@@ -6592,7 +6618,7 @@ void EncoderController::loadSourceFile(const QUrl& url) {
                       : QStringLiteral("sample rate %1 Hz is not legal here (need 32, 44.1 or 48 "
                                        "kHz)")
                             .arg(rate);
-    } else if (!plan::layout_for_source(channels)) {
+    } else if (!stated_layout && !plan::layout_for_source(channels)) {
         problem = QStringLiteral("%1 channels — %2")
                       .arg(channels)
                       .arg(to_qstring(plan::describe(plan::PlanError::kNoSourceLayout)));
@@ -6614,7 +6640,22 @@ void EncoderController::loadSourceFile(const QUrl& url) {
     // A newly loaded file picks the bed+extras that match it, which is what a
     // user almost always wants and is the only choice that carries every
     // channel through untouched. Everything else stays where they left it.
-    if (const auto natural = plan::layout_for_source(channels)) {
+    if (stated_layout) {
+        // The stated speakers are a layout this codec carries: take its bed
+        // and extras exactly as the named layouts below do.
+        const auto cp =
+            stated_layout->layout
+                ? plan::channel_plan_for(*stated_layout->layout)
+                : iclforge::ac3::eac3::chanmap::allocate(*stated_layout->custom_locations)
+                      .value_or(plan::ChannelPlan{});
+        bed_acmod_ = cp.bed_acmod;
+        bed_lfe_ = cp.bed_lfe;
+        extras_mask_ = 0;
+        for (const auto dependent : cp.dependents) {
+            extras_mask_ = static_cast<std::uint16_t>(extras_mask_ | dependent);
+        }
+        emit planChanged();
+    } else if (const auto natural = plan::layout_for_source(channels)) {
         if (plan::carries(codec_, *natural)) {
             const auto cp = plan::channel_plan_for(*natural);
             bed_acmod_ = cp.bed_acmod;
@@ -7032,17 +7073,32 @@ void EncoderController::autoAssignByName() {
         // A source whose channel count has a natural AC-3 layout carries its
         // own names: a 5.1 WAV's channels ARE L R C LFE Ls Rs in WAV order.
         // A count with no natural layout (3, 7...) has no names to assign by.
-        const auto layout = iclforge::ac3::io::ac3_layout_for(shapes[s].channels);
-        if (!layout) {
-            continue;
-        }
+        // The primary file that states its speakers names them itself, and
+        // then even a 2/1 or 3/1 file has names to assign by.
         std::vector<iclforge::ac3::eac3::chanmap::Location> locations;
-        for (const auto location : iclforge::ac3::eac3::chanmap::expand(
-                 iclforge::ac3::eac3::chanmap::acmod_map(layout->acmod, layout->lfe))) {
-            locations.push_back(location);
+        std::vector<std::size_t> wav_index;
+        if (s == 0 && source_) {
+            const auto stated = stated_locations(source_->wav);
+            if (stated.size() == shapes[s].channels) {
+                locations = stated;
+                for (std::size_t k = 0; k < stated.size(); ++k) {
+                    wav_index.push_back(k);
+                }
+            }
         }
-        for (std::size_t k = 0; k < locations.size() && k < layout->wav_index.size(); ++k) {
-            const auto wav_channel = layout->wav_index[k];
+        if (locations.empty()) {
+            const auto layout = iclforge::ac3::io::ac3_layout_for(shapes[s].channels);
+            if (!layout) {
+                continue;
+            }
+            for (const auto location : iclforge::ac3::eac3::chanmap::expand(
+                     iclforge::ac3::eac3::chanmap::acmod_map(layout->acmod, layout->lfe))) {
+                locations.push_back(location);
+            }
+            wav_index = layout->wav_index;
+        }
+        for (std::size_t k = 0; k < locations.size() && k < wav_index.size(); ++k) {
+            const auto wav_channel = wav_index[k];
             if (!in_plan.contains(locations[k])) {
                 continue;
             }

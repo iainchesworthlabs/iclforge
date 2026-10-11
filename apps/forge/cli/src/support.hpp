@@ -737,6 +737,11 @@ std::optional<int> finish_measurement(const iclforge::ac3::meta::LoudnessMeter& 
 // blend of two different things rather than either programme's own level;
 // callers route dual mono through measured_dialnorm_channel on each
 // programme's own channel alone instead.
+//
+// A file that states its speakers (WavData::channel_mask) is metered by them,
+// each of the bed's coded channels looked up by location; one that does not,
+// or that has no channel the bed needs, goes by the channel count, so a
+// three-channel file is 3/0 and nothing else.
 std::optional<int> measured_dialnorm(const iclforge::ac3::io::WavData& wav,
                                      iclforge::ac3::SampleRate rate, iclforge::ac3::Acmod acmod,
                                      bool lfe, FILE* out = stdout);
@@ -999,9 +1004,14 @@ std::expected<iclforge::ac3::io::WavData, iclforge::ac3::io::WavError> read_wav_
 class PlanarWavSink {
    public:
     // `order`: entry i names the source slot that belongs at WAV position i
-    // (write_wav_f32's convention); empty means identity.
+    // (write_wav_f32's convention); empty means identity. `channel_mask` is
+    // the SPEAKER_* bits of the speakers those positions are, in increasing
+    // bit order (plan::wav_channel_mask() produces one): non-zero, and naming
+    // exactly `slots` speakers, it makes the header WAVE_FORMAT_EXTENSIBLE so
+    // a reader can tell a 2/1 file from a 3/0 one; 0 is the plain header
+    // every decode wrote before.
     [[nodiscard]] bool open(std::string_view path, std::uint32_t sample_rate, std::size_t slots,
-                            std::span<const std::size_t> order);
+                            std::span<const std::size_t> order, std::uint32_t channel_mask = 0);
 
     [[nodiscard]] bool is_open() const { return open_; }
 
@@ -1023,6 +1033,7 @@ class PlanarWavSink {
     bool stdio_ = false;
     bool open_ = false;
     std::uint32_t sample_rate_ = 0;
+    std::uint32_t channel_mask_ = 0;
     iclforge::ac3::io::WavStreamWriter writer_;
     std::vector<std::vector<float>> slots_;
     std::vector<std::size_t> consumed_;
@@ -1266,9 +1277,40 @@ std::string_view container_note(RecordingSink::Container container);
 std::optional<iclforge::ac3::SampleRate> wav_sample_rate(std::uint32_t hz, std::string_view codec,
                                                     bool eac3);
 
+// Where a WAV source says its channels are, one Table E2.5 location per
+// channel in file order: `channel_mask` (the file's dwChannelMask, 0 when it
+// states none) read as locations. Empty - and a caller then goes by the
+// channel COUNT, as it always has - when the file states none, names a speaker
+// Table E2.5 has no location for (SPEAKER_TOP_BACK_CENTER), or does not name
+// exactly `channels` speakers.
+std::vector<iclforge::ac3::eac3::chanmap::Location> source_locations(std::uint32_t channel_mask,
+                                                                      std::size_t channels);
+
+// The AC-3 coding mode a WAV is, for the commands that name or meter a file's
+// channels as A/52 does: the Table 5.8 mode (with or without LFE) its stated
+// speakers are exactly, with `wav_index` the file position of each coded
+// channel; or, for a file that states none or whose speakers are no one mode,
+// the channel count's answer (iclforge::ac3::io::ac3_layout_for). Nothing for
+// a width no mode has.
+std::optional<iclforge::ac3::io::Ac3Layout> wav_source_layout(
+    const iclforge::ac3::io::WavData& wav);
+
+// Gives `p` the layout a source with these stated `locations` has, for an
+// unnamed layout= (the layout then follows the source): the named layout that
+// renders exactly them, else a custom Table E2.5 selection, and `label` says
+// which. False - `p` and `label` untouched - when the locations are not a
+// layout this codec can carry (no full-bandwidth channel, a pair named by one
+// half, or a dependent substream for AC-3), so the caller falls back to the
+// channel count's own answer and its own diagnosis.
+bool plan_from_locations(iclforge::ac3::plan::Plan& p, std::string& label,
+                         std::span<const iclforge::ac3::eac3::chanmap::Location> locations);
+
 // A source's channels routed onto a plan's coded channels, or a diagnosis.
-std::optional<iclforge::ac3::plan::Routing> routing_or_error(const iclforge::ac3::plan::Plan& p,
-                                                        std::size_t channels);
+// `locations` are the source's own stated speakers (source_locations()); empty
+// means the file stated none and the routing goes by `channels` alone.
+std::optional<iclforge::ac3::plan::Routing> routing_or_error(
+    const iclforge::ac3::plan::Plan& p, std::size_t channels,
+    std::span<const iclforge::ac3::eac3::chanmap::Location> locations = {});
 
 // --- AC-4 ----------------------------------------------------------------------
 

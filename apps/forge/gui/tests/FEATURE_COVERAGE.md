@@ -3,7 +3,7 @@
 What every user-facing feature of the Forge GUI (`apps/forge/gui/assets/qml`, driven by
 `EncoderController`, `QcController`, `ObjectDecodeController`,
 `StreamPlayerController`, `LanguageManager`) is exercised by. Two sets of tests
-hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (36 suites, 215
+hold it: the Qt Quick suites in `apps/forge/gui/tests/qml/tst_*.qml` (36 suites, 220
 test functions), and the Qt-free C++ cases in `apps/forge/gui/tests/*.cpp` (four files, 45
 cases, tagged `[gui]` and built into `iclforge-forge-gui-tests`). All the QML suites run the
 real controllers, not mocks.
@@ -43,6 +43,8 @@ reach without a device.
 | A loaded WAV sets `sourceReady` and the window's source label | logic | logic | SourceLoading::test_loadingAFileUpdatesSourceReadyAndTheDisplayedName |
 | Mismatched-rate source resampled and labelled | logic | logic | SourceLoading::test_addingAMismatchedRateSourceResamplesAndLabelsTheRow |
 | Per-source level pips (sourceLevels) | logic | logic | SourceLoading::test_sourceLevelsIsAPerSourceLookupSeparateFromSourceModel |
+| A WAV that states its speakers (a `WAVE_FORMAT_EXTENSIBLE` mask) loads as that coding mode, with or without an LFE | new | logic | SourceLoading::test_aFileThatStatesItsSpeakersIsLoadedAsThatCodingMode, test_aStatedLfeIsKeptNotMadeIntoAFifthFullBandwidthChannel |
+| A WAV that states no speakers keeps the reading its width gave | new | logic | SourceLoading::test_aFileThatStatesNoSpeakersKeepsTheReadingItsWidthGave |
 | Source offset spin box / timeline length | logic | logic | TimelineTimeModel::test_timelineLengthDerivesFromSourcesAndOffsets, test_encodeWithASourceOffsetProducesADoneRun |
 | Drag-and-drop / `forge-gui <file>` dispatch: a WAV becomes a source, a second WAV adds one, an `.ec3` opens the player, the window has a drop area for file URLs | logic | logic | DesktopIntegration::* (calls `openDroppedFile`, since an OS drag cannot be synthesised) |
 | A dropped or launched `.ac4` | new | none | No case. `openDroppedFile` routes on the `.ac3`/`.ec3` suffix alone, so an `.ac4` goes to the WAV source loader. |

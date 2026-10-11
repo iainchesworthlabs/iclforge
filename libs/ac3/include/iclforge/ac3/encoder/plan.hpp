@@ -159,6 +159,71 @@ inline constexpr std::array<LayoutInfo, 8> kLayouts{{
 // leaves the channels they lack silent rather than inventing any.
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<LayoutId> layout_for_source(std::size_t wav_channels);
 
+// The Table E2.5 location mask (parse_channels()'s own form) of a list of
+// locations, for a source that says where its channels are - what
+// iclforge::audio::locations_of() reads off a WAV's dwChannelMask. nullopt when
+// a location is named twice or a pair location (Lc/Rc, Lrs/Rrs, ...) names only
+// one half, because Table E2.5 has no bit for either.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<std::uint16_t> channel_mask_of(
+    std::span<const eac3::chanmap::Location> locations);
+
+// The named layout that renders exactly these locations (a mask in the form
+// channel_mask_of() gives), when there is one - so a source that states its own
+// speakers lands on "5.1" or "7.1" and not on a custom list that spells the
+// same thing. Never dual mono, which is not a soundfield.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<LayoutId> layout_for_locations(
+    std::uint16_t locations);
+
+// --- sources that state where their channels are ---------------------------
+//
+// A WAV's width is not its layout: three channels are 3/0 as FL FR FC and 2/1
+// as FL FR BC. The header's dwChannelMask is what says which, and a front end
+// that read it its own way would disagree with the other about what a file is -
+// the failure this header exists to prevent - so both read it here.
+
+// The Table E2.5 locations a WAVE_FORMAT_EXTENSIBLE dwChannelMask (mmreg.h's
+// SPEAKER_* bits) names, one per channel in the order the file interleaves
+// them: ascending bit order. nullopt when the mask says nothing usable - it is
+// 0, names a different number of speakers than the file has channels, or names
+// one Table E2.5 has no location for (SPEAKER_TOP_BACK_CENTER, or
+// SPEAKER_ALL's reserved bit) - and a caller then goes by the channel count.
+//
+// SPEAKER_BACK_LEFT/RIGHT are the surrounds (Ls, Rs) of a 5.1 ring, and the
+// rear surrounds (Lrs, Rrs) of a 7.1 room only when the mask also names the
+// sides, which is how ITU-R BS.2051 lays 7.1 out and how
+// iclforge::audio::locations_of() reads the same pair.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<std::vector<eac3::chanmap::Location>>
+wav_mask_locations(std::uint32_t channel_mask, std::size_t channels);
+
+// The inverse, for a file this library is about to write: the dwChannelMask of
+// channels at these locations, listed in the order they will interleave. 0 -
+// the plain header, no claim - for fewer than three channels (a mono or stereo
+// file has nothing to disambiguate and stays byte-identical to what it always
+// was), for a location WAVEFORMATEXTENSIBLE has no speaker for (the wides,
+// the surround-directs, the second LFE), for a repeated location, and for a
+// list that is not in ascending speaker order: a mask names speakers in the
+// order the file carries them, and one that would mislabel a channel is worse
+// than none.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::uint32_t wav_channel_mask(
+    std::span<const eac3::chanmap::Location> in_wav_order);
+
+// What an unnamed layout becomes for a source that states its locations: the
+// named layout that renders exactly them, or else a custom Table E2.5
+// selection (Plan::custom_locations), exactly one of the two set.
+struct SourceLayout {
+    std::optional<LayoutId> layout;
+    std::optional<std::uint16_t> custom_locations;
+};
+
+// nullopt when the locations are not a layout this codec can carry - a list
+// that repeats a location or names half a pair, one with no full-bandwidth
+// channel, or (for AC-3, which has no substream layer) one that needs a
+// dependent substream - so the caller falls back to layout_for_source() and its
+// own diagnosis. AC-4 takes its layouts from Plan::layout / validate() and
+// answers nullopt here.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<SourceLayout> source_layout(
+    Codec codec, std::span<const eac3::chanmap::Location> locations);
+
 // "mono | stereo | 51 | ...", built from kLayouts so a usage line and the
 // parser that rejects a bad token cannot list different sets.
 [[nodiscard]] ICLFORGE_AC3_EXPORT std::string layout_names(Codec codec = Codec::kEac3);
@@ -632,6 +697,22 @@ struct ICLFORGE_AC3_EXPORT Routing {
                                                            std::size_t wav_channels,
                                                            meta::CentreMixLevel clev,
                                                            meta::SurroundMixLevel slev);
+
+// The same routing for a source that states where its channels are: `source`
+// holds one location per source channel, in the order the file interleaves
+// them. Where the count-based overloads above must GUESS what a width means
+// (three channels are L R C or L R Cs, four are L R Ls Rs or L R C Cs, ...),
+// this one is told, so a 2/1 programme folds to stereo as 2/1 does (§7.8's lone
+// surround at -3 dB, not a centre) and a 3/1 one does not seat its centre in a
+// surround.
+//
+// Also unlike them, a source as wide as the target is not taken to BE the
+// target: the stated locations are the source, and a 5.1.2 file sent to a 7.1
+// layout is panned to it rather than read as 7.1. nullopt for an empty list or
+// one that names a location twice.
+[[nodiscard]] ICLFORGE_AC3_EXPORT std::optional<Routing> route(
+    const ChannelPlan& target, std::span<const eac3::chanmap::Location> source,
+    meta::CentreMixLevel clev, meta::SurroundMixLevel slev);
 
 // Applies a routing to one frame. `source` holds source_channels spans of
 // `samples` samples; `coded` holds coded_channels spans of the same length and

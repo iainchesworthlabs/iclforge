@@ -10,6 +10,8 @@
 #include <span>
 #include <string>
 
+#include "wav_format.hpp"
+
 // Separate translation unit from wav.cpp: the one-shot writers there build
 // the whole file in memory before ever opening a stream, while this one is a
 // stateful object that has to keep a file handle and a running frame count
@@ -35,6 +37,10 @@ struct WavStreamWriter::Impl {
     std::uint32_t sample_rate = 0;
     std::uint16_t channels = 0;
     std::uint64_t frames_written = 0;
+    // Where the header ends, which is where the data chunk's size field sits
+    // (4 bytes before it) and what the RIFF size field adds to the samples
+    // (8 less): 44 for the plain header, 68 for an extensible one.
+    std::size_t header_bytes = detail::f32_header_bytes(false);
     bool open = false;
 };
 
@@ -48,6 +54,13 @@ WavStreamWriter& WavStreamWriter::operator=(WavStreamWriter&&) noexcept = defaul
 std::expected<void, WavError> WavStreamWriter::open(const std::string& path,
                                                      std::uint32_t sample_rate,
                                                      std::uint16_t channels) {
+    return open(path, sample_rate, channels, 0);
+}
+
+std::expected<void, WavError> WavStreamWriter::open(const std::string& path,
+                                                     std::uint32_t sample_rate,
+                                                     std::uint16_t channels,
+                                                     std::uint32_t channel_mask) {
     if (channels == 0) {
         return std::unexpected(WavError::kUnsupportedFormat);
     }
@@ -64,19 +77,8 @@ std::expected<void, WavError> WavStreamWriter::open(const std::string& path,
         if (!create) {
             return std::unexpected(WavError::kCannotOpen);
         }
-        create.write("RIFF", 4);
-        put_u32(create, 36);  // data_bytes = 0 until write() advances it
-        create.write("WAVE", 4);
-        create.write("fmt ", 4);
-        put_u32(create, 16);
-        put_u16(create, 3);  // IEEE float
-        put_u16(create, channels);
-        put_u32(create, sample_rate);
-        put_u32(create, sample_rate * static_cast<std::uint32_t>(channels) * 4);
-        put_u16(create, static_cast<std::uint16_t>(channels * 4));
-        put_u16(create, 32);
-        create.write("data", 4);
-        put_u32(create, 0);
+        // data_bytes = 0 until write() advances it.
+        detail::write_f32_header(create, channels, sample_rate, 0, channel_mask);
         if (!create) {
             return std::unexpected(WavError::kCannotOpen);
         }
@@ -87,6 +89,7 @@ std::expected<void, WavError> WavStreamWriter::open(const std::string& path,
         return std::unexpected(WavError::kCannotOpen);
     }
     impl_->file.seekp(0, std::ios::end);
+    impl_->header_bytes = detail::f32_header_bytes(detail::states_mask(channels, channel_mask));
     impl_->sample_rate = sample_rate;
     impl_->channels = channels;
     impl_->frames_written = 0;
@@ -114,11 +117,12 @@ void WavStreamWriter::flush_header() {
     const std::uint64_t data_bytes64 =
         impl_->frames_written * static_cast<std::uint64_t>(impl_->channels) * 4;
     const auto data_bytes = static_cast<std::uint32_t>(data_bytes64);
-    const std::uint32_t riff_bytes = 36 + data_bytes;
+    const auto riff_bytes = static_cast<std::uint32_t>(impl_->header_bytes - 8) + data_bytes;
 
     impl_->file.seekp(4, std::ios::beg);
     put_u32(impl_->file, riff_bytes);
-    impl_->file.seekp(40, std::ios::beg);
+    // The data chunk's size is the last four bytes of the header.
+    impl_->file.seekp(static_cast<std::streamoff>(impl_->header_bytes - 4), std::ios::beg);
     put_u32(impl_->file, data_bytes);
     // Without this, the two size fields sit in the fstream's own buffer,
     // invisible to any other handle on the same path (including a plain
