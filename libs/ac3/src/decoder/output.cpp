@@ -390,7 +390,7 @@ FoldPlan plan_fold(const OutputConfig& config, std::size_t inputs, Acmod acmod, 
         const KaraokeSlots slot = karaoke_slots(acmod);
         const KaraokeCoefficients k =
             capable(false, config.karaoke_vocals, levels.loro_clev);
-        const PartGains gain = part_gains(config);
+        const PartGains part = part_gains(config);
         struct Role {
             int slot;
             double to_left;
@@ -398,9 +398,9 @@ FoldPlan plan_fold(const OutputConfig& config, std::size_t inputs, Acmod acmod, 
         };
         const std::array<Role, 5> roles = {{{slot.left, 1.0, 0.0},
                                             {slot.right, 0.0, 1.0},
-                                            {slot.melody, k.c * gain.melody, k.i * gain.melody},
-                                            {slot.vocal1, k.a * gain.vocal1, k.g * gain.vocal1},
-                                            {slot.vocal2, k.b * gain.vocal2, k.h * gain.vocal2}}};
+                                            {slot.melody, k.c * part.melody, k.i * part.melody},
+                                            {slot.vocal1, k.a * part.vocal1, k.g * part.vocal1},
+                                            {slot.vocal2, k.b * part.vocal2, k.h * part.vocal2}}};
         double left_sum = 0.0;
         double right_sum = 0.0;
         for (const Role& role : roles) {
@@ -734,16 +734,16 @@ KaraokePlan plan_karaoke(const OutputConfig& config, Acmod acmod, bool lfe, std:
                                 : aware_three_channel(slot.vocal2 >= 0, slev);
     // The listener's re-levelling (kCapable only), in the coefficients before the sums are
     // taken, so that the scale-down below holds the moved parts to 1 as it holds the rest.
-    const PartGains gain = part_gains(config);
-    k.a *= gain.vocal1;
-    k.d *= gain.vocal1;
-    k.g *= gain.vocal1;
-    k.b *= gain.vocal2;
-    k.e *= gain.vocal2;
-    k.h *= gain.vocal2;
-    k.c *= gain.melody;
-    k.f *= gain.melody;
-    k.i *= gain.melody;
+    const PartGains part = part_gains(config);
+    k.a *= part.vocal1;
+    k.d *= part.vocal1;
+    k.g *= part.vocal1;
+    k.b *= part.vocal2;
+    k.e *= part.vocal2;
+    k.h *= part.vocal2;
+    k.c *= part.melody;
+    k.f *= part.melody;
+    k.i *= part.melody;
     const auto present = [&](int index) {
         return index >= 0 && static_cast<std::size_t>(index) < inputs;
     };
