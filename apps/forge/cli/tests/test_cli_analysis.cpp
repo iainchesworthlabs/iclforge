@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +17,8 @@
 
 #include "platform/process.hpp"
 
+#include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 
 // The measurement and carrier commands (apps/forge/cli/src/commands/analysis.cpp:
@@ -69,6 +72,22 @@ void write_raw(const fs::path& path, std::span<const char> bytes) {
 
 std::string quoted(const fs::path& path) { return "\"" + path.string() + "\""; }
 
+std::vector<std::byte> read_bytes(const fs::path& path) {
+    const auto raw = read_raw(path);
+    std::vector<std::byte> bytes(raw.size());
+    std::ranges::transform(raw, bytes.begin(),
+                           [](char c) { return static_cast<std::byte>(static_cast<unsigned char>(c)); });
+    return bytes;
+}
+
+std::vector<std::byte> joined(const std::vector<std::span<const std::byte>>& units) {
+    std::vector<std::byte> out;
+    for (const auto unit : units) {
+        out.insert(out.end(), unit.begin(), unit.end());
+    }
+    return out;
+}
+
 // `channels` channels of a `hz` tone at `amplitude`, `frames` long. 1 kHz by
 // default; at 48 kHz that is exactly 48 samples a cycle, so the bytes repeat
 // at a fixed period - which once made apps/shared/media/src/container_input's MPEG-TS
@@ -87,6 +106,22 @@ fs::path write_tone_wav(const fs::path& path, std::size_t channels, std::uint32_
     }
     REQUIRE(iclforge::ac3::io::write_wav_f32(path.string(), data, rate).has_value());
     return path;
+}
+
+// A second of a 5.1 main and a second of a mono description as two independent
+// substreams of one E-AC-3 stream (§E2.3.1.2's I0 and I1), written the way the
+// documentation writes one: eac3-encode with programme2=.
+fs::path write_two_programme_stream(const fs::path& dir, const std::string& name) {
+    const auto main_wav = write_tone_wav(dir / (name + "_main.wav"), 6, 48000, 48000, 0.25);
+    const auto description_wav =
+        write_tone_wav(dir / (name + "_description.wav"), 1, 48000, 48000, 0.25, 700.0);
+    const auto stream = dir / (name + ".ec3");
+    const auto log = dir / (name + "_make.log");
+    REQUIRE(run_cli("eac3-encode " + quoted(main_wav) + " " + quoted(stream) +
+                        " 448 none 51 off programme2=" + quoted(description_wav) +
+                        " programme2-layout=mono programme2-bitrate=96",
+                    log) == 0);
+    return stream;
 }
 
 // Runs a command expected to fail and returns what it printed, after
@@ -510,4 +545,107 @@ TEST_CASE("unspdif refuses an unreadable carrier, plain PCM and an unwritable ou
     CHECK(run_failing("unspdif " + quoted(carrier) + " " + quoted(nowhere), log, 3)
               .find("error: cannot open " + nowhere.string() + " for writing") !=
           std::string::npos);
+}
+
+// A stream with a second independent substream (§E2.3.1.2: a second language,
+// an audio description) comes back from split_access_units with its programmes
+// interleaved, one frame period of each in turn, and an E-AC-3 burst is one
+// frame period. spdif wrapped every unit, so the carrier held both programmes'
+// bursts one after the other: a receiver locks onto the main at half speed
+// with the description between its frames. 'play' sends a receiver one
+// programme; these hold spdif, which writes what play would send, to the same.
+TEST_CASE("spdif wraps one programme of a multi-programme E-AC-3 stream, not both interleaved",
+          "[cli][analysis][spdif][programme]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_two_programme_stream(dir, "spdif_programme");
+    const auto source = read_bytes(stream);
+
+    // The premise: the unfiltered split really does hold both programmes.
+    const auto every_unit = iclforge::ac3::split_access_units(source);
+    const auto main_units = iclforge::ac3::split_access_units(source, 0);
+    const auto description_units = iclforge::ac3::split_access_units(source, 1);
+    REQUIRE(every_unit.has_value());
+    REQUIRE(main_units.has_value());
+    REQUIRE(description_units.has_value());
+    const auto units_each = main_units->size();
+    REQUIRE(units_each >= 2);
+    REQUIRE(description_units->size() == units_each);
+    REQUIRE(every_unit->size() == 2 * units_each);
+    const auto bursts = "unwrapped " + std::to_string(units_each) + " E-AC-3 bursts -> ";
+
+    // spdif then unspdif, the stream the carrier holds.
+    const auto round_trip = [&](const std::string& name, const std::string& options,
+                                std::string& spdif_text, std::string& unspdif_text) {
+        const auto carrier = dir / (name + ".wav");
+        const auto recovered = dir / (name + ".ec3");
+        const auto spdif_log = dir / (name + "_spdif.log");
+        const auto unspdif_log = dir / (name + "_unspdif.log");
+        const auto spdif_rc = run_cli(
+            "spdif " + quoted(stream) + " " + quoted(carrier) + (options.empty() ? "" : " ") +
+                options,
+            spdif_log);
+        spdif_text = read_log(spdif_log);
+        INFO(spdif_text);
+        REQUIRE(spdif_rc == 0);
+        const auto unspdif_rc =
+            run_cli("unspdif " + quoted(carrier) + " " + quoted(recovered), unspdif_log);
+        unspdif_text = read_log(unspdif_log);
+        INFO(unspdif_text);
+        REQUIRE(unspdif_rc == 0);
+        return read_bytes(recovered);
+    };
+    std::string spdif_text;
+    std::string unspdif_text;
+
+    SECTION("the first programme, which is substream 0 already, when programme= is omitted") {
+        const auto recovered = round_trip("spdif_programme_default", "", spdif_text, unspdif_text);
+        CHECK(spdif_text.find("  programme 0 of 2 (0, 1)") != std::string::npos);
+        CHECK(unspdif_text.find(bursts) != std::string::npos);
+        // The main's own access units, byte for byte, not both programmes' (twice as many).
+        const bool is_main = recovered == joined(*main_units);
+        CHECK(is_main);
+    }
+
+    SECTION("programme=1 is cut out and renumbered as substream 0, which a receiver takes") {
+        const auto recovered =
+            round_trip("spdif_programme_second", "programme=1", spdif_text, unspdif_text);
+        CHECK(spdif_text.find("  programme 1 of 2 (0, 1)") != std::string::npos);
+        CHECK(unspdif_text.find(bursts) != std::string::npos);
+
+        const auto scanned = iclforge::ac3::io::scan(source);
+        REQUIRE(scanned.has_value());
+        const auto cut = iclforge::ac3::io::extract_programme(*scanned, 1);
+        REQUIRE(cut.has_value());
+        const bool is_cut = recovered == *cut;
+        CHECK(is_cut);
+        const auto ids = iclforge::ac3::programme_ids(recovered);
+        REQUIRE(ids.has_value());
+        CHECK(*ids == std::vector<int>{0});
+    }
+
+    SECTION("a programme the stream does not carry is refused by name, leaving no carrier") {
+        const auto carrier = dir / "spdif_programme_missing.wav";
+        const auto log = dir / "spdif_programme_missing.log";
+        fs::remove(carrier);
+        const auto text =
+            run_failing("spdif " + quoted(stream) + " " + quoted(carrier) + " programme=5", log, 1);
+        CHECK(text.find("error: no programme 5 in this stream (it carries 0, 1)") !=
+              std::string::npos);
+        CHECK_FALSE(fs::exists(carrier));
+    }
+}
+
+TEST_CASE("spdif leaves an AC-3 stream whole whatever programme= says", "[cli][analysis][spdif][programme]") {
+    // AC-3 has no substream layer: programme= is for E-AC-3's independent
+    // substreams, and is read past here as monitor and play read past it.
+    const auto dir = scratch_dir();
+    const auto log = dir / "spdif_programme_ac3.log";
+    const auto stream = dir / "spdif_programme_ac3.ac3";
+    const auto carrier = dir / "spdif_programme_ac3.wav";
+    const auto back = dir / "spdif_programme_ac3_back.ac3";
+    REQUIRE(run_cli("sine " + quoted(stream) + " 1 192", log) == 0);
+    REQUIRE(run_cli("spdif " + quoted(stream) + " " + quoted(carrier) + " programme=3", log) == 0);
+    REQUIRE(run_cli("unspdif " + quoted(carrier) + " " + quoted(back), log) == 0);
+    const bool same = read_bytes(back) == read_bytes(stream);
+    CHECK(same);
 }

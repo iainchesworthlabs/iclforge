@@ -1023,32 +1023,16 @@ int run_play(std::string_view in_path, int device_index, const Options& meta) {
         // language, and an E-AC-3 burst is one frame period - so the receiver
         // would be given half the main's audio at half speed. programme= or
         // else the first the stream carries, as decode and monitor choose.
-        auto selected = select_programme_units(stream, meta.programme, in_path);
+        // A programme other than 0 is cut out and renumbered as substream 0,
+        // which is what a receiver takes (select_receiver_units); the bytes
+        // of that cut-out stream are programme_stream's.
+        auto selected =
+            select_receiver_units(stream, meta.programme, in_path, programme_stream);
         if (!selected.has_value()) {
             return selected.error();
         }
         played_programme = std::move(*selected);
-        auto& chosen = *played_programme;
-        if (chosen.programme == 0) {
-            units = chosen.units;
-        } else {
-            // A receiver takes independent substream 0 and ignores the rest,
-            // so another programme's frames as they stand would be a stream
-            // with nothing it will play: cut it out and renumber it as
-            // substream 0, as the container writers do for programme=.
-            auto cut = iclforge::apps::cut_programme(stream, chosen.programme);
-            if (!cut.has_value()) {
-                fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
-                return kExitInput;
-            }
-            programme_stream = std::move(*cut);
-            const auto split = iclforge::ac3::split_access_units(programme_stream);
-            if (!split.has_value() || split->empty()) {
-                fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
-                return kExitInput;
-            }
-            units = *split;
-        }
+        units = played_programme->units;
         content_rate =
             sample_rate_hz(static_cast<iclforge::ac3::SampleRate>(
                 std::to_integer<std::uint32_t>(units[0][4]) >> 6));

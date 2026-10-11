@@ -1150,17 +1150,22 @@ bool wrap_ac3_stream(std::span<const std::byte> stream, std::uint32_t& rate_out,
     return true;
 }
 
+// `units` are ONE programme's access units, in frame-period order - what
+// select_receiver_units hands back. Never the stream's own unfiltered split:
+// that comes back interleaved for a stream with a second independent substream,
+// and a burst is one frame period, so a receiver would be sent the main at
+// half speed with the second language between its frames.
 template <typename Push>
-bool wrap_eac3_stream(std::span<const std::byte> stream, std::uint32_t& rate_out, Push&& push) {
-    const auto units = iclforge::ac3::split_access_units(stream);
-    if (!units || units->empty()) {
+bool wrap_eac3_units(std::span<const std::span<const std::byte>> units, std::uint32_t& rate_out,
+                     Push&& push) {
+    if (units.empty()) {
         return false;
     }
-    const auto byte4 = std::to_integer<std::uint32_t>((*units)[0][4]);
+    const auto byte4 = std::to_integer<std::uint32_t>(units[0][4]);
     rate_out = sample_rate_hz(static_cast<iclforge::ac3::SampleRate>(byte4 >> 6));
 
     iclforge::containers::iec61937::Eac3BurstPacker packer;
-    for (const auto& unit : *units) {
+    for (const auto& unit : units) {
         const auto burst = packer.push(unit);
         if (!burst) {
             return false;
@@ -1684,7 +1689,7 @@ int run_spdif_ac4(std::span<const std::byte> stream, std::string_view in_path,
 
 }  // namespace
 
-int run_spdif(std::string_view in_path, std::string_view out_path) {
+int run_spdif(std::string_view in_path, std::string_view out_path, const Options& meta) {
     const auto stream = read_all(in_path);
     if (stream.empty()) {
         fmt::println(stderr, "error: cannot read {}", in_path);
@@ -1699,6 +1704,24 @@ int run_spdif(std::string_view in_path, std::string_view out_path) {
         return kExitInput;
     }
     const bool eac3 = *bsid > 8;
+
+    // One programme goes into the carrier, never the stream's programmes one
+    // burst each - the choice 'play' makes for the same receiver, so the WAV
+    // this writes is what 'play' would have sent: programme= or else the first
+    // the stream carries, and a programme other than 0 cut out and renumbered
+    // as substream 0. Made before the sink is touched, so a programme the
+    // stream lacks leaves no file. AC-3 has no substream layer and AC-4 (above)
+    // chooses a presentation instead.
+    std::vector<std::byte> programme_stream;
+    iclforge::apps::ProgrammeUnits wrapped_programme;
+    if (eac3) {
+        auto selected = select_receiver_units(stream, meta.programme, in_path, programme_stream);
+        if (!selected.has_value()) {
+            return selected.error();
+        }
+        report_programme(status_stream(), *selected);
+        wrapped_programme = std::move(*selected);
+    }
 
     // The WAV carrier itself runs at 4x the content rate for E-AC-3 (Dolby
     // Digital Plus over IEC 60958/61937 - Microsoft's "Representing Formats
@@ -1723,7 +1746,7 @@ int run_spdif(std::string_view in_path, std::string_view out_path) {
         }
         return true;
     };
-    const auto ok = eac3 ? wrap_eac3_stream(stream, content_rate, push)
+    const auto ok = eac3 ? wrap_eac3_units(wrapped_programme.units, content_rate, push)
                          : wrap_ac3_stream(stream, content_rate, push);
     if (!ok) {
         sink.abort();

@@ -807,6 +807,19 @@ std::optional<int> choose_programme(std::span<const int> ids, std::optional<int>
 [[nodiscard]] std::expected<iclforge::apps::ProgrammeUnits, int> select_programme_units(
     std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path);
 
+// The same choice, for a command that hands the programme to a RECEIVER (play,
+// spdif) rather than to a decoder: the units come back as a receiver has to be
+// given them. A receiver takes independent substream 0 and ignores the rest, so
+// another programme's frames as they stand would be a stream with nothing it
+// will play - for a programme other than 0 the result's units are the cut-out,
+// renumbered programme's (iclforge::apps::cut_programme), and `cut` is where
+// their bytes live: it must outlive every use of the units, and is untouched
+// when the units are the stream's own. `programme` and `ids` are the choice's,
+// for report_programme. Failures are select_programme_units's.
+[[nodiscard]] std::expected<iclforge::apps::ProgrammeUnits, int> select_receiver_units(
+    std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path,
+    std::vector<std::byte>& cut);
+
 // `  programme 1 of 2 (0, 1)` on `status`, only when the stream carries more
 // than one - the line decode prints, so a multi-programme stream is never
 // played without saying which programme it was.

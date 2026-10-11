@@ -3318,6 +3318,29 @@ std::expected<iclforge::apps::ProgrammeUnits, int> select_programme_units(
     return std::unexpected(kExitInput);
 }
 
+std::expected<iclforge::apps::ProgrammeUnits, int> select_receiver_units(
+    std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path,
+    std::vector<std::byte>& cut) {
+    auto selected = select_programme_units(stream, wanted, in_path);
+    if (!selected.has_value() || selected->programme == 0) {
+        return selected;
+    }
+    // Cut out and renumbered as substream 0, as the container writers do for
+    // programme=, then split again: the cut stream is a stream of its own, so
+    // this is the unfiltered split and its units are consecutive frame periods.
+    auto programme = iclforge::apps::cut_programme(stream, selected->programme);
+    if (programme.has_value()) {
+        cut = std::move(*programme);
+        auto units = iclforge::ac3::split_access_units(cut);
+        if (units.has_value() && !units->empty()) {
+            selected->units = std::move(*units);
+            return selected;
+        }
+    }
+    fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
+    return std::unexpected(kExitInput);
+}
+
 void report_programme(FILE* status, const iclforge::apps::ProgrammeUnits& selected) {
     if (selected.ids.size() > 1) {
         status_println(status, "  programme {} of {} ({})", selected.programme,
