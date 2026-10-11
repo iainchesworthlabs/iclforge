@@ -86,6 +86,9 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     if(Qt6_FOUND)
         add_executable(hearth_controller_tests
             ../../ui/tests/test_hearth_controller.cpp
+            ../../ui/tests/test_karaoke_controller.cpp
+            "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/karaoke_controller.cpp"
+            "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/karaoke_controller.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/hearth_controller.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.cpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.hpp"
