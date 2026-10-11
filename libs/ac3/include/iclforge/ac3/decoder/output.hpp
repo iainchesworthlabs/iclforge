@@ -209,6 +209,20 @@ struct OutputConfig {
     KaraokeReproduction karaoke = KaraokeReproduction::kOff;
     // The listener's choice of vocals under kCapable; read for no other mode.
     KaraokeVocals karaoke_vocals = KaraokeVocals::kBoth;
+    // Annex C.2.3's "additional flexibility", the karaoke-capable decoder's: the
+    // listener moves the level of each part. Linear gains on M, V1 and V2, where
+    // 1.0 is Table C.2.3 as it stands (bit for bit) and 0.0 mutes the part. They
+    // are read under kCapable alone, at the 3/0 and at the 2/0 (stereo and mono)
+    // reproductions: the aware column is Table C.2.2 and ignores them, whatever
+    // they hold. They multiply the table's coefficients before the scale-down
+    // that holds every output's sum to 1 (§7.8.1), so raising one part lowers
+    // the rest, the music included, by the same factor, and a muted part is out
+    // of the sums as an absent one is. L and R are not moved, and a part the
+    // stream does not code has nothing for its gain to act on. A value that is
+    // not a finite number of 0 or more is a mute.
+    double karaoke_melody_gain = 1.0;
+    double karaoke_vocal1_gain = 1.0;
+    double karaoke_vocal2_gain = 1.0;
 };
 
 // What the stream itself says about folding down, resolved from whichever

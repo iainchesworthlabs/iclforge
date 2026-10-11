@@ -1,7 +1,10 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <QDir>
+#include <QSettings>
 #include <QString>
+#include <QTemporaryDir>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -873,6 +876,98 @@ TEST_CASE("decoder settings: the karaoke choice round-trips through the map",
     const DecoderSettings defaults = iclforge::hearth::ui::decoder_settings_from_map(odd, base);
     CHECK(defaults.karaoke == iclforge::ac3::KaraokeReproduction::kAware);
     CHECK(defaults.karaoke_vocals == iclforge::ac3::KaraokeVocals::kBoth);
+}
+
+TEST_CASE("decoder settings: the karaoke part levels round-trip through the map",
+          "[hearth][hearth-controller][karaoke]") {
+    // A fresh start has every part at the table's level.
+    const QVariantMap fresh = iclforge::hearth::ui::decoder_settings_to_map(DecoderSettings{});
+    CHECK(fresh.value(QStringLiteral("karaokeMelodyDb")).toDouble() == 0.0);
+    CHECK(fresh.value(QStringLiteral("karaokeVocal1Db")).toDouble() == 0.0);
+    CHECK(fresh.value(QStringLiteral("karaokeVocal2Db")).toDouble() == 0.0);
+
+    DecoderSettings settings;
+    settings.karaoke_melody_db = -7.0;
+    settings.karaoke_vocal1_db = 3.0;
+    settings.karaoke_vocal2_db = -24.0;
+    const QVariantMap map = iclforge::hearth::ui::decoder_settings_to_map(settings);
+    CHECK(map.value(QStringLiteral("karaokeMelodyDb")).toDouble() == -7.0);
+    CHECK(map.value(QStringLiteral("karaokeVocal1Db")).toDouble() == 3.0);
+    CHECK(map.value(QStringLiteral("karaokeVocal2Db")).toDouble() == -24.0);
+    const DecoderSettings back =
+        iclforge::hearth::ui::decoder_settings_from_map(map, DecoderSettings{});
+    CHECK(back.karaoke_melody_db == -7.0);
+    CHECK(back.karaoke_vocal1_db == 3.0);
+    CHECK(back.karaoke_vocal2_db == -24.0);
+
+    // One level written by itself moves that level alone; a map without the keys leaves the
+    // base's levels, as every other key does.
+    QVariantMap one;
+    one.insert(QStringLiteral("karaokeVocal1Db"), -2.0);
+    const DecoderSettings moved = iclforge::hearth::ui::decoder_settings_from_map(one, settings);
+    CHECK(moved.karaoke_melody_db == -7.0);
+    CHECK(moved.karaoke_vocal1_db == -2.0);
+    CHECK(moved.karaoke_vocal2_db == -24.0);
+    const DecoderSettings same =
+        iclforge::hearth::ui::decoder_settings_from_map(QVariantMap{}, settings);
+    CHECK(same.karaoke_melody_db == -7.0);
+}
+
+TEST_CASE("decoder settings: the karaoke choice and its levels are kept across starts",
+          "[hearth][hearth-controller][karaoke]") {
+    QTemporaryDir folder;
+    REQUIRE(folder.isValid());
+    const QString path = QDir(folder.path()).filePath(QStringLiteral("kept.ini"));
+
+    // Nothing kept: aware, both vocals, every part at the table's level.
+    DecoderSettings fresh;
+    {
+        QSettings store(path, QSettings::IniFormat);
+        iclforge::hearth::ui::read_kept_karaoke(store, fresh);
+    }
+    CHECK(fresh == DecoderSettings{});
+
+    // Writing what is already kept writes nothing; a changed choice or level does.
+    DecoderSettings chosen;
+    chosen.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    chosen.karaoke_vocals = iclforge::ac3::KaraokeVocals::kV2;
+    chosen.karaoke_melody_db = -9.0;
+    chosen.karaoke_vocal1_db = 4.0;
+    chosen.karaoke_vocal2_db = -24.0;
+    {
+        QSettings store(path, QSettings::IniFormat);
+        CHECK_FALSE(iclforge::hearth::ui::write_kept_karaoke(store, DecoderSettings{}));
+        CHECK(iclforge::hearth::ui::write_kept_karaoke(store, chosen));
+        CHECK_FALSE(iclforge::hearth::ui::write_kept_karaoke(store, chosen));
+        store.sync();
+    }
+
+    // A later start reads all five back, from the file itself.
+    DecoderSettings later;
+    {
+        const QSettings store(path, QSettings::IniFormat);
+        iclforge::hearth::ui::read_kept_karaoke(store, later);
+    }
+    CHECK(later.karaoke == iclforge::ac3::KaraokeReproduction::kCapable);
+    CHECK(later.karaoke_vocals == iclforge::ac3::KaraokeVocals::kV2);
+    CHECK(later.karaoke_melody_db == -9.0);
+    CHECK(later.karaoke_vocal1_db == 4.0);
+    CHECK(later.karaoke_vocal2_db == -24.0);
+
+    // Each level on its own is enough to count as a change.
+    DecoderSettings one = chosen;
+    one.karaoke_vocal2_db = -3.0;
+    {
+        QSettings store(path, QSettings::IniFormat);
+        CHECK(iclforge::hearth::ui::write_kept_karaoke(store, one));
+    }
+    DecoderSettings read_again;
+    {
+        const QSettings store(path, QSettings::IniFormat);
+        iclforge::hearth::ui::read_kept_karaoke(store, read_again);
+    }
+    CHECK(read_again.karaoke_vocal2_db == -3.0);
+    CHECK(read_again.karaoke_melody_db == -9.0);
 }
 
 TEST_CASE("media_info_to_map: a karaoke programme names its coding mode and its parts",

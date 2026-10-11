@@ -57,7 +57,8 @@ TestCase {
             HearthController.removeAt(i);
         }
         tryVerify(function() { return HearthController.queue.length === 0; }, 10000);
-        settle({ karaoke: "aware", karaokeVocals: "both", stereoFold: "loro" });
+        settle({ karaoke: "aware", karaokeVocals: "both", stereoFold: "loro",
+                 karaokeMelodyDb: 0, karaokeVocal1Db: 0, karaokeVocal2Db: 0 });
         useLayout("2.0");
     }
 
@@ -329,6 +330,86 @@ TestCase {
         mouseClick(named(win, "useLoRoButton"));
         tryCompare(HearthController.decoderSettings, "stereoFold", "loro", 10000);
         tryCompare(named(win, "ltrtNotice"), "visible", false, 5000);
+    }
+
+    // The levels (Annex C.2.3's "additional flexibility"): a slider's value is
+    // dB against the table, and what plays follows it, measured tone by tone.
+    function test_aPartsLevelMovesWhatPlaysAndTheBottomIsOff() {
+        const win = openPage();
+        play(karaoke);
+        // The aware decoder has no levels, and the controls say so.
+        compare(named(win, "level-M").enabled, false);
+        clickSegment(win, "reproductionChoice", "capable");
+        tryCompare(HearthController.decoderSettings, "karaoke", "capable", 10000);
+        tryCompare(named(win, "level-M"), "enabled", true, 5000);
+        compare(named(win, "level-V1").enabled, true);
+        compare(named(win, "level-V2").enabled, true);
+        compare(text(win, "levelText-M"), qsTr("%1 dB").arg("0"));
+        settled();
+        const melodyAtTable = level("C", 800);
+        const vocalAtTable = level("L", 1030);
+        verify(melodyAtTable > present);
+
+        // -12 dB on the melody: its tone falls by 12 dB and the vocals do not move.
+        settle({ karaokeMelodyDb: -12 });
+        settled();
+        const quieter = level("C", 800);
+        verify(Math.abs((melodyAtTable - quieter) - 12) < 1.0,
+               "the melody fell " + (melodyAtTable - quieter) + " dB, not 12");
+        verify(Math.abs(level("L", 1030) - vocalAtTable) < 0.5, "the vocal moved with the melody");
+        compare(text(win, "levelText-M"), qsTr("%1 dB").arg("-12"));
+        compare(text(win, "partState-M"), qsTr("heard"));
+
+        // The bottom of the range is off: the part is not there, and the page says so.
+        settle({ karaokeMelodyDb: -24 });
+        settled();
+        verify(level("C", 800) < absent, "the melody is still heard at the bottom of its control");
+        compare(text(win, "levelText-M"), qsTr("off"));
+        compare(text(win, "partState-M"), qsTr("muted"));
+        compare(text(win, "speakerCarries-C"), qsTr("silent"));
+        verify(level("L", 440) > present, "the backing went with the melody");
+
+        // A vocal off leaves its side silent of it.
+        settle({ karaokeMelodyDb: 0, karaokeVocal2Db: -24 });
+        settled();
+        verify(level("R", 1270) < absent, "V2 is still heard");
+        verify(level("L", 1030) > present, "V1 went with V2");
+        compare(text(win, "partState-V2"), qsTr("muted"));
+        compare(text(win, "speakerCarries-R"), "R");
+
+        // Reset puts every part back to the table's, and the button is only open when one moved.
+        compare(named(win, "resetLevelsButton").enabled, true);
+        mouseClick(named(win, "resetLevelsButton"));
+        tryCompare(HearthController.decoderSettings, "karaokeVocal2Db", 0, 10000);
+        compare(HearthController.decoderSettings.karaokeMelodyDb, 0);
+        tryCompare(named(win, "resetLevelsButton"), "enabled", false, 5000);
+        settled();
+        verify(level("R", 1270) > present, "V2 did not come back");
+    }
+
+    function test_aLevelNoVocalChoiceIncludesHasNothingToActOn() {
+        const win = openPage();
+        play(karaoke);
+        clickSegment(win, "reproductionChoice", "capable");
+        tryCompare(HearthController.decoderSettings, "karaoke", "capable", 10000);
+        clickSegment(win, "vocalsChoice", "v1");
+        tryCompare(HearthController.decoderSettings, "karaokeVocals", "v1", 10000);
+        tryCompare(named(win, "level-V2"), "enabled", false, 5000);
+        compare(named(win, "level-V1").enabled, true);
+        compare(named(win, "level-M").enabled, true);
+    }
+
+    function test_theLevelsAreKeptAcrossStarts() {
+        settle({ karaoke: "capable", karaokeMelodyDb: -9, karaokeVocal1Db: 4, karaokeVocal2Db: -24 });
+        // What a restart reads: the file itself.
+        tryVerify(function() { return TestServices.storedSetting("karaoke/melodyDb") === "-9"
+                                      || TestServices.storedSetting("karaoke/melodyDb") === -9; }, 5000,
+                  "the melody's level was not written to the settings");
+        compare(Number(TestServices.storedSetting("karaoke/vocal1Db")), 4);
+        compare(Number(TestServices.storedSetting("karaoke/vocal2Db")), -24);
+        compare(String(TestServices.storedSetting("karaoke/reproduction")), "capable");
+        settle({ karaokeMelodyDb: 0, karaokeVocal1Db: 0, karaokeVocal2Db: 0 });
+        tryVerify(function() { return Number(TestServices.storedSetting("karaoke/melodyDb")) === 0; }, 5000);
     }
 
     function test_theDecoderPageSummarisesTheChoiceAndOpensTheKaraokePage() {

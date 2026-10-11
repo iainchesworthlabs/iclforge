@@ -225,6 +225,14 @@ public:
     // (a diagnostics export, a media JSON export).
     Q_INVOKABLE QString scratchPath(const QString& name) const { return QDir(scratch_.path()).filePath(name); }
 
+    // What the controller has written under `key` into the app's settings (a
+    // fresh read of the file, so what a restart would find), or null.
+    Q_INVOKABLE QVariant storedSetting(const QString& key) const {
+        const QSettings settings(QSettings::defaultFormat(), QSettings::UserScope,
+                                 QStringLiteral("iclforge"), QStringLiteral("Hearth"));
+        return settings.value(key);
+    }
+
     Q_INVOKABLE bool removeFile(const QString& path) const {
         return QFile::remove(path.startsWith(QStringLiteral("file:")) ? QUrl(path).toLocalFile() : path);
     }

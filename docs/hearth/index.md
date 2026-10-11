@@ -51,13 +51,14 @@ how the decoder reproduces it:
 - **Aware** (the default) reproduces L, C and R, with the vocals at the level the programme set
   (Table C.2.2). On two speakers it is the Lo/Ro fold, which Annex C says is the same thing.
 - **Capable** lets you choose the vocals: none, V1, V2 or both (Table C.2.3). A single vocal joins
-  the melody in the centre; a pair goes to the left and the right.
+  the melody in the centre; a pair goes to the left and the right. It also takes a **level** for
+  the melody and for each vocal, from 24 dB below the table (off) to 12 dB above it.
 
 The page says in words when the choice cannot apply: a stream that is not karaoke (E-AC-3 and
 AC-4 have no karaoke mode), a bitstream output, where the receiver decodes the stream and the
 reproduction is its to make, and a stereo fold of Lt/Rt, for which Annex C defines no reproduction.
-The choice is kept across starts, the only decoder setting that is. The Decoder page shows it in
-one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
+The choice and the levels are kept across starts, the only decoder settings that are. The Decoder
+page shows the choice in one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
 Annex C's own tables.
 
 **To a network group**, the reproduction is the same on every member. A sink that lists the
