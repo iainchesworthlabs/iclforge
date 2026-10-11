@@ -200,6 +200,12 @@ public:
     // own clock across joins and seeks.
     [[nodiscard]] PlayPosition position() const;
 
+    // Tells the open network group which item's lyrics its members are to hold and where the sound is
+    // in it (W7d, planning/karaoke-phase2.md). Called by the engine each turn; nothing for any other
+    // output. An item's lyric file is read when the clock reaches it, or when the output is opened
+    // again (a new stream: its members' lyrics went with the old one).
+    void follow_lyrics();
+
     // The newest meter snapshot the device's clock has reached since the last
     // call, copied into `latest`; false when there is none. The meters run on
     // the output's slots; see play_meters.hpp for what starts again when.
@@ -743,6 +749,11 @@ private:
 
     std::uint64_t submitted_since_open_ = 0;
     std::uint32_t opens_ = 0;
+    // The lyrics last given to the open group: the queue item, the open count the document was for,
+    // and the number it went with (new with every document).
+    std::size_t lyrics_queue_item_ = Queue::kNone;
+    std::uint32_t lyrics_opens_ = 0;
+    std::int64_t lyrics_serial_ = 0;
     std::vector<PlayedItem> history_;
     std::vector<Segment> segments_;
     // Built for the output's layout and rate; the history entry whose blocks

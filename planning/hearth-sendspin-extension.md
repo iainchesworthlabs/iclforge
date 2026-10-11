@@ -308,6 +308,7 @@ is what a chunk carries, what the sink reports, and the settings the server can 
 | `max_chunk_bytes?` | integer | 1 to 1,048,576: the most bytes one chunk to the sink may be, counted as `buffer_capacity` counts a chunk (the whole plaintext message, header included, the encryption's tag not). It bounds a burst chunk and a `player@v1` PCM chunk alike, so a server that plays this sink PCM sizes its units to it; absent when the sink does not say, and a server then sends what its codec allows |
 | `max_coded_channels?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 64: the most channels, full-bandwidth and LFE, the sink decodes of a stream of that type. A syncframe wider than it is refused, so a server sends such a stream another way. A type the object does not name has no stated limit, which is not a limit of none; absent when the sink states none for any type. A name a reader does not know is skipped |
 | `max_objects?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 0 to 255: the most objects the sink reconstructs and places of a stream of that type in real time. `0` is a statement and not an absence: the sink decodes the stream's bed and does not reconstruct its objects. A stream with more objects than the limit is decoded as its bed by the sink, never reconstructed past it, so a server that wants the objects placed sends it PCM it renders itself. A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
+| `lyrics?` | object | `max_bytes`: 1 to 60,000, the most bytes of lyric document (an LRC text in UTF-8) the sink holds for the item playing. Absent when the sink holds none. A sink that states it lists `lyrics` and `lyrics_position` in `supported_commands` ([Lyrics](#lyrics)) |
 
 ### State object
 
@@ -321,7 +322,7 @@ the rest are this role's.
 | `output_delay_ms` | integer | 0 to 5,000; delay beyond the audio port, persisted |
 | `required_lead_time_ms` | integer | As `player@v1`, including the sink's decoder warm-up |
 | `min_buffer_ms` | integer | As `player@v1` |
-| `supported_commands` | string[] | Subset of `volume`, `mute`, `set_output_delay`, `settings`, `identify` |
+| `supported_commands` | string[] | Subset of `volume`, `mute`, `set_output_delay`, `settings`, `identify`, `lyrics`, `lyrics_position` |
 | `settings_revision` | integer | The `revision` of the last settings the sink applied; 0 before any |
 | `settings_error?` | object | `{revision, why}` when the last settings were refused; absent otherwise |
 | `decoder?` | object | What the decoder found in the current stream: `data_type`, `acmod`, `lfe`, `substreams`, `objects` (count carried), `objects_placed` (boolean), `dialnorm` (dB); absent with no stream. For AC-4, `acmod` is the A/52 audio coding mode with the decoded channels' front and surround speakers (7 for 5.X and 7.X), `substreams` the substreams decoded, and `dialnorm` 0 until the decoder reports one |
@@ -329,6 +330,7 @@ the rest are this role's.
 | `counters` | object | Since the connection opened: `bursts_played`, `underruns`, `late_chunks`, `dropped_chunks`, `invalid_chunks` |
 | `why?` | string | A short sentence when the sink stopped playing for a reason of its own; absent otherwise |
 | `layout?` | string | The layout in force, in the grammar `layout_grammar` names, as the sink's page or the last settings made it; absent when the sink does not say. A server that renders for the sink reads it here, and not from what it last sent, since the page can change it |
+| `lyrics?` | object | `{item, line}`: the item number of the document the sink holds, and the line its own clock has the sound in (-1 before the first line, and for a document with no times); absent while it holds none. Sent when a document is taken and when the line changes, which is a few times a minute |
 
 The sink sends `client/state` whenever a field other than `levels` changes, and while a stream
 plays it also sends one at most ten times a second with fresh `levels`. `levels` are measured on
@@ -461,6 +463,43 @@ plays, every output carries `ac3::render::IdentifyTone::fill`'s result instead o
 audio: the tone on `output` (its low band when the output carries the LFE) and silence elsewhere.
 A running stream keeps its timeline and its chunks are decoded and discarded, so the stream
 continues in sync when the tone stops. `level_db` is inside `IdentifyTone`'s −60 to −12 dB.
+
+### Lyrics
+
+`server/command`, object `_iclforge_player`, for a sink whose state lists them. A server sends
+them only to a member that is sent the stream as it is, on this role, and only to a sink whose
+support object states `lyrics.max_bytes`: a member that is sent PCM over `player@v1` is on a role
+that has none. The sink follows the words on its own playout clock; there is no screen in this
+page, and a screen on a sink reads the cursor the sink keeps (the report below is the line).
+
+**`command: "lyrics"`**, with `lyrics: {item, text}`. `item` is a number the server makes new with
+every document, 0 or more, and `text` is the document: the library's LRC text, in UTF-8, as
+`iclforge::lyrics::write_lrc` writes it (the server converts a SubRip, ASS or MIDI karaoke file, so
+that a sink reads one format). It replaces the sink's document and drops its position: the anchors
+that follow are the item's. An empty `text`, or one with no lyrics in it, leaves the sink holding
+none, which is how a server says an item has none and a sink drops the last one's. `text` is at most
+60,000 bytes, and at most the sink's `max_bytes`; the whole message stays within the sink's
+`max_chunk_bytes` as a chunk does, so a document that does not fit is sent as none.
+
+**`command: "lyrics_position"`**, with `lyrics_position: {item, position_ms, at_us, speed}`: the
+sound of item `item` is at `position_ms` at `at_us` on the server's clock, and from there moves at
+`speed` times real time: 1 while the item plays, 0 held. The sink maps `at_us` to its own clock
+through its time filter, and applies the anchor when that time comes, not before: a hold the server
+sends for the end of what it has buffered does not stop the words early. An anchor of any other
+item than the one the sink holds is ignored. Before the first anchor the sink is before the first
+line.
+
+**What the server sends, and when.** The document at the start of each item, to every member that
+holds lyrics, and again to one whose state does not report that item (one that joined while it
+played, or came back). An anchor when the sound's speed changes, when the position jumps or drifts
+more than 150 ms from what the last anchor predicts, and at least every five seconds. The speed is
+the one measured from the position the server hears, not the transport's: a pause takes the length
+of the members' buffer to be heard, and the position stops by itself when it is.
+
+**What the sink does.** A `stream/clear` drops the position and keeps the document; `stream/end`
+drops both. The sink reports `lyrics` in its state when it takes a document and whenever the line
+changes. It keeps what it holds in the space `max_bytes` states: a parsed document is lines and
+words, about three times its text.
 
 ### Errors and limits
 

@@ -24,6 +24,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
+#include "iclforge/lyrics/follower.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
 #include "iclforge/render/trim_delay.hpp"
@@ -58,9 +59,14 @@ static_assert(kSendspinPort == ss::transport::websocket::kClientPort, "a player 
 constexpr std::size_t kRingBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES;
 constexpr std::size_t kMaxChunkBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES;
 constexpr std::uint32_t kDecodeStackBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES;
+constexpr bool kDecodeStackInPsram = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM != 0;
 constexpr std::size_t kServerStackBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES;
 constexpr int kMaxDelayMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS;
 constexpr std::size_t kMaxCodedChannels = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS;
+// The most bytes of lyric document the board holds for the item playing (0 = takes none: the commands
+// are not listed, so a server sends none).
+constexpr std::uint32_t kLyricsMaxBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES;
+static_assert(kLyricsMaxBytes <= ac::kMaxLyricsBytes, "a lyric document fits one message");
 constexpr std::uint32_t kReportEveryChunks = CONFIG_ICLFORGE_EXAMPLE_REPORT_EVERY_FRAMES;
 constexpr std::int32_t kLeadMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS;
 constexpr std::int32_t kBufferMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_BUFFER_MS;
@@ -138,6 +144,13 @@ Reported g_player_reported;
 Reported g_role_reported;
 std::optional<ac::State> g_last_role_state;
 std::int64_t g_last_role_report_us = 0;
+// The lyrics of the item playing, when the board holds any (kLyricsMaxBytes above 0): the document as
+// the server sent it, and the playhead its anchors move, on the server's clock. There is no screen to
+// draw them on yet (the panel waits for a board with one), so the board reports the line it has the
+// sound in and logs each change; a screen reads this, with the cursor's word. Made when the first
+// document arrives, and not as a static: an S3 with Wi-Fi up has no internal block over 31,744 bytes
+// to spare for the decode task's 32 KB stack, and a few hundred bytes of .bss is what that margin is.
+std::unique_ptr<iclforge::lyrics::Follower> g_lyrics;
 // What the control surface asked for while no player was running, for
 // start_player to take up: a layout, on the heap only while one waits (a
 // layout is some 600 bytes, which internal RAM would otherwise hold for
@@ -196,7 +209,19 @@ bool g_board_changed = false;
             s.max_coded_channels[static_cast<std::size_t>(type)] = static_cast<std::uint8_t>(kMaxCodedChannels);
         }
     }
+    s.lyrics_max_bytes = kLyricsMaxBytes;
     return s;
+}
+
+// The commands the role's state lists: the lyric pair only on a board that holds lyrics.
+[[nodiscard]] std::vector<ac::Command> role_commands() {
+    std::vector<ac::Command> commands{ac::Command::kVolume, ac::Command::kMute, ac::Command::kSetOutputDelay,
+                                      ac::Command::kSettings, ac::Command::kIdentify};
+    if (kLyricsMaxBytes != 0) {
+        commands.push_back(ac::Command::kLyrics);
+        commands.push_back(ac::Command::kLyricsPosition);
+    }
+    return commands;
 }
 
 [[nodiscard]] std::string mac_text() {
@@ -268,9 +293,7 @@ bool g_board_changed = false;
     config.iclforge_state.muted = false;
     config.iclforge_state.required_lead_time_ms = kLeadMs;
     config.iclforge_state.min_buffer_ms = kBufferMs;
-    config.iclforge_state.supported_commands = {ac::Command::kVolume, ac::Command::kMute,
-                                                ac::Command::kSetOutputDelay, ac::Command::kSettings,
-                                                ac::Command::kIdentify};
+    config.iclforge_state.supported_commands = role_commands();
     config.max_message_bytes = kMaxChunkBytes + 64;
     // The tokens one JSON message may hold, which sizes the one block the session takes for it:
     // 8 KB at most, where the host's default of 4,096 tokens is 64 KB and the C6 has no internal
@@ -299,8 +322,7 @@ bool g_board_changed = false;
     }
     s.required_lead_time_ms = kLeadMs;
     s.min_buffer_ms = kBufferMs;
-    s.supported_commands = {ac::Command::kVolume, ac::Command::kMute, ac::Command::kSetOutputDelay,
-                            ac::Command::kSettings, ac::Command::kIdentify};
+    s.supported_commands = role_commands();
     s.settings_revision = status.settings_revision;
     if (status.have_decoder) {
         s.decoder = status.decoder;
@@ -320,6 +342,18 @@ bool g_board_changed = false;
     if (status.layout[0] != '\0') {
         s.layout = std::string(status.layout.data());
     }
+    // The lyrics held, and the line the board's own clock has the sound in: the anchors are on the
+    // server's clock, which the host's time filter gives for the board's.
+    if (kLyricsMaxBytes != 0) {
+        const iclforge::SendspinHost* const clock = g_clock.load();
+        const std::optional<std::int64_t> server =
+            clock != nullptr ? clock->server_time(esp_timer_get_time()) : std::nullopt;
+        const std::lock_guard lock(g_mutex);
+        if (g_lyrics && g_lyrics->has_lyrics() && g_lyrics->item()) {
+            const std::int32_t line = server ? g_lyrics->line(*server).value_or(-1) : -1;
+            s.lyrics = ac::LyricsReport{.item = *g_lyrics->item(), .line = line};
+        }
+    }
     return s;
 }
 
@@ -328,7 +362,8 @@ bool g_board_changed = false;
            a.muted == b.muted && a.output_delay_ms == b.output_delay_ms &&
            a.settings_revision == b.settings_revision &&
            a.settings_error.has_value() == b.settings_error.has_value() && a.decoder == b.decoder &&
-           a.layout == b.layout && a.counters.bursts_played == b.counters.bursts_played &&
+           a.layout == b.layout && a.lyrics == b.lyrics &&
+           a.counters.bursts_played == b.counters.bursts_played &&
            a.counters.underruns == b.counters.underruns &&
            a.counters.late_chunks == b.counters.late_chunks &&
            a.counters.dropped_chunks == b.counters.dropped_chunks &&
@@ -363,8 +398,22 @@ class Events final : public iclforge::SendspinEvents {
     }
 
     void on_burst_stream_start(const ac::StreamStart& stream) override { player->start_bursts(stream); }
-    void on_burst_stream_clear() override { player->clear(); }
-    void on_burst_stream_end() override { player->end(); }
+    // A flush moves the sound: the document stays for the item, the position waits for the new
+    // stream's first anchor. The end of the stream is nothing playing.
+    void on_burst_stream_clear() override {
+        player->clear();
+        const std::lock_guard lock(g_mutex);
+        if (g_lyrics) {
+            g_lyrics->clear_position();
+        }
+    }
+    void on_burst_stream_end() override {
+        player->end();
+        const std::lock_guard lock(g_mutex);
+        if (g_lyrics) {
+            g_lyrics->reset();
+        }
+    }
     void on_burst(const ss::BurstChunk& chunk, std::int64_t local_time) override { player->burst(chunk, local_time); }
     void on_invalid_burst() override { player->invalid_chunk(); }
 
@@ -396,6 +445,31 @@ class Events final : public iclforge::SendspinEvents {
             case ac::Command::kIdentify:
                 player->identify(command.identify);
                 break;
+            case ac::Command::kLyrics: {
+                if (kLyricsMaxBytes == 0) {
+                    break;
+                }
+                const std::lock_guard lock(g_mutex);
+                if (!g_lyrics) {
+                    g_lyrics = std::make_unique<iclforge::lyrics::Follower>();
+                }
+                const bool held = g_lyrics->set_document(command.lyrics.item, command.lyrics.text, kLyricsMaxBytes);
+                std::printf("sendspin: lyrics for item %lld: %s (%u bytes)\n",
+                            static_cast<long long>(command.lyrics.item), held ? "held" : "none",
+                            static_cast<unsigned>(command.lyrics.text.size()));
+                break;
+            }
+            case ac::Command::kLyricsPosition: {
+                if (kLyricsMaxBytes == 0) {
+                    break;
+                }
+                const std::lock_guard lock(g_mutex);
+                const ac::LyricsAnchor& anchor = command.lyrics_position;
+                if (g_lyrics) {
+                    g_lyrics->anchor(anchor.item, anchor.position_ms, anchor.at_us, anchor.speed);
+                }
+                break;
+            }
         }
         report_now();
     }
@@ -540,6 +614,7 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     config.max_coded_channels = kMaxCodedChannels;
     config.core = kDecodeCore;
     config.stack_bytes = kDecodeStackBytes;
+    config.stack_in_psram = kDecodeStackInPsram;
     config.decode_lane = CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE != 0;
     config.report_every_chunks = kReportEveryChunks;
     config.local_time = [](std::int64_t server_us) -> std::optional<std::int64_t> {
@@ -901,6 +976,7 @@ void sendspin_poll() {
     const std::int64_t now = esp_timer_get_time();
     ac::State state = role_state(status, playing);
     bool send = false;
+    bool lyric_line_changed = false;
     {
         const std::lock_guard lock(g_mutex);
         // While a stream plays, fresh levels at most ten times a second; any
@@ -911,9 +987,16 @@ void sendspin_poll() {
             send = true;
         }
         if (send) {
+            lyric_line_changed = state.lyrics.has_value() &&
+                                 (!g_last_role_state || g_last_role_state->lyrics != state.lyrics);
             g_last_role_state = state;
             g_last_role_report_us = now;
         }
+    }
+    if (lyric_line_changed) {
+        // What a screen would show, until there is one: the line the sound is in.
+        std::printf("sendspin: lyrics item %lld line %d\n", static_cast<long long>(state.lyrics->item),
+                    static_cast<int>(state.lyrics->line));
     }
     if (send) {
         r->host->set_iclforge_state(state);

@@ -358,6 +358,9 @@ add_subdirectory("${ICLFORGE_ROOT}" iclforge_build)
 target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::ac3_minimal)
 if(CONFIG_ICLFORGE_SENDSPIN)
     target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::sendspin)
+    # The lyric reader, cursor and playhead (libs/lyrics, standard library only): the sink follows an
+    # item's words from the document and anchors a server sends it.
+    target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::lyrics)
 endif()
 # The AC-4 library's decode-only archive (the inspector, the core and the
 # decoder, libs/ac4/minimal.cmake), and its include directories for

@@ -505,6 +505,8 @@ void Engine::run(const std::stop_token& stop) {
         const bool active = player_.active();
         if (active) {
             report = player_.pump(timing_.budget);
+            // A group's members that hold lyrics are kept with the sound, paused or playing.
+            player_.follow_lyrics();
         }
         const bool metered = active && player_.meters(meter_scratch_);
         const bool reported = active && player_.unit_report(report_scratch_);

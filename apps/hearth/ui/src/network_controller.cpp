@@ -578,6 +578,7 @@ NetworkController::~NetworkController() {
     // Before the NetworkSinks it reaches goes, and waits for a plan in flight.
     NetworkOutputStatus::instance().set_planner({});
     NetworkOutputStatus::instance().set_karaoke_applier({});
+    NetworkOutputStatus::instance().set_lyrics_applier({});
     sinks_engine_.reset();
 }
 
@@ -614,6 +615,11 @@ void NetworkController::start() {
     NetworkOutputStatus::instance().set_karaoke_applier(
         [sinks](const std::string& group_id, const iclforge::hearth::KaraokeChoice& choice) {
             sinks->apply_karaoke(group_id, choice);
+        });
+    // The item's lyrics, and where the sound is in them, to the members that hold lyrics.
+    NetworkOutputStatus::instance().set_lyrics_applier(
+        [sinks](const std::string& group_id, const iclforge::hearth::LyricsUpdate& update) {
+            sinks->apply_lyrics(group_id, update);
         });
     poll_timer_.start();
     poll();

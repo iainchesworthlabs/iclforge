@@ -96,6 +96,23 @@ public:
     // applied where the PCM is made. Nothing when the group is not open, or has no applier.
     virtual void set_karaoke(const KaraokeChoice& choice) { static_cast<void>(choice); }
 
+    // The lyrics of the item playing, for the members that hold them (W7d, planning/karaoke-
+    // phase2.md): `item` is a number that is new with every document, and `document` an LRC text
+    // (iclforge::lyrics::write_lrc), empty when the item has none. Nothing when the group is not
+    // open or has no applier.
+    virtual void set_lyrics(std::int64_t item, const std::string& document) {
+        static_cast<void>(item);
+        static_cast<void>(document);
+    }
+    // Where in item `item` the sound is now, which is the heard position Player's position() has, in
+    // milliseconds. Called as often as the engine turns; the sink sends its members an anchor only
+    // when what they are holding would be off: a change of speed (a pause, a resume), a jump (a seek)
+    // or drift, and one every few seconds to correct the rest.
+    virtual void follow_lyrics(std::int64_t item, std::int64_t heard_ms) {
+        static_cast<void>(item);
+        static_cast<void>(heard_ms);
+    }
+
     // One rendered block, planar like PcmSink::submit() - converted to the
     // group's own interleaved form internally. Returns the frames actually
     // taken, which can be fewer than offered (Group::push()'s own
@@ -186,8 +203,94 @@ using MemberPlanner =
 // stream, for a choice made while it plays (NetworkGroupSink::set_karaoke()).
 using KaraokeApplier = std::function<void(const std::string& group_id, const KaraokeChoice& choice)>;
 
+// What a group's members that hold lyrics are told of the item playing (NetworkGroupSink::
+// set_lyrics() and follow_lyrics()).
+struct LyricsUpdate {
+    struct Anchor {
+        std::int64_t position_ms = 0;
+        // On the group's own clock, which is the server's: a member's time filter maps it to its own.
+        std::int64_t at_us = 0;
+        // 1 while the item plays, 0 held.
+        double speed = 1.0;
+    };
+    // The item's number, new with every document, so that an anchor is known for the item it is for.
+    std::int64_t item = 0;
+    // The item's lyrics as an LRC text, empty for an item with none. Set when the item starts; an
+    // update with only an anchor leaves the document where it is.
+    std::optional<std::string> document;
+    std::optional<Anchor> anchor;
+};
+
+// When a group's members are sent a new anchor (W7d): from the heard position of the item at each
+// turn of the engine, and the time on the group's clock. A member holds the last anchor and moves it
+// on at its speed, so a new one is only needed when that would be wrong: the sound's speed changed (a
+// pause, and a resume, and the stop of a member's buffer running out after one), the position jumped
+// (a seek) or drifted, and one every few seconds so that the rest is corrected.
+//
+// The speed is measured, not taken from the transport: a pause takes a buffer's worth of time to be
+// heard, and the position stops by itself when it is. It is judged over a stretch of at least
+// kSampleUs, so that two turns a few milliseconds apart do not read as a stop.
+class LyricsAnchors {
+public:
+    static constexpr std::int64_t kOffMs = 150;
+    static constexpr std::int64_t kRefreshUs = 5'000'000;
+    static constexpr std::int64_t kSampleUs = 40'000;
+
+    // A new item, or one heard from the start again: nothing is known of where the sound is.
+    void reset() {
+        anchor_.reset();
+        sample_.reset();
+    }
+
+    // The sound is at `heard_ms` at `now_us`. The anchor to send, or nothing when what the members
+    // hold is right.
+    [[nodiscard]] std::optional<LyricsUpdate::Anchor> sample(std::int64_t heard_ms, std::int64_t now_us) {
+        double speed = anchor_ ? anchor_->speed : 1.0;
+        if (!sample_) {
+            sample_ = Sample{.position_ms = heard_ms, .at_us = now_us};
+        } else if (now_us - sample_->at_us >= kSampleUs) {
+            const double moved = static_cast<double>(heard_ms - sample_->position_ms);
+            const double elapsed = static_cast<double>(now_us - sample_->at_us) / 1000.0;
+            if (moved >= 0.0 && moved <= 0.5 * elapsed) {
+                speed = 0.0;
+            } else if (moved - elapsed <= static_cast<double>(kOffMs) &&
+                       elapsed - moved <= static_cast<double>(kOffMs)) {
+                speed = 1.0;
+            }
+            // Otherwise the position jumped (a seek, either way): the speed is what it was, and the
+            // jump itself is what the check below sends an anchor for.
+            sample_ = Sample{.position_ms = heard_ms, .at_us = now_us};
+        }
+        bool send = !anchor_.has_value();
+        if (anchor_) {
+            const double predicted = static_cast<double>(anchor_->position_ms) +
+                                     static_cast<double>(now_us - anchor_->at_us) / 1000.0 * anchor_->speed;
+            const double off = static_cast<double>(heard_ms) - predicted;
+            send = speed != anchor_->speed || off > static_cast<double>(kOffMs) ||
+                   off < -static_cast<double>(kOffMs) || now_us - anchor_->at_us >= kRefreshUs;
+        }
+        if (!send) {
+            return std::nullopt;
+        }
+        anchor_ = LyricsUpdate::Anchor{.position_ms = heard_ms, .at_us = now_us, .speed = speed};
+        return anchor_;
+    }
+
+private:
+    struct Sample {
+        std::int64_t position_ms = 0;
+        std::int64_t at_us = 0;
+    };
+    std::optional<LyricsUpdate::Anchor> anchor_;
+    std::optional<Sample> sample_;
+};
+
+// Tells the members of group `group_id` that hold lyrics (NetworkSinks::apply_lyrics()).
+using LyricsApplier = std::function<void(const std::string& group_id, const LyricsUpdate& update)>;
+
 [[nodiscard]] std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve,
                                                                 MemberPlanner plan = {},
-                                                                KaraokeApplier karaoke = {});
+                                                                KaraokeApplier karaoke = {},
+                                                                LyricsApplier lyrics = {});
 
 }  // namespace iclforge::hearth

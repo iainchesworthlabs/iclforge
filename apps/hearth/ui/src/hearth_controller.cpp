@@ -1379,6 +1379,9 @@ void HearthController::start() {
             },
             [](const std::string& group_id, const iclforge::hearth::KaraokeChoice& choice) {
                 iclforge::hearth::ui::NetworkOutputStatus::instance().apply_karaoke(group_id, choice);
+            },
+            [](const std::string& group_id, const iclforge::hearth::LyricsUpdate& update) {
+                iclforge::hearth::ui::NetworkOutputStatus::instance().apply_lyrics(group_id, update);
             }),
         .endpoints =
             test_outputs_ ? test_outputs_->endpoints : iclforge::hearth::device_endpoints()};

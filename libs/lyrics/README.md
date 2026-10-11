@@ -7,7 +7,7 @@ Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words an
 A library, internal to the repository.
 
 - **Uses:** nothing
-- **Used by:** `crucible`, `hearth`
+- **Used by:** `crucible`, `esp-idf`, `hearth`, `hearth-sink`
 - **CI lanes:** core
 - **CMake target:** `iclforge::lyrics`
 

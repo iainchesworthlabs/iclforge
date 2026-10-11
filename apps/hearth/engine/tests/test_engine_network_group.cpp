@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <memory>
@@ -1405,6 +1406,8 @@ double slot_energy(const std::vector<std::vector<float>>& channels,
 // karaoke keys (and lists PCM too, as a board does), "legacy" does not and takes PCM at 5.1.
 struct KaraokeGroup {
     fs::path scratch;
+    // The item's path: a real one under the scratch folder, so that a lyrics file can sit beside it.
+    std::string item_path;
     KaraokeProgramme made;
     RecordingLog decodes_log;
     RecordingLog legacy_log;
@@ -1419,8 +1422,10 @@ struct KaraokeGroup {
     iclforge::render::OutputLayout master = iclforge::render::OutputLayout::stereo();
 
     KaraokeGroup(const std::string& name, int frames, const iclforge::hearth::DecoderSettings& wanted,
-                 bool decodes_takes_levels = true)
+                 bool decodes_takes_levels = true, std::uint32_t lyrics_bytes = 0)
         : scratch(fs::path{ICLFORGE_TEST_SCRATCH_DIR} / (name + "_" + scratch_pid_suffix())),
+          item_path((fs::path{ICLFORGE_TEST_SCRATCH_DIR} / (name + "_" + scratch_pid_suffix()) / "programme.ac3")
+                         .string()),
           made(karaoke_programme(frames)) {
         namespace ss = iclforge::sendspin;
         fs::remove_all(scratch);
@@ -1437,6 +1442,7 @@ struct KaraokeGroup {
             options.layout = "5.1";
             options.karaoke = karaoke;
             options.karaoke_levels = levels;
+            options.lyrics_max_bytes = lyrics_bytes;
             options.pcm_channels = std::move(widths);
             auto started = testsink::Sink::start(options, log);
             REQUIRE(started.has_value());
@@ -1472,8 +1478,8 @@ struct KaraokeGroup {
 
         const std::vector<std::byte>* programme = &made.bytes;
         const ItemLoader loader =
-            [programme](const std::string& path) -> std::expected<LoadedItem, std::string> {
-            if (path != "programme") {
+            [programme, item = item_path](const std::string& path) -> std::expected<LoadedItem, std::string> {
+            if (path != item) {
                 return std::unexpected("no such file: " + path);
             }
             return LoadedItem{.bytes = *programme};
@@ -1490,6 +1496,9 @@ struct KaraokeGroup {
                 },
                 [planner](const std::string& id, const iclforge::hearth::KaraokeChoice& choice) {
                     planner->apply_karaoke(id, choice);
+                },
+                [planner](const std::string& id, const iclforge::hearth::LyricsUpdate& update) {
+                    planner->apply_lyrics(id, update);
                 })};
         engine = std::make_unique<Engine>(std::move(outputs), loader, master, wanted,
                                           EngineTiming{.period = 5ms, .budget = 4800});
@@ -1497,7 +1506,7 @@ struct KaraokeGroup {
                                                          .follow_sink = true,
                                                          .group_name = group_id,
                                                          .group_ready = true});
-        engine->add({QueueItem{.path = "programme", .title = "Karaoke programme"}});
+        engine->add({QueueItem{.path = item_path, .title = "Karaoke programme"}});
     }
     KaraokeGroup(const KaraokeGroup&) = delete;
     KaraokeGroup& operator=(const KaraokeGroup&) = delete;
@@ -1824,4 +1833,136 @@ TEST_CASE("engine: a change of vocals while a karaoke item plays reaches the boa
         const EngineStatus status = rig.engine->status();
         return status.state == TransportState::kStopped && !status.history.empty();
     }));
+}
+
+// --- the lyrics beside an item (W7d, planning/karaoke-phase2.md) ----------------------------------
+
+namespace {
+
+using iclforge::sendspin::player::Command;
+
+// The first lyric command of kind `command`, and every one of it, from what a sink was sent.
+std::vector<iclforge::sendspin::player::CommandMessage> of_kind(
+    const std::vector<iclforge::sendspin::player::CommandMessage>& all, Command command) {
+    std::vector<iclforge::sendspin::player::CommandMessage> out;
+    for (const auto& message : all) {
+        if (message.command == command) {
+            out.push_back(message);
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("engine: the lyrics beside an item reach the boards that hold them, and where the sound is in them",
+          "[hearth][group][websocket][iclforge][lyrics]") {
+    constexpr int kFrameCount = 60;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    KaraokeGroup group("lyrics_group", kFrameCount, wanted, true, 16384);
+    fs::create_directories(fs::path(group.item_path).parent_path());
+    {
+        std::ofstream lrc(fs::path(group.item_path).replace_extension(".lrc"), std::ios::binary);
+        lrc << "[ti:Auld Lang Syne]\n[00:00.50]Should auld acquaintance\n[00:01.00]be forgot\n";
+    }
+    group.play_through();
+
+    // The board that decodes for itself is sent the stream as it is, on the role that carries
+    // lyrics; the one sent PCM is on player@v1, which has none, and is sent nothing.
+    for (const testsink::Sink* sink : {group.decodes.get()}) {
+        const bool got = eventually([&] {
+            const auto seen = sink->roles().lyric_commands;
+            return !of_kind(seen, Command::kLyrics).empty() && !of_kind(seen, Command::kLyricsPosition).empty();
+        });
+        const auto all = sink->roles().lyric_commands;
+        INFO((sink == group.decodes.get() ? "decodes" : "legacy")
+             << ": " << all.size() << " lyric commands, "
+             << of_kind(all, Command::kLyrics).size() << " documents, "
+             << of_kind(all, Command::kLyricsPosition).size() << " anchors");
+        REQUIRE(got);
+        // The document first, then anchors for the same item.
+        REQUIRE_FALSE(all.empty());
+        CHECK(all.front().command == Command::kLyrics);
+        const auto documents = of_kind(all, Command::kLyrics);
+        CHECK(documents.front().lyrics.text.find("[00:00.50]Should auld acquaintance") != std::string::npos);
+        CHECK(documents.front().lyrics.text.find("be forgot") != std::string::npos);
+        CHECK(documents.front().lyrics.item >= 1);
+        const auto anchors = of_kind(all, Command::kLyricsPosition);
+        for (const auto& anchor : anchors) {
+            CHECK(anchor.lyrics_position.item == documents.front().lyrics.item);
+            CHECK(anchor.lyrics_position.at_us > 0);
+            CHECK(anchor.lyrics_position.position_ms >= 0);
+            // The item is about two seconds long.
+            CHECK(anchor.lyrics_position.position_ms < 3000);
+        }
+        // The first anchor says the sound is playing, from the start.
+        CHECK(anchors.front().lyrics_position.speed == 1.0);
+        CHECK(anchors.front().lyrics_position.position_ms < 500);
+        // The anchors' times and positions only go forward.
+        for (std::size_t i = 1; i < anchors.size(); ++i) {
+            CHECK(anchors[i].lyrics_position.at_us >= anchors[i - 1].lyrics_position.at_us);
+        }
+    }
+    CHECK(group.legacy->roles().lyric_commands.empty());
+
+    // An anchor of an item the group was never given a document for is sent to no one.
+    iclforge::hearth::LyricsUpdate stray;
+    stray.item = 987654;
+    stray.anchor = iclforge::hearth::LyricsUpdate::Anchor{.position_ms = 1000, .at_us = 1, .speed = 1.0};
+    group.sinks->apply_lyrics(group.group_id, stray);
+    std::this_thread::sleep_for(300ms);
+    for (const auto& message : group.decodes->roles().lyric_commands) {
+        CHECK(message.lyrics.item != 987654);
+        CHECK(message.lyrics_position.item != 987654);
+    }
+}
+
+TEST_CASE("engine: an item with no lyrics tells the boards it has none, and a board that takes none is not sent any",
+          "[hearth][group][websocket][iclforge][lyrics]") {
+    constexpr int kFrameCount = 30;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    // Only the decoding board lists the lyric commands; no lyrics file is beside the item.
+    KaraokeGroup group("lyrics_none_group", kFrameCount, wanted, true, 0);
+    group.play_through();
+    // Neither takes them, so neither is sent any.
+    CHECK(group.decodes->roles().lyric_commands.empty());
+    CHECK(group.legacy->roles().lyric_commands.empty());
+}
+
+TEST_CASE("engine: a board that lists lyrics is told an item has none, so it drops the last item's",
+          "[hearth][group][websocket][iclforge][lyrics]") {
+    constexpr int kFrameCount = 30;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    KaraokeGroup group("lyrics_empty_group", kFrameCount, wanted, true, 16384);
+    group.play_through();
+    REQUIRE(eventually([&] { return !group.decodes->roles().lyric_commands.empty(); }));
+    const auto all = group.decodes->roles().lyric_commands;
+    const auto documents = of_kind(all, Command::kLyrics);
+    REQUIRE_FALSE(documents.empty());
+    CHECK(documents.front().lyrics.text.empty());
+}
+
+TEST_CASE("engine: a document too big for a board is sent as none, so that it drops the last item's",
+          "[hearth][group][websocket][iclforge][lyrics]") {
+    constexpr int kFrameCount = 30;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    // The board holds 64 bytes of document, and the item's lyrics are more.
+    KaraokeGroup group("lyrics_big_group", kFrameCount, wanted, true, 64);
+    fs::create_directories(fs::path(group.item_path).parent_path());
+    {
+        std::ofstream lrc(fs::path(group.item_path).replace_extension(".lrc"), std::ios::binary);
+        lrc << "[00:00.50]Should auld acquaintance be forgot and never brought to mind"
+            << '\n'
+            << "[00:01.00]Should auld acquaintance be forgot and days of auld lang syne"
+            << '\n';
+    }
+    group.play_through();
+    REQUIRE(eventually([&] { return !group.decodes->roles().lyric_commands.empty(); }));
+    const auto documents = of_kind(group.decodes->roles().lyric_commands, Command::kLyrics);
+    REQUIRE_FALSE(documents.empty());
+    CHECK(documents.front().lyrics.text.empty());
 }
