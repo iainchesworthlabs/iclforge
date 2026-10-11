@@ -696,3 +696,123 @@ TEST_CASE("the playout starts each stream afresh on a ring that runs on", "[io][
     CHECK(out.playout.stats().underruns == 0);
     CHECK(out.playout.stats().stream_frames == 5 * kSecond);
 }
+
+// --- PCM chunks --------------------------------------------------------------------
+//
+// The Sendspin player's PCM path (burst_player.cpp, play_pcm()) feeds the playout a chunk at a
+// time: `chunk` frames that arrive `lead_us` before the first is due, decoded in `decode_us` and
+// pushed in blocks of at most kBlock, so a chunk that is not a whole number of blocks leaves a
+// partial block staged for the next. The writer has nothing to push until a chunk has arrived.
+namespace {
+
+template <typename ArrivalExtra, typename TargetShift>
+void play_chunks(Playout& playout, SimulatedI2s& sink, std::int64_t first_target_us,
+                 std::uint64_t frames, std::size_t chunk, std::int64_t lead_us,
+                 std::int64_t decode_us, ArrivalExtra arrival_extra, TargetShift target_shift) {
+    std::array<std::array<float, 1024>, 2> samples{};
+    std::array<std::span<const float>, 2> views{};
+    sink.truth.first_target_us = first_target_us;
+    for (std::uint64_t f = 0; f < frames; f += chunk) {
+        const auto n = static_cast<std::size_t>(std::min<std::uint64_t>(chunk, frames - f));
+        for (std::size_t k = 0; k < n; ++k) {
+            const std::array<float, 2> value = encode(f + k);
+            samples[0][k] = value[0];
+            samples[1][k] = value[1];
+        }
+        const std::int64_t arrives = first_target_us + frames_us(f) - lead_us + arrival_extra(f);
+        if (sink.now() < arrives) {
+            sink.idle(arrives - sink.now());
+        }
+        sink.idle(decode_us);
+        for (std::size_t done = 0; done < n;) {
+            const std::size_t m = std::min(kBlock, n - done);
+            views[0] = std::span<const float>(samples[0].data() + done, m);
+            views[1] = std::span<const float>(samples[1].data() + done, m);
+            playout.push(views, m, first_target_us + frames_us(f + done) + target_shift(f),
+                         f + done, sink.now(), sink);
+            done += m;
+        }
+    }
+    playout.flush(sink.now(), sink);
+}
+
+void play_chunks(Playout& playout, SimulatedI2s& sink, std::int64_t first_target_us,
+                 std::uint64_t frames, std::size_t chunk, std::int64_t lead_us,
+                 std::int64_t decode_us) {
+    play_chunks(
+        playout, sink, first_target_us, frames, chunk, lead_us, decode_us,
+        [](std::uint64_t) { return 0; }, [](std::uint64_t) { return 0; });
+}
+
+}  // namespace
+
+TEST_CASE("the playout plays 666-frame chunks that arrive 110 ms ahead", "[io][playout][pcm]") {
+    // The C6's ring of 24 buffers of 128 frames, a 400 ms start, and 3 ms to decode a chunk.
+    SimulatedI2s sink({.descriptors = 24, .frames = 128});
+    TwoOutputs out;
+    play_chunks(out.playout, sink, sink.now() + 400'000, 20 * kSecond, 666, 110'000, 3'000);
+    const Playout::Stats& stats = out.playout.stats();
+    INFO("skipped " << stats.skipped_frames << " silence " << stats.silence_frames << " underruns "
+                    << stats.underruns << " resyncs " << stats.resyncs << " worst "
+                    << sink.truth.worst_us);
+    CHECK(stats.underruns == 0);
+    CHECK(stats.resyncs == 0);
+    CHECK(stats.skipped_frames == 0);
+    CHECK(stats.stream_frames == 20 * kSecond);
+}
+
+// What the board could see on top of that: each run is 20 s of the stream with one disturbance at
+// 0.4 s, and the stream must be playing again, with all but a little of it played.
+//
+// A stream whose chunks reach the playout later than they are due, and stay later, is not one of
+// them: every frame of it is skipped, and the playout cannot be blamed for it. That is what a
+// sender that has fallen behind real time looks like, and what the C6 showed when the group's
+// model of its buffer held units that had already played (apps/hearth/engine/tests/test_group.cpp,
+// "fed before play and not after"): one underrun, one resync, and nearly every frame skipped.
+TEST_CASE("the playout recovers a PCM stream from a clock step a late chunk and late interrupts",
+          "[io][playout][pcm]") {
+    constexpr std::uint64_t kAt = 19'706;  // 0.41 s, where the C6's first resyncs came
+    struct Case {
+        const char* name;
+        SimulatedI2s::Options sink;
+        std::int64_t arrival_extra_us;  // the chunk at kAt arrives this much later
+        std::int64_t target_step_us;    // every target from kAt on moves by this
+    };
+    const Case cases[] = {
+        {"target step -30 ms", {.descriptors = 24, .frames = 128}, 0, -30'000},
+        {"target step +30 ms", {.descriptors = 24, .frames = 128}, 0, 30'000},
+        {"a chunk 80 ms late", {.descriptors = 24, .frames = 128}, 80'000, 0},
+        {"a chunk 400 ms late", {.descriptors = 24, .frames = 128}, 400'000, 0},
+        {"interrupts 3 ms late", {.descriptors = 24, .frames = 128, .jitter_us = 3'000}, 0, 0},
+    };
+    for (const Case& c : cases) {
+        SimulatedI2s sink(c.sink);
+        TwoOutputs out;
+        play_chunks(
+            out.playout, sink, sink.now() + 400'000, 20 * kSecond, 666, 110'000, 3'000,
+            [&](std::uint64_t f) { return f >= kAt && f < kAt + 666 ? c.arrival_extra_us : 0; },
+            [&](std::uint64_t f) { return f >= kAt ? c.target_step_us : 0; });
+        const Playout::Stats& stats = out.playout.stats();
+        INFO(c.name << ": skipped " << stats.skipped_frames << " silence " << stats.silence_frames
+                    << " underruns " << stats.underruns << " resyncs " << stats.resyncs
+                    << " stream_frames " << stats.stream_frames);
+        // All but at most 0.5 s of it played.
+        CHECK(stats.stream_frames > 20 * kSecond - kSecond / 2);
+    }
+}
+
+TEST_CASE("the playout skips every frame of a stream whose chunks stay later than they are due",
+          "[io][playout][pcm]") {
+    // The same stream with every target 300 ms earlier from 0.4 s on, which is a sender 190 ms
+    // behind its own timeline once the 110 ms lead is counted: no frame can be played, and none is.
+    constexpr std::uint64_t kAt = 19'706;
+    SimulatedI2s sink({.descriptors = 24, .frames = 128});
+    TwoOutputs out;
+    play_chunks(
+        out.playout, sink, sink.now() + 400'000, 20 * kSecond, 666, 110'000, 3'000,
+        [](std::uint64_t) { return 0; }, [&](std::uint64_t f) { return f >= kAt ? -300'000 : 0; });
+    const Playout::Stats& stats = out.playout.stats();
+    CHECK(stats.stream_frames < kSecond);
+    CHECK(stats.skipped_frames > 15 * kSecond);
+    CHECK(stats.underruns >= 1);
+}
