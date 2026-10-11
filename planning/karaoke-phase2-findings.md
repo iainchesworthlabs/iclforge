@@ -174,10 +174,10 @@ Two ways to close it:
 | **(a) Host-side** | `StreamNeeds` gains "the reproduction is applied here"; for such an item `choose_sink_form` prefers PCM (or Opus where the sink is set to it), so every member hears one reproduction | **S** | A table row and a flag; the group already renders each width once, and a reproduction is 2.0 or 3.0 (+ LFE), no new width. A C6 is offered PCM with its caveat as it already is; passthrough cannot do it at all (P7) |
 | **(b) Sink-side** | `karaoke` and `karaoke_vocals` join the role's `decoder_settings` (11 keys today, none karaoke), the sink lists which it supports, and its decoder takes them | **M** | A protocol revision, firmware and library changes, Hearth's per-sink settings, tests; its payoff is a coded stream's bandwidth and a sink with an Atmos decode, neither of which a 2.0 karaoke stream needs |
 
-**Recommended: (a) first**, then A above. A P4 with a panel that is fed the host's PCM and a lyric
-document needs nothing more from the audio side, and (b) stays an option for the day a sink must
-decode coded. This is W7 in the plan: **S** to **M**, the flag, the rule, the table, a
-mixed-group test and the 50 ms check above.
+**Superseded on 2026-10-11 by the owner (D3):** (b) is the design, and (a) is the fallback for a
+sink that cannot decode karaoke ([below](#sink-local-decode-the-owners-requirement)). The reading
+above stays as the reasoning: (a) is what a sink that lists no karaoke setting is sent, and what
+keeps a group that mixes the two consistent.
 
 ## W5: Android and a browser page
 
@@ -289,12 +289,49 @@ its row, its generated project page and its test binary. The reader's `read_lyri
 
 **L** in all, six pull requests, and W13a is the only one the rest of the phase also wants.
 
+## Sink-local decode (the owner's requirement)
+
+On 2026-10-11 the owner said what the design is: a P4 that can handle it decodes **locally**, the
+audio and the lyrics, and the server converts to PCM only for a sink that cannot. The findings above
+had put the host-decoded PCM first because it needed no protocol or firmware change; that put the
+convenient case ahead of the one the board exists for. This is the sink-local case with its pieces,
+read from the code.
+
+### What it needs
+
+| Piece | Where | What changes | Size |
+|---|---|---|---|
+| The choice on the wire | `libs/sendspin` (`iclforge_player.hpp`, `kDecoderSettingNames`, the role's page) | Two keys in the role's decoder settings: `karaoke` (`off`, `aware`, `capable`) and `karaoke_vocals` (`none`, `v1`, `v2`, `both`); read, range-checked and listed in the sink's support object as the other keys are | S |
+| The board applies it | `firmware/hearth-sink/main/sendspin/player/sendspin.cpp` (the `kDecoderSettings` list) and `firmware/esp-idf/iclforge/src/burst_player.cpp` (`apply()`) | Two more lines setting `decoder.output.karaoke` and `karaoke_vocals`, which the library's output stage already has; the keys are listed so the server knows the board takes them | S |
+| **The layout it comes out in** | `burst_player.cpp` | A reproduced karaoke frame is L, C, R (and the LFE), not the coded layout, so a player that lays channels out from the coded `acmod` is wrong: the same finding as phase 1's K1. The board asks `ac3::output_mode()` as Hearth's decoder does, for the channels it renders and the outputs it opens | M |
+| The host's rule | `apps/hearth/engine/src/sink_form.cpp` (`choose_sink_form`) | `StreamNeeds` says the stream is karaoke and a reproduction is asked for: a sink that lists the karaoke keys is sent the stream as coded, one that does not is sent PCM decoded here (the fallback), so a group of both plays one reproduction | S |
+| The host sends the choice | Hearth's per-sink settings (`network_sinks`, `settings_model`) | The singer's choice joins what each sink is sent; a change is a new settings revision, applied at the next burst boundary, as the others are | S to M |
+| The words | W13a's library, then the board | The document and a progress anchor reach the board, which runs the cursor on its own playout clock (option A above); needs `lyrics` reachable from the firmware, which W13a settles | M to L |
+| The panel | the board's own UI | Draws the lines and the fill, in right-to-left for Hebrew and Yiddish, with the fonts those need | L (parked until the board) |
+
+### Whether the board can
+
+From the repository's own measurements (`docs/platforms/bare-metal/esp32-p4.md`): AC-3 5.1 takes
+0.16 to 0.18 of real time on the P4 (E-AC-3 7.1.4 0.35 to 0.43), so a 3/2 karaoke stream, which is
+five channels of AC-3, has most of both cores left for the display. What the P4 cannot do yet is
+output more than stereo: TDM waits for the v3.x board, so on today's board the 2/0 reproduction is
+what plays and the 3/0 one waits for the board that is in the post. The S3 sinks decode AC-3 as
+well, so **the audio side (the keys, the board applying them, the layout) can be verified on the S3
+boards now**, under the standing permission to use the plugged-in hardware, and only the lyrics
+screen waits for the panel.
+
+### What stays host-side
+
+A sink that does not list the keys (an older firmware, a board that cannot decode karaoke) is sent
+PCM decoded on the host, which is finding (a) above. That is also what keeps a group that mixes
+boards consistent: every member plays the same reproduction, whichever end made it.
+
 ## What the findings add to the plan
 
 | Plan item | What the findings say |
 |---|---|
 | W3, W6 | The tap editor, lines then words, with an estimate as its start; Hearth; writer beside the reader; **L** |
-| W7 | (a) the host decodes a karaoke stream for a sink, with the mixed-group test; the 50 ms check; **S** to **M** |
+| W7 | **Changed by the owner (D3): the sink decodes locally** ([above](#sink-local-decode-the-owners-requirement)): the two role keys, the board applying them and laying out from `output_mode()`, the host's rule with PCM as the fallback, the lyrics to the board; **M** to **L** |
 | After W7, if the owner wants a screen | The lyric module moves to `libs/device`; the document and the `metadata@v1` anchor; **M** to **L**. This is W12's design, ready for the board |
 | W8 | The browser decode demo: two arguments, a flag, a panel; **S** to **M** |
 | Android | Not a slice: a player app first |
