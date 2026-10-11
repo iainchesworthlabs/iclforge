@@ -9,11 +9,12 @@ to a group of network sinks over Sendspin, a protocol for synchronised network a
 ## The desktop player
 
 `hearth` runs on Windows, Linux, and macOS with a Qt 6.8 or later kit, and builds as the
-`iclforge-hearth` package on each. It reads raw `.ac3`, `.ec3` and `.ac4` elementary streams.
-**Add folder…** also lists MP4, Matroska and MPEG-TS files, and any file can be added or dropped.
-The queue marks a file it cannot read as not playable, with the reason, when it reaches it, and
-skips it or stops there as Settings > Playback > **An item fails** says. Every MP4, Matroska and
-MPEG-TS file is one of those today.
+`iclforge-hearth` package on each. It reads raw `.ac3`, `.ec3` and `.ac4` elementary streams, and
+the first AC-3, E-AC-3 or AC-4 track of an MP4, Matroska or MPEG-TS file (`.mp4`, `.mkv`, `.ts`).
+A container is told by its first bytes, not its name, and an MP4's edit list trims the priming and
+padding the encoder added. **Add folder…** lists those six kinds of file, and any file can be
+added or dropped. The queue marks a file it cannot read as not playable, with the reason, when it
+reaches it, and skips it or stops there as Settings > Playback > **An item fails** says.
 
 The window has six pages, chosen in the header or with `Ctrl+1` to `Ctrl+6`.
 
@@ -161,7 +162,9 @@ Raspberry Pi 4B without an underrun. See
 ## What it does not do
 
 - **Send AC-4 to an ESP32 sink in a group.** [ESP32 sinks](#esp32-sinks) has the detail.
-- **Play from a container.** Only raw `.ac3`, `.ec3` and `.ac4` streams play.
+- **Play every track of a container.** An MP4, Matroska or MPEG-TS file plays its first AC-3,
+  E-AC-3 or AC-4 track; the others are not offered, and a Matroska file's codec delay is not
+  trimmed.
 - **List AC-4 objects on the Play page.** The Objects card shows the positions of E-AC-3 objects.
   An AC-4 item's objects are rendered into the speaker layout, and the Media page says an A-JOC
   stream carries object metadata without listing it.

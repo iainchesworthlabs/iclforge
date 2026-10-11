@@ -29,6 +29,15 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth opens MP4, Matroska and MPEG-TS files**
+
+- **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
+  only raw `.ac3`, `.ec3` and `.ac4` streams and listed `.mp4`, `.mkv` and `.ts` files as not
+  playable. It now demuxes the first AC-3, E-AC-3 or AC-4 track through the same container input
+  `forge` uses, tells a container by its first bytes and not its name, applies an MP4 edit list's
+  priming and padding as `LoadedItem::skip_samples` and `play_samples`, and hands the container's
+  facts to the Media page. A file with no such track is unplayable with the demuxer's reason.
+
 **Atmos object signing: several keys, and the licensed gate**
 
 - **`verify-objects` takes a keyring.** `signing-key=` repeats, and a frame is valid when any of the
@@ -91,6 +100,12 @@ The sections below contain the complete change list and fixes.
   and right, mono the two summed. The library form is `KaraokeReproduction::kCapable` with
   `OutputConfig::karaoke_vocals` (`KaraokeVocals`). The table's cells were read from the
   specification's own pages and are transcribed into the tests.
+- **`output_mode()` says which layout the output stage's channels are in.** A frame's `acmod` and
+  `lfe` describe what was coded, and under the reproduction three or four channels come back for
+  the four to six coded, so a caller that lays channels out from `acmod` placed the vocals where
+  the coded surrounds were. `output_mode(config, acmod, lfe, karaoke)` returns an `OutputMode` (a
+  coding mode and an LFE flag): 3/0 with the LFE after R for the reproduction, 2/0 or 1/0 for a
+  fold, the coded mode otherwise. `output_channel_count()` is now its channel count, one rule.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
