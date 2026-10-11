@@ -1057,6 +1057,29 @@ converter's tables while it compiles `libs/dsp/src/tiered/resampler.cpp`, which 
 RISC-V GCC 15.2 8.4 s where it took 1.5, and `libs/ac4/CMakeLists.txt` raises the compiler's limit
 on constant evaluation for that file (`-fconstexpr-ops-limit`).
 
+## AC-3 and E-AC-3 in the Hearth player
+
+The Hearth player's E-AC-3 decode on the board beside the AC-4 figures above, measured on
+2026-10-11 on board 1 with the decode stack in PSRAM and a null sink: a 32 ms frame's decode,
+render and sink against its duration. The second core (the `decode-lane` task, `CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE`,
+on by default here) takes the E-AC-3 inverse transforms of a substream's channels, the bed's QMF
+analyses and each JOC object's reconstruction, and the next enhanced coupling block's spectrum;
+JOC runs in single precision (`dsp::QmfAnalysisF`, `QmfSynthesisF`). The per-channel RMS of every
+stream is identical with and without the lane.
+
+| Stream | To | one core | second core |
+|---|---|---:|---:|
+| `714-walk` | 7.1.4 | 0.39 | 0.31 |
+| `714-ecpl` | 7.1.4 | | 0.73 |
+| `dee-eac3-51` | 5.1 | | 0.15 |
+| `demo`, 4 objects | 7.1.4 | 0.76 | 0.42 |
+| `objects-mdct`, 5 objects | 7.1.4 | 0.84 | 0.43 |
+| `height`, 6 objects | 7.1.4 | 0.94 | 0.49 |
+| `514-joc-dee`, 12 objects | 7.1.4 | 1.59 | 0.79 |
+
+Every AC-3 and E-AC-3 stream the player was given is in real time on the P4 with the second
+core, the 12-object one included. An object costs about 1 ms of a frame here.
+
 ## QEMU
 
 ESP-IDF v6.1's `qemu-system-riscv32` emulates one machine, `esp32c3`, and no other RISC-V part —
