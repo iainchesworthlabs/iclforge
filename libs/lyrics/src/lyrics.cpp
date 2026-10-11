@@ -223,6 +223,7 @@ struct WordProto {
 
 struct LineProto {
     std::int64_t start = 0;
+    Singer singer = Singer::kUnmarked;
     std::string text{};
     std::vector<WordProto> words{};
     // Where the last word ends, from the line's start, when a closing tag said.
@@ -233,6 +234,78 @@ struct Segment {
     std::optional<std::int64_t> tag{};
     std::string text{};
 };
+
+// A singer marker at the start of `text`: `V1:`, `V2:`, `V1+V2:` or `V2+V1:`, in either case,
+// with spaces round the `+` and after the colon. It may come after a first word tag
+// (`<00:12.00>V1: Leave`), which is kept in front of what is left. Nothing is taken from a text
+// that does not start with one.
+struct Marked {
+    Singer singer = Singer::kUnmarked;
+    std::string rest{};
+};
+
+[[nodiscard]] Marked take_singer(std::string_view text) {
+    std::size_t at = 0;
+    while (at < text.size() && is_space(text[at])) {
+        ++at;
+    }
+    std::string_view tag;
+    if (at < text.size() && text[at] == '<') {
+        const std::size_t close = text.find('>', at);
+        if (close != std::string_view::npos && parse_time(text.substr(at + 1, close - at - 1))) {
+            tag = text.substr(at, close - at + 1);
+            at = close + 1;
+            while (at < text.size() && is_space(text[at])) {
+                ++at;
+            }
+        }
+    }
+    const auto upper = [](char c) {
+        return static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    };
+    const auto digit_after_v = [&](std::size_t i) -> int {
+        if (i + 1 < text.size() && upper(text[i]) == 'V' && (text[i + 1] == '1' || text[i + 1] == '2')) {
+            return text[i + 1] - '0';
+        }
+        return 0;
+    };
+    const int first = digit_after_v(at);
+    if (first == 0) {
+        return {.singer = Singer::kUnmarked, .rest = std::string{text}};
+    }
+    std::size_t i = at + 2;
+    Singer singer = first == 1 ? Singer::kFirst : Singer::kSecond;
+    // `+Vn` with the other digit, spaces allowed round the plus.
+    std::size_t j = i;
+    while (j < text.size() && is_space(text[j])) {
+        ++j;
+    }
+    if (j < text.size() && text[j] == '+') {
+        ++j;
+        while (j < text.size() && is_space(text[j])) {
+            ++j;
+        }
+        const int second = digit_after_v(j);
+        if (second == 0 || second == first) {
+            return {.singer = Singer::kUnmarked, .rest = std::string{text}};
+        }
+        singer = Singer::kBoth;
+        i = j + 2;
+    }
+    while (i < text.size() && is_space(text[i])) {
+        ++i;
+    }
+    if (i >= text.size() || text[i] != ':') {
+        return {.singer = Singer::kUnmarked, .rest = std::string{text}};
+    }
+    ++i;
+    while (i < text.size() && is_space(text[i])) {
+        ++i;
+    }
+    std::string rest{tag};
+    rest += text.substr(i);
+    return {.singer = singer, .rest = std::move(rest)};
+}
 
 // A line's text split at its `<mm:ss.xx>` tags. The first segment is whatever
 // came before the first tag and has none.
@@ -346,6 +419,7 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
     Lyrics lyrics;
     std::vector<LineProto> timed;
     std::vector<std::string> plain;
+    std::vector<Singer> plain_singers;
 
     const auto read_line = [&](std::string_view raw) {
         const std::string_view line = trim(raw);
@@ -373,9 +447,11 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
                 const std::string_view inner =
                     close == std::string_view::npos ? std::string_view{} : line.substr(1, close - 1);
                 const std::size_t colon = inner.find(':');
+                // A letter, then letters or digits: `ti`, `ar`, and `v1` and `v2`.
                 if (colon != std::string_view::npos && colon > 0 &&
+                    std::isalpha(static_cast<unsigned char>(inner[0])) != 0 &&
                     std::all_of(inner.begin(), inner.begin() + static_cast<std::ptrdiff_t>(colon),
-                                [](char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; })) {
+                                [](char c) { return std::isalnum(static_cast<unsigned char>(c)) != 0; })) {
                     const std::string name = lowercase(inner.substr(0, colon));
                     const std::string value{trim(inner.substr(colon + 1))};
                     if (name == "ti") {
@@ -386,6 +462,10 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
                         lyrics.album = value;
                     } else if (name == "by") {
                         lyrics.author = value;
+                    } else if (name == "v1") {
+                        lyrics.first_singer_name = value;
+                    } else if (name == "v2") {
+                        lyrics.second_singer_name = value;
                     } else if (name == "length") {
                         lyrics.length_ms = parse_time(value);
                     } else if (name == "offset") {
@@ -396,11 +476,17 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
                     return;
                 }
             }
-            plain.emplace_back(line);
+            // A plain line may carry the marker too, so that a duet's text can be marked
+            // before it is timed.
+            Marked marked = take_singer(line);
+            plain.emplace_back(std::move(marked.rest));
+            plain_singers.push_back(marked.singer);
             return;
         }
-        const std::vector<Segment> segments = split_words(line.substr(at));
+        const Marked marked = take_singer(line.substr(at));
+        const std::vector<Segment> segments = split_words(marked.rest);
         LineProto shape;
+        shape.singer = marked.singer;
         build_words(segments, times.front(), shape);
         for (const std::int64_t start : times) {
             LineProto copy = shape;
@@ -425,8 +511,12 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
         if (plain.empty()) {
             return std::unexpected(std::string{"The lyrics file has no lyrics in it."});
         }
-        for (std::string& line : plain) {
-            lyrics.lines.push_back({.start_ms = 0, .end_ms = 0, .text = std::move(line), .words = {}});
+        for (std::size_t i = 0; i < plain.size(); ++i) {
+            lyrics.lines.push_back({.start_ms = 0,
+                                    .end_ms = 0,
+                                    .text = std::move(plain[i]),
+                                    .words = {},
+                                    .singer = plain_singers[i]});
         }
         return lyrics;
     }
@@ -447,6 +537,7 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
         const LineProto& proto = timed[i];
         LyricLine line;
         line.start_ms = proto.start;
+        line.singer = proto.singer;
         line.text = proto.text;
         const bool has_explicit_end = proto.end_offset.has_value();
         std::int64_t explicit_end = 0;
@@ -578,6 +669,21 @@ LyricPosition lyric_position(const Lyrics& lyrics, std::int64_t position_ms,
                        static_cast<double>(word.end_ms - word.start_ms);
     }
     return out;
+}
+
+bool has_singers(const Lyrics& lyrics) {
+    return std::any_of(lyrics.lines.begin(), lyrics.lines.end(),
+                       [](const LyricLine& line) { return line.singer != Singer::kUnmarked; });
+}
+
+std::string_view singer_marker(Singer singer) {
+    switch (singer) {
+        case Singer::kFirst: return "V1:";
+        case Singer::kSecond: return "V2:";
+        case Singer::kBoth: return "V1+V2:";
+        case Singer::kUnmarked: break;
+    }
+    return {};
 }
 
 WordState word_state(const LyricWord& word, std::int64_t position_ms) {

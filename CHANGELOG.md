@@ -83,6 +83,14 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke-capable decoder can re-level the melody and the vocals.** `OutputConfig` gains
+  `karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, linear and 1.0 by
+  default, which multiply the Table C.2.3 coefficients of M, V1 and V2 (Annex C.2.3's "additional
+  flexibility") at the 3/0 and the 2/0 reproductions, before the scale-down that holds an output's
+  sum to 1. They are read under `KaraokeReproduction::kCapable` alone: the aware column ignores
+  them, and at 1.0 every output is the table's, bit for bit. A gain that is not a finite number of
+  0 or more is a mute (planning/karaoke-phase2.md, W10).
+
 - **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
   outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
   M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at
@@ -140,7 +148,7 @@ The sections below contain the complete change list and fixes.
   karaoke AC-3 stream, its coding mode and which of M, V1 and V2 it carries - and chooses how it is
   reproduced: as coded, aware or capable, with none, V1, V2 or both vocals. It shows which part each
   speaker carries, and says in words when the choice cannot apply: a stream that is not karaoke, a
-  bitstream output, a network group, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
+  bitstream output, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
   is kept across starts, the one decoder setting that is. The Decoder page shows it in a line with
   a button to the page.
 - **Hearth shows lyrics, word by word.** The Karaoke page has a Lyrics card for the `.lrc` file
@@ -151,6 +159,21 @@ The sections below contain the complete change list and fixes.
   said in words. `F11` opens the lyrics full screen (`Esc` leaves) with the transport and the
   vocals chooser kept at the bottom, and Settings has a lyric delay of -1,000 to +1,000 ms that is
   kept across starts.
+- **A karaoke stream is one reproduction across a network group.** `_iclforge_player@v1` takes
+  two more decoder settings, `karaoke` (`off`, `aware`, `capable`) and `karaoke_vocals` (`none`,
+  `v1`, `v2`, `both`), which a sink lists when it has them. Hearth sends a karaoke AC-3 stream as
+  it is to a sink that lists them, and tells it the singer's choice before the stream starts and
+  when it changes while the item plays; the sink's decoder reproduces it (L, C, R and the LFE, so
+  its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
+  firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
+  reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **A lyrics file can say who sings a line.** The reader (`libs/lyrics`) takes a duet's singer from
+  a `V1:`, `V2:` or `V1+V2:` marker at the start of a line (after its time tags, or after its first
+  word tag; either case; not part of the line's text), and the two singers' names from `[v1:name]`
+  and `[v2:name]` id tags. A line with no marker is for nobody in particular, and `V3:` is text.
+  The writer puts the markers and the names back, a plain file may carry the markers before it is
+  timed, and `set_line_singer()` is what an editor calls. Nothing in Hearth uses it yet: the duet
+  view and the editor are the next two changes (planning/karaoke-phase2.md, W11a).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
@@ -173,6 +196,11 @@ The sections below contain the complete change list and fixes.
   nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
   by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
+- **The Karaoke flow takes an LFE part.** An optional mono file, the stream's low-frequency
+  channel: it chooses no mode, is coded after the full-bandwidth channels (a 3/2 stream with one is
+  a 5.1 bed), is band-limited by the window as any channel assigned to the LFE is, and comes out of
+  a karaoke reproduction as L, C, R and the LFE. A multichannel file's own LFE is the stream's, where
+  it was a named problem. A project keeps the part as `lfe` (planning/karaoke-phase2.md, W9).
 - **A project holds the AC-4 tab and AC-4 objects, and a karaoke project's parts lay themselves
   out.** `encode.options` of an AC-4 project is `ac4-encode`'s own words (`frame-rate`, `codec-mode`,
   `dialnorm`, `drc`, `cmixlev`, `dialogue-channels`, ... and `coding` for objects), and

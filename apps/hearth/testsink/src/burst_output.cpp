@@ -17,6 +17,7 @@
 #include "iclforge/ac3/decoder/serving.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/render.hpp"
@@ -258,6 +259,18 @@ bool BurstOutput::start(const ac::StreamStart& stream) {
     return true;
 }
 
+void BurstOutput::set_karaoke(ac::Karaoke reproduction, ac::KaraokeVocals vocals) {
+    config_.output.karaoke = reproduction == ac::Karaoke::kCapable ? ac3::KaraokeReproduction::kCapable
+                             : reproduction == ac::Karaoke::kAware ? ac3::KaraokeReproduction::kAware
+                                                                   : ac3::KaraokeReproduction::kOff;
+    config_.output.karaoke_vocals = vocals == ac::KaraokeVocals::kNone ? ac3::KaraokeVocals::kNone
+                                    : vocals == ac::KaraokeVocals::kV1 ? ac3::KaraokeVocals::kV1
+                                    : vocals == ac::KaraokeVocals::kV2 ? ac3::KaraokeVocals::kV2
+                                                                       : ac3::KaraokeVocals::kBoth;
+    // The decoders were made with the old ones.
+    reset_decoding();
+}
+
 void BurstOutput::clear() {
     if (log_.is_open()) {
         log_ << "clear," << stream_frames_ << "\n";
@@ -329,7 +342,20 @@ void BurstOutput::decode_unit(std::span<const std::byte> unit) {
         reset_decoding();
         return;
     }
-    beds_.push_back(*bed);
+    // The bed is the layout the decoder's channels are in, which for an AC-3 syncframe is the
+    // coded one except under Annex C's reproduction: a karaoke stream comes out as L, C, R and
+    // the LFE, and laid out from the coded acmod its vocals would be placed where its surrounds
+    // were. (A fold has no bed: the renderer takes its channels as they come.)
+    ac3::eac3::chanmap::Layout unit_bed = *bed;
+    if (!serving_.fold && header->kind == ac3::io::StreamKind::kAc3 && header->bytes == unit.size()) {
+        const bool karaoke =
+            ac3::meta::is_karaoke(static_cast<ac3::meta::BitstreamMode>(header->bsmod), header->acmod);
+        const ac3::OutputMode mode = ac3::output_mode(config_.output, header->acmod, header->lfe, karaoke);
+        if (mode.acmod != header->acmod) {
+            unit_bed = ac3::eac3::chanmap::expand(ac3::eac3::chanmap::acmod_map(mode.acmod, mode.lfe));
+        }
+    }
+    beds_.push_back(unit_bed);
     const auto deliver = [this](const ac3::PcmBlock& block) { place(block); };
 
     // A unit that is one AC-3 syncframe goes to the AC-3 decoder, which a fold applies to as

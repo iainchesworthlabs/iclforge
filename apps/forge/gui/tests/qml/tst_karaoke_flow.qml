@@ -31,6 +31,8 @@ TestCase {
     property url lead
     property url harmony
     property url stereoLead
+    property url effects
+    property url silentEffects
     readonly property url speakers21: Qt.resolvedUrl("../fixtures/speakers-2-1.wav")
     readonly property url speakers30Lfe: Qt.resolvedUrl("../fixtures/speakers-3-0-lfe.wav")
     readonly property url speakersNone: Qt.resolvedUrl("../fixtures/speakers-none-3ch.wav")
@@ -60,7 +62,13 @@ TestCase {
         lead = audioFixtures.writeTones("kb-lead.wav", 48000, 1.024, [1030]);
         harmony = audioFixtures.writeTones("kb-harmony.wav", 48000, 1.024, [1270]);
         stereoLead = audioFixtures.writeTones("kb-duet.wav", 48000, 1.024, [1030, 1270]);
-        verify(backing.toString().length > 0 && harmony.toString().length > 0, "the parts could not be written");
+        effects = audioFixtures.writeTones("kb-effects.wav", 48000, 1.024, [60]);
+        // Silence: the window band-limits a channel assigned to the LFE (120 Hz, source-
+        // assignment.md) where `forge encode` writes it as given, so a byte comparison of the
+        // two is of a part that band-limiting leaves as it is.
+        silentEffects = audioFixtures.writeTones("kb-effects-silent.wav", 48000, 1.024, [0]);
+        verify(backing.toString().length > 0 && harmony.toString().length > 0 && effects.toString().length > 0,
+               "the parts could not be written");
         defaultCmix = EncoderController.cmixIndex;
         defaultSurmix = EncoderController.surmixIndex;
     }
@@ -262,10 +270,77 @@ TestCase {
         tryVerify(() => checkCodes(ctx.flow).indexOf("speakers-unnamed") >= 0, 5000);
         compare(ctx.flow.plan.buildable, false);
 
-        // An LFE is named, not dropped.
+        // A file's own LFE is the stream's: the bed has one, and the LFE channel is assigned.
         choose(ctx, "file", speakers30Lfe);
-        tryVerify(() => checkCodes(ctx.flow).indexOf("lfe-present") >= 0, 5000);
+        tryCompare(ctx.flow.plan, "buildable", true, 5000);
+        compare(ctx.flow.plan.lfe, true);
+        compare(bedId(), "3/0");
+        compare(EncoderController.bedLfe, true);
+        verify(tokens().indexOf("=LFE") >= 0, tokens());
+        verify(checkCodes(ctx.flow).indexOf("lfe-part") >= 0);
+    }
+
+    // ---- the LFE part ---------------------------------------------------------------
+    function test_anLfePartIsTheStreamsLfeAndTheDraftHasIt() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony, lfe: effects });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        compare(ctx.flow.plan.buildable, true);
+        compare(ctx.flow.plan.lfe, true);
+        // The 3/2 bed with its LFE, and the part assigned to it, after the full-bandwidth five.
+        compare(bedId(), "3/2");
+        compare(EncoderController.bedLfe, true);
+        compare(tokens(), "0:0=L 0:1=R 1:0=C 2:0=Ls 3:0=Rs 4:0=LFE");
+        compare(EncoderController.unassignedWarnings.length, 0);
+        verify(checkCodes(ctx.flow).indexOf("lfe-part") >= 0);
+        verify(checkCodes(ctx.flow).indexOf("parts-aligned") >= 0);
+        // The row says what it is.
+        compare(findByName(ctx.win, "karaokePartFile-lfe").text, "kb-effects.wav");
+    }
+
+    function test_removingTheLfePartTakesTheLfeOutOfTheDraft() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, lfe: effects });
+        tryCompare(ctx.flow.plan, "lfe", true, 5000);
+        compare(EncoderController.bedLfe, true);
+        press(ctx, "karaokeRemove-lfe");
+        tryCompare(ctx.flow.plan, "lfe", false, 5000);
+        compare(ctx.flow.plan.mode, "3/1");
+        compare(EncoderController.bedLfe, false);
+        compare(tokens(), "0:0=L 0:1=R 1:0=C 2:0=Cs");
+        verify(checkCodes(ctx.flow).indexOf("lfe-part") < 0);
+    }
+
+    function test_anLfePartAndABackingAreStillNothingToSingAlong() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, lfe: effects });
+        tryVerify(() => checkCodes(ctx.flow).indexOf("nothing-to-sing") >= 0, 5000);
         compare(ctx.flow.plan.buildable, false);
+        compare(ctx.flow.plan.mode, "");
+    }
+
+    function test_theStreamWithAnLfeIsHeardWithItsLfeInEveryListening() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony, lfe: effects });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        press(ctx, "karaokeNextButton");   // Levels
+        press(ctx, "karaokeNextButton");   // Hear: the stream is built
+        tryCompare(ctx.flow, "currentStepKey", "hear", 5000);
+        tryCompare(ctx.flow, "previewState", "ready", 60000);
+        compare(StreamPlayerController.isKaraoke, true);
+        verify(StreamPlayerController.codedLayoutLabel.indexOf("3/2") >= 0, StreamPlayerController.codedLayoutLabel);
+
+        // Aware is L, C, R and the LFE: four channels where five and the LFE are coded.
+        tryCompare(StreamPlayerController, "karaokeReproduction", "aware", 5000);
+        tryVerify(() => StreamPlayerController.channelMeta.length === 4, 30000);
+        compare(StreamPlayerController.karaokeReproduced, true);
+        compare(findByName(ctx.win, "karaokePlays-LFE").text, "LFE");
+
+        // As coded is the six the stream codes, the vocals in the rear speakers still.
+        mouseClick(findByName(findByName(ctx.win, "karaokeListening"), "seg-asCoded"));
+        tryCompare(StreamPlayerController, "karaokeReproduction", "asCoded", 5000);
+        tryVerify(() => StreamPlayerController.channelMeta.length === 6, 30000);
+        compare(findByName(ctx.win, "karaokePlays-LFE").text, "LFE");
     }
 
     function test_oneFileWhoseSpeakersAreNamedIsTheModeItSays() {
@@ -376,6 +451,44 @@ TestCase {
             verify(cliRunner.copyInto(folder, lead));
             compare(cliRunner.run(line, folder), 0, line);
                 verify(cliRunner.sameBytes(out, Qt.resolvedUrl("_test_output/tst_karaoke_flow_cli/out.ac3")),
+                   "the command line wrote different bytes than the window did");
+        }
+    }
+
+    function test_saveWithAnLfeWritesTheStreamTheCommandLineWritesAndItHasAnLfe() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, lfe: silentEffects });
+        tryCompare(ctx.flow.plan, "lfe", true, 5000);
+        ctx.flow.currentStepKey = "save";
+        const line = findByName(ctx.win, "karaokeCommandLine").text;
+        verify(line.indexOf("forge encode") === 0, line);
+        verify(line.indexOf("lfe") >= 0 || line.indexOf("LFE") >= 0, line);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_flow_lfe.ac3");
+        press(ctx, "karaokeNextButton");
+        const dialog = findByName(ctx.win, "saveDialog");
+        tryCompare(dialog, "visible", true, 5000);
+        dialog.selectedFile = out;
+        dialog.accepted();
+        dialog.close();
+        tryCompare(EncoderController, "busy", false, 60000);
+
+        StreamPlayerController.karaokeReproduction = "asCoded";
+        StreamPlayerController.openFile(out);
+        tryCompare(StreamPlayerController, "hasResult", true, 30000);
+        compare(StreamPlayerController.isKaraoke, true);
+        verify(StreamPlayerController.codedLayoutLabel.indexOf("3/1") >= 0, StreamPlayerController.codedLayoutLabel);
+        // Four coded channels and the LFE, which a plain surround player decodes as five.
+        tryVerify(() => StreamPlayerController.channelMeta.length === 5, 30000);
+
+        if (cliRunner.available()) {
+            const folder = Qt.resolvedUrl("_test_output/tst_karaoke_flow_lfe_cli");
+            verify(cliRunner.prepare(folder, backing));
+            verify(cliRunner.copyInto(folder, melody));
+            verify(cliRunner.copyInto(folder, lead));
+            verify(cliRunner.copyInto(folder, silentEffects));
+            compare(cliRunner.run(line, folder), 0, line);
+            verify(cliRunner.sameBytes(out, Qt.resolvedUrl("_test_output/tst_karaoke_flow_lfe_cli/out.ac3")),
                    "the command line wrote different bytes than the window did");
         }
     }

@@ -51,7 +51,10 @@ struct Channel {
 // encoder's input order and the decoder's output order, each with a tone of its
 // own: primes, so that none is on another's harmonic, 60 Hz or more apart, the
 // LFEs under the 120 Hz their tracks code to, and every other under the lowest
-// crossover the ASPX mode here has (7.5 kHz).
+// crossover the ASPX mode here has (7.5 kHz). Sixty hertz is what the shortest
+// window level() measures through - the sanitizer builds' 8,192 samples, whose
+// Hann window leaks 57 dB at 24 Hz - resolves to the 60 dB the checks ask for: the
+// two LFEs were 47 and 71 Hz, and measured 56.6 dB under ASan and UBSan only.
 std::vector<Channel> layout() {
     return {
         {Speaker::kLeft, 331.0},         {Speaker::kRight, 457.0},
@@ -59,10 +62,10 @@ std::vector<Channel> layout() {
         {Speaker::kRightSurround, 953.0}, {Speaker::kLeftBack, 1777.0},
         {Speaker::kRightBack, 1931.0},   {Speaker::kTopFrontLeft, 1117.0},
         {Speaker::kTopFrontRight, 1289.0}, {Speaker::kTopBackLeft, 1453.0},
-        {Speaker::kTopBackRight, 1621.0}, {Speaker::kLfe, 47.0},
+        {Speaker::kTopBackRight, 1621.0}, {Speaker::kLfe, 31.0},
         {Speaker::kTopSideLeft, 2131.0}, {Speaker::kTopSideRight, 2287.0},
         {Speaker::kTopFrontCentre, 2459.0}, {Speaker::kTopBackCentre, 2633.0},
-        {Speaker::kTopCentre, 2791.0},   {Speaker::kLfe2, 71.0},
+        {Speaker::kTopCentre, 2791.0},   {Speaker::kLfe2, 97.0},
         {Speaker::kBottomFrontLeft, 2971.0}, {Speaker::kBottomFrontRight, 3109.0},
         {Speaker::kBottomFrontCentre, 3253.0}, {Speaker::kCentreBack, 3407.0},
         {Speaker::kLeftWide, 3571.0},    {Speaker::kRightWide, 3739.0},

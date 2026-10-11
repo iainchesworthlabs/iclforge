@@ -259,6 +259,13 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // answers nothing and decides nothing, and the group plays as it would with no planner.
     [[nodiscard]] std::vector<render::OutputLayout> plan_group(const GroupPlanRequest& request);
 
+    // Tells the members of group `group_id` that are sent the stream as it is, and that take the
+    // karaoke settings, how to reproduce it: the singer changed the choice (or the vocals) while
+    // the item plays. A settings revision each, applied at the sink's next burst boundary. The
+    // members sent PCM have it applied where the PCM is made, and the ones that do not take the
+    // keys have nothing to be told. Nothing for an id this class does not know.
+    void apply_karaoke(const std::string& group_id, const KaraokeChoice& choice);
+
     // The host's own trail (ServerHostEvents::on_log()) since the last call,
     // oldest first: what was dialled, what each sink was given, and why a
     // connection ended. At most kLogLines are kept between calls; older ones
@@ -292,6 +299,13 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     void on_log(std::string_view line) override;
 
    private:
+    // Sends sink `sink_id` the karaoke settings `choice` is, merged onto the settings last sent it
+    // (or the layout it reports, for a sink never sent any), unless the sink has applied exactly
+    // that: its reported revision is the revision sent, which a sink that restarted since is not.
+    // Only the keys the sink lists are set. False when the sink takes neither key, or the
+    // settings could not be sent.
+    bool tell_karaoke(const std::string& sink_id, const SinkFacts& facts, const KaraokeChoice& choice);
+
     struct Entry {
         sendspin::discovery::Service service{};
         // Whether mDNS lists the sink now. A row mDNS has let go of stays

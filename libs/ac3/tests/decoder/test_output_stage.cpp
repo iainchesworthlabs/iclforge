@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <numbers>
 #include <optional>
 #include <span>
@@ -1342,9 +1343,12 @@ std::size_t coded_channels(ac3::Acmod acmod) {
 
 // What each coded channel contributes to {Lk, Ck, Rk}, from the equations and a
 // table column, scaled down together by the largest output's sum when that is
-// above 1 (and, for mono, by the sum of the left and right).
+// above 1 (and, for mono, by the sum of the left and right). `part` is the
+// listener's gain on M, V1 and V2 (C.2.3's re-levelling), which multiplies the
+// table's coefficients before the scaling.
 std::vector<std::array<double, 3>> table_gains(ac3::Acmod acmod, const CapableColumn& col,
-                                               double c, double i, bool mono = false) {
+                                               double c, double i, bool mono = false,
+                                               std::array<double, 3> part = {1.0, 1.0, 1.0}) {
     const Roles roles = roles_of(acmod);
     std::vector<std::array<double, 3>> gains(coded_channels(acmod), {0.0, 0.0, 0.0});
     const auto set = [&](int slot, std::array<double, 3> value) {
@@ -1354,9 +1358,9 @@ std::vector<std::array<double, 3>> table_gains(ac3::Acmod acmod, const CapableCo
     };
     set(roles.l, {1.0, 0.0, 0.0});
     set(roles.r, {0.0, 0.0, 1.0});
-    set(roles.m, {c, col.f, i});
-    set(roles.v1, {col.a, col.d, col.g});
-    set(roles.v2, {col.b, col.e, col.h});
+    set(roles.m, {c * part[0], col.f * part[0], i * part[0]});
+    set(roles.v1, {col.a * part[1], col.d * part[1], col.g * part[1]});
+    set(roles.v2, {col.b * part[2], col.e * part[2], col.h * part[2]});
     std::array<double, 3> sums{0.0, 0.0, 0.0};
     for (const auto& gain : gains) {
         for (std::size_t k = 0; k < 3; ++k) {
@@ -1813,6 +1817,204 @@ TEST_CASE("karaoke: output_mode is the layout a real decoder's channels come out
                                 .margin(1e-6));
                 }
             }
+        }
+    }
+}
+
+// ---- Annex C.2.3's re-levelling: the listener's gains on M, V1 and V2 -----------------------
+
+namespace {
+
+ac3::OutputConfig releveled(ac3::KaraokeVocals vocals, double melody, double vocal1, double vocal2,
+                            ac3::DownmixTarget target = ac3::DownmixTarget::kAsCoded) {
+    ac3::OutputConfig config = capable_config(vocals, target);
+    config.karaoke_melody_gain = melody;
+    config.karaoke_vocal1_gain = vocal1;
+    config.karaoke_vocal2_gain = vocal2;
+    return config;
+}
+
+// The reproduction of one coded channel's impulse under `config`.
+std::vector<double> response(const ac3::OutputConfig& config, ac3::Acmod acmod, std::size_t channel,
+                             bool lfe = false) {
+    ac3::OutputStage stage{config};
+    auto channels = impulse_at(coded_channels(acmod) + (lfe ? 1U : 0U), channel);
+    stage.apply(channels, acmod, lfe, capable_levels(), 31);
+    std::vector<double> out;
+    for (const auto& samples : channels) {
+        out.push_back(static_cast<double>(samples[0]));
+    }
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("karaoke re-levelling: a gain of 1.0 is the table as it was, for every mode and choice",
+          "[decoder][output][karaoke][capable][releveling]") {
+    for (const auto acmod : {ac3::Acmod::k2_1, ac3::Acmod::k3_1, ac3::Acmod::k2_2, ac3::Acmod::k3_2}) {
+        const std::size_t coded = coded_channels(acmod);
+        for (const auto& col : kTable23ThreeChannel) {
+            for (const auto target : {ac3::DownmixTarget::kAsCoded, ac3::DownmixTarget::kLoRo,
+                                      ac3::DownmixTarget::kMono}) {
+                for (std::size_t channel = 0; channel < coded; ++channel) {
+                    const auto before = response(capable_config(col.choice, target), acmod, channel);
+                    const auto after = response(releveled(col.choice, 1.0, 1.0, 1.0, target), acmod, channel);
+                    REQUIRE(before.size() == after.size());
+                    for (std::size_t k = 0; k < before.size(); ++k) {
+                        // Bit for bit, not within a margin.
+                        CHECK(before[k] == after[k]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("karaoke re-levelling: each gain moves its own part and nothing else, then the sums are held to 1",
+          "[decoder][output][karaoke][capable][releveling]") {
+    constexpr double kClev = 0.5;
+    struct Moved {
+        double melody;
+        double vocal1;
+        double vocal2;
+    };
+    // Boosts, cuts and mutes, one part at a time and together.
+    const std::vector<Moved> moves = {{2.0, 1.0, 1.0}, {1.0, 3.0, 1.0}, {1.0, 1.0, 0.5}, {0.0, 1.0, 1.0},
+                                      {1.0, 0.0, 1.0}, {1.0, 1.0, 0.0}, {0.25, 2.0, 4.0}};
+    for (const auto acmod : {ac3::Acmod::k3_0, ac3::Acmod::k2_1, ac3::Acmod::k3_1, ac3::Acmod::k2_2,
+                             ac3::Acmod::k3_2}) {
+        const std::size_t coded = coded_channels(acmod);
+        for (const Moved& move : moves) {
+            for (const auto& col : kTable23ThreeChannel) {
+                if (acmod == ac3::Acmod::k3_0) {
+                    continue;  // a 3/0 stream is L M R already: no 3/0 reproduction to move
+                }
+                INFO("acmod " << static_cast<int>(acmod) << ", choice " << static_cast<int>(col.choice)
+                              << ", gains " << move.melody << " " << move.vocal1 << " " << move.vocal2);
+                const auto want =
+                    table_gains(acmod, col, 0.0, 0.0, false, {move.melody, move.vocal1, move.vocal2});
+                for (std::size_t channel = 0; channel < coded; ++channel) {
+                    const auto got = response(releveled(col.choice, move.melody, move.vocal1, move.vocal2),
+                                              acmod, channel);
+                    REQUIRE(got.size() == 3);
+                    for (std::size_t k = 0; k < 3; ++k) {
+                        CHECK(got[k] == Catch::Approx(want[channel][k]).margin(1e-6));
+                    }
+                }
+            }
+            for (const auto& col : kTable23TwoChannel) {
+                INFO("2/0, acmod " << static_cast<int>(acmod) << ", choice "
+                                   << static_cast<int>(col.choice) << ", gains " << move.melody << " "
+                                   << move.vocal1 << " " << move.vocal2);
+                const std::array<double, 3> part = {move.melody, move.vocal1, move.vocal2};
+                const auto stereo = table_gains(acmod, col, kClev, kClev, false, part);
+                const auto mono = table_gains(acmod, col, kClev, kClev, true, part);
+                for (std::size_t channel = 0; channel < coded; ++channel) {
+                    const auto lo = response(
+                        releveled(col.choice, move.melody, move.vocal1, move.vocal2, ac3::DownmixTarget::kLoRo),
+                        acmod, channel);
+                    REQUIRE(lo.size() == 2);
+                    CHECK(lo[0] == Catch::Approx(stereo[channel][0]).margin(1e-6));
+                    CHECK(lo[1] == Catch::Approx(stereo[channel][2]).margin(1e-6));
+                    const auto one = response(
+                        releveled(col.choice, move.melody, move.vocal1, move.vocal2, ac3::DownmixTarget::kMono),
+                        acmod, channel);
+                    REQUIRE(one.size() == 1);
+                    CHECK(one[0] == Catch::Approx(mono[channel][0] + mono[channel][2]).margin(1e-6));
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("karaoke re-levelling: a boosted part lowers the rest by the same factor",
+          "[decoder][output][karaoke][capable][releveling]") {
+    // 3/2, both vocals, 3/0 reproduction: L gets V1 at 1 and R gets V2 at 1, so with V1 at 3 the
+    // left sum is 1 + 3 = 4 and everything in it is a quarter; the centre (M at unity) is alone
+    // in its sum and is not scaled.
+    const auto m = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 3.0, 1.0), ac3::Acmod::k3_2, 1);
+    const auto v1 = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 3.0, 1.0), ac3::Acmod::k3_2, 3);
+    const auto l = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 3.0, 1.0), ac3::Acmod::k3_2, 0);
+    REQUIRE(l.size() == 3);
+    CHECK(l[0] == Catch::Approx(0.25).margin(1e-6));   // L itself, a quarter of its unity
+    CHECK(v1[0] == Catch::Approx(0.75).margin(1e-6));  // V1: 3 of 4
+    CHECK(m[1] == Catch::Approx(0.25).margin(1e-6));   // M, centre: sums are one scale for all three
+    // A muted part is out of the sums as an absent one is: with both vocals muted the sums are
+    // L alone, M alone and R alone, so nothing is scaled down (with V2 left in, R's sum is 2).
+    const auto muted_l = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 0.0, 0.0), ac3::Acmod::k3_2, 0);
+    CHECK(muted_l[0] == Catch::Approx(1.0).margin(1e-6));
+    const auto half_l = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 0.0, 1.0), ac3::Acmod::k3_2, 0);
+    CHECK(half_l[0] == Catch::Approx(0.5).margin(1e-6));
+    const auto muted_v1 = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 0.0, 1.0), ac3::Acmod::k3_2, 3);
+    for (const double value : muted_v1) {
+        CHECK(value == 0.0);
+    }
+}
+
+TEST_CASE("karaoke re-levelling: the aware decoder ignores the gains, bit for bit",
+          "[decoder][output][karaoke][releveling]") {
+    const std::array<double, 3> gains[] = {{0.0, 0.0, 0.0}, {4.0, 0.25, 8.0}, {std::nan(""), -1.0, 1e308}};
+    for (const auto acmod : {ac3::Acmod::k2_1, ac3::Acmod::k3_1, ac3::Acmod::k2_2, ac3::Acmod::k3_2}) {
+        const std::size_t coded = coded_channels(acmod);
+        for (const auto target : {ac3::DownmixTarget::kAsCoded, ac3::DownmixTarget::kLoRo,
+                                  ac3::DownmixTarget::kMono}) {
+            ac3::OutputConfig aware;
+            aware.target = target;
+            aware.karaoke = ac3::KaraokeReproduction::kAware;
+            for (const auto& g : gains) {
+                ac3::OutputConfig moved = aware;
+                moved.karaoke_melody_gain = g[0];
+                moved.karaoke_vocal1_gain = g[1];
+                moved.karaoke_vocal2_gain = g[2];
+                for (std::size_t channel = 0; channel < coded; ++channel) {
+                    const auto want = response(aware, acmod, channel);
+                    const auto got = response(moved, acmod, channel);
+                    REQUIRE(want.size() == got.size());
+                    for (std::size_t k = 0; k < want.size(); ++k) {
+                        CHECK(want[k] == got[k]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("karaoke re-levelling: a gain that is not a finite number of 0 or more is a mute",
+          "[decoder][output][karaoke][capable][releveling]") {
+    const double bad[] = {std::nan(""), -1.0, -0.0001, std::numeric_limits<double>::infinity(),
+                          -std::numeric_limits<double>::infinity()};
+    for (const double gain : bad) {
+        INFO("gain " << gain);
+        const auto zero = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 0.0, 1.0), ac3::Acmod::k3_2, 3);
+        const auto got = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, gain, 1.0), ac3::Acmod::k3_2, 3);
+        REQUIRE(zero.size() == got.size());
+        for (std::size_t k = 0; k < zero.size(); ++k) {
+            CHECK(zero[k] == got[k]);
+        }
+        // And no coefficient became not-a-number.
+        for (const double value : response(releveled(ac3::KaraokeVocals::kBoth, gain, gain, gain),
+                                           ac3::Acmod::k3_2, 0)) {
+            CHECK(std::isfinite(value));
+        }
+    }
+}
+
+TEST_CASE("karaoke re-levelling: the LFE and the parts a stream lacks are untouched",
+          "[decoder][output][karaoke][capable][releveling]") {
+    // The LFE comes out after Rk as it was coded, whatever the gains say.
+    const auto lfe = response(releveled(ac3::KaraokeVocals::kBoth, 0.0, 0.0, 0.0), ac3::Acmod::k3_2, 5, true);
+    REQUIRE(lfe.size() == 4);
+    CHECK(lfe[3] == Catch::Approx(1.0).margin(1e-6));
+    CHECK(lfe[0] == 0.0);
+    CHECK(lfe[1] == 0.0);
+    CHECK(lfe[2] == 0.0);
+    // A 3/1 stream has no V2: its gain has nothing to act on, and cannot inflate a sum.
+    for (std::size_t channel = 0; channel < 4; ++channel) {
+        const auto plain = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 1.0, 1.0), ac3::Acmod::k3_1, channel);
+        const auto loud = response(releveled(ac3::KaraokeVocals::kBoth, 1.0, 1.0, 100.0), ac3::Acmod::k3_1, channel);
+        REQUIRE(plain.size() == loud.size());
+        for (std::size_t k = 0; k < plain.size(); ++k) {
+            CHECK(plain[k] == loud[k]);
         }
     }
 }

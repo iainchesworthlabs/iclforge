@@ -37,6 +37,10 @@ struct ItemFacts {
     std::optional<audio::BitstreamFormat> stream = std::nullopt;
     std::uint32_t sample_rate = 0;
     std::uint16_t channels = 0;
+    // An AC-3 stream flagged bsmod 7 with an acmod above 1/0: Annex C's karaoke (L, M, R and one
+    // or two vocals). Only an AC-3 stream is: E-AC-3 and AC-4 never set the flag, as the library's
+    // output stage has it. What a network sink is sent depends on it (sink_form.hpp).
+    bool karaoke = false;
     bool has_objects = false;
     // The most dynamic objects the programme places, as an E-AC-3 stream declares in its
     // addbsi (TS 103 420's complexity index, which is an object count); 0 for a stream that

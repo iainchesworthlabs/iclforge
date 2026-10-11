@@ -40,8 +40,8 @@ constexpr std::int32_t kBitDepth = 32;
 
 class GroupSink final : public NetworkGroupSink {
 public:
- GroupSink(GroupResolver resolve, MemberPlanner plan)
-     : resolve_(std::move(resolve)), plan_(std::move(plan)) {}
+ GroupSink(GroupResolver resolve, MemberPlanner plan, KaraokeApplier karaoke)
+     : resolve_(std::move(resolve)), plan_(std::move(plan)), karaoke_(std::move(karaoke)) {}
 
  ~GroupSink() override { close(); }
 
@@ -77,6 +77,7 @@ public:
                     .sample_rate = format.sample_rate,
                     .coded_channels = format.coded_channels,
                     .objects = format.objects,
+                    .karaoke = format.karaoke,
                     .layout = format.layout});
          for (const render::OutputLayout& layout : planned) {
              // One variant per width: a player lists a width, not a layout,
@@ -100,6 +101,7 @@ public:
          return std::unexpected(fmt::format("The group \"{}\" would not start.", group_name));
      }
      group_ = std::move(group);
+     open_group_name_ = group_name;
      variants_ = std::move(variants);
      channels_ = static_cast<std::size_t>(channels);
      sample_rate_ = format.sample_rate;
@@ -123,6 +125,12 @@ public:
     }
 
     [[nodiscard]] bool is_open() const override { return group_ != nullptr; }
+
+    void set_karaoke(const KaraokeChoice& choice) override {
+        if (group_ && karaoke_) {
+            karaoke_(open_group_name_, choice);
+        }
+    }
 
     [[nodiscard]] std::vector<render::OutputLayout> variants() const override { return variants_; }
 
@@ -232,6 +240,9 @@ private:
 
     GroupResolver resolve_;
     MemberPlanner plan_;
+    KaraokeApplier karaoke_;
+    // The id the open group was resolved from, for a choice made while it plays.
+    std::string open_group_name_;
     std::shared_ptr<sendspin::Group> group_;
     // The layouts beyond the player's the open group carries, and the
     // interleaved block of each, reused across calls.
@@ -252,8 +263,9 @@ private:
 
 }  // namespace
 
-std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve, MemberPlanner plan) {
-    return std::make_unique<GroupSink>(std::move(resolve), std::move(plan));
+std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve, MemberPlanner plan,
+                                                  KaraokeApplier karaoke) {
+    return std::make_unique<GroupSink>(std::move(resolve), std::move(plan), std::move(karaoke));
 }
 
 }  // namespace iclforge::hearth
