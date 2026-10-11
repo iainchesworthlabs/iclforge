@@ -135,6 +135,12 @@ struct PlayerConfig {
     BaseType_t decode_core = 1;
     UBaseType_t fetch_priority = 5;
     UBaseType_t decode_priority = 6;
+    // Run an AC-3 or E-AC-3 decode's independent per-channel and per-object stages (a
+    // substream's inverse transforms, a JOC reconstruction's banks) on a worker task on the other
+    // core, at the decode task's priority, where the part has two and the decode task is pinned to
+    // one (ICLFORGE_EXAMPLE_DECODE_LANE; the PCM is the same bit for bit). The worker's stack
+    // is in PSRAM where there is PSRAM.
+    bool decode_lane = false;
     // The decode task's stack. 32 KB is what the probe measured a decode
     // needing about 21 KB of, with an overflow that surfaced as a panic on the
     // other core when it was smaller (firmware/baremetal/platform/esp32s3/
