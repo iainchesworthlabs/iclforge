@@ -1,6 +1,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -223,6 +225,172 @@ TEST_CASE("lyrics: what is not lyrics says why", "[lyrics]") {
     const auto tags_only = iclforge::lyrics::parse_lyrics("[ti:x]\n[ar:y]\n");
     REQUIRE_FALSE(tags_only.has_value());
     CHECK(tags_only.error().find("no lyrics") != std::string::npos);
+}
+
+// ---- SubRip (planning/karaoke-phase2.md, W13c) -------------------------------------------------
+
+TEST_CASE("subrip: cues are lines that end where their cue does, with the gap between them",
+          "[lyrics][subrip]") {
+    const std::string text =
+        "1\n00:00:12,000 --> 00:00:15,500\nShould auld acquaintance\nbe forgot\n\n"
+        "2\n00:00:20,250 --> 00:00:22,000\nAnd never brought to mind?\n";
+    const auto lyrics = iclforge::lyrics::parse_subrip(text);
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->timed);
+    REQUIRE(lyrics->lines.size() == 2);
+    CHECK(lyrics->lines[0].start_ms == 12000);
+    CHECK(lyrics->lines[0].end_ms == 15500);
+    // A cue's text lines are one line of lyrics.
+    CHECK(lyrics->lines[0].text == "Should auld acquaintance be forgot");
+    CHECK_FALSE(lyrics->lines[0].word_timed());
+    CHECK(lyrics->lines[1].start_ms == 20250);
+    CHECK(lyrics->lines[1].end_ms == 22000);
+
+    // The gap between the cues is nothing being sung, which an LRC file cannot say.
+    const auto in_gap = iclforge::lyrics::lyric_position(*lyrics, 17000);
+    REQUIRE(in_gap.line.has_value());
+    CHECK(*in_gap.line == 0);
+    CHECK_FALSE(in_gap.in_line);
+    const auto in_cue = iclforge::lyrics::lyric_position(*lyrics, 21000);
+    REQUIRE(in_cue.line.has_value());
+    CHECK(*in_cue.line == 1);
+    CHECK(in_cue.in_line);
+}
+
+TEST_CASE("subrip: styling and position tags are dropped, and what is not a tag stays",
+          "[lyrics][subrip]") {
+    const std::string text =
+        "1\n00:00:01,000 --> 00:00:02,000 X1:63 X2:223 Y1:43 Y2:58\n"
+        "<i>Should</i> <b>auld</b> {\\an8}acquaintance <font color=\"#ff0000\">be</font>\n"
+        "\n"
+        "2\n00:00:03,000 --> 00:00:04,000\n"
+        "Mind 1 < 2 and 3 > 2 {\\i1}fine\n";
+    const auto lyrics = iclforge::lyrics::parse_subrip(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 2);
+    CHECK(lyrics->lines[0].text == "Should auld acquaintance be");
+    CHECK(lyrics->lines[0].end_ms == 2000);
+    // A lone angle bracket is a character; the override block is not.
+    CHECK(lyrics->lines[1].text == "Mind 1 < 2 and 3 > 2 fine");
+}
+
+TEST_CASE("subrip: numbers are not needed, a dot is a comma, and cues out of order are put in order",
+          "[lyrics][subrip]") {
+    const std::string text =
+        "00:01:00.5 --> 00:01:02.25\nLate\n\n"
+        "00:00:05,000 --> 00:00:06,000\nEarly\n\n"
+        "\n\n"
+        "00:10:00,000 --> 00:10:01,000\nVery late\n";
+    const auto lyrics = iclforge::lyrics::parse_subrip(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 3);
+    CHECK(lyrics->lines[0].text == "Early");
+    CHECK(lyrics->lines[1].text == "Late");
+    // ".5" is half a second and ".25" a quarter.
+    CHECK(lyrics->lines[1].start_ms == 60500);
+    CHECK(lyrics->lines[1].end_ms == 62250);
+    CHECK(lyrics->lines[2].start_ms == 600000);
+}
+
+TEST_CASE("subrip: a cue with no blank line after it, a cue that ends before it starts, and one with no text",
+          "[lyrics][subrip]") {
+    const std::string text =
+        "00:00:01,000 --> 00:00:02,000\nOne\n"
+        "00:00:03,000 --> 00:00:02,000\nBackwards\n"
+        "00:00:05,000 --> 00:00:06,000\n\n"
+        "00:00:07,000 --> 00:00:08,000\nLast\n";
+    const auto lyrics = iclforge::lyrics::parse_subrip(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 4);
+    CHECK(lyrics->lines[0].text == "One");
+    CHECK(lyrics->lines[0].end_ms == 2000);
+    // An end before the start is the start.
+    CHECK(lyrics->lines[1].start_ms == 3000);
+    CHECK(lyrics->lines[1].end_ms == 3000);
+    // A cue with no text is a time that marks nothing, kept as an empty line.
+    CHECK(lyrics->lines[2].text.empty());
+    CHECK(lyrics->lines[3].text == "Last");
+}
+
+TEST_CASE("subrip: the encodings are the LRC reader's, and what is not subtitles says so",
+          "[lyrics][subrip]") {
+    const std::string cue = "1\n00:00:01,000 --> 00:00:02,000\nShalom \xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D\n";
+    // A UTF-8 byte-order mark, and CR LF line ends.
+    std::string crlf = "\xEF\xBB\xBF";
+    for (const char c : cue) {
+        if (c == '\n') {
+            crlf += "\r\n";
+        } else {
+            crlf.push_back(c);
+        }
+    }
+    const auto with_mark = iclforge::lyrics::parse_subrip(crlf);
+    REQUIRE(with_mark.has_value());
+    REQUIRE(with_mark->lines.size() == 1);
+    CHECK(with_mark->lines[0].text == "Shalom \xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D");
+
+    // UTF-16 with a mark, in both byte orders.
+    const auto utf16 = [](const std::string& ascii, bool big_endian) {
+        std::string out = big_endian ? std::string{"\xFE\xFF"} : std::string{"\xFF\xFE"};
+        for (const char c : ascii) {
+            out.push_back(big_endian ? '\0' : c);
+            out.push_back(big_endian ? c : '\0');
+        }
+        return out;
+    };
+    const std::string ascii = "1\n00:00:01,000 --> 00:00:02,000\nHello\n";
+    for (const bool big : {false, true}) {
+        const auto read = iclforge::lyrics::parse_subrip(utf16(ascii, big));
+        REQUIRE(read.has_value());
+        CHECK(read->lines[0].text == "Hello");
+    }
+
+    CHECK(iclforge::lyrics::parse_subrip("[00:01.00]Not subtitles\n").error() ==
+          "The subtitle file has no cues in it.");
+    CHECK(iclforge::lyrics::parse_subrip("   \n").error() == "The lyrics file is empty.");
+    CHECK(iclforge::lyrics::parse_subrip("\xFF\x00\xFF").has_value() == false);
+}
+
+TEST_CASE("subrip: a file is read as subtitles or as LRC by what it holds", "[lyrics][subrip]") {
+    const auto srt = iclforge::lyrics::parse_timed_text("1\n00:00:01,000 --> 00:00:02,000\nHello there\n");
+    REQUIRE(srt.has_value());
+    REQUIRE(srt->lines.size() == 1);
+    CHECK(srt->lines[0].end_ms == 2000);
+    const auto lrc = iclforge::lyrics::parse_timed_text("[00:01.00]Hello there\n[00:03.00]Again\n");
+    REQUIRE(lrc.has_value());
+    REQUIRE(lrc->lines.size() == 2);
+    // An LRC line's end is the next line's start: it has no end of its own.
+    CHECK(lrc->lines[0].end_ms == 3000);
+    // A lyric that has an arrow in it is not a cue.
+    const auto arrow = iclforge::lyrics::parse_timed_text("[00:01.00]go --> there now\n");
+    REQUIRE(arrow.has_value());
+    CHECK(arrow->lines[0].text == "go --> there now");
+    // Neither, and the reader's own reason.
+    CHECK(iclforge::lyrics::parse_timed_text("").error() == "The lyrics file is empty.");
+}
+
+TEST_CASE("subrip: the file beside an item is its .lrc, and its .srt where there is no .lrc",
+          "[lyrics][subrip]") {
+    Folder folder;
+    folder.write("song.mp3", "x");
+    CHECK_FALSE(iclforge::lyrics::find_lyrics_file((folder.path() / "song.mp3").string()).has_value());
+    folder.write("SONG.SRT", "1\n00:00:01,000 --> 00:00:02,000\nHello\n");
+    const auto subtitles = iclforge::lyrics::find_lyrics_file((folder.path() / "song.mp3").string());
+    REQUIRE(subtitles.has_value());
+    // (On a case-insensitive file system the usual spelling is what comes back.)
+    std::string name = subtitles->filename().string();
+    std::transform(name.begin(), name.end(), name.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    CHECK(name == "song.srt");
+    // A file read by its path is read as what it is.
+    const auto read = iclforge::lyrics::read_lyrics(*subtitles);
+    REQUIRE(read.has_value());
+    CHECK(read->lines[0].text == "Hello");
+    // The .lrc is the one when there are both.
+    folder.write("song.lrc", "[00:01.00]From the lrc\n");
+    const auto both = iclforge::lyrics::find_lyrics_file((folder.path() / "song.mp3").string());
+    REQUIRE(both.has_value());
+    CHECK(both->filename().string() == "song.lrc");
 }
 
 TEST_CASE("lyrics: the cursor finds the line, the word and how far through it",

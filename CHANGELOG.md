@@ -159,6 +159,11 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **SubRip files are lyrics.** The lyric reader takes a `.srt` as lines that end where their cue
+  does (so the gap between cues is nothing being sung), with the cue's text lines joined, its styling
+  and `{...}` override blocks dropped, and no word times invented. A file is read as SubRip or as LRC
+  by what it holds, and Hearth finds `name.srt` beside an item when there is no `name.lrc`
+  (planning/karaoke-phase2.md, W13c).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).

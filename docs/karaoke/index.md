@@ -85,7 +85,8 @@ choice does not apply:
 ## Lyrics
 
 Hearth shows the words of the stream playing from a **`.lrc` file with the same name** in the same
-folder: `Auld Lang Syne.ac3` is read with `Auld Lang Syne.lrc` (the extension in any case).
+folder: `Auld Lang Syne.ac3` is read with `Auld Lang Syne.lrc` (the extension in any case). Where
+there is no `.lrc`, a **SubRip `.srt`** of that name is read the same way (see [below](#subrip)).
 
 ### The file
 
@@ -108,6 +109,29 @@ LRC is an informal format; what Hearth reads is:
 
 The text is **UTF-8**, with or without a byte-order mark. A file in another encoding is not shown,
 and the page says so; playback is not affected.
+
+### SubRip
+
+A `.srt` file is read as lyrics too, which is what subtitle tools and ripped karaoke subtitles write:
+
+```text
+1
+00:00:12,000 --> 00:00:15,500
+Should auld acquaintance
+be forgot
+
+2
+00:00:20,250 --> 00:00:22,000
+And never brought to mind?
+```
+
+Each cue is a line, and it ends where its cue ends, so the gap between two cues is a stretch where
+nothing is being sung (which an LRC file, whose lines end where the next begins, cannot say). The
+text lines of a cue are joined with a space; styling (`<i>`, `<b>`, `<font ...>`) and `{...}`
+override blocks are dropped, and a position after the end time is ignored. The number above a cue
+is not needed, a `.` is read for a `,` in a time, and cues out of order are put in order. There are
+no words in a SubRip file, so there is no word fill: the whole line is emphasised as it is sung.
+The encodings are the LRC reader's: UTF-8 with or without a byte-order mark, or UTF-16 with one.
 
 ### What is shown
 

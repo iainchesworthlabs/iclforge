@@ -313,10 +313,9 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
     }
 }
 
-}  // namespace
-
-std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
-                                                std::optional<std::int64_t> duration_ms) {
+// The bytes of a file as the UTF-8 they say: UTF-16 with a byte-order mark converted, a UTF-8 mark
+// dropped, anything else that is not UTF-8 refused with the reason, for both readers.
+[[nodiscard]] std::expected<std::string, std::string> decode_text(std::string_view text) {
     // UTF-32 would begin with the same two bytes as UTF-16's little-endian mark,
     // then two zero bytes; no lyrics file starts with a NUL character.
     if (text.starts_with(std::string_view{"\xFF\xFE\x00\x00", 4}) ||
@@ -342,6 +341,150 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
     if (trim(text).empty()) {
         return std::unexpected(std::string{"The lyrics file is empty."});
     }
+    return std::string{text};
+}
+
+// A SubRip time, "hh:mm:ss,mmm" ("." for "," taken too, and the milliseconds as a fraction of a
+// second of one to three digits), in milliseconds.
+[[nodiscard]] std::optional<std::int64_t> parse_subrip_time(std::string_view s) {
+    s = trim(s);
+    std::int64_t parts[3] = {0, 0, 0};
+    std::size_t at = 0;
+    for (int part = 0; part < 3; ++part) {
+        std::size_t digits = 0;
+        std::int64_t value = 0;
+        while (at < s.size() && is_digit(s[at])) {
+            if (++digits > 4) {
+                return std::nullopt;
+            }
+            value = (value * 10) + (s[at] - '0');
+            ++at;
+        }
+        if (digits == 0) {
+            return std::nullopt;
+        }
+        parts[part] = value;
+        if (part < 2) {
+            if (at >= s.size() || s[at] != ':') {
+                return std::nullopt;
+            }
+            ++at;
+        }
+    }
+    std::int64_t millis = 0;
+    if (at < s.size()) {
+        if (s[at] != ',' && s[at] != '.') {
+            return std::nullopt;
+        }
+        ++at;
+        std::size_t digits = 0;
+        std::int64_t fraction = 0;
+        while (at < s.size() && is_digit(s[at])) {
+            if (++digits > 3) {
+                return std::nullopt;
+            }
+            fraction = (fraction * 10) + (s[at] - '0');
+            ++at;
+        }
+        if (digits == 0 || at != s.size()) {
+            return std::nullopt;
+        }
+        millis = digits == 1 ? fraction * 100 : (digits == 2 ? fraction * 10 : fraction);
+    } else if (at != s.size()) {
+        return std::nullopt;
+    }
+    if (parts[1] > 59 || parts[2] > 59) {
+        return std::nullopt;
+    }
+    return (((parts[0] * 60) + parts[1]) * 60 + parts[2]) * 1000 + millis;
+}
+
+// A cue's start and end from its time line, "start --> end" with anything after the end (the
+// position tags `X1:... Y1:...`) ignored.
+[[nodiscard]] std::optional<std::pair<std::int64_t, std::int64_t>> parse_cue_times(std::string_view line) {
+    const std::size_t arrow = line.find("-->");
+    if (arrow == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const auto start = parse_subrip_time(line.substr(0, arrow));
+    std::string_view rest = trim(line.substr(arrow + 3));
+    const std::size_t space = rest.find_first_of(" \t");
+    const auto end = parse_subrip_time(space == std::string_view::npos ? rest : rest.substr(0, space));
+    if (!start || !end) {
+        return std::nullopt;
+    }
+    return std::pair{*start, std::max(*end, *start)};
+}
+
+// A cue's text without its styling: `<...>` tags that are tags (a letter or a slash after the
+// bracket), and `{...}` override blocks; white space folded to single spaces.
+[[nodiscard]] std::string clean_cue_text(std::string_view text) {
+    std::string out;
+    out.reserve(text.size());
+    for (std::size_t i = 0; i < text.size();) {
+        if (text[i] == '<' && i + 1 < text.size() &&
+            (text[i + 1] == '/' || std::isalpha(static_cast<unsigned char>(text[i + 1])) != 0)) {
+            const std::size_t close = text.find('>', i);
+            if (close != std::string_view::npos) {
+                i = close + 1;
+                continue;
+            }
+        }
+        if (text[i] == '{') {
+            const std::size_t close = text.find('}', i);
+            if (close != std::string_view::npos) {
+                i = close + 1;
+                continue;
+            }
+        }
+        out.push_back(is_space(text[i]) ? ' ' : text[i]);
+        ++i;
+    }
+    // Fold runs of spaces and trim.
+    std::string folded;
+    folded.reserve(out.size());
+    bool space = true;
+    for (const char c : out) {
+        if (c == ' ') {
+            if (!space) {
+                folded.push_back(' ');
+            }
+            space = true;
+        } else {
+            folded.push_back(c);
+            space = false;
+        }
+    }
+    while (!folded.empty() && folded.back() == ' ') {
+        folded.pop_back();
+    }
+    return folded;
+}
+
+// Whether the decoded text has a SubRip cue line: two times either side of an arrow.
+[[nodiscard]] bool looks_like_subrip(std::string_view text) {
+    std::size_t begin = 0;
+    for (std::size_t i = 0; i <= text.size(); ++i) {
+        if (i == text.size() || text[i] == '\n' || text[i] == '\r') {
+            const std::string_view line = text.substr(begin, i - begin);
+            if (line.find("-->") != std::string_view::npos && parse_cue_times(line)) {
+                return true;
+            }
+            begin = i + 1;
+        }
+    }
+    return false;
+}
+
+}  // namespace
+
+std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
+                                                std::optional<std::int64_t> duration_ms) {
+    const auto decoded = decode_text(text);
+    if (!decoded) {
+        return std::unexpected(decoded.error());
+    }
+    text = *decoded;
 
     Lyrics lyrics;
     std::vector<LineProto> timed;
@@ -490,6 +633,96 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
     return lyrics;
 }
 
+std::expected<Lyrics, std::string> parse_subrip(std::string_view text,
+                                                std::optional<std::int64_t> duration_ms) {
+    const auto decoded = decode_text(text);
+    if (!decoded) {
+        return std::unexpected(decoded.error());
+    }
+    struct Cue {
+        std::int64_t start = 0;
+        std::int64_t end = 0;
+        std::string text;
+    };
+    std::vector<Cue> cues;
+    // The cue being collected: its time line was read and its text lines follow, to a blank line.
+    std::optional<Cue> open;
+    const auto close_cue = [&] {
+        if (open) {
+            open->text = clean_cue_text(open->text);
+            cues.push_back(std::move(*open));
+            open.reset();
+        }
+    };
+    std::size_t begin = 0;
+    const std::string_view all = *decoded;
+    for (std::size_t i = 0; i <= all.size(); ++i) {
+        const bool end = i == all.size();
+        if (!end && all[i] != '\n' && all[i] != '\r') {
+            continue;
+        }
+        const std::string_view line = trim(all.substr(begin, i - begin));
+        begin = i + 1;
+        // CR LF is one line end, not a line and an empty one (which would end every cue).
+        if (!end && all[i] == '\r' && i + 1 < all.size() && all[i + 1] == '\n') {
+            ++i;
+            begin = i + 1;
+        }
+        if (line.empty()) {
+            close_cue();
+            continue;
+        }
+        if (const auto times = parse_cue_times(line)) {
+            // A time line closes a cue that had no blank line after it (some tools write none).
+            close_cue();
+            open = Cue{.start = times->first, .end = times->second, .text = {}};
+            continue;
+        }
+        if (open) {
+            if (!open->text.empty()) {
+                open->text.push_back(' ');
+            }
+            open->text.append(line);
+        }
+        // Anything else outside a cue - the number above one, a stray line - is nothing.
+    }
+    close_cue();
+    if (cues.empty()) {
+        return std::unexpected(std::string{"The subtitle file has no cues in it."});
+    }
+    std::stable_sort(cues.begin(), cues.end(), [](const Cue& a, const Cue& b) { return a.start < b.start; });
+
+    Lyrics lyrics;
+    lyrics.timed = true;
+    lyrics.lines.reserve(cues.size());
+    for (Cue& cue : cues) {
+        LyricLine line;
+        line.start_ms = cue.start;
+        line.end_ms = cue.end;
+        line.text = std::move(cue.text);
+        lyrics.lines.push_back(std::move(line));
+    }
+    // The last cue ends where it says; the item's length only lengthens a cue that ends at its own
+    // start, which would otherwise never be "being sung".
+    LyricLine& last = lyrics.lines.back();
+    if (last.end_ms <= last.start_ms) {
+        last.end_ms = (duration_ms && *duration_ms > last.start_ms) ? *duration_ms : last.start_ms + kLastLineMs;
+    }
+    return lyrics;
+}
+
+std::expected<Lyrics, std::string> parse_timed_text(std::string_view text,
+                                                    std::optional<std::int64_t> duration_ms) {
+    const auto decoded = decode_text(text);
+    if (!decoded) {
+        return std::unexpected(decoded.error());
+    }
+    if (looks_like_subrip(*decoded)) {
+        return parse_subrip(*decoded, duration_ms);
+    }
+    return parse_lyrics(*decoded, duration_ms);
+}
+
 std::expected<Lyrics, std::string> read_lyrics(const std::filesystem::path& file,
                                                std::optional<std::int64_t> duration_ms) {
     std::error_code sized;
@@ -508,7 +741,7 @@ std::expected<Lyrics, std::string> read_lyrics(const std::filesystem::path& file
     if (!bytes.empty() && !in.read(bytes.data(), static_cast<std::streamsize>(bytes.size()))) {
         return std::unexpected(std::string{"The lyrics file could not be read."});
     }
-    return parse_lyrics(bytes, duration_ms);
+    return parse_timed_text(bytes, duration_ms);
 }
 
 std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path) {
@@ -519,25 +752,28 @@ std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_pa
         return std::nullopt;
     }
     std::error_code error;
-    // The usual spelling first, which is also the only one on a case-
-    // insensitive file system.
-    const std::filesystem::path usual = folder / (stem + ".lrc");
-    if (std::filesystem::is_regular_file(usual, error) && !error) {
-        return usual;
-    }
-    error.clear();
-    std::filesystem::directory_iterator it(folder.empty() ? std::filesystem::path{"."} : folder,
-                                           std::filesystem::directory_options::skip_permission_denied,
-                                           error);
-    const std::filesystem::directory_iterator end;
-    while (!error && it != end) {
-        std::error_code entry_error;
-        if (it->is_regular_file(entry_error) && !entry_error &&
-            it->path().stem().string() == stem &&
-            lowercase(it->path().extension().string()) == ".lrc") {
-            return it->path();
+    // `.lrc` first and `.srt` where there is none: the usual spelling of each, which is also
+    // the only one on a case-insensitive file system, then any case.
+    for (const std::string_view extension : {std::string_view{".lrc"}, std::string_view{".srt"}}) {
+        const std::filesystem::path usual = folder / (stem + std::string{extension});
+        if (std::filesystem::is_regular_file(usual, error) && !error) {
+            return usual;
         }
-        it.increment(error);
+        error.clear();
+        std::filesystem::directory_iterator it(folder.empty() ? std::filesystem::path{"."} : folder,
+                                               std::filesystem::directory_options::skip_permission_denied,
+                                               error);
+        const std::filesystem::directory_iterator end;
+        while (!error && it != end) {
+            std::error_code entry_error;
+            if (it->is_regular_file(entry_error) && !entry_error &&
+                it->path().stem().string() == stem &&
+                lowercase(it->path().extension().string()) == extension) {
+                return it->path();
+            }
+            it.increment(error);
+        }
+        error.clear();
     }
     return std::nullopt;
 }

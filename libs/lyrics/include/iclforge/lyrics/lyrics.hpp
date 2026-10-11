@@ -89,12 +89,42 @@ struct Lyrics {
 [[nodiscard]] std::expected<Lyrics, std::string> parse_lyrics(
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
 
-// A file's lyrics. A file over four MiB is refused, which no lyric file is.
+// A SubRip (`.srt`) file read as lyrics (planning/karaoke-phase2.md, W13c): the cues of
+//
+//   1
+//   00:00:12,000 --> 00:00:15,500
+//   Should auld acquaintance
+//   be forgot
+//
+// as lines. A cue is a start and an END, which a SubRip file really has and an LRC file does not,
+// so a line ends where its cue does and there is a gap between lines where the cues leave one:
+// nothing is being sung then, and the view says so. A cue's text lines are joined with a space, the
+// styling a subtitle carries (`<i>`, `<b>`, `<u>`, `<font ...>`, and the `{...}` override blocks
+// some tools write) is dropped, and the position tags after an end time are ignored. The number
+// above a cue is not needed (a file without them reads), `.` is taken for `,` in a time, and cues out
+// of order are put in order of their start. A cue with no text is a time that marks nothing and is
+// kept as an empty line, as the LRC reader keeps one. There are no words in a SubRip file, so no
+// word times are invented: a view emphasises the whole line.
+//
+// The same encodings as parse_lyrics (UTF-8 with or without a byte-order mark, or UTF-16 with one),
+// and the same errors, with "no cues" for a file that has none.
+[[nodiscard]] std::expected<Lyrics, std::string> parse_subrip(
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+
+// Either of the above, by what the file is: SubRip where it has a cue's `-->` line between two
+// times, LRC otherwise. What a program that is handed a timed-text file by a person, whose
+// extension may be anything, calls.
+[[nodiscard]] std::expected<Lyrics, std::string> parse_timed_text(
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+
+// A file's lyrics (parse_timed_text of its bytes). A file over four MiB is refused, which no lyric
+// file is.
 [[nodiscard]] std::expected<Lyrics, std::string> read_lyrics(
     const std::filesystem::path& file, std::optional<std::int64_t> duration_ms = std::nullopt);
 
 // The lyrics file of a media item (L1): `name.lrc` in the item's folder, the
-// extension in any case. `item_path` is the item's path as the queue holds it.
+// extension in any case, and where there is none `name.srt`. `item_path` is the item's path as the
+// queue holds it.
 [[nodiscard]] std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path);
 
 enum class WordState : std::uint8_t { kSung, kBeingSung, kNotYetSung };

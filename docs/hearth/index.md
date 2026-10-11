@@ -72,7 +72,8 @@ settings whole: what the sink's own page set is not kept.
 
 #### Lyrics
 
-Beside a stream, `name.lrc` (the extension in any case) is its lyrics. The Karaoke page shows the
+Beside a stream, `name.lrc` (the extension in any case) is its lyrics, and where there is none
+`name.srt`, a SubRip file, whose cues are lines with no words in them. The Karaoke page shows the
 line being sung, the lines before it and after it, and a word at a time where the file times its
 words:
 
