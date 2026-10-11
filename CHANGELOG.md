@@ -203,6 +203,37 @@ The sections below contain the complete change list and fixes.
   and `[v2:name]` id tags. A line with no marker is for nobody in particular, and `V3:` is text.
   The writer puts the markers and the names back, a plain file may carry the markers before it is
   timed, and `set_line_singer()` is what an editor calls (planning/karaoke-phase2.md, W11a).
+- **Crucible imports SubRip, ASS and MIDI karaoke lyrics too.** The strip's import takes a `.srt`,
+  an `.ass` or a `.kar` as well as an `.lrc`, told apart by what is in the file (the same
+  `parse_timed_text` Hearth reads with); the file dialog lists them, and the catalogues are filled
+  (planning/karaoke-phase2.md, W13b).
+- **Crucible shows the lyrics of an application.** The Room page has a sixth block, **06 LYRICS**:
+  import an `.lrc` (UTF-8 or UTF-16) against the selected application, press **Start** as the song
+  begins and the strip shows the line being sung with the lines around it, a word at a time where the
+  file times its words. The position is start-and-nudge (Start, Start again, and 0.1 s nudges up to
+  10 s either way), because Crucible taps an application's sound and has no way to read its media
+  position; a media-session source is a later change. Lyrics go with the application when it
+  leaves the list. The reader is `libs/lyrics`, the one Hearth reads with
+  (planning/karaoke-phase2.md, W13b).
+- **MIDI karaoke files are lyrics, with word times.** The lyric reader takes a `.kar` (a Standard
+  MIDI File) for its words: the Text or Lyric events (the track called `Words` where there is one),
+  each syllable at its tick turned into milliseconds through the file's tempo map, so the fill moves
+  by syllable; `@T` lines are the title and the artist, a `/` or a backslash begins a line, and the
+  music in the file is not read. The words must be UTF-8 (a MIDI file declares no encoding, and
+  code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
+  `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
+  (planning/karaoke-phase2.md, W13e).
+- **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
+  `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
+  (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
+  blocks, drawings and comments are dropped and the columns are the script's own `Format:` line.
+  A file is recognised by what it holds, and Hearth finds `name.ass` beside an item when there is
+  no `.lrc` or `.srt` (planning/karaoke-phase2.md, W13d).
+- **SubRip files are lyrics.** The lyric reader takes a `.srt` as lines that end where their cue
+  does (so the gap between cues is nothing being sung), with the cue's text lines joined, its styling
+  and `{...}` override blocks dropped, and no word times invented. A file is read as SubRip or as LRC
+  by what it holds, and Hearth finds `name.srt` beside an item when there is no `name.lrc`
+  (planning/karaoke-phase2.md, W13c).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
