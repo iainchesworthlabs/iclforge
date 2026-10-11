@@ -71,7 +71,7 @@ tests, **L** is two to four stacked PRs. "Needs" is what the item cannot start w
 | W8 | **Karaoke in the browser decode demo** (the smallest slice W5 finds) | S to M | D4 | Approved |
 | W9 | **An LFE part in authoring** (phase 1's decision 6) | M | Nothing; the encoder and the output stage already carry an LFE | After sign-off |
 | W10 | **Annex C's re-levelling of M, V1 and V2** | M to L | A library change, reviewed with the AC-3 decoder's owner session | After sign-off |
-| W11 | **Duets** beyond the V1 and V2 choice that exists | M | The owner asking for it | Not planned; costed [below](#w11-duets) |
+| W11 | **Duets** beyond the V1 and V2 choice that exists | M | The owner asking for it | **Asked for by the owner on 2026-10-12**; W11a, the singer marker in `libs/lyrics`, is built, and W11b and W11c follow ([below](#w11-duets)) |
 | W12 | **The ESP32-P4 with a panel** | L | The board | **Parked**; [questions only](#w12-parked-the-esp32-p4-with-a-panel) |
 | W13 | **Timed-text import.** The lyric module in a library, Crucible importing LRC; SubRip, Advanced SubStation Alpha, MIDI karaoke and CD+G as stretch | L (six PRs; the first is S to M) | D9 to D12; the owner's answer on what Crucible does with the text | Scoped in [the findings](karaoke-phase2-findings.md#w13-timed-text-beyond-lrc-and-crucible); not started |
 
@@ -206,7 +206,7 @@ before its item starts.
 | D4 | Browser first, then nothing for Android until there is a player to put it in | **Approved**: the WebAssembly decoder demo gets the two fields and a panel; lyrics after | Skip the browser; or an Android player as a phase of its own |
 | D5 | LFE part: one optional mono part, low-passed as the encoder does today | **Approved** | An LFE from a 5.1 source's own LFE channel only |
 | D6 | Re-levelling: gains for M, V1 and V2 in the library's output stage and sliders on Hearth's Karaoke page | **Approved**, after the first items | Not built; Annex C calls it optional |
-| D7 | Duets: no per-song memory, and nothing beyond V1 and V2 until asked | **Approved** | The costed duet slice below |
+| D7 | Duets: no per-song memory, and nothing beyond V1 and V2 until asked | **Approved**; **asked for by the owner on 2026-10-12**, so the slice below is built (still no per-song memory) | The costed duet slice below |
 | D8 | UTF-16 with a byte-order mark, in either byte order, for `.lrc` beside UTF-8 (carried over from phase 1's decision 4; the reader took UTF-8 only) | **Changed by the owner: adopted**, so that Hebrew and Yiddish files saved as "Unicode" are read. Built in W13a, with Hebrew and Yiddish test files | UTF-8 only, as phase 1 built it |
 | D9 | What Crucible does with imported lyrics, and where their position comes from | **Approved: a lyric strip in Crucible's window for the application it is attached to; the position from that application's operating-system media session where it publishes one, and a start-and-nudge where it does not** | Events out (OSC) instead of, or as well as, a strip; the strip only, with no position source |
 | D10 | "Mini karaoke" is read as **MIDI karaoke** (`.kar`, lyrics as MIDI meta events) | **Confirmed: MIDI karaoke** | Another format: say which |
@@ -222,6 +222,26 @@ or a tag) that the reader would have to learn and the word-timing editor would h
 **a duet view** that colours a line by singer and says which part the chosen vocal covers. Names
 are S; the line marker and the view are M together. None of it needs a per-song memory, which the
 owner thinks is "probably not a thing", and none is planned.
+
+**Asked for on 2026-10-12**, with a second example, "Leave Her, Johnny", being built by another
+session as the fixture (V1 the shantyman, V2 the crew). The slice, in three pull requests:
+
+- **W11a, the marker and the names in the library.** A line's singer is `V1:`, `V2:` or `V1+V2:` as
+  the first thing after the line's time tags (or after its first word tag), in either case, with
+  spaces round the `+` and after the colon. It is not part of the line's text. Anything else
+  before a colon is text (`V3:` is a word), and a line with no marker is for nobody in particular,
+  which a solo's every line is. A plain, untimed file may carry the markers too, so a duet's text
+  can be marked up before it is timed. The names are `[v1:name]` and `[v2:name]` id tags. The
+  writer (W6) emits both and `set_line_singer()` is what an editor calls. Chosen over `M:`/`F:`
+  because the markers say which *vocal of the stream* sings the line, which is what the page needs
+  to say which lines the playing vocal covers; and over a bracket tag (`[v1]`) because other
+  players show an unknown bracket tag as text, where they show `V1: Leave her` as a legible line.
+- **W11b, Hearth's view.** Two typed names on the Karaoke page (kept for the session, never per
+  song; a typed name comes before the file's tag, and `V1` and `V2` before neither), the lyric view
+  telling each line's singer by name and by side as well as by colour (colour is never the only cue,
+  L4), and a line saying who sings it: the guide vocal that is playing, or you.
+- **W11c, the editor.** The timing dialog sets a line's singer as it times it, so a duet's file is
+  written whole by the tool that times it.
 
 ### W13: timed-text import
 

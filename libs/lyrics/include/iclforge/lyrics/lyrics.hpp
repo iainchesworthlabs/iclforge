@@ -31,6 +31,17 @@
 //                         appear sooner, as the format has always meant it
 //   [ti:] [ar:] [al:] [by:] [length:mm:ss]   kept for display; other id tags
 //                         are read and ignored
+//   V1:text  V2:text  V1+V2:text
+//                         a duet's singer for the line (planning/karaoke-phase2.md,
+//                         W11): the marker is the first thing after the line's time
+//                         tags (or after its first word tag), in either case, with
+//                         spaces round the `+` and after the colon, and is not
+//                         part of the line's text. V1 and V2 are the two vocals of
+//                         an Annex C karaoke stream. A line with no marker is for
+//                         nobody in particular. Anything else before a colon is
+//                         text: "V3:" is a word
+//   [v1:name] [v2:name]   what to call the two singers; a person's typed names
+//                         come first
 //
 // A line with time tags and no word tags is word-timed nowhere: it is a line
 // with times, and no word times are invented for it. A file with no time tags
@@ -55,6 +66,10 @@ struct LyricWord {
     std::string text{};
 };
 
+// Which singer of a duet sings a line: the first vocal (V1), the second (V2), or both of
+// them together. kUnmarked is a line that says nothing, which a solo has all of.
+enum class Singer : std::uint8_t { kUnmarked, kFirst, kSecond, kBoth };
+
 struct LyricLine {
     std::int64_t start_ms = 0;
     // The next line's start, or for the last line the item's duration when it
@@ -65,6 +80,8 @@ struct LyricLine {
     std::string text{};
     // Empty unless the line carried word tags.
     std::vector<LyricWord> words{};
+    // From a `V1:`, `V2:` or `V1+V2:` marker at the start of the line.
+    Singer singer = Singer::kUnmarked;
 
     [[nodiscard]] bool word_timed() const { return !words.empty(); }
 };
@@ -74,6 +91,9 @@ struct Lyrics {
     std::string artist{};
     std::string album{};
     std::string author{};
+    // The `[v1:]` and `[v2:]` id tags: what the file calls its two singers.
+    std::string first_singer_name{};
+    std::string second_singer_name{};
     std::optional<std::int64_t> length_ms{};
     // The file's `[offset:]`, already applied to every time below.
     std::int64_t offset_ms = 0;
@@ -96,6 +116,13 @@ struct Lyrics {
 // The lyrics file of a media item (L1): `name.lrc` in the item's folder, the
 // extension in any case. `item_path` is the item's path as the queue holds it.
 [[nodiscard]] std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path);
+
+// Whether any line has a singer: the file is a duet and a view shows who sings what.
+[[nodiscard]] bool has_singers(const Lyrics& lyrics);
+
+// The marker a line of that singer is written with, "V1:", "V2:" or "V1+V2:"; empty for
+// kUnmarked.
+[[nodiscard]] std::string_view singer_marker(Singer singer);
 
 enum class WordState : std::uint8_t { kSung, kBeingSung, kNotYetSung };
 
