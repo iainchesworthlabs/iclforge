@@ -16,6 +16,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_engine.cpp
     test_engine_queue_commands.cpp
     test_item_loader.cpp
+    test_lyrics.cpp
     test_media_info.cpp
     test_media_info_json.cpp
     test_network_view.cpp

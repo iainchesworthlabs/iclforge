@@ -18,8 +18,9 @@ either tool gets, not an internal detail.
 
 This page covers the AC-3 and E-AC-3 encoders. AC-4 is not in it: its encoder is scored in CI
 against floors, decoded and compared with its own source (`tools/checks/score_ac4_encode.py`),
-and raced against DEE's streams of the same sources on a maintainer's machine, and neither keeps
-a history to show here ([Validation: AC-4](verification.md#the-encoder)).
+and those scores are a series of their own, [AC-4 encode quality](quality-trend.md#ac-4-encode-quality).
+Its race against DEE's streams of the same sources runs on a maintainer's machine and keeps no
+history to show here ([Validation: AC-4](verification.md#the-encoder)).
 
 <div id="landscape-app">
   <p class="landscape-status">Loading landscape data…</p>

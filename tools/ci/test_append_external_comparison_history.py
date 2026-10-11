@@ -112,6 +112,30 @@ class ExternalHistory(unittest.TestCase):
         self.assertIn("MOS regression::eac3_51/spx: MOS-LQO 4.20 is 0.30 below", out)
         self.assertNotIn("eac3_51/aht", out)
 
+    def test_a_repeated_run_on_a_commit_records_nothing_and_judges_again(self):
+        """The nightly on a tip that has not moved: rows once, the verdict every time."""
+        self.seed([{"commit": "o", "leg": "eac3_51", "variant": "landscape", "snr_db": 30.0,
+                    "mos_lqo": 4.5}])
+        rows = [trend_row("eac3_51", "landscape", 19.0, mos=4.5),
+                trend_row("eac3_51", "spx", 29.0, mos=4.2)]
+        _, _, first_verdict, first = self.run_main(rows)
+        self.assertEqual(first_verdict, "hard_regression=true\n")
+        self.assertEqual([r["variant"] for r in first], ["landscape", "landscape", "spx"])
+        # The same commit again: no new rows, and the hard regression is flagged again rather than
+        # going quiet because its own 19 dB is now in the trailing window.
+        self.output.unlink()
+        _, out, second_verdict, second = self.run_main(rows)
+        self.assertEqual(second, first)
+        self.assertEqual(second_verdict, "hard_regression=true\n")
+        self.assertIn("2 already recorded for c", out)
+        self.assertIn("::error title=External-comparison trend hard regression::", out)
+
+    def test_a_new_leg_on_an_already_recorded_commit_is_added(self):
+        self.run_main([trend_row("eac3_51", "landscape", 22.0)])
+        _, _, _, recs = self.run_main([trend_row("eac3_51", "landscape", 22.0),
+                                       trend_row("eac3_51", "spx", 21.0)])
+        self.assertEqual([r["variant"] for r in recs], ["landscape", "spx"])
+
     def test_null_mos_history_is_skipped(self):
         self.seed([{"leg": "l", "variant": "v", "snr_db": 1.0, "mos_lqo": None}])
         history = aec.load_history(self.history)

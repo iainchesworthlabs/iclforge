@@ -19,6 +19,13 @@ failed), so what lands in history is never a broken run's numbers. The
 regression check below is a separate, softer signal on top of that hard gate:
 a relative-to-history warning, not a threshold this script can fail CI with.
 
+A (leg, codec, check) already recorded for this commit is not recorded again.
+The nightly run does not stop at a tip that has not moved, and on the commits
+it re-ran this file carried each of its rows once per run (84 rows three times
+over on b2a65322e, 240 extra on dd67c6461). Every row is still judged, against
+its history from BEFORE this commit, so a repeated run says again what the
+first said and a hard regression keeps failing the job it is in.
+
 stdlib-only (json/argparse/pathlib), matching compare_wav.py's own
 no-new-CI-provisioning reasoning. Takes commit and commit-date as arguments
 rather than reading the clock itself - see docs/quality-trend.md and this
@@ -144,7 +151,22 @@ def write_recent_window(history_path: Path) -> None:
           f"to {recent_path}")
 
 
-def trailing_mean(history_path: Path, leg: str, codec: str, check: str, window: int):
+def recorded_keys(history_path: Path, commit: str):
+    """The (leg, codec, check) of every record the file already holds for `commit`."""
+    if not history_path.exists():
+        return set()
+    keys = set()
+    for line in history_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        if rec.get("commit") == commit:
+            keys.add((rec.get("leg"), rec.get("codec"), rec.get("check")))
+    return keys
+
+
+def trailing_mean(history_path: Path, leg: str, codec: str, check: str, window: int,
+                  exclude_commit=None):
     """Matches on (leg, codec, check), not just (leg, codec): see
     load_leg_results's docstring for why codec alone can conflate two
     checks with unrelated SNR floors (e.g. eac3's tools=none/tools=cpl
@@ -155,6 +177,9 @@ def trailing_mean(history_path: Path, leg: str, codec: str, check: str, window: 
     history entries recorded before this field existed have no "check" key
     and so never match a current (non-None) check - they simply age out of
     the trailing window rather than being mismatched to the wrong series.
+
+    The records of `exclude_commit` are left out: a run is judged against what
+    came before its commit, not against a copy of its own numbers.
     """
     if not history_path.exists():
         return None
@@ -163,6 +188,8 @@ def trailing_mean(history_path: Path, leg: str, codec: str, check: str, window: 
         if not line.strip():
             continue
         rec = json.loads(line)
+        if exclude_commit is not None and rec.get("commit") == exclude_commit:
+            continue
         if rec.get("leg") == leg and rec.get("codec") == codec and rec.get("check") == check:
             matches.append(rec["worst_db"])
     if not matches:
@@ -171,7 +198,8 @@ def trailing_mean(history_path: Path, leg: str, codec: str, check: str, window: 
     return sum(tail) / len(tail)
 
 
-def trailing_channel_means(history_path: Path, leg: str, codec: str, check: str, window: int):
+def trailing_channel_means(history_path: Path, leg: str, codec: str, check: str, window: int,
+                           exclude_commit=None):
     """The same trailing baseline as trailing_mean, but one per CHANNEL.
 
     trailing_mean watches worst_db, and worst_db is the same channel every run
@@ -190,6 +218,8 @@ def trailing_channel_means(history_path: Path, leg: str, codec: str, check: str,
     Returns None when there is no usable history, or when the channel count
     changed within the window (a layout change means the older rows measure a
     different thing, and a per-index mean across the two would be meaningless).
+
+    The records of `exclude_commit` are left out, as in trailing_mean.
     """
     if not history_path.exists():
         return None
@@ -198,6 +228,8 @@ def trailing_channel_means(history_path: Path, leg: str, codec: str, check: str,
         if not line.strip():
             continue
         rec = json.loads(line)
+        if exclude_commit is not None and rec.get("commit") == exclude_commit:
+            continue
         if (rec.get("leg") == leg and rec.get("codec") == codec
                 and rec.get("check") == check and "channels_db" in rec):
             matches.append(rec["channels_db"])
@@ -238,11 +270,12 @@ def main() -> int:
               f"{args.results_dir}; nothing to append")
         return 0
 
+    recorded = recorded_keys(history_path, args.commit)
     lines = []
     hard_regression = False
     for rec in records:
         baseline = trailing_mean(history_path, rec["leg"], rec["codec"], rec["check"],
-                                  REGRESSION_TRAILING_WINDOW)
+                                  REGRESSION_TRAILING_WINDOW, exclude_commit=args.commit)
         entry = {
             "commit": args.commit,
             "branch": args.branch,
@@ -265,7 +298,8 @@ def main() -> int:
                           "tightest_channel", "tightest_headroom_db"):
             if optional in rec:
                 entry[optional] = rec[optional]
-        lines.append(json.dumps(entry, sort_keys=True))
+        if (rec["leg"], rec["codec"], rec["check"]) not in recorded:
+            lines.append(json.dumps(entry, sort_keys=True))
 
         # Per channel first: this is the check that can actually see a front
         # channel or the LFE move (see trailing_channel_means). The worst-db
@@ -286,7 +320,8 @@ def main() -> int:
                                      f"({baseline:.2f} -> {rec['worst_db']:.2f} dB)"))
 
         channel_means = trailing_channel_means(history_path, rec["leg"], rec["codec"],
-                                                rec["check"], REGRESSION_TRAILING_WINDOW)
+                                                rec["check"], REGRESSION_TRAILING_WINDOW,
+                                                exclude_commit=args.commit)
         if channel_means is not None and len(channel_means) == len(rec["channels_db"]):
             labels = rec.get("channel_labels") or [f"ch{i}" for i in range(len(channel_means))]
             channel_drop, worst_i = max(
@@ -318,7 +353,9 @@ def main() -> int:
         for line in lines:
             f.write(line + "\n")
 
-    print(f"Appended {len(lines)} record(s) to {history_path}")
+    skipped = len(records) - len(lines)
+    print(f"Appended {len(lines)} record(s) to {history_path}"
+          + (f" ({skipped} already recorded for {args.commit[:8]})" if skipped else ""))
     write_recent_window(history_path)
     emit_github_output("hard_regression", "true" if hard_regression else "false")
     return 0

@@ -89,6 +89,34 @@ class ObjectHistory(unittest.TestCase):
         self.assertNotIn("obj2", out)   # no baseline yet: nothing to regress against
         self.assertEqual(verdict, "hard_regression=true\n")
 
+    def test_a_repeated_run_on_a_commit_records_nothing_and_judges_again(self):
+        """Copies differ in the last digits of the MOS: a (leg, variant) is what makes them one."""
+        self.seed("obj0", [20.0, 20.0])
+        _, _, first_verdict = self.run_main([obj_row("obj0", 14.0, mos_lqo=4.1)])
+        self.assertEqual(first_verdict, "hard_regression=true\n")
+        self.output.unlink()
+        _, out, verdict = self.run_main([obj_row("obj0", 14.0, mos_lqo=4.1 + 4e-14)])
+        records = [line for line in self.history.read_text().splitlines() if line.strip()]
+        self.assertEqual(len(records), 3)   # 2 seeded + 1
+        self.assertEqual(verdict, "hard_regression=true\n")
+        self.assertIn("::error title=Object-quality trend hard regression::", out)
+        self.assertIn("1 already recorded for c", out)
+
+    def test_a_new_object_on_an_already_recorded_commit_is_added(self):
+        self.run_main([obj_row("obj0", 20.0)])
+        self.run_main([obj_row("obj0", 20.0), obj_row("scene", 18.0)])
+        variants = [json.loads(line)["variant"] for line in self.history.read_text().splitlines()]
+        self.assertEqual(variants, ["obj0", "scene"])
+
+    def test_a_commit_can_be_left_out_of_the_baseline(self):
+        self.seed("obj0", [20.0])
+        with self.history.open("a") as f:
+            f.write(json.dumps({"commit": "c", "leg": "eac3_joc_768", "variant": "obj0",
+                                "snr_db": 10.0}) + "\n")
+        self.assertEqual(aoq.trailing_mean(self.history, "eac3_joc_768", "obj0", 10), 15.0)
+        self.assertEqual(aoq.trailing_mean(self.history, "eac3_joc_768", "obj0", 10,
+                                           exclude_commit="c"), 20.0)
+
     def test_trailing_mean_missing_series(self):
         self.seed("obj0", [1.0])
         self.assertIsNone(aoq.trailing_mean(self.history, "eac3_joc_768", "nope", 10))

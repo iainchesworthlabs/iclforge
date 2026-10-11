@@ -2294,8 +2294,10 @@ The sections below contain the complete change list and fixes.
   speed card rank a workload against its own. AC-4 decode quality, from
   `score_ac4_decode.py --json-out`, is appended to `ac4-quality-main.jsonl` on `quality-history`
   with its own `ac4_hard_regression` output and failing step, and charted at the end of the
-  Quality trend page. The encode side has floors in CI and a local race against DEE, and no
-  history.
+  Quality trend page. The encoder's programme legs have a series of their own:
+  `score_ac4_encode.py --json-out` is appended to `ac4-encode-quality-main.jsonl`, which is
+  AC-4's line on the Listening quality card and the Quality trend page's AC-4 encode section.
+  The race against DEE is local and keeps no history.
 - **Golden masters from Dolby's encoders for AC-3, E-AC-3, E-AC-3 JOC and TrueHD.** DEE's licence
   ends on 2026-11-06 and is not renewed, so `tools/generators/gen_dee_gold.py` makes, and keeps
   on a local disk, every stream a later piece of work could want from it: 1,111 legs (1,086
@@ -2664,6 +2666,21 @@ The sections below contain the complete change list and fixes.
 - **A minimum-footprint build resolves the SIMD arch seam** instead of naming `generic/`
   literally, fixing a minimum-footprint decoder built for aarch64 that had been missing
   NEON.
+- **A Sendspin player's PCM chunk is unpacked and metered as integers**
+  (`libs/device/include/iclforge/pcm_unpack.hpp`, `burst_player.cpp`'s `play_pcm()`): 16- and
+  24-bit samples go to the float the playout takes without the soft-float conversions beside them,
+  and the level meter reads the integers while the gain is unity. On an ESP32-C6, which has no FPU,
+  a 1,000-frame 16-bit stereo chunk takes 1.8 to 2.0 ms of the player's time, where it took
+  5.4 ms (9% of the core, down from 27%), with the same samples out
+  (`test_pcm_unpack.cpp`: every 8-, 12-, 16- and 24-bit value, odd chunk sizes, levels against the
+  float meter). It does not make a C6 sustain PCM on a busy WiFi link: its ring holds 192 ms of 16-bit
+  stereo, shorter than the link's gaps (`docs/platforms/bare-metal/esp32-c6.md`, "PCM from a
+  server").
+- **`hearth-testserver` plays a tone as PCM** (`--pcm`, `--tone`, `--tone-bits`,
+  `--max-chunk-bytes`), pairs by a code the board shows (`--code-log`, `dial_to_pair()`), and
+  reports a board's PCM counters and its own end-of-stream totals; `test_playout.cpp` has the
+  playout recovering a PCM stream from a clock step, a late chunk and late interrupts on a model of
+  the I2S ring.
 
 **Library internals**
 

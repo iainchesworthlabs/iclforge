@@ -105,6 +105,28 @@ class Main(unittest.TestCase):
         self.assertNotIn("regression", out)
         self.assertEqual(len(self.records()), 4)
 
+    def test_a_stream_is_recorded_once_per_commit(self):
+        """Two nightlies on a tip that has not moved: the home page counted 20 streams for 10."""
+        legs = [{"leg": "dee-2.0", "min_snr_db": 20.0, "lsd_db": 1.0, "mos_lqo": 4.2},
+                {"leg": "dee-5.1", "min_snr_db": 25.0, "lsd_db": 1.0, "mos_lqo": 4.0}]
+        self.run_main(legs)
+        out = self.run_main([*legs, {"leg": "dee-new", "min_snr_db": 30.0, "lsd_db": 1.0,
+                                     "mos_lqo": 4.4}])
+        self.assertEqual([r["leg"] for r in self.records()], ["dee-2.0", "dee-5.1", "dee-new"])
+        self.assertIn("2 already recorded for abc", out)
+
+    def test_a_repeated_run_is_judged_against_what_came_before_its_commit(self):
+        """Its own record in the window must not soften the verdict the first run gave."""
+        (self.history / "ac4-quality-main.jsonl").write_text(
+            "\n".join(history_line("dee-2.0", 20.0, 1.0) for _ in range(3)) + "\n")
+        legs = [{"leg": "dee-2.0", "min_snr_db": 16.0, "lsd_db": 1.0, "mos_lqo": 3.9}]
+        self.run_main(legs)
+        self.output.write_text("")
+        out = self.run_main(legs)
+        self.assertIn("::error title=AC-4 quality hard regression::", out)
+        self.assertIn("ac4_hard_regression=true", self.output.read_text())
+        self.assertEqual(len(self.records()), 4)
+
     def test_no_legs_is_a_warning_not_an_append(self):
         out = self.run_main([])
         self.assertIn("::warning", out)
