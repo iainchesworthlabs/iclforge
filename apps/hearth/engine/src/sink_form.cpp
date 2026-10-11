@@ -76,6 +76,40 @@ namespace sp = sendspin::player;
     return std::nullopt;
 }
 
+// Whether the sink lists `key` among the decoder settings it takes.
+[[nodiscard]] bool takes_setting(const sp::Support& support, std::string_view key) {
+    return std::ranges::find(support.decoder_settings, key) != support.decoder_settings.end();
+}
+
+// Why a karaoke stream whose reproduction is wanted is not to be left to this sink's own decoder:
+// it has not been told how, so it would play the coded channels, and a group would play two
+// things. Nothing for a stream that is not to be reproduced, and for a sink that takes the
+// settings (the settings command is among the commands it supports, which is how a server
+// learns it can send one).
+[[nodiscard]] std::optional<std::string> karaoke_refusal(const StreamNeeds& stream,
+                                                         const SinkFacts& sink) {
+    if (!stream.karaoke || !sink.iclforge_support) {
+        return std::nullopt;
+    }
+    const sp::Support& support = *sink.iclforge_support;
+    if (!takes_setting(support, "karaoke")) {
+        return std::string("This sink does not reproduce karaoke: it does not take the setting");
+    }
+    if (stream.karaoke->reproduction == sp::Karaoke::kCapable &&
+        !takes_setting(support, "karaoke_vocals")) {
+        return std::string(
+            "This sink does not choose which vocals to play: it does not take karaoke_vocals");
+    }
+    const bool settings_command =
+        sink.iclforge_state &&
+        std::ranges::find(sink.iclforge_state->supported_commands, sp::Command::kSettings) !=
+            sink.iclforge_state->supported_commands.end();
+    if (!settings_command) {
+        return std::string("This sink takes no settings from this app, so it cannot be told");
+    }
+    return std::nullopt;
+}
+
 // The layout a sink is configured to, as the sink itself says before this
 // app's own record of what it last sent it, then the player's own for a sink
 // that has said none (a standard player has no layout at all), and 2.0
@@ -249,11 +283,26 @@ SinkChoice choose_sink_form(const StreamNeeds& stream, const SinkFacts& sink,
     }
     const std::string coded =
         fmt::format("Sending {} as it is", audio::format_name(*stream.stream));
-    const std::optional<std::string> objects = object_refusal(stream, sink);
-    if (!objects) {
+    // A karaoke stream is sent as it is only to a sink that reproduces it: decoded here for one
+    // that does not, so that a group hears one reproduction. Where this app cannot send it PCM,
+    // the stream still plays, as coded, and the reason says so.
+    if (const std::optional<std::string> karaoke = karaoke_refusal(stream, sink)) {
+        const SinkChoice pcm = pcm_choice(*karaoke, stream, sink, policy);
+        if (pcm.form == SinkForm::kPcm) {
+            return pcm;
+        }
         return {.form = SinkForm::kCoded,
                 .layout = std::nullopt,
-                .reason = coded + ": the sink decodes it for its own speakers."};
+                .reason = fmt::format("{}. {}, so the karaoke is played as coded.", coded, *karaoke)};
+    }
+    const std::optional<std::string> objects = object_refusal(stream, sink);
+    if (!objects) {
+        const std::string_view reproduced =
+            stream.karaoke ? " and reproduces the karaoke as asked" : "";
+        return {.form = SinkForm::kCoded,
+                .layout = std::nullopt,
+                .reason = fmt::format("{}: the sink decodes it for its own speakers{}.", coded,
+                                      reproduced)};
     }
     // The sink decodes the stream but would play its bed alone, past the objects it places.
     // Decoded here, the objects are placed; where that is not possible it plays the bed.

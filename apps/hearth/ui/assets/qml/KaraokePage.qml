@@ -350,9 +350,11 @@ ScrollView {
                         objectName: "groupNotice"
                         Layout.fillWidth: true
                         visible: root.isKaraoke && root.groupOutput
-                        text: qsTr("This is going to a network group. A sink that is sent PCM plays the "
-                                   + "reproduction; one that is sent coded AC-3 decodes it itself and "
-                                   + "plays it as coded.")
+                        text: qsTr("This is going to a network group. A sink that takes the karaoke "
+                                   + "settings decodes the stream itself and reproduces it as chosen "
+                                   + "here; one that does not is sent PCM with the reproduction "
+                                   + "applied, so the group plays one reproduction. The Network page "
+                                   + "says which each sink was sent.")
                         color: Theme.text
                         font.pixelSize: Theme.fontSmall
                         wrapMode: Text.WordWrap

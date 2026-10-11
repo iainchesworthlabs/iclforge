@@ -60,6 +60,16 @@ The choice is kept across starts, the only decoder setting that is. The Decoder 
 one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
 Annex C's own tables.
 
+**To a network group**, the reproduction is the same on every member. A sink that lists the
+`karaoke` setting (and `karaoke_vocals`, for Capable) is sent the stream as it is, and is told the
+choice before the stream starts and again when you change it while the item plays; it decodes for
+its own speakers, laying them out from the reproduction (L, C, R and the LFE) and not from the
+coded layout. A sink that does not list them, such as a board on firmware from before them, is
+sent PCM that Hearth has decoded with the reproduction applied, so the members never play two
+things. Where such a sink takes no PCM either, the stream plays as coded on it and the Network
+page says so. The Karaoke page's choice reaches a sink as settings, which replace that sink's
+settings whole: what the sink's own page set is not kept.
+
 #### Lyrics
 
 Beside a stream, `name.lrc` (the extension in any case) is its lyrics. The Karaoke page shows the
