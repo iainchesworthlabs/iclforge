@@ -54,6 +54,14 @@ In rough order of strength:
    `cplfsnroffst` ahead of the per-channel lists when the block couples, and the decoder skipped
    both, which no stream this project produces could have exposed.
 
+   Two more, `dee_joc_714.ec3` and `dee_joc_916.ec3`, are 7.1.4 and 9.1.6 beds that play one input
+   channel at a time, a tenth of a second each. They exist for what ten channels cannot show: that
+   the bed's channel order holds at twelve and sixteen, where Table 12's order and a production
+   tool's input order are different permutations (9.1.6 puts the wides last in the bed and right
+   after the rears at the input). The slice an object comes back loud in names the input channel
+   it carries, whatever the solver did with the others, and every object does — the DEE-checked
+   claim `docs/library/spatial-and-atmos.md` makes of CBI beds.
+
    What that fixture asserts is not just "it parses". Each of the ten channels of the source bed
    carries a different tone, so identifying each reconstructed JOC object by which tone dominates
    it is an independent check on both the reconstruction and the *order* the bed's channels

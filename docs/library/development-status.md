@@ -105,18 +105,20 @@ the carriage specs wired in-tree). Open gaps against those texts are collected a
 | Category | Feature | Status | Priority | Criticality | Notes |
 |---|---|---|---|---|---|
 | **EMDF** | Container parse / write (Annex H) | 🟢 | High | Essential | Skip-field placement verified vs DEE |
-| | Reserved / unsupported EMDF variants (§H.2.2) | 🔴 | Low | Optional | e.g. `protection_length_primary` = 00, `emdf_version` ≠ 0 — refused rather than guessed |
+| | Reserved / unsupported EMDF variants (§H.2.2) | 🔴🔵 | Low | Optional | `protection_length_primary` = 00 and `emdf_version` ≠ 0 name no field width, so there is nothing to read or skip — refused rather than guessed ([Decoding](decoding.md)) |
 | **OAMD** | Payload encode (project subset) | 🟢 | High | Essential | `AtmosEncoder` |
-| | Payload parse (broader than encode) | 🟡 | Medium | Important | The parser reads most of §5.5: several update blocks, inactive objects, several bed instances, ISF programs, the `trim_element`. The encoder writes one bed or dynamic objects, with `b_object_not_active`, a real `sample_offset_code` and multi-block updates since #801; it writes no ISF programs, extra bed instances or `trim_element` |
-| | Channel-based immersive (OAMD bed, no dynamic objects) | 🟡 | Medium | Optional | `AtmosEncoder`'s `BedProgram` constructor and `forge atmos-cbi` encode 5.1.4, 7.1.4 and 9.1.6 beds; only 5.1.4's channel order is checked against a DEE stream |
+| | Payload parse (broader than encode) | 🟡🔵 | Medium | Important | The parser reads all of §5.5: several update blocks, inactive objects, several and non-standard bed instances, ISF programs, the `trim_element`, divergence and extended precision positions (the last from the text alone; no outside stream carries one). The encoder writes one bed or dynamic objects, with `b_object_not_active`, a real `sample_offset_code` and multi-block updates since #801. Accepted: it writes no ISF programs, extra bed instances or `trim_element` — no input this project reads has an ISF object, a second bed or a trim to write, and the read side is checked on DEE's streams |
+| | Channel-based immersive (OAMD bed, no dynamic objects) | 🟢 | Medium | Optional | `AtmosEncoder`'s `BedProgram` constructor and `forge atmos-cbi` encode 5.1.4, 7.1.4 and 9.1.6 beds; the bed's channel order is checked against DEE streams of all three layouts (`dee_joc_514/714/916.ec3`, one channel at a time for 7.1.4 and 9.1.6) |
 | **JOC** | Matrix encode (5.X downmix) | 🟢 | High | Essential | 7.X configs decode-only |
+| | Reserved configurations (`oa_md_version` ≠ 0, ISF index 6/7, `joc_dmx_config_idx` 5–7, `joc_ext_config_idx` ≠ 0) | 🔴🔵 | Low | Optional | The tables reserve them and give no field layout or object count, so there is nothing to read — refused rather than guessed ([Decoding](decoding.md)) |
 | | Object reconstruction (QMF + MDCT, §6.6.6) | 🟢 | High | Essential | Default QMF domain; self-check > −20 dB |
 | | `joc_clipgain` application (§6.3.3.2) | 🟢 | Medium | Important | Applied to the reconstructed object PCM, once, in `reconstruct()`, never to the bed; where it applies was confirmed against the Dolby Reference Player (2026-09-22) |
-| | Phase-shift downmix undo (`phsflg`, Table 47 configs 2/4) | 🟡 | Low | Optional | Configs parse; reconstructed like unshifted siblings (no Hilbert undo) |
-| | 7.X downmix needing dependent Lb/Rb | 🟡 | Medium | Important | Metadata/JOC parse; `object_audio` empty when bed lacks the dependent |
+| | Phase-shift downmix (Table 47 configs 3/4, "90 degree phase shift") | 🟢 | Low | Optional | Reconstructed like the unshifted siblings, which is what §6.6.6 says: the shift is a property of how the downmix was built, the standard has no undo step, and a DEE stream of config 3 decodes correctly through the unmodified path |
+| | 7.X downmix needing a dependent substream (Lb/Rb, or Tfl/Tfr) | 🟡🔵 | Medium | Important | Reconstructed at the access unit once the dependent's channels are in hand (#814; 42–48 dB per object on constructed streams); decoded one substream at a time the object audio is empty and the metadata still reported. Accepted: no third-party stream carries configs 1, 2 or 4 (DEE picks config 3 even from a 7.1.4 source), so where Tfl/Tfr sit in the matrix is inferred from Tables 47 and 53 |
 | **Atmos encode** | Bed + objects in E-AC-3 | 🟢 | High | Essential | `oba::AtmosEncoder` |
 | | Object size / spread / zone constraints (wire) | 🟢 | Medium | Important | Transmitted in OAMD |
-| | Extent / spread / zone / snap in renderer | 🟡 | Low | Optional | Spec leaves behaviour to the renderer; VBAP bed pan does not apply them |
+| | Extent / zone / snap in renderer | 🟢 | Low | Optional | `LayoutRenderer`: channel lock to the nearest speaker, Tables 20/21 zones against Table A.7's speaker zones, elevation, and the extent cuboid as a constant-power spread — [Spatial & Atmos](spatial-and-atmos.md). The encoder's 5.1 downmix stays a point-source pan, as §4.3 asks. An object that says none of this renders as before |
+| | Divergence, screen factor and depth factor in renderer | 🟡🔵 | Low | Optional | Decoded and reported. Accepted: §5.2.7 gives the divergence amount and nothing on where the two objects it makes sit, and the screen and depth factors need a screen the output layouts do not describe |
 | | Complexity index / addbsi marker (§8.3) | 🟢 | High | Essential | Probe, `dec3`, HLS `CHANNELS="…/JOC"` |
 | | Scene timeline (`ObjectScene`) | 🟢 | Medium | Important | Shared by CLI / GUI / live |
 | | Live OSC object positions | 🟢 | Low | Optional | Scheme-prefixed; OSC only today |
@@ -331,10 +333,11 @@ this register is the checklist that those bounds appear here too.
 
 | Clause | Open item | Status |
 |---|---|---|
-| §5.5 / §5.6 | Commercial OAMD field shapes | 🟡 |
-| §5.x renderer behaviour | Extent / spread / zone / snap apply | 🟡 |
-| Table 47 | `phsflg` Hilbert undo; 7.X+dependent Lb/Rb | 🟡 |
-| Protection / authenticity | Project key + Dolby unlock | 🟡 |
+| §5.5 / §5.6 | The encoder writes no ISF programs, extra or non-standard bed instances or `trim_element`; the parser reads all of them | 🟡🔵 |
+| §5.6.0.1, Table 11b, Tables 48 / 49, §H.2.2 | Reserved values with no field layout: `oa_md_version` ≠ 0, ISF index 6/7, `joc_dmx_config_idx` 5–7, `joc_ext_config_idx` ≠ 0, `emdf_version` ≠ 0, `protection_length_primary` 00 | 🔴🔵 |
+| §5.2.7, §5.6.1.1.18-.20 | Renderer: divergence (no geometry given) and the screen and depth factors (no screen described) | 🟡🔵 |
+| Table 47 / 53 | Dependent substream's Tfl/Tfr (configs 2, 4) and Lb/Rb (config 1) matrix positions inferred; no third-party stream | 🟡🔵 |
+| Protection / authenticity | Project key + Dolby unlock: no key is shipped | 🟡🔵 |
 
 ### ETSI TS 103 190-1 / -2 (AC-4)
 

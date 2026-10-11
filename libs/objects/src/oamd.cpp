@@ -170,8 +170,69 @@ void put_obj_div_block(BitWriter& w, const DynamicObject& object, std::uint32_t 
     w.put(code, 6);
 }
 
-// §5.5.13 extended_object_element, with no extended precision positions. The Table 42 codes are
-// per update and per dynamic object; anchored objects send nothing (§5.5.14: obj_type != DYNAMIC).
+// §5.6.6.4 Tables 44-46: the refinement each 2-bit ext_prec_pos3D_* code names, in fifths of the
+// standard step (1/62 for x and y, 1/15 for z). A refinement of 0 is not a code - it is the axis not
+// being present in ext_prec_pos_presence[].
+constexpr std::array<int, 4> kExtPrecSteps = {1, 2, -1, -2};
+
+// What an object's position needs on top of the standard code to reach a fifth of a step: x, y and
+// z in the same fifths-of-a-step the tables use, each in [-2, 2]. The standard code is whatever
+// quantize_xy and put_z write, so the residual is measured against exactly that.
+struct ExtPrec {
+    int x = 0;
+    int y = 0;
+    int z = 0;
+
+    [[nodiscard]] bool any() const { return x != 0 || y != 0 || z != 0; }
+};
+
+[[nodiscard]] ExtPrec quantize_ext_prec(const Position& position) {
+    const auto steps = [](double residual, double fifth) {
+        return static_cast<int>(std::clamp(std::lround(residual / fifth), -2L, 2L));
+    };
+    const double x = std::clamp(position.x, 0.0, 1.0);
+    const double y = std::clamp(position.y, 0.0, 1.0);
+    const double z = std::clamp(position.z, -1.0, 1.0);
+    // pos3D_Z = sign * pos3D_Z_bits / 15 + ext_prec / 75: the refinement adds to the signed value.
+    const double z_standard = (z < 0.0 ? -1.0 : 1.0) * static_cast<double>(std::lround(std::abs(z) * 15.0)) / 15.0;
+    return {.x = steps(x - static_cast<double>(quantize_xy(x)) / 62.0, 1.0 / (62.0 * 5.0)),
+            .y = steps(y - static_cast<double>(quantize_xy(y)) / 62.0, 1.0 / (62.0 * 5.0)),
+            .z = steps(z - z_standard, 1.0 / (15.0 * 5.0))};
+}
+
+// The code Tables 44-46 give a refinement in {+-1, +-2}.
+[[nodiscard]] std::uint32_t ext_prec_code(int steps) {
+    const auto found = std::ranges::find(kExtPrecSteps, steps);
+    return static_cast<std::uint32_t>(found - kExtPrecSteps.begin());
+}
+
+// §5.5.15 ext_prec_pos_block for one dynamic object in one block: nothing for an inactive object
+// (b_obj_not_active), else b_ext_prec_pos, and when set ext_prec_pos_presence[] and the codes of the
+// axes it names. The presence array is transmitted index 0 first like the other arrays of this
+// payload, and Table 43 puts X at 2, Y at 1 and Z at 0, so Z leads on the wire and the codes
+// follow X, Y, Z.
+void put_ext_prec_pos_block(BitWriter& w, const DynamicObject& object, const ExtPrec& ext) {
+    if (!object.active) {
+        return;
+    }
+    if (!ext.any()) {
+        w.put(0, 1);  // b_ext_prec_pos
+        return;
+    }
+    w.put(1, 1);
+    const std::uint32_t presence = (ext.x != 0 ? 1u << 2 : 0u) | (ext.y != 0 ? 1u << 1 : 0u) |
+                                   (ext.z != 0 ? 1u << 0 : 0u);
+    w.put(flags_msb_first(presence, 3), 3);  // ext_prec_pos_presence[]
+    for (const int steps : {ext.x, ext.y, ext.z}) {
+        if (steps != 0) {
+            w.put(ext_prec_code(steps), 2);
+        }
+    }
+}
+
+// §5.5.13 extended_object_element. The Table 42 codes are per update and per dynamic object;
+// anchored objects send nothing (§5.5.14: obj_type != DYNAMIC). Extended precision positions are
+// sent only for an update that asks (ObjectUpdate::extended_position_precision).
 void put_extended_object_element(BitWriter& w, const Program& program, std::span<const ObjectUpdate> updates) {
     const int dynamic_count = program.dynamic_objects;
     std::vector<std::vector<std::uint32_t>> codes(static_cast<std::size_t>(dynamic_count));
@@ -195,13 +256,34 @@ void put_extended_object_element(BitWriter& w, const Program& program, std::span
             }
         }
     }
-    w.put(0, 1);  // b_ext_prec_pos_block
+    // Position refinements per object per block, and whether any is worth sending.
+    const auto refinement = [&](const ObjectUpdate& update, const DynamicObject& object) {
+        return update.extended_position_precision && object.active ? quantize_ext_prec(object.position)
+                                                                    : ExtPrec{};
+    };
+    bool any_ext = false;
+    for (const auto& update : updates) {
+        for (const auto& object : update.objects) {
+            any_ext = any_ext || refinement(update, object).any();
+        }
+    }
+    w.put(any_ext ? 1u : 0u, 1);  // b_ext_prec_pos_block
+    if (any_ext) {
+        for (int object = 0; object < dynamic_count; ++object) {
+            for (const auto& update : updates) {
+                const auto& state = update.objects[static_cast<std::size_t>(object)];
+                put_ext_prec_pos_block(w, state, refinement(update, state));
+            }
+        }
+    }
 }
 
 [[nodiscard]] bool needs_extended_object_element(std::span<const ObjectUpdate> updates) {
     return std::ranges::any_of(updates, [](const ObjectUpdate& update) {
-        return std::ranges::any_of(update.objects, [](const DynamicObject& object) {
-            return object.active && quantize_divergence(object.divergence) != 0;
+        return std::ranges::any_of(update.objects, [&](const DynamicObject& object) {
+            return object.active &&
+                   (quantize_divergence(object.divergence) != 0 ||
+                    (update.extended_position_precision && quantize_ext_prec(object.position).any()));
         });
     });
 }
@@ -938,10 +1020,14 @@ void read_trim_element(BitReader& r, int object_count, TrimElement& trim) {
     }
 }
 
-// §5.5.13 extended_object_element. Only obj_div_block carries anything this
-// model has a home for (DynamicObject::divergence); ext_prec_pos_block is a
-// sub-quantization-step refinement of a position already decoded, and is
-// walked past rather than folded in.
+// §5.5.13 extended_object_element: obj_div_block (DynamicObject::divergence) and
+// ext_prec_pos_block, which refines a position already decoded by a fifth of
+// the standard step per unit - §5.6.1.1.8-.14 add ext_prec_pos3D / (62 x 5) to
+// x and y and / (15 x 5) to z. The refinement belongs to the block that
+// carries it and is NOT fed back into the running position the next block's
+// differential coding reads: the standard says that value is the "standard
+// precision" one, and read_object_element has already finished with it, so
+// applying it here to the stored blocks is exactly that.
 [[nodiscard]] bool read_extended_object_element(BitReader& r, const ObjectLayout& layout,
                                                 int num_blocks, DecodedProgram& out) {
     if (num_blocks <= 0) {
@@ -980,16 +1066,34 @@ void read_trim_element(BitReader& r, int object_count, TrimElement& trim) {
         }
     }
     if (r.read(1) != 0) {  // b_ext_prec_pos_block
+        constexpr std::array<int, 4> kSteps = {1, 2, -1, -2};  // Tables 44-46
         for (int object = layout.anchored; object < layout.total; ++object) {
+            const auto index = static_cast<std::size_t>(object - layout.anchored);
             for (int blk = 0; blk < num_blocks; ++blk) {
+                auto& block = out.blocks[static_cast<std::size_t>(blk)];
+                // §5.5.15: an object that is not active sends nothing at all.
+                if (index >= block.objects.size() || !block.objects[index].active) {
+                    continue;
+                }
                 if (r.read(1) == 0) {  // b_ext_prec_pos
                     continue;
                 }
+                // ext_prec_pos_presence[], index 0 first on the wire; Table 43
+                // puts X at 2, Y at 1 and Z at 0, and the codes follow X, Y, Z.
                 const std::uint32_t present = flags_msb_first(r.read(3), 3);
-                for (int axis = 0; axis < 3; ++axis) {
-                    if ((present & (1u << axis)) != 0) {
-                        r.skip(2);
-                    }
+                auto& position = block.objects[index].position;
+                const auto refine = [&](double standard, double lower, double fifth) {
+                    const int steps = kSteps[r.read(2) & 3u];
+                    return std::clamp(standard + static_cast<double>(steps) * fifth, lower, 1.0);
+                };
+                if ((present & (1u << 2)) != 0) {
+                    position.x = refine(position.x, 0.0, 1.0 / (62.0 * 5.0));
+                }
+                if ((present & (1u << 1)) != 0) {
+                    position.y = refine(position.y, 0.0, 1.0 / (62.0 * 5.0));
+                }
+                if ((present & (1u << 0)) != 0) {
+                    position.z = refine(position.z, -1.0, 1.0 / (15.0 * 5.0));
                 }
             }
         }
@@ -1020,6 +1124,8 @@ std::vector<DisplayObject> describe_objects(const DecodedProgram& program, std::
                            .gain_db = object.gain_db,
                            .snap = object.snap,
                            .active = object.active,
+                           .zone = object.zone,
+                           .enable_elevation = object.enable_elevation,
                            .label = {}});
             continue;
         }

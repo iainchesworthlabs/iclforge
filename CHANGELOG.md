@@ -129,6 +129,33 @@ The sections below contain the complete change list and fixes.
   `expanded_loudspeaker_layout` values (9.1.6ch, 10.2.9.3ch, 7.1.5.4ch and their subsets) with the
   substream order of 3.6.2.3, and `decode_pcm()` decodes a single-layer element in any of them.
 
+**Atmos objects: channel lock, zones and extent in the renderer, and DEE-checked 7.1.4 and 9.1.6 beds**
+
+- **`LayoutRenderer` applies an object's channel lock, zone constraints and extent.** The renderer
+  Hearth, the ESP32 player and `forge decode`'s AC-4 object rendering play objects through took an
+  object's position and gain and nothing else. It now follows what TS 103 420 §5.2 says each
+  property means: `b_object_snap` puts the object on the one nearest speaker; the
+  zone constraints of Tables 20 and 21 take the excluded zones' speakers (Table A.7) out of the set
+  it is panned over, with a surround pair the back zone in a 5.X layout and the side zone in a
+  larger one, and `b_enable_elevation` false keeping it off the height speakers; and an extent is
+  rendered as the cuboid it describes, sampled and power-averaged, so a large object spreads over
+  more speakers at the same level. `DisplayObject` gains `zone` and `enable_elevation`. An object
+  that says none of this renders exactly as before. Object divergence and the screen and depth
+  factors are still not applied: the standard gives no geometry for the first, and the output
+  layouts describe no screen for the others.
+- **Extended precision positions are applied.** §5.5.15's `ext_prec_pos_block` was read and thrown
+  away. A position now gets the refinement it carries (x and y by up to two fifths of the 1/62
+  step, z of the 1/15 one), per update block and without feeding the next block's differential
+  coding, as §5.6.1.1.8-.14 say. It is decoded from the text alone, no outside stream carries one.
+  Reading it also fixed a bit count: an object that is not active sends no `b_ext_prec_pos`, and the
+  reader took one for it. `ObjectUpdate::extended_position_precision` lets the writer send it.
+- **7.1.4 and 9.1.6 channel-based-immersive beds are checked against DEE.** Two committed Dolby
+  Encoding Engine streams, `dee_joc_714.ec3` and `dee_joc_916.ec3`, play one input channel at a
+  time, and every reconstructed object comes back as the channel its bed label names. That settles
+  what the 5.1.4 fixture could not: the bed's order holds at twelve and sixteen channels, where
+  Table 12's order and the input order differ (9.1.6 has the wides last in the bed and after the
+  rears at the input).
+
 **IAB (SMPTE ST 2098-2): lossless audio, a writer, and spread and zones in the bridge**
 
 - **`AudioDataDLC` decodes.** `iclforge::iab::decode_dlc()` implements Annex B: the lattice

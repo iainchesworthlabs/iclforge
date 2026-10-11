@@ -7,6 +7,7 @@
 #include <numbers>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -220,5 +221,156 @@ TEST_CASE("every JOC object the DEE fixture reconstructs carries its own bed cha
         INFO("object " << object << " strongest tone is " << kInput[best].label
                        << ", expected " << expected);
         CHECK(std::string{kInput[best].label} == std::string{expected});
+    }
+}
+
+// --- 7.1.4 and 9.1.6 ----------------------------------------------------------
+//
+// The 5.1.4 fixture says the bed's order is right for ten channels; these two
+// say it holds for twelve and sixteen, where it is a different permutation
+// from the order a production tool takes its INPUT in (9.1.6 puts the wides
+// last in Table 12's bed and right after the rears at the input). Each
+// fixture plays one input channel at a time, channel k alone in the k-th
+// tenth of a second (gen_object_fixture.py), so the slice a reconstructed
+// object is loud in names the input channel it came from, whatever the solver
+// did with the rest - and the table below is the expectation written down
+// independently of oba::bed_labels(): which INPUT slice carries each bed
+// object, in the order the program lists them.
+
+namespace {
+
+constexpr std::size_t kSliceSamples = 4800;  // 0.1 s at 48 kHz
+
+std::vector<std::byte> read_named(const char* name) {
+    const std::string path = std::string{ICLFORGE_GOLDEN_OBJECT_DIR} + "/" + name;
+    std::ifstream in{path, std::ios::binary};
+    REQUIRE(in.good());
+    const std::string bytes{std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+    std::vector<std::byte> out(bytes.size());
+    std::ranges::transform(bytes, out.begin(), [](char c) { return static_cast<std::byte>(c); });
+    return out;
+}
+
+struct TdmDecode {
+    iclforge::objects::oba::DecodedProgram program;
+    // Every JOC object's audio over the whole stream, one vector each.
+    std::vector<std::vector<float>> objects;
+    std::vector<int> object_indices;
+};
+
+TdmDecode decode_tdm(const char* name, std::size_t expected_objects) {
+    const auto data = read_named(name);
+    const auto units = iclforge::ac3::split_access_units(data);
+    REQUIRE(units.has_value());
+    iclforge::ac3::Eac3Decoder decoder;
+    TdmDecode out;
+    out.objects.assign(expected_objects, {});
+    bool have_program = false;
+    for (const auto& unit : *units) {
+        const auto decoded = decoder.decode_access_unit(unit);
+        REQUIRE(decoded.has_value());
+        REQUIRE(decoded->has_value());
+        const auto& au = **decoded;
+        if (!have_program && au.object_metadata.has_value()) {
+            out.program = *au.object_metadata;
+            out.object_indices = au.object_indices;
+            have_program = true;
+        }
+        // An access unit that has no objects yet still occupies its 1 536
+        // samples of the timeline, so the slices stay where the input put them.
+        for (std::size_t i = 0; i < out.objects.size(); ++i) {
+            if (i < au.object_audio.size()) {
+                out.objects[i].insert(out.objects[i].end(), au.object_audio[i].begin(),
+                                      au.object_audio[i].end());
+            } else {
+                out.objects[i].insert(out.objects[i].end(), 1536, 0.0F);
+            }
+        }
+    }
+    REQUIRE(have_program);
+    return out;
+}
+
+// The input slice an object is loudest in, and by how many dB over the next.
+std::pair<std::size_t, double> loudest_slice(std::span<const float> object, std::size_t slices) {
+    std::vector<double> energy(slices, 0.0);
+    for (std::size_t k = 0; k < slices; ++k) {
+        for (std::size_t n = k * kSliceSamples;
+             n < std::min((k + 1) * kSliceSamples, object.size()); ++n) {
+            energy[k] += static_cast<double>(object[n]) * static_cast<double>(object[n]);
+        }
+    }
+    std::size_t best = 0;
+    for (std::size_t k = 1; k < slices; ++k) {
+        if (energy[k] > energy[best]) {
+            best = k;
+        }
+    }
+    double second = 1e-30;
+    for (std::size_t k = 0; k < slices; ++k) {
+        if (k != best) {
+            second = std::max(second, energy[k]);
+        }
+    }
+    return {best, 10.0 * std::log10(std::max(energy[best], 1e-30) / second)};
+}
+
+}  // namespace
+
+TEST_CASE("the DEE 7.1.4 fixture's bed is Table 12's twelve and each object is its own channel",
+          "[oba][fixture][layouts]") {
+    namespace oba = iclforge::objects::oba;
+    const auto tdm = decode_tdm("dee_joc_714.ec3", 11);
+
+    CHECK_FALSE(tdm.program.program.dynamic_only);
+    CHECK(tdm.program.program.dynamic_objects == 0);
+    CHECK(oba::object_count(tdm.program.program) == 12);
+    CHECK(tdm.program.program.bed ==
+          (oba::bed::kLR | oba::bed::kC | oba::bed::kLfe | oba::bed::kLsRs | oba::bed::kLbRb |
+           oba::bed::kTflTfr | oba::bed::kTblTbr));
+    CHECK(std::ranges::find(tdm.object_indices, 3) == tdm.object_indices.end());  // the LFE
+
+    // Object i -> the input slice that carries it. The input order is
+    // L R C LFE Ls Rs Lrs Rrs Ltf Rtf Ltr Rtr, so slice 3 (LFE) is nobody's
+    // and the rest follow in order: Table 12's order IS the input order here.
+    constexpr std::array<std::size_t, 11> kSlice = {0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11};
+    const auto labels = oba::bed_labels(tdm.program.program.bed);
+    REQUIRE(labels.size() == 12);
+    for (std::size_t object = 0; object < kSlice.size(); ++object) {
+        const auto [slice, dominance] = loudest_slice(tdm.objects[object], 12);
+        INFO("object " << object << " (" << oba::describe(labels[object < 3 ? object : object + 1])
+                       << ") is loudest in slice " << slice << ", expected " << kSlice[object]);
+        CHECK(slice == kSlice[object]);
+        CHECK(dominance > 3.0);
+    }
+}
+
+TEST_CASE("the DEE 9.1.6 fixture's wides sit last in the bed and first among the heights at the "
+          "input",
+          "[oba][fixture][layouts]") {
+    namespace oba = iclforge::objects::oba;
+    const auto tdm = decode_tdm("dee_joc_916.ec3", 15);
+
+    CHECK(oba::object_count(tdm.program.program) == 16);
+    CHECK(tdm.program.program.bed ==
+          (oba::bed::kLR | oba::bed::kC | oba::bed::kLfe | oba::bed::kLsRs | oba::bed::kLbRb |
+           oba::bed::kTflTfr | oba::bed::kTslTsr | oba::bed::kTblTbr | oba::bed::kLwRw));
+    CHECK(std::ranges::find(tdm.object_indices, 3) == tdm.object_indices.end());
+
+    // The input order is L R C LFE Ls Rs Lrs Rrs Lw Rw Ltf Rtf Ltm Rtm Ltr Rtr;
+    // Table 12 lists the bed L R C LFE Ls Rs Lb Rb Tfl Tfr Tsl Tsr Tbl Tbr Lw Rw.
+    // So the JOC objects (the LFE bypassed) carry input slices
+    //   L R C Ls Rs Lb Rb Tfl Tfr Tsl Tsr Tbl Tbr Lw Rw
+    //   0 1 2 4  5  6  7  10  11  12  13  14  15  8  9
+    // and the last two - the wides - are the ones that move.
+    constexpr std::array<std::size_t, 15> kSlice = {0, 1, 2, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 8, 9};
+    const auto labels = oba::bed_labels(tdm.program.program.bed);
+    REQUIRE(labels.size() == 16);
+    for (std::size_t object = 0; object < kSlice.size(); ++object) {
+        const auto [slice, dominance] = loudest_slice(tdm.objects[object], 16);
+        INFO("object " << object << " (" << oba::describe(labels[object < 3 ? object : object + 1])
+                       << ") is loudest in slice " << slice << ", expected " << kSlice[object]);
+        CHECK(slice == kSlice[object]);
+        CHECK(dominance > 3.0);
     }
 }
