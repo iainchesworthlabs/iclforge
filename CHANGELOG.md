@@ -2287,8 +2287,10 @@ The sections below contain the complete change list and fixes.
   speed card rank a workload against its own. AC-4 decode quality, from
   `score_ac4_decode.py --json-out`, is appended to `ac4-quality-main.jsonl` on `quality-history`
   with its own `ac4_hard_regression` output and failing step, and charted at the end of the
-  Quality trend page. The encode side has floors in CI and a local race against DEE, and no
-  history.
+  Quality trend page. The encoder's programme legs have a series of their own:
+  `score_ac4_encode.py --json-out` is appended to `ac4-encode-quality-main.jsonl`, which is
+  AC-4's line on the Listening quality card and the Quality trend page's AC-4 encode section.
+  The race against DEE is local and keeps no history.
 - **Golden masters from Dolby's encoders for AC-3, E-AC-3, E-AC-3 JOC and TrueHD.** DEE's licence
   ends on 2026-11-06 and is not renewed, so `tools/generators/gen_dee_gold.py` makes, and keeps
   on a local disk, every stream a later piece of work could want from it: 1,111 legs (1,086

@@ -333,6 +333,13 @@ def ac4_quality(rows):
     per-channel floors are recorded, only CI's pinned ones, so nothing here can
     be coloured, and the figures are shown without a verdict.
     """
+    # One row per stream: a run repeated on one commit (the nightly, on a tip
+    # that has not moved) recorded each stream again, and the history on the
+    # branch still holds those copies.
+    once = {}
+    for r in rows:
+        once.setdefault(r.get("leg"), r)
+    rows = list(once.values())
     snr = [r for r in rows if _number(r.get("min_snr_db"))]
     mos = [r for r in rows if _number(r.get("mos_lqo"))]
     if not snr and not mos:

@@ -10,8 +10,8 @@
 //
 // <history-dir> holds the *.jsonl files the scripts fetch from
 // raw.githubusercontent.com/<repo>/quality-history/, for example a directory with
-// main.jsonl, performance-main.jsonl, memory-main.jsonl, external-comparison-main.jsonl
-// and ac4-quality-main.jsonl. The scripts run unchanged in a vm context with a stub
+// main.jsonl, performance-main.jsonl, memory-main.jsonl, external-comparison-main.jsonl,
+// ac4-quality-main.jsonl and ac4-encode-quality-main.jsonl. The scripts run unchanged in a vm context with a stub
 // `document` and a `fetch` that reads that directory; nothing is fetched from the network.
 //
 // test_write_measurement_badges.py calls this to hold the two scripts to the badges the

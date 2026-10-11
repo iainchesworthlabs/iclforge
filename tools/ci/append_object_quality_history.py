@@ -40,6 +40,15 @@ measurement rather than a floor value (see object_spectral_scores). It is
 carried through as-is, read-only, with no regression handling, exactly as
 lsd_db and mos_lqo are on the external-comparison series.
 
+A (leg, variant) already recorded for this commit is not recorded again. The
+nightly run scores a tip that has not moved to the same numbers it scored the
+night before - to the last digits of the MOS, which differ by about 4e-14
+between runs, so a copy is told by what it measures and not by being
+byte-identical - and this file carried a copy for each of those runs. Every
+row is still judged, against its history from BEFORE this commit, so a repeated
+run says again what the first said and a hard regression keeps failing the job
+it is in.
+
 stdlib-only (json/argparse/pathlib), matching every other append-*.py
 script's no-new-CI-provisioning reasoning. Takes commit and commit-date as
 arguments rather than reading the clock itself - see this project's general
@@ -74,7 +83,25 @@ def load_object_rows(objects_json: Path):
     return payload["rows"]
 
 
-def trailing_mean(history_path: Path, leg: str, variant: str, window: int):
+def recorded_keys(history_path: Path, commit: str):
+    """The (leg, variant) of every record the file already holds for `commit`."""
+    if not history_path.exists():
+        return set()
+    keys = set()
+    for line in history_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        if rec.get("commit") == commit:
+            keys.add((rec.get("leg"), rec.get("variant")))
+    return keys
+
+
+def trailing_mean(history_path: Path, leg: str, variant: str, window: int,
+                  exclude_commit=None):
+    """Mean of the last `window` snr_db of this (leg, variant), without the
+    records of `exclude_commit`: a run is judged against what came before its
+    commit, not against a copy of its own numbers."""
     if not history_path.exists():
         return None
     matches = []
@@ -82,6 +109,8 @@ def trailing_mean(history_path: Path, leg: str, variant: str, window: int):
         if not line.strip():
             continue
         rec = json.loads(line)
+        if exclude_commit is not None and rec.get("commit") == exclude_commit:
+            continue
         if rec.get("leg") == leg and rec.get("variant") == variant:
             matches.append(rec["snr_db"])
     if not matches:
@@ -116,23 +145,26 @@ def main() -> int:
         print(f"::warning::no rows found in {args.objects_json}; nothing to append")
         return 0
 
+    recorded = recorded_keys(history_path, args.commit)
     lines = []
     hard_regression = False
     for row in rows:
         leg, variant = row["leg"], row["variant"]
-        baseline = trailing_mean(history_path, leg, variant, REGRESSION_TRAILING_WINDOW)
-        lines.append(json.dumps({
-            "commit": args.commit,
-            "branch": args.branch,
-            "commit_date": args.commit_date,
-            "leg": leg,
-            "bitrate_kbps": row["bitrate_kbps"],
-            "variant": variant,
-            "snr_db": row["snr_db"],
-            "lsd_db": row["lsd_db"],
-            "leak_db": row.get("leak_db"),
-            "mos_lqo": row.get("mos_lqo"),
-        }, sort_keys=True))
+        baseline = trailing_mean(history_path, leg, variant, REGRESSION_TRAILING_WINDOW,
+                                 exclude_commit=args.commit)
+        if (leg, variant) not in recorded:
+            lines.append(json.dumps({
+                "commit": args.commit,
+                "branch": args.branch,
+                "commit_date": args.commit_date,
+                "leg": leg,
+                "bitrate_kbps": row["bitrate_kbps"],
+                "variant": variant,
+                "snr_db": row["snr_db"],
+                "lsd_db": row["lsd_db"],
+                "leak_db": row.get("leak_db"),
+                "mos_lqo": row.get("mos_lqo"),
+            }, sort_keys=True))
 
         drop = None if baseline is None else baseline - row["snr_db"]
         if drop is not None and drop >= HARD_REGRESSION_DROP_DB:
@@ -154,7 +186,9 @@ def main() -> int:
         for line in lines:
             f.write(line + "\n")
 
-    print(f"Appended {len(lines)} record(s) to {history_path}")
+    skipped = len(rows) - len(lines)
+    print(f"Appended {len(lines)} record(s) to {history_path}"
+          + (f" ({skipped} already recorded for {args.commit[:8]})" if skipped else ""))
     write_recent_window(history_path)
     emit_github_output("hard_regression", "true" if hard_regression else "false")
     return 0
