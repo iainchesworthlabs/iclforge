@@ -2,10 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
 #include <iterator>
 #include <optional>
-#include <system_error>
 #include <utility>
 
 namespace iclforge::lyrics {
@@ -15,7 +13,6 @@ namespace {
 // How long the last line lasts when nothing says: the item's duration, a
 // `[length:]` tag, and a closing time tag are all better, and are used first.
 constexpr std::int64_t kLastLineMs = 5000;
-constexpr std::uintmax_t kMaxFileBytes = 4U * 1024U * 1024U;
 
 // ASCII white space only, whatever the locale: a byte of a UTF-8 sequence is not
 // white space in any locale's table that matters here, but a Latin-1 locale
@@ -488,58 +485,6 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
         lyrics.lines.push_back(std::move(line));
     }
     return lyrics;
-}
-
-std::expected<Lyrics, std::string> read_lyrics(const std::filesystem::path& file,
-                                               std::optional<std::int64_t> duration_ms) {
-    std::error_code sized;
-    const std::uintmax_t size = std::filesystem::file_size(file, sized);
-    if (sized) {
-        return std::unexpected(std::string{"The lyrics file could not be read: "} + sized.message());
-    }
-    if (size > kMaxFileBytes) {
-        return std::unexpected(std::string{"The lyrics file is too large to be lyrics."});
-    }
-    std::ifstream in(file, std::ios::binary);
-    if (!in) {
-        return std::unexpected(std::string{"The lyrics file could not be opened."});
-    }
-    std::string bytes(static_cast<std::size_t>(size), '\0');
-    if (!bytes.empty() && !in.read(bytes.data(), static_cast<std::streamsize>(bytes.size()))) {
-        return std::unexpected(std::string{"The lyrics file could not be read."});
-    }
-    return parse_lyrics(bytes, duration_ms);
-}
-
-std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path) {
-    const std::filesystem::path media{item_path};
-    const std::filesystem::path folder = media.parent_path();
-    const std::string stem = media.stem().string();
-    if (stem.empty()) {
-        return std::nullopt;
-    }
-    std::error_code error;
-    // The usual spelling first, which is also the only one on a case-
-    // insensitive file system.
-    const std::filesystem::path usual = folder / (stem + ".lrc");
-    if (std::filesystem::is_regular_file(usual, error) && !error) {
-        return usual;
-    }
-    error.clear();
-    std::filesystem::directory_iterator it(folder.empty() ? std::filesystem::path{"."} : folder,
-                                           std::filesystem::directory_options::skip_permission_denied,
-                                           error);
-    const std::filesystem::directory_iterator end;
-    while (!error && it != end) {
-        std::error_code entry_error;
-        if (it->is_regular_file(entry_error) && !entry_error &&
-            it->path().stem().string() == stem &&
-            lowercase(it->path().extension().string()) == ".lrc") {
-            return it->path();
-        }
-        it.increment(error);
-    }
-    return std::nullopt;
 }
 
 LyricPosition lyric_position(const Lyrics& lyrics, std::int64_t position_ms,

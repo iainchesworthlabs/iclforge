@@ -10,12 +10,16 @@
 # Always STATIC and never installed, like iclforge::audio: no export annotations, and it is not part
 # of the distributed package.
 # ---------------------------------------------------------------------------
-# The minimum-footprint profile compiles what it needs into one archive (libs/ac3/minimal.cmake).
-if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
+# The minimum-footprint profile compiles what it needs into one archive (libs/ac3/minimal.cmake),
+# which has no use for the lyrics; a sink's player (ICLFORGE_SENDSPIN_PLAYER_ONLY, set by
+# firmware/esp-idf/iclforge/CMakeLists.txt) follows an item's words and needs them.
+if((ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER) AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
     return()
 endif()
 
-add_library(iclforge_lyrics STATIC src/lyrics.cpp src/timing.cpp)
+# files.cpp is the part that reads a file: kept apart so that a program that only parses text (the sink
+# firmware) does not link the stream and file-system code.
+add_library(iclforge_lyrics STATIC src/lyrics.cpp src/timing.cpp src/files.cpp)
 add_library(iclforge::lyrics ALIAS iclforge_lyrics)
 target_include_directories(iclforge_lyrics PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")

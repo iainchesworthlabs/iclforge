@@ -31,7 +31,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `device` (internal) | `libs/device/` | The device-side logic of the ESP32 sinks and players that needs no SDK, so that the host tests it: the interleave and the slot conversion, the playout and DAC queue models, the sink planner, the Improv provisioning protocol, the pairing records and the firmware image rules. Header-only. Internal; never installed. | nothing | `esp-idf`, `hearth`, `hearth-sink` | core |
 | `dsp` | `libs/dsp/` | The signal processing more than one library uses: the FFT, the QMF bank, the offline sample-rate converter and filter sections, and the tiered (float and fixed-point) kernels AC-4 builds at its decode tier. | `base` | `ac3`, `ac4`, `baremetal`, `esp-idf`, `forge`, `objects`, `tests` | core |
 | `iab` | `libs/iab/` | SMPTE ST 2098-2 Immersive Audio Bitstream reading and writing, as bare bitstreams and in MXF. | `base` | `adm`, `examples`, `forge` | core |
-| `lyrics` (internal) | `libs/lyrics/` | Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words and written back, the file's place beside a media item, the stateless cursor that says which line and word a playing position is in, and the editing a tap timer needs (a line's start, a word's start, an estimate by letters). Standard library only, so that Hearth, Crucible, the sink firmware and the browser can all link it. Internal; never installed. | nothing | `hearth` | core |
+| `lyrics` (internal) | `libs/lyrics/` | Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words and written back, the file's place beside a media item, the stateless cursor that says which line and word a playing position is in, and the editing a tap timer needs (a line's start, a word's start, an estimate by letters). Standard library only, so that Hearth, Crucible, the sink firmware and the browser can all link it. Internal; never installed. | nothing | `esp-idf`, `hearth`, `hearth-sink` | core |
 | `objects` | `libs/objects/` | The object-audio model: an object's position and path over time, the placement an encoder is handed each frame, and the Object Audio Metadata payload of ETSI TS 103 420 with the EMDF container it travels in. | `base`, `dsp` | `ac3`, `ac4`, `adm`, `app-media`, `audio`, `baremetal`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `render` | core |
 | `render` | `libs/render/` | From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it. | `base`, `objects` | `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink` | core |
 | `sendspin` (internal) | `libs/sendspin/` | The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed. | `time-filter` | `esp-idf`, `hearth`, `hearth-sink` | core |
@@ -73,7 +73,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
-| `esp-idf` | `firmware/esp-idf/` | The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples. | `ac3`, `ac4`, `base`, `device`, `dsp`, `objects`, `render`, `sendspin` | `hearth-sink` | esp |
+| `esp-idf` | `firmware/esp-idf/` | The ESP-IDF component: the codec and player for the ESP32-S3, C3, C6 and P4, with its examples. | `ac3`, `ac4`, `base`, `device`, `dsp`, `lyrics`, `objects`, `render`, `sendspin` | `hearth-sink` | esp |
 
 ## Firmware
 
@@ -81,7 +81,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 |---|---|---|---|---|---|
 | `baremetal` | `firmware/baremetal/` | The minimum-footprint probes: the Cortex-M3 build under QEMU, the ESP32 images and the fixtures they decode. | `ac3`, `ac4`, `base`, `dsp`, `objects`, `render` | nothing | esp |
 | `esphome` | `firmware/esphome/` | The ESPHome external component that brings the ESP-IDF component into an ESPHome build. | `ac3` | nothing | esp |
-| `hearth-sink` | `firmware/hearth-sink/` | Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component. | `ac3`, `device`, `esp-idf`, `render`, `sendspin` | nothing | esp |
+| `hearth-sink` | `firmware/hearth-sink/` | Hearth's sink firmware for the ESP32 boards, a Sendspin player built on the ESP-IDF component. | `ac3`, `device`, `esp-idf`, `lyrics`, `render`, `sendspin` | nothing | esp |
 
 ## Examples
 
