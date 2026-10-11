@@ -27,6 +27,8 @@
 # sink_wait.hpp is header-only: 'play', 'monitor', 'identify' and 'live' wait on their sinks
 # through it, and test_sink_wait.cpp holds those waits against sinks that stop on cue. These three
 # tests were in libs/ac3/tests and libs/audio/tests until the code they test moved (C7-2).
+# source_frame.hpp is header-only too: forge encode and the Forge GUI fill every frame they hand an
+# encoder through it, so what a source supplies past its end (its last sample, held) is held here.
 # ---------------------------------------------------------------------------
 iclforge_add_test_binary(iclforge-app-media-tests PROJECT app-media SOURCES
     test_ac4_objects_core.cpp
@@ -34,6 +36,7 @@ iclforge_add_test_binary(iclforge-app-media-tests PROJECT app-media SOURCES
     test_container_input.cpp
     test_recording_sink.cpp
     test_sink_wait.cpp
+    test_source_frame.cpp
     test_stream_playback.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/fmp4_folder_writer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/recording_sink.cpp"
