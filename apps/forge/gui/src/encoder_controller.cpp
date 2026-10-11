@@ -1659,11 +1659,20 @@ QString EncoderController::metaTokens() const {
     // lfemix's default is a VALUE (kLfeMixLevelIdeal), so "off" is the
     // non-default worth spelling; dmixmod's default is Lo/Ro, so "ltrt" and
     // the explicit "none" are the two that need saying.
-    if (meta_.lfemix != defaults.lfemix) {
+    //
+    // Each rides in a group the stream has to carry for it to be written at all: E-AC-3's mixing
+    // metadata (mixmeta) for both, and AC-3's Annex D (annexd) for dmixmod. The command line
+    // reads either token as asking for its group - lfemix= and dmixmod= each turn mixmeta on, and
+    // dmixmod= annexd - so a value held under a group that is off, which the encode leaves out,
+    // would make the line write a stream the window does not. It is left off the line, as it is
+    // left off the stream.
+    const bool mixing_group = codec_ == plan::Codec::kEac3 && meta_.mixmeta;
+    const bool downmix_group = mixing_group || (codec_ == plan::Codec::kAc3 && meta_.annexd);
+    if (mixing_group && meta_.lfemix != defaults.lfemix) {
         tokens.append(meta_.lfemix ? QStringLiteral("lfemix=%1").arg(*meta_.lfemix)
                                    : QStringLiteral("lfemix=off"));
     }
-    if (meta_.dmixmod != defaults.dmixmod) {
+    if (downmix_group && meta_.dmixmod != defaults.dmixmod) {
         QString name = QStringLiteral("none");
         switch (meta_.dmixmod) {
             case iclforge::ac3::meta::DownmixMode::kLtRt:
@@ -2504,8 +2513,29 @@ void EncoderController::resetEncodeSettings() {
     vbr_min_kbps_ = 192;
     vbr_max_enabled_ = false;
     vbr_max_kbps_ = 640;
+    // The AC-4 tab's choices are the same kind of setting, and `ac4-encode`'s own defaults are the
+    // struct's.
+    ac4_ = forge_gui::Ac4EncodeSettings{};
     emit planChanged();
     refreshRouting();
+}
+
+int EncoderController::setAc4Option(const QString& key, const QString& value) {
+    if (busy_) {
+        return 1;
+    }
+    forge_gui::Ac4EncodeSettings next = ac4_;
+    switch (forge_gui::ac4_apply_option(next, key.toStdString(), value.toStdString())) {
+        case forge_gui::Ac4OptionResult::kApplied:
+            break;
+        case forge_gui::Ac4OptionResult::kBadValue:
+            return 1;
+        case forge_gui::Ac4OptionResult::kNotHeld:
+            return 2;
+    }
+    ac4_ = next;
+    emit planChanged();
+    return 0;
 }
 
 bool EncoderController::setToolsFromToken(const QString& text) {
