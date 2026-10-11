@@ -111,6 +111,9 @@ struct MemberForm {
     MemberAction action = MemberAction::kHold;
     // kPcm: the width the sink is asked for.
     std::int32_t channels = 0;
+    // What the sink is sent, in a few words, for the column of a table: "E-AC-3 as it is",
+    // "PCM · 2.0", "Nothing · held back". The reason is choice.reason.
+    std::string label{};
 };
 
 struct GroupFormPlan {

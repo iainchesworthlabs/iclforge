@@ -338,6 +338,14 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
         // own header comment on why membership is kept here rather than
         // read back from Group, and in sink-id rather than client_id terms.
         std::vector<std::string> member_sink_ids{};
+        // What plan_group() last decided for each member, by sink id: the form's key
+        // (GroupMemberFacts::form), its label and the reason.
+        struct Planned {
+            std::string form{};
+            std::string label{};
+            std::string reason{};
+        };
+        std::map<std::string, Planned> planned{};
     };
 
     // A dial to make once mutex_ is released: to pair, or not.
