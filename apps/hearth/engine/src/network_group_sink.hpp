@@ -13,6 +13,7 @@
 #include "iclforge/audio/monitor.hpp"
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/render/layout.hpp"
+#include "sink_form.hpp"
 #include "transport.hpp"
 
 // Forward-declared, not included: player.hpp includes this header
@@ -68,6 +69,9 @@ public:
         std::uint16_t coded_channels = 0;
         // The objects it places (ItemFacts::objects); 0 for none or not known.
         std::uint16_t objects = 0;
+        // The karaoke reproduction the item is to be heard in, when it is a karaoke stream and
+        // one is wanted (StreamNeeds::karaoke).
+        std::optional<KaraokeChoice> karaoke{};
     };
 
     // The layouts the open group's members are to be sent PCM at, beyond
@@ -86,6 +90,11 @@ public:
                                                                             const Format& format) = 0;
     virtual void close() = 0;
     [[nodiscard]] virtual bool is_open() const = 0;
+
+    // The singer changed the karaoke reproduction while the open group plays: the members that
+    // decode for themselves are told (NetworkSinks::apply_karaoke()), the ones sent PCM have it
+    // applied where the PCM is made. Nothing when the group is not open, or has no applier.
+    virtual void set_karaoke(const KaraokeChoice& choice) { static_cast<void>(choice); }
 
     // One rendered block, planar like PcmSink::submit() - converted to the
     // group's own interleaved form internally. Returns the frames actually
@@ -159,6 +168,8 @@ struct GroupPlanRequest {
     std::uint32_t sample_rate = 0;
     std::uint16_t coded_channels = 0;
     std::uint16_t objects = 0;
+    // As NetworkGroupSink::Format::karaoke.
+    std::optional<KaraokeChoice> karaoke{};
     // The layout the player renders to, which a member that wants it is sent.
     render::OutputLayout layout{};
 };
@@ -171,7 +182,12 @@ struct GroupPlanRequest {
 using MemberPlanner =
     std::function<std::vector<render::OutputLayout>(const GroupPlanRequest& request)>;
 
+// Tells the members of group `group_id` that decode for themselves how to reproduce a karaoke
+// stream, for a choice made while it plays (NetworkGroupSink::set_karaoke()).
+using KaraokeApplier = std::function<void(const std::string& group_id, const KaraokeChoice& choice)>;
+
 [[nodiscard]] std::unique_ptr<NetworkGroupSink> make_group_sink(GroupResolver resolve,
-                                                                MemberPlanner plan = {});
+                                                                MemberPlanner plan = {},
+                                                                KaraokeApplier karaoke = {});
 
 }  // namespace iclforge::hearth

@@ -140,7 +140,7 @@ The sections below contain the complete change list and fixes.
   karaoke AC-3 stream, its coding mode and which of M, V1 and V2 it carries - and chooses how it is
   reproduced: as coded, aware or capable, with none, V1, V2 or both vocals. It shows which part each
   speaker carries, and says in words when the choice cannot apply: a stream that is not karaoke, a
-  bitstream output, a network group, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
+  bitstream output, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
   is kept across starts, the one decoder setting that is. The Decoder page shows it in a line with
   a button to the page.
 - **Hearth shows lyrics, word by word.** The Karaoke page has a Lyrics card for the `.lrc` file
@@ -151,6 +151,14 @@ The sections below contain the complete change list and fixes.
   said in words. `F11` opens the lyrics full screen (`Esc` leaves) with the transport and the
   vocals chooser kept at the bottom, and Settings has a lyric delay of -1,000 to +1,000 ms that is
   kept across starts.
+- **A karaoke stream is one reproduction across a network group.** `_iclforge_player@v1` takes
+  two more decoder settings, `karaoke` (`off`, `aware`, `capable`) and `karaoke_vocals` (`none`,
+  `v1`, `v2`, `both`), which a sink lists when it has them. Hearth sends a karaoke AC-3 stream as
+  it is to a sink that lists them, and tells it the singer's choice before the stream starts and
+  when it changes while the item plays; the sink's decoder reproduces it (L, C, R and the LFE, so
+  its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
+  firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
+  reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
 - **The lyric reader is a library, and reads UTF-16.** `iclforge::lyrics` (`libs/lyrics`) is what
   was `apps/hearth/engine/src/lyrics.*`: standard library only, so Crucible, the sink firmware and
   the browser can read the same files without a second parser (planning/karaoke-phase2.md, W13a).
@@ -178,6 +186,18 @@ The sections below contain the complete change list and fixes.
   a 5.1 bed), is band-limited by the window as any channel assigned to the LFE is, and comes out of
   a karaoke reproduction as L, C, R and the LFE. A multichannel file's own LFE is the stream's, where
   it was a named problem. A project keeps the part as `lfe` (planning/karaoke-phase2.md, W9).
+- **A project holds the AC-4 tab and AC-4 objects, and a karaoke project's parts lay themselves
+  out.** `encode.options` of an AC-4 project is `ac4-encode`'s own words (`frame-rate`, `codec-mode`,
+  `dialnorm`, `drc`, `cmixlev`, `dialogue-channels`, ... and `coding` for objects), and
+  `forge project` runs an AC-4 object session as `atmos-encode ... codec=ac4` with its scene, its
+  `src=`, `map=` and offsets, and AC-4 into an MP4 file as the one command that writes it. Sources
+  that each name a `part` (backing, melody, vocal1, vocal2) and a project with no `bed` and no
+  `assignments` are laid out where Annex C's Table C.2.1 puts them, by the Karaoke flow and by
+  `forge project` from one table, so the example's four parts alone are its stream byte for byte.
+  Fixed: the window's LFE mix and preferred downmix were written to the command line (and so to a
+  project) when E-AC-3's mixing metadata, or AC-3's Annex D, was off and the stream had neither, so
+  the line and the project were a different stream than the window encoded; they are now written
+  with their group, and a project that names either asks for it, as `forge` reads it.
 - **The browser decode demo reproduces karaoke streams.** `PushDecoder` and the npm package's
   `FoldOptions` take `karaoke` (as coded, aware, capable) and `karaokeVocals` (none, V1, V2, both),
   and every push says whether the unit is Annex C karaoke type. The demo page shows a control for
