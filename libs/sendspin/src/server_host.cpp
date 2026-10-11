@@ -115,10 +115,12 @@ struct ServerHost::State {
     std::set<Key32> sources;
     // The clients the host plays on player@v1's PCM although they offer the extension role
     // (use_pcm()), each with the most audio a chunk to it may carry (0: no limit) and the channel
-    // count of the PCM it is to get (0: the first its player lists that the programme can make).
+    // count of the PCM it is to get (0: the first its player lists that the programme can make),
+    // and the codec it is to get it in (unset: the first its player lists).
     struct PcmRequest {
         std::size_t max_chunk_bytes = 0;
         std::int32_t channels = 0;
+        std::optional<m::Codec> codec{};
     };
     std::map<Key32, PcmRequest> pcm_clients;
     std::vector<std::weak_ptr<Group::State>> groups;
@@ -929,7 +931,7 @@ bool ServerHost::allow_source(const std::string& client_id, bool allowed) {
 }
 
 bool ServerHost::use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes,
-                         std::int32_t channels) {
+                         std::int32_t channels, std::optional<m::Codec> codec) {
     const std::shared_ptr<HostConnection> connection = state_->find(client_id);
     if (!connection) {
         return false;
@@ -938,7 +940,8 @@ bool ServerHost::use_pcm(const std::string& client_id, bool use, std::size_t max
         const std::lock_guard lock(state_->mutex);
         const Key32 key = connection->view().client_key;
         if (use) {
-            state_->pcm_clients[key] = {.max_chunk_bytes = max_chunk_bytes, .channels = channels};
+            state_->pcm_clients[key] = {
+                .max_chunk_bytes = max_chunk_bytes, .channels = channels, .codec = codec};
         } else {
             state_->pcm_clients.erase(key);
         }
@@ -1396,12 +1399,16 @@ struct Group::State {
                     request = found->second;
                 }
             }
-            // The first of its listed formats the programme can make, at the width asked for when
-            // one was, from whichever of the programme's variants has that width.
+            // The first of its listed formats the programme can make, at the width and in the
+            // codec asked for when one was, from whichever of the programme's variants has that
+            // width.
             const m::AudioFormat* chosen = nullptr;
             std::size_t chosen_variant = 0;
             for (const m::AudioFormat& format : client.player_support->supported_formats) {
                 if (request.channels != 0 && format.channels != request.channels) {
+                    continue;
+                }
+                if (request.codec && format.codec != *request.codec) {
                     continue;
                 }
                 for (std::size_t index = 0; index < variant_count() && chosen == nullptr; ++index) {

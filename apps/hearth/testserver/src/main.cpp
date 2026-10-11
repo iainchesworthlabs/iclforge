@@ -83,6 +83,8 @@ _iclforge_player@v1, and writes a report of what each said about it.
                        role (needs --tone, and takes no --layout)
     --max-chunk-bytes N  with --pcm, at most N bytes of audio in a chunk to
                        it (a board takes a few KB a message); default 20 ms
+    --opus             with --pcm, in Opus (20 ms packets) where the player
+                       lists it, a twelfth of PCM's bytes and lossy
 
   --play FILE          the programme, an .ac3 or .ec3 file
   --tone               instead of a file, two tones at 48 kHz stereo for
@@ -143,6 +145,8 @@ struct PlayerSpec {
     // role, in chunks of at most max_chunk_bytes of audio (0: 20 ms).
     bool pcm = false;
     std::size_t max_chunk_bytes = 0;
+    // With pcm: in Opus, where the player lists it (ServerHost::use_pcm's codec).
+    bool opus = false;
 };
 
 // What one board's GET /status said, sampled once a second.
@@ -537,7 +541,9 @@ class BurstSource {
         if (run.spec.pcm && !asked_for_pcm && now &&
             now->psk == ss::handshake::PskCategory::kLongTerm && now->available) {
             // Paired and playing its first role: now it is moved to PCM, and chunked to its limit.
-            if (!host.use_pcm(run.client_id, true, run.spec.max_chunk_bytes)) {
+            if (!host.use_pcm(
+                    run.client_id, true, run.spec.max_chunk_bytes, 0,
+                    run.spec.opus ? std::optional<m::Codec>{m::Codec::kOpus} : std::nullopt)) {
                 return fail("cannot be asked to play PCM");
             }
             asked_for_pcm = true;
@@ -560,7 +566,8 @@ class BurstSource {
         std::this_thread::sleep_for(50ms);
     }
     if (run.spec.pcm) {
-        note(run.spec.label + ": playing player@v1's PCM (" + run.dialect + ")" +
+        note(run.spec.label + ": playing player@v1's " + (run.spec.opus ? "Opus" : "PCM") + " (" +
+             run.dialect + ")" +
              (run.spec.max_chunk_bytes != 0
                   ? ", chunks of at most " + std::to_string(run.spec.max_chunk_bytes) +
                         " bytes of audio"
@@ -649,6 +656,7 @@ void write_report(std::ostream& out, const std::string& server_name, const std::
         w.member("settings_revision", run.settings_revision);
         w.member("role", run.spec.pcm ? "player@v1" : "_iclforge_player@v1");
         w.member("max_chunk_bytes", static_cast<std::uint64_t>(run.spec.max_chunk_bytes));
+        w.member("codec", run.spec.pcm ? (run.spec.opus ? "opus" : "pcm") : "bursts");
         w.key("failure");
         run.failure ? w.string(*run.failure) : w.null();
         if (run.last_view && run.last_view->iclforge_state) {
@@ -821,6 +829,14 @@ int main(int argc, char** argv) {
                 return kExitUsage;
             }
             players.back().hold = true;
+            continue;
+        }
+        if (argument == "--opus") {
+            if (players.empty() || players.back().in_process || !players.back().pcm) {
+                std::cerr << "--opus follows a --player and its --pcm\n";
+                return kExitUsage;
+            }
+            players.back().opus = true;
             continue;
         }
         if (argument == "--pcm") {

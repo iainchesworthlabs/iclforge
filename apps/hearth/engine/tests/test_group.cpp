@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <array>
@@ -91,6 +92,7 @@ class QuietLog final : public testsink::SinkLog {
             }
             code_ = digits;
         }
+        lines_.emplace_back(text);
     }
 
     // The last dynamic pairing code a sink showed, as digits.
@@ -99,9 +101,17 @@ class QuietLog final : public testsink::SinkLog {
         return code_;
     }
 
+    // Whether any line a sink logged holds `text`.
+    bool saw(std::string_view text) {
+        const std::lock_guard lock(mutex_);
+        return std::ranges::any_of(
+            lines_, [&](const std::string& line) { return line.find(text) != std::string::npos; });
+    }
+
    private:
     std::mutex mutex_;
     std::optional<std::string> code_;
+    std::vector<std::string> lines_;
 };
 
 class HostEvents final : public iclforge::sendspin::ServerHostEvents {
@@ -1431,6 +1441,98 @@ TEST_CASE("group: a PCM sink with a small buffer is fed before play and not afte
         std::this_thread::sleep_for(20ms);
     }
     CHECK(sink->totals().frames == kFrames);
+    group.reset();
+    host->reset();
+}
+
+// A sink that lists PCM and Opus is played what it lists first, and Opus when the host is asked
+// for it (use_pcm's codec): the stream it starts says which, and every frame of it is decoded.
+TEST_CASE("group: a sink that lists PCM and Opus is played Opus when asked for it",
+          "[hearth][group][websocket]") {
+    namespace ss = iclforge::sendspin;
+    const bool ask_opus = GENERATE(false, true);
+    CAPTURE(ask_opus);
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_opus_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    testsink::SinkOptions options;
+    options.name = "Opus";
+    options.address = "127.0.0.1";
+    options.port = 0;
+    options.state_directory = scratch / "state";
+    options.output_directory = scratch / "out";
+    options.advertise = false;
+    options.unpaired_access = true;
+    options.codecs = {m::Codec::kPcm, m::Codec::kOpus};
+    options.extension_role = false;
+    auto started = testsink::Sink::start(options, log);
+    REQUIRE(started.has_value());
+    const std::unique_ptr<testsink::Sink> sink = std::move(*started);
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    (*host)->dial("ws://127.0.0.1:" + std::to_string(sink->port()) + "/sendspin");
+    REQUIRE(
+        events.wait([&](const auto& clients) { return clients.contains(sink->client_id()); }, 15s));
+    REQUIRE((*host)->approve(sink->client_id(), true));
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            const auto found = clients.find(sink->client_id());
+            return found != clients.end() && found->second.playing && found->second.available;
+        },
+        30s));
+    if (ask_opus) {
+        REQUIRE((*host)->use_pcm(sink->client_id(), true, 0, 0, m::Codec::kOpus));
+    }
+
+    constexpr std::size_t kFrames = 2 * 48000;
+    std::vector<std::int32_t> programme;
+    for (std::size_t frame = 0; frame < kFrames; ++frame) {
+        const auto t = static_cast<double>(frame);
+        programme.push_back(static_cast<std::int32_t>(std::lround(9000.0 * std::sin(t * 0.0575))));
+        programme.push_back(static_cast<std::int32_t>(std::lround(9000.0 * std::sin(t * 0.131))));
+    }
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Opus");
+    group->add(sink->client_id());
+    const m::AudioFormat pcm_format{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    REQUIRE(group->start({.pcm = pcm_format, .bursts = std::nullopt, .buffered = true}));
+    std::size_t offset = 0;
+    const auto deadline = std::chrono::steady_clock::now() + 30s;
+    while (offset < programme.size() && std::chrono::steady_clock::now() < deadline) {
+        const std::size_t block = std::min<std::size_t>(4800 * 2, programme.size() - offset);
+        const std::size_t taken =
+            group->push(std::span<const std::int32_t>(programme).subspan(offset, block));
+        if (taken > 0) {
+            offset += taken * 2;
+        } else {
+            std::this_thread::sleep_for(5ms);
+        }
+    }
+    REQUIRE(offset == programme.size());
+    group->stop();
+
+    const auto until = std::chrono::steady_clock::now() + 15s;
+    while (sink->totals().frames < kFrames - 4800 && std::chrono::steady_clock::now() < until) {
+        std::this_thread::sleep_for(20ms);
+    }
+    CHECK(log.saw(ask_opus ? "stream Opus 48000 Hz" : "stream PCM 48000 Hz"));
+    CHECK_FALSE(log.saw(ask_opus ? "stream PCM" : "stream Opus"));
+    // Every packet decoded: all of it but the last 100 ms, which a stop may cut.
+    CHECK(sink->totals().frames >= kFrames - 4800);
     group.reset();
     host->reset();
 }
