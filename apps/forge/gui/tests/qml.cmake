@@ -45,6 +45,8 @@ qt_add_executable(forge_gui_qmltests
     src/karaoke_authoring_controller.hpp
     src/project_file.cpp
     src/project_file.hpp
+    ../../shared/project/src/project_document.cpp
+    ../../shared/project/src/project_document.hpp
     ../../shared/media/src/ac4_sync_word.hpp
     ../../shared/media/src/fmp4_folder_writer.cpp
     ../../shared/media/src/fmp4_folder_writer.hpp
@@ -74,6 +76,7 @@ qt_add_executable(forge_gui_qmltests
 target_include_directories(forge_gui_qmltests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/preferences/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/project/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/src")
 
 qt_add_qml_module(forge_gui_qmltests
@@ -176,6 +179,7 @@ target_link_libraries(forge_gui_qmltests
         iclforge::ac4
         iclforge::warnings
         iclforge::fmt
+        iclforge::json
         # This target recompiles encoder_controller.cpp/stream_player_controller.cpp
         # from scratch (this file's own header comment), so it needs the same
         # profiling header pair ../CMakeLists.txt's forge-gui target links -

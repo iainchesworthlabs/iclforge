@@ -449,6 +449,8 @@ ignored, per [E14](#encryption); a known key with an invalid value refuses the w
 | `programme` | integer or `null` | `DecoderConfig::programme` |
 | `objects` | `"auto"`, `"always"`, `"never"` | `ac3::render::ObjectsPolicy` |
 | `concealment` | `"none"`, `"repeat_fade"`, `"mute"` | `DecoderConfig::concealment` |
+| `karaoke` | `"off"`, `"aware"`, `"capable"` | `OutputConfig::karaoke` (`KaraokeReproduction::kOff`, `kAware`, `kCapable`): Annex C's reproduction of an AC-3 stream flagged bsmod 7. A reproduced frame is L, C, R and the LFE, not the coded layout, so a sink lays its speakers out from `ac3::output_mode()` and not from the coded `acmod` |
+| `karaoke_vocals` | `"none"`, `"v1"`, `"v2"`, `"both"` | `OutputConfig::karaoke_vocals`: which vocals the `"capable"` reproduction plays; read and ignored by the other two |
 
 ### Identify
 
