@@ -83,6 +83,14 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke-capable decoder can re-level the melody and the vocals.** `OutputConfig` gains
+  `karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, linear and 1.0 by
+  default, which multiply the Table C.2.3 coefficients of M, V1 and V2 (Annex C.2.3's "additional
+  flexibility") at the 3/0 and the 2/0 reproductions, before the scale-down that holds an output's
+  sum to 1. They are read under `KaraokeReproduction::kCapable` alone: the aware column ignores
+  them, and at 1.0 every output is the table's, bit for bit. A gain that is not a finite number of
+  0 or more is a mute (planning/karaoke-phase2.md, W10).
+
 - **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
   outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
   M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at

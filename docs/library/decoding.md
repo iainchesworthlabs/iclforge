@@ -539,11 +539,20 @@ which has to be for Annex C's remark that a Lo/Ro downmix is the aware 2/0 repro
 listener's levels and not the stream's `surmixlev`, so the stream's own surround level is not read.
 A choice of a vocal the stream does not code (V2 of a 3/1 stream) reproduces none of it, and V1+V2
 over a stream with one vocal puts V1 into the left alone, as the table's column does. `kLtRt` is
-left as the Lt/Rt fold in both modes. The annex's "additional flexibility" - moving or re-levelling
-V1, V2 and M, and what to do with the surround outputs - is left to the implementation and is not
-offered. No stream from anyone else exists to check any of this against, so it is held to the
-annex's tables - by impulse for every coefficient, transcribed from the PDF into the tests, and
-over real coded streams sample for sample.
+left as the Lt/Rt fold in both modes. No stream from anyone else exists to check any of this
+against, so it is held to the annex's tables - by impulse for every coefficient, transcribed from
+the PDF into the tests, and over real coded streams sample for sample.
+
+The annex's "additional flexibility" is the capable decoder's re-levelling of M, V1 and V2:
+`OutputConfig::karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, linear gains
+that multiply the table's coefficients for that part, 1.0 each by default (the table as it stands,
+bit for bit) and 0.0 a mute. They are read under `kCapable` alone - at the 3/0 and at the 2/0
+reproductions - and the aware column (Table C.2.2) ignores them, whatever they hold. They come
+before the scale-down above, so raising one part lowers the rest, the music included, by the same
+factor, and a muted part is out of the sums as an absent one is; L and R are not moved, a part the
+stream does not code has nothing for its gain to act on, and the LFE is never touched. A value that
+is not a finite number of 0 or more is a mute. What to do with the surround outputs, and moving
+(not re-levelling) a part, are left to the implementation and are not offered.
 
 **A §E2.3.1.2 legacy core inside `Eac3Decoder`.** An AC-3 syncframe (`bsid` <= 8) present in an
 E-AC-3 stream is processed as independent substream 0, and its channels become the bed §E3.8.2

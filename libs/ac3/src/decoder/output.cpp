@@ -315,6 +315,27 @@ KaraokeCoefficients capable(bool three_channel, KaraokeVocals vocals, double cle
     return k;
 }
 
+// The listener's gains on M, V1 and V2 (OutputConfig::karaoke_*_gain), as the
+// coefficients take them: 1.0 each unless the decoder is the karaoke-capable
+// one, whose "additional flexibility" they are (C.2.3), and a value that is not
+// a finite number of 0 or more is a mute. At 1.0 every product the callers
+// make is exact, so the tables come out as they were.
+struct PartGains {
+    double melody = 1.0;
+    double vocal1 = 1.0;
+    double vocal2 = 1.0;
+};
+
+PartGains part_gains(const OutputConfig& config) {
+    if (config.karaoke != KaraokeReproduction::kCapable) {
+        return {};
+    }
+    const auto sane = [](double gain) { return std::isfinite(gain) && gain > 0.0 ? gain : 0.0; };
+    return {.melody = sane(config.karaoke_melody_gain),
+            .vocal1 = sane(config.karaoke_vocal1_gain),
+            .vocal2 = sane(config.karaoke_vocal2_gain)};
+}
+
 // Whether a frame is Annex C's to reproduce at all, and as which column.
 bool karaoke_three_acmod(Acmod acmod) {
     // 3/0 is L M R already and 2/0 is L R alone: neither is a layout change.
@@ -369,6 +390,7 @@ FoldPlan plan_fold(const OutputConfig& config, std::size_t inputs, Acmod acmod, 
         const KaraokeSlots slot = karaoke_slots(acmod);
         const KaraokeCoefficients k =
             capable(false, config.karaoke_vocals, levels.loro_clev);
+        const PartGains gain = part_gains(config);
         struct Role {
             int slot;
             double to_left;
@@ -376,9 +398,9 @@ FoldPlan plan_fold(const OutputConfig& config, std::size_t inputs, Acmod acmod, 
         };
         const std::array<Role, 5> roles = {{{slot.left, 1.0, 0.0},
                                             {slot.right, 0.0, 1.0},
-                                            {slot.melody, k.c, k.i},
-                                            {slot.vocal1, k.a, k.g},
-                                            {slot.vocal2, k.b, k.h}}};
+                                            {slot.melody, k.c * gain.melody, k.i * gain.melody},
+                                            {slot.vocal1, k.a * gain.vocal1, k.g * gain.vocal1},
+                                            {slot.vocal2, k.b * gain.vocal2, k.h * gain.vocal2}}};
         double left_sum = 0.0;
         double right_sum = 0.0;
         for (const Role& role : roles) {
@@ -707,9 +729,21 @@ struct KaraokePlan {
 KaraokePlan plan_karaoke(const OutputConfig& config, Acmod acmod, bool lfe, std::size_t inputs,
                          double slev) {
     const KaraokeSlots slot = karaoke_slots(acmod);
-    const KaraokeCoefficients k = config.karaoke == KaraokeReproduction::kCapable
-                                      ? capable(true, config.karaoke_vocals, 0.0)
-                                      : aware_three_channel(slot.vocal2 >= 0, slev);
+    KaraokeCoefficients k = config.karaoke == KaraokeReproduction::kCapable
+                                ? capable(true, config.karaoke_vocals, 0.0)
+                                : aware_three_channel(slot.vocal2 >= 0, slev);
+    // The listener's re-levelling (kCapable only), in the coefficients before the sums are
+    // taken, so that the scale-down below holds the moved parts to 1 as it holds the rest.
+    const PartGains gain = part_gains(config);
+    k.a *= gain.vocal1;
+    k.d *= gain.vocal1;
+    k.g *= gain.vocal1;
+    k.b *= gain.vocal2;
+    k.e *= gain.vocal2;
+    k.h *= gain.vocal2;
+    k.c *= gain.melody;
+    k.f *= gain.melody;
+    k.i *= gain.melody;
     const auto present = [&](int index) {
         return index >= 0 && static_cast<std::size_t>(index) < inputs;
     };
