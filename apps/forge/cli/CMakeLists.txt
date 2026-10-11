@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # forge - the command-line front end over iclforge::ac3.
 # ---------------------------------------------------------------------------
-add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src/multi_source.cpp ../../shared/media/src/fmp4_folder_writer.cpp ../../shared/media/src/recording_sink.cpp ../../shared/media/src/container_input.cpp ../../shared/media/src/stream_playback.cpp ../../shared/media/src/associated_mix.cpp ../../shared/media/src/ac4_object_render.cpp ../../shared/media/src/ac4_encode_core.cpp ../../shared/media/src/ac4_objects_core.cpp src/commands/containers.cpp src/commands/audio_io.cpp src/commands/live_audio.cpp src/commands/synth.cpp src/commands/atmos.cpp src/commands/encode.cpp src/commands/ac4_encode.cpp src/commands/ac4_encode_objects.cpp src/commands/decode.cpp src/commands/analysis.cpp src/commands/probe.cpp src/commands/stream_tools.cpp)
+add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src/multi_source.cpp src/commands/project.cpp ../../shared/project/src/project_document.cpp ../../shared/project/src/project_command.cpp ../../shared/media/src/fmp4_folder_writer.cpp ../../shared/media/src/recording_sink.cpp ../../shared/media/src/container_input.cpp ../../shared/media/src/stream_playback.cpp ../../shared/media/src/associated_mix.cpp ../../shared/media/src/ac4_object_render.cpp ../../shared/media/src/ac4_encode_core.cpp ../../shared/media/src/ac4_objects_core.cpp src/commands/containers.cpp src/commands/audio_io.cpp src/commands/live_audio.cpp src/commands/synth.cpp src/commands/atmos.cpp src/commands/encode.cpp src/commands/ac4_encode.cpp src/commands/ac4_encode_objects.cpp src/commands/decode.cpp src/commands/analysis.cpp src/commands/probe.cpp src/commands/stream_tools.cpp)
 
 # ../../shared/media/src/recording_sink.cpp + fmp4_folder_writer.cpp: the take writer
 # 'record' and 'live' stream their output through (wide-layout record/live paths), shared
@@ -18,7 +18,10 @@ add_executable(forge src/main.cpp src/support.cpp src/usage.cpp src/json.cpp src
 # the steps of 'ac4-encode' forge-gui's AC-4 encode takes too, and
 # ../../shared/media/src/ac4_objects_core.cpp, the object slots and the AC-4 objects' steps
 # 'atmos-encode', 'atmos-adm' and 'atmos-iab' take, which forge-gui's AC-4 objects take too.
-target_include_directories(forge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src")
+target_include_directories(forge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src"
+    # `forge project` and the Forge GUI read the same file with the same code
+    # (apps/shared/project, which compiles straight in as apps/shared/media does).
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/project/src")
 
 # forge's platform-specific code, two seams' worth: putting stdin/stdout into
 # binary mode for the "-" stdin/stdout file-argument convention (see
@@ -103,6 +106,7 @@ target_link_libraries(forge
         iclforge::ac4
         iclforge::warnings
         iclforge::fmt
+        iclforge::json
         iclforge::coverage)
 
 # iclforge::ac3, iclforge::containers are link-only here, but

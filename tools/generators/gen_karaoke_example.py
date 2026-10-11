@@ -499,17 +499,27 @@ def project_json():
             {"path": PART_FILES["vocal1"], "part": "vocal1"},
             {"path": PART_FILES["vocal2"], "part": "vocal2"},
         ],
-        # What the stream is made with, written out although some of it is what the window
-        # starts with: the centre and surround levels are A/52's own defaults (codes 1 and 1, -4.5
-        # dB and -6 dB), which `forge encode` also takes when it is not told, so that the window
-        # and the README's line write the same bytes.
+        # The channel plan and where each channel goes, which the Karaoke flow works out from the
+        # parts and `forge project` does not (it has the file and not the flow): Annex C's 3/2 is
+        # L M R V1 V2, so the backing is L and R, the melody guide C and the vocals Ls and Rs.
+        "bed": "3/2",
+        "lfe": False,
+        "assignments": [
+            {"source": 0, "channel": 0, "to": "L"},
+            {"source": 0, "channel": 1, "to": "R"},
+            {"source": 1, "channel": 0, "to": "C"},
+            {"source": 2, "channel": 0, "to": "Ls"},
+            {"source": 3, "channel": 0, "to": "Rs"},
+        ],
+        # What the stream is made with, in the command line's own words: `bsmod=voiceover` is
+        # `bsmod` 7, which at a layout above 1/0 is the karaoke main service. The centre and
+        # surround levels are A/52's own defaults, which `forge encode` takes when it is not told
+        # (so there is nothing to say), and that is also what the window starts with.
         "encode": {
             "codec": "ac3",
             "container": "elementary",
             "bitrateKbps": BITRATE_KBPS,
-            "bsmod": 7,
-            "cmixlev": 1,
-            "surmixlev": 1,
+            "options": {"bsmod": "voiceover"},
         },
         "karaoke": {"input": "parts", "listening": "aware", "vocals": "both"},
     }

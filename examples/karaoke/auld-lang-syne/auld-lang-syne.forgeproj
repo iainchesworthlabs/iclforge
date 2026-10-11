@@ -21,13 +21,42 @@
       "part": "vocal2"
     }
   ],
+  "bed": "3/2",
+  "lfe": false,
+  "assignments": [
+    {
+      "source": 0,
+      "channel": 0,
+      "to": "L"
+    },
+    {
+      "source": 0,
+      "channel": 1,
+      "to": "R"
+    },
+    {
+      "source": 1,
+      "channel": 0,
+      "to": "C"
+    },
+    {
+      "source": 2,
+      "channel": 0,
+      "to": "Ls"
+    },
+    {
+      "source": 3,
+      "channel": 0,
+      "to": "Rs"
+    }
+  ],
   "encode": {
     "codec": "ac3",
     "container": "elementary",
     "bitrateKbps": 384,
-    "bsmod": 7,
-    "cmixlev": 1,
-    "surmixlev": 1
+    "options": {
+      "bsmod": "voiceover"
+    }
   },
   "karaoke": {
     "input": "parts",
