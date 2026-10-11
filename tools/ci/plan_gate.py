@@ -128,6 +128,7 @@ GUI_EXCEPTIONS = (
     "apps/shared/media/tests/test_container_input.cpp",
     "apps/shared/media/tests/test_stream_playback.cpp",
     "apps/shared/media/tests/test_sink_wait.cpp",
+    "apps/shared/project/tests/",
     "notices/fragments/forge-",
     "notices/fragments/qt-linux.txt",
     "notices/fragments/qt-macos.txt",

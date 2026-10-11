@@ -2483,6 +2483,69 @@ void EncoderController::setAnnexD(bool on) {
     emit planChanged();
 }
 
+void EncoderController::resetEncodeSettings() {
+    if (busy_) {
+        return;
+    }
+    tools_ = plan::Tools{};
+    // The whole group, not field by field: several of the setters above turn infomdat or annexd
+    // on as a side effect, and putting each field back by its setter would leave those on.
+    meta_ = plan::Metadata{};
+    drc_index_ = 0;
+    ceiling_db_ = -0.5;
+    dialogue_db_ = -20.0;
+    drc2_index_ = 0;
+    ceiling2_db_ = -0.5;
+    dialogue2_db_ = -20.0;
+    vbr_enabled_ = false;
+    vbr_quality_ = 75;
+    vbr_min_enabled_ = false;
+    vbr_min_kbps_ = 192;
+    vbr_max_enabled_ = false;
+    vbr_max_kbps_ = 640;
+    emit planChanged();
+    refreshRouting();
+}
+
+bool EncoderController::setToolsFromToken(const QString& text) {
+    plan::Tools parsed;
+    if (busy_ || !plan::parse_tools(text.toStdString(), parsed)) {
+        return false;
+    }
+    tools_ = parsed;
+    emit planChanged();
+    return true;
+}
+
+bool EncoderController::setVbrFromToken(const QString& text) {
+    std::optional<iclforge::ac3::eac3::VbrConfig> vbr;
+    if (busy_ || !plan::parse_vbr(text.toStdString(), vbr)) {
+        return false;
+    }
+    if (!vbr) {
+        vbr_enabled_ = false;
+        emit planChanged();
+        return true;
+    }
+    // Average-rate control, and a nominal rate for the tools to take their band edges from, are
+    // the command line's: the window's VBR is a quality and optional bounds.
+    if (vbr->abr || vbr->nominal_kbps) {
+        return false;
+    }
+    vbr_enabled_ = true;
+    vbr_quality_ = std::clamp(static_cast<int>(std::lround(vbr->quality * 100.0)), 0, 100);
+    vbr_min_enabled_ = vbr->min_kbps.has_value();
+    if (vbr->min_kbps) {
+        vbr_min_kbps_ = *vbr->min_kbps;
+    }
+    vbr_max_enabled_ = vbr->max_kbps.has_value();
+    if (vbr->max_kbps) {
+        vbr_max_kbps_ = *vbr->max_kbps;
+    }
+    emit planChanged();
+    return true;
+}
+
 void EncoderController::setAtmosEnabled(bool enabled) {
     if (atmos_enabled_ == enabled || busy_) {
         return;

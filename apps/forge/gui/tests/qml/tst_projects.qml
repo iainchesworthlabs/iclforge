@@ -51,7 +51,7 @@ TestCase {
         EncoderController.codecIndex = 0;
         EncoderController.containerIndex = 0;
         EncoderController.bitrateKbps = 192;
-        EncoderController.bsmodIndex = 0;
+        EncoderController.resetEncodeSettings();
         EncoderController.cmixIndex = defaultCmix;
         EncoderController.surmixIndex = defaultSurmix;
         EncoderController.applyChannelPreset("stereo");
@@ -100,6 +100,20 @@ TestCase {
         return audioFixtures.folder() + "/" + name;
     }
 
+    // A project file, as the window's own reader hands it over: the whole document, with where
+    // each source is made absolute.
+    function readProject(file) {
+        const read = ProjectFile.read(file);
+        verify(read.ok, JSON.stringify(read.error));
+        return JSON.parse(read.text);
+    }
+
+    function writeProject(name, document) {
+        const file = audioFixtures.writeText(name, JSON.stringify(document, null, 2));
+        verify(file.toString().length > 0);
+        return file;
+    }
+
     function bedId() {
         return EncoderController.bedChoices[EncoderController.bedIndex].id;
     }
@@ -126,9 +140,7 @@ TestCase {
     // ---- saving ---------------------------------------------------------------
     function test_aSavedProjectNamesItsPartsBesideItAndHowTheyAreHeard() {
         const file = saveThreeParts("kp-saved.forgeproj");
-        const read = ProjectFile.read(file);
-        verify(read.ok, JSON.stringify(read.error));
-        const project = read.project;
+        const project = readProject(file);
         compare(project.format, "iclforge-project");
         compare(project.version, 1);
         compare(project.flow, "karaoke");
@@ -140,9 +152,11 @@ TestCase {
         compare(project.sources[1].part, "melody");
         compare(project.sources[2].part, "vocal1");
         compare(project.encode.codec, "ac3");
+        compare(project.encode.container, "elementary");
         compare(project.encode.bitrateKbps, 256);
-        compare(project.encode.bsmod, 7);
-        compare(project.encode.cmixlev, 2);
+        // The command line's own words for the service and the mix level.
+        compare(project.encode.options.bsmod, "voiceover");
+        compare(project.encode.options.cmixlev, -6);
         compare(project.karaoke.listening, "capable");
         compare(project.karaoke.vocals, "v1");
         compare(project.bed, "3/1");
@@ -231,8 +245,7 @@ TestCase {
         EncoderController.setSourceOffset(1, 0.25);
         const file = inTheFolder("kp-expert.forgeproj");
         verify(win.saveProjectFile(file));
-        const read = ProjectFile.read(file);
-        verify(read.ok);
+        const read = { project: readProject(file) };
         compare(read.project.flow, "expert");
         compare(read.project.bed, "3/0");
         compare(read.project.lfe, false);
@@ -254,52 +267,41 @@ TestCase {
 
     // ---- extending ------------------------------------------------------------
     function test_aKeyThisVersionDoesNotKnowSurvivesAnOpenAndASave() {
-        const text = JSON.stringify({
+        const file = writeProject("kp-future.forgeproj", {
             format: "iclforge-project",
             version: 1,
             title: "From a later Forge",
             flow: "expert",
             sources: [{ path: "kp-backing.wav", note: "kept with its source", loop: true }],
-            encode: { bitrateKbps: 256, tomorrow: 7 },
+            encode: { bitrateKbps: 256, tomorrow: 7,
+                      options: { dialnorm: 27, "some-future-option": "x" } },
             comments: ["a", "b"],
             future: { x: 1 }
-        }, null, 2);
-        const file = audioFixtures.writeText("kp-future.forgeproj", text);
-        verify(file.toString().length > 0);
+        });
 
         const win = openWindow();
         verify(win.openProjectFile(file));
         compare(EncoderController.bitrateKbps, 256);
         compare(EncoderController.sourceModel.length, 1);
 
+        compare(EncoderController.dialnorm, 27);
         const again = inTheFolder("kp-future-saved.forgeproj");
         verify(win.saveProjectFile(again));
-        const back = ProjectFile.read(again).project;
+        const back = readProject(again);
         compare(back.title, "From a later Forge");
         compare(back.future.x, 1);
         compare(back.comments.length, 2);
         compare(back.encode.tomorrow, 7);
         compare(back.encode.bitrateKbps, 256);
+        // What the window holds is the window's; what it does not is passed through.
+        compare(back.encode.options.dialnorm, 27);
+        compare(back.encode.options["some-future-option"], "x");
         compare(back.sources[0].note, "kept with its source");
         compare(back.sources[0].loop, true);
         compare(back.sources[0].path, "kp-backing.wav");
     }
 
-    function test_theEncodeSettingsAreKeptByIdAndNotByPosition() {
-        EncoderController.codecIndex = 1;
-        EncoderController.containerIndex = 0;
-        EncoderController.bitrateKbps = 256;
-        EncoderController.bsmodIndex = 3;
-        EncoderController.cmixIndex = 2;
-        EncoderController.surmixIndex = 1;
-        const kept = ProjectFile.captureEncode(EncoderController);
-        compare(kept.codec, "eac3");
-        compare(kept.container, "elementary");
-        compare(kept.bitrateKbps, 256);
-        compare(kept.bsmod, 3);
-        compare(kept.cmixlev, 2);
-        compare(kept.surmixlev, 1);
-
+    function test_theCodecAndTheContainerAreKeptByIdAndNotByPosition() {
         // The positions the ids stand for, which the file must not depend on.
         compare(EncoderController.codecNames[0], "AC-3");
         compare(EncoderController.codecNames[1], "E-AC-3");
@@ -311,18 +313,128 @@ TestCase {
         compare(EncoderController.containerNames[4].indexOf("Fragmented"), 0);
         compare(EncoderController.containerNames[5].indexOf("MPEG-TS"), 0);
 
+        EncoderController.codecIndex = 1;
+        EncoderController.containerIndex = 3;
+        EncoderController.bitrateKbps = 256;
+        const kept = JSON.parse(ProjectFile.captureEncode(EncoderController));
+        compare(kept.codec, "eac3");
+        compare(kept.container, "mp4");
+        compare(kept.bitrateKbps, 256);
+
         cleanup();
-        compare(EncoderController.codecIndex, 0);
         compare(ProjectFile.applyEncode(EncoderController, kept, 0).length, 0);
-        compare(ProjectFile.applyEncode(EncoderController, kept, 1).length, 0);
         compare(EncoderController.codecIndex, 1);
+        compare(EncoderController.containerIndex, 3);
+        compare(ProjectFile.applyEncode(EncoderController, kept, 1).length, 0);
         compare(EncoderController.bitrateKbps, 256);
-        compare(EncoderController.bsmodIndex, 3);
-        compare(EncoderController.cmixIndex, 2);
-        compare(EncoderController.surmixIndex, 1);
+    }
+
+    function test_aFreshDraftHasNoOptionsAndAProjectOfOneHasNone() {
+        EncoderController.resetEncodeSettings();
+        const kept = JSON.parse(ProjectFile.captureEncode(EncoderController));
+        compare(Object.keys(kept.options).length, 0, JSON.stringify(kept.options));
+        compare(kept.tools, undefined);
+        compare(kept.vbr, undefined);
+    }
+
+    function test_theMetadataAndTheLoudnessAreKeptInTheCommandLinesOwnWords() {
+        EncoderController.resetEncodeSettings();
+        EncoderController.drcIndex = 2;
+        EncoderController.heavy = true;
+        EncoderController.ceilingDb = -2.0;
+        EncoderController.dialogueDb = -24.0;
+        EncoderController.measureDialnorm = true;
+        EncoderController.cmixIndex = 0;
+        EncoderController.surmixIndex = 2;
+        EncoderController.lfeMix = -1;
+        EncoderController.dmixIndex = 1;
+        EncoderController.bsmodIndex = 5;
+        EncoderController.mixLevelDbSpl = 105;
+        EncoderController.roomTypeIndex = 1;
+        EncoderController.copyrightBit = true;
+        EncoderController.originalBitstream = false;
+        const names = EncoderController.drcNames;
+        const kept = JSON.parse(ProjectFile.captureEncode(EncoderController)).options;
+        compare(kept.drc, names[2]);
+        compare(kept.heavy, true);
+        compare(kept.ceiling, -2);
+        compare(kept.dialogue, -24);
+        compare(kept.dialnorm, "auto");
+        compare(kept.cmixlev, -3);
+        compare(kept.surmixlev, "off");
+        compare(kept.lfemix, "off");
+        compare(kept.dmixmod, "ltrt");
+        compare(kept.bsmod, "commentary");
+        compare(kept.mixlevel, 105);
+        compare(kept.roomtyp, "large");
+        compare(kept.copyright, true);
+        compare(kept.origbs, "off");
+        // The same words the window's own command line says them in.
+        const line = EncoderController.metaTokens;
+        for (const word of ["drc=" + names[2], "heavy", "ceiling=-2", "dialogue=-24",
+                            "dialnorm=auto", "cmixlev=-3", "surmixlev=off", "lfemix=off",
+                            "dmixmod=ltrt", "bsmod=commentary", "mixlevel=105", "roomtyp=large",
+                            "copyright", "origbs=off"]) {
+            verify(line.split(" ").indexOf(word) >= 0, word + " is not in: " + line);
+        }
+
+        // And put back, over a window that held something else.
+        const text = ProjectFile.captureEncode(EncoderController);
+        EncoderController.resetEncodeSettings();
+        EncoderController.drcIndex = 1;
+        EncoderController.dialnorm = 20;
+        EncoderController.surmixIndex = 0;
+        const encode = JSON.parse(text);
+        compare(ProjectFile.applyEncode(EncoderController, encode, 0).length, 0);
+        compare(ProjectFile.applyEncode(EncoderController, encode, 1).length, 0);
+        compare(ProjectFile.captureEncode(EncoderController), text);
+        compare(EncoderController.metaTokens, line);
+    }
+
+    function test_theCodingToolsAndTheVbrAreKeptAsTheTokensTheCommandLineTakes() {
+        EncoderController.resetEncodeSettings();
+        EncoderController.codecIndex = 1;
+        EncoderController.coupling = true;
+        EncoderController.spx = true;
+        EncoderController.vbrEnabled = true;
+        EncoderController.vbrQuality = 60;
+        EncoderController.vbrMaxEnabled = true;
+        EncoderController.vbrMaxKbps = 448;
+        const kept = JSON.parse(ProjectFile.captureEncode(EncoderController));
+        compare(kept.tools, EncoderController.toolsToken);
+        verify(kept.tools.indexOf("cpl") >= 0 && kept.tools.indexOf("spx") >= 0, kept.tools);
+        compare(kept.vbr, EncoderController.vbrToken);
+
+        EncoderController.resetEncodeSettings();
+        compare(EncoderController.coupling, false);
+        compare(EncoderController.vbrEnabled, false);
+        compare(ProjectFile.applyEncode(EncoderController, kept, 1).length, 0);
+        compare(EncoderController.coupling, true);
+        compare(EncoderController.spx, true);
+        compare(EncoderController.vbrEnabled, true);
+        compare(EncoderController.vbrQuality, 60);
+        compare(EncoderController.vbrMaxEnabled, true);
+        compare(EncoderController.vbrMaxKbps, 448);
+        compare(EncoderController.toolsToken, kept.tools);
+    }
+
+    function test_aProjectIsAWholePlanAndNotAPatchOnWhatTheWindowHeld() {
+        // Settings the project does not mention come back to the command line's defaults, so
+        // that what it opens is what `forge` would write from it, whatever was set before.
+        EncoderController.dialnorm = 20;
+        EncoderController.heavy = true;
+        EncoderController.bsmodIndex = 3;
+        EncoderController.coupling = true;
+        compare(ProjectFile.applyEncode(EncoderController, { codec: "ac3" }, 0).length, 0);
+        compare(EncoderController.dialnorm, 31);
+        compare(EncoderController.heavy, false);
+        compare(EncoderController.bsmodIndex, 0);
+        compare(EncoderController.coupling, false);
+        compare(EncoderController.metaTokens, "");
     }
 
     function test_aValueTheTableCannotUseIsReportedAndLeftAlone() {
+        EncoderController.resetEncodeSettings();
         const before = EncoderController.codecIndex;
         let notes = ProjectFile.applyEncode(EncoderController, { codec: "ac9" }, 0);
         compare(notes.length, 1);
@@ -331,12 +443,92 @@ TestCase {
         compare(notes[0].args[1], "ac9");
         compare(EncoderController.codecIndex, before);
 
-        notes = ProjectFile.applyEncode(EncoderController, { bsmod: 12 }, 1);
-        compare(notes[0].code, "setting-out-of-range");
         notes = ProjectFile.applyEncode(EncoderController, { bitrateKbps: 100 }, 1);
         compare(notes[0].code, "bitrate-not-offered");
-        // A key of some other version is not this one's to report.
-        compare(ProjectFile.applyEncode(EncoderController, { tomorrow: 1 }, 1).length, 0);
+        notes = ProjectFile.applyEncode(EncoderController,
+                                        { options: { bsmod: "cartoon", dialnorm: 99 } }, 1);
+        compare(notes.length, 2);
+        compare(notes[0].code, "setting-out-of-range");
+        compare(EncoderController.bsmodIndex, 0);
+        compare(EncoderController.dialnorm, 31);
+        notes = ProjectFile.applyEncode(EncoderController, { tools: "nonsense" }, 1);
+        compare(notes[0].code, "setting-unknown-choice");
+        // An average-rate target is the command line's: the window has no controls for it.
+        notes = ProjectFile.applyEncode(EncoderController, { vbr: "avg:256" }, 1);
+        compare(notes[0].code, "setting-unknown-choice");
+        compare(EncoderController.vbrEnabled, false);
+    }
+
+    function test_anOptionTheWindowHasNoControlForIsSaidAndIsCarriedThrough() {
+        EncoderController.resetEncodeSettings();
+        const notes = ProjectFile.applyEncode(
+            EncoderController, { options: { lorocmixlev: -3, "from-a-newer-forge": 1 } }, 1);
+        compare(notes.length, 2);
+        compare(notes[0].code, "setting-not-held");
+        const keys = ProjectFile.optionKeys();
+        verify(keys.indexOf("dialnorm") >= 0);
+        verify(keys.indexOf("lorocmixlev") < 0);
+    }
+
+    function test_theObjectsPlacementsAndMotionAreKept() {
+        const win = openWindow();
+        EncoderController.loadSourceFile(backing);
+        EncoderController.atmosEnabled = true;
+        const count = EncoderController.objectCount;
+        verify(count >= 2, "objects: " + count);
+        EncoderController.setObjectPathKeyframes(0, [
+            { time: 0.0, x: 0.1, y: 0.2, z: 0.0, gain: 0.5, lfeSend: 0.0 },
+            { time: 0.5, x: 0.9, y: 0.8, z: 0.5, gain: 0.5, lfeSend: 0.1 }
+        ], "");
+        EncoderController.setObjectPosition(1, 0.25, 0.75, -0.5);
+        const text = ProjectFile.captureObjects(EncoderController);
+        verify(text.length > 0);
+        const kept = JSON.parse(text);
+        compare(kept.count, count);
+        verify(kept.scene !== undefined);
+
+        EncoderController.clearObjectPath(0);
+        compare(EncoderController.objectKeyframes(0).length, 0);
+        const notes = ProjectFile.applyObjects(EncoderController, text);
+        compare(notes.length, 0, JSON.stringify(notes));
+        const keys = EncoderController.objectKeyframes(0);
+        compare(keys.length, 2);
+        compare(keys[1].time, 0.5);
+        compare(keys[1].x, 0.9);
+        compare(keys[1].y, 0.8);
+        // An object that never moved holds its place as a single keyframe at the start.
+        const still = EncoderController.objectKeyframes(1);
+        compare(still.length, 1);
+        compare(still[0].x, 0.25);
+        compare(still[0].z, -0.5);
+
+        // Outside object mode there is nothing to keep.
+        EncoderController.atmosEnabled = false;
+        compare(ProjectFile.captureObjects(EncoderController), "");
+    }
+
+    function test_theObjectsOfAnObjectSessionRideInTheProject() {
+        const win = openWindow();
+        win.tier = "advanced";
+        EncoderController.loadSourceFile(backing);
+        EncoderController.atmosEnabled = true;
+        EncoderController.setObjectPathKeyframes(0, [
+            { time: 0.0, x: 0.0, y: 0.0, z: 0.0, gain: 0.6, lfeSend: 0.0 },
+            { time: 0.4, x: 1.0, y: 1.0, z: 0.0, gain: 0.6, lfeSend: 0.0 }
+        ], "");
+        const file = inTheFolder("kp-objects.forgeproj");
+        verify(win.saveProjectFile(file));
+        const saved = readProject(file);
+        compare(saved.atmos, true);
+        verify(saved.objects.scene !== undefined);
+
+        cleanup();
+        const second = openWindow();
+        verify(second.openProjectFile(file));
+        compare(EncoderController.atmosEnabled, true);
+        const keys = EncoderController.objectKeyframes(0);
+        compare(keys.length, 2);
+        compare(keys[1].x, 1.0);
     }
 
     // ---- refusing -------------------------------------------------------------
@@ -389,6 +581,77 @@ TestCase {
             return note !== null && note.text.indexOf("kp-gone.wav") >= 0;
         }, 5000, "the dialog does not name the missing part");
         compare(findByName(win, "karaokeFlow").plan.mode, "2/1");
+    }
+
+    // ---- the window and forge -------------------------------------------------
+    // The window's own encode of a draft, and what `forge project` writes from the project the
+    // window saved of it: the same bytes, which is what makes a project the line its command bar
+    // shows and not a second way of saying it.
+    function windowAndForgeWriteTheSameBytes(name, suffix, setup) {
+        if (!cliRunner.available()) {
+            skip("this build has no forge to run");
+        }
+        const win = openWindow();
+        win.tier = "expert";
+        EncoderController.loadSourceFile(backing);
+        EncoderController.applyChannelPreset("stereo");
+        setup();
+        const project = inTheFolder(name + ".forgeproj");
+        verify(win.saveProjectFile(project), "the project could not be saved");
+
+        const fromWindow = Qt.resolvedUrl("_test_output/tst_projects_" + name + suffix);
+        EncoderController.encodeTo(fromWindow);
+        tryCompare(EncoderController, "busy", false, 120000);
+        verify(cliRunner.size(fromWindow) > 0, "the window wrote nothing");
+
+        const folder = audioFixtures.folder();
+        const result = "from-forge-" + name + suffix;
+        const line = "forge project " + ProjectFile.localPath(project) + " "
+                     + ProjectFile.localPath(inTheFolder(result));
+        compare(cliRunner.run(line, folder), 0, line);
+        verify(cliRunner.sameBytes(fromWindow, inTheFolder(result)),
+               "forge project wrote different bytes than the window did: " + line);
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnAc3WithItsMetadata() {
+        windowAndForgeWriteTheSameBytes("eq-ac3", ".ac3", () => {
+            EncoderController.bitrateKbps = 256;
+            EncoderController.coupling = true;
+            EncoderController.dialnorm = 27;
+            EncoderController.drcIndex = 2;
+            EncoderController.heavy = true;
+            EncoderController.cmixIndex = 0;
+            EncoderController.surmixIndex = 2;
+            EncoderController.bsmodIndex = 5;
+            EncoderController.copyrightBit = true;
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnEac3WithToolsAndVbr() {
+        windowAndForgeWriteTheSameBytes("eq-eac3", ".ec3", () => {
+            EncoderController.codecIndex = 1;
+            EncoderController.bitrateKbps = 192;
+            EncoderController.coupling = true;
+            EncoderController.spx = true;
+            EncoderController.vbrEnabled = true;
+            EncoderController.vbrQuality = 55;
+            EncoderController.vbrMaxEnabled = true;
+            EncoderController.vbrMaxKbps = 256;
+            EncoderController.dialnorm = 24;
+        });
+    }
+
+    function test_forgeProjectWritesWhatTheWindowWritesForAnObjectSession() {
+        windowAndForgeWriteTheSameBytes("eq-objects", ".ec3", () => {
+            EncoderController.atmosEnabled = true;
+            EncoderController.bitrateKbps = 448;
+            EncoderController.setObjectPathKeyframes(0, [
+                { time: 0.0, x: 0.1, y: 0.1, z: 0.0, gain: 0.5, lfeSend: 0.0 },
+                { time: 0.5, x: 0.9, y: 0.9, z: 0.2, gain: 0.5, lfeSend: 0.0 }
+            ], "");
+            EncoderController.setObjectPosition(1, 0.3, 0.6, 0.0);
+            EncoderController.dialnorm = 26;
+        });
     }
 
     // ---- the example ----------------------------------------------------------

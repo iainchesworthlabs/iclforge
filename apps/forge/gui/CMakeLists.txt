@@ -45,6 +45,8 @@ qt_add_executable(forge-gui
     src/karaoke_authoring_controller.hpp
     src/project_file.cpp
     src/project_file.hpp
+    ../../shared/project/src/project_document.cpp
+    ../../shared/project/src/project_document.hpp
     ../../shared/media/src/ac4_sync_word.hpp
     ../../shared/media/src/fmp4_folder_writer.cpp
     ../../shared/media/src/fmp4_folder_writer.hpp
@@ -85,6 +87,7 @@ qt_add_executable(forge-gui
 target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/preferences/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/project/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/src")
 
 # The family components (apps/shared/theme/assets/qml) are staged into assets/qml/shared and
@@ -341,6 +344,9 @@ target_link_libraries(forge-gui
         iclforge::ac4
         iclforge::warnings
         iclforge::fmt
+        # The project file's reader and writer (apps/shared/project), which `forge` compiles in
+        # too.
+        iclforge::json
         # Unlike iclforge::ac3's own PRIVATE, $<BUILD_INTERFACE:...>-wrapped link
         # (libs/ac3/CMakeLists.txt), this app has no intermediate engine
         # library of its own to hang the profiling header pair on the way

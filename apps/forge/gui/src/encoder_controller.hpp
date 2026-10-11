@@ -1233,6 +1233,23 @@ public:
     // empties the table, since automatic panning has no defined meaning
     // across several sources.
     Q_INVOKABLE void clearAssignment();
+
+    // ---- what a project holds (project_file.hpp) ------------------------------
+    // Every setting a project's `encode` object can hold, other than the codec, the container and
+    // the bit rate, put back to what a plan that says nothing has: the coding tools, variable bit
+    // rate, and the metadata group with the compression and loudness around it. These are the
+    // command line's own defaults, not the Preferences' - a project means what the same line of
+    // `forge` means - so that opening one does not leave, in the settings it does not mention,
+    // whatever the window held before. Refused while a run is busy.
+    Q_INVOKABLE void resetEncodeSettings();
+    // The coding tools from `text`, the `+`-joined token forge takes (plan::parse_tools), whole:
+    // what the window has no control for (enhanced coupling, transient pre-noise, a block count)
+    // is held and encoded all the same, and is in toolsToken afterwards. False, with nothing
+    // set, for a token that is not one.
+    Q_INVOKABLE bool setToolsFromToken(const QString& text);
+    // Variable bit rate from `text` (plan::parse_vbr). False, with nothing set, for a token that
+    // is not one, and for one the window has no controls for: an average-rate target.
+    Q_INVOKABLE bool setVbrFromToken(const QString& text);
     Q_INVOKABLE void encodeTo(const QUrl& url);
     Q_INVOKABLE void cancel();
     Q_INVOKABLE [[nodiscard]] QString suggestedOutputName() const;
