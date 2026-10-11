@@ -265,6 +265,17 @@ bool g_board_changed = false;
                                                 ac::Command::kSetOutputDelay, ac::Command::kSettings,
                                                 ac::Command::kIdentify};
     config.max_message_bytes = kMaxChunkBytes + 64;
+    // The tokens one JSON message may hold, which sizes the one block the session takes for it:
+    // 8 KB at most, where the host's default of 4,096 tokens is 64 KB and the C6 has no internal
+    // block above 31,744 bytes with Wi-Fi up (a valid 4 KB text of 2,000 one-digit values would
+    // need 32 KB; a failed allocation aborts with exceptions off). The largest message a server
+    // sends is 98 tokens, and no message comes within twice the cap
+    // (libs/sendspin/tests/test_sessions.cpp, "no message a server sends comes within twice a
+    // sink's token cap"). The one figure that grows with the board is the settings command, two
+    // numbers an output: measured for sixteen, so more slots than that call for the cap again.
+    static_assert(iclforge::render::OutputLayout::kMaxSlots <= 16,
+                  "ss::kSinkMaxJsonTokens was sized for settings commands of sixteen outputs");
+    config.max_json_tokens = ss::kSinkMaxJsonTokens;
     return config;
 }
 
