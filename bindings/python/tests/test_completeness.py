@@ -172,3 +172,54 @@ def test_signing_signs_a_real_atmos_stream() -> None:
     # The wrong key must not verify.
     wrong = ac3.signing.SigningKey(b"ffffffffffffffffffffffffffffffff")
     assert ac3.signing.verify_atmos_stream(signed, wrong).mismatch == 4
+
+
+def _atmos_stream(frames: int = 4) -> bytes:
+    encoder = ac3.AtmosEncoder(ac3.AtmosConfig(bitrate_kbps=640), 2)
+    t = np.arange(ac3.SAMPLES_PER_FRAME * frames, dtype=np.float32) / RATE
+    placements = [ac3.ObjectPlacement(), ac3.ObjectPlacement()]
+    stream = b""
+    for frame in range(frames):
+        seg = t[frame * ac3.SAMPLES_PER_FRAME : (frame + 1) * ac3.SAMPLES_PER_FRAME]
+        objects = np.stack(
+            [0.3 * np.sin(2 * np.pi * 300 * seg), 0.3 * np.sin(2 * np.pi * 1200 * seg)]
+        ).astype(np.float32)
+        stream += encoder.encode_frame(objects, placements)
+    return stream
+
+
+def test_signing_keyring_accepts_any_of_its_keys() -> None:
+    stream = _atmos_stream()
+    signer = ac3.signing.SigningKey(b"0123456789abcdef0123456789abcdef")
+    other = ac3.signing.SigningKey(b"ffffffffffffffffffffffffffffffff")
+    signed, _ = ac3.signing.sign_atmos_stream(stream, signer)
+
+    ring = ac3.signing.verify_atmos_stream_any(signed, [other, signer])
+    assert ring.totals.valid == 4 and ring.totals.mismatch == 0
+    # Credited to the key that signed: the second of the two.
+    assert ring.per_key == [0, 4]
+
+    # A list that holds no signing key accepts nothing; it is not a pass.
+    none = ac3.signing.verify_atmos_stream_any(signed, [other])
+    assert none.totals.valid == 0 and none.totals.mismatch == 4
+    assert ac3.signing.verify_atmos_stream_any(signed, []).totals.mismatch == 4
+
+
+def test_signing_gate_keeps_objects_only_where_the_tag_verifies() -> None:
+    stream = _atmos_stream()
+    signer = ac3.signing.SigningKey(b"0123456789abcdef0123456789abcdef")
+    other = ac3.signing.SigningKey(b"ffffffffffffffffffffffffffffffff")
+    signed, _ = ac3.signing.sign_atmos_stream(stream, signer)
+
+    kept, summary = ac3.signing.gate_atmos_stream(signed, [signer])
+    assert summary.passed == 4 and summary.gated == 0
+    assert kept == signed
+
+    bed, summary = ac3.signing.gate_atmos_stream(signed, [other])
+    assert summary.passed == 0 and summary.gated == 4
+    assert len(bed) < len(signed)
+    # What is left carries no object layer, so there is nothing more to gate.
+    assert ac3.signing.verify_atmos_stream(bed, signer).no_container == 4
+
+    with pytest.raises(ValueError):
+        ac3.signing.gate_atmos_stream(b"", [signer])

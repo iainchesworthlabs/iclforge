@@ -515,10 +515,12 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
     }
     // Options AC-3's and E-AC-3's decode reads: said, not silently dropped.
     // The two that promise a result AC-4 cannot give are refused.
-    if (!meta.bap_census_path.empty() || meta.verify_objects) {
+    if (!meta.bap_census_path.empty() || meta.verify_objects || meta.gate_objects) {
         fmt::println(stderr, "error: {} is AC-4: {} AC-3's and E-AC-3's", in_path,
-                     meta.verify_objects ? "verify-objects checks the EMDF object signatures of"
-                                         : "bap-census= counts the bit allocation of");
+                     meta.verify_objects
+                         ? "verify-objects checks the EMDF object signatures of"
+                         : meta.gate_objects ? "gate-objects plays the signed EMDF object layer of"
+                                             : "bap-census= counts the bit allocation of");
         return kExitUsage;
     }
     if (!meta.eac3_decode_tokens.empty()) {
@@ -1358,10 +1360,23 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     if (!apply_object_verification(stream, meta, status_stream(out_path))) {
         return kExitInput;
     }
+    // gate-objects decodes a copy in which every frame that did not verify is
+    // already its bed; nothing below can tell it from a stream that never had
+    // the objects. Without it, `playable` is the stream as read - no copy.
+    std::vector<std::byte> gated;
+    if (meta.gate_objects) {
+        auto result = apply_object_gate(stream, meta, status_stream(out_path));
+        if (!result) {
+            return kExitInput;
+        }
+        gated = std::move(*result);
+    }
+    const std::span<const std::byte> playable =
+        meta.gate_objects ? std::span<const std::byte>{gated} : std::span<const std::byte>{stream};
     // bsid at bit 40 says which syntax this is, before either is assumed.
     // spdif and play branch on it the same way now that both packers handle
     // E-AC-3 (Eac3BurstPacker alongside AC-3's wrap_frame).
-    const auto bsid = iclforge::ac3::stream_bsid(stream);
+    const auto bsid = iclforge::ac3::stream_bsid(playable);
     if (!bsid.has_value()) {
         fmt::println(stderr, "error: {} is too short to hold a syncframe", in_path);
         return kExitInput;
@@ -1369,8 +1384,8 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // ...except for §E2.3.1.2's legacy core, where the first frame is AC-3 and
     // the stream is not: an AC-3 bed with Annex E dependents extending it goes
     // down the access-unit path too, which reads the core natively.
-    if (*bsid > 8 || iclforge::ac3::has_eac3_extension_substreams(stream)) {
-        return run_decode_eac3(stream, out_path, meta, objects_dir, adm_out);
+    if (*bsid > 8 || iclforge::ac3::has_eac3_extension_substreams(playable)) {
+        return run_decode_eac3(playable, out_path, meta, objects_dir, adm_out);
     }
     if (!objects_dir.empty()) {
         fmt::println(stderr,
@@ -1380,7 +1395,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     if (!adm_out.empty()) {
         fmt::println(stderr, "warning: {} given but {} is plain AC-3 - it has no object layer", adm_out, in_path);
     }
-    const auto frames = iclforge::ac3::split_frames(stream);
+    const auto frames = iclforge::ac3::split_frames(playable);
     if (!frames.has_value()) {
         fmt::println(stderr, "error: {}: {}", in_path, iclforge::ac3::describe(frames.error()));
         return kExitInput;

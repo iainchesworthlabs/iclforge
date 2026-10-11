@@ -143,7 +143,7 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 |---|---|---|
 | **IAMF** (was IM3) | `libs/containers/src/iamf`: v2.0 reader and writer — channel-based and object-based `ipcm` elements, scalable channel reconstruction, Opus / AAC-LC / FLAC packets carried, Parameter Blocks, trimming, raw OBU streams, ISO-BMFF and fragments | Nothing planned. Known and accepted: encoding and decoding Opus, AAC-LC and FLAC (the module links no codec; packets are carried), Common Encryption (needs AES, and the module has no third-party dependency), rendering to a playback layout and mixing (section 7.4 leaves the algorithms to the Open Audio Renderer) |
 | **IAB** (was IM1) | Reader, `AudioDataDLC` decode, writer and DLC encoder, spread and zone control into the Atmos bridge, ST 2067-201 MXF Track File write | A Track File checked by an IMF packager or validator |
-| **Object authenticity modes** | `iclforge::ac3::signing` HMAC tag; `sign-objects`; single-key `verify-objects` (hard fail); default decode reconstructs objects **unchecked** (FOSS-style) | **Multi-key** verify (keyring / repeated `signing-key=`); **licensed** soft-gate (e.g. `gate-objects`: tag mismatch / unsigned → bed-only, decode continues); CLI + docs naming the three modes — [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#planned-decode-modes). TrueHD Evolution HMAC is the parallel on IM5, not EMDF |
+| **Object authenticity modes** | `iclforge::ac3::signing` HMAC tag; `sign-objects`; `verify-objects` with one or several `signing-key=` (a keyring: a frame is good under any key; hard fail); `gate-objects`, the licensed soft-gate (tag mismatch / unsigned → bed-only, decode continues); default decode reconstructs objects **unchecked** (FOSS-style) | Nothing planned. Known and accepted: this project ships no key, so a Dolby-licensed decoder accepting its objects is a personal-use path only — [Object signing](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md#decode-modes). TrueHD Evolution HMAC is the parallel on IM5, not EMDF |
 | **Multi-programme E-AC-3 encode** | `programme2=`..`programme8=` authoring via CLI (all eight §E2.3.1.2 substreams, full per-programme `mixmdate`/`bsmod` metadata) | Receiver-side use of that metadata — actually combining an associated service with the main programme during mixdown, rather than just carrying it — see [capabilities](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/library/capabilities.md) |
 | **Encoder reproducibility** (was VX12) | Audit done; `ilogb` fix landed; sixteen real-programme streams in the bitstream-hash gate, identical on MSVC, clang-cl, GCC 16 and Clang 22 on the x86-64 and generic kernels, Linux arm64 and macOS (libc++), after the delta-segment selection stopped depending on `std::nth_element`'s tie choice | The float32 encoder's pins, which no longer match a fresh GCC build; fixed-point transient port optional |
 | **Listening test** (was VX9) | Apparatus in `tools/listening/` | **No session run yet** — see [`tools/listening/responses/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/listening/responses/README.md) |
@@ -159,7 +159,6 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 | GStreamer element or FFmpeg external encoder for >5.1 / JOC encode | Out of tree, over the C API; AP5 (C API) is done | AP10 |
 | Dolby Reference Player wider CI crosscheck | Extend beyond `none/cpl/spx/aht/all`; self-hosted Windows job | VX5 |
 | Perceptual encoder criterion calibration | EQ13 follow-on; `kPerceptual` | EQ14 |
-| Object authenticity: multi-key + licensed gate | Completes the Partial tail above — keyring verify and AVR-like bed-only soft-gate for EMDF; Evolution HMAC for TrueHD rides IM5 | — |
 | QC delivery report file | `forge qc` writes stdout today | [`planning/qc-report.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/qc-report.md) |
 | DAW / NLE host plugin | Feasibility study only | [`planning/host-plugin.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/host-plugin.md) |
 | ESP32 sink tiers (C6 / C61 / S3 / P4) on one ES9080 PCB | Modular MCU: C6 2.0 / one DAC (shipped); C61 5.1 desired (no board); S3 ≤7.1.4 no ecpl / both DACs @ 16-bit (shipped); P4 ≤9.1.6 full tools desired / both DACs @ 32-bit on one I2S. P4 reopened only as best tier; its probe and hosted-Wi-Fi sink are built, its TDM output and the PCB are not | [`planning/esp32-sink-tiers.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-sink-tiers.md) |
@@ -184,7 +183,7 @@ These shipped but have an open follow-on. They do not belong in "In progress" as
 
 ## Out of scope
 
-- **Forging Dolby's authenticity tag** — see [`docs/concepts/object-signing.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md). The signer ships; the key is the operator's. Multi-key verify and licensed soft-gate (Partial / Proposed above) use **operator-provisioned** keys only — they do not recover or invent decoder secrets.
+- **Forging Dolby's authenticity tag** — see [`docs/concepts/object-signing.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/docs/concepts/object-signing.md). The signer ships; the key is the operator's. Multi-key verify and the licensed soft-gate use **operator-provisioned** keys only — they do not recover or invent decoder secrets.
 - **AC-3 VBR** — structurally impossible; frame size indexes a fixed table.
 - **Room correction and equalisation** — covered by [Cavern](https://github.com/VoidXH/Cavern). Hearth renders to the speakers and manages them (per-output trim and delay, a bass-management crossover) and does no measurement, equalisation or filtering beyond the crossover. A headphone/binaural preview for the WASM demo stays off unless that boundary is redrawn on purpose.
 - **A DAMF reader** — no public specification; IM1 / ADM BWF is the replacement.
@@ -235,7 +234,7 @@ Full ledger text preserved in git history of this file before 2026-09-17.
 | EQ | EQ1–EQ13 encoder quality work | EQ14 proposed; EQ2 out of scope |
 | DC | DC1–DC10 decoder and stream tools | Multi-programme mix metadata tail |
 | IO | IO1–IO12 containers, QC, loudness | QC report file proposed |
-| IM | IM1–IM4, IM7 | IM5 in progress; IM6 blocked; IM3/IAB tails; object authenticity modes Partial |
+| IM | IM1–IM4, IM7 | IM5 in progress; IM6 blocked; IM3/IAB tails |
 | VX | VX1–VX23 except VX9/VX12 tails | VX9/VX12 partial; VX5 proposed |
 | PF | PF1–PF8 performance | — |
 | AP | AP2–AP7, AP9, AP11–AP12 | AP1 in progress; AP8/AP10 proposed |
