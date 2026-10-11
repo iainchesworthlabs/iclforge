@@ -59,6 +59,9 @@ struct SinkOptions {
     // also at 44.1 kHz 16-bit and 48 kHz 24-bit.
     std::vector<sendspin::messages::Codec> codecs{sendspin::messages::Codec::kPcm, sendspin::messages::Codec::kFlac,
                                                   sendspin::messages::Codec::kOpus};
+    // The channel counts PCM and FLAC are offered at, each of the formats above (Opus stays at
+    // two): a player that renders to a layout wider than stereo lists that width.
+    std::vector<std::int32_t> pcm_channels{2};
     // Offer _iclforge_player@v1 before player@v1, as a Hearth sink does.
     bool extension_role = true;
     // Lists the Settings command in the extension role's state and applies

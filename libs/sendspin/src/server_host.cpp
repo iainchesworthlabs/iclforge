@@ -1,6 +1,7 @@
 #include "iclforge/sendspin/server_host.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -8,6 +9,7 @@
 #include <deque>
 #include <expected>
 #include <functional>
+#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -112,8 +114,13 @@ struct ServerHost::State {
     // of a member's changes.
     std::set<Key32> sources;
     // The clients the host plays on player@v1's PCM although they offer the extension role
-    // (use_pcm()), each with the most audio a chunk to it may carry (0: no limit).
-    std::map<Key32, std::size_t> pcm_clients;
+    // (use_pcm()), each with the most audio a chunk to it may carry (0: no limit) and the channel
+    // count of the PCM it is to get (0: the first its player lists that the programme can make).
+    struct PcmRequest {
+        std::size_t max_chunk_bytes = 0;
+        std::int32_t channels = 0;
+    };
+    std::map<Key32, PcmRequest> pcm_clients;
     std::vector<std::weak_ptr<Group::State>> groups;
 
     std::mutex posted_mutex;
@@ -921,7 +928,8 @@ bool ServerHost::allow_source(const std::string& client_id, bool allowed) {
     return true;
 }
 
-bool ServerHost::use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes) {
+bool ServerHost::use_pcm(const std::string& client_id, bool use, std::size_t max_chunk_bytes,
+                         std::int32_t channels) {
     const std::shared_ptr<HostConnection> connection = state_->find(client_id);
     if (!connection) {
         return false;
@@ -930,7 +938,7 @@ bool ServerHost::use_pcm(const std::string& client_id, bool use, std::size_t max
         const std::lock_guard lock(state_->mutex);
         const Key32 key = connection->view().client_key;
         if (use) {
-            state_->pcm_clients[key] = max_chunk_bytes;
+            state_->pcm_clients[key] = {.max_chunk_bytes = max_chunk_bytes, .channels = channels};
         } else {
             state_->pcm_clients.erase(key);
         }
@@ -971,6 +979,8 @@ struct Group::State {
 
     mutable std::mutex mutex;
     std::optional<m::AudioFormat> pcm;
+    // The programme rendered to other widths (Programme::more_pcm).
+    std::vector<m::AudioFormat> more_pcm;
     std::optional<player::StreamStart> bursts;
     std::int64_t sample_rate = 0;
     bool buffered = false;
@@ -984,6 +994,8 @@ struct Group::State {
         // Plays _iclforge_player@v1's bursts rather than player@v1's PCM.
         bool bursts = false;
         std::optional<m::AudioFormat> format;
+        // Which of the programme's PCM variants the member plays: 0 is `pcm`, n is `more_pcm[n-1]`.
+        std::size_t variant = 0;
         std::unique_ptr<codec::Encoder> encoder;
         std::int64_t joined_frame = 0;
         std::uint64_t capacity = 0;
@@ -1016,6 +1028,12 @@ struct Group::State {
     bool tracks_downbeats = false;
 
     [[nodiscard]] bool playing() const { return pcm || bursts; }
+
+    // The programme's PCM variants: `pcm` and then `more_pcm`; none while it has no PCM.
+    [[nodiscard]] std::size_t variant_count() const { return pcm ? 1 + more_pcm.size() : 0; }
+    [[nodiscard]] const m::AudioFormat& variant(std::size_t index) const {
+        return index == 0 ? *pcm : more_pcm[index - 1];
+    }
 
     [[nodiscard]] Member* member_of(const std::string& client_id) {
         const auto found = std::find_if(members.begin(), members.end(),
@@ -1346,6 +1364,15 @@ struct Group::State {
             return;
         }
         if (client.bursts) {
+            // A client the host has been asked to play PCM to is moving to player@v1 (use_pcm()),
+            // which takes a moment on the live connection: until it has, it is not started on
+            // the burst stream it is still on, which it would be sent in the form the host
+            // meant it not to have.
+            if (const std::lock_guard lock(host->mutex);
+                host->pcm_clients.contains(client.client_key) && client.player_support &&
+                contains(client.supported_roles, kPlayerRole)) {
+                return;
+            }
             if (!bursts || !client.iclforge_support || !client.iclforge_state ||
                 !connection->driver()
                      .call([&] { return connection->session().start_burst_stream(*bursts); })
@@ -1359,24 +1386,42 @@ struct Group::State {
             if (!pcm || !client.player_support || !client.player_state) {
                 return;
             }
-            const auto chosen = std::find_if(client.player_support->supported_formats.begin(),
-                                             client.player_support->supported_formats.end(),
-                                             [&](const m::AudioFormat& format) { return producible(format, *pcm); });
-            if (chosen == client.player_support->supported_formats.end()) {
+            // What use_pcm() asked of this client: the most audio a chunk to it may carry, and
+            // the width of PCM it is to get.
+            ServerHost::State::PcmRequest request;
+            {
+                const std::lock_guard lock(host->mutex);
+                if (const auto found = host->pcm_clients.find(client.client_key);
+                    found != host->pcm_clients.end()) {
+                    request = found->second;
+                }
+            }
+            // The first of its listed formats the programme can make, at the width asked for when
+            // one was, from whichever of the programme's variants has that width.
+            const m::AudioFormat* chosen = nullptr;
+            std::size_t chosen_variant = 0;
+            for (const m::AudioFormat& format : client.player_support->supported_formats) {
+                if (request.channels != 0 && format.channels != request.channels) {
+                    continue;
+                }
+                for (std::size_t index = 0; index < variant_count() && chosen == nullptr; ++index) {
+                    if (producible(format, variant(index))) {
+                        chosen = &format;
+                        chosen_variant = index;
+                    }
+                }
+                if (chosen != nullptr) {
+                    break;
+                }
+            }
+            if (chosen == nullptr) {
                 return;
             }
             // A client the host was asked to play small chunks to (use_pcm()) gets PCM units of as
             // many whole frames as fit its limit, where the default is 20 ms.
             codec::EncoderOptions options;
             if (chosen->codec == m::Codec::kPcm) {
-                std::size_t limit = 0;
-                {
-                    const std::lock_guard lock(host->mutex);
-                    if (const auto found = host->pcm_clients.find(client.client_key);
-                        found != host->pcm_clients.end()) {
-                        limit = found->second;
-                    }
-                }
+                std::size_t limit = request.max_chunk_bytes;
                 // Where use_pcm() gave none, the limit the sink states (support.max_chunk_bytes).
                 // That figure counts a chunk with its header; use_pcm()'s counts the audio alone.
                 if (limit == 0 && client.iclforge_support &&
@@ -1404,6 +1449,7 @@ struct Group::State {
             member.lead = lead_for(state.output_delay_ms.value_or(0), state.min_buffer_ms.value_or(0),
                                    state.required_lead_time_ms.value_or(0));
             member.format = *chosen;
+            member.variant = chosen_variant;
             member.encoder = std::move(encoder);
             member.capacity = client.player_support->buffer_capacity;
             member.joined_frame = frames_pushed;
@@ -1714,9 +1760,27 @@ bool Group::start(const Programme& programme) {
         (bursts && bursts->sample_rate < 1) || (pcm && bursts && pcm->sample_rate != bursts->sample_rate)) {
         return false;
     }
+    // The other widths are the same programme at the same rate and depth, each at a width of its
+    // own, and are PCM only; a programme with none has no use for them.
+    if (!pcm && !programme.more_pcm.empty()) {
+        return false;
+    }
+    std::vector<std::int32_t> widths;
+    if (pcm) {
+        widths.push_back(pcm->channels);
+    }
+    for (const m::AudioFormat& other : programme.more_pcm) {
+        if (other.codec != m::Codec::kPcm || other.channels < 1 ||
+            other.sample_rate != pcm->sample_rate || other.bit_depth != pcm->bit_depth ||
+            std::find(widths.begin(), widths.end(), other.channels) != widths.end()) {
+            return false;
+        }
+        widths.push_back(other.channels);
+    }
     stop();
     const std::lock_guard lock(state_->mutex);
     state_->pcm = pcm;
+    state_->more_pcm = programme.more_pcm;
     state_->bursts = bursts;
     state_->sample_rate = pcm ? pcm->sample_rate : bursts->sample_rate;
     state_->buffered = programme.buffered;
@@ -1730,13 +1794,25 @@ bool Group::start(const Programme& programme) {
 }
 
 std::size_t Group::push(std::span<const std::int32_t> interleaved) {
+    const std::array<std::span<const std::int32_t>, 1> only{interleaved};
+    return push_variants(only);
+}
+
+std::size_t Group::push_variants(std::span<const std::span<const std::int32_t>> variants) {
     State& state = *state_;
     const std::lock_guard lock(state.mutex);
-    if (!state.pcm) {
+    // A block of every variant or none of the call: a member whose variant went without would have
+    // its encoder's frame count fall behind the group's, and every later unit would be stamped
+    // early.
+    if (!state.pcm || variants.size() != state.variant_count()) {
         return 0;
     }
-    const auto channels = static_cast<std::size_t>(state.pcm->channels);
-    const std::size_t frames = interleaved.size() / channels;
+    // The frames every block holds: a block that is short holds the rest back.
+    std::size_t frames = std::numeric_limits<std::size_t>::max();
+    for (std::size_t index = 0; index < variants.size(); ++index) {
+        frames = std::min(frames, variants[index].size() /
+                                      static_cast<std::size_t>(state.variant(index).channels));
+    }
     if (frames == 0) {
         return 0;
     }
@@ -1745,11 +1821,13 @@ std::size_t Group::push(std::span<const std::int32_t> interleaved) {
         return 0;
     }
 
-    const std::span<const std::int32_t> taken = interleaved.first(frames * channels);
     for (State::Member& member : state.members) {
         if (!member.started || member.bursts) {
             continue;
         }
+        const auto channels = static_cast<std::size_t>(state.variant(member.variant).channels);
+        const std::span<const std::int32_t> taken =
+            variants[member.variant].first(frames * channels);
         const std::shared_ptr<HostConnection> connection = state.host->find(member.client_id);
         if (!connection) {
             // The client has gone; it starts afresh if it comes back.

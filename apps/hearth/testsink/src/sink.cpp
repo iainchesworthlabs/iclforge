@@ -508,10 +508,18 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
     config.supported_roles = {"player@v1"};
     std::vector<m::AudioFormat> formats;
     for (const m::Codec codec : options_.codecs) {
-        formats.push_back({.codec = codec, .channels = 2, .sample_rate = 48000, .bit_depth = 16});
-        if (codec != m::Codec::kOpus) {
-            formats.push_back({.codec = codec, .channels = 2, .sample_rate = 44100, .bit_depth = 16});
-            formats.push_back({.codec = codec, .channels = 2, .sample_rate = 48000, .bit_depth = 24});
+        if (codec == m::Codec::kOpus) {
+            formats.push_back(
+                {.codec = codec, .channels = 2, .sample_rate = 48000, .bit_depth = 16});
+            continue;
+        }
+        for (const std::int32_t channels : options_.pcm_channels) {
+            formats.push_back(
+                {.codec = codec, .channels = channels, .sample_rate = 48000, .bit_depth = 16});
+            formats.push_back(
+                {.codec = codec, .channels = channels, .sample_rate = 44100, .bit_depth = 16});
+            formats.push_back(
+                {.codec = codec, .channels = channels, .sample_rate = 48000, .bit_depth = 24});
         }
     }
     config.player_support = {.supported_formats = std::move(formats),
