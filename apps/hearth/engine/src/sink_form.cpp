@@ -180,11 +180,12 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
     // A source with no coded form is PCM already, and is not decoded here.
     const std::string_view decoded = stream.stream ? "decoded here and " : "";
     const render::OutputLayout wanted = configured_layout(sink, stream);
+    const std::string caveat = policy.pcm_caveat.empty() ? "" : " " + policy.pcm_caveat;
     if (lists(wanted.slots())) {
         return {.form = SinkForm::kPcm,
                 .layout = wanted,
-                .reason = fmt::format("{}, so it is {}sent as PCM at {}.", refusal, decoded,
-                                      wanted.text())};
+                .reason = fmt::format("{}, so it is {}sent as PCM at {}.{}", refusal, decoded,
+                                      wanted.text(), caveat)};
     }
     for (const Folded& target : kFoldTargets) {
         if (target.channels < wanted.slots() && lists(target.channels)) {
@@ -194,8 +195,8 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
                 return {.form = SinkForm::kPcm,
                         .layout = folded,
                         .reason = fmt::format(
-                            "{}, so it is {}folded to {} PCM, the widest its PCM formats take.",
-                            refusal, decoded, target.name)};
+                            "{}, so it is {}folded to {} PCM, the widest its PCM formats take.{}",
+                            refusal, decoded, target.name, caveat)};
             }
         }
     }
@@ -251,7 +252,9 @@ SinkFormPolicy form_policy(const SinkFacts& sink) {
     std::ranges::transform(hardware, hardware.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (hardware.find("esp32-c6") != std::string::npos) {
-        policy.pcm_fallback = false;
+        policy.pcm_caveat =
+            "This board holds under a fifth of a second of PCM, so on a busy WiFi the stream can "
+            "drop out.";
     }
     return policy;
 }
