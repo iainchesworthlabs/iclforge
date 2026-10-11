@@ -81,36 +81,6 @@ std::optional<std::vector<std::span<const std::byte>>> carried_units(
     return units;
 }
 
-// programme=N on a command that wraps a stream: the stream becomes that
-// programme alone, as a stream of its own (iclforge::ac3::io::extract_programme
-// renumbers it as independent substream 0, which is what a player takes).
-// Without it every programme is carried (MP4, fMP4, MPEG-TS) or the first is
-// (Matroska). A stream with no programme of that id is refused by name, and
-// one this reader does not scan (AC-4, say) is left for the command to report
-// as it always did.
-[[nodiscard]] bool apply_programme_option(std::vector<std::byte>& raw, const Options& meta,
-                                          std::string_view in_path) {
-    if (!meta.programme.has_value()) {
-        return true;
-    }
-    const auto scanned = iclforge::ac3::io::scan(raw);
-    if (!scanned.has_value()) {
-        return true;
-    }
-    auto selected = iclforge::ac3::io::extract_programme(*scanned, *meta.programme);
-    if (!selected.has_value()) {
-        std::string carried;
-        for (const auto& programme : scanned->programmes) {
-            carried += (carried.empty() ? "" : ", ") + std::to_string(programme.substreamid);
-        }
-        fmt::println(stderr, "error: {}: no programme {} in this stream (it carries {})", in_path,
-                     *meta.programme, carried);
-        return false;
-    }
-    raw = std::move(*selected);
-    return true;
-}
-
 // What the stream's shape reads as in a report: the programme count when
 // there is more than one, otherwise the lead programme's substreams or layout.
 std::string stream_shape(const iclforge::ac3::io::ScannedStream& scanned) {

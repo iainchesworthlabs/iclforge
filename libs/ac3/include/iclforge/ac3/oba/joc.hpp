@@ -9,6 +9,7 @@
 #include <span>
 #include <vector>
 
+#include "iclforge/base/executor.hpp"
 #include "iclforge/dsp/qmf.hpp"
 #include "iclforge/ac3/export.hpp"
 #include "iclforge/objects/joc_domain.hpp"
@@ -427,6 +428,43 @@ struct ReconstructionState {
         std::deque<std::vector<double>> pending{};
     };
     std::unique_ptr<QmfState> qmf{};
+
+    // Domain::kQmf in single precision: the same reconstruction over the single-precision
+    // bank pair (dsp::QmfAnalysisF/QmfSynthesisF) and float mixing coefficients, for a
+    // part whose FPU is single precision, where the double reconstruction above runs in
+    // software - 381 ms of a 397 ms frame for four objects on an ESP32-S3, 12 times real
+    // time. Off by default, so every caller that has not asked for it gets the reference
+    // arithmetic unchanged; Eac3Decoder turns it on for the decoders whose scalar is not
+    // double (decode_scalar_t). Only the ordinary six-block frame takes it: a short
+    // syncframe's reconstruction (reconstruct_qmf_short) stays double. Half the size of
+    // QmfState, which matters on the parts that take it.
+    bool qmf_single_precision = false;
+    // Where the single-precision reconstruction may run its banks on a second thread (Eac3Decoder
+    // sets it from DecoderConfig::executor); null runs them on the calling thread. The output is
+    // the same bit for bit.
+    iclforge::base::Executor* executor = nullptr;
+    struct QmfStateSingle {
+        std::array<dsp::QmfAnalysisF, kNumChannels5X> bed{};
+        std::vector<dsp::QmfSynthesisF> objects{};
+        // The bed's subband values for a frame's twenty-four slots, [slot][channel][real,
+        // imag][subband]: the banks run one after another, so a bank's state stays in the
+        // data cache (61 KB, made when a frame first needs it).
+        std::vector<float> spectra{};
+        // What one object's slot works in, one set a lane: a second lane takes whole objects.
+        struct LaneScratch {
+            std::array<float, dsp::kQmfSubbands> object_real{};
+            std::array<float, dsp::kQmfSubbands> object_imag{};
+            std::array<std::array<float, dsp::kQmfSubbands>, kNumChannels5X> mix{};
+            std::array<std::array<float, 32>, kNumChannels5X> band_mix{};
+        };
+        static constexpr std::size_t kLanes = 2;
+        std::array<LaneScratch, kLanes> lanes{};
+        // How many slots in a row each object's bank has been given silence, up to the ten its
+        // delay line holds: after that its state is zero and a silent slot's output is zero
+        // outright, so the bank is not run (a bank made new is already there).
+        std::vector<std::uint8_t> silent_slots{};
+    };
+    std::unique_ptr<QmfStateSingle> qmf_single{};
 
     // The matrix from TWO frames back. The MDCT path never needs it: every
     // block it emits belongs to the frame being decoded, so previous_matrix

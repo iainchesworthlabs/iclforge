@@ -11,6 +11,7 @@
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/ac3/io/elementary.hpp"
 
 namespace iclforge::apps {
 
@@ -46,6 +47,33 @@ void lay_over(const chanmap::Layout& layout, const iclforge::ac3::DecodedSubstre
 bool reads_as_access_units(std::span<const std::byte> stream) {
     const auto bsid = iclforge::ac3::stream_bsid(stream);
     return bsid.has_value() && (*bsid > 8 || iclforge::ac3::has_eac3_extension_substreams(stream));
+}
+
+std::expected<ProgrammeUnits, ProgrammeError> select_programme(std::span<const std::byte> stream,
+                                                               std::optional<int> wanted) {
+    auto ids = iclforge::ac3::programme_ids(stream);
+    if (!ids.has_value() || ids->empty()) {
+        return std::unexpected(ProgrammeError{});
+    }
+    const int programme = wanted.value_or(ids->front());
+    if (!std::ranges::contains(*ids, programme)) {
+        return std::unexpected(ProgrammeError{.not_carried = true, .carried = std::move(*ids)});
+    }
+    auto units = iclforge::ac3::split_access_units(stream, programme);
+    if (!units.has_value() || units->empty()) {
+        return std::unexpected(ProgrammeError{});
+    }
+    return ProgrammeUnits{
+        .programme = programme, .ids = std::move(*ids), .units = std::move(*units)};
+}
+
+std::optional<std::vector<std::byte>> cut_programme(std::span<const std::byte> stream,
+                                                    int programme) {
+    const auto scanned = iclforge::ac3::io::scan(stream);
+    if (!scanned.has_value()) {
+        return std::nullopt;
+    }
+    return iclforge::ac3::io::extract_programme(*scanned, programme);
 }
 
 std::optional<iclforge::ac3::DecodedAccessUnit> held_back_unit(

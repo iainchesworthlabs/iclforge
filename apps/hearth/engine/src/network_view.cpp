@@ -314,15 +314,19 @@ GroupDetail to_group_detail(const GroupFacts& facts) {
         GroupMemberRow row;
         row.sink_id = member.sink_id;
         row.name = member.name;
-        switch (member.kind) {
-            case SinkKind::kHearthSink:
-                row.gets_text = member.connected ? "E-AC-3 · this sink's own render" : "E-AC-3 · not connected";
-                break;
-            case SinkKind::kTestSink:
-            case SinkKind::kStandardPlayer:
-            default:
-                row.gets_text = member.connected ? "Stereo, this application's own mix" : "Stereo · not connected";
-                break;
+        row.form = member.form;
+        row.reason_text = member.form_reason;
+        if (!member.connected) {
+            row.gets_text = member.form_label.empty() ? "not connected"
+                                                      : member.form_label + " · not connected";
+        } else if (!member.form_label.empty()) {
+            row.gets_text = member.form_label;
+        } else if (member.kind == SinkKind::kHearthSink) {
+            // Nothing has played to the group yet: a Hearth sink takes the stream as it is where it
+            // decodes it, and PCM decoded here where it does not.
+            row.gets_text = "The stream, or PCM";
+        } else {
+            row.gets_text = "PCM, decoded here";
         }
         row.volume = member.volume;
         row.muted = member.muted;

@@ -438,6 +438,7 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
     config.decode_core = core_from_kconfig(CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE);
     config.decode_stack_bytes = CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES;
     config.decode_stack_in_psram = CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM != 0;
+    config.decode_lane = CONFIG_ICLFORGE_EXAMPLE_DECODE_LANE != 0;
     config.hold_first_unit = CONFIG_ICLFORGE_EXAMPLE_HOLD_FIRST_UNIT != 0;
     config.max_passes = kMaxLaps;
     config.volume = g_volume.load();

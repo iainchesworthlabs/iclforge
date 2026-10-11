@@ -467,6 +467,20 @@ config ICLFORGE_EXAMPLE_AC4_PARALLEL
         the same bit for bit. A play's location can say parallel=on or
         parallel=off.
 
+config ICLFORGE_EXAMPLE_DECODE_LANE
+    int "AC-3 and E-AC-3: decode a frame's per-channel and per-object stages on both cores (1) or one (0)"
+    default 1 if IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32P4
+    default 0
+    range 0 1
+    help
+        On a part with two cores, with the decode task pinned to one of them
+        (ICLFORGE_EXAMPLE_DECODE_CORE), a worker task on the other takes half of a decode's
+        independent stages: each channel's inverse transform and overlap-add, and a JOC
+        reconstruction's bed analyses and objects. It is a task with its stack in PSRAM where
+        there is PSRAM, at the decode task's priority. The PCM is the same bit for bit.
+        Measured on an ESP32-S3 (planning/esp32-714-realtime.md): objects 7.1.4 ... see the
+        board page for the figures.
+
 config ICLFORGE_EXAMPLE_AC4_PCM_HASH
     int "AC-4: hash every decoded sample (1) or not (0)"
     depends on ICLFORGE_AC4
