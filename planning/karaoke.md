@@ -164,20 +164,28 @@ used by the verification table below.
 
 - **L1 Find.** For an item `name.ext`, a file `name.lrc` in the same folder (extension matched
   without regard to case) is its lyrics.
-- **L2 Read.** Time-tagged lines `[mm:ss.xx]text`, several tags on one line, `[offset:±ms]`, and
-  the id tags `ti`, `ar`, `al`, `by` and `length` (shown or kept for display). Word-level tags in
-  the enhanced form `<mm:ss.xx>` are not used for timing in v1; their text is shown without the
-  tags.
+- **L2 Read.** Time-tagged lines `[mm:ss.xx]text`, several tags on one line, `[offset:±ms]`, the
+  id tags `ti`, `ar`, `al`, `by` and `length` (shown or kept for display), and the enhanced word
+  tags `<mm:ss.xx>`, one before each word. A word runs from its tag to the next word's tag, and
+  the last word of a line to the next line's tag (to the item's length for the last line). Tags
+  are never shown as text.
 - **L3 Encoding.** UTF-8, with or without a byte-order mark. A file that is not valid UTF-8 is
   reported as unreadable; it is not guessed at.
-- **L4 Show.** The current line is emphasised, with the previous and the next lines in view. It
-  follows the playing position, and a seek moves it. A file with no time tags is shown as plain
-  text and is not followed.
+- **L4 Show.** Each word is drawn in one of three states, in different colours: *sung*, *being
+  sung* and *not yet sung*. The word being sung fills in proportion to the time elapsed within
+  its span, so a partly sung word is partly one colour and partly the other. Colour is not the
+  only cue (the word being sung also differs in weight or underline). The line being sung is
+  emphasised, with the previous and the next lines in view, and a seek moves everything to the
+  new position. A line whose words carry no tags is emphasised as a whole and is not given
+  invented word times; a file with no time tags at all is shown as plain text and is not
+  followed.
 - **L5 Fail soft.** A missing, empty or unreadable lyrics file shows "no lyrics" (with the reason
   where there is one) and never stops or delays playback.
-- **L6 Time.** A line changes within 50 ms of the audio it belongs to being heard on a local
-  output (the engine's heard position, not the decoded position). For a network sink the lyrics
-  follow the same clock the sink is synchronised to (checked in design; see
+- **L6 Time.** A word changes state within 50 ms of the audio it belongs to being heard on a
+  local output (the engine's heard position, not the decoded position). The fill of the word
+  being sung is redrawn at the display's frame rate from that position, advanced by the time
+  since the engine last published it, so it moves smoothly between publications. For a network
+  sink the lyrics follow the same clock the sink is synchronised to (checked in design; see
   [Later](#later-not-v1)).
 
 **Creation (Forge GUI)**
@@ -216,10 +224,10 @@ used by the verification table below.
 ### Not in v1
 
 Stem files as a playback source, microphone input, scoring and recording; an LFE part in
-authoring; Annex C's optional re-levelling of V1, V2 and M; a lyrics editor; word-level lyric
-timing; karaoke in E-AC-3 or AC-4 (the specifications give them no mode and the decoder never sets
-the flag); video playback of a karaoke MP4's picture; Android, a browser page and an ESP32 sink
-(see [Later](#later-not-v1)).
+authoring; Annex C's optional re-levelling of V1, V2 and M; a lyrics editor or a tool that times
+words against a stream; estimated word times for a line that has none; karaoke in E-AC-3 or AC-4
+(the specifications give them no mode and the decoder never sets the flag); video playback of a
+karaoke MP4's picture; Android, a browser page and an ESP32 sink (see [Later](#later-not-v1)).
 
 ### Quality targets
 
@@ -248,7 +256,7 @@ table would be invisible to any comparison with another program. What stands in 
 | Not karaoke, and coded outputs | Engine tests: an ordinary 3/2 stream with the controls set decodes as without them; passthrough and a coded sink leave the stream's bytes alone | P6, P7 |
 | Fold and settings | `tst_decoder_settings`-style QML and controller tests for the disabled states, the Lt/Rt notice and persistence | P6 to P9 |
 | Containers | The loader test opens the same stream raw, in MP4 and in Matroska and compares the decode | P11 |
-| Lyrics | Unit tests of the reader over a file of cases (tags, offsets, several tags, no tags, bad encoding, enhanced tags) and an engine test of the line at a given position | L1 to L6 |
+| Lyrics | Unit tests of the reader over a file of cases (tags, offsets, several tags, no tags, bad encoding, word tags, a line without them) and a test of each word's state and fill at a given position, including a seek | L1 to L6 |
 | Authoring | Build a stream from generated parts through the page's controller, probe it (`bsmod`, mode, levels), decode under each reproduction and check each part's place and gain against Annex C's tables | A1 to A8 |
 | Pages | `qml.exe` or offscreen QML tests for each state, and screenshots re-cropped from the running app, not recalled | Design sheet |
 | A listening pass | The owner on a desktop, recorded in the PR | S2, S3, S7 |
@@ -259,14 +267,15 @@ what is in them.
 
 ### Specification decisions
 
-Put to the owner on 2026-10-11 with the answer the draft assumed; all seven were accepted as
-drafted. The alternatives are kept so any of them can be reopened.
+Put to the owner on 2026-10-11 with the answer the draft assumed; six were accepted as drafted,
+and decision 3 was changed the same day from line level to word level. The alternatives are kept
+so any of them can be reopened.
 
 | # | Decision | Taken | Alternatives |
 |---|---|---|---|
 | 1 | Default reproduction for a karaoke stream | **Aware**: Hearth starts a karaoke stream with the vocals at the level the programme provider set, and the singer's chooser moves it to capable. The library's own default stays *off* | *As coded*: V1 and V2 then play from the surround speakers, which is wrong for a karaoke stream on a 5.1 layout. *Capable with the vocals muted*: what a singer most often wants, but it hides what the stream says |
 | 2 | One page or a section (P2) | **A seventh Hearth page**, "Karaoke" (Ctrl+7), with the lyric view also reachable full-screen from Play; the design sheet settles the layout | A section of the Play page: fewer places to look, but the Play page is already 750 lines of QML and a lyric view wants the whole window |
-| 3 | Lyrics timing (L2) | **Line level.** A line is shown when its time tag is reached | *Word level*: the enhanced LRC tags `<mm:ss.xx>` fill each word as it is sung; needs a per-word layout and a finer clock, a later increment. *None*: show the text as a static block |
+| 3 | Lyrics timing (L2, L4, L6) | **Word level**, the owner's call (the draft had assumed line level): the enhanced LRC tags `<mm:ss.xx>` colour each word as sung, being sung or to come, and the word being sung fills as it is sung | *Line level*: a line is shown when its tag is reached; simpler, and what most LRC files in the wild carry. *Word level with estimated times for untagged lines*: spreads a line's words evenly over its duration, which looks like karaoke but is a guess. *None*: show the text as a static block |
 | 4 | Lyrics encoding (L3) | **UTF-8**, with or without a byte-order mark; anything else is reported as unreadable | *UTF-8, and UTF-16 only when it carries a byte-order mark*: unambiguous and cheap, since the mark states the encoding. *Legacy code pages guessed* (Windows-1252, GBK, Shift-JIS are common in older LRC files): often wrong, and a wrong guess shows as garbled text. *A per-file encoding picker* in the UI |
 | 5 | Authoring input (A2) | **Separate part files first**, one multichannel WAV second | The WAV first (it needs the speaker mask #1263 added, now merged); both together |
 | 6 | LFE part in authoring (A8) | **None in v1** | An optional LFE part: the encoder supports it, the page and its checks grow |
@@ -324,6 +333,11 @@ Research, not specification: none of these is a v1 requirement.
 4. **The ESP32 display.** The panel's interface and size, and whether the screen shows generated
    lyrics or a video, once the owner has chosen the hardware (the assumption is a P4; see
    [Later](#later-not-v1)).
+5. **Where word-timed lyrics come from.** Word level (decision 3) needs the enhanced LRC form,
+   which is rarer in the wild than line-level files. A tool that marks each word against the
+   playing stream is the natural companion, and an estimate of word times for an untagged line is
+   a guess the spec does not make; neither is in v1. The v1 test content is generated, with word
+   tags.
 
 ## Working rules for this programme
 
