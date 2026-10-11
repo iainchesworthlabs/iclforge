@@ -321,6 +321,8 @@ TEST_CASE("lyrics: a plain file may carry the marker too, and the names are id t
     CHECK(lyrics.lines[0].singer == Singer::kFirst);
     CHECK(lyrics.lines[0].text == "Oh, the times are hard");
     CHECK(lyrics.lines[1].singer == Singer::kSecond);
+}
+
 // ---- SubRip (planning/karaoke-phase2.md, W13c) -------------------------------------------------
 
 TEST_CASE("subrip: cues are lines that end where their cue does, with the gap between them",

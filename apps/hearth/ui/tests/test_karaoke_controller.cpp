@@ -659,6 +659,8 @@ TEST_CASE("KaraokeController: timing sets who sings a line and what the singers 
     INFO(second_save.toStdString());
     REQUIRE(second_save.isEmpty());
     CHECK(line_at(controller, 0).value("singer").toString().isEmpty());
+}
+
 TEST_CASE("KaraokeController: a CD+G file with no lyrics file is a picture that follows the position",
           "[hearth][hearth-controller][karaoke][lyrics][cdg]") {
     Room room;

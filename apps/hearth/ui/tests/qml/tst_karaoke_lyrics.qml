@@ -480,6 +480,8 @@ TestCase {
                 qsTr("The lines are marked for %1 and for %2.").arg("Anna").arg("Crew"));
         KaraokeController.firstSingerName = "";
         compare(named(win, "firstSingerField").text, "");
+    }
+
     // --- the picture of a CD+G disc ----------------------------------------------
 
     // One 24-byte CD+G packet as a string of byte values: command 9, the instruction, two parity
