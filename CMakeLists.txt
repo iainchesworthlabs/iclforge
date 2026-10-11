@@ -393,12 +393,12 @@ include(MinimalDecoder)
 # further down, so resolving it here is still early enough.
 if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
     include(Fmt)
-    # iclforge::json - nlohmann/json, which apps/shared/project reads and writes the project file
-    # with (cmake/NlohmannJson.cmake). No library links it: only what compiles that code in, which
-    # is forge, forge-gui and the shared tests, so a build of none of them resolves nothing.
-    if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS)
-        include(NlohmannJson)
-    endif()
+    # iclforge::json - nlohmann/json (cmake/NlohmannJson.cmake): the project file's reader and
+    # writer (apps/shared/project) and iclforge::objects' scene file reader. Header-only and
+    # linked PRIVATE through $<BUILD_INTERFACE:...> the way iclforge::fmt_private is, so no export
+    # graph names it; it is resolved wherever iclforge::objects is built, which is everywhere this
+    # block is reached.
+    include(NlohmannJson)
 endif()
 
 # iclforge::adm (libs/adm) is a READER, not a writer like the three container modules above -

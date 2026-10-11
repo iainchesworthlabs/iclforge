@@ -99,6 +99,13 @@ if(fmt_VERSION)
 else()
     set(ICLFORGE_HEARTH_FMT_VERSION "${ICLFORGE_FMT_VERSION}")
 endif()
+# nlohmann/json's, the same way (cmake/NlohmannJson.cmake): iclforge::objects compiles it in for
+# the scene file's reader, and Hearth's programs link that library.
+if(nlohmann_json_VERSION)
+    set(ICLFORGE_HEARTH_JSON_VERSION "${nlohmann_json_VERSION}")
+else()
+    set(ICLFORGE_HEARTH_JSON_VERSION "${ICLFORGE_NLOHMANN_JSON_VERSION}")
+endif()
 # Tracy's version, from its package - the same Tracy_VERSION/"not reported" choice
 # notices/crucible/notices.cmake makes for the identical shared fragment (see the
 # ICLFORGE_ENABLE_TRACY block below for why this is computed unconditionally).
@@ -126,7 +133,7 @@ if(EXISTS "${ICLFORGE_HEARTH_VCPKG_SHARE}/libogg/copyright")
     list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS "LIBOGG_VERSION=${version}")
     list(APPEND ICLFORGE_HEARTH_NOTICE_FILES "LIBOGG_COPYRIGHT=${ICLFORGE_HEARTH_VCPKG_SHARE}/libogg/copyright")
 endif()
-list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt hearth-fonts material-symbols trademarks)
+list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt nlohmann-json hearth-fonts material-symbols trademarks)
 # Tracy's client library: hearth_engine (engine/CMakeLists.txt) links iclforge::tracy
 # unconditionally, which only pulls in Tracy::TracyClient - and so is only worth
 # disclosing - when ICLFORGE_ENABLE_TRACY is on (cmake/Tracy.cmake). Same fact,
@@ -146,6 +153,8 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS
     # values for the tokens they each leave for the including app to fill.
     "FMT_VERSION=${ICLFORGE_HEARTH_FMT_VERSION}"
     "FMT_USERS=Hearth's programs"
+    "JSON_VERSION=${ICLFORGE_HEARTH_JSON_VERSION}"
+    "JSON_USERS=Hearth's programs"
     "FONT_USER=Hearth"
     "TRACY_VERSION=${ICLFORGE_HEARTH_TRACY_VERSION}"
     "TRACY_USERS=Hearth's programs")
@@ -158,6 +167,7 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS
 list(APPEND ICLFORGE_HEARTH_NOTICE_FILES
     "LGPL3=${CMAKE_SOURCE_DIR}/notices/licences/LGPL-3.0.txt"
     "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
+    "JSON_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-nlohmann-json.txt"
     "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
     "MATERIAL_SYMBOLS_LICENSE=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Apache-2.0.txt"
     "TRACY_BSD=${CMAKE_SOURCE_DIR}/notices/licences/BSD-3-Clause-Tracy.txt")

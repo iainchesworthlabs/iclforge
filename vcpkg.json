@@ -1,7 +1,7 @@
 {
   "name": "iclforge",
   "$comment": "No \"version\" field: per vcpkg.json's own schema (learn.microsoft.com/vcpkg/reference/vcpkg-json), version is only required for a manifest describing a library/port - this one just declares this project's own build-time dependencies. The build's real version derives from git tags (cmake/GitVersionDerivation.cmake); the staged port's version-semver (packaging/vcpkg-port/iclforge/vcpkg.json) is what tracks releases. See docs/releasing.md.",
-  "description": "Clean-room AC-3 (ATSC A/52), E-AC-3 and AC-4 encoder and decoder library, with tools and applications, in C++23. The codecs' one third-party library is {fmt}, compiled in for formatting text; the programs' project files are read and written with nlohmann-json, which no library links; vcpkg also supplies Catch2 for the tests and the packages behind the profiling, adm and hearth features.",
+  "description": "Clean-room AC-3 (ATSC A/52), E-AC-3 and AC-4 encoder and decoder library, with tools and applications, in C++23. The codecs' third-party libraries are {fmt}, compiled in for formatting text, and nlohmann-json, compiled in for reading an object scene file; the programs' project files are read and written with nlohmann-json too, and neither is linked as a library; vcpkg also supplies Catch2 for the tests and the packages behind the profiling, adm and hearth features.",
   "builtin-baseline": "386d7c478221b7ee0c97bfe6ea61dcf65121d564",
   "dependencies": [
     "catch2",

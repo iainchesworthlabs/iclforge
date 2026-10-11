@@ -235,13 +235,15 @@ endif()
 # The config file find_package(iclforge) actually loads. No find_dependency()
 # calls needed in iclforgeConfig.cmake.in: the platform-audio code is
 # physically in a separate, non-exported target (iclforge::audio), and {fmt}, the
-# one third-party library iclforge::ac3 and iclforge::containers use, is compiled into their
+# third-party library iclforge::ac3 and iclforge::containers use, is compiled into their
 # object files as a private copy (iclforge::fmt_private, cmake/Fmt.cmake) instead of linked. A
 # shared library absorbs a linked {fmt} at its own link step; a static archive
 # cannot, so a linked {fmt} would leave its consumers an undefined fmt:: symbol
 # that this package names nowhere. tools/checks/check_install_consumer.sh links
 # every installed archive whole, so a symbol that neither the package nor the
-# C/C++ runtime supplies fails there.
+# C/C++ runtime supplies fails there. nlohmann/json, which iclforge::objects uses to read a
+# scene file, is header-only and compiled in the same way (iclforge::json, cmake/NlohmannJson.cmake),
+# so it adds no symbol and no find_dependency() either.
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/iclforgeConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/iclforgeConfig.cmake"

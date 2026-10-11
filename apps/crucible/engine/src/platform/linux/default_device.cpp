@@ -4,7 +4,9 @@
 
 #include <cstdlib>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 
 #include "iclforge/audio/passthrough.hpp"
 #include "pipewire_support.hpp"
@@ -32,29 +34,31 @@ namespace {
 
 constexpr const char* kDefaultSinkKey = "default.audio.sink";
 
-// The node name inside PipeWire's JSON metadata value.
+// The node name inside PipeWire's JSON metadata value. Empty when the value is not a JSON object
+// with a string "name", which is what an unset default looks like too.
 [[nodiscard]] std::string name_from_json(const char* value) {
     if (value == nullptr) {
         return {};
     }
-    const std::string_view json{value};
-    const auto at = json.find("\"name\"");
-    if (at == std::string_view::npos) {
+    const nlohmann::json document =
+        nlohmann::json::parse(value, nullptr, /*allow_exceptions=*/false);
+    if (!document.is_object()) {
         return {};
     }
-    const auto colon = json.find(':', at);
-    if (colon == std::string_view::npos) {
+    const auto name = document.find("name");
+    if (name == document.end() || !name->is_string()) {
         return {};
     }
-    const auto open = json.find('"', colon + 1);
-    if (open == std::string_view::npos) {
-        return {};
-    }
-    const auto close = json.find('"', open + 1);
-    if (close == std::string_view::npos) {
-        return {};
-    }
-    return std::string{json.substr(open + 1, close - open - 1)};
+    return name->get<std::string>();
+}
+
+// The value to store for a node: {"name":"<id>"}, with the id escaped as JSON needs - a node name
+// is whatever its owner called it. A byte sequence that is not UTF-8 is replaced rather than
+// refused, so the write still reaches PipeWire.
+[[nodiscard]] std::string json_for_name(std::string_view endpoint_id) {
+    nlohmann::json document = nlohmann::json::object();
+    document["name"] = std::string{endpoint_id};
+    return document.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
 }
 
 // One connect - act - disconnect round trip against the "default" metadata
@@ -201,7 +205,7 @@ public:
         if (endpoint_id.empty()) {
             return std::unexpected("no endpoint given");
         }
-        const std::string json = "{\"name\":\"" + std::string{endpoint_id} + "\"}";
+        const std::string json = json_for_name(endpoint_id);
         const bool ok = with_default_metadata([&json](pw_proxy* metadata) {
             pw_metadata_set_property(reinterpret_cast<pw_metadata*>(metadata), PW_ID_CORE,
                                      kDefaultSinkKey, "Spa:String:JSON", json.c_str());

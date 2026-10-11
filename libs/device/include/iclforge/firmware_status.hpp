@@ -108,6 +108,13 @@ struct FirmwareStatus {
 
 namespace detail {
 
+// A writer of its own, rather than iclforge::sendspin::json::Writer or nlohmann/json, because this
+// library is header-only and standard-library only (libs/device/CMakeLists.txt) and an image
+// without Sendspin's player half (a Kconfig option) still renders this status. Measured on a C6
+// and an S3 for this very document, the two alternatives write it in 1.2x (Sendspin's) and
+// 4.6-4.9x (nlohmann's) the time, the latter using 3.1-3.2x the heap in 20x the allocations and
+// about 60 KB more flash; see the header of libs/sendspin/include/iclforge/sendspin/json.hpp.
+//
 // JSON string escaping: the two characters that end or escape a string, and
 // every control character as \u00XX, since a version or a reason is text a
 // build or a failure chose.
