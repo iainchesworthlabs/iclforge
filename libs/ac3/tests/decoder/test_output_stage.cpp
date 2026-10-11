@@ -1660,3 +1660,159 @@ TEST_CASE("karaoke: a real karaoke stream decodes to L C R through the decoder",
         CHECK(heard->channels == coded->channels);
     }
 }
+
+namespace {
+
+// Full-bandwidth channels of each coding mode, Table 5.8, written out here and
+// not read back from the library the test is holding to it.
+std::size_t full_bandwidth_channels(ac3::Acmod acmod) {
+    constexpr std::array<std::size_t, 8> kCount = {2, 1, 2, 3, 3, 4, 4, 5};
+    return kCount.at(static_cast<std::size_t>(acmod));
+}
+
+}  // namespace
+
+TEST_CASE("karaoke: output_mode names the layout the stage's channels are in",
+          "[decoder][output][karaoke]") {
+    using ac3::Acmod;
+    using ac3::OutputMode;
+
+    const ac3::OutputConfig coded{};
+    const ac3::OutputConfig aware = karaoke_config();
+    ac3::OutputConfig capable = karaoke_config();
+    capable.karaoke = ac3::KaraokeReproduction::kCapable;
+    capable.karaoke_vocals = ac3::KaraokeVocals::kV1;
+
+    // A karaoke frame with something to reproduce leaves as 3/0, with the LFE
+    // after R when it has one, for either kind of decoder.
+    for (const ac3::OutputConfig& config : {aware, capable}) {
+        for (const Acmod acmod : {Acmod::k2_1, Acmod::k3_1, Acmod::k2_2, Acmod::k3_2}) {
+            CHECK(ac3::output_mode(config, acmod, false, true) == OutputMode{Acmod::k3_0, false});
+            CHECK(ac3::output_mode(config, acmod, true, true) == OutputMode{Acmod::k3_0, true});
+            // The same frame, not karaoke: as coded.
+            CHECK(ac3::output_mode(config, acmod, true, false) == OutputMode{acmod, true});
+        }
+        // 3/0 is L M R already, 2/0 has nothing to reproduce, and 1/0 and 1+1
+        // are not karaoke layouts: the coded mode, LFE included.
+        for (const Acmod acmod : {Acmod::k3_0, Acmod::k2_0, Acmod::k1_0, Acmod::kDualMono}) {
+            CHECK(ac3::output_mode(config, acmod, true, true) == OutputMode{acmod, true});
+        }
+    }
+
+    // Off, karaoke or not: as coded.
+    CHECK(ac3::output_mode(coded, Acmod::k3_2, true, true) == OutputMode{Acmod::k3_2, true});
+    CHECK(ac3::output_mode(coded, Acmod::k2_1, false, true) == OutputMode{Acmod::k2_1, false});
+
+    // A fold has its own channels and no LFE of its own, however the frame is
+    // flagged and whichever decoder is asked for; dual mono is left alone.
+    for (const bool karaoke : {false, true}) {
+        for (const ac3::KaraokeReproduction reproduction :
+             {ac3::KaraokeReproduction::kOff, ac3::KaraokeReproduction::kAware,
+              ac3::KaraokeReproduction::kCapable}) {
+            ac3::OutputConfig config{.karaoke = reproduction};
+            config.target = ac3::DownmixTarget::kLoRo;
+            CHECK(ac3::output_mode(config, Acmod::k3_2, true, karaoke) ==
+                  OutputMode{Acmod::k2_0, false});
+            config.target = ac3::DownmixTarget::kLtRt;
+            CHECK(ac3::output_mode(config, Acmod::k2_2, true, karaoke) ==
+                  OutputMode{Acmod::k2_0, false});
+            config.target = ac3::DownmixTarget::kMono;
+            CHECK(ac3::output_mode(config, Acmod::k3_0, true, karaoke) ==
+                  OutputMode{Acmod::k1_0, false});
+            CHECK(ac3::output_mode(config, Acmod::kDualMono, true, karaoke) ==
+                  OutputMode{Acmod::kDualMono, true});
+        }
+    }
+}
+
+TEST_CASE("karaoke: output_mode and output_channel_count never disagree",
+          "[decoder][output][karaoke]") {
+    ac3::OutputConfig capable = karaoke_config();
+    capable.karaoke = ac3::KaraokeReproduction::kCapable;
+    ac3::OutputConfig capable_stereo = capable;
+    capable_stereo.target = ac3::DownmixTarget::kLoRo;
+    ac3::OutputConfig capable_mono = capable;
+    capable_mono.target = ac3::DownmixTarget::kMono;
+    ac3::OutputConfig ltrt{.target = ac3::DownmixTarget::kLtRt};
+    const std::array<ac3::OutputConfig, 6> configs = {ac3::OutputConfig{}, karaoke_config(),
+                                                      capable, capable_stereo, capable_mono, ltrt};
+    for (const ac3::OutputConfig& config : configs) {
+        for (int code = 0; code < 8; ++code) {
+            const auto acmod = static_cast<ac3::Acmod>(code);
+            for (const bool lfe : {false, true}) {
+                for (const bool karaoke : {false, true}) {
+                    const ac3::OutputMode mode = ac3::output_mode(config, acmod, lfe, karaoke);
+                    INFO("acmod " << code << ", lfe " << lfe << ", karaoke " << karaoke);
+                    CHECK(ac3::output_channel_count(config, acmod, lfe, karaoke) ==
+                          full_bandwidth_channels(mode.acmod) + (mode.lfe ? 1U : 0U));
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("karaoke: output_mode is the layout a real decoder's channels come out in",
+          "[decoder][output][karaoke]") {
+    // 3/2 with an LFE, flagged bsmod 7: five tones for L M R V1 V2 and a low
+    // one for the LFE. Decoded as coded, aware, capable and folded, the
+    // channels the decoder returns are as many as output_mode() says, and
+    // under the reproduction the fourth is the coded LFE, untouched.
+    const std::array<double, 6> hz = {200.0, 400.0, 800.0, 1600.0, 3200.0, 80.0};
+    ac3::EncoderConfig encoder_config;
+    encoder_config.acmod = ac3::Acmod::k3_2;
+    encoder_config.lfe = true;
+    encoder_config.bitrate_kbps = 448;
+    encoder_config.info.bsmod = ac3::meta::BitstreamMode::kVoiceOverOrKaraoke;
+    ac3::FrameEncoder encoder{encoder_config};
+    std::vector<std::vector<std::byte>> frames;
+    std::uint64_t n0 = 0;
+    for (int f = 0; f < 4; ++f) {
+        const auto pcm = tones(hz, n0, ac3::kSamplesPerFrame);
+        n0 += ac3::kSamplesPerFrame;
+        std::vector<std::span<const float>> views;
+        for (const auto& channel : pcm) {
+            views.emplace_back(channel);
+        }
+        auto frame = encoder.encode_frame(views);
+        REQUIRE(frame.has_value());
+        frames.push_back(std::move(*frame));
+    }
+
+    ac3::OutputConfig capable = karaoke_config();
+    capable.karaoke = ac3::KaraokeReproduction::kCapable;
+    capable.karaoke_vocals = ac3::KaraokeVocals::kBoth;
+    const ac3::OutputConfig stereo{.target = ac3::DownmixTarget::kLoRo};
+    const ac3::OutputConfig mono{.target = ac3::DownmixTarget::kMono};
+
+    for (const ac3::OutputConfig& config :
+         std::array<ac3::OutputConfig, 5>{ac3::OutputConfig{}, karaoke_config(), capable, stereo,
+                                          mono}) {
+        ac3::FrameDecoder decoder{{.output = config}};
+        ac3::FrameDecoder reference;
+        for (const auto& frame : frames) {
+            const auto heard = decoder.decode_frame(frame);
+            const auto coded = reference.decode_frame(frame);
+            REQUIRE(heard.has_value());
+            REQUIRE(coded.has_value());
+            REQUIRE(heard->acmod == ac3::Acmod::k3_2);
+            REQUIRE(heard->lfe);
+            const bool karaoke = ac3::meta::is_karaoke(
+                static_cast<ac3::meta::BitstreamMode>(heard->bsmod), heard->acmod);
+            REQUIRE(karaoke);
+            const ac3::OutputMode mode =
+                ac3::output_mode(config, heard->acmod, heard->lfe, karaoke);
+            CHECK(heard->channels.size() ==
+                  full_bandwidth_channels(mode.acmod) + (mode.lfe ? 1U : 0U));
+            if (mode.acmod == ac3::Acmod::k3_0 && mode.lfe) {
+                // L, C, R, then the LFE as it was coded.
+                REQUIRE(heard->channels.size() == 4);
+                REQUIRE(coded->channels.size() == 6);
+                for (std::size_t i = 0; i < heard->channels[3].size(); ++i) {
+                    REQUIRE(static_cast<double>(heard->channels[3][i]) ==
+                            Catch::Approx(static_cast<double>(coded->channels[5][i]))
+                                .margin(1e-6));
+                }
+            }
+        }
+    }
+}
