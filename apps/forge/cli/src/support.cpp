@@ -65,6 +65,7 @@
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "container_input.hpp"
+#include "exit_codes.hpp"
 #include "platform/stdio_binary.hpp"
 #include "recording_sink.hpp"
 #include "usage.hpp"
@@ -3312,6 +3313,75 @@ std::optional<int> choose_programme(std::span<const int> ids, std::optional<int>
         return std::nullopt;
     }
     return wanted;
+}
+
+std::expected<iclforge::apps::ProgrammeUnits, int> select_programme_units(
+    std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path) {
+    auto selected = iclforge::apps::select_programme(stream, wanted);
+    if (selected.has_value()) {
+        return std::move(*selected);
+    }
+    if (selected.error().not_carried) {
+        // choose_programme says which ones it does carry, in the wording
+        // decode, qc and levels answer a bad programme= with.
+        (void)choose_programme(selected.error().carried, wanted);
+        return std::unexpected(kExitUsage);
+    }
+    fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
+    return std::unexpected(kExitInput);
+}
+
+std::expected<iclforge::apps::ProgrammeUnits, int> select_receiver_units(
+    std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path,
+    std::vector<std::byte>& cut) {
+    auto selected = select_programme_units(stream, wanted, in_path);
+    if (!selected.has_value() || selected->programme == 0) {
+        return selected;
+    }
+    // Cut out and renumbered as substream 0, as the container writers do for
+    // programme=, then split again: the cut stream is a stream of its own, so
+    // this is the unfiltered split and its units are consecutive frame periods.
+    auto programme = iclforge::apps::cut_programme(stream, selected->programme);
+    if (programme.has_value()) {
+        cut = std::move(*programme);
+        auto units = iclforge::ac3::split_access_units(cut);
+        if (units.has_value() && !units->empty()) {
+            selected->units = std::move(*units);
+            return selected;
+        }
+    }
+    fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
+    return std::unexpected(kExitInput);
+}
+
+void report_programme(FILE* status, const iclforge::apps::ProgrammeUnits& selected) {
+    if (selected.ids.size() > 1) {
+        status_println(status, "  programme {} of {} ({})", selected.programme,
+                       selected.ids.size(), format_programme_ids(selected.ids));
+    }
+}
+
+bool apply_programme_option(std::vector<std::byte>& raw, const Options& meta,
+                            std::string_view in_path) {
+    if (!meta.programme.has_value()) {
+        return true;
+    }
+    const auto scanned = iclforge::ac3::io::scan(raw);
+    if (!scanned.has_value()) {
+        return true;
+    }
+    auto selected = iclforge::ac3::io::extract_programme(*scanned, *meta.programme);
+    if (!selected.has_value()) {
+        std::string carried;
+        for (const auto& programme : scanned->programmes) {
+            carried += (carried.empty() ? "" : ", ") + std::to_string(programme.substreamid);
+        }
+        fmt::println(stderr, "error: {}: no programme {} in this stream (it carries {})", in_path,
+                     *meta.programme, carried);
+        return false;
+    }
+    raw = std::move(*selected);
+    return true;
 }
 
 namespace {

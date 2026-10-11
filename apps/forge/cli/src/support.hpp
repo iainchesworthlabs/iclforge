@@ -43,6 +43,7 @@
 #include "iclforge/containers/mp4/hls.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "recording_sink.hpp"
+#include "stream_playback.hpp"
 
 // The CLI-wide support layer: option/metadata parsing, path/stdio conventions, frame and WAV I/O,
 // and level reporting shared by nearly every command in main.cpp's kCommands table. Split out of
@@ -801,6 +802,50 @@ std::string format_programme_ids(std::span<const int> ids);
 // iclforge::ac3::programme_ids() returned and must not be empty. Shared by decode, qc
 // and levels so all three answer a bad programme= the same way.
 std::optional<int> choose_programme(std::span<const int> ids, std::optional<int> wanted);
+
+// What monitor, spatial and play do first with an E-AC-3 stream: choose the one
+// programme they play (`wanted` is programme=; omitted takes the first the
+// stream carries, as decode does) and split out its units - see
+// iclforge::apps::select_programme, which does the choosing without any
+// printing, for why it is one and never a fold of several.
+//
+// On failure the reason is already on stderr and the value is the exit code:
+// kExitInput for a stream that does not frame (`in_path` is named, as these
+// commands always have), kExitUsage for a programme= the stream does not carry
+// (choose_programme lists the ones it does). Not decode's own wording - decode
+// keeps its `stream framing failed` messages and its codes, which a script may
+// already gate on.
+[[nodiscard]] std::expected<iclforge::apps::ProgrammeUnits, int> select_programme_units(
+    std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path);
+
+// The same choice, for a command that hands the programme to a RECEIVER (play,
+// spdif) rather than to a decoder: the units come back as a receiver has to be
+// given them. A receiver takes independent substream 0 and ignores the rest, so
+// another programme's frames as they stand would be a stream with nothing it
+// will play - for a programme other than 0 the result's units are the cut-out,
+// renumbered programme's (iclforge::apps::cut_programme), and `cut` is where
+// their bytes live: it must outlive every use of the units, and is untouched
+// when the units are the stream's own. `programme` and `ids` are the choice's,
+// for report_programme. Failures are select_programme_units's.
+[[nodiscard]] std::expected<iclforge::apps::ProgrammeUnits, int> select_receiver_units(
+    std::span<const std::byte> stream, std::optional<int> wanted, std::string_view in_path,
+    std::vector<std::byte>& cut);
+
+// `  programme 1 of 2 (0, 1)` on `status`, only when the stream carries more
+// than one - the line decode prints, so a multi-programme stream is never
+// played without saying which programme it was.
+void report_programme(FILE* status, const iclforge::apps::ProgrammeUnits& selected);
+
+// programme=N on a command that wraps or re-codes a stream: the stream becomes
+// that programme alone, as a stream of its own (iclforge::ac3::io::
+// extract_programme renumbers it as independent substream 0, which is what a
+// player takes). Without it the command's own default stands - every programme
+// carried (MP4, fMP4, MPEG-TS), the first one (Matroska, transcode). A stream
+// with no programme of that id is refused by name (false, the reason on
+// stderr), and one this reader does not scan (AC-4, say) is left for the
+// command to report as it always did.
+[[nodiscard]] bool apply_programme_option(std::vector<std::byte>& raw, const Options& meta,
+                                          std::string_view in_path);
 
 // The output stage a decode/monitor run actually uses: `meta.output`, with
 // downmix=auto settled into a concrete fold. §D3.1.1's automatic Lt/Rt-or-

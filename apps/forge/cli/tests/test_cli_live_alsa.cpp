@@ -939,3 +939,78 @@ TEST_CASE("monitor decodes and plays an AC-4 stream to the end on the default ou
     CHECK(contains(out, "(AC-4, presentation 0, 2 channels, 48000 Hz)"));
     CHECK(contains(out, "played "));
 }
+
+// ---------------------------------------------------------------------------
+// A stream with two programmes (§E2.3.1.2's independent substreams): monitor
+// plays ONE of them. Its units arrive interleaved, a frame period of each in
+// turn, and monitor used to hand them all to a decoder given no `programme` -
+// the main, then the audio description, then the main - and sized each unit's
+// output from the first one's 5.1, so the mono unit after it read channels
+// that were not there.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("monitor plays one programme of a stream that carries two, whichever is asked for",
+          "[cli][audio-io][alsa-null][concurrency][programme]") {
+    const auto dir = scratch_dir();
+    // A second of a 5.1 main and a second of a mono description, as the
+    // documentation builds one (eac3-encode with programme2=).
+    const auto main_ec3 = dir / "programme_main.ec3";
+    const auto main_wav = dir / "programme_main.wav";
+    const auto description_ec3 = dir / "programme_description.ec3";
+    const auto description_wav = dir / "programme_description.wav";
+    const auto stream = dir / "programme_two.ec3";
+    const auto make = dir / "programme_make.log";
+    REQUIRE(run_cli(null_config(), "eac3-silence \"" + main_ec3.string() + "\" 1 448 51", make) ==
+            0);
+    REQUIRE(run_cli(null_config(),
+                    "decode \"" + main_ec3.string() + "\" \"" + main_wav.string() + "\"", make) ==
+            0);
+    REQUIRE(run_cli(null_config(),
+                    "eac3-silence \"" + description_ec3.string() + "\" 1 96 mono", make) == 0);
+    REQUIRE(run_cli(null_config(),
+                    "decode \"" + description_ec3.string() + "\" \"" + description_wav.string() +
+                        "\"",
+                    make) == 0);
+    REQUIRE(run_cli(null_config(),
+                    "eac3-encode \"" + main_wav.string() + "\" \"" + stream.string() +
+                        "\" 448 none 51 off programme2=\"" + description_wav.string() +
+                        "\" programme2-layout=mono programme2-bitrate=96",
+                    make) == 0);
+
+    SECTION("the first programme, by default, at its own width") {
+        const auto log = dir / "programme_default.log";
+        REQUIRE(run_cli(null_config(), "monitor \"" + stream.string() + "\"", log) == 0);
+        const auto out = read_text(log);
+        check_clean(out);
+        CHECK(contains(out, "  programme 0 of 2 (0, 1)"));
+        CHECK(contains(out, "(6 channels, 48000 Hz)"));
+        // One programme's 32 frame periods, not both programmes' 64 units.
+        CHECK(contains(out, "played 32 access units"));
+    }
+    SECTION("the other, when programme= names it") {
+        const auto log = dir / "programme_second.log";
+        REQUIRE(run_cli(null_config(), "monitor \"" + stream.string() + "\" -1 programme=1", log) ==
+                0);
+        const auto out = read_text(log);
+        check_clean(out);
+        CHECK(contains(out, "  programme 1 of 2 (0, 1)"));
+        CHECK(contains(out, "(1 channels, 48000 Hz)"));
+        CHECK(contains(out, "played 32 access units"));
+    }
+    SECTION("folded to stereo when asked, still the first programme's units alone") {
+        const auto log = dir / "programme_fold.log";
+        REQUIRE(run_cli(null_config(),
+                        "monitor \"" + stream.string() + "\" -1 downmix=loro", log) == 0);
+        const auto out = read_text(log);
+        CHECK(contains(out, "(2 channels, 48000 Hz)"));
+        CHECK(contains(out, "played 32 access units"));
+    }
+    SECTION("a programme the stream lacks is refused by name, and nothing plays") {
+        const auto log = dir / "programme_missing.log";
+        CHECK(run_cli(null_config(), "monitor \"" + stream.string() + "\" -1 programme=5", log) ==
+              1);
+        const auto out = read_text(log);
+        CHECK(contains(out, "no programme 5 in this stream (it carries 0, 1)"));
+        CHECK_FALSE(contains(out, "played "));
+    }
+}

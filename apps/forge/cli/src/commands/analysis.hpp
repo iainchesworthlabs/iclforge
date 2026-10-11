@@ -70,7 +70,13 @@ int run_levels(std::string_view in_path, const Options& meta);
 // AC-4 stream's presentation as decode's options choose it - beside the
 // dialnorm the stream carries.
 int run_loudness(std::string_view in_path, const Options& meta);
-int run_spdif(std::string_view in_path, std::string_view out_path);
+// IEC 61937 wrap of an AC-3, E-AC-3 or AC-4 stream. An E-AC-3 stream with a
+// second independent substream (a second language, an audio description) goes
+// in as ONE programme - programme= (Options::programme), else the first the
+// stream carries - cut out and renumbered as substream 0 when it is not 0
+// already, which is what a receiver takes. Ignored for AC-3 (no substream
+// layer) and AC-4 (a presentation, not a programme).
+int run_spdif(std::string_view in_path, std::string_view out_path, const Options& meta);
 int run_unspdif(std::string_view in_path, std::string_view out_path, bool keep_partial);
 
 }  // namespace forge_cli::commands

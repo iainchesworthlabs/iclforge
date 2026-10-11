@@ -910,16 +910,20 @@ only the second programme — see
 ## Programme options (`decode`, `qc`, `levels`): `programme=`
 
 ```text
-programme options (decode, qc, levels, mkv, mp4, fmp4, ts; any order, after the positional
-arguments):
+programme options (decode, qc, levels, monitor, spatial, play, transcode, spdif, mkv, mp4, fmp4,
+ts; any order, after the positional arguments):
   programme=<0..7>  which programme of a multi-programme stream to work on, by the §E2.3.1.2
                     substreamid of its independent substream; omitted takes the first the
                     stream carries (mp4, fmp4 and ts omit it to carry every programme)
 ```
 
-The decode-side half of `programme2=` above. All three commands work on exactly one programme —
-never a fold of several, since two programmes are alternatives rather than layers and mixing them
-would give a WAV that splices unrelated audio, or a loudness figure neither programme has.
+The decode-side half of `programme2=` above, and the same token for the commands that play, re-code
+or wrap a stream (`monitor`, `spatial`, `play`, `transcode`, `spdif`). Every one of them works on
+exactly one programme — never a fold of several, since two programmes are alternatives rather than
+layers and mixing them would give a WAV that splices unrelated audio, a loudness figure neither
+programme has, from `monitor`, a main and then its audio description one frame period at a time, or,
+from `play` and `spdif`, a receiver sent the main at half speed with the description between its
+frames.
 
 `decode` alone can also mix one programme into another when the second is an **associated service**
 (§E3.10): a description, a commentary, a voice-over, carried beside the main with the gains and pan
@@ -952,6 +956,26 @@ forge decode out.ec3 main.wav                # programme 0
 forge decode out.ec3 commentary.wav programme=1
 forge levels out.ec3 programme=1
 forge qc out.ec3 programme=1 preset=atsc-a85
+forge monitor out.ec3 -1 programme=1         # hear the commentary
+forge transcode out.ec3 commentary.ac3 192 programme=1
+```
+
+`monitor` and `spatial` play the programme they chose and say so before they touch a device; a
+programme the stream does not carry is refused by name (exit `1`) on a machine with no output at
+all. `play` sends a receiver that programme alone: a receiver takes independent substream 0 and
+ignores the rest, so a programme other than 0 is cut out and renumbered as substream 0 first, as the
+containers do. Where `play` has to fall back, the PCM leg is `monitor` and the AC-3 leg is
+`transcode`, and both honour `programme=` the same way. `transcode` without it takes the first
+programme, as it always has.
+
+`spdif` writes what `play` would send: the one programme, cut out and renumbered as substream 0 when
+it is not 0 already, as that programme's bursts alone, so `unspdif` recovers that programme and no
+other. It names the programme it wrapped, and a programme the stream does not carry is refused by
+name (exit `1`) with no carrier left behind.
+
+```bash
+forge spdif out.ec3 main.wav                 # programme 0, as play sends it
+forge spdif out.ec3 commentary.wav programme=1
 ```
 
 On `mkv`, `mp4`, `fmp4` and `ts` the chosen programme is written alone, renumbered as independent
@@ -964,7 +988,8 @@ command says which it picked and what else was there (`programme 0 of 2 (0, 1)`)
 multi-programme stream is never handled silently. Asking for a programme the stream does not
 carry is an error that lists the ones it does. Ignored for AC-3, which has no substream layer.
 AC-4 has no programmes: it chooses a presentation instead (below), and `decode` given `programme=`
-with an AC-4 stream names it in a warning and ignores it.
+with an AC-4 stream names it in a warning and ignores it; `monitor`, `play` and `spdif` ignore it for
+AC-4 without saying so.
 
 ## AC-4 options
 

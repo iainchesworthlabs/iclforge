@@ -437,9 +437,11 @@ constexpr std::array<Command, 44> kCommands{{
      topic::kQc | topic::kProgramme | topic::kAc4Decode,
      Needs::kNothing, [](const Args& x) { return run_qc(x.str(1), x.meta); }},
     {"spdif", 3, "<in.ac3|in.ec3|in.ac4> <out.wav>",
-     "IEC 61937 wrap as playable PCM16 WAV; AC-4 in IEC 61937-14's bursts", topic::kNone,
+     "IEC 61937 wrap as playable PCM16 WAV, one programme of a multi-programme E-AC-3 stream "
+     "(programme=); AC-4 in IEC 61937-14's bursts",
+     topic::kNone,
      Needs::kNothing,
-     [](const Args& x) { return run_spdif(x.str(1), x.str(2)); }},
+     [](const Args& x) { return run_spdif(x.str(1), x.str(2), x.meta); }},
     {"unspdif", 3, "<in.wav|in.raw|-> <out.ac3|out.ec3|out.ac4|->",
      "the inverse: recover the elementary stream from IEC 61937 bursts, as captured from "
      "an S/PDIF or HDMI input or written by 'spdif'. '-' pipes either end",

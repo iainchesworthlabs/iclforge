@@ -1225,6 +1225,14 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
                      "source's dialnorm and downmix values, and drc= names its DRC profile");
         return kExitUsage;
     }
+    // programme=N transcodes that programme alone, cut out as a stream of its
+    // own as the container commands cut it. Without it the first programme is
+    // the one transcoded, as ScannedStream::access_units always has been -
+    // which is also the programme 'play' sends a receiver that takes AC-3 and
+    // not E-AC-3, through this command.
+    if (!apply_programme_option(bytes, meta, in_path)) {
+        return kExitInput;
+    }
     const auto loaded = scan_loaded(std::move(bytes), in_path);
     if (!loaded.has_value()) {
         return kExitInput;
