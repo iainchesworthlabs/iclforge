@@ -1196,6 +1196,31 @@ std::optional<DecodeRenderStats> decode_and_render(std::string_view in_path,
     return stats;
 }
 
+namespace {
+
+// The locations of a stream whose channels are exactly one Table 5.8 coding
+// mode plus its LFE - no dependent substream, no chanmap - in the order the
+// decode writes them (WAV order), or nothing for a stream that holds more
+// (7.1, the heights) or whose mode is dual mono, which has no locations.
+std::optional<std::vector<iclforge::ac3::eac3::chanmap::Location>> own_coding_mode(
+    const iclforge::ac3::io::ScannedStream& scan, std::size_t channels) {
+    if (scan.acmod == iclforge::ac3::Acmod::kDualMono ||
+        static_cast<int>(channels) !=
+            iclforge::ac3::fullbw_channel_count(scan.acmod) + (scan.lfe ? 1 : 0)) {
+        return std::nullopt;
+    }
+    const auto coded = iclforge::ac3::eac3::chanmap::expand(
+        iclforge::ac3::eac3::chanmap::acmod_map(scan.acmod, scan.lfe));
+    std::vector<iclforge::ac3::eac3::chanmap::Location> out;
+    out.reserve(static_cast<std::size_t>(coded.count));
+    for (const auto location : coded) {
+        out.push_back(location);
+    }
+    return out;
+}
+
+}  // namespace
+
 int run_transcode(std::string_view in_path, std::string_view out_path, std::uint32_t bitrate,
                   std::string_view layout, const Options& meta) {
     // A stream inside a container is read as decode reads it.
@@ -1349,6 +1374,12 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
             fmt::println(stderr, "error: {} is 1+1 but carries no dialnorm2", in_path);
             return kExitInput;  // both bsi syntaxes always send it for 1+1
         }
+    } else if (!to_ac4 && own_coding_mode(loaded->scan, source_channels) &&
+               plan_from_locations(p, label, *own_coding_mode(loaded->scan, source_channels))) {
+        // A stream that is exactly one Table 5.8 coding mode - 3/0, 2/1, 3/1 or
+        // 2/2 among them - goes out in that mode. Following the channel COUNT
+        // would put three channels on a 5.1 as L R C whatever they were, so a
+        // 2/1 programme's lone surround would come back as its centre.
     } else {
         auto id = plan::layout_for_source(source_channels);
         if (id.has_value() && !plan::carries(*target_codec, *id)) {

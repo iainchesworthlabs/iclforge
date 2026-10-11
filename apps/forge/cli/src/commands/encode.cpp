@@ -100,6 +100,12 @@ class ProgrammeSource {
         return streaming_ ? static_cast<std::size_t>(stream_.frame_count())
                           : whole_.frame_count();
     }
+    // Where the file says its channels are, per source_locations(): empty when
+    // it states none.
+    [[nodiscard]] std::vector<iclforge::ac3::eac3::chanmap::Location> locations() const {
+        return source_locations(streaming_ ? stream_.channel_mask() : whole_.channel_mask,
+                                channels());
+    }
 
     // Fills `dest` (one vector per channel, each `frame_len` long - usually
     // kSamplesPerFrame, shorter when the primary programme's own numblkscod
@@ -230,7 +236,12 @@ std::unique_ptr<PlannedExtraProgramme> open_extra_programme(int n,
     // against, which is the whole point of carrying it as a separate
     // programme. See Options::ExtraProgramme::meta / parse_programme_metadata_option.
     out->p.meta = extra.meta;
-    if (extra.layout.empty()) {
+    const auto stated = out->source.locations();
+    if (extra.layout.empty() && plan_from_locations(out->p, out->label, stated)) {
+        // The file said which speakers its channels are, and that is a layout
+        // this programme can carry: it is that layout, not a guess from its
+        // width.
+    } else if (extra.layout.empty()) {
         const auto id = plan::layout_for_source(out->source.channels());
         if (!id.has_value()) {
             fmt::println(stderr, "error: {} has {} channels - {}", out->path,
@@ -256,7 +267,7 @@ std::unique_ptr<PlannedExtraProgramme> open_extra_programme(int n,
                      n, n);
         return nullptr;
     }
-    auto routing = routing_or_error(out->p, out->source.channels());
+    auto routing = routing_or_error(out->p, out->source.channels(), stated);
     if (!routing.has_value()) {
         return nullptr;
     }
@@ -710,7 +721,14 @@ int run_eac3_encode(std::string_view in_path, std::string_view out_path,
                  .bitrate_kbps = bitrate,
                  .meta = meta.p};
     std::string label;
-    if (layout.empty()) {
+    // What the file says its channels are (a WAVE_FORMAT_EXTENSIBLE mask), when
+    // it says: a 2/1 file and a 3/0 one are both three channels wide, and only
+    // the speakers tell them apart.
+    const auto stated = source_locations(
+        streaming ? stream_in.channel_mask() : wav->channel_mask, src_channels);
+    if (layout.empty() && plan_from_locations(p, label, stated)) {
+        // The layout is the file's own, as stated.
+    } else if (layout.empty()) {
         // An unnamed layout follows the source, which is what this command
         // did before it could be told otherwise.
         const auto id = plan::layout_for_source(src_channels);
@@ -772,7 +790,7 @@ int run_eac3_encode(std::string_view in_path, std::string_view out_path,
         p.meta.dialnorm2 = *measured2;
     }
 
-    const auto routing = routing_or_error(p, src_channels);
+    const auto routing = routing_or_error(p, src_channels, stated);
     if (!routing.has_value()) {
         return kExitUsage;
     }
@@ -1272,7 +1290,14 @@ int run_encode(std::string_view in_path, std::string_view out_path, std::uint32_
                  .bitrate_kbps = bitrate,
                  .meta = meta.p};
     std::string label;
-    if (layout.empty()) {
+    // What the file says its channels are (a WAVE_FORMAT_EXTENSIBLE mask), when
+    // it says: that is how a 2/1, 3/1, 3/0 or 2/2 programme reaches an AC-3
+    // stream of its own mode instead of a 5.1 with silent channels.
+    const auto stated = source_locations(
+        streaming ? stream_in.channel_mask() : wav->channel_mask, src_channels);
+    if (layout.empty() && plan_from_locations(p, label, stated)) {
+        // The layout is the file's own, as stated.
+    } else if (layout.empty()) {
         // An unnamed layout follows the source, which is what this command
         // did before it could be told otherwise. Naming one is how a stereo
         // file reaches a 5.1 stream, or a 5.1 file gets folded down per §7.8.
@@ -1345,7 +1370,7 @@ int run_encode(std::string_view in_path, std::string_view out_path, std::uint32_
         p.meta.dialnorm2 = *measured2;
     }
 
-    const auto routing = routing_or_error(p, src_channels);
+    const auto routing = routing_or_error(p, src_channels, stated);
     if (!routing.has_value()) {
         return kExitUsage;
     }

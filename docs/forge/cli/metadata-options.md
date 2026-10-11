@@ -401,6 +401,12 @@ layout: mono | stereo | 1+1 | 51 | 71 | 512 | 514 | 714
         Locations: L C R Ls Rs Lc Rc Lrs Rrs Cs Ts Lsd Rsd Lw Rw Vhl Vhr
         Vhc Lts Rts LFE2 LFE - a paired location (Lc/Rc, Lrs/Rrs, Lsd/Rsd,
         Lw/Rw, Vhl/Vhr, Lts/Rts) must be given both halves.
+
+        With no [layout], 'encode' and 'eac3-encode' follow the source: a WAV
+        that states which speakers its channels are (a WAVE_FORMAT_EXTENSIBLE
+        channel mask, which 'decode' writes from three channels up) is encoded
+        as exactly those - FL FR BC is 2/1, FL FR FC BC is 3/1 - and one that
+        states none is read by its channel count.
 ```
 
 `71` and `714` render fewer speakers than they code because, per §E3.8.2, a dependent

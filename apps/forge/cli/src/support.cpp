@@ -1448,16 +1448,17 @@ std::vector<std::byte> to_bytes(std::span<const char> raw) {
 // pipe stdout usually is as the path overload is on a plain file.
 std::expected<void, iclforge::ac3::io::WavError> write_wav_f32_arg(
         std::string_view path, std::span<const std::vector<float>> channels,
-        std::uint32_t sample_rate, std::span<const std::size_t> channel_order = {}) {
+        std::uint32_t sample_rate, std::span<const std::size_t> channel_order = {},
+        std::uint32_t channel_mask = 0) {
     if (is_stdio_path(path)) {
         iclforge::cli::platform::set_stdio_binary();
-        auto result =
-            iclforge::ac3::io::write_wav_f32(std::cout, channels, sample_rate, channel_order);
+        auto result = iclforge::ac3::io::write_wav_f32(std::cout, channels, sample_rate,
+                                                       channel_order, channel_mask);
         std::cout.flush();
         return result;
     }
     return iclforge::ac3::io::write_wav_f32(std::string{path}, channels, sample_rate,
-                                            channel_order);
+                                            channel_order, channel_mask);
 }
 
 }  // namespace
@@ -1893,6 +1894,43 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             }
             fmt::println(stderr,
                          "error: mode is 'performance' (the default) or 'reference' (got '{}')",
+                         token);
+            return false;
+        }
+        if (command == "decode" && (token == "karaoke" || key == "karaoke")) {
+            // Annex C's karaoke-aware 3/0 reproduction, for a decode: its
+            // output has fewer channels than the stream codes and is named by
+            // a layout (L C R) the other commands that read this stage's
+            // output do not know, so it is `decode`'s alone.
+            // Bare, on and aware are the karaoke-AWARE decoder (C.2.3.1); none,
+            // v1, v2 and v1+v2 are the karaoke-CAPABLE one's listener choices
+            // (C.2.3.2, Table C.2.3), which also pick the vocals a stereo or
+            // mono target is given.
+            using iclforge::ac3::KaraokeReproduction;
+            using iclforge::ac3::KaraokeVocals;
+            if (token == "karaoke" || value == "on" || value == "aware") {
+                out.output.karaoke = KaraokeReproduction::kAware;
+                continue;
+            }
+            if (value == "off") {
+                out.output.karaoke = KaraokeReproduction::kOff;
+                continue;
+            }
+            const std::optional<KaraokeVocals> vocals =
+                value == "none"                       ? std::optional{KaraokeVocals::kNone}
+                : value == "v1"                       ? std::optional{KaraokeVocals::kV1}
+                : value == "v2"                       ? std::optional{KaraokeVocals::kV2}
+                : (value == "v1+v2" || value == "both") ? std::optional{KaraokeVocals::kBoth}
+                                                      : std::nullopt;
+            if (vocals) {
+                out.output.karaoke = KaraokeReproduction::kCapable;
+                out.output.karaoke_vocals = *vocals;
+                continue;
+            }
+            fmt::println(stderr,
+                         "error: karaoke is bare, 'on' or 'aware' (the karaoke-aware decoder), "
+                         "'none', 'v1', 'v2' or 'v1+v2' (the capable one's vocals), or 'off' "
+                         "(got '{}')",
                          token);
             return false;
         }
@@ -3180,6 +3218,40 @@ std::optional<int> measured_dialnorm(const iclforge::ac3::io::WavData& wav,
                                      iclforge::ac3::SampleRate rate, iclforge::ac3::Acmod acmod,
                                      bool lfe, FILE* out) {
     iclforge::ac3::meta::LoudnessMeter meter{rate, acmod, lfe};
+    const auto locations = source_locations(wav.channel_mask, wav.channels.size());
+    // A source that states its speakers is metered by them: the bed's coded
+    // channels (Table 5.8 order, LFE last) are looked up by location, so a
+    // 2/1 file's lone surround is weighted as the surround it is and not as
+    // the right channel the count-based permutation below would seat it in.
+    // When the bed has a channel the file does not, the count-based answer is
+    // what it was.
+    if (!locations.empty() && locations.size() == wav.channels.size()) {
+        using iclforge::ac3::eac3::chanmap::acmod_map;
+        using iclforge::ac3::eac3::chanmap::expand;
+        const auto bed = expand(acmod_map(acmod, false));
+        std::vector<std::span<const float>> placed;
+        placed.reserve(wav.channels.size());
+        bool complete = true;
+        const auto place = [&](iclforge::ac3::eac3::chanmap::Location location) {
+            const auto at = std::ranges::find(locations, location);
+            if (at == locations.end()) {
+                complete = false;
+                return;
+            }
+            placed.emplace_back(
+                wav.channels[static_cast<std::size_t>(std::distance(locations.begin(), at))]);
+        };
+        for (int k = 0; k < bed.count; ++k) {
+            place(bed[k]);
+        }
+        if (lfe) {
+            place(iclforge::ac3::eac3::chanmap::Location::kLfe);
+        }
+        if (complete) {
+            meter.push(placed);
+            return finish_measurement(meter, {}, "dialnorm", out);
+        }
+    }
     // LoudnessMeter takes its spans in AC-3 CODED order (Table 5.8: L, C, R,
     // Ls, Rs, LFE), which is not WAV order (FL, FR, FC, LFE, BL, BR) for any
     // layout wider than stereo. Pushing the file's own order straight in put
@@ -3751,10 +3823,11 @@ std::expected<iclforge::ac3::io::WavData, iclforge::ac3::io::WavError> read_wav_
 }
 
 bool PlanarWavSink::open(std::string_view path, std::uint32_t sample_rate, std::size_t slots,
-                         std::span<const std::size_t> order) {
+                         std::span<const std::size_t> order, std::uint32_t channel_mask) {
     path_ = std::string{path};
     stdio_ = is_stdio_path(path);
     sample_rate_ = sample_rate;
+    channel_mask_ = channel_mask;
     slots_.assign(slots, {});
     consumed_.assign(slots, 0);
     order_.assign(order.begin(), order.end());
@@ -3765,7 +3838,7 @@ bool PlanarWavSink::open(std::string_view path, std::uint32_t sample_rate, std::
         }
     }
     if (!stdio_) {
-        if (!writer_.open(path_, sample_rate, static_cast<std::uint16_t>(slots))) {
+        if (!writer_.open(path_, sample_rate, static_cast<std::uint16_t>(slots), channel_mask)) {
             return false;
         }
     }
@@ -3785,7 +3858,7 @@ std::expected<void, iclforge::ac3::io::WavError> PlanarWavSink::close() {
     }
     open_ = false;
     if (stdio_) {
-        return write_wav_f32_arg(path_, slots_, sample_rate_, order_);
+        return write_wav_f32_arg(path_, slots_, sample_rate_, order_, channel_mask_);
     }
     if (!drain()) {
         writer_.close();
@@ -4317,9 +4390,69 @@ std::optional<iclforge::ac3::SampleRate> wav_sample_rate(std::uint32_t hz, std::
     return std::nullopt;
 }
 
-std::optional<iclforge::ac3::plan::Routing> routing_or_error(const iclforge::ac3::plan::Plan& p,
-                                                        std::size_t channels) {
-    auto routing = plan::route(plan::resolve(p), channels, p.meta.cmixlev, p.meta.surmixlev);
+std::vector<iclforge::ac3::eac3::chanmap::Location> source_locations(std::uint32_t channel_mask,
+                                                                      std::size_t channels) {
+    return plan::wav_mask_locations(channel_mask, channels).value_or(
+        std::vector<iclforge::ac3::eac3::chanmap::Location>{});
+}
+
+std::optional<iclforge::ac3::io::Ac3Layout> wav_source_layout(
+    const iclforge::ac3::io::WavData& wav) {
+    namespace chanmap = iclforge::ac3::eac3::chanmap;
+    const auto stated = source_locations(wav.channel_mask, wav.channels.size());
+    if (const auto held = plan::channel_mask_of(stated); held.has_value() && !stated.empty()) {
+        for (const auto acmod : {iclforge::ac3::Acmod::k1_0, iclforge::ac3::Acmod::k2_0,
+                                 iclforge::ac3::Acmod::k3_0, iclforge::ac3::Acmod::k2_1,
+                                 iclforge::ac3::Acmod::k3_1, iclforge::ac3::Acmod::k2_2,
+                                 iclforge::ac3::Acmod::k3_2}) {
+            for (const bool lfe : {false, true}) {
+                if (chanmap::acmod_map(acmod, lfe) != *held) {
+                    continue;
+                }
+                // The mode's own channels in coded order, then the LFE, each at
+                // the file position of its speaker.
+                iclforge::ac3::io::Ac3Layout layout{.acmod = acmod, .lfe = lfe, .wav_index = {}};
+                const auto position = [&](chanmap::Location location) {
+                    return static_cast<std::size_t>(std::distance(
+                        stated.begin(), std::ranges::find(stated, location)));
+                };
+                for (const auto location : chanmap::expand(chanmap::acmod_map(acmod, false))) {
+                    layout.wav_index.push_back(position(location));
+                }
+                if (lfe) {
+                    layout.wav_index.push_back(position(chanmap::Location::kLfe));
+                }
+                return layout;
+            }
+        }
+    }
+    return iclforge::ac3::io::ac3_layout_for(wav.channels.size());
+}
+
+bool plan_from_locations(iclforge::ac3::plan::Plan& p, std::string& label,
+                         std::span<const iclforge::ac3::eac3::chanmap::Location> locations) {
+    const auto chosen = plan::source_layout(p.codec, locations);
+    if (!chosen.has_value()) {
+        return false;
+    }
+    if (chosen->layout.has_value()) {
+        p.layout = *chosen->layout;
+        p.custom_locations = std::nullopt;
+        label = std::string(plan::layout(*chosen->layout).label);
+    } else {
+        p.custom_locations = chosen->custom_locations;
+        label = plan::format_channels(*chosen->custom_locations);
+    }
+    return true;
+}
+
+std::optional<iclforge::ac3::plan::Routing> routing_or_error(
+    const iclforge::ac3::plan::Plan& p, std::size_t channels,
+    std::span<const iclforge::ac3::eac3::chanmap::Location> locations) {
+    auto routing = locations.empty() || locations.size() != channels
+                       ? plan::route(plan::resolve(p), channels, p.meta.cmixlev, p.meta.surmixlev)
+                       : plan::route(plan::resolve(p), locations, p.meta.cmixlev,
+                                     p.meta.surmixlev);
     if (!routing.has_value()) {
         fmt::println(stderr, "error: {} channels - {}", channels,
                      plan::describe(plan::PlanError::kNoSourceLayout));
