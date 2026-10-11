@@ -1,6 +1,6 @@
 # Karaoke, phase 2
 
-!!! note "Status as of 2026-10-11: signed off by the owner; W1 is merged, W2 is in review, the builds start with W13a"
+!!! note "Status as of 2026-10-12: signed off by the owner; W1, W2, W13a, W6's library, W7's host and W8 are merged, and the rest of the builds are in review"
     [Phase 1](karaoke.md) built Annex C karaoke as K0 to K6 (Hearth's Karaoke page, lyrics and
     singer view; the Forge GUI's Karaoke flow). This page is the plan for what phase 1 left, in
     the order the owner gave on 2026-10-11 ([Order](#order)). Each item below is a small pull
@@ -12,9 +12,9 @@
     | Step | What | State |
     |---|---|---|
     | 0 | This page: scope, order, decisions | Signed off 2026-10-11 |
-    | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1 merged (#1290); W2 in review (#1293); W3 designed in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes) |
+    | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1 merged (#1290); W2 merged (#1293); W3 designed in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes) |
     | 2 | Research W4 and W5 (lyrics for a network group; Android and a browser page) | Read from the code; written up in [the findings](karaoke-phase2-findings.md) |
-    | 3 | Builds in [the approved order](#order), one pull request each | Approved; W13a first |
+    | 3 | Builds in [the approved order](#order), one pull request each | W13a, W6's library and writer, W7's wire and host, and W8 are merged; W6's controller and dialog, W7's firmware, W9, W10, W11 and W13b are in review ([the table below](#work-items)) |
     | 4 | W12, the ESP32-P4 with a panel | **Parked** until the board arrives; only its questions are kept |
 
 ## What this phase is
@@ -62,18 +62,18 @@ tests, **L** is two to four stacked PRs. "Needs" is what the item cannot start w
 | ID | Item | Size | Needs | State |
 |---|---|---|---|---|
 | W1 | **The last frame.** The Forge GUI and `forge encode` write a different last frame for a source that is not whole AC-3 frames; fix the side that is wrong | S | Nothing | **Merged, PR #1290**: the GUI was the side that is wrong ([below](#w1-the-last-frame)) |
-| W2 | **Flow polish.** The header and rail say "5.0"; 192 kbps where the sheet showed 384; the mode card below the fold at 900 px; the Hear preview a run; Expert edits overwritten when a part changes; no `.lrc` beside a saved stream | M | Catalogue regeneration | **Built, PR #1293**, each item held by a test that fails without it ([below](#w2-flow-polish)) |
+| W2 | **Flow polish.** The header and rail say "5.0"; 192 kbps where the sheet showed 384; the mode card below the fold at 900 px; the Hear preview a run; Expert edits overwritten when a part changes; no `.lrc` beside a saved stream | M | Catalogue regeneration | **Merged, PR #1293**, each item held by a test that fails without it ([below](#w2-flow-polish)) |
 | W3 | **Word timing, as a design.** Which of a tap editor, an estimate and an alignment, and where it lives | S | The owner's choice of shape | Evaluated in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes); recommendation [below](#w3-word-timing) |
 | W4 | **Findings: lyrics for a network group.** Which position the lyric clock follows for a group, how a sink with a screen would get the line and the word, and how the choice reaches a sink that decodes for itself | S | Nothing | Read from `NetworkGroupSink`, `choose_sink_form` and the Sendspin roles: [the findings](karaoke-phase2-findings.md#w4-lyrics-for-a-network-group) |
 | W5 | **Findings: Android and a browser page.** What the C API, the bindings and WebAssembly lack, and the smallest first slice | S | Nothing | Read from `libs/capi`, `bindings/*`, `apps/demos/*`: [the findings](karaoke-phase2-findings.md#w5-android-and-a-browser-page) |
-| W6 | **Word timing, built** (shape per W3, D2) | L | W13a | Approved; after W13a |
-| W7 | **The sink decodes locally where it can** (D3): the role's settings carry the karaoke choice, the board applies it and runs the lyrics itself; the host sends PCM only to a sink that cannot | M to L | W13a for the lyrics; D3 | Approved; scoped in [the findings](karaoke-phase2-findings.md#sink-local-decode-the-owners-requirement); the audio side can be verified on the S3 boards before the panel arrives |
-| W8 | **Karaoke in the browser decode demo** (the smallest slice W5 finds) | S to M | D4 | Approved |
-| W9 | **An LFE part in authoring** (phase 1's decision 6) | M | Nothing; the encoder and the output stage already carry an LFE | After sign-off |
-| W10 | **Annex C's re-levelling of M, V1 and V2** | M to L | A library change, reviewed with the AC-3 decoder's owner session | After sign-off |
+| W6 | **Word timing, built** (shape per W3, D2) | L | W13a | **Built.** The library and the writer are merged (#1300); Hearth's controller (#1303) and the timing dialog (#1304) are in review |
+| W7 | **The sink decodes locally where it can** (D3): the role's settings carry the karaoke choice, the board applies it and runs the lyrics itself; the host sends PCM only to a sink that cannot | M to L | W13a for the lyrics; D3 | **Built.** The wire keys (#1305) and the host's rule (#1308) are merged; the firmware (#1310) is in review and was verified on a real S3 against the host's decode, within 0.25 dB for each reproduction. The lyrics to the board are not built (W7d: the panel is parked) |
+| W8 | **Karaoke in the browser decode demo** (the smallest slice W5 finds) | S to M | D4 | **Merged, PR #1311**: the WebAssembly build was run in Node against `forge decode`, all eight cases sample for sample |
+| W9 | **An LFE part in authoring** (phase 1's decision 6) | M | Nothing; the encoder and the output stage already carry an LFE | **Built, PR #1312** (in review) |
+| W10 | **Annex C's re-levelling of M, V1 and V2** | M to L | A library change, reviewed with the AC-3 decoder's owner session | **Built, in review**: the library's gains (#1313), Hearth's levels and sliders (#1317), and the levels to a sink that decodes for itself, with PCM for one that cannot (#1327, verified on a real S3) |
 | W11 | **Duets** beyond the V1 and V2 choice that exists | M | The owner asking for it | Not planned; costed [below](#w11-duets) |
 | W12 | **The ESP32-P4 with a panel** | L | The board | **Parked**; [questions only](#w12-parked-the-esp32-p4-with-a-panel) |
-| W13 | **Timed-text import.** The lyric module in a library, Crucible importing LRC; SubRip, Advanced SubStation Alpha, MIDI karaoke and CD+G as stretch | L (six PRs; the first is S to M) | D9 to D12; the owner's answer on what Crucible does with the text | Scoped in [the findings](karaoke-phase2-findings.md#w13-timed-text-beyond-lrc-and-crucible); not started |
+| W13 | **Timed-text import.** The lyric module in a library, Crucible importing LRC; SubRip, Advanced SubStation Alpha, MIDI karaoke and CD+G as stretch | L (six PRs; the first is S to M) | D9 to D12; the owner's answer on what Crucible does with the text | Scoped in [the findings](karaoke-phase2-findings.md#w13-timed-text-beyond-lrc-and-crucible). W13a is merged (#1299); W13b, Crucible's lyric strip with start-and-nudge as the position (D9), is in review (#1329); the media-session sources and W13c to W13f are not started |
 
 ## First items
 
