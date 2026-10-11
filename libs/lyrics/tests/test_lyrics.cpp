@@ -225,6 +225,101 @@ TEST_CASE("lyrics: what is not lyrics says why", "[lyrics]") {
     CHECK(tags_only.error().find("no lyrics") != std::string::npos);
 }
 
+// ---- a duet's singer (planning/karaoke-phase2.md, W11) -----------------------------------------
+
+TEST_CASE("lyrics: a line's singer is the marker at its start, and not part of its text",
+          "[lyrics][duet]") {
+    using iclforge::lyrics::Singer;
+    const Lyrics lyrics = parsed(
+        "[00:01.00]V1: Leave her, Johnny\n"
+        "[00:03.00]V2:Leave her\n"
+        "[00:05.00]V1+V2: Oh leave her, Johnny, leave her\n"
+        "[00:07.00]It's time for us to leave her\n");
+    REQUIRE(lyrics.lines.size() == 4);
+    CHECK(lyrics.lines[0].singer == Singer::kFirst);
+    CHECK(lyrics.lines[0].text == "Leave her, Johnny");
+    CHECK(lyrics.lines[1].singer == Singer::kSecond);
+    CHECK(lyrics.lines[1].text == "Leave her");
+    CHECK(lyrics.lines[2].singer == Singer::kBoth);
+    CHECK(lyrics.lines[2].text == "Oh leave her, Johnny, leave her");
+    // A line that says nothing is for nobody in particular, a solo's every line.
+    CHECK(lyrics.lines[3].singer == Singer::kUnmarked);
+    CHECK(lyrics.lines[3].text == "It's time for us to leave her");
+    CHECK(iclforge::lyrics::has_singers(lyrics));
+    CHECK_FALSE(iclforge::lyrics::has_singers(parsed("[00:01.00]Should auld acquaintance\n")));
+}
+
+TEST_CASE("lyrics: the marker's spellings, and what is only text", "[lyrics][duet]") {
+    using iclforge::lyrics::Singer;
+    const Lyrics lyrics = parsed(
+        "[00:01.00]v1: lower case\n"
+        "[00:02.00]  V2 :  spaced out\n"
+        "[00:03.00]v2+v1: the other order\n"
+        "[00:04.00]V1 + V2: spaces round the plus\n"
+        "[00:05.00]V3: not a singer\n"
+        "[00:06.00]V1 is the first vocal\n"
+        "[00:07.00]Sing V1: not at the start\n"
+        "[00:08.00]V1+V1: not two singers\n"
+        "[00:09.00]V1:\n");
+    REQUIRE(lyrics.lines.size() == 9);
+    CHECK(lyrics.lines[0].singer == Singer::kFirst);
+    CHECK(lyrics.lines[0].text == "lower case");
+    CHECK(lyrics.lines[1].singer == Singer::kSecond);
+    CHECK(lyrics.lines[1].text == "spaced out");
+    CHECK(lyrics.lines[2].singer == Singer::kBoth);
+    CHECK(lyrics.lines[3].singer == Singer::kBoth);
+    CHECK(lyrics.lines[3].text == "spaces round the plus");
+    for (std::size_t i = 4; i <= 7; ++i) {
+        CHECK(lyrics.lines[i].singer == Singer::kUnmarked);
+    }
+    CHECK(lyrics.lines[4].text == "V3: not a singer");
+    CHECK(lyrics.lines[5].text == "V1 is the first vocal");
+    CHECK(lyrics.lines[6].text == "Sing V1: not at the start");
+    CHECK(lyrics.lines[7].text == "V1+V1: not two singers");
+    // The marker alone is a line with a singer and no words, as a gap with a time.
+    CHECK(lyrics.lines[8].singer == Singer::kFirst);
+    CHECK(lyrics.lines[8].text.empty());
+}
+
+TEST_CASE("lyrics: the marker comes before the word tags, or after the first, and is not a word",
+          "[lyrics][duet]") {
+    using iclforge::lyrics::Singer;
+    const Lyrics lyrics = parsed(
+        "[00:10.00]V2: <00:10.00>Leave <00:10.50>her <00:11.00>Johnny\n"
+        "[00:20.00]<00:20.00>V1: Leave <00:20.50>her\n"
+        "[00:30.00][00:40.00]V1+V2: Chorus\n");
+    REQUIRE(lyrics.lines.size() == 4);
+    CHECK(lyrics.lines[0].singer == Singer::kSecond);
+    CHECK(lyrics.lines[0].text == "Leave her Johnny");
+    REQUIRE(lyrics.lines[0].words.size() == 3);
+    CHECK(lyrics.lines[0].words[0].text == "Leave ");
+    CHECK(lyrics.lines[0].words[0].start_ms == 10000);
+    CHECK(lyrics.lines[1].singer == Singer::kFirst);
+    CHECK(lyrics.lines[1].text == "Leave her");
+    REQUIRE(lyrics.lines[1].words.size() == 2);
+    CHECK(lyrics.lines[1].words[0].text == "Leave ");
+    // A repeated line is the same singer each time.
+    CHECK(lyrics.lines[2].singer == Singer::kBoth);
+    CHECK(lyrics.lines[3].singer == Singer::kBoth);
+}
+
+TEST_CASE("lyrics: a plain file may carry the marker too, and the names are id tags",
+          "[lyrics][duet]") {
+    using iclforge::lyrics::Singer;
+    const Lyrics lyrics = parsed(
+        "[ti:Leave Her, Johnny]\n[v1:Shantyman]\n[v2:Crew]\n"
+        "V1: Oh, the times are hard\n"
+        "V2: Leave her, Johnny\n");
+    CHECK_FALSE(lyrics.timed);
+    CHECK(lyrics.first_singer_name == "Shantyman");
+    CHECK(lyrics.second_singer_name == "Crew");
+    CHECK(lyrics.title == "Leave Her, Johnny");
+    REQUIRE(lyrics.lines.size() == 2);
+    CHECK(lyrics.lines[0].singer == Singer::kFirst);
+    CHECK(lyrics.lines[0].text == "Oh, the times are hard");
+    CHECK(lyrics.lines[1].singer == Singer::kSecond);
+}
+
 TEST_CASE("lyrics: the cursor finds the line, the word and how far through it",
           "[lyrics]") {
     const Lyrics lyrics = parsed(kWordTimed);

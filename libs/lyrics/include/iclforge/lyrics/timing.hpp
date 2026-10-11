@@ -33,7 +33,9 @@ namespace iclforge::lyrics {
 // `lyrics` as `.lrc` text: UTF-8 without a byte-order mark, one line to a line, in the order held.
 //
 //   [ti:] [ar:] [al:] [by:] [length:mm:ss]   the id tags that are set
+//   [v1:name] [v2:name]                      the duet's two singers' names, when set
 //   [mm:ss.xx]text                           a timed line
+//   [mm:ss.xx]V1: text                       a line of a duet, V1:, V2: or V1+V2: first
 //   [mm:ss.xx]<mm:ss.xx>word <mm:ss.xx>word  a word-timed line, its words as they are spaced
 //   [mm:ss.xx]                               a time that only marks an end
 //   text                                     a line of an untimed file
@@ -64,6 +66,11 @@ bool set_line_start(Lyrics& lyrics, std::size_t line, std::int64_t start_ms);
 // Where word `word` of line `line` starts, from a press, held between the word before it and the one
 // after (or the line's own start and end). False, changing nothing, for a word that does not exist.
 bool set_word_start(Lyrics& lyrics, std::size_t line, std::size_t word, std::int64_t start_ms);
+
+// Who sings a line (W11). False, changing nothing, for a line that does not exist. kUnmarked
+// takes the marker off. Nothing about the line's time or text changes, so the marker is only
+// written (write_lrc) and read back.
+bool set_line_singer(Lyrics& lyrics, std::size_t line, Singer singer);
 
 // Gives a line that has no word times the estimate (estimate_words) over its span. False when the
 // line does not exist, has no text, or already has word times, which an estimate must not replace.

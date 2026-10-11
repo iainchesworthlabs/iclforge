@@ -112,6 +112,8 @@ std::string write_lrc(const Lyrics& lyrics) {
     tag("ar", lyrics.artist);
     tag("al", lyrics.album);
     tag("by", lyrics.author);
+    tag("v1", lyrics.first_singer_name);
+    tag("v2", lyrics.second_singer_name);
     if (lyrics.length_ms) {
         const std::int64_t seconds = std::max<std::int64_t>(*lyrics.length_ms, 0) / 1000;
         char text[40];
@@ -120,10 +122,16 @@ std::string write_lrc(const Lyrics& lyrics) {
         tag("length", text);
     }
     for (const LyricLine& line : lyrics.lines) {
+        // A duet's singer comes first on the line, before any text or word tag.
+        const std::string_view marker = singer_marker(line.singer);
         if (lyrics.timed) {
             out += '[';
             out += stamp(line.start_ms);
             out += ']';
+            if (!marker.empty()) {
+                out += marker;
+                out += ' ';
+            }
             if (line.word_timed()) {
                 for (const LyricWord& word : line.words) {
                     out += '<';
@@ -135,6 +143,10 @@ std::string write_lrc(const Lyrics& lyrics) {
                 out += line.text;
             }
         } else {
+            if (!marker.empty()) {
+                out += marker;
+                out += ' ';
+            }
             out += line.text;
         }
         out += '\n';
@@ -249,6 +261,14 @@ bool set_word_start(Lyrics& lyrics, std::size_t line, std::size_t word, std::int
     }
     target.words[word].end_ms =
         word + 1 < target.words.size() ? target.words[word + 1].start_ms : line_end;
+    return true;
+}
+
+bool set_line_singer(Lyrics& lyrics, std::size_t line, Singer singer) {
+    if (line >= lyrics.lines.size()) {
+        return false;
+    }
+    lyrics.lines[line].singer = singer;
     return true;
 }
 
