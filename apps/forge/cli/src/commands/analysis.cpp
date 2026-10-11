@@ -1695,6 +1695,10 @@ int run_spdif(std::string_view in_path, std::string_view out_path, const Options
         fmt::println(stderr, "error: cannot read {}", in_path);
         return kExitInput;
     }
+    // associated= names a second programme to mix into the main, and this
+    // decodes nothing: said once, as 'play' says it, since wrapping the main
+    // alone would read as the service having been mixed.
+    warn_associated_not_mixed(meta, "spdif", "it wraps one coded programme without decoding it");
     if (is_ac4_stream(stream)) {
         return run_spdif_ac4(stream, in_path, out_path);
     }

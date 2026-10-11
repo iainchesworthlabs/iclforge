@@ -16,6 +16,7 @@
 #include "iclforge/sendspin/noise.hpp"
 #include "iclforge/sendspin/pairing_messages.hpp"
 #include "iclforge/sendspin/server_host.hpp"
+#include "network_group_sink.hpp"
 #include "network_view.hpp"
 #include "pairing_store.hpp"
 
@@ -241,6 +242,16 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // uniqueness check, so a name cannot resolve one group unambiguously the
     // way iclforge::sendspin::Group::id() (unique per host) does.
     [[nodiscard]] std::shared_ptr<sendspin::Group> group(const std::string& group_id) const;
+
+    // Decides what each connected member of the group `request.group_name` (a group id) is sent
+    // the programme `request` describes, and tells the host: choose_sink_form() for each sink
+    // (sink_form.hpp), then ServerHost::use_pcm() to move it to PCM at the width chosen or back to
+    // the coded stream, and Group::hold() for a sink that takes neither. Answers the layouts the
+    // members chosen for PCM take beyond `request.layout`, which is what a MemberPlanner
+    // (network_group_sink.hpp) is. Called by the engine as a group opens, so on its thread;
+    // the line each member's reason makes is in take_log(). An id this class does not know
+    // answers nothing and decides nothing, and the group plays as it would with no planner.
+    [[nodiscard]] std::vector<render::OutputLayout> plan_group(const GroupPlanRequest& request);
 
     // The host's own trail (ServerHostEvents::on_log()) since the last call,
     // oldest first: what was dialled, what each sink was given, and why a

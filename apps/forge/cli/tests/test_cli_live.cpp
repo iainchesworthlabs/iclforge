@@ -11,6 +11,7 @@
 #include <numbers>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "platform/process.hpp"
@@ -221,8 +222,10 @@ void patch_bits(std::vector<std::byte>& frame, std::size_t offset, int count,
 // A second of a 5.1 main and a second of a mono description as two independent
 // substreams of one E-AC-3 stream (§E2.3.1.2's I0 and I1), written the way the
 // documentation writes one: eac3-encode with programme2=. Silent, because on a
-// machine with speakers 'monitor' plays what it is given.
-fs::path write_two_programme_stream(const std::string& name) {
+// machine with speakers 'monitor' plays what it is given. `description_options`
+// are more programme2- tokens (the service's bsmod, its gains).
+fs::path write_two_programme_stream(const std::string& name,
+                                    const std::string& description_options = "") {
     const auto dir = scratch_dir();
     const auto main_wav = dir / (name + "_main.wav");
     const auto description_wav = dir / (name + "_description.wav");
@@ -233,7 +236,7 @@ fs::path write_two_programme_stream(const std::string& name) {
     const auto stream = dir / (name + ".ec3");
     REQUIRE(run_cli("eac3-encode \"" + main_wav.string() + "\" \"" + stream.string() +
                         "\" 448 none 51 off programme2=\"" + description_wav.string() +
-                        "\" programme2-layout=mono programme2-bitrate=96",
+                        "\" programme2-layout=mono programme2-bitrate=96" + description_options,
                     dir / (name + "_make.log")) == 0);
     return stream;
 }
@@ -843,6 +846,170 @@ TEST_CASE("monitor plays one programme of a stream that carries two, and says wh
             CHECK(out.find("played 32 access units") != std::string::npos);
         }
     }
+}
+
+// §E3.10: monitor mixes an associated service into the programme it plays, as
+// decode does, from a second decoder run in step with the first. What is mixed
+// is checked sample for sample by iclforge-app-media-tests
+// (test_associated_mix.cpp); these hold the command around it, on a machine
+// with or without an output.
+
+TEST_CASE("monitor refuses an associated service the stream cannot give, by name, and plays nothing",
+          "[cli][audio-io][programme][associated]") {
+    // Chosen with the programme, before any device is looked at, so this holds
+    // on a machine with no output at all - and in decode's words and with
+    // decode's exit code.
+    const auto stream = write_two_programme_stream("associated_refused", " programme2-bsmod=vi");
+    const auto run = [&](const std::string& options) {
+        const auto log = scratch_dir() / "associated_refused.log";
+        const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 " + options, log);
+        return std::pair{rc, read_log(log)};
+    };
+
+    SECTION("a substream the stream does not carry") {
+        const auto [rc, out] = run("associated=5");
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(rc == 2);
+        CHECK(out.find("error: no programme 5 in this stream (it carries 0, 1)") !=
+              std::string::npos);
+        CHECK(out.find("played ") == std::string::npos);
+    }
+    SECTION("the programme being played") {
+        const auto [rc, out] = run("associated=0");
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(rc == 2);
+        CHECK(out.find("associated=0 is the programme being decoded") != std::string::npos);
+    }
+    SECTION("a service no programme is") {
+        const auto [rc, out] = run("associated=commentary");
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(rc == 2);
+        CHECK(out.find("no programme of this stream is that associated service") !=
+              std::string::npos);
+        // What there was to choose from, by what the stream calls each.
+        CHECK(out.find("1: associated service: visually impaired") != std::string::npos);
+    }
+    SECTION("the main is the second programme and the service is the first") {
+        // programme=1 plays the description; the main is then 'the other'.
+        const auto [rc, out] = run("programme=1 associated=1");
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(rc == 2);
+        CHECK(out.find("associated=1 is the programme being decoded") != std::string::npos);
+    }
+    SECTION("a gain with nothing to scale is named and ignored") {
+        const auto [rc, out] = run("associated-gain=-6");
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(out.find("associated-gain= scales an associated service") != std::string::npos);
+        check_spoke_either_way(rc, out);
+    }
+}
+
+TEST_CASE("monitor mixes an associated service into the programme it plays, and says so",
+          "[cli][audio-io][programme][associated][concurrency]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_two_programme_stream("associated_monitor", " programme2-bsmod=vi");
+
+    SECTION("by substream") {
+        const auto log = dir / "associated_monitor_number.log";
+        const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 associated=1", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(out.find("  programme 0 of 2 (0, 1)") != std::string::npos);
+        check_spoke_either_way(rc, out);
+        if (rc == 0) {
+            // What it mixes, said when playback starts and again with the
+            // gains it applied; one programme's second of audio all the way.
+            CHECK(out.find("  mixing programme 1 (associated service: visually impaired") !=
+                  std::string::npos);
+            CHECK(out.find("  mixed programme 1 (associated service: visually impaired") !=
+                  std::string::npos);
+            CHECK(out.find("into programme 0") != std::string::npos);
+            CHECK(out.find("played 32 access units") != std::string::npos);
+        }
+    }
+    SECTION("by what the stream calls it, with the listener's own level") {
+        const auto log = dir / "associated_monitor_name.log";
+        const auto rc = run_cli("monitor \"" + stream.string() +
+                                    "\" -1 associated=visually-impaired associated-gain=-6",
+                                log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        check_spoke_either_way(rc, out);
+        if (rc == 0) {
+            CHECK(out.find("  mixed programme 1 (associated service: visually impaired") !=
+                  std::string::npos);
+            CHECK(out.find("associated -6.0 dB") != std::string::npos);
+        }
+    }
+    SECTION("folded to the endpoint's width, still with the service in it") {
+        const auto log = dir / "associated_monitor_fold.log";
+        const auto rc =
+            run_cli("monitor \"" + stream.string() + "\" -1 downmix=loro associated=1", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        check_spoke_either_way(rc, out);
+        if (rc == 0) {
+            CHECK(out.find("(2 channels, ") != std::string::npos);
+            CHECK(out.find("  mixed programme 1 ") != std::string::npos);
+        }
+    }
+}
+
+TEST_CASE("monitor names associated= as ignored on a plain AC-3 stream, which has one programme",
+          "[cli][audio-io][associated][concurrency]") {
+    const auto dir = scratch_dir();
+    const auto stream = dir / "associated_plain.ac3";
+    REQUIRE(run_cli("silence \"" + stream.string() + "\" 1", dir / "associated_plain_make.log") ==
+            0);
+    const auto log = dir / "associated_plain.log";
+    const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 associated=1", log);
+    const auto out = read_log(log);
+    INFO(out);
+    if (out.find("is unavailable on this platform") != std::string::npos) {
+        return;
+    }
+    CHECK(out.find("warning: associated= mixes a second programme and") != std::string::npos);
+    CHECK(out.find("is plain AC-3, which carries one; ignored") != std::string::npos);
+    check_spoke_either_way(rc, out);
+}
+
+TEST_CASE("spatial names associated= as ignored, since it places one programme's objects",
+          "[cli][audio-io][atmos][programme][associated][concurrency]") {
+    const auto stream = write_two_programme_stream("associated_spatial", " programme2-bsmod=vi");
+    const auto log = scratch_dir() / "associated_spatial.log";
+    const auto rc = run_cli("spatial \"" + stream.string() + "\" -1 associated=1", log);
+    const auto out = read_log(log);
+    INFO(out);
+    if (out.find("is unavailable on this platform") != std::string::npos) {
+        return;
+    }
+    // Said before the spatial endpoint is probed, so on every machine.
+    CHECK(out.find("warning: associated= is ignored by spatial") != std::string::npos);
+    check_spoke_either_way(rc, out);
 }
 
 TEST_CASE("spatial names the programme it renders from a stream that carries two",

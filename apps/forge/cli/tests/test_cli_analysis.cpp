@@ -623,6 +623,16 @@ TEST_CASE("spdif wraps one programme of a multi-programme E-AC-3 stream, not bot
         CHECK(*ids == std::vector<int>{0});
     }
 
+    SECTION("associated= is named as ignored, and the first programme is wrapped as ever") {
+        // spdif decodes nothing, so it mixes nothing: said, not dropped, as play says it.
+        const auto recovered =
+            round_trip("spdif_programme_associated", "associated=1", spdif_text, unspdif_text);
+        CHECK(spdif_text.find("warning: associated= is ignored by spdif") != std::string::npos);
+        CHECK(unspdif_text.find(bursts) != std::string::npos);
+        const bool is_main = recovered == joined(*main_units);
+        CHECK(is_main);
+    }
+
     SECTION("a programme the stream does not carry is refused by name, leaving no carrier") {
         const auto carrier = dir / "spdif_programme_missing.wav";
         const auto log = dir / "spdif_programme_missing.log";

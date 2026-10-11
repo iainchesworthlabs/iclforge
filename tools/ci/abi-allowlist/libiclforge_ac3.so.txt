@@ -287,6 +287,7 @@ iclforge::ac3::oba::joc::quantize(double, bool)
 iclforge::ac3::oba::joc::reconstruct(std::span<std::span<float const, 18446744073709551615ul> const, 18446744073709551615ul>, iclforge::ac3::oba::joc::FrameParameters const&, iclforge::ac3::oba::joc::ReconstructionState&, bool, bool, iclforge::objects::oba::joc::Domain)
 iclforge::ac3::oba::qmf_band_energy(std::span<float const, 18446744073709551615ul>, std::span<unsigned char const, 64ul>, std::span<double, 18446744073709551615ul>, iclforge::dsp::QmfAnalysis&)
 iclforge::ac3::output_channel_count(iclforge::ac3::OutputConfig const&, iclforge::ac3::Acmod, bool)
+iclforge::ac3::output_channel_count(iclforge::ac3::OutputConfig const&, iclforge::ac3::Acmod, bool, bool)
 iclforge::ac3::plan::Assignment::at(unsigned long, unsigned long) const
 iclforge::ac3::plan::Assignment::rows_of(iclforge::ac3::plan::DestinationKind) const
 iclforge::ac3::plan::Assignment::set(unsigned long, unsigned long, iclforge::ac3::plan::Destination)

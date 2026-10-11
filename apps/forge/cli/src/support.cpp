@@ -64,10 +64,12 @@
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
+#include "associated_mix.hpp"
 #include "container_input.hpp"
 #include "exit_codes.hpp"
 #include "platform/stdio_binary.hpp"
 #include "recording_sink.hpp"
+#include "stream_playback.hpp"
 #include "usage.hpp"
 
 namespace forge_cli {
@@ -1898,6 +1900,43 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                          token);
             return false;
         }
+        if (command == "decode" && (token == "karaoke" || key == "karaoke")) {
+            // Annex C's karaoke-aware 3/0 reproduction, for a decode: its
+            // output has fewer channels than the stream codes and is named by
+            // a layout (L C R) the other commands that read this stage's
+            // output do not know, so it is `decode`'s alone.
+            // Bare, on and aware are the karaoke-AWARE decoder (C.2.3.1); none,
+            // v1, v2 and v1+v2 are the karaoke-CAPABLE one's listener choices
+            // (C.2.3.2, Table C.2.3), which also pick the vocals a stereo or
+            // mono target is given.
+            using iclforge::ac3::KaraokeReproduction;
+            using iclforge::ac3::KaraokeVocals;
+            if (token == "karaoke" || value == "on" || value == "aware") {
+                out.output.karaoke = KaraokeReproduction::kAware;
+                continue;
+            }
+            if (value == "off") {
+                out.output.karaoke = KaraokeReproduction::kOff;
+                continue;
+            }
+            const std::optional<KaraokeVocals> vocals =
+                value == "none"                       ? std::optional{KaraokeVocals::kNone}
+                : value == "v1"                       ? std::optional{KaraokeVocals::kV1}
+                : value == "v2"                       ? std::optional{KaraokeVocals::kV2}
+                : (value == "v1+v2" || value == "both") ? std::optional{KaraokeVocals::kBoth}
+                                                      : std::nullopt;
+            if (vocals) {
+                out.output.karaoke = KaraokeReproduction::kCapable;
+                out.output.karaoke_vocals = *vocals;
+                continue;
+            }
+            fmt::println(stderr,
+                         "error: karaoke is bare, 'on' or 'aware' (the karaoke-aware decoder), "
+                         "'none', 'v1', 'v2' or 'v1+v2' (the capable one's vocals), or 'off' "
+                         "(got '{}')",
+                         token);
+            return false;
+        }
         if (token == "mix-lfe") {
             out.output.mix_lfe = true;
             continue;
@@ -3394,6 +3433,121 @@ void report_programme(FILE* status, const iclforge::apps::ProgrammeUnits& select
         status_println(status, "  programme {} of {} ({})", selected.programme,
                        selected.ids.size(), format_programme_ids(selected.ids));
     }
+}
+
+std::optional<iclforge::apps::AssociatedChoice> choose_associated_programme(
+    std::span<const std::byte> stream, std::span<const int> ids, int main, const Options& meta) {
+    using Reason = iclforge::apps::AssociatedRefusal::Reason;
+    const auto chosen = iclforge::apps::choose_associated(
+        stream, main, {.programme = meta.eac3_associated_programme, .bsmod = meta.ac4_associated});
+    if (chosen.has_value()) {
+        return *chosen;
+    }
+    const auto& refusal = chosen.error();
+    switch (refusal.reason) {
+        case Reason::kUnreadable:
+            fmt::println(stderr, "error: cannot read the stream's programmes: {}", refusal.detail);
+            break;
+        case Reason::kDualMonoMain:
+            fmt::println(stderr,
+                         "error: programme {} is 1+1 dual mono, which is two programmes and not a "
+                         "main an associated service can be mixed into",
+                         refusal.main);
+            break;
+        case Reason::kIsTheMain:
+            fmt::println(stderr,
+                         "error: associated={} is the programme being decoded (programme=); an "
+                         "associated service is a second one",
+                         refusal.requested);
+            break;
+        case Reason::kNotCarried:
+            fmt::println(stderr, "error: no programme {} in this stream (it carries {})",
+                         refusal.requested, format_programme_ids(ids));
+            break;
+        case Reason::kNoSuchService: {
+            std::string carried;
+            for (const auto& programme : refusal.carried) {
+                carried += fmt::format(
+                    "{}{}: {}", carried.empty() ? "" : ", ", programme.id,
+                    iclforge::ac3::meta::describe(
+                        static_cast<iclforge::ac3::meta::BitstreamMode>(programme.bsmod),
+                        programme.acmod));
+            }
+            fmt::println(stderr,
+                         "error: no programme of this stream is that associated service "
+                         "(it carries {}); associated=<0..7> names one by its substream",
+                         carried);
+            break;
+        }
+    }
+    return std::nullopt;
+}
+
+bool wants_associated(const Options& meta) {
+    return meta.eac3_associated_programme.has_value() || meta.ac4_associated.has_value();
+}
+
+void warn_associated_gain_unused() {
+    fmt::println(stderr,
+                 "warning: associated-gain= scales an associated service and associated= "
+                 "names none, so it is ignored");
+}
+
+void warn_associated_not_mixed(const Options& meta, std::string_view command,
+                               std::string_view why) {
+    if (!wants_associated(meta)) {
+        return;
+    }
+    fmt::println(stderr, "warning: associated= is ignored by {}: {}; 'forge monitor' mixes one",
+                 command, why);
+}
+
+std::string describe_associated(const iclforge::apps::AssociatedChoice& choice) {
+    return fmt::format(
+        "programme {} ({}, {})", choice.id,
+        iclforge::ac3::meta::describe(static_cast<iclforge::ac3::meta::BitstreamMode>(choice.bsmod),
+                                      choice.acmod),
+        iclforge::ac3::analysis::layout_name(choice.acmod, choice.lfe));
+}
+
+namespace {
+
+std::string describe_gain_range(double low, double high) {
+    const auto one = [](double db) {
+        return std::isinf(db) ? std::string{"-inf"} : fmt::format("{:+.1f}", db);
+    };
+    return low == high ? fmt::format("{} dB", one(low))
+                       : fmt::format("{} .. {} dB", one(low), one(high));
+}
+
+}  // namespace
+
+void print_mix_report(FILE* status, const iclforge::apps::AssociatedChoice& choice, int main,
+                      const iclforge::apps::MixReport& report) {
+    status_println(status, "  mixed {} into programme {}", describe_associated(choice), main);
+    if (report.units == 0) {
+        status_println(status, "          no access unit of it overlapped the main's");
+        return;
+    }
+    status_println(status, "          main {}, associated {}{}",
+                   describe_gain_range(report.main_min, report.main_max),
+                   describe_gain_range(report.associated_min, report.associated_max),
+                   report.panmean.has_value()
+                       ? fmt::format(", placed at pan {} ({:.1f} degrees clockwise from the centre)",
+                                     *report.panmean,
+                                     static_cast<double>(*report.panmean) *
+                                         iclforge::ac3::meta::kPanMeanDegreesPerStep)
+                       : std::string{});
+}
+
+void report_mix_error(const iclforge::apps::AssociatedMixError& error) {
+    if (error.stage == iclforge::apps::AssociatedMixError::Stage::kDecode) {
+        fmt::println(stderr, "error: programme {} decode failed: {}", error.associated,
+                     error.reason);
+        return;
+    }
+    fmt::println(stderr, "error: cannot mix programme {} into programme {}: {}", error.associated,
+                 error.main, error.reason);
 }
 
 bool apply_programme_option(std::vector<std::byte>& raw, const Options& meta,

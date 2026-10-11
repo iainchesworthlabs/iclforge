@@ -56,9 +56,41 @@ The sections below contain the complete change list and fixes.
   block. `premixcmp*`, the speech enhancement words and `blkmixcfginfo` are not applied, because
   Annex E gives them no processing (§E2.3.1.21: "decoders are not required to use them").
   `associated=1` or `associated=visually-impaired`, with `associated-gain=<dB>` as the listener's
-  own trim; `monitor`, `play` and Hearth do not mix yet. `meta::pgm_scale_gain()` and
+  own trim; `play` and Hearth do not mix. `meta::pgm_scale_gain()` and
   `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
   15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
+- **`forge monitor associated=` mixes the service as it plays.** `monitor` runs a second decoder
+  for the associated programme in step with the main's and plays the main with the service mixed
+  in, with the same tokens and the same report as `decode`. `decode` and `monitor` share one choice
+  of the service (`associated=<0..7>` or a service name against each programme's `bsmod`, a 1+1
+  main refused) and one pairing of the two decoders' units, which hold frames back for transient
+  pre-noise independently and are cut to the shorter where they differ
+  (`apps/shared/media/src/associated_mix.*`, held sample for sample against decoding both and
+  mixing by hand in `iclforge-app-media-tests`); `forge decode`'s output is unchanged. A stream
+  that cannot give the service is refused before the output is opened, in `decode`'s words. A
+  main folded to a narrower endpoint takes the service by `dmixscl`, as `decode channels=2` does.
+  `play` hands a coded programme to a receiver and `spatial` places one programme's objects: both
+  now say that `associated=` is ignored, where they ignored it silently.
+
+**AC-3 karaoke streams (Annex C)**
+
+- **`forge decode ... karaoke` reproduces a karaoke stream as a karaoke-aware decoder with three
+  outputs does.** A stream with `bsmod` 7 and an `acmod` above 1/0 carries L and R, a guide melody
+  M and one or two vocals V1 and V2 (Table C.2.1). The output is L, C, R and then the LFE: M at
+  unity in the centre, a single V1 added to the centre and a pair added to the left and the right,
+  each vocal at the stream's own surround level and everything scaled down by the largest
+  output's sum (Table C.2.2). At `channels=2`/`1` it is the Lo/Ro downmix, which is Annex C's 2/0
+  reproduction, and `downmix=ltrt` is refused. A stream that is not karaoke is decoded as coded
+  and the report says so. The library form is `OutputConfig::karaoke`
+  (`KaraokeReproduction::kAware`), `MixLevels::karaoke`, `meta::is_karaoke()` and a
+  four-argument `output_channel_count()`; E-AC-3 and AC-4 streams ignore it.
+- **`karaoke=none|v1|v2|v1+v2` is the karaoke-capable decoder's listener choice of vocals
+  (C.2.3.2, Table C.2.3).** The same L, C, R with only the chosen vocals in it - V1 or V2 added to
+  the centre, or V1 into the left and V2 into the right at unity - and, at `channels=2`/`1`, the
+  2/0 reproduction: the melody at `cmixlev`, a single vocal at 0.7 in both channels, a pair left
+  and right, mono the two summed. The library form is `KaraokeReproduction::kCapable` with
+  `OutputConfig::karaoke_vocals` (`KaraokeVocals`). The table's cells were read from the
+  specification's own pages and are transcribed into the tests.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
