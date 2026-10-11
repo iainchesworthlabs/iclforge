@@ -623,11 +623,22 @@ only the in-repo decoder can read is checked against itself, not against anythin
 | E-AC-3 with enhanced coupling (`ecpl`) | no | yes |
 | E-AC-3 with transient pre-noise processing (`tpn`) | yes, without applying the correction | yes |
 | E-AC-3 `fscod2` half rates (24/22.05/16 kHz) | header only | yes |
+| E-AC-3 type 2 substream (`strmtyp` 2, "previously coded in AC-3") | yes | yes |
 | E-AC-3 with a second *independent* substream (two programmes) | no — and it poisons the first programme too | yes |
 | E-AC-3 with JOC objects (Atmos) | 5.1 bed only | yes, including the objects |
 
 AC-4 is not in this table because FFmpeg has no AC-4 decoder: every AC-4 stream is a "no" for its
 audio, and FFmpeg's demuxers are the only outside reader of its framing ([AC-4](#ac-4)).
+
+A **type 2 substream** (§E2.3.1.1) is a "yes" in both columns, and was a bug in one of them before
+it was checked: it swaps `convsync` for `blkid` and `frmsizecod` and, per Table E1.2 and E1.3's
+`strmtyp == 0x0` gates, sends neither the programme-mixing group nor the converter exponent and SNR
+elements, and this decoder read it with a type 0's gates. An encoder-written type 2 stream decodes
+in ffmpeg 8.0.1 to the samples of the same coding as type 0 (every sample within 2e-6, which is
+the mantissas the rate loop spends the saved bsi bits on) and `tools/references/eac3_parse.py`
+walks it consistently; the in-repo decoder, scan, accumulator and metadata editor now agree with
+both on where it begins and what it carries. The conversion to and from AC-3 that gives the type
+its name is not built, so there is nothing of it to check.
 
 Every "no" in that column is a cell where a generated stream has to be checked some other way,
 which is what [`tools/ci/fuzz_eac3_encoder_space.py`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/ci/fuzz_eac3_encoder_space.py)

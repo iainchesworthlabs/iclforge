@@ -62,9 +62,12 @@
 //     (see decoder.hpp's DecodedSubstream::compr). Its 8 bits are still on
 //     the wire and are still skipped correctly; they are simply not a compr
 //     word, so this refuses to write one into them.
-//   * strmtyp 2 (a "convertible" substream, §E2.3.1.1) is refused outright,
-//     matching iclforge::ac3::plan::validate's own stance - its bsi carries an extra
-//     blkid/frmsizecod branch nothing in this project produces or consumes.
+//   * strmtyp 2 (a "convertible" substream, §E2.3.1.1: previously coded in
+//     AC-3) is edited as an independent substream is. Its bsi swaps convsync
+//     for blkid and frmsizecod, which are walked rather than rewritten, and
+//     it sends neither the programme-mixing group nor the converter strategy
+//     elements (Table E1.2 and E1.3 gate those on strmtyp 0). strmtyp 3 is
+//     reserved and refused.
 
 namespace iclforge::ac3::io {
 
@@ -72,7 +75,7 @@ enum class EditError : std::uint8_t {
     kBadSyncWord,
     kTruncated,        // the span is shorter than the syncframe's own declared size
     kUnsupportedBsid,  // not AC-3 (<= 10) or E-AC-3 (16)
-    kReservedValue,    // a reserved fscod/frmsizecod, or strmtyp 2
+    kReservedValue,    // a reserved fscod/frmsizecod, or strmtyp 3
     kFieldAbsent,      // asked to change a field this frame does not transmit
     kOutOfRange,       // a value the field cannot hold
     kCannotInsert,     // insert_*: this frame cannot take the field without re-framing it
