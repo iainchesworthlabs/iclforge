@@ -11,6 +11,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -56,7 +57,8 @@ namespace testsink = iclforge::hearth::testsink;
 using namespace std::chrono_literals;
 using SteadyClock = std::chrono::steady_clock;
 
-constexpr std::string_view kUsage = R"(usage: hearth-testserver [options] --play FILE --player URL [player options]...
+constexpr std::string_view kUsage =
+    R"(usage: hearth-testserver [options] --play FILE --player URL [player options]...
 
 A Sendspin server for Hearth's tests. It dials each player, pairs it, sends it
 settings, plays one AC-3 or E-AC-3 programme to all of them as a group over
@@ -76,8 +78,20 @@ _iclforge_player@v1, and writes a report of what each said about it.
     --hold             only connect, and stay connected unpaired, as a
                        second server such as Music Assistant does: it is not
                        paired or played to, and may be displaced
+    --pcm              play it PCM over player@v1, not bursts over
+                       _iclforge_player@v1: it is paired, then moved to the
+                       role (needs --tone, and takes no --layout)
+    --max-chunk-bytes N  with --pcm, at most N bytes of audio in a chunk to
+                       it (a board takes a few KB a message); default 20 ms
+    --opus             with --pcm, in Opus (20 ms packets) where the player
+                       lists it, a twelfth of PCM's bytes and lossy
 
   --play FILE          the programme, an .ac3 or .ec3 file
+  --tone               instead of a file, two tones at 48 kHz stereo for
+                       --seconds (default 10); PCM only, so every player
+                       played takes --pcm
+  --tone-bits N        the tone's depth, 16 or 24 (default 24); a player is
+                       sent the first format it lists, rescaled
   --seconds N          play the file over and over for at least N seconds
                        (default: once through)
   --sink DIRECTORY     also play to a test sink in this process, which writes
@@ -127,6 +141,12 @@ struct PlayerSpec {
     std::optional<std::string> status_url{};
     bool hold = false;
     bool in_process = false;
+    // Played PCM over player@v1 (ServerHost::use_pcm()) rather than bursts over the extension
+    // role, in chunks of at most max_chunk_bytes of audio (0: 20 ms).
+    bool pcm = false;
+    std::size_t max_chunk_bytes = 0;
+    // With pcm: in Opus, where the player lists it (ServerHost::use_pcm's codec).
+    bool opus = false;
 };
 
 // What one board's GET /status said, sampled once a second.
@@ -135,10 +155,21 @@ struct StatusSample {
     std::optional<std::int64_t> origin_server_us{};
     std::string playing{};
     std::int64_t underruns = 0;
+    std::int64_t late = 0;
+    std::int64_t dropped = 0;
+    std::int64_t invalid = 0;
+    std::int64_t resyncs = 0;
     std::int64_t error_us = 0;
     std::int64_t worst_error_us = 0;
     std::int64_t decode_stack_free = 0;
     std::int64_t server_stack_free = 0;
+};
+
+// What was played, for the report: a file, or the generated tone.
+struct ProgrammeInfo {
+    std::string file{};
+    std::string codec{};
+    int channels = 0;
 };
 
 struct PlayerRun {
@@ -155,6 +186,9 @@ struct PlayerRun {
     std::vector<ac::Level> levels{};
     std::vector<StatusSample> samples{};
     std::optional<std::string> status_error{};
+    // The last "sendspin.stream=" line a board's GET /log holds, once the play is over: its own
+    // totals for the stream, such as the frames it skipped for being late.
+    std::optional<std::string> board_summary{};
 };
 
 class Events final : public ss::ServerHostEvents {
@@ -375,11 +409,43 @@ class BurstSource {
     sample.origin_server_us = sendspin["origin_server_us"].as_int();
     sample.playing = sendspin["playing"].as_string().value_or("");
     sample.underruns = sendspin["underruns"].as_int().value_or(0);
+    sample.late = sendspin["late"].as_int().value_or(0);
+    sample.dropped = sendspin["dropped"].as_int().value_or(0);
+    sample.invalid = sendspin["invalid"].as_int().value_or(0);
+    sample.resyncs = sendspin["resyncs"].as_int().value_or(0);
     sample.error_us = sendspin["error_us"].as_int().value_or(0);
     sample.worst_error_us = sendspin["worst_error_us"].as_int().value_or(0);
     sample.decode_stack_free = sendspin["decode_stack_free"].as_int().value_or(0);
     sample.server_stack_free = sendspin["server_stack_free"].as_int().value_or(0);
     return sample;
+}
+
+// The last "sendspin.stream=" line in a board's GET /log, which the board writes as a stream ends:
+// its totals for the play, among them the frames it left out for being late and the silence it
+// wrote. The log is read from the same origin as the status URL.
+[[nodiscard]] std::optional<std::string> read_board_summary(const std::string& status_url) {
+    const std::size_t scheme = status_url.find("://");
+    const std::size_t path_at = status_url.find('/', scheme == std::string::npos ? 0 : scheme + 3);
+    const std::string origin =
+        path_at == std::string::npos ? status_url : status_url.substr(0, path_at);
+    httplib::Client client(origin);
+    client.set_connection_timeout(2, 0);
+    client.set_read_timeout(4, 0);
+    const httplib::Result result = client.Get("/log");
+    if (!result || result->status != 200) {
+        return std::nullopt;
+    }
+    std::optional<std::string> last;
+    std::size_t at = 0;
+    while (at < result->body.size()) {
+        const std::size_t end = std::min(result->body.find('\n', at), result->body.size());
+        const std::string line = result->body.substr(at, end - at);
+        if (line.find("sendspin.stream=") != std::string::npos) {
+            last = line;
+        }
+        at = end + 1;
+    }
+    return last;
 }
 
 // Connects, pairs and configures one player; its client_id once it plays the extension role with
@@ -417,19 +483,28 @@ class BurstSource {
     }
     run.paired_by = run.spec.token ? "token" : view->psk == ss::handshake::PskCategory::kLongTerm ? "record" : "";
 
-    // Paired: by its record, by its token (entered before dialling), or by the code it shows.
+    // Paired: by its record, by its token (entered before dialling), or by the code it shows. A
+    // player asked for PCM (--pcm) is moved to player@v1 once it is paired, and is playing when it
+    // has taken that role.
     const auto playing = [&](const ss::ClientView& client) {
+        if (run.spec.pcm) {
+            return client.playing && !client.bursts && client.available &&
+                   client.psk == ss::handshake::PskCategory::kLongTerm &&
+                   client.player_state.has_value();
+        }
         return client.playing && client.bursts && client.available &&
                client.psk == ss::handshake::PskCategory::kLongTerm && client.iclforge_state.has_value();
     };
+    bool asked_for_pcm = false;
+    bool stated_noted = false;
     if (view->psk != ss::handshake::PskCategory::kLongTerm && !run.spec.token) {
         if (!run.spec.code_log) {
             return fail("is not paired, and has no --token or --code-log");
         }
         const std::uintmax_t from = size_of(*run.spec.code_log);
-        if (!host.pair(run.client_id, m::PairMethod::kDynamicCode, m::CodeFormat::kDigits)) {
-            return fail("cannot be asked to pair by a code");
-        }
+        // main() asked for this pairing at the dial (dial_to_pair), so that it is the connection's
+        // first activation. Asking again here would leave a request behind that the host honours
+        // once the player is paired, and sends it back to pair a second time.
         run.paired_by = "code";
         note(run.spec.label + ": asked to show a code; reading " + run.spec.code_log->string());
         std::optional<std::string> code;
@@ -456,6 +531,23 @@ class BurstSource {
     }
     while (true) {
         const std::optional<ss::ClientView> now = host.client(run.client_id);
+        if (!stated_noted && now && now->iclforge_support && now->iclforge_state) {
+            // What the sink says of itself: the chunk limit and the layout it renders to.
+            stated_noted = true;
+            note(run.spec.label + ": states a chunk limit of " +
+                 std::to_string(now->iclforge_support->max_chunk_bytes) + " bytes and layout " +
+                 now->iclforge_state->layout.value_or("(none)"));
+        }
+        if (run.spec.pcm && !asked_for_pcm && now &&
+            now->psk == ss::handshake::PskCategory::kLongTerm && now->available) {
+            // Paired and playing its first role: now it is moved to PCM, and chunked to its limit.
+            if (!host.use_pcm(
+                    run.client_id, true, run.spec.max_chunk_bytes, 0,
+                    run.spec.opus ? std::optional<m::Codec>{m::Codec::kOpus} : std::nullopt)) {
+                return fail("cannot be asked to play PCM");
+            }
+            asked_for_pcm = true;
+        }
         if (now && playing(*now)) {
             view = now;
             break;
@@ -472,6 +564,20 @@ class BurstSource {
                         (now->available ? ", available" : "") + ")");
         }
         std::this_thread::sleep_for(50ms);
+    }
+    if (run.spec.pcm) {
+        note(run.spec.label + ": playing player@v1's " + (run.spec.opus ? "Opus" : "PCM") + " (" +
+             run.dialect + ")" +
+             (run.spec.max_chunk_bytes != 0
+                  ? ", chunks of at most " + std::to_string(run.spec.max_chunk_bytes) +
+                        " bytes of audio"
+                  : std::string{}));
+        if (run.spec.layout) {
+            return fail(
+                "takes no layout: player@v1 renders nothing, and --layout is for the extension "
+                "role");
+        }
+        return true;
     }
     note(run.spec.label + ": playing _iclforge_player@v1 (" + run.dialect + ")");
 
@@ -517,18 +623,20 @@ class BurstSource {
 }
 
 void write_report(std::ostream& out, const std::string& server_name, const std::string& server_id,
-                  const fs::path& programme, const iclforge::ac3::io::ScannedStream& stream, std::uint64_t bursts_sent,
-                  std::optional<std::int64_t> start_server_us, double played_seconds, const std::vector<PlayerRun>& runs,
+                  const ProgrammeInfo& programme, std::uint64_t bursts_sent,
+                  std::uint64_t pcm_frames_sent, std::optional<std::int64_t> start_server_us,
+                  double played_seconds, const std::vector<PlayerRun>& runs,
                   const std::string& result) {
     std::string text;
     json::Writer w(text);
     w.begin_object();
     w.key("server").begin_object().member("name", server_name).member("id", server_id).end_object();
     w.key("programme").begin_object();
-    w.member("file", programme.generic_string());
-    w.member("codec", stream.kind == iclforge::ac3::io::StreamKind::kAc3 ? "AC-3" : "E-AC-3");
-    w.member("channels", stream.channels);
+    w.member("file", programme.file);
+    w.member("codec", programme.codec);
+    w.member("channels", programme.channels);
     w.member("bursts", bursts_sent);
+    w.member("pcm_frames", pcm_frames_sent);
     w.key("seconds").number(played_seconds, 1);
     w.key("start_server_us");
     start_server_us ? w.integer(*start_server_us) : w.null();
@@ -546,6 +654,9 @@ void write_report(std::ostream& out, const std::string& server_name, const std::
         w.key("layout");
         run.spec.layout ? w.string(*run.spec.layout) : w.null();
         w.member("settings_revision", run.settings_revision);
+        w.member("role", run.spec.pcm ? "player@v1" : "_iclforge_player@v1");
+        w.member("max_chunk_bytes", static_cast<std::uint64_t>(run.spec.max_chunk_bytes));
+        w.member("codec", run.spec.pcm ? (run.spec.opus ? "opus" : "pcm") : "bursts");
         w.key("failure");
         run.failure ? w.string(*run.failure) : w.null();
         if (run.last_view && run.last_view->iclforge_state) {
@@ -592,11 +703,19 @@ void write_report(std::ostream& out, const std::string& server_name, const std::
             std::optional<std::int64_t> low;
             std::optional<std::int64_t> high;
             std::int64_t underruns = 0;
+            std::int64_t late = 0;
+            std::int64_t dropped = 0;
+            std::int64_t invalid = 0;
+            std::int64_t resyncs = 0;
             std::int64_t worst = 0;
             std::optional<std::int64_t> decode_stack;
             std::optional<std::int64_t> server_stack;
             for (const StatusSample& sample : run.samples) {
                 underruns = std::max(underruns, sample.underruns);
+                late = std::max(late, sample.late);
+                dropped = std::max(dropped, sample.dropped);
+                invalid = std::max(invalid, sample.invalid);
+                resyncs = std::max(resyncs, sample.resyncs);
                 if (std::llabs(sample.worst_error_us) > std::llabs(worst)) {
                     worst = sample.worst_error_us;
                 }
@@ -620,6 +739,12 @@ void write_report(std::ostream& out, const std::string& server_name, const std::
             high ? w.integer(*high) : w.null();
             w.end_object();
             w.member("underruns", underruns);
+            w.member("late", late);
+            w.member("dropped", dropped);
+            w.member("invalid", invalid);
+            w.member("resyncs", resyncs);
+            w.key("board_summary");
+            run.board_summary ? w.string(*run.board_summary) : w.null();
             w.member("worst_error_us", worst);
             w.key("decode_stack_free");
             decode_stack ? w.integer(*decode_stack) : w.null();
@@ -681,6 +806,8 @@ void write_report(std::ostream& out, const std::string& server_name, const std::
 int main(int argc, char** argv) {
     std::vector<PlayerSpec> players;
     fs::path programme;
+    bool tone = false;
+    std::int32_t tone_bits = 24;
     std::optional<long> seconds;
     std::optional<fs::path> sink_directory;
     std::string sink_layout = "2.0";
@@ -704,6 +831,26 @@ int main(int argc, char** argv) {
             players.back().hold = true;
             continue;
         }
+        if (argument == "--opus") {
+            if (players.empty() || players.back().in_process || !players.back().pcm) {
+                std::cerr << "--opus follows a --player and its --pcm\n";
+                return kExitUsage;
+            }
+            players.back().opus = true;
+            continue;
+        }
+        if (argument == "--pcm") {
+            if (players.empty() || players.back().in_process) {
+                std::cerr << "--pcm follows a --player\n";
+                return kExitUsage;
+            }
+            players.back().pcm = true;
+            continue;
+        }
+        if (argument == "--tone") {
+            tone = true;
+            continue;
+        }
         if (i + 1 >= arguments.size()) {
             std::cerr << argument << " needs a value\n";
             return kExitUsage;
@@ -718,6 +865,24 @@ int main(int argc, char** argv) {
         };
         if (argument == "--player") {
             players.push_back({.url = value});
+        } else if (argument == "--tone-bits") {
+            const std::optional<long> bits = parse_number(value);
+            if (!bits || (*bits != 16 && *bits != 24)) {
+                std::cerr << "--tone-bits takes 16 or 24\n";
+                return kExitUsage;
+            }
+            tone_bits = static_cast<std::int32_t>(*bits);
+        } else if (argument == "--max-chunk-bytes") {
+            PlayerSpec* spec = player();
+            if (spec == nullptr) {
+                return kExitUsage;
+            }
+            const std::optional<long> bytes = parse_number(value);
+            if (!bytes || *bytes < 64) {
+                std::cerr << "--max-chunk-bytes takes a whole number of bytes, at least 64\n";
+                return kExitUsage;
+            }
+            spec->max_chunk_bytes = static_cast<std::size_t>(*bytes);
         } else if (argument == "--label" || argument == "--token" || argument == "--code-log" ||
                    argument == "--layout" || argument == "--trim-db" || argument == "--status") {
             PlayerSpec* spec = player();
@@ -781,29 +946,63 @@ int main(int argc, char** argv) {
             return kExitUsage;
         }
     }
-    if (programme.empty() || (players.empty() && !sink_directory)) {
+    if ((programme.empty() && !tone) || (!programme.empty() && tone) ||
+        (players.empty() && !sink_directory)) {
         std::cerr << kUsage;
         return kExitUsage;
     }
+    // A tone is PCM, which only player@v1 takes; and a player asked for PCM has no bursts to play.
+    for (const PlayerSpec& spec : players) {
+        if (spec.hold) {
+            continue;
+        }
+        if (tone && !spec.pcm && !spec.in_process) {
+            std::cerr << "--tone is PCM: " << spec.url << " needs --pcm (or --hold)\n";
+            return kExitUsage;
+        }
+        if (!tone && spec.pcm) {
+            std::cerr << "--pcm plays the --tone programme, not a file: " << spec.url << "\n";
+            return kExitUsage;
+        }
+    }
 
-    const std::optional<std::vector<std::byte>> bytes = read_file(programme);
-    if (!bytes) {
-        std::cerr << "cannot read " << programme.string() << "\n";
-        return kExitUsage;
+    // The programme: a file's access units, or the tone.
+    ProgrammeInfo info;
+    std::optional<iclforge::ac3::io::ScannedStream> stream;
+    std::uint64_t pass_samples = 0;
+    int passes = 1;
+    if (tone) {
+        if (!seconds) {
+            seconds = 10;
+        }
+        info = {.file = "tone", .codec = "PCM", .channels = 2};
+    } else {
+        const std::optional<std::vector<std::byte>> bytes = read_file(programme);
+        if (!bytes) {
+            std::cerr << "cannot read " << programme.string() << "\n";
+            return kExitUsage;
+        }
+        std::expected<iclforge::ac3::io::ScannedStream, iclforge::ac3::io::ScanError> scanned =
+            iclforge::ac3::io::scan(*bytes);
+        if (!scanned || scanned->access_units.empty()) {
+            std::cerr << programme.string() << " is not an AC-3 or E-AC-3 stream\n";
+            return kExitUsage;
+        }
+        if (scanned->sample_rate != iclforge::ac3::SampleRate::k48000) {
+            std::cerr << programme.string()
+                      << " is not at 48 kHz, which is all a Hearth sink plays\n";
+            return kExitUsage;
+        }
+        stream = std::move(*scanned);
+        pass_samples = iclforge::ac3::io::stream_duration_samples(*stream);
+        passes = seconds ? static_cast<int>(((static_cast<std::uint64_t>(*seconds) * kSampleRate) +
+                                             pass_samples - 1) /
+                                            pass_samples)
+                         : 1;
+        info = {.file = programme.generic_string(),
+                .codec = stream->kind == iclforge::ac3::io::StreamKind::kAc3 ? "AC-3" : "E-AC-3",
+                .channels = stream->channels};
     }
-    const std::expected<iclforge::ac3::io::ScannedStream, iclforge::ac3::io::ScanError> stream =
-        iclforge::ac3::io::scan(*bytes);
-    if (!stream || stream->access_units.empty()) {
-        std::cerr << programme.string() << " is not an AC-3 or E-AC-3 stream\n";
-        return kExitUsage;
-    }
-    if (stream->sample_rate != iclforge::ac3::SampleRate::k48000) {
-        std::cerr << programme.string() << " is not at 48 kHz, which is all a Hearth sink plays\n";
-        return kExitUsage;
-    }
-    const std::uint64_t pass_samples = iclforge::ac3::io::stream_duration_samples(*stream);
-    const int passes =
-        seconds ? static_cast<int>(((static_cast<std::uint64_t>(*seconds) * kSampleRate) + pass_samples - 1) / pass_samples) : 1;
 
     auto store = iclforge::hearth::testserver::FileServerStore::open(state_directory);
     if (!store) {
@@ -848,7 +1047,8 @@ int main(int argc, char** argv) {
         players.push_back({.url = "ws://127.0.0.1:" + std::to_string(sink->port()) + "/sendspin",
                            .label = "reference sink",
                            .token = sink->pairing_token(),
-                           .in_process = true});
+                           .in_process = true,
+                           .pcm = tone});
     }
 
     std::vector<PlayerRun> runs;
@@ -858,10 +1058,19 @@ int main(int argc, char** argv) {
             return kExitUsage;
         }
         runs.push_back({.spec = spec});
-        (*host)->dial(spec.url);
+        if (spec.code_log && !spec.token) {
+            // The connection's first activation is the pairing, which a board another server
+            // holds (Music Assistant, attached and idle) admits beside it; asked after the first
+            // activation of "nothing", the board refuses it with the rest.
+            (void)(*host)->dial_to_pair(spec.url, m::PairMethod::kDynamicCode,
+                                        m::CodeFormat::kDigits);
+        } else {
+            (*host)->dial(spec.url);
+        }
     }
 
     std::string server_id = (*host)->server_id();
+    std::uint64_t pcm_frames_sent = 0;
     const auto finish = [&](int status, const std::string& result, std::optional<std::int64_t> start, std::uint64_t sent,
                             double played) {
         for (PlayerRun& run : runs) {
@@ -873,9 +1082,11 @@ int main(int argc, char** argv) {
         }
         if (report_path) {
             std::ofstream out(*report_path, std::ios::binary | std::ios::trunc);
-            write_report(out, server_name, server_id, programme, *stream, sent, start, played, runs, result);
+            write_report(out, server_name, server_id, info, sent, pcm_frames_sent, start, played,
+                         runs, result);
         } else {
-            write_report(std::cout, server_name, server_id, programme, *stream, sent, start, played, runs, result);
+            write_report(std::cout, server_name, server_id, info, sent, pcm_frames_sent, start,
+                         played, runs, result);
         }
         note(result);
         return status;
@@ -909,17 +1120,37 @@ int main(int argc, char** argv) {
             group->add(run.client_id);
         }
     }
-    const ac::DataType data_type = stream->kind == iclforge::ac3::io::StreamKind::kAc3
+    // The tone is PCM at --tone-bits; a member is sent the first format it lists, rescaled.
+    const std::int32_t kToneBitDepth = tone_bits;
+    const bool from_file = stream.has_value();
+    const ac::DataType data_type = from_file && stream->kind == iclforge::ac3::io::StreamKind::kAc3
                                        ? ac::DataType::kAc3
                                        : ac::DataType::kEac3;
-    if (!group->start({.pcm = std::nullopt,
-                       .bursts = ac::StreamStart{.data_type = data_type, .sample_rate = static_cast<std::int32_t>(kSampleRate)},
-                       .buffered = true})) {
+    ss::Group::Programme group_programme{
+        .pcm = std::nullopt, .bursts = std::nullopt, .buffered = true};
+    if (tone) {
+        group_programme.pcm = m::AudioFormat{.codec = m::Codec::kPcm,
+                                             .channels = 2,
+                                             .sample_rate = static_cast<std::int32_t>(kSampleRate),
+                                             .bit_depth = kToneBitDepth};
+    } else {
+        group_programme.bursts = ac::StreamStart{
+            .data_type = data_type, .sample_rate = static_cast<std::int32_t>(kSampleRate)};
+    }
+    if (!group->start(group_programme)) {
         return finish(kExitSetup, "failed: the group did not start", std::nullopt, 0, 0.0);
     }
-    const double programme_seconds = static_cast<double>(pass_samples) * passes / kSampleRate;
-    note("playing " + programme.filename().string() + " " + std::to_string(passes) + " time(s) through, " +
-        std::to_string(static_cast<long>(programme_seconds)) + " s, to " + std::to_string(runs.size()) + " player(s)");
+    const double programme_seconds = tone
+                                         ? static_cast<double>(*seconds)
+                                         : static_cast<double>(pass_samples) * passes / kSampleRate;
+    if (tone) {
+        note("playing a tone for " + std::to_string(static_cast<long>(programme_seconds)) +
+             " s, to " + std::to_string(runs.size()) + " player(s)");
+    } else {
+        note("playing " + programme.filename().string() + " " + std::to_string(passes) +
+             " time(s) through, " + std::to_string(static_cast<long>(programme_seconds)) +
+             " s, to " + std::to_string(runs.size()) + " player(s)");
+    }
 
     // The boards' status, once a second, on a thread of its own.
     std::atomic<bool> playing{true};
@@ -948,7 +1179,10 @@ int main(int argc, char** argv) {
         }
     });
 
-    BurstSource source(*stream, passes);
+    std::optional<BurstSource> source;
+    if (stream) {
+        source.emplace(*stream, passes);
+    }
     std::uint64_t sent = 0;
     // The programme frame after the last burst sent.
     std::int64_t end_frame = 0;
@@ -979,19 +1213,55 @@ int main(int argc, char** argv) {
     const SteadyClock::time_point play_deadline =
         SteadyClock::now() + std::chrono::milliseconds(static_cast<std::int64_t>(programme_seconds * 1500.0)) + 60s;
     SteadyClock::time_point next_check = SteadyClock::now();
+    // The tone: 440 Hz left and 660 Hz right at -18 dBFS, in blocks of 20 ms, the first
+    // sample of each block continuing the last of the one before.
+    constexpr std::size_t kToneBlockFrames = kSampleRate / 50;
+    const auto tone_frames = static_cast<std::uint64_t>(tone ? *seconds : 0) * kSampleRate;
+    std::vector<std::int32_t> tone_block(kToneBlockFrames * 2);
+    std::uint64_t tone_next = 0;
+    bool tone_block_ready = false;
     while (failure.empty()) {
-        if (!burst) {
-            burst = source.next(error);
-            if (!burst) {
+        if (tone) {
+            if (tone_next >= tone_frames) {
                 break;
             }
-        }
-        if (group->push_burst(*burst)) {
-            ++sent;
-            end_frame = burst->frame + kSamplesPerBurst;
-            burst.reset();
+            if (!tone_block_ready) {
+                constexpr double kPi = 3.14159265358979323846;
+                const double kAmplitude =
+                    0.125 * (static_cast<double>(std::int64_t{1} << (kToneBitDepth - 1)) -
+                             1.0);  // -18 dBFS
+                for (std::size_t k = 0; k < kToneBlockFrames; ++k) {
+                    const double t = static_cast<double>(tone_next + k) / kSampleRate;
+                    tone_block[(k * 2)] = static_cast<std::int32_t>(
+                        std::lround(kAmplitude * std::sin(2.0 * kPi * 440.0 * t)));
+                    tone_block[(k * 2) + 1] = static_cast<std::int32_t>(
+                        std::lround(kAmplitude * std::sin(2.0 * kPi * 660.0 * t)));
+                }
+                tone_block_ready = true;
+            }
+            const std::size_t taken = group->push(tone_block);
+            if (taken > 0) {
+                tone_next += taken;
+                pcm_frames_sent += taken;
+                end_frame = static_cast<std::int64_t>(tone_next);
+                tone_block_ready = false;
+            } else {
+                std::this_thread::sleep_for(5ms);
+            }
         } else {
-            std::this_thread::sleep_for(5ms);
+            if (!burst) {
+                burst = source->next(error);
+                if (!burst) {
+                    break;
+                }
+            }
+            if (group->push_burst(*burst)) {
+                ++sent;
+                end_frame = burst->frame + kSamplesPerBurst;
+                burst.reset();
+            } else {
+                std::this_thread::sleep_for(5ms);
+            }
         }
         if (SteadyClock::now() >= next_check) {
             next_check = SteadyClock::now() + 250ms;
@@ -1051,6 +1321,12 @@ int main(int argc, char** argv) {
     playing.store(false);
     poller.join();
     const double played = std::chrono::duration<double>(SteadyClock::now() - play_started).count();
+    // A board's own totals for the stream, which it writes to its log as the stream ends.
+    for (PlayerRun& run : runs) {
+        if (run.spec.status_url && !run.spec.hold) {
+            run.board_summary = read_board_summary(*run.spec.status_url);
+        }
+    }
 
     // What each player reported of the play.
     for (PlayerRun& run : runs) {
@@ -1058,6 +1334,37 @@ int main(int argc, char** argv) {
             continue;
         }
         const std::optional<ss::ClientView> view = (*host)->client(run.client_id);
+        if (run.spec.pcm) {
+            // player@v1 reports no counters of its own; a board's GET /status does, when it was
+            // given one (--status). Without it the play is judged only by the player staying.
+            if (!view && failure.empty()) {
+                failure = run.spec.label + " went away at the end";
+            }
+            std::int64_t underruns = 0;
+            std::int64_t late = 0;
+            std::int64_t dropped = 0;
+            std::int64_t invalid = 0;
+            for (const StatusSample& sample : run.samples) {
+                underruns = std::max(underruns, sample.underruns);
+                late = std::max(late, sample.late);
+                dropped = std::max(dropped, sample.dropped);
+                invalid = std::max(invalid, sample.invalid);
+            }
+            if (run.spec.status_url) {
+                note(run.spec.label + ": " + std::to_string(pcm_frames_sent) + " frames sent, " +
+                     std::to_string(underruns) + " underruns, " + std::to_string(late) + " late, " +
+                     std::to_string(dropped) + " dropped, " + std::to_string(invalid) + " invalid" +
+                     (run.board_summary ? "; the board: " + *run.board_summary : std::string{}));
+                if (failure.empty() && (underruns > 0 || late > 0 || dropped > 0 || invalid > 0)) {
+                    failure = run.spec.label +
+                              " did not play every chunk: " + std::to_string(underruns) +
+                              " underruns, " + std::to_string(late) + " late, " +
+                              std::to_string(dropped) + " dropped, " + std::to_string(invalid) +
+                              " invalid";
+                }
+            }
+            continue;
+        }
         if (!view || !view->iclforge_state) {
             if (failure.empty()) {
                 failure = run.spec.label + " reported nothing at the end";
