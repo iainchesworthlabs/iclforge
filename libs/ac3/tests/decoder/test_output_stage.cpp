@@ -1031,7 +1031,7 @@ constexpr double kSlev = ac3::meta::level::kMinus6dB;  // 0.5: the stream's surm
 
 ac3::OutputConfig karaoke_config() {
     return {.target = ac3::DownmixTarget::kAsCoded,
-            .karaoke = ac3::KaraokeReproduction::kMultichannel};
+            .karaoke = ac3::KaraokeReproduction::kAware};
 }
 
 ac3::MixLevels karaoke_levels(double slev = kSlev) {
@@ -1275,6 +1275,273 @@ TEST_CASE("karaoke: RF mode's ceiling holds over all three outputs", "[decoder][
     CHECK(stage.rf_protection_db() < 0.0);  // it engaged, rather than the sum merely being small
 }
 
+// ---------------------------------------------------------------------------
+// Annex C.2.3.2: the karaoke-capable decoder
+// ---------------------------------------------------------------------------
+//
+// Table C.2.3 of ETSI TS 102 366 V1.4.1 (pages 105-106), transcribed here so
+// the stage is held to the table and not to its own reading of it. One column
+// per listener choice; c and i are clev in the 2/0 columns and 0,0 in the 3/0
+// ones, and "---" is 0.0 here (a coefficient the reproduction has no use for).
+// "0,7" is the annex's one-decimal -3 dB: the same factor Table C.2.2 writes
+// as "0,7 x slev", which has to be §7.8's 0.7071 for Annex C's remark that a
+// Lo/Ro downmix is the aware 2/0 reproduction to hold.
+
+namespace {
+
+struct CapableColumn {
+    ac3::KaraokeVocals choice;
+    double a;
+    double b;
+    double d;
+    double e;
+    double f;
+    double g;
+    double h;
+};
+
+constexpr double kP = ac3::meta::level::kMinus3dB;
+
+constexpr std::array<CapableColumn, 4> kTable23TwoChannel = {{
+    {ac3::KaraokeVocals::kNone, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
+    {ac3::KaraokeVocals::kV1, kP, 0.0, 0.0, 0.0, 0.0, kP, 0.0},
+    {ac3::KaraokeVocals::kV2, 0.0, kP, 0.0, 0.0, 0.0, 0.0, kP},
+    {ac3::KaraokeVocals::kBoth, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0},
+}};
+
+constexpr std::array<CapableColumn, 4> kTable23ThreeChannel = {{
+    {ac3::KaraokeVocals::kNone, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0},
+    {ac3::KaraokeVocals::kV1, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0},
+    {ac3::KaraokeVocals::kV2, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0},
+    {ac3::KaraokeVocals::kBoth, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0},
+}};
+
+// Table C.2.1: which coded slot is which role, -1 where the acmod has none.
+struct Roles {
+    int l;
+    int m;
+    int r;
+    int v1;
+    int v2;
+};
+
+Roles roles_of(ac3::Acmod acmod) {
+    switch (acmod) {
+        case ac3::Acmod::k3_0: return {0, 1, 2, -1, -1};
+        case ac3::Acmod::k2_1: return {0, -1, 1, 2, -1};
+        case ac3::Acmod::k3_1: return {0, 1, 2, 3, -1};
+        case ac3::Acmod::k2_2: return {0, -1, 1, 2, 3};
+        case ac3::Acmod::k3_2: return {0, 1, 2, 3, 4};
+        default: return {0, -1, 1, -1, -1};
+    }
+}
+
+std::size_t coded_channels(ac3::Acmod acmod) {
+    return static_cast<std::size_t>(ac3::fullbw_channel_count(acmod));
+}
+
+// What each coded channel contributes to {Lk, Ck, Rk}, from the equations and a
+// table column, scaled down together by the largest output's sum when that is
+// above 1 (and, for mono, by the sum of the left and right).
+std::vector<std::array<double, 3>> table_gains(ac3::Acmod acmod, const CapableColumn& col,
+                                               double c, double i, bool mono = false) {
+    const Roles roles = roles_of(acmod);
+    std::vector<std::array<double, 3>> gains(coded_channels(acmod), {0.0, 0.0, 0.0});
+    const auto set = [&](int slot, std::array<double, 3> value) {
+        if (slot >= 0) {
+            gains[static_cast<std::size_t>(slot)] = value;
+        }
+    };
+    set(roles.l, {1.0, 0.0, 0.0});
+    set(roles.r, {0.0, 0.0, 1.0});
+    set(roles.m, {c, col.f, i});
+    set(roles.v1, {col.a, col.d, col.g});
+    set(roles.v2, {col.b, col.e, col.h});
+    std::array<double, 3> sums{0.0, 0.0, 0.0};
+    for (const auto& gain : gains) {
+        for (std::size_t k = 0; k < 3; ++k) {
+            sums[k] += gain[k];
+        }
+    }
+    const double loudest = mono ? sums[0] + sums[2] : std::max({sums[0], sums[1], sums[2]});
+    const double scale = loudest > 1.0 ? 1.0 / loudest : 1.0;
+    for (auto& gain : gains) {
+        for (double& value : gain) {
+            value *= scale;
+        }
+    }
+    return gains;
+}
+
+ac3::OutputConfig capable_config(ac3::KaraokeVocals vocals,
+                                 ac3::DownmixTarget target = ac3::DownmixTarget::kAsCoded) {
+    ac3::OutputConfig config;
+    config.target = target;
+    config.karaoke = ac3::KaraokeReproduction::kCapable;
+    config.karaoke_vocals = vocals;
+    return config;
+}
+
+// A level pair no coefficient could be mistaken for: clev 0.5, slev 0.25.
+ac3::MixLevels capable_levels(bool karaoke = true) {
+    ac3::MixLevels levels{.loro_clev = 0.5, .loro_slev = 0.25};
+    levels.karaoke = karaoke;
+    return levels;
+}
+
+}  // namespace
+
+TEST_CASE("karaoke capable: the 3/0 reproduction is Table C.2.3's right-hand columns",
+          "[decoder][output][karaoke][capable]") {
+    for (const auto acmod : {ac3::Acmod::k2_1, ac3::Acmod::k3_1, ac3::Acmod::k2_2, ac3::Acmod::k3_2}) {
+        const std::size_t coded = coded_channels(acmod);
+        for (const auto& col : kTable23ThreeChannel) {
+            INFO("acmod " << static_cast<int>(acmod) << ", choice "
+                          << static_cast<int>(col.choice));
+            const auto gains = table_gains(acmod, col, 0.0, 0.0);
+            for (std::size_t channel = 0; channel < coded; ++channel) {
+                ac3::OutputStage stage{capable_config(col.choice)};
+                auto channels = impulse_at(coded, channel);
+                stage.apply(channels, acmod, false, capable_levels(), 31);
+                REQUIRE(channels.size() == 3);
+                for (std::size_t k = 0; k < 3; ++k) {
+                    CHECK(static_cast<double>(channels[k][0]) ==
+                          Catch::Approx(gains[channel][k]).margin(1e-6));
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("karaoke capable: the 2/0 reproduction is Table C.2.3's left-hand columns, stereo and mono",
+          "[decoder][output][karaoke][capable]") {
+    constexpr double kClev = 0.5;
+    for (const auto acmod : {ac3::Acmod::k3_0, ac3::Acmod::k2_1, ac3::Acmod::k3_1,
+                             ac3::Acmod::k2_2, ac3::Acmod::k3_2}) {
+        const std::size_t coded = coded_channels(acmod);
+        for (const auto& col : kTable23TwoChannel) {
+            INFO("acmod " << static_cast<int>(acmod) << ", choice "
+                          << static_cast<int>(col.choice));
+            const auto stereo = table_gains(acmod, col, kClev, kClev);
+            const auto mono = table_gains(acmod, col, kClev, kClev, true);
+            for (std::size_t channel = 0; channel < coded; ++channel) {
+                {
+                    ac3::OutputStage stage{capable_config(col.choice, ac3::DownmixTarget::kLoRo)};
+                    auto channels = impulse_at(coded, channel);
+                    stage.apply(channels, acmod, false, capable_levels(), 31);
+                    REQUIRE(channels.size() == 2);
+                    CHECK(static_cast<double>(channels[0][0]) ==
+                          Catch::Approx(stereo[channel][0]).margin(1e-6));
+                    CHECK(static_cast<double>(channels[1][0]) ==
+                          Catch::Approx(stereo[channel][2]).margin(1e-6));
+                }
+                {
+                    ac3::OutputStage stage{capable_config(col.choice, ac3::DownmixTarget::kMono)};
+                    auto channels = impulse_at(coded, channel);
+                    stage.apply(channels, acmod, false, capable_levels(), 31);
+                    REQUIRE(channels.size() == 1);
+                    // "Summing the left and right output channels of the 2/0
+                    // reproduction" (C.2.3.1).
+                    CHECK(static_cast<double>(channels[0][0]) ==
+                          Catch::Approx(mono[channel][0] + mono[channel][2]).margin(1e-6));
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("karaoke capable: the choice is read per stream, and a vocal the stream lacks is nothing",
+          "[decoder][output][karaoke][capable]") {
+    // A 3/1 stream codes V1 only: choosing V2 reproduces none of it, and V1+V2
+    // is Table C.2.3's V1+V2 column over the one vocal there is (a: V1 to Lk).
+    {
+        ac3::OutputStage stage{capable_config(ac3::KaraokeVocals::kV2)};
+        auto channels = impulse_at(4, 3);  // V1
+        stage.apply(channels, ac3::Acmod::k3_1, false, capable_levels(), 31);
+        REQUIRE(channels.size() == 3);
+        for (std::size_t k = 0; k < 3; ++k) {
+            CHECK(static_cast<double>(channels[k][0]) == Catch::Approx(0.0).margin(1e-9));
+        }
+    }
+    {
+        ac3::OutputStage stage{capable_config(ac3::KaraokeVocals::kBoth)};
+        auto channels = impulse_at(4, 3);
+        stage.apply(channels, ac3::Acmod::k3_1, false, capable_levels(), 31);
+        CHECK(static_cast<double>(channels[0][0]) == Catch::Approx(0.5).margin(1e-6));  // a, then 1/2
+        CHECK(static_cast<double>(channels[1][0]) == Catch::Approx(0.0).margin(1e-9));
+        CHECK(static_cast<double>(channels[2][0]) == Catch::Approx(0.0).margin(1e-9));
+    }
+}
+
+TEST_CASE("karaoke capable: nothing changes for a stream that is not karaoke, or has no vocals",
+          "[decoder][output][karaoke][capable]") {
+    const std::array<double, 5> hz = {200.0, 300.0, 500.0, 700.0, 1100.0};
+    const auto source = tones(hz, 0, 1536);
+    for (const auto vocals : {ac3::KaraokeVocals::kNone, ac3::KaraokeVocals::kV1,
+                              ac3::KaraokeVocals::kV2, ac3::KaraokeVocals::kBoth}) {
+        // Not karaoke (bsmod something else): the 3/0 target is as coded, and a
+        // stereo target is the plain Lo/Ro fold the output stage always did.
+        {
+            ac3::OutputStage stage{capable_config(vocals)};
+            auto channels = source;
+            stage.apply(channels, ac3::Acmod::k3_2, false, capable_levels(false), 31);
+            CHECK(channels == source);
+        }
+        {
+            auto a = source;
+            auto b = source;
+            ac3::OutputStage{capable_config(vocals, ac3::DownmixTarget::kLoRo)}.apply(
+                a, ac3::Acmod::k3_2, false, capable_levels(false), 31);
+            ac3::OutputConfig plain;
+            plain.target = ac3::DownmixTarget::kLoRo;
+            ac3::OutputStage{plain}.apply(b, ac3::Acmod::k3_2, false, capable_levels(false), 31);
+            CHECK(a == b);
+        }
+        // A 2/0 karaoke stream is L and R alone: it is the plain fold, which
+        // no listener's choice of vocals can alter.
+        {
+            auto a = std::vector<std::vector<float>>(source.begin(), source.begin() + 2);
+            auto b = a;
+            ac3::OutputStage{capable_config(vocals, ac3::DownmixTarget::kLoRo)}.apply(
+                a, ac3::Acmod::k2_0, false, capable_levels(), 31);
+            ac3::OutputConfig plain;
+            plain.target = ac3::DownmixTarget::kLoRo;
+            ac3::OutputStage{plain}.apply(b, ac3::Acmod::k2_0, false, capable_levels(), 31);
+            CHECK(a == b);
+        }
+        // Lt/Rt has no Annex C reproduction: the same fold as without karaoke.
+        {
+            auto a = source;
+            auto b = source;
+            ac3::OutputStage{capable_config(vocals, ac3::DownmixTarget::kLtRt)}.apply(
+                a, ac3::Acmod::k3_2, false, capable_levels(), 31);
+            ac3::OutputConfig plain;
+            plain.target = ac3::DownmixTarget::kLtRt;
+            ac3::OutputStage{plain}.apply(b, ac3::Acmod::k3_2, false, capable_levels(), 31);
+            CHECK(a == b);
+        }
+    }
+}
+
+TEST_CASE("karaoke capable: channel counts, and the LFE follows Rk", "[decoder][output][karaoke][capable]") {
+    const auto config = capable_config(ac3::KaraokeVocals::kV1);
+    CHECK(ac3::output_channel_count(config, ac3::Acmod::k3_2, true, true) == 4);
+    CHECK(ac3::output_channel_count(config, ac3::Acmod::k3_2, false, true) == 3);
+    CHECK(ac3::output_channel_count(config, ac3::Acmod::k3_2, false, false) == 5);
+    auto stereo = config;
+    stereo.target = ac3::DownmixTarget::kLoRo;
+    CHECK(ac3::output_channel_count(stereo, ac3::Acmod::k3_2, true, true) == 2);
+
+    ac3::OutputStage stage{config};
+    std::vector<std::vector<float>> channels(6, std::vector<float>(64, 0.0F));
+    channels[3][0] = 1.0F;   // V1: the choice, so it reaches Ck with the melody
+    channels[5][0] = 0.25F;  // LFE
+    stage.apply(channels, ac3::Acmod::k3_2, true, capable_levels(), 31);
+    REQUIRE(channels.size() == 4);
+    CHECK(static_cast<double>(channels[1][0]) == Catch::Approx(0.5).margin(1e-6));  // 1/(1 + 1)
+    CHECK(static_cast<double>(channels[3][0]) == Catch::Approx(0.25).margin(1e-9));
+}
+
 TEST_CASE("karaoke: a real karaoke stream decodes to L C R through the decoder",
           "[decoder][output][karaoke]") {
     // A 3/2 stream flagged bsmod 7 - L, M, R, V1, V2 as five tones - decoded
@@ -1333,6 +1600,48 @@ TEST_CASE("karaoke: a real karaoke stream decodes to L C R through the decoder",
                     Catch::Approx(m * scale).margin(1e-6));
             REQUIRE(static_cast<double>(heard->channels[2][i]) ==
                     Catch::Approx((r + kSlev * v2) * scale).margin(1e-6));
+        }
+    }
+
+    // The karaoke-capable decoder over the same coded audio: V1 alone at the
+    // default layout (Table C.2.3, 3/0: d = 1 puts it with the melody in Ck,
+    // and 1 + 1 scales all three outputs by 1/2), and V2 alone at a stereo
+    // target (2/0: b = h = 0.7071 and M at clev, over 1 + 0.7071 + 0.7071).
+    {
+        ac3::OutputConfig centre = capable_config(ac3::KaraokeVocals::kV1);
+        ac3::OutputConfig stereo =
+            capable_config(ac3::KaraokeVocals::kV2, ac3::DownmixTarget::kLoRo);
+        ac3::FrameDecoder plain_again;
+        ac3::FrameDecoder capable_centre{{.output = centre}};
+        ac3::FrameDecoder capable_stereo{{.output = stereo}};
+        for (const auto& frame : karaoke) {
+            const auto coded = plain_again.decode_frame(frame);
+            const auto three = capable_centre.decode_frame(frame);
+            const auto two = capable_stereo.decode_frame(frame);
+            REQUIRE(coded.has_value());
+            REQUIRE(three.has_value());
+            REQUIRE(two.has_value());
+            REQUIRE(three->channels.size() == 3);
+            REQUIRE(two->channels.size() == 2);
+            const double clev = ac3::meta::level::kMinus3dB;  // the stream's cmixlev
+            const double down = 1.0 / (1.0 + clev + clev);
+            for (std::size_t i = 0; i < three->channels[0].size(); ++i) {
+                const auto l = static_cast<double>(coded->channels[0][i]);
+                const auto m = static_cast<double>(coded->channels[1][i]);
+                const auto r = static_cast<double>(coded->channels[2][i]);
+                const auto v1 = static_cast<double>(coded->channels[3][i]);
+                const auto v2 = static_cast<double>(coded->channels[4][i]);
+                REQUIRE(static_cast<double>(three->channels[0][i]) ==
+                        Catch::Approx(0.5 * l).margin(1e-6));
+                REQUIRE(static_cast<double>(three->channels[1][i]) ==
+                        Catch::Approx(0.5 * (m + v1)).margin(1e-6));
+                REQUIRE(static_cast<double>(three->channels[2][i]) ==
+                        Catch::Approx(0.5 * r).margin(1e-6));
+                REQUIRE(static_cast<double>(two->channels[0][i]) ==
+                        Catch::Approx((l + clev * v2 + clev * m) * down).margin(1e-6));
+                REQUIRE(static_cast<double>(two->channels[1][i]) ==
+                        Catch::Approx((r + clev * v2 + clev * m) * down).margin(1e-6));
+            }
         }
     }
 

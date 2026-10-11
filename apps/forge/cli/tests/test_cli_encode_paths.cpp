@@ -980,14 +980,14 @@ TEST_CASE("decode karaoke writes a karaoke stream as L C R at Table C.2.2's leve
     double worst = 0.0;
     double loudest = 0.0;
     for (std::size_t i = 0; i < heard.frame_count(); ++i) {
-        const double l = coded.channels[0][i];
-        const double r = coded.channels[1][i];
-        const double m = coded.channels[2][i];
-        const double v1 = coded.channels[3][i];
-        const double v2 = coded.channels[4][i];
-        worst = std::max(worst, std::abs(heard.channels[0][i] - (l + 0.5 * v1) * kScale));
-        worst = std::max(worst, std::abs(heard.channels[1][i] - (r + 0.5 * v2) * kScale));
-        worst = std::max(worst, std::abs(heard.channels[2][i] - m * kScale));
+        const double l = static_cast<double>(coded.channels[0][i]);
+        const double r = static_cast<double>(coded.channels[1][i]);
+        const double m = static_cast<double>(coded.channels[2][i]);
+        const double v1 = static_cast<double>(coded.channels[3][i]);
+        const double v2 = static_cast<double>(coded.channels[4][i]);
+        worst = std::max(worst, std::abs(static_cast<double>(heard.channels[0][i]) - (l + 0.5 * v1) * kScale));
+        worst = std::max(worst, std::abs(static_cast<double>(heard.channels[1][i]) - (r + 0.5 * v2) * kScale));
+        worst = std::max(worst, std::abs(static_cast<double>(heard.channels[2][i]) - m * kScale));
         loudest = std::max(loudest, std::abs(static_cast<double>(heard.channels[2][i])));
     }
     CHECK(worst < 1e-6);
@@ -1040,7 +1040,88 @@ TEST_CASE("decode karaoke leaves a stream that is not karaoke as it was, and say
     const auto log = dir / "k32n_bad.log";
     CHECK(run_cli("decode " + quoted(stream) + " " + quoted(dir / "k32n_bad.wav") + " karaoke=maybe",
                   log) != 0);
-    CHECK(read_log(log).find("'on' or 'off'") != std::string::npos);
+    CHECK(read_log(log).find("'v1+v2'") != std::string::npos);
+}
+
+TEST_CASE("decode karaoke=none|v1|v2|v1+v2 is the karaoke-capable decoder's Table C.2.3",
+          "[cli][decode][karaoke]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_karaoke_candidate(dir, "k32c", "bsmod=7");
+    const auto coded = decode_to_wav(stream, dir / "k32c_coded.wav", "");
+    REQUIRE(coded.channels.size() == 5);  // FL FR FC BL BR = L R M V1 V2
+    const std::size_t frames = coded.frame_count();
+    const auto at = [&](std::size_t channel, std::size_t i) {
+        return static_cast<double>(coded.channels[channel][i]);
+    };
+    const double clev = 0.7071067811865476;  // the candidate's cmixlev=-3
+
+    // 3/0 reproduction. Each choice is a column of the table's right-hand half,
+    // and all three outputs share one scale-down factor.
+    const auto three = [&](const std::string& choice, double scale, auto left, auto centre,
+                           auto right) {
+        std::string report;
+        const auto heard =
+            decode_to_wav(stream, dir / ("k32c_" + choice + ".wav"), "karaoke=" + choice, &report);
+        INFO(report);
+        REQUIRE(heard.channels.size() == 3);
+        CHECK(heard.channel_mask == (kFL | kFR | kFC));
+        CHECK(report.find("C.2.3.2") != std::string::npos);
+        REQUIRE(heard.frame_count() == frames);
+        double worst = 0.0;
+        for (std::size_t i = 0; i < frames; ++i) {
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[0][i]) - scale * left(i)));
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[2][i]) - scale * centre(i)));
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[1][i]) - scale * right(i)));
+        }
+        CHECK(worst < 1e-6);
+    };
+    // heard.channels is in the WAV's FL FR FC order: Lk, Rk, Ck.
+    const auto l = [&](std::size_t i) { return at(0, i); };
+    const auto r = [&](std::size_t i) { return at(1, i); };
+    const auto m = [&](std::size_t i) { return at(2, i); };
+    const auto v1 = [&](std::size_t i) { return at(3, i); };
+    const auto v2 = [&](std::size_t i) { return at(4, i); };
+    three("none", 1.0, l, m, r);
+    three("v1", 0.5, l, [&](std::size_t i) { return m(i) + v1(i); }, r);
+    three("v2", 0.5, l, [&](std::size_t i) { return m(i) + v2(i); }, r);
+    three("v1+v2", 0.5, [&](std::size_t i) { return l(i) + v1(i); }, m,
+          [&](std::size_t i) { return r(i) + v2(i); });
+
+    // 2/0 reproduction at a stereo and a mono target: the melody at clev, a
+    // single vocal at 0.7 in both channels, a pair left and right at unity.
+    const auto two = [&](const std::string& choice, auto lo, auto ro, double scale) {
+        const auto heard = decode_to_wav(stream, dir / ("k32c_s_" + choice + ".wav"),
+                                         "channels=2 karaoke=" + choice);
+        REQUIRE(heard.channels.size() == 2);
+        double worst = 0.0;
+        for (std::size_t i = 0; i < frames; ++i) {
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[0][i]) - scale * lo(i)));
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[1][i]) - scale * ro(i)));
+        }
+        CHECK(worst < 1e-6);
+    };
+    two("v2", [&](std::size_t i) { return l(i) + clev * v2(i) + clev * m(i); },
+        [&](std::size_t i) { return r(i) + clev * v2(i) + clev * m(i); }, 1.0 / (1.0 + 2.0 * clev));
+    two("v1+v2", [&](std::size_t i) { return l(i) + v1(i) + clev * m(i); },
+        [&](std::size_t i) { return r(i) + v2(i) + clev * m(i); }, 1.0 / (2.0 + clev));
+
+    const auto mono = decode_to_wav(stream, dir / "k32c_mono.wav", "channels=1 karaoke=v1+v2");
+    REQUIRE(mono.channels.size() == 1);
+    double worst = 0.0;
+    for (std::size_t i = 0; i < frames; ++i) {
+        const double expected =
+            (l(i) + v1(i) + clev * m(i) + r(i) + v2(i) + clev * m(i)) / (4.0 + 2.0 * clev);
+        worst = std::max(worst, std::abs(static_cast<double>(mono.channels[0][i]) - expected));
+    }
+    CHECK(worst < 1e-6);
+
+    // Annex C has no Lt/Rt reproduction, for either kind of decoder.
+    const auto log = dir / "k32c_ltrt.log";
+    const auto refused = dir / "k32c_ltrt.wav";
+    fs::remove(refused);
+    CHECK(run_cli("decode " + quoted(stream) + " " + quoted(refused) + " downmix=ltrt karaoke=v1",
+                  log) != 0);
+    CHECK_FALSE(fs::exists(refused));
 }
 
 TEST_CASE("karaoke is decode's option and AC-3's: other commands refuse it", "[cli][decode][karaoke]") {

@@ -99,42 +99,64 @@ struct MixLevelOverride {
 // carries L and R (the music) and, in the slots a programme otherwise gives
 // its centre and surrounds, a guide melody M and one or two vocal channels V1
 // and V2 (Table C.2.1: 3/0 is L M R, 2/1 is L R V1, 3/1 is L M R V1, 2/2 is
-// L R V1 V2, 3/2 is L M R V1 V2). A karaoke-AWARE decoder (C.2.3.1) forms
+// L R V1 V2, 3/2 is L M R V1 V2). Annex C forms the outputs as
 //
 //     Lk = L + a V1 + b V2 + c M        Ck = d V1 + e V2 + f M
 //     Rk = R + g V1 + h V2 + i M
 //
-// with Table C.2.2's coefficients, which put the vocals at the stream's own
-// surround level and the melody at its centre level or at unity:
+// with coefficients that depend on the reproduction (2/0 or 3/0) and, for the
+// karaoke-AWARE decoder (C.2.3.1, Table C.2.2), on how many vocals the stream
+// codes, or, for the karaoke-CAPABLE one (C.2.3.2, Table C.2.3), on which
+// vocals the listener chose. In every case they are scaled down together,
+// §7.8.1's way, so that no output's sum exceeds 1.
 //
-//   2 channels (2/0)  L R, M at clev, one V at 0.7 slev in both, two Vs at slev
-//                     in their own side - exactly the Lo/Ro downmix, which is
-//                     why Annex C says "any AC-3 decoder will produce the
-//                     appropriate output if it is set to perform an Lo, Ro
-//                     downmix", and why DownmixTarget::kLoRo needs nothing here.
-//   3 channels (3/0)  L R unchanged, M at unity in the centre, a single V at
-//                     slev in the centre (V1 only), a pair at slev in L (V1)
-//                     and R (V2). This is what kMultichannel produces.
+//   aware, 2/0   L R, M at clev, one V at 0.7 slev in both, two Vs at slev in
+//                their own side - exactly the Lo/Ro downmix, which is why Annex
+//                C says "any AC-3 decoder will produce the appropriate output
+//                if it is set to perform an Lo, Ro downmix", and why
+//                DownmixTarget::kLoRo needs nothing here.
+//   aware, 3/0   L R unchanged, M at unity in the centre, a single V at slev in
+//                the centre (V1 only), a pair at slev in L (V1) and R (V2).
+//   capable, 3/0 L R unchanged, M at unity in the centre, then whichever vocals
+//                were chosen at unity: V1 alone in the centre, V2 alone in the
+//                centre, both as V1 left and V2 right.
+//   capable, 2/0 L R, M at clev in both, then V1 alone or V2 alone at 0.7 in
+//                both (a phantom centre), or both as V1 left and V2 right at
+//                unity.
 //
-// The coefficients are scaled down together, §7.8.1's way, so that no output's
-// sum exceeds 1 when everything contributing to it is at full scale.
-//
-// Not implemented: C.2.3.2's karaoke-CAPABLE decoder, whose listener chooses
-// none, one or both of the vocals (Table C.2.3).
+// The aware vocals sit at the stream's own surround level (the programme
+// provider's choice, C.1); the capable ones at the listener's, which Table
+// C.2.3 gives as these defaults.
 enum class KaraokeReproduction : std::uint8_t {
     // A karaoke stream goes through the stage like any other. The default: the
     // decoders are a check on the encoder first, and nothing here re-routes a
     // programme unasked.
     kOff,
-    // The 3/0 reproduction above, for a karaoke stream with something to
-    // reproduce (acmod 2/1, 3/1, 2/2 or 3/2) at DownmixTarget::kAsCoded: the
-    // output is L, C, R in that order and then the LFE, when there is one,
-    // so that three or four channels replace the four to six coded. A 3/0
-    // stream (L M R) is already that and a 2/0 one has nothing but L and R;
-    // both pass through. A stereo or mono target is the 2/0 reproduction as it
-    // stands (Lo/Ro), and kLtRt is Annex C's own silence - it is left as the
-    // Lt/Rt fold it is. Ignored for a stream that is not karaoke.
-    kMultichannel,
+    // C.2.3.1, Table C.2.2. At DownmixTarget::kAsCoded a karaoke stream with
+    // something to reproduce (acmod 2/1, 3/1, 2/2 or 3/2) comes back as L, C,
+    // R and then the LFE, when there is one, so that three or four channels
+    // replace the four to six coded. A 3/0 stream (L M R) is already that and
+    // a 2/0 one has nothing but L and R; both pass through. A stereo or mono
+    // target is the 2/0 reproduction as it stands (Lo/Ro), and kLtRt is left as
+    // the Lt/Rt fold it is - Annex C defines none. Ignored for a stream that is
+    // not karaoke.
+    kAware,
+    // C.2.3.2, Table C.2.3: as kAware, but the vocals reproduced are
+    // OutputConfig::karaoke_vocals' choice and, at a stereo or mono target,
+    // the 2/0 column is applied too (a listener who asked for no vocals is not
+    // handed them by a Lo/Ro fold). Mono is the sum of the 2/0 reproduction's
+    // left and right, as C.2.3.1 has it.
+    kCapable,
+};
+
+// Which of a karaoke stream's vocal channels the listener hears
+// (KaraokeReproduction::kCapable). A choice of a vocal the stream does not code
+// - V2 of a 3/1 stream - reproduces none.
+enum class KaraokeVocals : std::uint8_t {
+    kNone,
+    kV1,
+    kV2,
+    kBoth,
 };
 
 struct OutputConfig {
@@ -185,6 +207,8 @@ struct OutputConfig {
     // KaraokeReproduction. Only the AC-3 decoder (FrameDecoder) knows a frame
     // is karaoke, so for E-AC-3 this is never applied.
     KaraokeReproduction karaoke = KaraokeReproduction::kOff;
+    // The listener's choice of vocals under kCapable; read for no other mode.
+    KaraokeVocals karaoke_vocals = KaraokeVocals::kBoth;
 };
 
 // What the stream itself says about folding down, resolved from whichever

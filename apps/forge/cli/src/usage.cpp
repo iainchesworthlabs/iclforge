@@ -52,7 +52,7 @@ constexpr std::array<OptionToken, 105> kOptionTokens{{
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
     {"karaoke", "decode: an AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R"},
-    {"karaoke=", "decode: on, or off (the default: a karaoke stream decodes like any other)"},
+    {"karaoke=", "decode: on or aware; none, v1, v2 or v1+v2 for the karaoke-capable decoder's vocals; off (the default)"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
     {"fast-imdct", "names the default inverse MDCT (the fast §7.9.4 step 3)"},
     {"quiet", "no status output at all - errors and the payload only"},
@@ -455,7 +455,12 @@ void print_decode_topic() {
     fmt::println("       into the left and the right (Table C.2.2). With channels=2 or 1 it is");
     fmt::println("       the Lo/Ro downmix, which is Annex C's 2/0 reproduction. downmix=ltrt");
     fmt::println("       is refused: Annex C defines no Lt/Rt. A stream that is not karaoke");
-    fmt::println("       is decoded as coded, and the report says so.");
+    fmt::println("       is decoded as coded, and the report says so. karaoke=none, v1, v2");
+    fmt::println("       or v1+v2 is the karaoke-capable decoder's listener choice of vocals");
+    fmt::println("       (C.2.3.2, Table C.2.3): at the default layout the same L, C, R with");
+    fmt::println("       only the chosen vocals in it (V1 or V2 alone in the centre, a pair");
+    fmt::println("       left and right at unity), and at channels=2 or 1 the 2/0 form with");
+    fmt::println("       the melody at clev and a single vocal at 0.7 in both channels.");
 }
 
 void print_ac4_decode_topic() {

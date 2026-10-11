@@ -230,6 +230,118 @@ MixLevels with_override(MixLevels levels, const MixLevelOverride& override_level
     return levels;
 }
 
+// --- Annex C: the coefficients ----------------------------------------------
+//
+// Table C.2.1 puts L, M, R, V1 and V2 in the coded slots of Table 5.8, so a
+// karaoke frame's roles are found by acmod; the coefficients are then the
+// tables' own, in double, before any scaling.
+
+// The coded slot of each role, -1 where the acmod has none.
+struct KaraokeSlots {
+    int left = -1;
+    int melody = -1;
+    int right = -1;
+    int vocal1 = -1;
+    int vocal2 = -1;
+};
+
+KaraokeSlots karaoke_slots(Acmod acmod) {
+    switch (acmod) {
+        case Acmod::k2_0: return {.left = 0, .right = 1};
+        case Acmod::k3_0: return {.left = 0, .melody = 1, .right = 2};
+        case Acmod::k2_1: return {.left = 0, .right = 1, .vocal1 = 2};
+        case Acmod::k3_1: return {.left = 0, .melody = 1, .right = 2, .vocal1 = 3};
+        case Acmod::k2_2: return {.left = 0, .right = 1, .vocal1 = 2, .vocal2 = 3};
+        case Acmod::k3_2:
+            return {.left = 0, .melody = 1, .right = 2, .vocal1 = 3, .vocal2 = 4};
+        case Acmod::kDualMono:
+        case Acmod::k1_0: break;
+    }
+    return {};
+}
+
+// Lk = L + a V1 + b V2 + c M, Ck = d V1 + e V2 + f M, Rk = R + g V1 + h V2 + i M.
+struct KaraokeCoefficients {
+    double a = 0.0;
+    double b = 0.0;
+    double c = 0.0;
+    double d = 0.0;
+    double e = 0.0;
+    double f = 0.0;
+    double g = 0.0;
+    double h = 0.0;
+    double i = 0.0;
+};
+
+// Table C.2.2's 3/0 reproduction: the vocals at the stream's own surround
+// level, one of them (V1 only) in the centre and a pair in the left and the
+// right, the melody at unity in the centre.
+KaraokeCoefficients aware_three_channel(bool two_vocals, double slev) {
+    KaraokeCoefficients k;
+    k.f = 1.0;
+    if (two_vocals) {
+        k.a = slev;  // V1 to Lk
+        k.h = slev;  // V2 to Rk
+    } else {
+        k.d = slev;  // V1 to Ck
+    }
+    return k;
+}
+
+// Table C.2.3, the karaoke-capable decoder's defaults, by what the listener
+// chose. 0.7 is the annex's one-decimal -3 dB: the same factor its aware table
+// writes as "0,7 x slev", which has to be §7.8's 0.7071 for Annex C's claim
+// that a Lo/Ro downmix IS the aware 2/0 reproduction to hold.
+KaraokeCoefficients capable(bool three_channel, KaraokeVocals vocals, double clev) {
+    const bool v1 = vocals == KaraokeVocals::kV1;
+    const bool v2 = vocals == KaraokeVocals::kV2;
+    const bool both = vocals == KaraokeVocals::kBoth;
+    constexpr double kPhantom = 0.7071067811865476;
+    KaraokeCoefficients k;
+    if (three_channel) {
+        k.a = both ? 1.0 : 0.0;
+        k.d = v1 ? 1.0 : 0.0;
+        k.e = v2 ? 1.0 : 0.0;
+        k.f = 1.0;
+        k.h = both ? 1.0 : 0.0;
+        return k;
+    }
+    k.a = both ? 1.0 : (v1 ? kPhantom : 0.0);
+    k.b = v2 ? kPhantom : 0.0;
+    k.c = clev;
+    k.g = v1 ? kPhantom : 0.0;
+    k.h = both ? 1.0 : (v2 ? kPhantom : 0.0);
+    k.i = clev;
+    return k;
+}
+
+// Whether a frame is Annex C's to reproduce at all, and as which column.
+bool karaoke_three_acmod(Acmod acmod) {
+    // 3/0 is L M R already and 2/0 is L R alone: neither is a layout change.
+    return acmod == Acmod::k2_1 || acmod == Acmod::k3_1 || acmod == Acmod::k2_2 ||
+           acmod == Acmod::k3_2;
+}
+
+bool karaoke_two_acmod(Acmod acmod) {
+    // A 2/0 stream has no M or V to treat differently from a Lo/Ro fold.
+    return acmod == Acmod::k3_0 || karaoke_three_acmod(acmod);
+}
+
+// The 3/0 reproduction: the frame leaves the coded layout for Lk, Ck, Rk (and
+// the LFE), for either kind of karaoke decoder.
+bool karaoke_reproduces(const OutputConfig& config, Acmod acmod, bool karaoke_frame) {
+    return karaoke_frame && config.karaoke != KaraokeReproduction::kOff &&
+           config.target == DownmixTarget::kAsCoded && karaoke_three_acmod(acmod);
+}
+
+// The 2/0 reproduction a karaoke-CAPABLE decoder's listener asked for: at a
+// stereo or mono target, in place of the Lo/Ro fold (which is the aware one).
+bool karaoke_two_channel(const OutputConfig& config, Acmod acmod, bool karaoke_frame) {
+    return karaoke_frame && config.karaoke == KaraokeReproduction::kCapable &&
+           (config.target == DownmixTarget::kLoRo || config.target == DownmixTarget::kMono) &&
+           karaoke_two_acmod(acmod);
+}
+
 FoldPlan plan_fold(const OutputConfig& config, std::size_t inputs, Acmod acmod, bool lfe,
                    const MixLevels& stream_levels) {
     // Every fold is planned here, whichever apply() it came through, so this
@@ -249,7 +361,56 @@ FoldPlan plan_fold(const OutputConfig& config, std::size_t inputs, Acmod acmod, 
             into[count++] = {.channel = ch, .gain = static_cast<Scalar>(gain)};
         }
     };
-    if (config.target == DownmixTarget::kMono) {
+    if (karaoke_two_channel(config, acmod, levels.karaoke)) {
+        // Annex C.2.3.2's 2/0 reproduction, Table C.2.3's left-hand columns.
+        // Lk and Rk are summed per role over the channels the stream has, and
+        // mono is C.2.3.1's "sum the left and right outputs". Scaled down
+        // together so that no output's sum exceeds 1 (§7.8.1).
+        const KaraokeSlots slot = karaoke_slots(acmod);
+        const KaraokeCoefficients k =
+            capable(false, config.karaoke_vocals, levels.loro_clev);
+        struct Role {
+            int slot;
+            double to_left;
+            double to_right;
+        };
+        const std::array<Role, 5> roles = {{{slot.left, 1.0, 0.0},
+                                            {slot.right, 0.0, 1.0},
+                                            {slot.melody, k.c, k.i},
+                                            {slot.vocal1, k.a, k.g},
+                                            {slot.vocal2, k.b, k.h}}};
+        double left_sum = 0.0;
+        double right_sum = 0.0;
+        for (const Role& role : roles) {
+            if (role.slot >= 0 && static_cast<std::size_t>(role.slot) < inputs) {
+                left_sum += role.to_left;
+                right_sum += role.to_right;
+            }
+        }
+        const double loudest = plan.stereo ? std::max(left_sum, right_sum) : left_sum + right_sum;
+        const double scale_down = loudest > 1.0 ? 1.0 / loudest : 1.0;
+        for (const Role& role : roles) {
+            if (role.slot < 0 || static_cast<std::size_t>(role.slot) >= inputs) {
+                continue;
+            }
+            const auto channel = static_cast<std::size_t>(role.slot);
+            if (plan.stereo) {
+                if (role.to_left != 0.0) {
+                    plan.left[plan.left_terms++] = {
+                        .channel = channel, .gain = static_cast<Scalar>(role.to_left * scale_down)};
+                }
+                if (role.to_right != 0.0) {
+                    plan.right[plan.right_terms++] = {
+                        .channel = channel,
+                        .gain = static_cast<Scalar>(role.to_right * scale_down)};
+                }
+            } else if (role.to_left + role.to_right != 0.0) {
+                plan.left[plan.left_terms++] = {
+                    .channel = channel,
+                    .gain = static_cast<Scalar>((role.to_left + role.to_right) * scale_down)};
+            }
+        }
+    } else if (config.target == DownmixTarget::kMono) {
         terms(meta::mono_downmix(acmod, levels.loro_clev, levels.loro_slev), plan.left,
               plan.left_terms);
     } else if (config.target == DownmixTarget::kLoRo) {
@@ -516,22 +677,13 @@ void limit_frame(const OutputConfig& config, double& protection_gain, Scalar sca
     protection_gain = frame_gain;
 }
 
-// Annex C.2.3.1's karaoke-aware reproduction, planned once per frame like a
-// fold: which coded channel reaches each of Lk, Ck and Rk and at what gain.
-//
-// Table C.2.1 puts L, M, R, V1 and V2 in the coded slots of Table 5.8, so the
-// slots are found by acmod and the coefficients are Table C.2.2's 3/0
-// reproduction:
-//
-//   one vocal  (V1 only: 2/1, 3/1)   Lk = L           Ck = M + slev V1   Rk = R
-//   two vocals (V1 and V2: 2/2, 3/2) Lk = L + slev V1 Ck = M             Rk = R + slev V2
-//
-// with M absent at 2/1 and 2/2, where nothing is melody and the centre output
-// carries what the table gives it (the single vocal) or nothing. `slev` is the
-// stream's Lo/Ro surround level - cmixlev/surmixlev are "under control of the
-// programme provider" and re-purposed as the melody and vocal levels here
-// (C.1), and for an Annex D stream §D3.1.2's lorosurmixlev is the level the
-// Lo/Ro downmix uses.
+// Annex C's 3/0 reproduction, planned once per frame like a fold: which coded
+// channel reaches each of Lk, Ck and Rk and at what gain. The coefficients are
+// Table C.2.2's third and fourth columns (aware) or Table C.2.3's right-hand
+// ones (capable), above; `slev` is the stream's Lo/Ro surround level -
+// cmixlev/surmixlev are "under control of the programme provider" and
+// re-purposed as the melody and vocal levels here (C.1), and for an Annex D
+// stream §D3.1.2's lorosurmixlev is the level the Lo/Ro downmix uses.
 //
 // Scaled down together, never up (§7.8.1): when the loudest output's sum is
 // above 1 every coefficient is divided by it, so a vocal never costs the
@@ -541,72 +693,57 @@ struct KaraokePlan {
         std::size_t channel = 0;
         Scalar gain{};
     };
-    std::array<Term, 2> left{};
+    std::array<Term, 4> left{};
     std::size_t left_terms = 0;
-    std::array<Term, 2> centre{};
+    std::array<Term, 3> centre{};
     std::size_t centre_terms = 0;
-    std::array<Term, 2> right{};
+    std::array<Term, 4> right{};
     std::size_t right_terms = 0;
     // The coded slot of the LFE, which is output after Rk when there is one.
     bool lfe = false;
     std::size_t lfe_channel = 0;
 };
 
-// The 3/0 reproduction has something to do for these acmods only: 3/0 is L M R
-// already and 2/0 is L R alone (Table C.2.1), and neither is a layout change.
-bool karaoke_reproduces_acmod(Acmod acmod) {
-    return acmod == Acmod::k2_1 || acmod == Acmod::k3_1 || acmod == Acmod::k2_2 ||
-           acmod == Acmod::k3_2;
-}
-
-// Whether this frame leaves the coded layout for Lk, Ck, Rk (and the LFE).
-bool karaoke_reproduces(const OutputConfig& config, Acmod acmod, bool karaoke_frame) {
-    return karaoke_frame && config.karaoke == KaraokeReproduction::kMultichannel &&
-           config.target == DownmixTarget::kAsCoded && karaoke_reproduces_acmod(acmod);
-}
-
-KaraokePlan plan_karaoke(Acmod acmod, bool lfe, std::size_t inputs, double slev) {
-    // Table C.2.1: the coded slot of each, -1 where the acmod has none.
-    int left = 0;
-    int melody = -1;
-    int right = 1;
-    int vocal1 = -1;
-    int vocal2 = -1;
-    switch (acmod) {
-        case Acmod::k2_1: vocal1 = 2; break;
-        case Acmod::k3_1: melody = 1; right = 2; vocal1 = 3; break;
-        case Acmod::k2_2: vocal1 = 2; vocal2 = 3; break;
-        case Acmod::k3_2: melody = 1; right = 2; vocal1 = 3; vocal2 = 4; break;
-        case Acmod::kDualMono:
-        case Acmod::k1_0:
-        case Acmod::k2_0:
-        case Acmod::k3_0: break;  // not reached: karaoke_reproduces_acmod() refused them
-    }
-    const bool two_vocals = vocal2 >= 0;
-    // Table C.2.2's coefficients, in double and by output, before the scaling.
-    const double left_vocal = two_vocals ? slev : 0.0;    // a: V1 into Lk
-    const double right_vocal = two_vocals ? slev : 0.0;   // h: V2 into Rk
-    const double centre_vocal = two_vocals ? 0.0 : slev;  // d: V1 into Ck
-    const double centre_melody = melody >= 0 ? 1.0 : 0.0;  // f
-    const double loudest = std::max({1.0 + left_vocal, centre_melody + centre_vocal,
-                                     1.0 + right_vocal});
+KaraokePlan plan_karaoke(const OutputConfig& config, Acmod acmod, bool lfe, std::size_t inputs,
+                         double slev) {
+    const KaraokeSlots slot = karaoke_slots(acmod);
+    const KaraokeCoefficients k = config.karaoke == KaraokeReproduction::kCapable
+                                      ? capable(true, config.karaoke_vocals, 0.0)
+                                      : aware_three_channel(slot.vocal2 >= 0, slev);
+    const auto present = [&](int index) {
+        return index >= 0 && static_cast<std::size_t>(index) < inputs;
+    };
+    // The sums the scaling bounds, over the channels the stream really has.
+    const double left_sum = 1.0 + (present(slot.vocal1) ? k.a : 0.0) +
+                            (present(slot.vocal2) ? k.b : 0.0) + (present(slot.melody) ? k.c : 0.0);
+    const double centre_sum = (present(slot.vocal1) ? k.d : 0.0) +
+                              (present(slot.vocal2) ? k.e : 0.0) +
+                              (present(slot.melody) ? k.f : 0.0);
+    const double right_sum = 1.0 + (present(slot.vocal1) ? k.g : 0.0) +
+                             (present(slot.vocal2) ? k.h : 0.0) +
+                             (present(slot.melody) ? k.i : 0.0);
+    const double loudest = std::max({left_sum, centre_sum, right_sum});
     const double scale_down = loudest > 1.0 ? 1.0 / loudest : 1.0;
 
     KaraokePlan plan;
-    const auto put = [&](std::array<KaraokePlan::Term, 2>& into, std::size_t& count, int slot,
-                         double gain) {
-        if (slot < 0 || static_cast<std::size_t>(slot) >= inputs || gain == 0.0) {
+    const auto put = [&](auto& into, std::size_t& count, int index, double gain) {
+        if (!present(index) || gain == 0.0) {
             return;
         }
-        into[count++] = {.channel = static_cast<std::size_t>(slot),
+        into[count++] = {.channel = static_cast<std::size_t>(index),
                          .gain = static_cast<Scalar>(gain * scale_down)};
     };
-    put(plan.left, plan.left_terms, left, 1.0);
-    put(plan.left, plan.left_terms, vocal1, left_vocal);
-    put(plan.centre, plan.centre_terms, melody, centre_melody);
-    put(plan.centre, plan.centre_terms, vocal1, centre_vocal);
-    put(plan.right, plan.right_terms, right, 1.0);
-    put(plan.right, plan.right_terms, vocal2, right_vocal);
+    put(plan.left, plan.left_terms, slot.left, 1.0);
+    put(plan.left, plan.left_terms, slot.vocal1, k.a);
+    put(plan.left, plan.left_terms, slot.vocal2, k.b);
+    put(plan.left, plan.left_terms, slot.melody, k.c);
+    put(plan.centre, plan.centre_terms, slot.vocal1, k.d);
+    put(plan.centre, plan.centre_terms, slot.vocal2, k.e);
+    put(plan.centre, plan.centre_terms, slot.melody, k.f);
+    put(plan.right, plan.right_terms, slot.right, 1.0);
+    put(plan.right, plan.right_terms, slot.vocal1, k.g);
+    put(plan.right, plan.right_terms, slot.vocal2, k.h);
+    put(plan.right, plan.right_terms, slot.melody, k.i);
     const auto lfe_slot = static_cast<std::size_t>(fullbw_channel_count(acmod));
     if (lfe && lfe_slot < inputs) {
         plan.lfe = true;
@@ -804,7 +941,7 @@ void OutputStage::apply(std::span<const std::span<float>> channels, Acmod acmod,
         // to 3 over V1.
         const MixLevels mix = with_override(levels, config_.mix_override);
         const KaraokePlan plan =
-            plan_karaoke(acmod, lfe, channels.size(), mix.loro_slev);
+            plan_karaoke(config_, acmod, lfe, channels.size(), mix.loro_slev);
         out_left_.resize(kFoldBlock);
         out_centre_.resize(kFoldBlock);
         out_right_.resize(kFoldBlock);

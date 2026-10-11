@@ -1896,15 +1896,36 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             // output has fewer channels than the stream codes and is named by
             // a layout (L C R) the other commands that read this stage's
             // output do not know, so it is `decode`'s alone.
-            if (token == "karaoke" || value == "on") {
-                out.output.karaoke = iclforge::ac3::KaraokeReproduction::kMultichannel;
+            // Bare, on and aware are the karaoke-AWARE decoder (C.2.3.1); none,
+            // v1, v2 and v1+v2 are the karaoke-CAPABLE one's listener choices
+            // (C.2.3.2, Table C.2.3), which also pick the vocals a stereo or
+            // mono target is given.
+            using iclforge::ac3::KaraokeReproduction;
+            using iclforge::ac3::KaraokeVocals;
+            if (token == "karaoke" || value == "on" || value == "aware") {
+                out.output.karaoke = KaraokeReproduction::kAware;
                 continue;
             }
             if (value == "off") {
-                out.output.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+                out.output.karaoke = KaraokeReproduction::kOff;
                 continue;
             }
-            fmt::println(stderr, "error: karaoke is 'on' or 'off', or bare (got '{}')", token);
+            const std::optional<KaraokeVocals> vocals =
+                value == "none"                       ? std::optional{KaraokeVocals::kNone}
+                : value == "v1"                       ? std::optional{KaraokeVocals::kV1}
+                : value == "v2"                       ? std::optional{KaraokeVocals::kV2}
+                : (value == "v1+v2" || value == "both") ? std::optional{KaraokeVocals::kBoth}
+                                                      : std::nullopt;
+            if (vocals) {
+                out.output.karaoke = KaraokeReproduction::kCapable;
+                out.output.karaoke_vocals = *vocals;
+                continue;
+            }
+            fmt::println(stderr,
+                         "error: karaoke is bare, 'on' or 'aware' (the karaoke-aware decoder), "
+                         "'none', 'v1', 'v2' or 'v1+v2' (the capable one's vocals), or 'off' "
+                         "(got '{}')",
+                         token);
             return false;
         }
         if (token == "mix-lfe") {
