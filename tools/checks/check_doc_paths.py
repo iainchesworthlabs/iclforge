@@ -126,6 +126,9 @@ PLANNED_PATHS = {
     "libs/ac3/src/decoder/associated_service.cpp": (
         "proposed by the programme-mixing-metadata plan's Phase 5, not created yet"
     ),
+    "docs/karaoke": (
+        "the karaoke plan's user guide, written as each feature lands (Phase 3), not created yet"
+    ),
 }
 
 # Script trees whose literals are not references into this tree. tools/adapt holds the rewrite
