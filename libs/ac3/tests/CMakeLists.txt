@@ -24,6 +24,7 @@ iclforge_add_test_binary(iclforge-ac3-tests PROJECT ac3 SOURCES
     decoder/test_diagnostics.cpp
     meta/test_drc.cpp
     encoder/test_eac3.cpp
+    encoder/test_eac3_convertible.cpp
     encoder/test_eac3_short_syncframes.cpp
     decoder/test_eac3_decoder.cpp
     decoder/test_eac3_programmes.cpp

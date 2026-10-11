@@ -677,8 +677,9 @@ void print_stream_tools_topic() {
     fmt::println("across rather than resetting them, and folds a layout AC-3 cannot code down");
     fmt::println("to 5.1 per §7.8. The other four never touch a coded coefficient:");
     fmt::println("metadata/normalize rewrite bsi fields in place and re-stamp the CRCs, cut/cat");
-    fmt::println("move whole access units. Convertible substreams (strmtyp 2) are out of scope");
-    fmt::println("for all five, the same way 'validate' already refuses them.");
+    fmt::println("move whole access units. A convertible substream (strmtyp 2, §E2.3.1.1:");
+    fmt::println("previously coded in AC-3) is an independent one and goes through all five;");
+    fmt::println("transcode reads it as the E-AC-3 it is.");
     fmt::println("");
     fmt::println("metadata can only overwrite a field the stream already transmits. A field it");
     fmt::println("does not (compr behind a clear compre, bsmod and dsurmod behind a clear");

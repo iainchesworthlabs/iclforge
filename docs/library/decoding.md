@@ -167,8 +167,10 @@ Stated as limits rather than left to be discovered:
 - A **dependent** E-AC-3 substream reports no `compr` whatever its `compre` bit says: §E3.8.5
   repurposes that bit to mark the last dependent of the programme. Its eight bits are still
   skipped correctly; they are simply not a `compr` word.
-- `strmtyp 2` (a convertible substream, §E2.3.1.1) is refused outright, matching
-  `iclforge::ac3::plan::validate`'s own stance.
+- `strmtyp 2` (a convertible substream, §E2.3.1.1: previously coded in AC-3) is edited as an
+  independent substream is. Its bsi swaps `convsync` for `blkid` and `frmsizecod`, which are
+  walked and left as they are, and it sends neither the programme-mixing group nor the converter
+  elements Table E1.2 and E1.3 gate on `strmtyp` 0. `strmtyp` 3 is reserved and refused.
 
 A field named in an edit that **no** syncframe in the stream carries fails before anything is
 written, so the stream is either fully rewritten or left byte-for-byte alone — a metadata option

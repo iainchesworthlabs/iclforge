@@ -1287,9 +1287,12 @@ variadic. It refuses inputs whose codec, sample rate, coding mode, LFE presence,
 channel count or substream-per-unit count differ from the first — a decoder walking the join has
 no way to be told the format changed.
 
-**Out of scope for all five:** `strmtyp 2` convertible streams — the spec's own no-re-encode
-path to AC-3 — which `iclforge::ac3::plan::validate` already refuses. Nothing here produces or consumes
-one.
+**`strmtyp 2`, a convertible substream** (§E2.3.1.1, "previously coded in AC-3"), is an
+independent substream like any other to all five: `metadata` and `normalize` rewrite its fields
+and keep the `blkid` and `frmsizecod` it carries, `cut` and `cat` move its access units whole, and
+`probe` names the AC-3 frame size code it was converted from. What is not here is the conversion
+to or from AC-3 that gives the type its name: the standard specifies the signalling and no process,
+and nothing in this project produces or consumes a type 2 stream.
 
 **AC-4 and the four that copy.** `metadata`, `normalize`, `cut` and `cat` frame AC-3 and E-AC-3
 syncframes and do not read AC-4: given an AC-4 stream they stop with exit `2` (`lost sync:

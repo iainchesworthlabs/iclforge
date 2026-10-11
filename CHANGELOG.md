@@ -2718,6 +2718,20 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**E-AC-3: a type 2 substream, read and written as the standard has it**
+
+- **`strmtyp` 2 (§E2.3.1.1, "previously coded in AC-3") is a whole stream type now, not a
+  half-parsed one.** Table E1.2 and E1.3 gate the programme-mixing group, the converter exponent
+  strategies and the converter SNR offset on `strmtyp == 0x0`; the decoder, the EMDF walker, the
+  scanner and the metadata editor read them for any substream that was not dependent, so a real
+  type 2 stream would have been decoded from the wrong bit offset (FFmpeg and the Python reference
+  parser read it as the table says). The encoder refused it, `scan` and the access unit
+  accumulator did not start an access unit at one, and `forge metadata` refused it by name. All
+  now treat it as the independent substream it is. `FrameConfig::ac3_frmsizecod` writes one
+  (held to AC-3's tools, no dependents, a Table 5.18 code) and `DecodedSubstream`,
+  `FrameHeader` and `forge probe` report the code it was converted from. The conversion to and
+  from AC-3 itself is not built: the standard gives the signalling and no process.
+
 **ADM / BW64**
 
 - **`write_bw64` dropped an `audioObject`'s duration.** `AudioObject::duration` was read and never
