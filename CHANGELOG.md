@@ -2607,6 +2607,15 @@ The sections below contain the complete change list and fixes.
   reports a board's PCM counters and its own end-of-stream totals; `test_playout.cpp` has the
   playout recovering a PCM stream from a clock step, a late chunk and late interrupts on a model of
   the I2S ring.
+- **The Sendspin player decodes Opus** (`CONFIG_ICLFORGE_SENDSPIN_OPUS`,
+  `firmware/esp-idf/iclforge/src/opus_stream.*`, `opus.cmake`): libopus 1.6.1's decoder in fixed
+  point, built from the release tarball (checked against its SHA-256) or a tree at
+  `ICLFORGE_OPUS_SOURCE_DIR`, behind a `player@v1` stream of 20 ms packets. A board that has it
+  lists Opus after its PCM formats, and `ServerHost::use_pcm()` takes the `codec` to play a sink
+  in (`hearth-testserver --pcm --opus`). On an ESP32-C6 a packet takes 11.8 ms of the player's
+  time (59% of the core), the decoder 27 KB of heap and 16.7 KB of the decode task's stack; 30 s
+  of tone played with no underrun in three runs, on a link where the same board's PCM stream
+  dropped out 14 and 17 times in 15 s. Opus is a twelfth of PCM's bytes and lossy.
 
 **Library internals**
 
