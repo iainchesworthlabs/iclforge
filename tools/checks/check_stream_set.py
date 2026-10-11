@@ -13,10 +13,12 @@ capture is enough to check a play against the host.
         --all, also fails if a stream the manifest expects the shape to play
         (every one not marked psram) has no play in the console.
 
-    check_stream_set.py play <streams.json> <console> --device <url> --base <url>
+    check_stream_set.py play <streams.json> <console> --device <url> --base <url> [--only a,b]
         Plays every stream not marked psram, one POST /play at a time, waiting
         for each play's verdict on the console, and checks each as above - and
         what GET /status says about it, where the firmware reports the fields.
+        With --only, exactly the named streams, the psram-marked ones too: the
+        shape that names them is one that has PSRAM.
 
 A play passes when it printed result=pass, skipped no bytes looking for a
 sync word, decoded the manifest's access units (played and held together),
@@ -214,12 +216,17 @@ def http(method, url, body=None, timeout=10):
         return response.status, response.read().decode()
 
 
-def run_play(manifest, console_path, device, base, timeout):
+def run_play(manifest, console_path, device, base, timeout, only=None):
     slots = manifest["slots"]
     layout = manifest["layout"]
     failures = []
     for entry in manifest["streams"]:
-        if entry.get("psram"):
+        if only is not None:
+            # The caller names the streams, a psram-marked one included: it is the
+            # caller's shape that has the PSRAM.
+            if entry["file"] not in only:
+                continue
+        elif entry.get("psram"):
             continue
         before = len(plays(console_path.read_text(errors="replace")))
         location = f"{base.rstrip('/')}/{entry['file']}"
@@ -274,12 +281,26 @@ def main(argv=None):
     p.add_argument("--device", required=True)
     p.add_argument("--base", required=True)
     p.add_argument("--timeout", type=int, default=120)
+    p.add_argument(
+        "--only",
+        help="comma-separated manifest file names: play exactly these, a psram-marked "
+        "one included (for a shape that has PSRAM), instead of every stream not marked psram",
+    )
     args = ap.parse_args(argv)
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     if args.command == "check":
         failures = run_check(manifest, args.console.read_text(errors="replace"), args.all)
     else:
-        failures = run_play(manifest, args.console, args.device, args.base, args.timeout)
+        only = None
+        if args.only is not None:
+            only = [name.strip() for name in args.only.split(",") if name.strip()]
+            known = {entry["file"] for entry in manifest["streams"]}
+            unknown = [name for name in only if name not in known]
+            if not only or unknown:
+                ap.error(
+                    f"--only names no stream of the manifest: {', '.join(unknown) or '(empty)'}"
+                )
+        failures = run_play(manifest, args.console, args.device, args.base, args.timeout, only)
     if failures:
         names = ", ".join(failures)
         print(
