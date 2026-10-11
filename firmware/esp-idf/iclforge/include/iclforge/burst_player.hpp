@@ -97,6 +97,10 @@ struct BurstPlayerConfig {
 
     BaseType_t core = 1;
     UBaseType_t priority = 6;
+    // A worker on the other core takes a decode's independent per-channel and per-object
+    // stages (PlayerConfig::decode_lane): made when the task starts, at the task's priority,
+    // its stack in PSRAM where there is PSRAM. The PCM is the same bit for bit.
+    bool decode_lane = false;
     // The decode task's stack, which the decoder needs most of
     // (PlayerConfig::decode_stack_bytes has the measurements).
     std::uint32_t stack_bytes = 32768;

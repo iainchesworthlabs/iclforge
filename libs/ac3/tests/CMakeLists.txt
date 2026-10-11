@@ -11,6 +11,7 @@ iclforge_add_test_binary(iclforge-ac3-tests PROJECT ac3 SOURCES
     oba/test_atmos_cbi.cpp
     oba/test_dee_joc_fixture.cpp
     oba/test_joc_7channel.cpp
+    oba/test_joc_single.cpp
     oba/test_atmos_motion.cpp
     core/test_bitalloc.cpp
     core/test_fixed32.cpp
@@ -30,6 +31,8 @@ iclforge_add_test_binary(iclforge-ac3-tests PROJECT ac3 SOURCES
     encoder/test_eac3_short_syncframes.cpp
     decoder/test_eac3_decoder.cpp
     decoder/test_eac3_programmes.cpp
+    decoder/test_eac3_store_reuse.cpp
+    decoder/test_lanes.cpp
     decoder/test_eac3_transient_prenoise.cpp
     io/test_elementary.cpp
     io/test_stream_accumulator.cpp
@@ -262,5 +265,15 @@ target_include_directories(iclforge-ac3-tests PRIVATE "${PROJECT_SOURCE_DIR}/tes
 if(NOT BUILD_SHARED_LIBS)
     target_sources(iclforge-ac3-tests PRIVATE core/test_fixed32_ecpl.cpp)
 endif()
+
+# decoder/test_lanes.cpp: the fixed-point tier has no float enhanced coupling spectrum, so it never
+# hands the second lane that background task, which the test otherwise holds to have run.
+if(ICLFORGE_DECODE_SCALAR_TIER STREQUAL "fixed32")
+    set(_ac3_tests_fixed_tier 1)
+else()
+    set(_ac3_tests_fixed_tier 0)
+endif()
+target_compile_definitions(iclforge-ac3-tests PRIVATE
+    ICLFORGE_AC3_TESTS_FIXED_TIER=${_ac3_tests_fixed_tier})
 
 
