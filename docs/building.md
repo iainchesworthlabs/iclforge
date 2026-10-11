@@ -327,7 +327,9 @@ throughput guards, is a separate binary whose cases carry the `Performance` labe
 file: `forge_gui_qml_tests_*` (label `gui`), `hearth_qml_tests_*` (`hearth-ui`) and
 `crucible_qml_tests_*` (`crucible-ui`), and only when the matching application is built.
 `ctest -R <name>` selects by test name and `ctest --rerun-failed --output-on-failure` repeats
-the failures of the last run; add `--output-on-failure` to any run to see a failing case's output.
+the failures of the last run, by number. After a run filtered with `-E` and no `-R` the numbers
+are not the full list's, so repeat those with `-R '^<name>$'`. Add `--output-on-failure` to any
+run to see a failing case's output.
 
 ## Options
 
