@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <deque>
 #include <expected>
 #include <filesystem>
 #include <fstream>
@@ -28,11 +27,9 @@
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
-#include "iclforge/ac3/decoder/associated_service.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
-#include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
@@ -50,6 +47,7 @@
 #include "ac4_channels.hpp"
 #include "ac4_object_render.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "associated_mix.hpp"
 #include "stream_playback.hpp"
 
 namespace forge_cli::commands {
@@ -806,151 +804,6 @@ int run_decode_ac4(std::span<const std::byte> stream, std::string_view in_path, 
     return 0;
 }
 
-// The programme associated= names, and what the stream says it is.
-struct AssociatedChoice {
-    int id = 0;
-    int bsmod = 0;
-    iclforge::ac3::Acmod acmod = iclforge::ac3::Acmod::k2_0;
-    bool lfe = false;
-};
-
-std::string describe_associated(const AssociatedChoice& choice) {
-    return fmt::format(
-        "programme {} ({}, {})", choice.id,
-        iclforge::ac3::meta::describe(static_cast<iclforge::ac3::meta::BitstreamMode>(choice.bsmod),
-                                      choice.acmod),
-        iclforge::ac3::analysis::layout_name(choice.acmod, choice.lfe));
-}
-
-// §E3.10: which programme associated= names, or std::nullopt after saying why
-// there is none. A number names the independent substream. A service name is
-// matched against each programme's bsmod: A/52 Table 5.7 numbers the services
-// as TS 103 190-1 Table 91 numbers its content classifiers, so the code the
-// name resolved to for AC-4 is the bsmod to look for here. The main is never
-// its own associated service, and a 1+1 main is two programmes with no
-// soundfield to mix a third into.
-std::optional<AssociatedChoice> choose_associated(std::span<const std::byte> stream,
-                                                  std::span<const int> ids, int main,
-                                                  const forge_cli::Options& meta) {
-    const auto scanned = iclforge::ac3::io::scan(stream);
-    if (!scanned.has_value()) {
-        fmt::println(stderr, "error: cannot read the stream's programmes: {}",
-                     iclforge::ac3::io::describe(scanned.error()));
-        return std::nullopt;
-    }
-    const auto& programmes = scanned->programmes;
-    const auto find = [&](int id) -> const iclforge::ac3::io::ScannedProgramme* {
-        for (const auto& programme : programmes) {
-            if (programme.substreamid == id) {
-                return &programme;
-            }
-        }
-        return nullptr;
-    };
-    if (const auto* lead = find(main);
-        lead != nullptr && lead->acmod == iclforge::ac3::Acmod::kDualMono) {
-        fmt::println(stderr,
-                     "error: programme {} is 1+1 dual mono, which is two programmes and not a "
-                     "main an associated service can be mixed into",
-                     main);
-        return std::nullopt;
-    }
-    const iclforge::ac3::io::ScannedProgramme* chosen = nullptr;
-    if (meta.eac3_associated_programme.has_value()) {
-        const int id = *meta.eac3_associated_programme;
-        if (id == main) {
-            fmt::println(stderr,
-                         "error: associated={} is the programme being decoded (programme=); an "
-                         "associated service is a second one",
-                         id);
-            return std::nullopt;
-        }
-        chosen = find(id);
-        if (chosen == nullptr) {
-            fmt::println(stderr, "error: no programme {} in this stream (it carries {})", id,
-                         format_programme_ids(ids));
-            return std::nullopt;
-        }
-    } else {
-        for (const auto& programme : programmes) {
-            if (programme.substreamid != main && programme.bsmod == *meta.ac4_associated) {
-                chosen = &programme;
-                break;
-            }
-        }
-        if (chosen == nullptr) {
-            std::string carried;
-            for (const auto& programme : programmes) {
-                carried += fmt::format(
-                    "{}{}: {}", carried.empty() ? "" : ", ", programme.substreamid,
-                    iclforge::ac3::meta::describe(
-                        static_cast<iclforge::ac3::meta::BitstreamMode>(programme.bsmod),
-                        programme.acmod));
-            }
-            fmt::println(stderr,
-                         "error: no programme of this stream is that associated service "
-                         "(it carries {}); associated=<0..7> names one by its substream",
-                         carried);
-            return std::nullopt;
-        }
-    }
-    return AssociatedChoice{.id = chosen->substreamid,
-                            .bsmod = chosen->bsmod,
-                            .acmod = chosen->acmod,
-                            .lfe = chosen->lfe};
-}
-
-// What §E3.10's mix applied over the stream, for the status report: the range
-// each gain took and where a mono service sat.
-struct MixReport {
-    std::size_t units = 0;
-    double main_min = 0.0;
-    double main_max = 0.0;
-    double associated_min = 0.0;
-    double associated_max = 0.0;
-    std::optional<int> panmean = std::nullopt;
-
-    void observe(const iclforge::ac3::AssociatedServiceMixResult& result) {
-        if (units == 0) {
-            main_min = main_max = result.main_gain_db;
-            associated_min = associated_max = result.associated_gain_db;
-            panmean = result.panmean;
-        } else {
-            main_min = std::min(main_min, result.main_gain_db);
-            main_max = std::max(main_max, result.main_gain_db);
-            associated_min = std::min(associated_min, result.associated_gain_db);
-            associated_max = std::max(associated_max, result.associated_gain_db);
-        }
-        ++units;
-    }
-};
-
-std::string describe_gain_range(double low, double high) {
-    const auto one = [](double db) {
-        return std::isinf(db) ? std::string{"-inf"} : fmt::format("{:+.1f}", db);
-    };
-    return low == high ? fmt::format("{} dB", one(low))
-                       : fmt::format("{} .. {} dB", one(low), one(high));
-}
-
-void print_mix_report(FILE* status, const AssociatedChoice& choice, int main,
-                      const MixReport& report) {
-    status_println(status, "  mixed {} into programme {}", describe_associated(choice), main);
-    if (report.units == 0) {
-        status_println(status, "          no access unit of it overlapped the main's");
-        return;
-    }
-    status_println(status, "          main {}, associated {}{}",
-                   describe_gain_range(report.main_min, report.main_max),
-                   describe_gain_range(report.associated_min, report.associated_max),
-                   report.panmean.has_value()
-                       ? fmt::format(", placed at pan {} ({:.1f} degrees clockwise from the centre)",
-                                     *report.panmean,
-                                     static_cast<double>(*report.panmean) *
-                                         iclforge::ac3::meta::kPanMeanDegreesPerStep)
-                       : std::string{});
-}
-
 int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path,
                      const forge_cli::Options& meta, std::string_view objects_dir, std::string_view adm_out) {
     if (!adm_out.empty() && !forge_cli::adm_capability().available) {
@@ -980,17 +833,14 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     // §E3.10: associated= names a second programme to mix into the first.
     // Chosen here, before anything decodes, so that a stream that cannot give
     // one is refused rather than decoded without it.
-    std::optional<AssociatedChoice> associated;
-    if (meta.eac3_associated_programme.has_value() || meta.ac4_associated.has_value()) {
-        const auto chosen = choose_associated(stream, *ids, *programme, meta);
-        if (!chosen.has_value()) {
+    std::optional<iclforge::apps::AssociatedChoice> associated;
+    if (wants_associated(meta)) {
+        associated = choose_associated_programme(stream, *ids, *programme, meta);
+        if (!associated.has_value()) {
             return kExitInput;
         }
-        associated = *chosen;
     } else if (meta.ac4_associated_gain != 0.0) {
-        fmt::println(stderr,
-                     "warning: associated-gain= scales an associated service and associated= "
-                     "names none, so it is ignored");
+        warn_associated_gain_unused();
     }
     // Access units, not syncframes: a dependent substream is only meaningful
     // alongside the independent one it extends, and the two are rendered
@@ -1020,38 +870,26 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     const bool census_wanted = !meta.bap_census_path.empty();
     iclforge::ac3::verify::Eac3AccessUnitTrace census_trace;
     iclforge::ac3::verify::BapCensus census;
-    iclforge::ac3::Eac3Decoder decoder{{.drc_scale = meta.drc_scale,
-                             .fast_imdct = meta.fast_imdct,
-                             .heavy_compression = meta.p.heavy.has_value(),
-                             .output = meta.output,
-                             .concealment = meta.concealment,
-                             .fast_mdct = meta.fast_mdct,
-                             .joc_domain = meta.joc_domain,
-                             .eac3_trace = census_wanted ? &census_trace : nullptr,
-                             .programme = programme,
-                             .skip_object_reconstruction = meta.bed_only}};
-    // The associated service's own decoder. It renders as coded whatever fold
-    // the main was asked for: a mono description folded to Lo/Ro would arrive
-    // as two channels with the centre already spread over both, and the mixer
-    // could no longer place it by its pan. Its objects are never wanted.
-    std::optional<iclforge::ac3::Eac3Decoder> associated_decoder;
+    const iclforge::ac3::DecoderConfig main_config{.drc_scale = meta.drc_scale,
+                                         .fast_imdct = meta.fast_imdct,
+                                         .heavy_compression = meta.p.heavy.has_value(),
+                                         .output = meta.output,
+                                         .concealment = meta.concealment,
+                                         .fast_mdct = meta.fast_mdct,
+                                         .joc_domain = meta.joc_domain,
+                                         .eac3_trace = census_wanted ? &census_trace : nullptr,
+                                         .programme = programme,
+                                         .skip_object_reconstruction = meta.bed_only};
+    iclforge::ac3::Eac3Decoder decoder{main_config};
+    // §E3.10: the associated service's own decoder, run in step with the main's
+    // and its units paired and mixed with it. It renders as coded whatever
+    // fold the main was asked for (iclforge::apps::AssociatedMix's header says
+    // why), and its objects are never wanted.
+    std::optional<iclforge::apps::AssociatedMix> mix;
     if (associated.has_value()) {
-        auto output = meta.output;
-        output.target = iclforge::ac3::DownmixTarget::kAsCoded;
-        associated_decoder.emplace(iclforge::ac3::DecoderConfig{
-            .drc_scale = meta.drc_scale,
-            .fast_imdct = meta.fast_imdct,
-            .heavy_compression = meta.p.heavy.has_value(),
-            .output = output,
-            .concealment = meta.concealment,
-            .fast_mdct = meta.fast_mdct,
-            .programme = associated->id,
-            .skip_object_reconstruction = true});
+        mix.emplace(main_config, *programme, *associated, std::move(associated_units),
+                    meta.ac4_associated_gain);
     }
-    iclforge::ac3::AssociatedServiceMixer mixer{
-        {.main_fold = meta.output.target,
-         .associated_fold = iclforge::ac3::DownmixTarget::kAsCoded,
-         .associated_trim_db = meta.ac4_associated_gain}};
     // The decoded programme goes out through the sink as units decode - the
     // sink's per-slot carry absorbs the one place slots advance unevenly
     // (the transient-pre-noise flush below).
@@ -1350,96 +1188,33 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         return 0;
     };
 
-    // §E3.10's mix. Both programmes decode in step, but a decoder holding
-    // frames back for transient pre-noise (§3.7) releases its first a frame or
-    // more late, and the two need not hold the same number back - so each
-    // side's units wait in a queue until its partner has one, and a unit of
-    // one is cut to the length of the other's where the two differ (the
-    // flushed tail of a stream that holds back several short frames). The
-    // mixer sees equal-length units only.
-    std::deque<iclforge::ac3::DecodedAccessUnit> pending_main;
-    std::deque<iclforge::ac3::DecodedAccessUnit> pending_associated;
-    std::optional<iclforge::ac3::eac3::chanmap::Layout> associated_layout;
-    bool associated_done = false;  // flushed: nothing more will join the queue
-    MixReport mix_report;
-    const auto length_of = [](const iclforge::ac3::DecodedAccessUnit& unit) -> std::size_t {
-        return unit.channels.empty() ? 0 : unit.channels.front().size();
-    };
-    // The first `count` samples of every channel, split off the front.
-    const auto split_head = [](iclforge::ac3::DecodedAccessUnit& unit, std::size_t count) {
-        iclforge::ac3::DecodedAccessUnit head = unit;
-        for (std::size_t ch = 0; ch < unit.channels.size(); ++ch) {
-            head.channels[ch].resize(count);
-            unit.channels[ch].erase(unit.channels[ch].begin(),
-                                    unit.channels[ch].begin() +
-                                        static_cast<std::ptrdiff_t>(count));
-        }
-        return head;
-    };
-    const auto mix_and_consume =
-        [&](iclforge::ac3::DecodedAccessUnit& main_unit,
-            const iclforge::ac3::DecodedAccessUnit& associated_unit) -> int {
-        const auto mixed = mixer.mix(main_unit, associated_unit);
-        if (!mixed.has_value()) {
-            fmt::println(stderr, "error: cannot mix programme {} into programme {}: {}",
-                         associated->id, *programme, iclforge::ac3::describe(mixed.error()));
-            abort_all();
-            return kExitInput;
-        }
-        mix_report.observe(*mixed);
-        return consume(main_unit);
-    };
+    // §E3.10's mix: what comes out of `mix` is the main with the service in it
+    // (see iclforge::apps::AssociatedMix for why the two sides' units wait for
+    // each other), and goes where a decoded unit always goes.
     const auto drain = [&]() -> int {
-        while (!pending_main.empty()) {
-            if (pending_associated.empty()) {
-                if (!associated_done) {
-                    break;  // its next unit is still to come
-                }
-                // The service has ended; the rest of the programme is the
-                // main alone.
-                if (const int code = consume(pending_main.front()); code != 0) {
-                    return code;
-                }
-                pending_main.pop_front();
-                continue;
+        while (true) {
+            auto mixed = mix->next();
+            if (!mixed.has_value()) {
+                report_mix_error(mixed.error());
+                abort_all();
+                return kExitInput;
             }
-            auto& main_unit = pending_main.front();
-            auto& associated_unit = pending_associated.front();
-            const auto main_length = length_of(main_unit);
-            const auto associated_length = length_of(associated_unit);
-            if (main_length == 0 || associated_length == 0) {
-                // Nothing to mix (a unit with no channels): drop the empty one.
-                (main_length == 0 ? pending_main : pending_associated).pop_front();
-                continue;
+            if (!mixed->has_value()) {
+                return 0;
             }
-            int code = 0;
-            if (main_length == associated_length) {
-                code = mix_and_consume(main_unit, associated_unit);
-                pending_main.pop_front();
-                pending_associated.pop_front();
-            } else if (main_length > associated_length) {
-                auto head = split_head(main_unit, associated_length);
-                code = mix_and_consume(head, associated_unit);
-                pending_associated.pop_front();
-            } else {
-                const auto head = split_head(associated_unit, main_length);
-                code = mix_and_consume(main_unit, head);
-                pending_main.pop_front();
-            }
-            if (code != 0) {
+            if (const int code = consume(**mixed); code != 0) {
                 return code;
             }
         }
-        return 0;
     };
 
     Progress progress;
     progress.start("decoding", units->size());
     std::uint64_t units_done = 0;
-    std::size_t unit_index = 0;
     for (const auto& unit : *units) {
         progress.tick(++units_done);
-        const auto decoded = decoder.decode_access_unit(unit);
+        // Not const: a released unit is moved on to the mix, not copied.
+        auto decoded = decoder.decode_access_unit(unit);
         if (!decoded.has_value()) {
             // describe(), not the raw enumerator: this is the line a CI
             // log shows when a third-party stream will not decode, and
@@ -1453,35 +1228,14 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         if (census_wanted) {
             census.observe(census_trace);
         }
-        if (associated_decoder.has_value()) {
-            if (unit_index < associated_units.size()) {
-                const auto heard =
-                    associated_decoder->decode_access_unit(associated_units[unit_index]);
-                if (!heard.has_value()) {
-                    fmt::println(stderr, "error: programme {} decode failed: {}", associated->id,
-                                 iclforge::ac3::describe(heard.error()));
-                    abort_all();
-                    return kExitInput;
-                }
-                if (heard->has_value()) {
-                    if (!associated_layout.has_value()) {
-                        associated_layout = (*heard)->layout;
-                    }
-                    pending_associated.push_back(std::move(**heard));
-                }
-            } else if (!associated_done) {
-                // The service ran out of access units before the main did.
-                auto flushed_associated = associated_decoder->flush();
-                if (!flushed_associated.empty()) {
-                    auto held = iclforge::apps::held_back_unit(std::move(flushed_associated),
-                                                               associated_layout, false);
-                    if (held.has_value()) {
-                        pending_associated.push_back(std::move(*held));
-                    }
-                }
-                associated_done = true;
+        if (mix.has_value()) {
+            // The service's next unit, whether or not this one released audio:
+            // the two decoders hold frames back independently.
+            if (const auto stepped = mix->advance(); !stepped.has_value()) {
+                report_mix_error(stepped.error());
+                abort_all();
+                return kExitInput;
             }
-            ++unit_index;
         }
         if (!decoded->has_value()) {
             // §3.7: this access unit's frame(s) are being held back pending
@@ -1489,11 +1243,11 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
             // own doc comment) - nothing new to append yet, not an error.
             continue;
         }
-        if (associated_decoder.has_value()) {
+        if (mix.has_value()) {
             if (!programme_layout.has_value()) {
                 programme_layout = (*decoded)->layout;
             }
-            pending_main.push_back(std::move(**decoded));
+            mix->push_main(std::move(**decoded));
             if (const int code = drain(); code != 0) {
                 return code;
             }
@@ -1509,16 +1263,8 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     // `programme_layout` (or, when nothing ever decoded, a layout it synthesizes
     // itself by unioning the flushed substreams' own locations) - see its
     // own doc comment for the placement rules this used to duplicate here.
-    if (associated_decoder.has_value() && !associated_done) {
-        auto flushed_associated = associated_decoder->flush();
-        if (!flushed_associated.empty()) {
-            auto held = iclforge::apps::held_back_unit(std::move(flushed_associated),
-                                                       associated_layout, false);
-            if (held.has_value()) {
-                pending_associated.push_back(std::move(*held));
-            }
-        }
-        associated_done = true;
+    if (mix.has_value()) {
+        mix->end();
     }
     const auto flushed = decoder.flush();
     if (!flushed.empty()) {
@@ -1531,14 +1277,14 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
             // numblkscod already come from the lead substream alone, the
             // same convention DecodedAccessUnit's own fields follow for a
             // live unit.
-            if (associated_decoder.has_value()) {
-                pending_main.push_back(std::move(*held));
+            if (mix.has_value()) {
+                mix->push_main(std::move(*held));
             } else if (const int code = consume(*held); code != 0) {
                 return code;
             }
         }
     }
-    if (associated_decoder.has_value()) {
+    if (mix.has_value()) {
         if (const int code = drain(); code != 0) {
             return code;
         }
@@ -1614,7 +1360,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
             print_mix_summary(status, *first.mixing);
         }
         if (associated.has_value()) {
-            print_mix_report(status, *associated, *programme, mix_report);
+            print_mix_report(status, *associated, *programme, mix->report());
         }
         print_concealment_summary(status, concealed_units, units->size(), "access units");
         return report_decoded_objects(status, first.object_metadata, have_object_audio,
@@ -1652,7 +1398,7 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         print_mix_summary(status, *first.mixing);
     }
     if (associated.has_value()) {
-        print_mix_report(status, *associated, *programme, mix_report);
+        print_mix_report(status, *associated, *programme, mix->report());
     }
     print_concealment_summary(status, concealed_units, units->size(), "access units");
     return report_decoded_objects(status, first.object_metadata, have_object_audio,

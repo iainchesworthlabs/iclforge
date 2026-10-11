@@ -936,6 +936,8 @@ int submit_units_to_sink(iclforge::audio::PassthroughSink& sink,
 // exactly as they would to a direct 'transcode' invocation.
 int play_via_ac3_transcode(std::string_view in_path, const std::string& device_id,
                            std::string_view device_name, const Options& meta) {
+    warn_associated_not_mixed(meta, "play",
+                              "it transcodes one programme to AC-3 for the receiver without mixing");
     const auto temp_path = make_temp_ac3_path();
     if (!claim_temp_path(temp_path)) {
         fmt::println(stderr, "error: could not claim temp path {}", temp_path.string());
@@ -1143,6 +1145,9 @@ int run_play(std::string_view in_path, int device_index, const Options& meta) {
         return kExitUnavailable;
     }
 
+    // Before the sink opens, as the other legs say theirs.
+    warn_associated_not_mixed(meta, "play",
+                              "it passes one coded programme to a receiver without decoding it");
     iclforge::audio::PassthroughSink sink;
     const auto started = sink.start(
         device_id, content_rate,

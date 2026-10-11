@@ -569,13 +569,14 @@ A stream carrying more than one programme (a second independent substream — a 
 an audio description) is handled one programme at a time: `decode`, `levels`, `qc`, `monitor`,
 `spatial`, `play` and `transcode` all take `programme=<0..7>`, and without it take the first the
 stream carries while saying what else was there. See [Options & grammars](metadata-options.md) for
-the token, and `eac3-encode`'s `programme2=` for authoring such a stream. `decode` can also mix an
-associated service (a description, a commentary) into the programme it decodes, with
-`associated=` — see
+the token, and `eac3-encode`'s `programme2=` for authoring such a stream. `decode` and `monitor`
+can also mix an associated service (a description, a commentary) into the programme they decode,
+with `associated=` — see
 [Options & grammars](metadata-options.md#programme-options-decode-qc-levels-programme).
 
 ```bash
 forge decode out.ec3 commentary.wav programme=1
+forge monitor broadcast.ec3 associated=audio-description   # the main with its description mixed in
 ```
 
 For an Atmos stream, add `objects_dir` to also export each object's reconstructed audio:

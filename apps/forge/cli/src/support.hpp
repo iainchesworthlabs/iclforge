@@ -43,6 +43,7 @@
 #include "iclforge/containers/mp4/hls.hpp"
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "recording_sink.hpp"
+#include "associated_mix.hpp"
 #include "stream_playback.hpp"
 
 // The CLI-wide support layer: option/metadata parsing, path/stdio conventions, frame and WAV I/O,
@@ -625,9 +626,9 @@ struct Options {
     // second language, an audio description), not layers, and the only
     // combination §E3.10 defines is a main with an associated service.
     std::optional<int> programme;
-    // 'decode' of E-AC-3: the independent substream (§E2.3.1.2's substreamid,
-    // 0..7) of an associated service to mix into `programme`, by associated=
-    // given a number. associated= given a service name selects by bsmod
+    // 'decode' and 'monitor' of E-AC-3: the independent substream
+    // (§E2.3.1.2's substreamid, 0..7) of an associated service to mix into
+    // `programme`, by associated= given a number. associated= given a service name selects by bsmod
     // instead, through ac4_associated's classifier, which is the same code
     // (Table 5.7 and TS 103 190-1 Table 91 number the services alike).
     // associated-gain= is the listener's trim on it (ac4_associated_gain).
@@ -811,6 +812,44 @@ std::optional<int> choose_programme(std::span<const int> ids, std::optional<int>
 // than one - the line decode prints, so a multi-programme stream is never
 // played without saying which programme it was.
 void report_programme(FILE* status, const iclforge::apps::ProgrammeUnits& selected);
+
+// §E3.10: the programme associated= names beside `main` - a substream number
+// (`meta.eac3_associated_programme`) or a service name (`meta.ac4_associated`,
+// which labels the programme through its bsmod) - or std::nullopt after saying
+// on stderr why there is none. `ids` is what iclforge::ac3::programme_ids()
+// found. decode and monitor both ask this, so a stream that cannot give one is
+// refused the same way, in the same words, by both before anything decodes;
+// the caller picks the exit code.
+[[nodiscard]] std::optional<iclforge::apps::AssociatedChoice> choose_associated_programme(
+    std::span<const std::byte> stream, std::span<const int> ids, int main, const Options& meta);
+
+// True when associated= asked for a second programme, by number or by name.
+[[nodiscard]] bool wants_associated(const Options& meta);
+
+// What decode and monitor say of an associated-gain= with no associated= to
+// scale: the gain is ignored, and the command goes on.
+void warn_associated_gain_unused();
+
+// associated= (or associated-gain=) given to a command that decodes nothing to
+// mix a second programme into: `play` hands a coded programme to a receiver, and
+// `spatial` places one programme's objects. Said once on stderr, and ignored -
+// silently dropping it would play the main alone and read as the service
+// having been mixed. `command` and `why` complete the line.
+void warn_associated_not_mixed(const Options& meta, std::string_view command,
+                               std::string_view why);
+
+// `programme 1 (associated service: visually impaired, mono)`: the programme as
+// the stream labels it.
+[[nodiscard]] std::string describe_associated(const iclforge::apps::AssociatedChoice& choice);
+
+// What the mix did, on `status`: which programme went into which, the range
+// each gain took and, for a mono service, where it sat.
+void print_mix_report(FILE* status, const iclforge::apps::AssociatedChoice& choice, int main,
+                      const iclforge::apps::MixReport& report);
+
+// The reason an AssociatedMix stopped, on stderr: the service's decoder refused
+// a unit, or the mixer refused the pair.
+void report_mix_error(const iclforge::apps::AssociatedMixError& error);
 
 // programme=N on a command that wraps or re-codes a stream: the stream becomes
 // that programme alone, as a stream of its own (iclforge::ac3::io::

@@ -51,6 +51,7 @@
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "ac4_channels.hpp"
+#include "associated_mix.hpp"
 #include "recording_sink.hpp"
 #include "sink_wait.hpp"
 #include "stream_playback.hpp"
@@ -268,6 +269,12 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     // before a device is touched, so a programme the stream lacks is refused
     // the same way on a machine with no output at all.
     std::optional<iclforge::apps::ProgrammeUnits> selected;
+    // §E3.10: associated= names a second programme to mix into the one played,
+    // chosen here with it - a stream that cannot give one is refused, on a
+    // machine with no output at all, rather than played without it. Refused in
+    // decode's words and with decode's exit code.
+    std::optional<iclforge::apps::AssociatedChoice> associated;
+    std::vector<std::span<const std::byte>> associated_units;
     if (access_units) {
         auto chosen = select_programme_units(stream, meta.programme, in_path);
         if (!chosen.has_value()) {
@@ -275,6 +282,26 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
         }
         report_programme(status_stream(), *chosen);
         selected = std::move(*chosen);
+        if (wants_associated(meta)) {
+            associated =
+                choose_associated_programme(stream, selected->ids, selected->programme, meta);
+            if (!associated.has_value()) {
+                return kExitInput;
+            }
+            const auto own = iclforge::ac3::split_access_units(stream, associated->id);
+            if (!own.has_value() || own->empty()) {
+                fmt::println(stderr, "error: {} is not a valid E-AC-3 stream", in_path);
+                return kExitInput;
+            }
+            associated_units = *own;
+        } else if (meta.ac4_associated_gain != 0.0) {
+            warn_associated_gain_unused();
+        }
+    } else if (wants_associated(meta)) {
+        fmt::println(stderr,
+                     "warning: associated= mixes a second programme and {} is plain AC-3, which "
+                     "carries one; ignored",
+                     in_path);
     }
 
     const auto target = monitor_target(device_index);
@@ -335,6 +362,7 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
         return false;
     };
 
+    std::optional<iclforge::apps::AssociatedMix> mix;
     if (selected.has_value()) {
         // `programme` is also given to the decoder: the units are already
         // this programme's alone, and it skips any that are not, so a unit
@@ -345,14 +373,27 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
         // several KB of per-block scratch members (alert #63's fix), which
         // pushed this one-shot stack declaration over the threshold - same
         // pattern as PR #50.
-        auto decoder = std::make_unique<iclforge::ac3::Eac3Decoder>(
-            iclforge::ac3::DecoderConfig{.drc_scale = meta.drc_scale,
-                               .fast_imdct = meta.fast_imdct,
-                               .heavy_compression = meta.p.heavy.has_value(),
-                               .output = output,
-                               .concealment = meta.concealment,
-                               .fast_mdct = meta.fast_mdct,
-                               .programme = selected->programme});
+        const iclforge::ac3::DecoderConfig main_config{.drc_scale = meta.drc_scale,
+                                             .fast_imdct = meta.fast_imdct,
+                                             .heavy_compression = meta.p.heavy.has_value(),
+                                             .output = output,
+                                             .concealment = meta.concealment,
+                                             .fast_mdct = meta.fast_mdct,
+                                             .programme = selected->programme};
+        auto decoder = std::make_unique<iclforge::ac3::Eac3Decoder>(main_config);
+        // The associated service's own decoder, in step with this one. It
+        // renders as coded whatever fold the endpoint's width asked of the
+        // main (iclforge::apps::AssociatedMix's header says why), and the mixer
+        // is told the main's fold, so a main folded to the endpoint's stereo or
+        // mono takes dmixscl in place of the per-channel scales it no longer
+        // has (§E3.10.7). A service is typically one channel at 96 kbit/s, so
+        // the second decoder adds little to a frame period's work; the one
+        // latency it can add is a unit at the start, before the device opens,
+        // when it holds a frame back and the main does not.
+        if (associated.has_value()) {
+            mix.emplace(main_config, selected->programme, *associated,
+                        std::move(associated_units), meta.ac4_associated_gain);
+        }
         const bool folded = output.target != iclforge::ac3::DownmixTarget::kAsCoded;
         std::vector<std::size_t> order;
         // The programme's layout, from the first unit played. The held-back
@@ -392,6 +433,10 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
                 status_println(status_stream(), "monitoring {} ({} channels, {} Hz) on \"{}\"…",
                                in_path, order.size(), sample_rate_hz(out.sample_rate),
                                device_name);
+                if (mix.has_value()) {
+                    status_println(status_stream(), "  mixing {} into programme {}",
+                                   describe_associated(mix->choice()), mix->main_programme());
+                }
                 // The object layer, in the lines run_decode_eac3 reports it
                 // with (print_object_summary, which prints nothing for a
                 // stream without one). Only the JOC note is this command's
@@ -410,12 +455,38 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
             ++units_played;
             return kExitOk;
         };
+        // §E3.10's mix: what comes out of `mix` is the main with the service
+        // in it, and is played as a decoded unit always is.
+        const auto play_mixed = [&]() -> int {
+            while (true) {
+                auto mixed = mix->next();
+                if (!mixed.has_value()) {
+                    report_mix_error(mixed.error());
+                    return kExitInput;
+                }
+                if (!mixed->has_value()) {
+                    return kExitOk;
+                }
+                if (const int code = monitor_unit(**mixed); code != kExitOk) {
+                    return code;
+                }
+            }
+        };
         for (const auto& unit : selected->units) {
-            const auto decoded = decoder->decode_access_unit(unit);
+            // Not const: a released unit is moved on to the mix, not copied.
+            auto decoded = decoder->decode_access_unit(unit);
             if (!decoded.has_value()) {
                 fmt::println(stderr, "error: decode failed: {}",
                              iclforge::ac3::describe(decoded.error()));
                 return kExitInput;
+            }
+            if (mix.has_value()) {
+                // The service's next unit, whether or not this one released
+                // audio: the two decoders hold frames back independently.
+                if (const auto stepped = mix->advance(); !stepped.has_value()) {
+                    report_mix_error(stepped.error());
+                    return kExitInput;
+                }
             }
             if (!decoded->has_value()) {
                 // §3.7: held back pending transient pre-noise processing
@@ -423,9 +494,26 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
                 // comes out with a later unit, or from flush() below.
                 continue;
             }
+            if (mix.has_value()) {
+                // The held-back unit at the end is laid out against the
+                // layout of the first unit decoded, not the first one played,
+                // which is a unit later when the service holds frames back
+                // and the main does not.
+                if (!programme.has_value()) {
+                    programme = (*decoded)->layout;
+                }
+                mix->push_main(std::move(**decoded));
+                if (const int code = play_mixed(); code != kExitOk) {
+                    return code;
+                }
+                continue;
+            }
             if (const int code = monitor_unit(**decoded); code != kExitOk) {
                 return code;
             }
+        }
+        if (mix.has_value()) {
+            mix->end();
         }
         // §3.7 again: what the decoder still holds once the stream has ended,
         // which is its last unit whenever the stream's last frames used
@@ -433,9 +521,16 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
         // substreams; held_back_unit lays them out the way every unit above
         // was laid out, so it plays in the same order. A unit whose width no
         // longer matches the open device is not played.
-        const auto held = iclforge::apps::held_back_unit(decoder->flush(), programme, folded);
+        auto held = iclforge::apps::held_back_unit(decoder->flush(), programme, folded);
         if (held.has_value() && (order.empty() || held->channels.size() == order.size())) {
-            if (const int code = monitor_unit(*held); code != kExitOk) {
+            if (mix.has_value()) {
+                mix->push_main(std::move(*held));
+            } else if (const int code = monitor_unit(*held); code != kExitOk) {
+                return code;
+            }
+        }
+        if (mix.has_value()) {
+            if (const int code = play_mixed(); code != kExitOk) {
                 return code;
             }
         }
@@ -500,6 +595,9 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     }
     status_println(status_stream(), "played {} {}, {} underruns", units_played,
                    access_units ? "access units" : "frames", stats.underruns);
+    if (mix.has_value()) {
+        print_mix_report(status_stream(), mix->choice(), mix->main_programme(), mix->report());
+    }
     return kExitOk;
 }
 
@@ -589,6 +687,8 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
         return selected.error();
     }
     report_programme(status_stream(), *selected);
+    warn_associated_not_mixed(meta, "spatial",
+                              "it places one programme's objects and has no second programme to mix");
 
     std::string device_id;
     std::string device_name = "default endpoint";

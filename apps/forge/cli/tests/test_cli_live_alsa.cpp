@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1012,5 +1013,118 @@ TEST_CASE("monitor plays one programme of a stream that carries two, whichever i
         const auto out = read_text(log);
         CHECK(contains(out, "no programme 5 in this stream (it carries 0, 1)"));
         CHECK_FALSE(contains(out, "played "));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// §E3.10: monitor mixes an associated service into the programme it plays.
+// What is mixed is held sample for sample by iclforge-app-media-tests
+// (test_associated_mix.cpp); these hold the command around it - that the audio
+// reaches the device, and only when associated= asks for it.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A second of a SILENT 5.1 main and a second of a 440 Hz mono description (a
+// visually impaired service) as two programmes of one stream, so anything that
+// reaches the output is the service.
+fs::path write_silent_main_with_description(const fs::path& dir, const std::string& name) {
+    const auto make = dir / (name + "_make.log");
+    const auto main_ec3 = dir / (name + "_main.ec3");
+    const auto main_wav = dir / (name + "_main.wav");
+    const auto voice_ec3 = dir / (name + "_voice.ec3");
+    const auto voice_wav = dir / (name + "_voice.wav");
+    const auto stream = dir / (name + ".ec3");
+    REQUIRE(run_cli(null_config(), "eac3-silence \"" + main_ec3.string() + "\" 1 448 51", make) ==
+            0);
+    REQUIRE(run_cli(null_config(),
+                    "decode \"" + main_ec3.string() + "\" \"" + main_wav.string() + "\"", make) ==
+            0);
+    REQUIRE(run_cli(null_config(),
+                    "eac3-sine \"" + voice_ec3.string() + "\" 1 96 440 50 mono", make) == 0);
+    REQUIRE(run_cli(null_config(),
+                    "decode \"" + voice_ec3.string() + "\" \"" + voice_wav.string() + "\"", make) ==
+            0);
+    REQUIRE(run_cli(null_config(),
+                    "eac3-encode \"" + main_wav.string() + "\" \"" + stream.string() +
+                        "\" 448 none 51 off programme2=\"" + voice_wav.string() +
+                        "\" programme2-layout=mono programme2-bitrate=96 programme2-bsmod=vi",
+                    make) == 0);
+    return stream;
+}
+
+// A configuration whose default playback device writes what it is given, raw,
+// to `out`: whatever the backend negotiates, silence is all-zero bytes in it.
+fs::path capture_playback_config(const fs::path& path, const fs::path& out) {
+    return write_default_config(
+        path, "\"null\"",
+        "{ type file slave.pcm \"null\" file \"" + out.string() + "\" format raw }");
+}
+
+bool has_nonzero_byte(const std::vector<std::byte>& bytes) {
+    return std::ranges::any_of(bytes, [](std::byte b) { return b != std::byte{0}; });
+}
+
+}  // namespace
+
+TEST_CASE("monitor plays the associated service into the programme, and only when asked to",
+          "[cli][audio-io][alsa-null][concurrency][programme][associated]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_silent_main_with_description(dir, "associated_live");
+
+    SECTION("without associated= the silent main is all that plays") {
+        const auto out = dir / "associated_plain.raw";
+        fs::remove(out);
+        const auto config = capture_playback_config(dir / "associated_plain.conf", out);
+        const auto log = dir / "associated_plain.log";
+        REQUIRE(run_cli(config, "monitor \"" + stream.string() + "\"", log) == 0);
+        const auto text = read_text(log);
+        check_clean(text);
+        CHECK(contains(text, "played 32 access units"));
+        CHECK_FALSE(contains(text, "mixing programme"));
+        REQUIRE(fs::exists(out));
+        const auto bytes = read_bytes(out);
+        CHECK_FALSE(bytes.empty());
+        CHECK_FALSE(has_nonzero_byte(bytes));
+    }
+    SECTION("with associated= the service is in what reaches the device") {
+        const auto out = dir / "associated_mixed.raw";
+        fs::remove(out);
+        const auto config = capture_playback_config(dir / "associated_mixed.conf", out);
+        const auto log = dir / "associated_mixed.log";
+        REQUIRE(run_cli(config, "monitor \"" + stream.string() + "\" -1 associated=1", log) == 0);
+        const auto text = read_text(log);
+        check_clean(text);
+        CHECK(contains(text, "  programme 0 of 2 (0, 1)"));
+        CHECK(contains(text, "(6 channels, 48000 Hz)"));
+        CHECK(contains(text, "  mixing programme 1 (associated service: visually impaired"));
+        CHECK(contains(text, "  mixed programme 1 (associated service: visually impaired"));
+        CHECK(contains(text, "played 32 access units"));
+        REQUIRE(fs::exists(out));
+        CHECK(has_nonzero_byte(read_bytes(out)));
+    }
+    SECTION("by name, folded to stereo, the service is still in it") {
+        const auto out = dir / "associated_folded.raw";
+        fs::remove(out);
+        const auto config = capture_playback_config(dir / "associated_folded.conf", out);
+        const auto log = dir / "associated_folded.log";
+        REQUIRE(run_cli(config,
+                        "monitor \"" + stream.string() +
+                            "\" -1 downmix=loro associated=visually-impaired associated-gain=-3",
+                        log) == 0);
+        const auto text = read_text(log);
+        check_clean(text);
+        CHECK(contains(text, "(2 channels, 48000 Hz)"));
+        CHECK(contains(text, "associated -3.0 dB"));
+        REQUIRE(fs::exists(out));
+        CHECK(has_nonzero_byte(read_bytes(out)));
+    }
+    SECTION("a service the stream does not carry is refused, and nothing plays") {
+        const auto log = dir / "associated_missing.log";
+        CHECK(run_cli(null_config(), "monitor \"" + stream.string() + "\" -1 associated=5", log) ==
+              kExitInput);
+        const auto text = read_text(log);
+        CHECK(contains(text, "no programme 5 in this stream (it carries 0, 1)"));
+        CHECK_FALSE(contains(text, "played "));
     }
 }

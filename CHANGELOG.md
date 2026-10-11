@@ -40,9 +40,21 @@ The sections below contain the complete change list and fixes.
   block. `premixcmp*`, the speech enhancement words and `blkmixcfginfo` are not applied, because
   Annex E gives them no processing (§E2.3.1.21: "decoders are not required to use them").
   `associated=1` or `associated=visually-impaired`, with `associated-gain=<dB>` as the listener's
-  own trim; `monitor`, `play` and Hearth do not mix yet. `meta::pgm_scale_gain()` and
+  own trim; `play` and Hearth do not mix. `meta::pgm_scale_gain()` and
   `meta::external_scale_gain()` return the linear gain of a code, mute included: Table E2.8's code
   15 is -infinity, which `kExternalScaleDb` can only hold as 0.0 dB.
+- **`forge monitor associated=` mixes the service as it plays.** `monitor` runs a second decoder
+  for the associated programme in step with the main's and plays the main with the service mixed
+  in, with the same tokens and the same report as `decode`. `decode` and `monitor` share one choice
+  of the service (`associated=<0..7>` or a service name against each programme's `bsmod`, a 1+1
+  main refused) and one pairing of the two decoders' units, which hold frames back for transient
+  pre-noise independently and are cut to the shorter where they differ
+  (`apps/shared/media/src/associated_mix.*`, held sample for sample against decoding both and
+  mixing by hand in `iclforge-app-media-tests`); `forge decode`'s output is unchanged. A stream
+  that cannot give the service is refused before the output is opened, in `decode`'s words. A
+  main folded to a narrower endpoint takes the service by `dmixscl`, as `decode channels=2` does.
+  `play` hands a coded programme to a receiver and `spatial` places one programme's objects: both
+  now say that `associated=` is ignored, where they ignored it silently.
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
