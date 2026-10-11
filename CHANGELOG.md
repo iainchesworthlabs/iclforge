@@ -189,6 +189,11 @@ The sections below contain the complete change list and fixes.
   nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
   by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
+- **The Karaoke flow takes an LFE part.** An optional mono file, the stream's low-frequency
+  channel: it chooses no mode, is coded after the full-bandwidth channels (a 3/2 stream with one is
+  a 5.1 bed), is band-limited by the window as any channel assigned to the LFE is, and comes out of
+  a karaoke reproduction as L, C, R and the LFE. A multichannel file's own LFE is the stream's, where
+  it was a named problem. A project keeps the part as `lfe` (planning/karaoke-phase2.md, W9).
 - **A project holds the AC-4 tab and AC-4 objects, and a karaoke project's parts lay themselves
   out.** `encode.options` of an AC-4 project is `ac4-encode`'s own words (`frame-rate`, `codec-mode`,
   `dialnorm`, `drc`, `cmixlev`, `dialogue-channels`, ... and `coding` for objects), and
