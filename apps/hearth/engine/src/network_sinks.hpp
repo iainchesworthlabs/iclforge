@@ -203,6 +203,12 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // intended_settings's own comment). Whether the sink actually applied it
     // shows up later, separately, in status()'s iclforge_state.
     bool push_sink_settings(const std::string& id, sendspin::player::Settings settings);
+
+    // Sets whether audio Hearth decodes for this sink is sent as Opus (lossy, a twelfth of PCM's
+    // bytes) rather than PCM, for a sink on a link too poor for PCM. It takes effect at the
+    // group's next play, and is kept for this run. False when the sink is not known or lists no
+    // Opus.
+    bool set_sink_opus_fallback(const std::string& id, bool opus);
     // Starts the identify tone on `output`, moving it there if another
     // output was already sounding it, or stops it with std::nullopt - same
     // connectedness and return-value terms as push_sink_settings(). Tracked
@@ -301,6 +307,8 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
         // after the connection ends.
         std::optional<sendspin::ClientView> known{};
         std::string client_id{};
+        // set_sink_opus_fallback().
+        bool opus_fallback = false;
 
         SinkLink link = SinkLink::kIdle;
         std::uint32_t failed_dials = 0;

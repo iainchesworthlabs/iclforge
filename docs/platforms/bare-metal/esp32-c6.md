@@ -268,6 +268,13 @@ The price is 27 KB of heap for the decoder while an Opus stream plays, and a 17 
 24 KB decode task already has, against about 120 KB free in the idle image (79 KB with the
 benchmark's own 40 KB stack, under which these were taken); and that Opus is lossy.
 
+**Through a stream** (`CONFIG_ICLFORGE_SENDSPIN_OPUS`, `hearth-testserver --pcm --opus --tone`
+to the C6, 30 s of tone, 1,500 packets a run): 0 underruns, 0 late, 0 dropped and 0 invalid in
+each of three runs. The player's time for a packet, the decode with the render and the meter, was
+11.8 ms (59% of the core; worst 28 ms); the decode task's stack had 7.9 KB to spare of its 24 KB;
+and the internal heap's least was 51 KB, where a PCM stream's is 96 KB. Alternated with 15 s PCM
+streams in the same minutes, two Opus runs had 0 underruns each and the two PCM ones 14 and 17.
+
 ### WiFi's code kept in flash
 
 ESP-IDF's defaults put parts of the WiFi and PHY code in RAM (`CONFIG_ESP_WIFI_IRAM_OPT`,

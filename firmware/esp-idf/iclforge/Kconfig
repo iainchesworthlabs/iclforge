@@ -25,6 +25,25 @@ config ICLFORGE_SENDSPIN
         rest: X25519, SHA-256, SHA-512 and AES-256-GCM are on in ESP-IDF's
         default configuration.
 
+# OPUS FOR THE SENDSPIN PLAYER - libopus's decoder, in fixed point, behind the player's
+# player@v1 streams (src/opus_stream.hpp, opus.cmake). Off by default: it is 27 KB of heap and
+# 17 KB of stack while a stream plays, and a build that does not play Opus carries none of it.
+config ICLFORGE_SENDSPIN_OPUS
+    bool "Opus streams in the Sendspin player"
+    depends on ICLFORGE_SENDSPIN
+    default n
+    help
+        Builds libopus 1.6.1's decoder, in fixed point, into the component and has the player
+        decode a player@v1 stream of Opus: 20 ms packets at 48 kHz, one or two channels. A board
+        lists Opus beside its PCM formats, and a server that is asked to (Hearth does, for a
+        board on a link too poor for PCM) sends it a twelfth of PCM's bytes, lossily.
+
+        The sources are the release tarball from xiph.org, checked against its SHA-256 and
+        extracted into the build directory the first time; set ICLFORGE_OPUS_SOURCE_DIR to build
+        from a tree on the disk. Measured on an ESP32-C6: 7.5 ms to decode 20 ms of 128 kbit/s
+        stereo (37% of the core), 27,060 bytes of decoder state, about 16.4 KB of stack
+        (docs/platforms/bare-metal/esp32-c6.md).
+
 # THE AC-4 DECODER - libs/ac4, and the player's
 # reading of AC-4 streams (src/ac4_bridge.hpp; planning/ac4.md, D14b). Off by
 # default: a firmware that plays AC-3 and E-AC-3 carries none of it, and its

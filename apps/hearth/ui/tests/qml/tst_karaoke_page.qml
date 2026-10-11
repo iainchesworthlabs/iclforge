@@ -28,6 +28,7 @@ TestCase {
 
     readonly property string repo: Qt.resolvedUrl("../../../../../").toString()
     property string karaoke: ""
+    property string karaoke21: ""
     property string main: ""
     property string plainEac3: ""
     // A tone is "there" above this level and "not there" below the other.
@@ -42,6 +43,7 @@ TestCase {
         HearthController.firstRunSeen = true;
         karaoke = TestServices.writeAc3Stream("karaoke.ac3", "karaoke-3/2");
         main = TestServices.writeAc3Stream("main.ac3", "main-3/2");
+        karaoke21 = TestServices.writeAc3Stream("karaoke21.ac3", "karaoke-2/1");
         plainEac3 = TestServices.stageFixture(repo + "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
                                               "plain.ec3");
         verify(karaoke.length > 0 && main.length > 0 && plainEac3.length > 0, "the streams could not be made");
@@ -232,6 +234,36 @@ TestCase {
         // A pair goes to the sides at unity.
         verify(level("L", 1030) > present && level("R", 1270) > present);
         verify(level("C", 1030) < absent);
+    }
+
+    // A 2/1 stream's coded channels are L (440 Hz), R (800) and S, the one vocal
+    // (620): what the page says each speaker plays is held to what the decoder
+    // does, for a stream with a single vocal (found by the forge-gui oracle
+    // test, which decodes every mode: "both" is V1 on the left alone, not in
+    // the centre).
+    function test_aSingleVocalIsOnTheLeftForBothAndInTheCentreForV1() {
+        const win = openPage();
+        play(karaoke21);
+        clickSegment(win, "reproductionChoice", "capable");
+        tryCompare(HearthController.decoderSettings, "karaoke", "capable", 10000);
+        compare(HearthController.currentMedia.programmes[0].karaokeParts.join(" "), "L R V1");
+
+        clickSegment(win, "vocalsChoice", "both");
+        tryCompare(HearthController.decoderSettings, "karaokeVocals", "both", 10000);
+        settled();
+        verify(level("L", 620) > present, "V1 is not on L");
+        verify(level("C", 620) < absent, "V1 is in the centre");
+        verify(level("R", 620) < absent, "V1 is on R");
+        compare(text(win, "speakerCarries-L"), "L + V1");
+        compare(text(win, "speakerCarries-C"), qsTr("silent"));
+
+        clickSegment(win, "vocalsChoice", "v1");
+        tryCompare(HearthController.decoderSettings, "karaokeVocals", "v1", 10000);
+        settled();
+        verify(level("C", 620) > present, "V1 is not in the centre");
+        verify(level("L", 620) < absent, "V1 is still on L");
+        compare(text(win, "speakerCarries-C"), "V1");
+        compare(text(win, "speakerCarries-L"), "L");
     }
 
     function test_aStreamThatIsNotKaraokeSaysSoAndDisablesTheControls() {

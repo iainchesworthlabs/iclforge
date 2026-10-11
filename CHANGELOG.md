@@ -1315,6 +1315,14 @@ The sections below contain the complete change list and fixes.
     when it was due on each board (its own `worst_error_us`). A hidden `ac3tests` case,
     `[hearth-network-live]`, repeats that against the sinks named in `AC3HEARTH_LIVE_SINKS`, and
     withdraws its pairings afterwards.
+- **A network group is planned by what each of its members takes** (`NetworkSinks::plan_group`,
+  `sink_form.cpp`): a member that decodes the stream keeps it coded; one that cannot is sent PCM
+  decoded here at the layout it takes, one render for each width the group needs; one that can be
+  sent neither is held back, and its reason is in the log and the group editor. A sink whose
+  buffer holds under a second of the stream is sent PCM in units of at most 10 ms (a long unit
+  stalls a shallow buffer more often: on an ESP32-C6, a median of 2 drop-outs in 15 s against
+  22 at 21 ms), and an ESP32-C6 is offered the PCM fallback with a caveat in its reason, since
+  its 48 KB buffer holds under a fifth of a second and a busy WiFi drops the stream out.
 
 **Audio outputs**
 
@@ -2689,6 +2697,21 @@ The sections below contain the complete change list and fixes.
   reports a board's PCM counters and its own end-of-stream totals; `test_playout.cpp` has the
   playout recovering a PCM stream from a clock step, a late chunk and late interrupts on a model of
   the I2S ring.
+- **The Sendspin player decodes Opus** (`CONFIG_ICLFORGE_SENDSPIN_OPUS`,
+  `firmware/esp-idf/iclforge/src/opus_stream.*`, `opus.cmake`): libopus 1.6.1's decoder in fixed
+  point, built from the release tarball (checked against its SHA-256) or a tree at
+  `ICLFORGE_OPUS_SOURCE_DIR`, behind a `player@v1` stream of 20 ms packets. A board that has it
+  lists Opus after its PCM formats, and `ServerHost::use_pcm()` takes the `codec` to play a sink
+  in (`hearth-testserver --pcm --opus`). On an ESP32-C6 a packet takes 11.8 ms of the player's
+  time (59% of the core), the decoder 27 KB of heap and 16.7 KB of the decode task's stack; 30 s
+  of tone played with no underrun in three runs, on a link where the same board's PCM stream
+  dropped out 14 and 17 times in 15 s. Opus is a twelfth of PCM's bytes and lossy.
+- **A Hearth sink that lists Opus can be set to be sent it in place of PCM**
+  (`NetworkSinks::set_sink_opus_fallback`, the Decoder tab's "Audio decoded here" choice, and
+  `choose_sink_form`'s `PcmCodec`): for a board on a link too poor for PCM, audio Hearth decodes
+  for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
+  sink, applies at the group's next play, and is kept for the run. The group editor says which a
+  member is sent.
 
 **Library internals**
 
@@ -2978,6 +3001,18 @@ The sections below contain the complete change list and fixes.
   `play` and `forge transcode` now take `programme=` too (they always transcoded the first).
   `iclforge::apps::select_programme()` and `cut_programme()` in `apps/shared/media` do the
   choosing without any printing, for a player that is not the CLI.
+- **`forge spdif` and the GUI stream player made the same mistake with a second independent
+  substream.** `spdif` wrapped every access unit of an E-AC-3 stream carrying two programmes, so
+  the carrier held both programmes' bursts one after the other (64 for a main of 32 frame periods),
+  which a receiver locks onto as the main at half speed with the description between its frames.
+  It now wraps one programme as `play` sends it: `programme=<0..7>`, or the first the stream
+  carries, said as `programme 0 of 2 (0, 1)`, cut out and renumbered as substream 0 when it is not
+  0, and refused by name when the stream lacks it. The Forge GUI's stream player fed the same
+  interleaved units to one decoder, sized from the first unit's 5.1, so the mono description's unit
+  read channels that were not there (on a two-programme file the decode never finished and the
+  player stayed busy); it now plays the first programme and says so in its summary line
+  (`… · programme 0 of 2 (0, 1)`). `play` and `spdif` share one choose-and-cut helper
+  (`select_receiver_units`).
 - **`ac3cli monitor` refused a §E2.3.1.2 legacy-core stream and dropped every stream's last
   unit.** It picked its decode path from the first frame's bsid alone, so a stream whose 5.1
   bed is a plain AC-3 syncframe with Annex E dependents extending it went to `FrameDecoder`,

@@ -76,6 +76,7 @@ public:
                     .stream = format.stream,
                     .sample_rate = format.sample_rate,
                     .coded_channels = format.coded_channels,
+                    .objects = format.objects,
                     .layout = format.layout});
          for (const render::OutputLayout& layout : planned) {
              // One variant per width: a player lists a width, not a layout,

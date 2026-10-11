@@ -76,6 +76,14 @@ if(CONFIG_ICLFORGE_SENDSPIN)
         "src/burst_player.cpp"
         "src/sendspin_host.cpp"
         "src/sendspin_store.cpp")
+    # The Opus decoder the player calls: libopus's, or the one that decodes nothing
+    # (src/opus_stream.hpp). Chosen here and not by an #if in the player, as the peer
+    # implementations above are.
+    if(CONFIG_ICLFORGE_SENDSPIN_OPUS)
+        list(APPEND ICLFORGE_COMPONENT_SRCS "src/opus_stream.cpp")
+    else()
+        list(APPEND ICLFORGE_COMPONENT_SRCS "src/opus_stream_none.cpp")
+    endif()
 endif()
 idf_component_register(
     SRCS ${ICLFORGE_COMPONENT_SRCS}
@@ -97,6 +105,13 @@ idf_component_register(
     # vfs: src/log.cpp's device, which stdout is reopened on.
     PRIV_REQUIRES lwip esp_psram esp_app_format app_update esp_partition spi_flash hal espcoredump vfs
     EMBED_FILES "ui/iclforge_ui.html" "ui/iclforge_ui.js")
+
+# libopus, built into this component when the Sendspin player is to decode Opus (opus.cmake).
+# Below the registration, as the conversion directory further down is: the option is not set in
+# IDF's requirements pass.
+if(CONFIG_ICLFORGE_SENDSPIN AND CONFIG_ICLFORGE_SENDSPIN_OPUS)
+    include("${CMAKE_CURRENT_LIST_DIR}/opus.cmake")
+endif()
 
 # iclforge_lwip_ip4_input (src/tcp_arrivals.cpp) is called only from lwIP's own
 # ip4.c, once a project installs the hook (lwip_hooks/iclforge_lwip_hooks.h) -

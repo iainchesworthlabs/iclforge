@@ -335,6 +335,49 @@ TEST_CASE("network sinks rows: settings and identify for a Hearth sink with no l
     CHECK_FALSE(row.identify_slot.has_value());
 }
 
+// Opus in place of PCM is a choice kept per sink, and refused for a sink that lists none.
+TEST_CASE("network sinks rows: a sink can be set to Opus only where it lists Opus",
+          "[hearth][network-sinks]") {
+    Rig rig;
+    const auto plain_service = service_named("plain-player", 1);
+    rig.sinks->on_found(plain_service);
+    auto plain = connected(plain_service, "client-plain");
+    ss::messages::PlayerSupport plain_support;
+    plain_support.supported_formats = {
+        {.codec = ss::messages::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16}};
+    plain.player_support = plain_support;
+    rig.sinks->on_client(plain);
+
+    const auto opus_service = service_named("opus-player", 2);
+    rig.sinks->on_found(opus_service);
+    auto with_opus = connected(opus_service, "client-opus");
+    ss::messages::PlayerSupport opus_support;
+    opus_support.supported_formats = {
+        {.codec = ss::messages::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16},
+        {.codec = ss::messages::Codec::kOpus,
+         .channels = 2,
+         .sample_rate = 48000,
+         .bit_depth = 16}};
+    with_opus.player_support = opus_support;
+    rig.sinks->on_client(with_opus);
+
+    const auto fallback_of = [&](const std::string& id) {
+        for (const auto& sink : rig.sinks->status().sinks) {
+            if (sink.id == id) {
+                return sink.opus_fallback;
+            }
+        }
+        return false;
+    };
+    CHECK_FALSE(rig.sinks->set_sink_opus_fallback("plain-player", true));
+    CHECK_FALSE(fallback_of("plain-player"));
+    CHECK_FALSE(rig.sinks->set_sink_opus_fallback("no-such-sink", true));
+    CHECK(rig.sinks->set_sink_opus_fallback("opus-player", true));
+    CHECK(fallback_of("opus-player"));
+    CHECK(rig.sinks->set_sink_opus_fallback("opus-player", false));
+    CHECK_FALSE(fallback_of("opus-player"));
+}
+
 TEST_CASE("network sinks rows: a group is looked up by its id, and an unknown id finds none",
           "[hearth][network-sinks]") {
     Rig rig;
@@ -349,7 +392,7 @@ TEST_CASE("network sinks rows: a group is looked up by its id, and an unknown id
 // What a group is sent, decided by what each connected member takes (NetworkSinks::plan_group,
 // which the engine's group sink calls as a group opens): a stereo player is planned a 2.0 render
 // of a 5.1 stream, a Hearth board that decodes it keeps the coded stream, and a C6 that decodes
-// 2.0 only is held back, its reason in the log.
+// 2.0 only is sent PCM at 2.0 with a caveat, its reason in the log.
 TEST_CASE("network sinks rows: a group is planned by what each member takes",
           "[hearth][network-sinks][plan]") {
     Rig rig;
@@ -420,7 +463,8 @@ TEST_CASE("network sinks rows: a group is planned by what each member takes",
     CHECK(line_for("Stereo player").find("folded to 2.0") != std::string::npos);
     CHECK(line_for("Board").find("as it is") != std::string::npos);
     CHECK(line_for("C6").find("up to 2 channels") != std::string::npos);
-    CHECK(line_for("C6").find("switched off") != std::string::npos);
+    CHECK(line_for("C6").find("folded to 2.0") != std::string::npos);
+    CHECK(line_for("C6").find("drop out") != std::string::npos);
 
     // What the Network page shows: each member's form, in a few words, and why. The sink id is
     // the key, and the labels are the planner's own.
@@ -456,9 +500,10 @@ TEST_CASE("network sinks rows: a group is planned by what each member takes",
     CHECK(board_member->form_label == "AC-3 as it is");
     const auto c6_member = member("hearth-c6");
     REQUIRE(c6_member.has_value());
-    CHECK(c6_member->form == "held");
-    CHECK(c6_member->form_label == "Nothing · held back");
-    CHECK(c6_member->form_reason.find("switched off") != std::string::npos);
+    // Past the 2 channels it decodes: sent PCM folded to 2.0, with the caveat in its reason.
+    CHECK(c6_member->form == "pcm");
+    CHECK(c6_member->form_label == "PCM · 2.0");
+    CHECK(c6_member->form_reason.find("drop out") != std::string::npos);
     // A member that leaves takes what was planned for it with it.
     rig.sinks->remove_group_member(group, "hearth-c6");
     CHECK_FALSE(member("hearth-c6").has_value());

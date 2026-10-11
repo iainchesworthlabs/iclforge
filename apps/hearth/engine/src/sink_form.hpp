@@ -32,6 +32,11 @@
 //      stream's type; its `sample_rates` list the stream's rate; and the
 //      stream has no more channels than the sink states it decodes of that
 //      type (`max_coded_channels`; none stated is no limit).
+//      Objects are a limit of their own: a sink that states how many it
+//      places (`max_objects`, per data type) and would place this stream's -
+//      its settings ask for objects, or leave it to its layout, which has
+//      height speakers - is sent PCM decoded here where that is possible, and
+//      the stream as it is, to be played as its bed, where it is not.
 //   2. Else PCM, if the sink offers `player@v1` with a PCM format that
 //      carries the stream's rate and if the policy allows it. The layout is
 //      the one the sink is configured to (its own reported `layout`, else the
@@ -41,11 +46,13 @@
 //      cannot take is folded rather than refused.
 //   3. Else nothing, and the reason says which of the sink's own limits it was.
 //
-// What this does not decide: whether the sink can SUSTAIN a PCM stream (an
-// ESP32-C6 cannot, at the figures measured) is a fact about the board that
-// the sink does not state yet. The caller passes it as `pcm_fallback`, so the
-// one place that turns the fallback off for a board, or for a person who asked
-// for "never decode in Hearth", is that argument.
+// What this does not decide: whether the sink can SUSTAIN a PCM stream. An
+// ESP32-C6 does on a quiet link and drops out on a busy one, its buffer being
+// a fifth of a second (planning/esp32-sink-compatibility-matrix.md), a fact
+// about the board that the sink does not state yet. The caller passes it as
+// `pcm_fallback` and `pcm_caveat`: the one place that turns the fallback off
+// for a board, or for a person who asked for "never decode in Hearth", is
+// the first, and what a board is offered with a warning, the second.
 
 namespace iclforge::hearth {
 
@@ -69,6 +76,10 @@ struct StreamNeeds {
     // are its chosen presentation's). Zero when unknown, which is not compared
     // with the sink's limit.
     std::uint16_t coded_channels = 0;
+    // The most dynamic objects the programme places (ItemFacts::objects), which
+    // a sink's stated limit is compared with; 0 for a programme with none, or
+    // where it is not known.
+    std::uint16_t objects = 0;
     // The layout to send a sink that has said none of its own - a standard
     // player has none to say - which is the player's: such a sink then gets the
     // programme as the player renders it where it lists that width, and the
@@ -76,15 +87,33 @@ struct StreamNeeds {
     std::optional<render::OutputLayout> default_layout{};
 };
 
+// The codec decoded audio is sent in: PCM, or Opus for a sink on a link too poor for PCM.
+enum class PcmCodec : std::uint8_t {
+    kPcm,
+    kOpus,
+};
+
+// Whether a sink lists Opus (48 kHz, stereo) in its player@v1 formats.
+[[nodiscard]] bool sink_lists_opus(const SinkFacts& sink);
+
 struct SinkFormPolicy {
     // Whether a sink that cannot take the stream as coded may be sent PCM.
     bool pcm_fallback = true;
+    // Whether it is sent Opus instead, lossy and a twelfth of PCM's bytes: set for a sink the
+    // person has chosen it for that lists it (SinkFacts::opus_fallback). Where the stream's
+    // rate is not 48 kHz, or the sink lists no Opus, it is PCM as before.
+    bool opus = false;
+    // A sentence added to the reason of a sink that is sent PCM: what may go wrong with it on
+    // this board. Empty for a sink with nothing to add.
+    std::string pcm_caveat{};
 };
 
 struct SinkChoice {
     SinkForm form = SinkForm::kNone;
     // kPcm: the layout rendered for this sink. Unset otherwise.
     std::optional<render::OutputLayout> layout{};
+    // kPcm: the codec it is sent in.
+    PcmCodec codec = PcmCodec::kPcm;
     // One sentence, for the sink's row: what is sent and, when it is not the
     // stream as it is, which of the sink's own limits it was.
     std::string reason{};
@@ -109,10 +138,11 @@ struct MemberForm {
     // overruled it (a width another sink already has).
     SinkChoice choice{};
     MemberAction action = MemberAction::kHold;
-    // kPcm: the width the sink is asked for.
+    // kPcm: the width the sink is asked for, and the codec it is asked to be played in.
     std::int32_t channels = 0;
+    PcmCodec codec = PcmCodec::kPcm;
     // What the sink is sent, in a few words, for the column of a table: "E-AC-3 as it is",
-    // "PCM · 2.0", "Nothing · held back". The reason is choice.reason.
+    // "PCM · 2.0", "Opus · 2.0", "Nothing · held back". The reason is choice.reason.
     std::string label{};
 };
 
@@ -125,10 +155,12 @@ struct GroupFormPlan {
 };
 
 // The policy for one sink: whether it may be sent PCM decoded here when it cannot take the
-// stream as it is. Off for an ESP32-C6, whose player cannot sustain a PCM stream at the figures
-// measured (planning/esp32-sink-compatibility-matrix.md): the sink does not state that, so it is
-// read from the hardware it names, until the board can say it. This is the place a person's own
-// "never decode in Hearth" setting will be read as well.
+// stream as it is, and what to say about it. An ESP32-C6 is sent PCM with a caveat, its buffer
+// being short enough that a busy WiFi drops the stream out (planning/esp32-sink-compatibility-
+// matrix.md): the sink does not state that, so it is read from the hardware it names, until the
+// board can say it. A sink the person has set to Opus (SinkFacts::opus_fallback) that lists it is
+// sent that instead. This is the place a person's own "never decode in Hearth" setting will be
+// read as well.
 [[nodiscard]] SinkFormPolicy form_policy(const SinkFacts& sink);
 
 // Each sink's form for one stream, and the layouts the group needs rendered beyond `master`,

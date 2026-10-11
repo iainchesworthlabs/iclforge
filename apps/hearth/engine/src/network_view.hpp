@@ -114,6 +114,9 @@ struct SinkFacts {
     // send this sink as PCM when it cannot play it the stream as it is. Empty
     // when the sink does not offer the role, or lists no PCM.
     std::vector<PcmFormat> pcm_formats{};
+    // The person's choice for this sink: audio Hearth decodes for it is sent as Opus where it
+    // lists it (sink_lists_opus()), not PCM. Kept in this run only, as intended_settings is.
+    bool opus_fallback = false;
     // `_iclforge_player@v1_support.outputs`, when the role is offered.
     std::optional<std::uint32_t> output_slots{};
     std::optional<std::uint32_t> output_bit_depth{};
@@ -215,6 +218,9 @@ struct SinkRow {
 // already the display string the page shows - QML formats nothing itself, the
 // way HearthController's own decoder-settings map does not either.
 struct SinkDetail {
+    // Whether the sink lists Opus, and whether it is set to be sent it (SinkFacts::opus_fallback).
+    bool opus_available = false;
+    bool opus_fallback = false;
     std::string id{};
     std::string name{};
     std::string badge{};
