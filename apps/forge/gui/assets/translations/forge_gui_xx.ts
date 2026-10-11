@@ -1859,6 +1859,18 @@
             <translation>[Prõjéct… ~~~]</translation>
         </message>
         <message>
+            <source>%1 is in the project and `forge` uses it, but this window has no control for it, so its own encode does not.</source>
+            <translation>[%1 îs în thé prõjéct ànd `fõrgé` ûsés ît, bût thîs wîndõw hàs nõ cõntrõl fõr ît, sõ îts õwn éncõdé dõés nõt. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The project has %1 objects and the window has %2: the rest were left out.</source>
+            <translation>[Thé prõjéct hàs %1 õbjécts ànd thé wîndõw hàs %2: thé rést wéré léft õût. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The objects' placements and motion in the project could not be read.</source>
+            <translation>[Thé õbjécts' plàcéménts ànd mõtîõn în thé prõjéct cõûld nõt bé réàd. ~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>Open project…</source>
             <translation>[Õpén prõjéct… ~~~~~]</translation>
         </message>

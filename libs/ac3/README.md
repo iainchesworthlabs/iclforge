@@ -7,7 +7,7 @@ The AC-3 and E-AC-3 codec, including Joint Object Coding (Atmos objects) and EMD
 A library.
 
 - **Uses:** `base`, `dsp`, `objects`, `render`
-- **Used by:** `app-media`, `baremetal`, `capi`, `crucible`, `demo-android`, `demo-wasm`, `esp-idf`, `esphome`, `examples`, `forge`, `hearth`, `hearth-sink`, `python`, `tests`
+- **Used by:** `app-media`, `app-project`, `baremetal`, `capi`, `crucible`, `demo-android`, `demo-wasm`, `esp-idf`, `esphome`, `examples`, `forge`, `hearth`, `hearth-sink`, `python`, `tests`
 - **CI lanes:** core
 - **CMake target:** `iclforge::ac3`
 

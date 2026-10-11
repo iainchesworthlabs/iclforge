@@ -1,17 +1,28 @@
 # Projects
 
 A **project** is a file that holds what is set up in the window: which files are the sources,
-how their channels are routed, and the encode settings, with the flow they were set up in. It is
-written by **Project…**, **Save project…** and read by **Project…**, **Open project…**, by dropping
-it on the window, or by naming it on the command line:
+how their channels are routed, the encode settings and the objects' motion, with the flow they
+were set up in. It is written by **Project…**, **Save project…** and read by **Project…**,
+**Open project…**, by dropping it on the window, or by naming it on the command line:
 
 ```text
 forge-gui examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj
 ```
 
-The window opens in the flow the project was made in with the sources loaded, and encoding from
-there is the same encode as encoding the same files by hand. A project is a record of choices; it
-holds no audio and no stream.
+The window opens in the flow the project was made in, with the sources loaded and every setting
+as the project says. A project is a record of choices; it holds no audio and no stream.
+
+**`forge` reads the same file.** `forge project song.forgeproj` runs what it stands for, the line
+the window's command bar shows for the same settings, and writes the stream:
+
+```text
+forge project examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj out.ac3
+forge project examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj print
+```
+
+The first writes the stream the example ships, byte for byte, and so does **Save** in the window
+for the same project. The second prints the commands and runs none. See [`forge
+project`](../cli/commands.md#projects-a-forge-project-file-run).
 
 The [Auld Lang Syne example](https://github.com/iainchesworthlabs/iclforge/tree/main/examples/karaoke/auld-lang-syne)
 ships one: four generated parts, the project that opens them in the [Karaoke flow](karaoke.md),
@@ -26,23 +37,42 @@ the stream they make and its words.
 | `flow` | The surface the project was made in: `guided`, `advanced`, `expert` or `karaoke`. |
 | `sources` | The source files, in order. Each has a `path`, and optionally a `part` (the Karaoke flow's `backing`, `melody`, `vocal1`, `vocal2` or `file`) and an `offsetSeconds`. |
 | `bed`, `lfe`, `extras`, `atmos` | The channel plan: the layout (`"3/2"`), whether it has an LFE, the extra channels (`"wide"`, `"rear"`, `"topf"`, `"topr"`, `"lfe2"`) and whether it is an object (Atmos) session. |
-| `assignments` | Where each source channel goes: `source`, `channel` and `to` (`"L"`, `"C"`, `"Ls"`, ...). |
+| `assignments` | Where each source channel goes: `source`, `channel` and `to` (`"L"`, `"C"`, `"Ls"`, `"obj"`, `"none"`, with `@-3.5` for a trim). Every channel, when there is one: it is the command line's `map=`. |
+| `objects` | An object session's placements and motion: `count` and `scene`, the scene file `forge atmos-encode` reads. |
 | `encode` | The encode settings below. |
 | `karaoke` | The Karaoke flow's own choices: `input` (`"parts"` or `"file"`) and how the Hear step plays it (`listening`, `vocals`). |
 
-The `encode` object holds these settings, each by an id and not by its position in a list:
+The `encode` object holds these, each by the command line's own word for it:
 
 | Key | Values |
 |---|---|
 | `codec` | `"ac3"`, `"eac3"`, `"ac4"` |
 | `container` | `"elementary"`, `"matroska"`, `"spdif"`, `"mp4"`, `"fmp4"`, `"mpegts"` |
 | `bitrateKbps` | A rate the codec offers, such as `384` |
-| `bsmod` | A/52 Table 5.7's code, 0 to 7 (7 is the karaoke main service) |
-| `cmixlev` | The centre mix level code, 0 to 2: -3, -4.5, -6 dB |
-| `surmixlev` | The surround mix level code, 0 to 2: -3, -6 dB, off |
+| `tools` | The coding tools, as the token `eac3-encode` takes: `"cpl+spx"`, `"auto"`, `"aht:0"`. Absent for none. |
+| `vbr` | Variable bit rate, as `eac3-encode`'s token: `"q:0.75,max:640"`. Absent for CBR. |
+| `options` | The metadata, loudness and compression: below. |
 
-Everything else is as the window starts: metadata, loudness, coding tools, AC-4 settings, the
-objects' paths and motion, and live capture are not in a version 1 project.
+### `options`
+
+`options` has the command line's keys and values, and only what differs from the command line's
+own defaults, so that a project of a plain encode has none. A flag is `true`.
+
+| Key | Value |
+|---|---|
+| `dialnorm` | `1` to `31`, or `"auto"` to measure it |
+| `drc`, `heavy`, `ceiling`, `dialogue` | A profile name, `true`, and the two levels in dB |
+| `dialnorm2`, `drc2`, `heavy2`, `ceiling2`, `dialogue2` | The same for dual mono's second programme |
+| `cmixlev`, `surmixlev` | The centre and surround mix levels: `-3`, `-4.5`, `-6`, and `"off"` for the surround |
+| `lfemix`, `dmixmod`, `mixmeta` | The LFE level (0 to 31 or `"off"`), `"loro"`/`"ltrt"`/`"none"`, and the mixing metadata flag |
+| `bsmod` | `"cm"`, `"me"`, `"vi"`, `"hi"`, `"dialogue"`, `"commentary"`, `"emergency"`, `"voiceover"`: A/52 Table 5.7's service; `"voiceover"` at a layout above 1/0 is the karaoke main service |
+| `dsurmod`, `dheadphonmod`, `dsurexmod` | `"none"`, `"off"`, `"on"` (and `"ex"`, `"pliiz"` for the last) |
+| `mixlevel`, `roomtyp` | The mixing level, 80 to 111 dB SPL, and `"none"`, `"large"`, `"small"` |
+| `adconvtyp`, `copyright`, `origbs`, `annexd` | `"hdcd"`, and the three flags |
+
+Everything the command line takes in that group is a legal key. A key the window has no control for
+(`lorocmixlev=`, say) is kept in the file and used by `forge`; opening the project says it is there
+and that the window's own encode does not use it.
 
 A saved project is written with `format` and `version` first and everything else in reading order:
 
@@ -58,14 +88,23 @@ A saved project is written with `format` and `version` first and everything else
     { "path": "parts/vocal-1-lead.wav", "part": "vocal1" },
     { "path": "parts/vocal-2-harmony.wav", "part": "vocal2" }
   ],
-  "encode": { "codec": "ac3", "bitrateKbps": 384, "bsmod": 7 },
+  "bed": "3/2",
+  "assignments": [ { "source": 0, "channel": 0, "to": "L" }, "..." ],
+  "encode": {
+    "codec": "ac3",
+    "container": "elementary",
+    "bitrateKbps": 384,
+    "options": { "bsmod": "voiceover" }
+  },
   "karaoke": { "input": "parts", "listening": "aware", "vocals": "both" }
 }
 ```
 
-Every key but `format` and `version` is optional. A key that is not there leaves what the window
-has, so the example above gives no `bed` and no `assignments`: the Karaoke flow works them out
-from the parts, as it does when they are chosen by hand.
+Every key but `format` and `version` is optional. What the window does with a key that is not
+there: the plan and the routing are left as the flow or the loader derives them, and every
+setting of `encode` is put to the command line's default first, so that opening a project does
+not leave, in the settings it does not mention, whatever the window held before. A project means
+what the same line of `forge` means.
 
 ## Paths
 
@@ -82,28 +121,35 @@ The format is meant to grow without a new file type, and the rules that allow it
   refuses a newer file by saying which version it is and which this window reads, so a project is
   never half read. A change that adds a key or a value does not raise it. One that changes what
   an existing key means does.
-- **A key this window does not know is kept.** It is not an error and it is not shown. Opening a
-  project made by a newer Forge and saving it writes the unknown keys back, at the top level, in
-  `encode` and in a source's own object, so nothing it did not understand is lost.
-- **A setting is a row, not a format.** The `encode` settings are a table in
+- **A key this reader does not know is kept.** It is not an error and it is not shown. The
+  document is read and written as it came, in its order (nlohmann/json's `ordered_json`), so opening
+  a project made by a newer Forge and saving it writes the unknown keys back, at the top level, in
+  `encode`, in `options`, in `karaoke` and in a source's own object, and nothing it did not
+  understand is lost.
+- **A setting is a word the command line already has.** `options` takes `forge`'s own keys, so a
+  new option the command line gains can be written in a project the day it exists, and `forge
+  project` passes it through. For the window, a setting is a row of a table in
   [`apps/forge/gui/src/project_file.cpp`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/forge/gui/src/project_file.cpp):
-  a key, the controller property it is read from and written to, and its ids or its range.
-  Adding a setting is adding a row and a line to `tst_projects.qml`.
-- **A value is an id or a code from a standard.** Never a position in a list the window may
-  reorder: `"eac3"` and `7` mean the same in every version. A value this window does not know is
-  reported in a note, and the setting is left as it was.
+  its key, the controller property it is read from and written to, and its words. Adding one is
+  adding a row and a line to `tst_projects.qml`.
+- **A value is a word or a code from a standard.** Never a position in a list the window may
+  reorder: `"eac3"` and `"voiceover"` mean the same in every version. A value this window does not
+  know is reported in a note, and the setting is left as the command line's default.
 - **What a flow keeps is its own key.** `karaoke` is the Karaoke flow's; a flow added later brings
   its own object, and the window ignores one it has no flow for.
 
 A note appears after an open that could not use everything: a source that is not there, a setting
-whose value this window does not know, a source that could not be loaded. Opening a file that is not
-a project at all, or is a newer one, shows a note and changes nothing.
+whose value this window does not know, an option it has no control for, a source that could not
+be loaded. Opening a file that is not a project at all, or is a newer one, shows a note and
+changes nothing.
 
 ## What it does not do
 
-- **`forge` does not read a project.** The command line the last step shows is what reproduces
-  the encode there.
+- **`forge project` does not work out the channel plan.** The Karaoke flow derives it from the
+  parts (a stereo backing, a melody guide, one or two vocals), and the window writes it into the
+  file when it saves; a project written by hand, or by the example's generator, has to say it as
+  `bed` and `assignments`. Several sources with no assignment are refused with that said.
 - **No file type is claimed with the desktop**, as for the other files the window opens: a
   `.forgeproj` is opened from the window, dropped on it or named on its command line.
-- **Object sessions are saved as a flag.** A project records that a session is an object (Atmos)
-  session, not the objects' paths and motion; `forge atmos-path` files are for those.
+- **Not yet in a project:** the AC-4 tab's settings, the AC-4 objects' scene, a live session and the
+  object-motion preview. An AC-4 object session cannot be run by `forge project` yet.

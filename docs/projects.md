@@ -21,7 +21,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
-| `ac3` | `libs/ac3/` | The AC-3 and E-AC-3 codec, including Joint Object Coding (Atmos objects) and EMDF object signing, with loudness metering, level analysis and quality measurement. | `base`, `dsp`, `objects`, `render` | `app-media`, `baremetal`, `capi`, `crucible`, `demo-android`, `demo-wasm`, `esp-idf`, `esphome`, `examples`, `forge`, `hearth`, `hearth-sink`, `python`, `tests` | core |
+| `ac3` | `libs/ac3/` | The AC-3 and E-AC-3 codec, including Joint Object Coding (Atmos objects) and EMDF object signing, with loudness metering, level analysis and quality measurement. | `base`, `dsp`, `objects`, `render` | `app-media`, `app-project`, `baremetal`, `capi`, `crucible`, `demo-android`, `demo-wasm`, `esp-idf`, `esphome`, `examples`, `forge`, `hearth`, `hearth-sink`, `python`, `tests` | core |
 | `ac4` | `libs/ac4/` | The AC-4 decoder and encoder, with the sync frames, table of contents and presentations both work through. | `base`, `dsp`, `objects`, `render` | `app-media`, `baremetal`, `capi`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `tests` | core |
 | `adm` | `libs/adm/` | ADM and BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder and decoder. | `iab`, `objects` | `examples`, `forge` | core |
 | `audio` (internal) | `libs/audio/` | Live capture, IEC 61937 passthrough delivery, shared-mode monitor playback and the OSC object-position source: the OS-specific audio code of the project. Internal; never installed. | `base`, `render`, `containers`, `objects` | `crucible`, `demo-android`, `forge`, `hearth` | core |
@@ -48,6 +48,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 |---|---|---|---|---|---|
 | `app-media` (internal) | `apps/shared/media/` | The media code the programs compile in: container input, stream playback, recording sinks, the AC-4 object renderer. Internal; compiled into Forge, Hearth and Crucible. | `ac3`, `ac4`, `containers`, `objects`, `render` | `forge`, `hearth` | windows, linux, macos |
 | `app-preferences` (internal) | `apps/shared/preferences/` | The settings store and its migration, shared by the desktop programs. Internal; compiled into the programs. | nothing | `crucible`, `forge`, `hearth` | windows, linux, macos |
+| `app-project` (internal) | `apps/shared/project/` | The project file the Forge GUI and forge share: its document and the command line it stands for. Internal; compiled into the programs. | `ac3` | `forge` | windows, linux, macos |
 | `app-theme` (internal) | `apps/shared/theme/` | The theme and system-theme detection the desktop programs share. Internal; compiled into the programs. | nothing | `crucible`, `forge`, `hearth` | windows, linux, macos |
 
 ## Programs
@@ -57,7 +58,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `crucible` | `apps/crucible/` | Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS. | `ac3`, `ac4`, `audio`, `base`, `containers`, `objects`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 | `demo-android` | `apps/demos/android/` | The Android (Shield) demo application. | `ac3`, `audio`, `base`, `containers` | nothing | android |
 | `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `objects` | nothing | wasm |
-| `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `objects`, `render`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
+| `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `objects`, `render`, `app-media`, `app-preferences`, `app-project`, `app-theme` | nothing | windows, linux, macos |
 | `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 
 ## Bindings

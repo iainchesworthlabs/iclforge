@@ -91,7 +91,12 @@ resource. A parallel phase that still has failures runs them again one at a time
 passes alone passes the phase, with a warning that names it, and one that fails alone is a
 failure. That rule exists because a concurrency test whose threads had not started when its main
 thread finished failed on every hosted Windows run, twice in a row in some of them, and refused a
-queue entry for a change that broke nothing. When a run fails, its summary page lists the compiler errors or the failed tests and the
+queue entry for a change that broke nothing. The repeat runs the tests by name, from the list
+of failures the phase printed (`ctest --tests-from-file`), and the leg fails unless the tests it
+started are exactly the tests that failed. It does not use `--rerun-failed`, which reads test
+numbers: `ctest -E` numbers a filtered run differently from the full list, so the repeat once
+ran other tests, passed them, and let a failing leg go green. When a run fails, its summary page
+lists the compiler errors or the failed tests and the
 command that reproduces them. The checks that only need the built binaries (the gold-reference
 gate, the GUI smoke test, the translation checks) run whenever the build succeeded, even if a test
 failed, so one run reports every failure.

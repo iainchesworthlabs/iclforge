@@ -168,9 +168,16 @@ class KaraokeExample(unittest.TestCase):
             self.assertTrue((EXAMPLE / source["path"]).is_file(), source["path"])
             parts[source["part"]] = source["path"]
         self.assertEqual(set(parts), {"backing", "melody", "vocal1", "vocal2"})
-        # What the stream is made with is the project's encode block.
-        self.assertEqual(project["encode"]["bsmod"], 7)
+        # What the stream is made with is the project's encode block, in the command line's
+        # own words, and where each channel goes is the project's, since `forge project` has
+        # the file and not the Karaoke flow.
+        self.assertEqual(project["encode"]["options"]["bsmod"], "voiceover")
         self.assertEqual(project["encode"]["bitrateKbps"], self.generator.BITRATE_KBPS)
+        self.assertEqual(project["bed"], "3/2")
+        self.assertEqual(
+            [(a["source"], a["channel"], a["to"]) for a in project["assignments"]],
+            [(0, 0, "L"), (0, 1, "R"), (1, 0, "C"), (2, 0, "Ls"), (3, 0, "Rs")],
+        )
 
     def test_the_command_line_of_the_readme_is_the_one_that_is_run(self):
         readme = (EXAMPLE / "README.md").read_text(encoding="utf-8")
