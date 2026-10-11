@@ -1,6 +1,6 @@
 # Karaoke: design
 
-!!! note "Status as of 2026-10-11: architecture and work breakdown drafted; the UI sheet and the owner's sign-off are next"
+!!! note "Status as of 2026-10-11: architecture, work breakdown and the UI sheet drafted; the owner's sign-off is next"
     Phase 2 of [the karaoke plan](karaoke.md). It answers the specification there (requirement IDs
     P1 to P11, L1 to L6, A1 to A8, D1 and D2) and changes none of it. Nothing below is built, except
     the first PR of the breakdown, which is open: PR #1274. Section
@@ -116,6 +116,36 @@ not pushed, as the rest of Hearth's live state is: no engine callback carries a 
 - **Preview (A6).** `StreamPlayerController` already decodes a stream to memory and plays it. It
   gains the reproduction and vocals choice, and the page uses it on the file just encoded, so the
   author hears the encoded stream through the same decoder a singer's player runs.
+
+## The UI design sheet
+
+Five artboards, drawn in Hearth's own language (the signal palette, zero radius, numbered mono
+section labels, the three-column page and the transport bar at the bottom) from its design
+screenshots and `Theme.qml`, and read back from the rendered pages and an enlarged crop, not from
+memory. The sheet is a design canvas, <https://claude.ai/artifact/4gF1gBgmBpPFLt7nLDYH7e>, private
+to the owner.
+
+| Board | Shows | Answers |
+|---|---|---|
+| Hearth: Karaoke page, reference view | Queue with karaoke items, the stream's parts and which are heard or muted, the Reproduction card (decoder: as coded, aware, capable; vocals: none, V1, V2, both), the lyric panel with a word part-way through, what each output carries, and the signal path | P1, P2, P4, P10; L4 |
+| Hearth: singer view | Full screen, dark: the line being sung large, previous lines dim in the sung colour, upcoming lines muted, the vocals chooser and transport kept at the bottom | L4, L6 |
+| Hearth: the states | Not a karaoke stream (controls disabled, with the reason), a bitstream output, the Lt/Rt fold, and the three lyric cases (line times only, no file, unreadable) | P6, P7, P8; L5 |
+| Forge GUI: Karaoke flow, Parts | A fourth entry beside Guided, Advanced and Expert; the parts as named slots, the coding mode chosen from what was supplied, the checks, the coded channels on the left | A1 to A3, A8 |
+| Forge GUI: Karaoke flow, Hear | The encoded stream played under each reproduction, with what reaches each output | A6 |
+
+What the sheet fixes, so the build does not have to decide it again:
+
+- **Three word states, and a cue that is not colour.** *Sung* is the accent, *not yet sung* is the
+  muted neutral, and the word *being sung* is bold and underlined, with the sung part of it in the
+  accent. The first render of the sheet lost that underline on the Hearth page (the underline fell
+  outside the clipped background and went transparent); the QML draws it as its own item, not as
+  text decoration.
+- **The page keeps Hearth's order.** Karaoke is the seventh button, after Settings, so `Ctrl+1` to
+  `Ctrl+6` keep their meaning.
+- **Notices sit inside the Reproduction card**, in words, with the one action that fixes the
+  cause (`Play decoded here`, `Use Lo/Ro`), so a disabled control is never unexplained.
+- **The Forge flow is a mode of the controls row**, with the same stepper and footer as Guided, and
+  the coded channels shown on the left as they will be written.
 
 ## Work breakdown
 
