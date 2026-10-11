@@ -7,7 +7,7 @@
 // on top of THIS class, not a second decode path.
 
 import type { IclForgeEmbindModule, FoldOptions, NativePushDecoder, ObjectFrame, PushOutcome, ScanOutcome } from "./types.js";
-import { DownmixTarget } from "./types.js";
+import { DownmixTarget, KaraokeReproduction, KaraokeVocals } from "./types.js";
 
 /**
  * Splits a whole elementary-stream byte blob into the access units
@@ -30,7 +30,13 @@ export class PushDecoder {
   #closed = false;
 
   constructor(module: IclForgeEmbindModule, fold: FoldOptions = DEFAULT_FOLD_OPTIONS) {
-    this.#native = new module.PushDecoder(fold.target, fold.applyDialnorm ?? false, fold.mixLfe ?? false);
+    this.#native = new module.PushDecoder(
+      fold.target,
+      fold.applyDialnorm ?? false,
+      fold.mixLfe ?? false,
+      fold.karaoke ?? KaraokeReproduction.AsCoded,
+      fold.karaokeVocals ?? KaraokeVocals.Both,
+    );
   }
 
   /**
@@ -61,6 +67,7 @@ export class PushDecoder {
       channelCount: raw.channelCount!,
       channelLabels: raw.channelLabels!,
       foldChannelCount: raw.foldChannelCount!,
+      karaoke: raw.karaoke ?? false,
       objectCount: raw.objectCount!,
       objectLabels: raw.objectLabels!,
     };
@@ -71,7 +78,10 @@ export class PushDecoder {
     return this.#native.channelPcm(index);
   }
 
-  /** The optional §7.8 fold (iclforge::ac3::OutputStage/DC1) this instance was constructed for - null if `fold.target` was `AsCoded`. */
+  /**
+   * The optional §7.8 fold (iclforge::ac3::OutputStage/DC1) this instance was constructed for - null if `fold.target` was
+   * `AsCoded` and no karaoke reproduction was asked for.
+   */
   fold(index: number): Float32Array | null {
     if (index >= this.#native.foldChannelCount()) return null;
     return this.#native.foldPcm(index);

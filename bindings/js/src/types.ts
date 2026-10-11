@@ -10,6 +10,27 @@ export enum DownmixTarget {
   Mono = 3,
 }
 
+/**
+ * Annex C's reproduction of an AC-3 karaoke stream (bsmod 7 above 1/0), in iclforge::ac3::KaraokeReproduction's
+ * own numeric order. Applied to the fold, so it only changes anything for a stream that is karaoke.
+ */
+export enum KaraokeReproduction {
+  /** The coded channels, as they are. */
+  AsCoded = 0,
+  /** L, C and R with the vocals at the stream's own level (Table C.2.2). */
+  Aware = 1,
+  /** The listener chooses which vocals are heard (Table C.2.3; see {@link KaraokeVocals}). */
+  Capable = 2,
+}
+
+/** Which of a karaoke stream's vocals the {@link KaraokeReproduction.Capable} reproduction plays. */
+export enum KaraokeVocals {
+  None = 0,
+  V1 = 1,
+  V2 = 2,
+  Both = 3,
+}
+
 /** Which of PushDecoder's outputs feeds the AudioWorklet ring buffer - see decoder-worker.ts/decoder-node.ts. */
 export type WriteTarget = "channels" | "fold";
 
@@ -19,6 +40,13 @@ export interface FoldOptions {
   applyDialnorm?: boolean;
   /** §7.8's optional LFE contribution to the fold. */
   mixLfe?: boolean;
+  /**
+   * Annex C's reproduction of a karaoke AC-3 stream. At a stereo or mono `target` it is Annex C's own 2/0
+   * reproduction; at `AsCoded` it is three channels (four with the LFE): L, C and R. Default `AsCoded` (none).
+   */
+  karaoke?: KaraokeReproduction;
+  /** Which vocals the `Capable` reproduction plays. Default `Both`. */
+  karaokeVocals?: KaraokeVocals;
 }
 
 export interface PushMetadata {
@@ -30,6 +58,8 @@ export interface PushMetadata {
   channelLabels: string[];
   /** 0 when no fold was requested at construction. */
   foldChannelCount: number;
+  /** Whether this unit is Annex C karaoke type: an AC-3 syncframe flagged bsmod 7 above 1/0. Never an E-AC-3 or AC-4 unit. */
+  karaoke: boolean;
   objectCount: number;
   objectLabels: string[];
 }
@@ -83,6 +113,7 @@ export interface RawPushResult {
   channelCount?: number;
   channelLabels?: string[];
   foldChannelCount?: number;
+  karaoke?: boolean;
   objectCount?: number;
   objectLabels?: string[];
 }
@@ -109,7 +140,13 @@ export interface RawScanResult {
 
 /** The Embind module `apps/demos/wasm/decoder_bindings.cpp` builds - what `createIclForgeModule()` resolves to. */
 export interface IclForgeEmbindModule {
-  PushDecoder: new (foldTarget: number, foldApplyDialnorm: boolean, foldMixLfe: boolean) => NativePushDecoder;
+  PushDecoder: new (
+    foldTarget: number,
+    foldApplyDialnorm: boolean,
+    foldMixLfe: boolean,
+    karaoke: number,
+    karaokeVocals: number,
+  ) => NativePushDecoder;
   scanStream(bytes: Uint8Array): RawScanResult;
 }
 
