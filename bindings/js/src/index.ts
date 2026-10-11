@@ -15,7 +15,7 @@ export type { Fragment as Fmp4Fragment, Sample as Fmp4Sample, TrackInfo as Fmp4T
 export { attachHlsAudioBridge, installMediaSourceShim, syncTo } from "./hls-bridge.js";
 export type { HlsAudioBridgeOptions, MediaSourceShimOptions, SegmentSink } from "./hls-bridge.js";
 
-export { DownmixTarget } from "./types.js";
+export { DownmixTarget, KaraokeReproduction, KaraokeVocals } from "./types.js";
 export type {
   IclForgeEmbindModule,
   IclForgeModuleFactory,

@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PushDecoder, scanStream } from "../dist/push-decoder.js";
-import { DownmixTarget } from "../dist/types.js";
+import { DownmixTarget, KaraokeReproduction, KaraokeVocals } from "../dist/types.js";
 import { failure, frame, holdBack, makeFakeModule, pcm } from "./fake-embind.js";
 
 test("scanStream passes a successful scan through as a typed outcome", () => {
@@ -35,7 +35,15 @@ test("scanStream keeps the native error, and names one when the native side gave
 test("the constructor defaults to no fold, no dialnorm and no LFE mix", () => {
   const { module, log } = makeFakeModule();
   new PushDecoder(module).close();
-  assert.deepEqual(log.constructed, [{ foldTarget: DownmixTarget.AsCoded, applyDialnorm: false, mixLfe: false }]);
+  assert.deepEqual(log.constructed, [
+    {
+      foldTarget: DownmixTarget.AsCoded,
+      applyDialnorm: false,
+      mixLfe: false,
+      karaoke: KaraokeReproduction.AsCoded,
+      karaokeVocals: KaraokeVocals.Both,
+    },
+  ]);
 });
 
 test("the constructor forwards every fold option it is given", () => {
@@ -43,9 +51,59 @@ test("the constructor forwards every fold option it is given", () => {
   new PushDecoder(module, { target: DownmixTarget.LtRt, applyDialnorm: true, mixLfe: true }).close();
   new PushDecoder(module, { target: DownmixTarget.Mono }).close();
   assert.deepEqual(log.constructed, [
-    { foldTarget: DownmixTarget.LtRt, applyDialnorm: true, mixLfe: true },
-    { foldTarget: DownmixTarget.Mono, applyDialnorm: false, mixLfe: false },
+    {
+      foldTarget: DownmixTarget.LtRt,
+      applyDialnorm: true,
+      mixLfe: true,
+      karaoke: KaraokeReproduction.AsCoded,
+      karaokeVocals: KaraokeVocals.Both,
+    },
+    {
+      foldTarget: DownmixTarget.Mono,
+      applyDialnorm: false,
+      mixLfe: false,
+      karaoke: KaraokeReproduction.AsCoded,
+      karaokeVocals: KaraokeVocals.Both,
+    },
   ]);
+});
+
+test("the constructor forwards the karaoke reproduction and the vocals as the library numbers them", () => {
+  const { module, log } = makeFakeModule();
+  new PushDecoder(module, {
+    target: DownmixTarget.AsCoded,
+    karaoke: KaraokeReproduction.Capable,
+    karaokeVocals: KaraokeVocals.V2,
+  }).close();
+  new PushDecoder(module, { target: DownmixTarget.LoRo, karaoke: KaraokeReproduction.Aware }).close();
+  assert.deepEqual(
+    log.constructed.map(({ karaoke, karaokeVocals }) => [karaoke, karaokeVocals]),
+    [
+      [2, 2],
+      [1, 3],
+    ],
+  );
+  // The enumerations are iclforge::ac3's own numeric order.
+  assert.deepEqual([KaraokeReproduction.AsCoded, KaraokeReproduction.Aware, KaraokeReproduction.Capable], [0, 1, 2]);
+  assert.deepEqual([KaraokeVocals.None, KaraokeVocals.V1, KaraokeVocals.V2, KaraokeVocals.Both], [0, 1, 2, 3]);
+});
+
+test("push says whether the unit is karaoke type, and an older module that does not say is not", () => {
+  const { module } = makeFakeModule({
+    script: [frame({ channels: [pcm(1)], karaoke: true }), frame({ channels: [pcm(1)] })],
+  });
+  const decoder = new PushDecoder(module);
+  assert.equal(decoder.push(new Uint8Array(1)).karaoke, true);
+  assert.equal(decoder.push(new Uint8Array(1)).karaoke, false);
+  // A module built before the field returns none: it is read as not karaoke, not as a missing key.
+  const older = makeFakeModule({ script: [frame({ channels: [pcm(1)] })] });
+  const raw = older.module.PushDecoder.prototype.pushAccessUnit;
+  older.module.PushDecoder.prototype.pushAccessUnit = function (bytes) {
+    const result = { ...raw.call(this, bytes) };
+    delete result.karaoke;
+    return result;
+  };
+  assert.equal(new PushDecoder(older.module).push(new Uint8Array(1)).karaoke, false);
 });
 
 test("push maps a decoded frame's metadata onto the outcome", () => {
@@ -64,6 +122,7 @@ test("push maps a decoded frame's metadata onto the outcome", () => {
     channelCount: 2,
     channelLabels: ["L", "R"],
     foldChannelCount: 1,
+    karaoke: false,
     objectCount: 0,
     objectLabels: [],
   });

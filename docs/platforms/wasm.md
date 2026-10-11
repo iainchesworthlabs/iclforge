@@ -202,6 +202,15 @@ in place. Everything the OLD whole-file Embind `Decoder` class used to accumulat
 channel/energy buffers, object position/audio bookkeeping, the stereo fold) now lives in
 `bindings/js/src/decode-file.ts`, built on top of `PushDecoder` rather than duplicating it.
 
+The same side fold carries Annex C's karaoke reproduction: `PushDecoder` takes two more constructor
+arguments (the `OutputConfig::karaoke` and `karaoke_vocals` numbers, a three-argument form that asks
+for none being kept), reads whether the unit is karaoke from its own syncframe header (a lone AC-3
+syncframe flagged `bsmod` 7 above 1/0 - the decoded unit does not carry an AC-3 core's `bsmod`),
+resolves an AC-3 core's fold levels from its own `cmixlev`/`surmixlev` as the decoder's own fold does
+(an E-AC-3 bed's from `mixmdate`), and reports `karaoke` in each result. At `AsCoded` the reproduction
+is three channels (four with an LFE) in `foldPcm`; at a stereo target it is Annex C's own 2/0
+reproduction. The demo page shows a vocals control for a stream that is karaoke.
+
 `bindings/js/` is the package itself (not published — see [Publishing](#publishing) below):
 `push-decoder.ts` (the typed wrapper over the Embind class above), `decode-file.ts` (the
 whole-file convenience helper the demo's scrub/solo experience needs),

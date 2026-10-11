@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decodeFile } from "../dist/decode-file.js";
-import { DownmixTarget } from "../dist/types.js";
+import { DownmixTarget, KaraokeReproduction } from "../dist/types.js";
 import { failure, frame, holdBack, makeFakeModule, pcm } from "./fake-embind.js";
 
 const units = (n) => new Uint8Array(n);
@@ -80,6 +80,21 @@ test("the fold is accumulated alongside the channels when one was requested", ()
   assert.equal(program.fold.length, 2);
   assert.deepEqual(Array.from(program.fold[0]), [0.5, 0.25]);
   assert.deepEqual(Array.from(program.fold[1]), [-0.5, -0.25]);
+});
+
+test("a karaoke stream is said to be one, whichever reproduction was asked for", () => {
+  const karaokeFrame = frame({ frameSamples: 1, channels: [pcm(1), pcm(1), pcm(1)], fold: [pcm(0.5), pcm(0.5), pcm(0.5)], karaoke: true });
+  const { module, log } = makeFakeModule({ script: [karaokeFrame, karaokeFrame] });
+  const program = decodeFile(module, units(2), {
+    fold: { target: DownmixTarget.AsCoded, karaoke: KaraokeReproduction.Aware },
+  });
+  assert.equal(program.karaoke, true);
+  assert.equal(log.constructed[0].karaoke, KaraokeReproduction.Aware);
+  // The fold is the reproduction: three channels where the stream codes five.
+  assert.equal(program.fold.length, 3);
+
+  const plain = makeFakeModule({ script: [frame({ frameSamples: 1, channels: [pcm(1), pcm(1)] })] });
+  assert.equal(decodeFile(plain.module, units(1)).karaoke, false);
 });
 
 test("energy is the RMS of each 1024-sample block, the last block over what remains", () => {

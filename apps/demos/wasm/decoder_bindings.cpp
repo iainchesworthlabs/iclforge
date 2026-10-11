@@ -40,6 +40,7 @@
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/objects/oamd.hpp"
 
 namespace {
@@ -139,11 +140,23 @@ class PushDecoder {
     // caller gets by passing target=asCoded) means "no fold": foldPcm/
     // foldChannelCount then always report nothing, and apply_fold's copy is
     // skipped entirely.
-    PushDecoder(int fold_target, bool fold_apply_dialnorm, bool fold_mix_lfe)
+    //
+    // karaoke / karaokeVocals: Annex C's reproduction of an AC-3 karaoke stream
+    // (bsmod 7 above 1/0), iclforge::ac3::KaraokeReproduction's and KaraokeVocals'
+    // own numeric order (0=as coded, 1=aware, 2=capable; 0=none, 1=V1, 2=V2,
+    // 3=both). Part of the same side fold: asking for a reproduction is asking
+    // for one, so foldPcm/foldChannelCount then report it even at fold target
+    // asCoded (three or four channels: L, C, R and the LFE), and at Lo/Ro it
+    // is Annex C's own 2/0 reproduction. Only an AC-3 stream is ever karaoke
+    // (E-AC-3 and AC-4 never set the flag), whatever is asked.
+    PushDecoder(int fold_target, bool fold_apply_dialnorm, bool fold_mix_lfe, int karaoke,
+                int karaoke_vocals)
         : fold_(iclforge::ac3::OutputConfig{
               .target = static_cast<iclforge::ac3::DownmixTarget>(fold_target),
               .apply_dialnorm = fold_apply_dialnorm,
-              .mix_lfe = fold_mix_lfe}) {
+              .mix_lfe = fold_mix_lfe,
+              .karaoke = static_cast<iclforge::ac3::KaraokeReproduction>(karaoke),
+              .karaoke_vocals = static_cast<iclforge::ac3::KaraokeVocals>(karaoke_vocals)}) {
         for (auto& channel : pcm_) {
             channel.resize(iclforge::ac3::kSamplesPerFrame);
         }
@@ -156,6 +169,11 @@ class PushDecoder {
         }
     }
 
+    // The three-argument form: no karaoke reproduction, which is what a caller from before the
+    // two arguments gets.
+    PushDecoder(int fold_target, bool fold_apply_dialnorm, bool fold_mix_lfe)
+        : PushDecoder(fold_target, fold_apply_dialnorm, fold_mix_lfe, 0, 3) {}
+
     emscripten::val pushAccessUnit(const emscripten::val& js_bytes) {
         object_positions_.clear();
         object_audio_.clear();
@@ -165,6 +183,7 @@ class PushDecoder {
         const std::vector<std::uint8_t> raw = emscripten::vecFromJSArray<std::uint8_t>(js_bytes);
         const std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(raw.data()),
                                                 raw.size());
+        unit_karaoke_ = is_karaoke_unit(bytes);
         try {
             auto decoded = decoder_.decode_access_unit_into(bytes, spans_);
             if (!decoded) {
@@ -344,6 +363,8 @@ class PushDecoder {
         result.set("channelCount", static_cast<int>(labels.size()));
         result.set("channelLabels", make_string_array(labels));
         result.set("foldChannelCount", fold_channel_count_);
+        // Annex C: an AC-3 stream flagged bsmod 7 above 1/0, whatever reproduction was asked for.
+        result.set("karaoke", unit_karaoke_);
         result.set("objectCount", static_cast<int>(objects.size()));
         result.set("objectLabels", make_string_array(object_labels_));
         return result;
@@ -357,8 +378,22 @@ class PushDecoder {
     // demo's case). Copying into fold_scratch_ first - a bounded, allocation-
     // free copy, both buffers sized once at construction - keeps both
     // outputs available from one decode.
+    // Whether the unit just pushed is Annex C karaoke type, from its own syncframe header: a
+    // lone AC-3 syncframe flagged bsmod 7 above 1/0. Not read from the decoded unit, which does
+    // not carry an AC-3 core's bsmod; and never an E-AC-3 bed, which has a bsmod of its own in
+    // infomdat that the library does not reproduce as karaoke (Annex C is AC-3's).
+    [[nodiscard]] static bool is_karaoke_unit(std::span<const std::byte> unit) {
+        const auto header = iclforge::ac3::io::read_frame_header(unit);
+        return header.has_value() && header->kind == iclforge::ac3::io::StreamKind::kAc3 &&
+               header->bytes == unit.size() &&
+               iclforge::ac3::meta::is_karaoke(static_cast<iclforge::ac3::meta::BitstreamMode>(header->bsmod),
+                                               header->acmod);
+    }
+
     void apply_fold(const iclforge::ac3::DecodedAccessUnit& unit) {
-        if (fold_.config().target == iclforge::ac3::DownmixTarget::kAsCoded) {
+        // Nothing to do for the coded channels as they are: no fold, and no reproduction asked.
+        if (fold_.config().target == iclforge::ac3::DownmixTarget::kAsCoded &&
+            fold_.config().karaoke == iclforge::ac3::KaraokeReproduction::kOff) {
             return;
         }
         fold_views_.clear();
@@ -369,7 +404,13 @@ class PushDecoder {
             fold_views_.emplace_back(fold_scratch_[ch].data(),
                                      static_cast<std::size_t>(last_frame_samples_));
         }
-        const auto levels = iclforge::ac3::mix_levels(unit.mixing);
+        // Resolved as the decoder's own fold does (Eac3Decoder's resolve_mix_levels): a legacy
+        // core's levels are bsi's (and Annex D's xbsi1), a genuine E-AC-3 bed's are mixmdate's.
+        auto levels = unit.bsid <= 8 ? iclforge::ac3::mix_levels(unit.acmod, unit.cmixlev, unit.surmixlev,
+                                                                 unit.alternate_bsi)
+                                     : iclforge::ac3::mix_levels(unit.mixing);
+        // Annex C's flag, which only OutputConfig::karaoke asks the stage to act on.
+        levels.karaoke = unit_karaoke_;
         const bool has_lfe =
             unit.layout.count > 0 &&
             unit.layout.index_of(iclforge::ac3::eac3::chanmap::Location::kLfe) >= 0;
@@ -379,8 +420,8 @@ class PushDecoder {
         } else {
             fold_.apply(fold_views_, unit.acmod, has_lfe, levels, unit.dialnorm, unit.dialnorm2);
         }
-        fold_channel_count_ = static_cast<int>(
-            iclforge::ac3::output_channel_count(fold_.config(), unit.acmod, has_lfe));
+        fold_channel_count_ = static_cast<int>(iclforge::ac3::output_channel_count(
+            fold_.config(), unit.acmod, has_lfe, levels.karaoke));
     }
 
     iclforge::ac3::Eac3Decoder decoder_;  // Default DecoderConfig: always raw/coded output.
@@ -394,6 +435,8 @@ class PushDecoder {
     std::array<std::vector<float>, kMaxChannels> fold_scratch_;
     std::vector<std::span<float>> fold_views_;
     int fold_channel_count_ = 0;
+    // The unit being decoded is Annex C karaoke type (is_karaoke_unit above).
+    bool unit_karaoke_ = false;
 
     // This frame only - see objectPosition's own comment on why these are
     // not accumulated across calls the way the old whole-file Decoder did.
@@ -408,6 +451,7 @@ EMSCRIPTEN_BINDINGS(iclforge_wasm_push_decode) {
     emscripten::function("scanStream", &scanStream);
     emscripten::class_<PushDecoder>("PushDecoder")
         .constructor<int, bool, bool>()
+        .constructor<int, bool, bool, int, int>()
         .function("pushAccessUnit", &PushDecoder::pushAccessUnit)
         .function("flush", &PushDecoder::flush)
         .function("flushedChannelPcm", &PushDecoder::flushedChannelPcm)

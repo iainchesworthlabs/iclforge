@@ -1,7 +1,7 @@
 // KaraokeController (planning/karaoke-design.md, K5): the lyrics of the item
 // playing as the lyric view binds to them, and the cursor the view asks every
 // frame. The reader and the cursor's own rules are tested where they live
-// (apps/hearth/engine/tests/test_lyrics.cpp); what is checked here is what this
+// (libs/lyrics/tests/test_lyrics.cpp); what is checked here is what this
 // class makes of them for QML: the shapes, the statuses and their reasons, the
 // delay and that it is kept.
 
@@ -208,7 +208,7 @@ TEST_CASE("KaraokeController: no file, a plain file and an unreadable one each s
     controller.load(room.path("broken.ac3"), 5000);
     CHECK(controller.status().toStdString() == "error");
     CHECK(controller.fileName().toStdString() == "broken.lrc");
-    CHECK(controller.errorText().toStdString() == "The lyrics file is not UTF-8.");
+    CHECK(controller.errorText().toStdString() == "The lyrics file is not UTF-8 or UTF-16.");
     CHECK(controller.lines().isEmpty());
 
     // And the file's extension is matched in any case.
