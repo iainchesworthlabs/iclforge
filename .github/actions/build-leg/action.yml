@@ -462,6 +462,15 @@ runs:
         # A test that passes alone passes the phase, with a warning that names it,
         # because it has a timing or shared-resource assumption and refusing a change
         # that broke nothing is the worse trade. One that fails alone is a failure.
+        #
+        # "Those" are the tests the phase's own output names, run again by name with
+        # `--tests-from-file`, and the leg checks that the tests the repeat started are
+        # exactly the tests that failed. It is not `--rerun-failed`: that reads test
+        # NUMBERS from LastTestsFailed.log and looks them up in the full test list, and
+        # `ctest -E <regex>` with no -R takes the matching tests out of the list before it
+        # numbers it. The first phase's #535 was the full list's #588, so the repeat ran
+        # another test, saw it pass and turned a red leg green (a real failure of the
+        # translation catalogues passed this way on every leg).
         cpus="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo "${NUMBER_OF_PROCESSORS:-2}")"
         jobs="$CTEST_JOBS"
         if [ "$jobs" = "auto" ]; then jobs="$cpus"; fi
@@ -470,8 +479,65 @@ runs:
         log="${RUNNER_TEMP}/ctest.log"
         failed_log="${RUNNER_TEMP}/ctest-failed.log"
         phase_log="${RUNNER_TEMP}/ctest-phase.log"
+        again_log="${RUNNER_TEMP}/ctest-again.log"
+        failed_names="${RUNNER_TEMP}/ctest-failed-names.txt"
         : > "$log"
         : > "$failed_log"
+        # What a ctest run's own output says, read from stdin, with the carriage
+        # returns a Windows ctest ends its lines with taken off.
+        #
+        # failed_test_names: the exact name of each test under "The following tests
+        # FAILED:", one a line. The line is `<tab><number> - <name> (<status>)[ <label>...]`
+        # and the name is what comes before the LAST parenthesised word, so a name with
+        # parentheses of its own and a list of labels both come out whole. A skipped
+        # test is listed above that, under "did not run", and is not a failure.
+        failed_test_names() {
+          tr -d '\r' \
+            | sed -n '/^The following tests FAILED:/,/^Errors while running CTest/p' \
+            | sed -n -E 's/^[[:space:]]+[0-9]+ - (.*) \([^()]+\)( [^()]*)?$/\1/p'
+        }
+        # failed_test_count: how many tests ctest itself says failed ("99% tests
+        # passed, 2 tests failed out of 3701"), which failed_test_names is held to.
+        # Empty when it printed no such line.
+        failed_test_count() {
+          tr -d '\r' \
+            | sed -n -E 's/^[0-9]+% tests passed, ([0-9]+) tests? failed out of [0-9]+.*$/\1/p' \
+            | tail -n 1
+        }
+        # started_test_names: the exact name of each test the run started.
+        started_test_names() {
+          tr -d '\r' | sed -n -E 's/^[[:space:]]+Start +[0-9]+: (.*)$/\1/p'
+        }
+        # run_failed_alone <log of the run that failed> <log for this run>: runs the tests
+        # the first log names once more, one at a time, and returns ctest's status for
+        # that run. It returns non-zero without running anything when the first log does
+        # not name the tests ctest counted, and non-zero, whatever ctest said, when the
+        # tests it started are not the tests that failed: a repeat that passes on other
+        # tests is not a pass for these.
+        #
+        # The path is absolute because --preset makes ctest resolve a relative one from
+        # the build directory. tools/ci/test_build_leg_ctest_rerun.py runs this function.
+        run_failed_alone() {
+          local first="$1" again_out="$2" count rc=0 missing extra
+          : > "$again_out"
+          failed_test_names < "$first" > "$failed_names"
+          count="$(failed_test_count < "$first")"
+          if [ ! -s "$failed_names" ] || [ "$(( $(wc -l < "$failed_names") ))" != "${count:-none}" ]; then
+            echo "::error title=ctest::Not running the failed tests again: ctest counted ${count:-no} failed and its output names $(( $(wc -l < "$failed_names") )), so the names are not to be trusted."
+            return 1
+          fi
+          LC_ALL=C sort -u "$failed_names" -o "$failed_names"
+          ctest --preset "test-$LEG_PRESET" --tests-from-file "$failed_names" --output-on-failure 2>&1 \
+            | tee "$again_out" | tee -a "$log" || rc=$?
+          started_test_names < "$again_out" | LC_ALL=C sort -u > "$again_out.names"
+          if ! cmp -s "$failed_names" "$again_out.names"; then
+            missing="$(LC_ALL=C comm -23 "$failed_names" "$again_out.names" | head -8 | paste -sd ';' - || true)"
+            extra="$(LC_ALL=C comm -13 "$failed_names" "$again_out.names" | head -8 | paste -sd ';' - || true)"
+            echo "::error title=ctest::The run that was to repeat the failed tests did not run them. Not run again: ${missing:-none}. Run, and did not fail: ${extra:-none}."
+            return 1
+          fi
+          return "$rc"
+        }
         # One phase: $1 tests at once, $2 is `retry` to run a failing case once more
         # (anything else runs it once), and the rest is ctest's own filters. What is
         # still failing at the end of it goes to $failed_log for the summary.
@@ -479,6 +545,7 @@ runs:
           local at_once="$1" retry="$2"
           shift 2
           local status=0 again=0 names=""
+          : > "$again_log"
           if [ "$retry" = retry ]; then
             ctest --preset "test-$LEG_PRESET" -j "$at_once" --repeat until-pass:2 "$@" 2>&1 \
               | tee "$phase_log" | tee -a "$log" || status=$?
@@ -490,20 +557,23 @@ runs:
             return 0
           fi
           if [ "$at_once" -gt 1 ]; then
-            names="$(sed -n '/The following tests FAILED:/,/^Errors while running CTest/p' "$phase_log" \
-              | sed -n -E 's/^[[:space:]]+[0-9]+ - (.*) \((Failed|Timeout|SEGFAULT|Exception|Not Run|Subprocess aborted|Child aborted|Bus error|Illegal|Interrupted|OTHER_FAULT|Numerical)\).*/\1/p' \
-              | head -8 | paste -sd ';' - || true)"
             echo "::group::Still failing at ${at_once} tests at a time: running what failed again, one at a time"
-            ctest --preset "test-$LEG_PRESET" --rerun-failed --output-on-failure 2>&1 \
-              | tee "$phase_log" | tee -a "$log" || again=$?
+            run_failed_alone "$phase_log" "$again_log" || again=$?
             echo "::endgroup::"
             if [ "$again" -eq 0 ]; then
-              echo "::warning title=ctest::Failed under -j${at_once} and passed when run alone: ${names:-see the ctest output above}. The test has a timing or shared-resource assumption."
+              names="$(head -8 "$failed_names" | paste -sd ';' -)"
+              echo "::warning title=ctest::Failed under -j${at_once} and passed when run alone: ${names}. The test has a timing or shared-resource assumption."
               return 0
             fi
             status="$again"
           fi
-          cat "$phase_log" >> "$failed_log"
+          # What is still failing: the repeat's own list when it made one, else the list
+          # the phase made.
+          if grep -q 'The following tests FAILED:' "$again_log"; then
+            cat "$again_log" >> "$failed_log"
+          else
+            cat "$phase_log" >> "$failed_log"
+          fi
           return "$status"
         }
         rc=0

@@ -56,7 +56,7 @@ TABLE = project_graph.load_table()
 # the program. A directory that holds both kinds names its Catch2 files by their test_ prefix.
 APP_TESTS = (
     "apps/forge/cli/tests/", "apps/shared/media/tests/", "apps/shared/preferences/tests/",
-    "apps/hearth/engine/tests/", "apps/crucible/engine/tests/",
+    "apps/shared/project/tests/", "apps/hearth/engine/tests/", "apps/crucible/engine/tests/",
     "apps/forge/gui/tests/test_", "apps/hearth/ui/tests/test_hearth_controller.cpp",
     "apps/crucible/ui/tests/test_desktop_entries.cpp",
     "apps/crucible/ui/tests/test_translations.cpp",

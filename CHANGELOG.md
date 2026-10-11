@@ -140,7 +140,7 @@ The sections below contain the complete change list and fixes.
   karaoke AC-3 stream, its coding mode and which of M, V1 and V2 it carries - and chooses how it is
   reproduced: as coded, aware or capable, with none, V1, V2 or both vocals. It shows which part each
   speaker carries, and says in words when the choice cannot apply: a stream that is not karaoke, a
-  bitstream output, a network group, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
+  bitstream output, or an Lt/Rt fold (with a button to the Lo/Ro fold). The choice
   is kept across starts, the one decoder setting that is. The Decoder page shows it in a line with
   a button to the page.
 - **Hearth shows lyrics, word by word.** The Karaoke page has a Lyrics card for the `.lrc` file
@@ -159,15 +159,19 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
-- **The Forge GUI opens and saves projects.** A `.forgeproj` is a JSON file holding the sources
-  (with their paths relative to it and, in the Karaoke flow, which part each is), the channel plan,
-  the assignments, a table of encode settings (`codec`, `container`, `bitrateKbps`, `bsmod`,
-  `cmixlev`, `surmixlev`, each an id or a code and not a position in a list) and the Karaoke
-  flow's choices, with the flow it was made in. A **Project…** menu in the title strip
-  (**Open project…**, **Save project…**), a file dropped on the window and
-  `forge-gui file.forgeproj` read it. The format is versioned and meant to be added to: a newer
-  file is refused by naming its version, a key this version does not know is written back
-  unchanged, and a setting is one row of a table. [Projects](docs/forge/gui/projects.md) has the
+- **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
+  JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
+  part each is), the channel plan, the assignments, the objects' placements and motion, the
+  encode settings - codec, container, bit rate, coding tools, VBR and the metadata, loudness and
+  compression, in the command line's own words (`dialnorm`, `drc`, `bsmod`, ...) - and the Karaoke
+  flow's choices, with the flow it was made in. A **Project…** menu in the title strip (**Open
+  project…**, **Save project…**), a file dropped on the window and `forge-gui file.forgeproj` read
+  it; `forge project file.forgeproj [out]` runs the commands it stands for, which are the line the
+  window's command bar shows, and `print` shows them. The format is versioned and meant to be added
+  to: a newer file is refused by naming its version, a key this version does not know is written
+  back unchanged and in its place, and a setting is one row of a table. It is read and written with
+  nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
+  by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
 - **A karaoke example, "Auld Lang Syne"** (`examples/karaoke/auld-lang-syne/`): four parts, the
   `.forgeproj` that opens them in the Karaoke flow, the 3/2 `bsmod` 7 stream they make and a

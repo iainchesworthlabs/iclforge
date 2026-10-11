@@ -15,4 +15,4 @@
 # (CMakePresets.json), so a CLI-only .dmg is the ordinary local case.
 set(ICLFORGE_NOTICES_PLATFORM "macOS")
 set(ICLFORGE_NOTICES_LOCATION "NOTICES.txt at the root of the disk image, beside LICENSE.txt")
-set(ICLFORGE_NOTICE_FRAGMENTS forge-header qt-macos fmt fonts trademarks)
+set(ICLFORGE_NOTICE_FRAGMENTS forge-header qt-macos fmt nlohmann-json fonts trademarks)

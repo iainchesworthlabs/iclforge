@@ -112,6 +112,8 @@ nav:
           - C API: library/c-api.md
           - Python: library/python-api.md
           - Rust: library/rust-api.md
+  - Karaoke:
+      - Guide: karaoke/index.md
   - Validation:
       - How output is checked: verification.md
       - Threat model: threat-model.md

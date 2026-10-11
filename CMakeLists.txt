@@ -393,6 +393,12 @@ include(MinimalDecoder)
 # further down, so resolving it here is still early enough.
 if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
     include(Fmt)
+    # iclforge::json - nlohmann/json, which apps/shared/project reads and writes the project file
+    # with (cmake/NlohmannJson.cmake). No library links it: only what compiles that code in, which
+    # is forge, forge-gui and the shared tests, so a build of none of them resolves nothing.
+    if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS)
+        include(NlohmannJson)
+    endif()
 endif()
 
 # iclforge::adm (libs/adm) is a READER, not a writer like the three container modules above -
@@ -618,6 +624,7 @@ if(ICLFORGE_BUILD_TESTS)
     endif()
     add_subdirectory(apps/shared/media/tests)
     add_subdirectory(apps/shared/preferences/tests)
+    add_subdirectory(apps/shared/project/tests)
     add_subdirectory(apps/forge/gui/tests)
     if(ICLFORGE_BUILD_HEARTH)
         add_subdirectory(apps/hearth/engine/tests)

@@ -6,7 +6,7 @@ Forge: the command-line tool (forge) and the desktop application (forge-gui) for
 
 A app.
 
-- **Uses:** `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `objects`, `render`, `app-media`, `app-preferences`, `app-theme`
+- **Uses:** `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `objects`, `render`, `app-media`, `app-preferences`, `app-project`, `app-theme`
 - **Used by:** nothing
 - **CI lanes:** windows, linux, macos
 

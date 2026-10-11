@@ -20,6 +20,7 @@
 #include "iclforge/ac3/core/aht_tables.hpp"
 #include "iclforge/ac3/core/bitalloc.hpp"
 #include "iclforge/base/bitreader.hpp"
+#include "iclforge/base/executor.hpp"
 #include "iclforge/ac3/core/coupling.hpp"
 #include "iclforge/ac3/core/crc16.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
