@@ -91,6 +91,7 @@ checked. The table is of `main` at `5ef9eeafc`.
 | D14d | the C6, fixed point | open, 2026-10-02; board run 2026-10-10 | exit met: the fixed decode within 105.7 to 132.1 dB of `double` below A-SPX's crossover and 34.2 to 97.2 above, the probe's hashes equal on x86-64, the Cortex-M3 and RV32IMC, `double` and `float` unchanged; on the board no stream fits beside the Hearth sink (117 KB of heap against a floor of 286,365 bytes) and a play is refused, not aborted; the C6 takes AC-4 as PCM from Hearth |
 | D14f | the decoder's memory | open, 2026-10-03 | measured: 2.0 peaks at 286,365 bytes on a 32-bit core from 429,667 (fixed) and 413,611 (`float`), 5.1 at 704,311, 5.1.4 at 1,502,903; every PCM pin unmoved and `double` byte-identical to `main` |
 | D14g | AC-4 playback speed on the S3 and the P4 | open, 2026-10-11 | measured: the P4 keeps up at 5.1 in all four codec modes (A-CPL mode 3 at 0.73, from 1.16) and takes 5.1.4 at 1.01 to 1.21, from 1.59 to 1.92; the S3, with QIO flash, 64-byte lines, the code in PSRAM, a 64 KB data cache and the second core, keeps up at 2.0 (0.40 and 0.50), through the converter at every rate and at E-AC-3 7.1.4, and takes 5.1 SIMPLE at 0.99; every PCM hash unmoved on 160 S3 plays and 40 P4 plays |
+| D14h | A-CPL's interpolation at single precision at the float tier | open, 2026-10-11 | measured: the P4's 5.1 A-CPL mode 3 frame takes 0.63 of its duration from 0.73, the S3's 1.44 from 1.57; the PCM of streams with A-CPL moves, the float probe's six hashes and the float against double floors do not; the P4's and S3's hashes are equal on all twenty plays |
 | E1 | the encoder library, the frame writer, SIMPLE mono and stereo | #1011, 2026-09-25 | merged; exit met |
 | E2 | A-SPX and companding | #1013, 2026-09-25 | merged; exit met |
 | E3 | the 5.X element | #1025, 2026-09-25 | merged; exit met |
@@ -2700,8 +2701,8 @@ without the second core, in each memory configuration, and the host's tests hold
 - **Exit, as measured** (the decoder's time over the frame's duration, Wi-Fi up, a null sink, the P4 at 360 MHz): the tables of
   [the P4 page](../docs/platforms/bare-metal/esp32-p4.md#the-firmware-in-psram-and-the-second-core) and
   [the S3 page](../docs/platforms/bare-metal/esp32-s3.md#playback-speed). The P4 keeps up at 2.0 and at 5.1 in all four codec modes
-  (A-CPL mode 3 at 0.73, from 1.16) and in every converter rate (0.31 to 0.38, from 0.53 to 0.72), and takes 5.1.4 at 1.01 to 1.21,
-  from 1.59 to 1.92. The S3 in its default image takes 2.0 in SIMPLE at 0.80 and A-SPX at 0.99; with the free changes (QIO and
+  (A-CPL mode 3 at 0.73 from 1.16, and 0.63 with D14h) and in every converter rate (0.31 to 0.38, from 0.53 to 0.72), and takes 5.1.4
+  at 1.01 to 1.21, from 1.59 to 1.92. The S3 in its default image takes 2.0 in SIMPLE at 0.80 and A-SPX at 0.99; with the free changes (QIO and
   64-byte lines) the converter at 24 and 25 fps too; with `sdkconfig.s3-fast` those at 0.47 and 0.61 and 0.78; and with
   `sdkconfig.s3-dcache` after it, 2.0 at 0.40 and 0.50, the converter at all four rates (0.67 to 0.87, from 1.32 to 1.86), 5.1
   SIMPLE (0.99, from 2.13) and E-AC-3 7.1.4 (0.75, from 0.99); the rest of 5.1 (1.25 to 1.57) and 5.1.4 (2.28 to 2.73) stay over.
@@ -2712,8 +2713,8 @@ without the second core, in each memory configuration, and the host's tests hold
 - **Not done, and why.** (a) The syntax's parse (4.6 to 9.4 ms a frame) and the dequantisation are one thread's: the next frame's
   parse alongside this frame's reconstruction would take the P4's 5.1.4 frame to about 1.0 and the S3's 5.1 SIMPLE to 0.8, but what
   `Decoder::metadata()` and `presentations()` report is the frame just decoded, and a parse ahead moves it; it needs an API of
-  its own. (b) A-CPL's interpolation at `float` would save about 7 ms of the P4's A-CPL mode 3 frame and 3 of its 5.1.4 one, and moves
-  the `float` pins that have A-CPL in them. (c) The downmix and the copy before it are a permutation in the 5.1.4 streams the
+  its own. (b) A-CPL's interpolation at `float`, which would save about 7 ms of the P4's A-CPL mode 3 frame on one core and moves the
+  PCM of streams with A-CPL: done in [D14h](#d14h-a-cpls-interpolation-in-single-precision-at-the-float-tier). (c) The downmix and the copy before it are a permutation in the 5.1.4 streams the
   harness plays (11 ms and 6 ms of an S3 frame at 5.1.4). (d) The S3 has no sampler: the one ported to Xtensa stopped the board.
   (e) The Huffman decoder's second step takes about a tenth of the codewords and under 0.5 ms a frame on the P4.
 - **Decisions** (the user, 2026-10-11): `sdkconfig.s3-fast` and `sdkconfig.s3-dcache` are in the S3 images, the second
@@ -2723,6 +2724,28 @@ without the second core, in each memory configuration, and the host's tests hold
   E-AC-3 gain nothing from it), so the release image, which has no AC-4, takes `sdkconfig.s3-fast` alone; A-CPL's interpolation goes to `float` (D14h) and the next frame's parse is made ahead of
   this frame's reconstruction (D14i). Those two are separate changes from this one: the first moves `float` pins and the second
   adds to `Decoder`'s API, which this phase's output, bit for bit as it was, does not.
+
+#### D14h: A-CPL's interpolation in single precision at the float tier
+
+After D14g, on the user's yes of 2026-10-11 to the decision D14g left open. Pseudocode 109 is the interpolation of every A-CPL
+parameter, and the seventeen of a coupling slot and the sums of them were `double` operations, 46,000 a frame, calls into software
+on the ESP32s' single precision FPUs (about 7 ms of a P4 5.1 A-CPL mode 3 frame on one core).
+
+- **Built.** `acpl::BasicInterpolator<R>` in `libs/ac4/src/core/acpl/acpl.hpp` (`Interpolator` is its `double`), a `float`
+  `acpl::interpolate()`, and the decoder's A-CPL stage (`libs/ac4/src/decoder/pcm/acpl.cpp`) running it at `InterpReal`, `float` at
+  the `float` tier and `double` at the others: the pseudocode's expression operation for operation, from values narrowed once in the
+  column; the products and sums of parameters stay `double`, once a frame and a band.
+- **What moves.** The `float` tier's PCM of a stream whose A-CPL parameters change; the `double` and fixed-point tiers' do not. The
+  six `float` probe fixtures' PCM hashes (`testdata/ac4-probe-pcm-hashes.json`) are unchanged, on the host and the Cortex-M3 under
+  QEMU; the float against double decode of every committed stream
+  (`testdata/ac4/scalar-agreement.json`) stays at its floors, to the 0.1 dB the measure gives; 160 S3 and P4 plays' hashes are the same
+  on the two boards and with the second core on and off, and different from D14g's for the three streams with A-CPL.
+- **Exit, as measured.** The P4's 5.1 A-CPL mode 3 frame takes 0.63 of its duration from 0.73 (0.59 from 0.69 folded to 2.0); mode 2
+  0.58 from 0.59; the 5.1.4 streams 1.01, 1.19 and 1.21, from 1.01, 1.21 and 1.21. The S3's mode 3 frame takes 1.44 from 1.57; no other
+  stream moves by more than 3%.
+- **Held by.** `libs/ac4/tests/core/test_acpl_exact.cpp`: the `float` interpolation is the expression as written in single precision
+  to the bit, and within 2e-6 of the `double`'s; `libs/ac4/tests/decoder/test_acpl_exact.cpp` holds the stage to the same at the
+  decoder's scalar.
 
 ### Encoder phases
 

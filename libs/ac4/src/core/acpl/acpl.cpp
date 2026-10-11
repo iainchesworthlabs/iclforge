@@ -12,19 +12,21 @@ namespace {
     return static_cast<std::size_t>(index);
 }
 
-// The doubles of (ts + 1) and its kin, as a table: Pseudocode 109 converts each from an integer at
-// every subband, which is a call into soft float on a chip without double hardware. Past the table,
-// the conversion.
-constexpr std::array<double, kMaxSlots + 1> kRamp = [] {
-    std::array<double, kMaxSlots + 1> table{};
+// The scalar values of (ts + 1) and its kin, as a table: Pseudocode 109 converts each from an
+// integer at every subband, which is a call into soft float on a chip without double hardware.
+// Past the table, the conversion.
+template <typename R>
+constexpr std::array<R, kMaxSlots + 1> kRamp = [] {
+    std::array<R, kMaxSlots + 1> table{};
     for (std::size_t k = 0; k < table.size(); ++k) {
-        table[k] = static_cast<double>(k);
+        table[k] = static_cast<R>(k);
     }
     return table;
 }();
 
-[[nodiscard]] double ramp(int k) noexcept {
-    return at(k) < kRamp.size() ? kRamp[at(k)] : static_cast<double>(k);
+template <typename R>
+[[nodiscard]] R ramp(int k) noexcept {
+    return at(k) < kRamp<R>.size() ? kRamp<R>[at(k)] : static_cast<R>(k);
 }
 
 // Table 197, one row per QMF band group: the group's first subband and its
@@ -250,15 +252,17 @@ double gamma_step(Quant quant) noexcept {
     return quant == Quant::kFine ? 1638.0 / 16384.0 : 3276.0 / 16384.0;
 }
 
-Interpolator::Divisor::Divisor(int divisor) noexcept
-    : n(static_cast<double>(divisor)),
+template <typename R>
+BasicInterpolator<R>::Divisor::Divisor(int divisor) noexcept
+    : n(static_cast<R>(divisor)),
       by_multiply(divisor > 0 && std::has_single_bit(static_cast<unsigned>(divisor))) {
     if (by_multiply) {
-        reciprocal = 1.0 / n;
+        reciprocal = R{1} / n;
     }
 }
 
-Interpolator::Interpolator(const Framing& framing, int num_ts) noexcept
+template <typename R>
+BasicInterpolator<R>::BasicInterpolator(const Framing& framing, int num_ts) noexcept
     : steep_(framing.steep),
       two_(framing.num_param_sets == 2),
       half_(num_ts / 2),
@@ -267,15 +271,16 @@ Interpolator::Interpolator(const Framing& framing, int num_ts) noexcept
       first_half_(num_ts / 2),
       second_half_(num_ts - num_ts / 2) {}
 
-double Interpolator::at(const Column& column, int ts) const noexcept {
+template <typename R>
+R BasicInterpolator<R>::at(const Column& column, int ts) const noexcept {
     if (!steep_) {
         if (!two_) {
-            return column.prev + whole_(ramp(ts + 1) * column.rise);
+            return column.prev + whole_(ramp<R>(ts + 1) * column.rise);
         }
         if (ts < half_) {
-            return column.prev + first_half_(ramp(ts + 1) * column.rise);
+            return column.prev + first_half_(ramp<R>(ts + 1) * column.rise);
         }
-        return column.first + second_half_(ramp(ts - half_ + 1) * column.step);
+        return column.first + second_half_(ramp<R>(ts - half_ + 1) * column.step);
     }
     if (ts < slot_[0]) {
         return column.prev;
@@ -283,12 +288,18 @@ double Interpolator::at(const Column& column, int ts) const noexcept {
     return !two_ || ts < slot_[1] ? column.first : column.second;
 }
 
-void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values, const ParamPrev& prev,
-                 int num_ts, std::span<double> out) noexcept {
+template class BasicInterpolator<double>;
+template class BasicInterpolator<float>;
+
+namespace {
+
+template <typename R>
+void interpolate_at(const Framing& framing, int num_param_bands, const ParamSets& values,
+                    const ParamPrev& prev, int num_ts, std::span<R> out) noexcept {
     if (num_ts <= 0 || out.size() < at(num_ts) * kSubbands) {
         return;
     }
-    const Interpolator interpolator(framing, num_ts);
+    const BasicInterpolator<R> interpolator(framing, num_ts);
     int run_band = -1;
     std::uint64_t run_prev = 0;
     for (int sb = 0; sb < kSubbands; ++sb) {
@@ -304,12 +315,25 @@ void interpolate(const Framing& framing, int num_param_bands, const ParamSets& v
         }
         run_band = pb;
         run_prev = p_bits;
-        const Interpolator::Column column =
-            Interpolator::column(p, values[0][at(pb)], values[1][at(pb)]);
+        const typename BasicInterpolator<R>::Column column =
+            BasicInterpolator<R>::column(static_cast<R>(p), static_cast<R>(values[0][at(pb)]),
+                                         static_cast<R>(values[1][at(pb)]));
         for (int ts = 0; ts < num_ts; ++ts) {
             out[at(ts) * kSubbands + at(sb)] = interpolator.at(column, ts);
         }
     }
+}
+
+}  // namespace
+
+void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values,
+                 const ParamPrev& prev, int num_ts, std::span<double> out) noexcept {
+    interpolate_at<double>(framing, num_param_bands, values, prev, num_ts, out);
+}
+
+void interpolate(const Framing& framing, int num_param_bands, const ParamSets& values,
+                 const ParamPrev& prev, int num_ts, std::span<float> out) noexcept {
+    interpolate_at<float>(framing, num_param_bands, values, prev, num_ts, out);
 }
 
 void end_frame(const Framing& framing, int num_param_bands, const ParamSets& values, ParamPrev& prev) noexcept {
