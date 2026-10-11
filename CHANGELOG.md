@@ -151,6 +151,14 @@ The sections below contain the complete change list and fixes.
   said in words. `F11` opens the lyrics full screen (`Esc` leaves) with the transport and the
   vocals chooser kept at the bottom, and Settings has a lyric delay of -1,000 to +1,000 ms that is
   kept across starts.
+- **A karaoke stream is one reproduction across a network group.** `_iclforge_player@v1` takes
+  two more decoder settings, `karaoke` (`off`, `aware`, `capable`) and `karaoke_vocals` (`none`,
+  `v1`, `v2`, `both`), which a sink lists when it has them. Hearth sends a karaoke AC-3 stream as
+  it is to a sink that lists them, and tells it the singer's choice before the stream starts and
+  when it changes while the item plays; the sink's decoder reproduces it (L, C, R and the LFE, so
+  its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
+  firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
+  reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
 - **The Forge GUI opens and saves projects.** A `.forgeproj` is a JSON file holding the sources
   (with their paths relative to it and, in the Karaoke flow, which part each is), the channel plan,
   the assignments, a table of encode settings (`codec`, `container`, `bitrateKbps`, `bsmod`,

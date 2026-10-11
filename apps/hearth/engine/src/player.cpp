@@ -50,6 +50,41 @@ constexpr std::size_t kInitialPendingBlocks = 32;
            a.associated_type == b.associated_type && a.headphones == b.headphones;
 }
 
+// The settings' karaoke choice in the words of the role's settings, "off" for as coded.
+[[nodiscard]] KaraokeChoice karaoke_words(const DecoderSettings& settings) {
+    namespace sp = sendspin::player;
+    KaraokeChoice choice;
+    choice.reproduction = settings.karaoke == ac3::KaraokeReproduction::kCapable ? sp::Karaoke::kCapable
+                          : settings.karaoke == ac3::KaraokeReproduction::kAware ? sp::Karaoke::kAware
+                                                                                 : sp::Karaoke::kOff;
+    switch (settings.karaoke_vocals) {
+        case ac3::KaraokeVocals::kNone:
+            choice.vocals = sp::KaraokeVocals::kNone;
+            break;
+        case ac3::KaraokeVocals::kV1:
+            choice.vocals = sp::KaraokeVocals::kV1;
+            break;
+        case ac3::KaraokeVocals::kV2:
+            choice.vocals = sp::KaraokeVocals::kV2;
+            break;
+        case ac3::KaraokeVocals::kBoth:
+            choice.vocals = sp::KaraokeVocals::kBoth;
+            break;
+    }
+    return choice;
+}
+
+// The reproduction a karaoke item is to be heard in, for the sinks that decode it themselves:
+// nothing for a stream that is not karaoke, and for a karaoke one played as coded, which is what
+// a sink does with no word about it.
+[[nodiscard]] std::optional<KaraokeChoice> karaoke_choice(const ItemFacts& facts,
+                                                          const DecoderSettings& settings) {
+    if (!facts.karaoke || settings.karaoke == ac3::KaraokeReproduction::kOff) {
+        return std::nullopt;
+    }
+    return karaoke_words(settings);
+}
+
 // What a transcode decodes onto: 5.1, whose slots are in the order the AC-3
 // encoder takes its channels.
 [[nodiscard]] const render::OutputLayout& transcode_layout() {
@@ -582,7 +617,14 @@ void Player::set_decoder_settings(const DecoderSettings& settings) {
         // the old presentation.
         drop_prepared();
     }
-    settings_ = settings;
+    const DecoderSettings previous = std::exchange(settings_, settings);
+    // A choice made while a karaoke item plays to a group: the members that decode it themselves
+    // are told, and the ones sent PCM have it applied by the decode below. Going back to "as
+    // coded" is a choice too, and is told as "off".
+    if (mode_ == OutputMode::kNetworkGroup && session_ && session_->facts().karaoke &&
+        (previous.karaoke != settings.karaoke || previous.karaoke_vocals != settings.karaoke_vocals)) {
+        group_->set_karaoke(karaoke_words(settings));
+    }
     if (!session_ || !decoder_) {
         // Nothing is being decoded: the next item to start builds its decoder
         // with these.
@@ -1371,7 +1413,8 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
                                                        .layout = layout_,
                                                        .stream = sent_stream(*session_),
                                                        .coded_channels = facts.channels,
-                                                       .objects = facts.objects});
+                                                       .objects = facts.objects,
+                                                       .karaoke = karaoke_choice(facts, settings_)});
     } else {
         opened = sink_->open(
             PcmSink::Format{.sample_rate = rate, .layout = layout_, .endpoint_id = choice_.endpoint_id});

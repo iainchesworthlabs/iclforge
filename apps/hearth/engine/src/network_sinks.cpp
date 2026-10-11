@@ -814,7 +814,8 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
     const StreamNeeds needs{.stream = request.stream,
                             .sample_rate = request.sample_rate,
                             .coded_channels = request.coded_channels,
-                            .objects = request.objects};
+                            .objects = request.objects,
+                            .karaoke = request.karaoke};
     const GroupFormPlan plan = plan_group_forms(needs, request.layout, facts);
 
     for (std::size_t index = 0; index < members.size(); ++index) {
@@ -824,6 +825,12 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
             case MemberAction::kCoded:
                 (void)host_->use_pcm(client_id, false);
                 group->hold(client_id, false);
+                // A karaoke stream goes as it is only to a sink that is told how to reproduce
+                // it, which it is before the stream starts: the command is ahead of the
+                // stream's start on the same connection.
+                if (request.karaoke) {
+                    (void)tell_karaoke(members[index].sink_id, members[index].facts, *request.karaoke);
+                }
                 break;
             case MemberAction::kPcm:
                 // The codec is asked for by name, so that a sink that lists Opus first is not
@@ -859,6 +866,73 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
         }
     }
     return plan.variants;
+}
+
+bool NetworkSinks::tell_karaoke(const std::string& sink_id, const SinkFacts& facts,
+                                const KaraokeChoice& choice) {
+    if (!facts.iclforge_support) {
+        return false;
+    }
+    const std::vector<std::string>& takes = facts.iclforge_support->decoder_settings;
+    const auto lists = [&](std::string_view key) {
+        return std::ranges::find(takes, key) != takes.end();
+    };
+    if (!lists("karaoke")) {
+        return false;
+    }
+    ss::player::Settings settings;
+    if (facts.intended_settings) {
+        settings = *facts.intended_settings;
+    } else if (facts.iclforge_state && facts.iclforge_state->layout) {
+        // Settings replace the sink's whole, so the layout it is running stays what it is.
+        settings.layout = facts.iclforge_state->layout;
+    }
+    settings.decoder.karaoke = choice.reproduction;
+    if (lists("karaoke_vocals")) {
+        settings.decoder.karaoke_vocals = choice.vocals;
+    }
+    if (facts.intended_settings && facts.iclforge_state &&
+        facts.iclforge_state->settings_revision == facts.intended_settings->revision &&
+        facts.intended_settings->decoder.karaoke == settings.decoder.karaoke &&
+        facts.intended_settings->decoder.karaoke_vocals == settings.decoder.karaoke_vocals) {
+        return true;
+    }
+    return push_sink_settings(sink_id, std::move(settings));
+}
+
+void NetworkSinks::apply_karaoke(const std::string& group_id, const KaraokeChoice& choice) {
+    struct Member {
+        std::string sink_id;
+        SinkFacts facts;
+        bool coded = false;
+    };
+    std::vector<Member> members;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto found = groups_.find(group_id);
+        if (found == groups_.end()) {
+            return;
+        }
+        for (const std::string& sink_id : found->second.member_sink_ids) {
+            const auto sink = sinks_.find(sink_id);
+            if (sink == sinks_.end() || !sink->second.client.has_value() ||
+                sink->second.client_id.empty()) {
+                continue;
+            }
+            // What the plan of the programme that is playing decided: only a member sent the
+            // stream as it is decodes it for itself.
+            const auto planned = found->second.planned.find(sink_id);
+            members.push_back({.sink_id = sink_id,
+                               .facts = facts_locked(sink_id, sink->second),
+                               .coded = planned != found->second.planned.end() &&
+                                        planned->second.form == "coded"});
+        }
+    }
+    for (const Member& member : members) {
+        if (member.coded) {
+            (void)tell_karaoke(member.sink_id, member.facts, choice);
+        }
+    }
 }
 
 std::string NetworkSinks::member_client_id_locked(const std::string& sink_id) const {

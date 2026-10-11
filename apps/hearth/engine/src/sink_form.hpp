@@ -37,6 +37,12 @@
 //      its settings ask for objects, or leave it to its layout, which has
 //      height speakers - is sent PCM decoded here where that is possible, and
 //      the stream as it is, to be played as its bed, where it is not.
+//      One more condition for a karaoke AC-3 stream the singer wants reproduced (not "as
+//      coded"): the sink's decoder settings list `karaoke`, and `karaoke_vocals` for the capable
+//      reproduction. A sink whose decoder is not told how plays the coded channels, and a group
+//      would then play two things: that sink is sent PCM decoded here instead, with the
+//      reproduction applied, and where it takes no PCM it is sent the stream as it is and the
+//      reason says it is not reproduced (planning/karaoke-phase2.md, W7).
 //   2. Else PCM, if the sink offers `player@v1` with a PCM format that
 //      carries the stream's rate and if the policy allows it. The layout is
 //      the one the sink is configured to (its own reported `layout`, else the
@@ -65,6 +71,17 @@ enum class SinkForm : std::uint8_t {
     kNone,
 };
 
+// The reproduction a karaoke stream is to be heard in (Annex C of ETSI TS 102 366), in the words
+// of the role's settings: what a sink that decodes for itself is told, and what decoding for it
+// here applies.
+struct KaraokeChoice {
+    sendspin::player::Karaoke reproduction = sendspin::player::Karaoke::kAware;
+    // Which vocals the capable reproduction plays; read by no other.
+    sendspin::player::KaraokeVocals vocals = sendspin::player::KaraokeVocals::kBoth;
+
+    friend bool operator==(const KaraokeChoice&, const KaraokeChoice&) = default;
+};
+
 // What the item is, as far as the form is concerned.
 struct StreamNeeds {
     // The coded form the source has, and nullopt for one with none: a WAV, or
@@ -80,6 +97,10 @@ struct StreamNeeds {
     // a sink's stated limit is compared with; 0 for a programme with none, or
     // where it is not known.
     std::uint16_t objects = 0;
+    // Set for a karaoke AC-3 stream whose reproduction is wanted (ItemFacts::karaoke with a
+    // reproduction other than "as coded"), which a sink must be told for itself or be sent PCM
+    // that has it applied. Unset for every other stream, and for a karaoke one played as coded.
+    std::optional<KaraokeChoice> karaoke{};
     // The layout to send a sink that has said none of its own - a standard
     // player has none to say - which is the player's: such a sink then gets the
     // programme as the player renders it where it lists that width, and the
