@@ -123,6 +123,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/KaraokePage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricClock.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricScreen.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricTimingDialog.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricView.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Network.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkList.qml"

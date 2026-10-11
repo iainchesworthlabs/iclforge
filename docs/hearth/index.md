@@ -86,6 +86,27 @@ position, and a file's times are rarely right to the frame.
 larger type and more lines, and Previous, Play/Pause, Next and the vocals chooser kept at the
 bottom. `Space` pauses. Choosing a vocal there chooses the capable reproduction with it.
 
+#### Timing the lyrics
+
+**Time the lyrics...** on the Lyrics card is for an item whose words have no times, or whose times
+are for lines and not words. It opens a window over the page, and the item plays as usual:
+
+1. **Lines.** Press `Space`, or the button, as each line starts. A press is taken to be the
+   **reaction time** late (120 ms to start with, set in the window, kept across starts), and that is
+   taken off, so that what is stored is where the sound was and not where the finger came down.
+   Choose a line to play from it, to stamp it again, or to nudge it 10 ms at a time.
+2. **Words.** Each stamped line has its words spread over it by their letters, drawn slanted and
+   muted: a guess. Play, and press `Space` as each word starts; a word that was pressed turns solid
+   and keeps its time. A line's words are guessed again only where no press has set them.
+
+**Save** writes the item's `.lrc`, or makes one beside the item, and keeps the first file that was
+there once, as `.lrc.bak`. Nothing is shown as sung from the window's guesses until it is saved, and
+`Esc` does not close the window while there are edits that were not saved (**Discard and close**
+does). Times are kept to a hundredth of a second, which is what the format has.
+
+An item with no words says so, and takes a text file with a line of the words to a line, saved as
+UTF-8 or UTF-16 (an `.lrc` with no times will do), and times that.
+
 ### AC-4
 
 The desktop player plays channel-based, immersive and object AC-4 (A-JOC and direct-coded)
@@ -215,8 +236,9 @@ Raspberry Pi 4B without an underrun. See
 - **Play every track of a container.** An MP4, Matroska or MPEG-TS file plays its first AC-3,
   E-AC-3 or AC-4 track; the others are not offered, and a Matroska file's codec delay is not
   trimmed.
-- **Make or time a lyrics file.** Hearth reads `.lrc` files beside a stream; it does not write
-  them, fetch them, or time the words of one that has only lines.
+- **Fetch lyrics, or time them from the recording.** Hearth reads `.lrc` files beside a stream, and
+  times the words of one by hand ([Timing the lyrics](#timing-the-lyrics)); it does not find or
+  download them, or work the times out from the sound.
 - **List AC-4 objects on the Play page.** The Objects card shows the positions of E-AC-3 objects.
   An AC-4 item's objects are rendered into the speaker layout, and the Media page says an A-JOC
   stream carries object metadata without listing it.

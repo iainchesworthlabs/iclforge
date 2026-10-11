@@ -414,11 +414,20 @@ ScrollView {
                             elide: Text.ElideMiddle
                         }
                         AppButton {
+                            objectName: "timeLyricsButton"
+                            enabled: root.loaded
+                            text: qsTr("Time the lyrics…")
+                            onClicked: timingDialog.open()
+                        }
+                        AppButton {
                             objectName: "lyricsFullScreenButton"
                             text: qsTr("Full screen · F11")
                             onClicked: root.lyricsFullScreenRequested()
                         }
                     }
+
+                    // Stamps the words of the item as it plays (planning/karaoke-phase2.md, W6).
+                    LyricTimingDialog { id: timingDialog }
 
                     LyricView {
                         id: lyricView

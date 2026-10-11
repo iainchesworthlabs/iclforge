@@ -151,6 +151,14 @@ The sections below contain the complete change list and fixes.
   8-bit code page such as Windows-1255 are still refused by name and not guessed at. White space
   is ASCII white space whatever the locale, so a line that ends in a letter whose UTF-8 ends in
   `0xA0` (nun, among others) keeps it. The namespace is `iclforge::lyrics`; nothing else changes.
+- **Hearth times lyrics.** **Time the lyrics...** on the Karaoke page's Lyrics card opens a window
+  over the item as it plays: `Space` stamps each line as it starts and then each word, the words
+  of a stamped line begin as an estimate by their letters (drawn slanted and muted, never as
+  sung) and a press replaces one, and every press has a reaction time (120 ms to start with, kept)
+  taken off it so that the stored time is the sound's. **Save** writes the item's `.lrc` with
+  enhanced word tags and keeps the first file there once as `.lrc.bak`; an item with no words
+  takes a text file in UTF-8 or UTF-16. The writer, the estimate and the edits are in
+  `iclforge::lyrics` (planning/karaoke-phase2.md, W6).
 - **The Forge GUI opens and saves projects.** A `.forgeproj` is a JSON file holding the sources
   (with their paths relative to it and, in the Karaoke flow, which part each is), the channel plan,
   the assignments, a table of encode settings (`codec`, `container`, `bitrateKbps`, `bsmod`,

@@ -1156,127 +1156,132 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="418"/>
+        <location filename="../qml/KaraokePage.qml" line="419"/>
+        <source>Time the lyrics…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="424"/>
         <source>Full screen · F11</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="436"/>
+        <location filename="../qml/KaraokePage.qml" line="445"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="438"/>
+        <location filename="../qml/KaraokePage.qml" line="447"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="457"/>
+        <location filename="../qml/KaraokePage.qml" line="466"/>
         <source>The stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="462"/>
+        <location filename="../qml/KaraokePage.qml" line="471"/>
         <source>Backing left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="463"/>
+        <location filename="../qml/KaraokePage.qml" line="472"/>
         <source>Backing right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="464"/>
+        <location filename="../qml/KaraokePage.qml" line="473"/>
         <source>Melody guide</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="465"/>
+        <location filename="../qml/KaraokePage.qml" line="474"/>
         <source>Vocal 1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="466"/>
+        <location filename="../qml/KaraokePage.qml" line="475"/>
         <source>Vocal 2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="483"/>
+        <location filename="../qml/KaraokePage.qml" line="492"/>
         <source>not in this stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="484"/>
+        <location filename="../qml/KaraokePage.qml" line="493"/>
         <source>heard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="484"/>
+        <location filename="../qml/KaraokePage.qml" line="493"/>
         <source>muted</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="494"/>
+        <location filename="../qml/KaraokePage.qml" line="503"/>
         <source>What plays</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="532"/>
+        <location filename="../qml/KaraokePage.qml" line="541"/>
         <source>Nothing karaoke is playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="540"/>
+        <location filename="../qml/KaraokePage.qml" line="549"/>
         <source>Signal path</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="548"/>
+        <location filename="../qml/KaraokePage.qml" line="557"/>
         <source>Decoded as the stream says.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="551"/>
+        <location filename="../qml/KaraokePage.qml" line="560"/>
         <source>as coded</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="552"/>
+        <location filename="../qml/KaraokePage.qml" line="561"/>
         <source>aware</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="553"/>
+        <location filename="../qml/KaraokePage.qml" line="562"/>
         <source>capable, vocals: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="554"/>
+        <location filename="../qml/KaraokePage.qml" line="563"/>
         <source>none</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="555"/>
+        <location filename="../qml/KaraokePage.qml" line="564"/>
         <source>both</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="558"/>
+        <location filename="../qml/KaraokePage.qml" line="567"/>
         <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="559"/>
+        <location filename="../qml/KaraokePage.qml" line="568"/>
         <source>AC-3 karaoke, %1.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="571"/>
+        <location filename="../qml/KaraokePage.qml" line="580"/>
         <source>Nothing is playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="573"/>
+        <location filename="../qml/KaraokePage.qml" line="582"/>
         <source>%1 · %2 ch at %3 Hz</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1349,6 +1354,185 @@
     <message>
         <location filename="../qml/LyricScreen.qml" line="233"/>
         <source>Both</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>LyricTimingDialog</name>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="120"/>
+        <source>Next line: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="121"/>
+        <source>Every line has a time. Go on to the words, or save.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="125"/>
+        <source>Next word: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="128"/>
+        <source>Stamp the lines first.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="131"/>
+        <source>Play to the first line, then press Space as each word starts.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="132"/>
+        <source>Every word in this line is pressed. Play on to the next line.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="163"/>
+        <source>Saved as %1. A file that was there is kept once, as %1.bak.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="179"/>
+        <source>Choose the words to time</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="180"/>
+        <source>Lyrics and text (*.lrc *.txt)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="180"/>
+        <source>All files (*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="187"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="199"/>
+        <source>Time the lyrics</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="217"/>
+        <source>There are no words to time for this item.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="224"/>
+        <source>Choose a text file with one line of the words to a line (an .lrc file with no times will do), saved as UTF-8 or UTF-16.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="232"/>
+        <source>Choose a text file…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="255"/>
+        <source>What Space stamps</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="257"/>
+        <source>1 · Lines</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="258"/>
+        <source>2 · Words</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="271"/>
+        <source>Every stamped line has its words spread over it by their letters, as a guess: slanted and muted. Play, and press Space as each word starts; a pressed word turns solid.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="269"/>
+        <source>Play the item and press Space as each line starts. A line can be stamped again, or nudged, afterwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="286"/>
+        <source>Pause</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="286"/>
+        <source>Play</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="291"/>
+        <source>Back 5 s</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="296"/>
+        <source>Forward 5 s</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="311"/>
+        <source>Start of line · Space</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="312"/>
+        <source>Start of word · Space</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="442"/>
+        <source>%1 of %2 lines have a time</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="450"/>
+        <source>Stamp again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="456"/>
+        <source>−10 ms</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="462"/>
+        <source>+10 ms</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="472"/>
+        <source>Reaction time</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="484"/>
+        <source>Reaction time in milliseconds</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="487"/>
+        <source>ms taken off each press</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="496"/>
+        <source>Save</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="501"/>
+        <source>Discard and close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="501"/>
+        <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
