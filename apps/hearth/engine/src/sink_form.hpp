@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -78,6 +79,17 @@ struct KaraokeChoice {
     sendspin::player::Karaoke reproduction = sendspin::player::Karaoke::kAware;
     // Which vocals the capable reproduction plays; read by no other.
     sendspin::player::KaraokeVocals vocals = sendspin::player::KaraokeVocals::kBoth;
+    // The level of the melody and of each vocal, in dB against Table C.2.3 (DecoderSettings'
+    // karaoke_*_db); read by the capable reproduction alone.
+    double melody_db = 0.0;
+    double vocal1_db = 0.0;
+    double vocal2_db = 0.0;
+
+    // The levels that change what is heard under this choice, held to the span and in the order
+    // melody, vocal 1, vocal 2: 0 for a vocal the choice leaves out, and for all three under a
+    // reproduction that has no levels. These are what a sink is told, and what it must be able
+    // to be told (a sink that cannot is sent PCM).
+    [[nodiscard]] std::array<double, 3> heard_levels_db() const;
 
     friend bool operator==(const KaraokeChoice&, const KaraokeChoice&) = default;
 };

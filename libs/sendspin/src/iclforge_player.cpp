@@ -669,6 +669,15 @@ void write_command(json::Writer& w, const CommandMessage& command) {
             if (decoder.karaoke_vocals) {
                 w.member("karaoke_vocals", name_of(kKaraokeVocals, *decoder.karaoke_vocals));
             }
+            if (decoder.karaoke_melody_db) {
+                w.key("karaoke_melody_db").number(*decoder.karaoke_melody_db, 1);
+            }
+            if (decoder.karaoke_vocal1_db) {
+                w.key("karaoke_vocal1_db").number(*decoder.karaoke_vocal1_db, 1);
+            }
+            if (decoder.karaoke_vocal2_db) {
+                w.key("karaoke_vocal2_db").number(*decoder.karaoke_vocal2_db, 1);
+            }
             w.end_object().end_object();
             break;
         }
@@ -797,6 +806,20 @@ namespace {
     if (!named("karaoke_vocals", kKaraokeVocals, out.karaoke_vocals)) {
         return refuse("decoder.karaoke_vocals is not none, v1, v2 or both");
     }
+    const auto level = [&](std::string_view key, std::optional<double>& target) {
+        const json::Value field = decoder[key];
+        if (!field.exists()) {
+            return true;
+        }
+        target = read_number(field);
+        return target && *target >= kKaraokeLevelMinDb && *target <= kKaraokeLevelMaxDb;
+    };
+    if (!level("karaoke_melody_db", out.karaoke_melody_db) ||
+        !level("karaoke_vocal1_db", out.karaoke_vocal1_db) ||
+        !level("karaoke_vocal2_db", out.karaoke_vocal2_db)) {
+        return refuse("decoder.karaoke_melody_db, karaoke_vocal1_db and karaoke_vocal2_db are from "
+                      "-24.0 to 12.0 (dB)");
+    }
     return settings;
 }
 
@@ -908,6 +931,9 @@ std::optional<std::string> check_settings(const Settings& settings, const Suppor
         decoder.concealment.has_value(),
         decoder.karaoke.has_value(),
         decoder.karaoke_vocals.has_value(),
+        decoder.karaoke_melody_db.has_value(),
+        decoder.karaoke_vocal1_db.has_value(),
+        decoder.karaoke_vocal2_db.has_value(),
     };
     for (std::size_t i = 0; i < present.size(); ++i) {
         if (present[i] && std::find(support.decoder_settings.begin(), support.decoder_settings.end(),

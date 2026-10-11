@@ -51,13 +51,14 @@ how the decoder reproduces it:
 - **Aware** (the default) reproduces L, C and R, with the vocals at the level the programme set
   (Table C.2.2). On two speakers it is the Lo/Ro fold, which Annex C says is the same thing.
 - **Capable** lets you choose the vocals: none, V1, V2 or both (Table C.2.3). A single vocal joins
-  the melody in the centre; a pair goes to the left and the right.
+  the melody in the centre; a pair goes to the left and the right. It also takes a **level** for
+  the melody and for each vocal, from 24 dB below the table (off) to 12 dB above it.
 
 The page says in words when the choice cannot apply: a stream that is not karaoke (E-AC-3 and
 AC-4 have no karaoke mode), a bitstream output, where the receiver decodes the stream and the
 reproduction is its to make, and a stereo fold of Lt/Rt, for which Annex C defines no reproduction.
-The choice is kept across starts, the only decoder setting that is. The Decoder page shows it in
-one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
+The choice and the levels are kept across starts, the only decoder settings that are. The Decoder
+page shows the choice in one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
 Annex C's own tables.
 
 **To a network group**, the reproduction is the same on every member. A sink that lists the
@@ -69,6 +70,14 @@ sent PCM that Hearth has decoded with the reproduction applied, so the members n
 things. Where such a sink takes no PCM either, the stream plays as coded on it and the Network
 page says so. The Karaoke page's choice reaches a sink as settings, which replace that sink's
 settings whole: what the sink's own page set is not kept.
+
+The levels of the melody and the vocals (Capable only) travel the same way, as `karaoke_melody_db`,
+`karaoke_vocal1_db` and `karaoke_vocal2_db`, and only the ones that change what is heard: a level
+of 0 dB is left out, and so is the level of a vocal the Vocals choice leaves out. A sink that has
+the reproduction but does not list a level's key (a board on firmware from before them) is sent PCM
+as soon as that level is moved, so no member plays the table while another plays the level. A level
+changed while an item plays reaches the sinks that are decoding for themselves; a sink that was
+started on the item without its key keeps the table until the item is played again.
 
 #### Lyrics
 

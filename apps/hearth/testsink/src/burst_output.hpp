@@ -76,7 +76,10 @@ class BurstOutput {
     // a settings command's decoder object says; the decoders are made again with them, at the
     // next burst. A karaoke stream is laid out from ac3::output_mode(), as a board does, since
     // the reproduced frame is L, C, R and the LFE and not the coded layout.
-    void set_karaoke(sendspin::player::Karaoke reproduction, sendspin::player::KaraokeVocals vocals);
+    // `levels_db` are the melody's, vocal 1's and vocal 2's, in dB against the table: absent
+    // keys of the command are 0, the table's.
+    void set_karaoke(sendspin::player::Karaoke reproduction, sendspin::player::KaraokeVocals vocals,
+                     const std::array<double, 3>& levels_db = {0.0, 0.0, 0.0});
 
     // A stream began, or changed in place: new decoders, and a new file.
     bool start(const sendspin::player::StreamStart& stream);

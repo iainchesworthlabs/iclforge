@@ -891,10 +891,24 @@ bool NetworkSinks::tell_karaoke(const std::string& sink_id, const SinkFacts& fac
     if (lists("karaoke_vocals")) {
         settings.decoder.karaoke_vocals = choice.vocals;
     }
+    // The levels, where they are not the table's and the sink takes the key. The copy above may
+    // hold the last ones sent and a settings command replaces the sink's whole, so each is set
+    // or cleared here and never left as it was.
+    const std::array<double, 3> levels = choice.heard_levels_db();
+    const auto level = [&](std::size_t part, std::string_view key) {
+        return levels[part] != 0.0 && lists(key) ? std::optional<double>{levels[part]}
+                                                  : std::nullopt;
+    };
+    settings.decoder.karaoke_melody_db = level(0, "karaoke_melody_db");
+    settings.decoder.karaoke_vocal1_db = level(1, "karaoke_vocal1_db");
+    settings.decoder.karaoke_vocal2_db = level(2, "karaoke_vocal2_db");
     if (facts.intended_settings && facts.iclforge_state &&
         facts.iclforge_state->settings_revision == facts.intended_settings->revision &&
         facts.intended_settings->decoder.karaoke == settings.decoder.karaoke &&
-        facts.intended_settings->decoder.karaoke_vocals == settings.decoder.karaoke_vocals) {
+        facts.intended_settings->decoder.karaoke_vocals == settings.decoder.karaoke_vocals &&
+        facts.intended_settings->decoder.karaoke_melody_db == settings.decoder.karaoke_melody_db &&
+        facts.intended_settings->decoder.karaoke_vocal1_db == settings.decoder.karaoke_vocal1_db &&
+        facts.intended_settings->decoder.karaoke_vocal2_db == settings.decoder.karaoke_vocal2_db) {
         return true;
     }
     return push_sink_settings(sink_id, std::move(settings));

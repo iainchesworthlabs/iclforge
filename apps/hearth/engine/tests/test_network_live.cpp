@@ -517,6 +517,10 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
     const auto& takes = support_facts.iclforge_support->decoder_settings;
     REQUIRE(std::find(takes.begin(), takes.end(), "karaoke") != takes.end());
     REQUIRE(std::find(takes.begin(), takes.end(), "karaoke_vocals") != takes.end());
+    // And, from W10, the three part levels.
+    for (const char* key : {"karaoke_melody_db", "karaoke_vocal1_db", "karaoke_vocal2_db"}) {
+        REQUIRE(std::find(takes.begin(), takes.end(), key) != takes.end());
+    }
     const std::size_t outputs = static_cast<std::size_t>(support_facts.iclforge_support->outputs.count);
     REQUIRE(outputs >= 3);
 
@@ -574,12 +578,17 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
         const char* name;
         iclforge::ac3::KaraokeReproduction reproduction;
         iclforge::ac3::KaraokeVocals vocals;
+        // Annex C.2.3's part levels, dB against the table (W10): the capable decoder's.
+        double melody_db = 0.0;
+        double vocal1_db = 0.0;
     };
-    const std::array<Case, 4> cases{{
+    const std::array<Case, 5> cases{{
         {"as coded", iclforge::ac3::KaraokeReproduction::kOff, iclforge::ac3::KaraokeVocals::kBoth},
         {"aware", iclforge::ac3::KaraokeReproduction::kAware, iclforge::ac3::KaraokeVocals::kBoth},
         {"capable, vocal 1", iclforge::ac3::KaraokeReproduction::kCapable, iclforge::ac3::KaraokeVocals::kV1},
         {"capable, no vocals", iclforge::ac3::KaraokeReproduction::kCapable, iclforge::ac3::KaraokeVocals::kNone},
+        {"capable, both, melody -12 dB, vocal 1 +6 dB", iclforge::ac3::KaraokeReproduction::kCapable,
+         iclforge::ac3::KaraokeVocals::kBoth, -12.0, 6.0},
     }};
 
     // The host's own decode of the programme, as the same settings would have it, at each slot.
@@ -587,6 +596,8 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
         iclforge::hearth::DecoderSettings reference_settings;
         reference_settings.karaoke = c.reproduction;
         reference_settings.karaoke_vocals = c.vocals;
+        reference_settings.karaoke_melody_db = c.melody_db;
+        reference_settings.karaoke_vocal1_db = c.vocal1_db;
         iclforge::hearth::StreamDecoder reference{*layout, 48000, reference_settings};
         std::vector<double> sum(layout->slots(), 0.0);
         std::size_t count = 0;
@@ -615,6 +626,8 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
         iclforge::hearth::DecoderSettings wanted;
         wanted.karaoke = c.reproduction;
         wanted.karaoke_vocals = c.vocals;
+        wanted.karaoke_melody_db = c.melody_db;
+        wanted.karaoke_vocal1_db = c.vocal1_db;
         engine.set_decoder_settings(wanted);
         engine.add({iclforge::hearth::QueueItem{.path = "programme", .title = "Live karaoke"}});
         ++plays;

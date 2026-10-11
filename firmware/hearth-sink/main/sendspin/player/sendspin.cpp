@@ -85,10 +85,13 @@ constexpr iclforge::objects::oba::joc::Domain kJocDomain =
 // drc_boost wait for the library's separate cut and boost scales. karaoke and
 // karaoke_vocals are Annex C's reproduction of a karaoke AC-3 stream: a server
 // that sees them listed sends the stream as it is, and the board lays its
-// speakers out from what the reproduction makes (burst_player.cpp).
+// speakers out from what the reproduction makes (burst_player.cpp). The three
+// karaoke_*_db levels move the melody and each vocal against the table; a
+// server that moves one and does not see its key listed sends PCM instead.
 const std::vector<std::string> kDecoderSettings{"mode",    "heavy_compression", "dialnorm",   "downmix",   "ltrt_phase_shift",
                                                 "mix_lfe", "programme",         "objects",    "concealment", "karaoke",
-                                                "karaoke_vocals"};
+                                                "karaoke_vocals", "karaoke_melody_db", "karaoke_vocal1_db",
+                                                "karaoke_vocal2_db"};
 
 // The sink seam as the burst player's sink.
 class SeamSink final : public iclforge::ScheduledSink {

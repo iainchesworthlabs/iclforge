@@ -554,6 +554,13 @@ stream does not code has nothing for its gain to act on, and the LFE is never to
 is not a finite number of 0 or more is a mute. What to do with the surround outputs, and moving
 (not re-levelling) a part, are left to the implementation and are not offered.
 
+A control for a person (Hearth's Karaoke page and settings, the Sendspin extension's
+`karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db`, a sink's decoder) speaks dB
+against the table and not these linear gains. `karaoke_gain_from_db()` is the one conversion:
+`kKaraokeMinLevelDb` (-24) to `kKaraokeMaxLevelDb` (+12), the bottom of which is off (0.0), 0 dB
+exactly 1.0, and a value that is not a number 0 dB, the table's, where the gains themselves would
+mute it. `karaoke_level_db()` holds a level to that span.
+
 **A §E2.3.1.2 legacy core inside `Eac3Decoder`.** An AC-3 syncframe (`bsid` <= 8) present in an
 E-AC-3 stream is processed as independent substream 0, and its channels become the bed §E3.8.2
 assembles a wider programme from. That core has no `mixmdate` to carry — mixing metadata is

@@ -75,6 +75,10 @@ struct SinkOptions {
     // does what a board's does (planning/karaoke-phase2.md, W7). Without it a karaoke stream is
     // played as coded, as a sink from before the keys plays it.
     bool karaoke = false;
+    // With `karaoke`: also lists karaoke_melody_db, karaoke_vocal1_db and karaoke_vocal2_db and
+    // applies them (W10), as a board with the part levels does. Off, it is a board from before
+    // them: it reproduces karaoke and has no way to be told a level.
+    bool karaoke_levels = true;
     // The speaker layout the extension role's streams are rendered to, in iclforge::render::OutputLayout's
     // grammar.
     std::string layout = "7.1.4";

@@ -30,6 +30,28 @@ namespace {
 // impaired, which audio description is.
 constexpr int kVisuallyImpaired = 0b010;
 
+// The levels that are not the table's, as words: "melody -6 dB, vocal 1 off".
+[[nodiscard]] std::string karaoke_levels_words(const DecoderSettings& settings) {
+    struct Level {
+        const char* name;
+        double db;
+    };
+    const Level levels[] = {{"melody", settings.karaoke_melody_db},
+                            {"vocal 1", settings.karaoke_vocal1_db},
+                            {"vocal 2", settings.karaoke_vocal2_db}};
+    std::vector<std::string> parts;
+    for (const Level& level : levels) {
+        const double held = ac3::karaoke_level_db(level.db);
+        if (held == 0.0) {
+            continue;
+        }
+        parts.push_back(held <= ac3::kKaraokeMinLevelDb
+                            ? fmt::format("{} off", level.name)
+                            : fmt::format("{} {:+.0f} dB", level.name, held));
+    }
+    return joined(parts);
+}
+
 // AC-4's downmix for the fold the layout gets: the same target, or the
 // stream's preferred method for a stereo fold the listener has left to it.
 [[nodiscard]] iclforge::ac4::DownmixTarget ac4_downmix(
@@ -189,6 +211,9 @@ DecoderSetup decoder_setup(const DecoderSettings& settings, const render::Output
     config.output.mix_override = settings.mix_levels;
     config.output.karaoke = settings.karaoke;
     config.output.karaoke_vocals = settings.karaoke_vocals;
+    config.output.karaoke_melody_gain = ac3::karaoke_gain_from_db(settings.karaoke_melody_db);
+    config.output.karaoke_vocal1_gain = ac3::karaoke_gain_from_db(settings.karaoke_vocal1_db);
+    config.output.karaoke_vocal2_gain = ac3::karaoke_gain_from_db(settings.karaoke_vocal2_db);
     config.joc_domain = settings.joc_domain;
     // Not settings.programme: which programme plays is which units a session
     // feeds (Session::open), and a decoder told to skip every other
@@ -250,16 +275,18 @@ std::string describe(const DecoderSettings& settings) {
     switch (settings.karaoke) {
         case ac3::KaraokeReproduction::kOff: parts.emplace_back("karaoke: as coded"); break;
         case ac3::KaraokeReproduction::kAware: parts.emplace_back("karaoke: aware"); break;
-        case ac3::KaraokeReproduction::kCapable:
+        case ac3::KaraokeReproduction::kCapable: {
+            std::string capable = "karaoke: capable, ";
             switch (settings.karaoke_vocals) {
-                case ac3::KaraokeVocals::kNone: parts.emplace_back("karaoke: capable, no vocals"); break;
-                case ac3::KaraokeVocals::kV1: parts.emplace_back("karaoke: capable, vocal 1"); break;
-                case ac3::KaraokeVocals::kV2: parts.emplace_back("karaoke: capable, vocal 2"); break;
-                case ac3::KaraokeVocals::kBoth:
-                    parts.emplace_back("karaoke: capable, both vocals");
-                    break;
+                case ac3::KaraokeVocals::kNone: capable += "no vocals"; break;
+                case ac3::KaraokeVocals::kV1: capable += "vocal 1"; break;
+                case ac3::KaraokeVocals::kV2: capable += "vocal 2"; break;
+                case ac3::KaraokeVocals::kBoth: capable += "both vocals"; break;
             }
+            const std::string moved = karaoke_levels_words(settings);
+            parts.push_back(moved.empty() ? capable : capable + ", " + moved);
             break;
+        }
     }
     parts.push_back(settings.programme ? fmt::format("programme {}", *settings.programme)
                                        : std::string{"the first programme"});
