@@ -1,11 +1,11 @@
 # Karaoke: design
 
-!!! note "Status as of 2026-10-11: architecture, work breakdown and the UI sheet drafted; the owner's sign-off is next"
+!!! note "Status as of 2026-10-11: signed off and built (K0 to K6); corrected to what was built"
     Phase 2 of [the karaoke plan](karaoke.md). It answers the specification there (requirement IDs
-    P1 to P11, L1 to L6, A1 to A8, D1 and D2) and changes none of it. Nothing below is built, except
-    the first PR of the breakdown, which is open: PR #1274. Section
-    [Decisions for the owner](#decisions-for-the-owner) lists what the design needs answered
-    before Phase 3.
+    P1 to P11, L1 to L6, A1 to A8, D1 and D2) and changes none of it. The breakdown below was
+    built as K0 to K6 and K7 is the user guide; where the build departed from the design the
+    text carries an *As built* note, and [karaoke.md](karaoke.md#as-built) has the list.
+    [Decisions for the owner](#decisions-for-the-owner) records each decision and what became of it.
 
 ## What the design rests on
 
@@ -65,12 +65,15 @@ An arrow is *uses*. Nothing in `hearth` uses `forge-gui` or the other way round.
   words, and a cursor answers "which line, which word, how far through it" for a position by binary
   search (L1 to L5). Nothing about it is Hearth-specific, so it can move to `apps/shared` if the
   Forge GUI ever shows lyrics.
-- **UI (Qt).** A third QML singleton, `KaraokeController`, beside `HearthController` and
-  `NetworkController`, so `hearth_controller.cpp` (about 2,200 lines, edited by many sessions)
-  does not grow. It holds the stream facts, the reproduction and vocals properties (which write
-  through `HearthController`'s decoder settings), the lyrics of the current item, and the notices
-  of P6 to P8. The page and the lyric view are new QML files; the lyric colours are three new
-  roles in `apps/shared/theme/assets/qml/Theme.qml`.
+- **UI (Qt).** *As built:* the Karaoke page (K4) reads the stream facts, the reproduction and the
+  vocals from `HearthController.decoderSettings` and `currentMedia`, which carry them, and writes
+  the choice through `setDecoderSettings`; the notices of P6 to P8 are the page's own. A third QML
+  singleton, `KaraokeController` (K5), holds what is new: the lyrics of the current item (the
+  engine's reader), the cursor and the lyric delay. `hearth_controller.cpp` (about 2,200 lines,
+  edited by many sessions) grew by the persisted choice and a few map keys. The page, the lyric
+  view (`LyricView.qml`), the clock (`LyricClock.qml`) and the singer view (`LyricScreen.qml`) are
+  new QML files. The lyric colours are properties of the view, taken from the existing theme
+  roles; no role was added to `apps/shared/theme`.
 
 ### The reproduced layout (the finding)
 
@@ -104,6 +107,13 @@ fill moves too often for that, so:
 
 The fill is proportional to time across the word's width, not to its letters. The view is polled,
 not pushed, as the rest of Hearth's live state is: no engine callback carries a word.
+
+*As built:* the clock is `LyricClock.qml`, a reading and the time since it arrived while the
+transport plays, never more than 120 ms (two polls) ahead and snapped by every poll, so a pause,
+a seek and an item change are only another reading. A lyric delay of up to a second either way
+is added to the file's own `[offset:]` (K5). The cursor is the engine's `lyric_position()`, asked
+through `KaraokeController.cursor()`; the view calls it when the position, the file or the delay
+changes.
 
 ### Forge GUI
 
@@ -154,16 +164,20 @@ have merged first.
 
 | PR | What | Needs | Size | Checks |
 |---|---|---|---|---|
-| **K0** (#1274) | Hearth opens MP4, Matroska and MPEG-TS (P11) | nothing | S | Open, CI running |
+| **K0** (#1274) | Hearth opens MP4, Matroska and MPEG-TS (P11) | nothing | S | Merged |
 | **K1** | Library: the layout a reproduced karaoke frame comes out in, with tests (decision 1) | nothing | S | `libs/ac3` tests; owner of the decoder reviews |
 | **K2** | Hearth engine: karaoke settings, `decoder_setup`, bed layout, report fields (P1 to P5, P10) | K1 | M | Player on a fake device against the library decode, per reproduction |
 | **K3** | Hearth engine: LRC reader and cursor (L1 to L5) | nothing | M | Unit tests over a file of cases; cursor against known positions, seek included |
-| **K4** | Hearth UI: `KaraokeController`, Karaoke page (reference view), notices P6 to P8, persistence (P9), translations | K2 | M | QML tests, `qml.exe` screenshots, lupdate gate |
-| **K5** | Hearth UI: lyric view, the clock, full-screen view, lyric delay (L4, L6) | K3, K4 | M | QML tests with a driven clock; screenshots |
+| **K4** | Hearth UI: the Karaoke page (reference view), notices P6 to P8, persistence (P9), translations. *As built:* no controller; the page reads `HearthController` | K2 | M | QML tests, lupdate gate |
+| **K5** | Hearth UI: `KaraokeController` (lyrics, cursor, delay), the lyric view, the clock, the full-screen singer view (L4, L6) | K3, K4 | M | QML tests with a driven clock |
 | **K6** | Forge GUI: parts helper, karaoke flow, preview choice in the stream player (A1 to A8) | nothing (the library is on `main`) | L | End to end: build from generated parts, probe, decode under each reproduction, compare with Annex C |
 | **K7** | `docs/karaoke` user guide, the development-status rows, roadmap row, screenshots; remove the `docs/karaoke` entry from `PLANNED_PATHS` | K5, K6 | S | `check_doc_paths.py`, `--smoke-shot` |
 
 K2 and K3, and K6 against the Hearth PRs, can run at the same time. K0 and K1 first.
+
+*As built:* K0 to K6 were built in that order of need (K3 and K2 beside each other once K1
+merged, K4 on K2's branch, K5 on K4's, K6 on `main`). K6 is two pieces in one PR: the Qt-free
+rules with the player's choice, and the flow over them.
 
 **Owners.** Every PR is this session's unless the owner chooses to hand pieces to subagents; that
 is billed, so it is asked about before a wave. Before a PR touches a file, the open PRs on it are
@@ -196,7 +210,10 @@ stream is, the three reproductions and the listener's choice, lyrics (the format
 with an example), and making a stream in the Forge GUI. `docs/hearth/index.md` and
 `docs/forge/gui` link to it. The development-status rows record what is checked against what, and
 use the blue dot only for a stated, accepted gap (no outside decoder; word-timed files rarer than
-line-timed ones). Screenshots come from the running app with `--smoke-shot`, never `--shot`.
+line-timed ones). Screenshots come from the running app with `--smoke-shot`, never `--shot`. *As built:* Hearth has
+no `--smoke-shot` and its `--shot` opens no item, so the guide's four screenshots were taken by a
+throwaway QML script in the test binaries (a generated stream, a fake output, the bundled fonts on
+`QT_QPA_FONTDIR`).
 
 ## Risks
 
@@ -207,7 +224,7 @@ line-timed ones). Screenshots come from the running app with `--smoke-shot`, nev
   GUI's `Main.qml` (about 7,700 lines) and `encoder_controller.cpp` are edited by many sessions.
   The design adds new files and small hooks to them, and each PR is rebased on a fresh `main`.
 - **The clock under load.** If the GUI thread stalls, the fill can lag; the clamp (two polls)
-  bounds how far it can run ahead and a poll snaps it back. Measured in K5 on a loaded machine.
+  bounds how far it can run ahead and a poll snaps it back. *As built:* the clamp and the snap are tested with a driven clock; a loaded machine was not measured.
 - **Word-timed files are rare.** The feature is only as good as the files; v1 test content is
   generated and the plan's open question 5 is the tool that would time words.
 - **Translations.** Each UI PR adds strings; the lupdate location gate restamps on unrelated edits
@@ -236,3 +253,10 @@ Each has the answer the design assumes.
 5. **Full screen (K5).** *Assumed:* the singer view is the page's lyric view made full screen
    (F11, Escape to leave), with the transport and the vocals chooser reachable by one key.
    *Alternative:* a separate window, which would also allow a second monitor.
+
+**What became of them.** Each was built as assumed. 1 is `output_mode()` (K1), used by Hearth and by
+the Forge GUI's player. 2 is a guided flow over the encoder draft, with a stateless
+`KaraokeAuthoring` singleton for the rules and a Qt-free helper under it (K6). 3 is the Decoder
+page's one line and a button to the page (K4). 4 is a Settings slider of +/-1,000 ms (K5). 5 is the
+singer view as a full-screen popup on F11, with Escape to leave and Space to pause (K5). The owner
+started the PRs that carry 1 and 2 and has not been asked to confirm 3 to 5 separately.
