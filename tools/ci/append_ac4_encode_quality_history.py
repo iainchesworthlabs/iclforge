@@ -27,9 +27,11 @@ Only the MOS has a trend tier here, and it is soft: a ::warning::, never a failu
   0.15, since the tool sets there differ by that much between themselves; this pipeline has one
   encoder and a fixed set of sources.
 
-A leg already recorded for this commit is not recorded again. FFmpeg Validate runs on a push to
-main and in the nightly run, and when both land on one commit the series would otherwise carry
-every leg twice and a reader counting rows would count twice the legs.
+A leg already recorded for this commit is not recorded again. FFmpeg Validate runs in the nightly
+run, and a nightly on a tip that has not moved scores the same legs to the same numbers: the series
+would otherwise carry every leg once per run, and a reader counting rows would count them all (the
+decode series did, until append_ac4_quality_history.py learned the same guard). A repeated leg is
+still judged, against its history from before this commit, so a run says again what the first said.
 
 stdlib-only, like every tools/ci/append_*.py script.
 """
@@ -70,11 +72,10 @@ def main(argv=None) -> int:
 
     history_path = args.history_dir / f"ac4-encode-quality-{branch_slug(args.branch)}.jsonl"
     history = read_history(history_path)
-    recorded = {rec["leg"] for rec in history if rec.get("commit") == args.commit}
+    recorded = {rec.get("leg") for rec in history if rec.get("commit") == args.commit}
+    earlier = [rec for rec in history if rec.get("commit") != args.commit]
     lines = []
     for leg in legs:
-        if leg["leg"] in recorded:
-            continue
         rec = {
             "branch": args.branch,
             "commit": args.commit,
@@ -86,13 +87,14 @@ def main(argv=None) -> int:
             "lsd_db": leg.get("lsd_db"),
             "mos_lqo": leg.get("mos_lqo"),
         }
-        baseline = trailing_mean(history, rec["leg"], "mos_lqo", REGRESSION_TRAILING_WINDOW)
+        baseline = trailing_mean(earlier, rec["leg"], "mos_lqo", REGRESSION_TRAILING_WINDOW)
         if verdict(rec["mos_lqo"], baseline, MOS_REGRESSION_DROP, float("inf"), False):
             print(f"::warning title=AC-4 encode quality soft regression::{rec['leg']} MOS-LQO "
                   f"{rec['mos_lqo']:.2f} is {baseline - rec['mos_lqo']:.2f} below its trailing "
                   f"{REGRESSION_TRAILING_WINDOW}-run mean of {baseline:.2f} on {args.branch}. "
                   "Soft tier only: the scorer's own pins fail the run when a floor is crossed.")
-        lines.append(json.dumps(rec, sort_keys=True))
+        if rec["leg"] not in recorded:
+            lines.append(json.dumps(rec, sort_keys=True))
 
     args.history_dir.mkdir(parents=True, exist_ok=True)
     with history_path.open("a") as out:

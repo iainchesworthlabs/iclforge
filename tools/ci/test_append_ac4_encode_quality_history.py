@@ -114,6 +114,14 @@ class Main(unittest.TestCase):
         self.run_main([leg("20-music-192", 4.7)], commit="def")
         self.assertEqual(len(self.records()), 4)
 
+    def test_a_repeated_run_still_warns_of_a_drop(self):
+        (self.history / "ac4-encode-quality-main.jsonl").write_text(
+            "\n".join(history_line("20-music-192", 4.70) for _ in range(3)) + "\n")
+        self.run_main([leg("20-music-192", 4.55)])
+        out = self.run_main([leg("20-music-192", 4.55)])
+        self.assertIn("::warning title=AC-4 encode quality soft regression::", out)
+        self.assertEqual(len(self.records()), 4)
+
     def test_no_legs_is_a_warning_not_an_append(self):
         out = self.run_main([])
         self.assertIn("::warning", out)

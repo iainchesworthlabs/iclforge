@@ -131,6 +131,11 @@ def newest_commit_rows(path: Path):
     The last SHA to appear, not the newest commit_date: these files are
     appended to in merge order, and two records written by the same run share
     a timestamp to the second, so a date sort has ties that this does not.
+
+    A record is counted once. A run repeated on one commit (the nightly, on a
+    tip that has not moved) appended the same records again before the
+    appenders learned to skip them, and the history on the branch still holds
+    those copies; the site's scripts count them once as well.
     """
     if not path.exists():
         return []
@@ -146,7 +151,15 @@ def newest_commit_rows(path: Path):
     if not records:
         return []
     newest = records[-1].get("commit")
-    return [r for r in records if r.get("commit") == newest]
+    rows, seen = [], set()
+    for r in records:
+        if r.get("commit") != newest:
+            continue
+        key = json.dumps(r, sort_keys=True)
+        if key not in seen:
+            seen.add(key)
+            rows.append(r)
+    return rows
 
 
 def badge(label, message, color):

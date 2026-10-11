@@ -725,13 +725,19 @@ give `invalid frame type` / `unable to determine channel mode`. So FFmpeg remain
 oracle on each programme's frames, but only after the stream has been demultiplexed by programme,
 which is what `iclforge::ac3::split_access_units(stream, programme)` does.
 
-That demultiplexing is what the container path already performs — a track carries one programme,
-so `forge mkv`/`mp4` write the first programme's access units (and warn about the rest) — and
-FFmpeg strict-decodes the *result* cleanly. `tools/ci/run_codec_matrix.sh` therefore skips the
-FFmpeg check on the raw two-programme stream, the same way it does for 7.1.4, but keeps it on the
-muxed file: that check is a direct guard on the access-unit boundaries, since a programme's unit
-has to end at the next independent substream of *any* programme rather than at its own next
-frame, or each span swallows the other programme's frame and FFmpeg refuses the container too.
+That demultiplexing is what a single-programme container does — a Matroska track carries one
+programme, so `forge mkv` writes the first programme's access units (and warns about the rest), and
+`forge mp4 programme=N` writes programme N alone — and FFmpeg strict-decodes the *result* cleanly.
+`tools/ci/run_codec_matrix.sh` therefore skips the FFmpeg check on the raw two-programme stream,
+the same way it does for 7.1.4, but keeps it on the Matroska file and on each programme's MP4:
+that check is a direct guard on the access-unit boundaries, since a programme's unit has to end at
+the next independent substream of *any* programme rather than at its own next frame, or each span
+swallows the other programme's frame and FFmpeg refuses the container too. An MP4 written without
+`programme=` carries every programme in each sample (TS 102 366 F.2), which FFmpeg refuses for the
+reason it refuses the raw stream, so the matrix does not hand it to FFmpeg: it holds that file to
+`forge demux` returning the stream byte for byte. The matrix did hand it to FFmpeg until
+2026-10-10, when `mp4` began to keep every programme, and the nightly FFmpeg Validate failed there
+until the row was split this way.
 
 **Enhanced coupling has no external oracle at all — not even the partial one 7.1.4 gets.**
 FFmpeg's own Annex E parser was never written to read its syntax, so it doesn't reject these

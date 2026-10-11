@@ -277,7 +277,17 @@
   function newestCommitRows(records) {
     if (records.length === 0) return { rows: [], commit: null, date: null };
     const commit = records[records.length - 1].commit;
-    const rows = records.filter((r) => r.commit === commit);
+    // A run repeated on one commit (the nightly, on a tip that has not moved) appended the same
+    // records again, and the history on the branch still holds those copies. A copy is not a
+    // measurement: a record is counted once.
+    const seen = new Set();
+    const rows = records.filter((r) => {
+      if (r.commit !== commit) return false;
+      const key = JSON.stringify(r);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     return { rows: rows, commit: commit, date: rows[0] ? rows[0].commit_date : null };
   }
 

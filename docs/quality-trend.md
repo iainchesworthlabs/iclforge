@@ -819,10 +819,10 @@ decodes the Dolby Encoding Engine's AC-4 streams and scores each against the sou
 from ([Validation](verification.md#ac-4) describes how). Its measure is Decode accuracy against
 that source, not against another decoder. It runs in FFmpeg Validate, a nightly job, on the
 `linux-llvm` build, and its pinned floors fail that run. The same run writes the scores as a JSON
-artifact, and the `Publish quality trend` job appends one row per stream to
-`ac4-quality-main.jsonl` on the same `quality-history` branch, by
+artifact, and the `Publish external-encoder landscape trend` job, which follows it,
+appends one row per stream to `ac4-quality-main.jsonl` on the same `quality-history` branch, by
 [`tools/ci/append_ac4_quality_history.py`](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/ci/append_ac4_quality_history.py):
-one set of rows per nightly run. It covers 10 of the 15 committed legs, described below the
+one set of rows per commit, however many nightly runs score it. It covers 10 of the 15 committed legs, described below the
 chart. The AC-4 encoder's own scores are the [next series](#ac-4-encode-quality); its race against
 the Dolby encoder runs locally and has none, and nor do AC-4's objects.
 
@@ -840,7 +840,7 @@ against the full-band source is about −2.3 dB on every 5.1 stream and its own 
 from the same scoring pass. The chart plots the worst stream for each commit
 on the chosen measure. A row is flagged when its SNR falls, or its LSD rises, 0.5 dB past that
 stream's own trailing ten-run mean. A hard regression (3 dB of SNR, or 2 dB of LSD) fails the
-`Publish quality trend` job after the numbers are pushed, as the AC-3 series does.
+job that publishes it after the numbers are pushed, as the AC-3 series does.
 
 ## AC-4 encode quality
 
@@ -944,7 +944,9 @@ are what fail a run, and they fail it before the numbers are published.
         const resp = await fetch(rawUrl(file));
         if (!resp.ok) continue;
         const text = await resp.text();
-        return text.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+        // A line is a record once: a run repeated on one commit appended its records again, and
+        // the history still holds those copies.
+        return [...new Set(text.split("\n").filter((l) => l.trim()))].map((l) => JSON.parse(l));
       } catch (e) {
         // Try the next candidate.
       }

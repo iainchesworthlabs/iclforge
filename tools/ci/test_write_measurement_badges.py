@@ -672,6 +672,28 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.assertIn("is not classified", cards["Live growth"]["note"])
         self.assertEqual(self.figures(cards["Speed"])["AC-3"], "8x")
 
+    def test_a_record_repeated_on_the_newest_commit_is_counted_once(self):
+        """The nightly on a tip that has not moved appended every record again, and the history
+        still holds the copies: the tile counted 335 measurements where there were 67."""
+        self.fixture()
+        rows = [{"codec": "ac4", "leg": "ac4-10-speech-24", "mos_lqo": 4.27},
+                {"codec": "ac4", "leg": "ac4-20-music-192", "mos_lqo": 4.71}]
+        self.write("ac4-encode-quality-main", rows * 5)
+        self.write("ac4-quality-main", [
+            {"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72},
+            {"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72}])
+        for flags, title in (((), "Listening quality"),
+                             (("--page",), "Predicted listening quality")):
+            with self.subTest(surface="page" if flags else "strip"):
+                cards = self.render(*flags)
+                listening = {line["codec"]: line for line in cards[title]["lines"]}
+                # The strip says "2 measurements", the page "2 encoder measurements".
+                self.assertRegex(listening["AC-4"]["what"],
+                                 r"\b2 (encoder )?measurements on 2 legs")
+                accuracy = {line["codec"]: line["what"]
+                            for line in cards["Decode accuracy"]["lines"]}
+                self.assertRegex(accuracy["AC-4"], r"of 1 Dolby streams")
+
     def test_a_codec_with_no_rows_says_so_on_its_own_line(self):
         self.fixture()
         self.write("performance-main", [perf("plain_51", 4.0)])
@@ -702,6 +724,14 @@ class HistoryAndMainTest(unittest.TestCase):
         path.write_text("\n".join(json.dumps(r) for r in [
             {"commit": "a", "v": 1}, {"commit": "b", "v": 2}, {"commit": "b", "v": 3}]) + "\n")
         self.assertEqual([r["v"] for r in badges.newest_commit_rows(path)], [2, 3])
+
+    def test_newest_commit_rows_counts_a_record_once(self):
+        path = self.dir / "h.jsonl"
+        same = {"commit": "b", "leg": "x", "mos_lqo": 4.5}
+        path.write_text("\n".join(json.dumps(r) for r in [
+            {"commit": "a", "leg": "x"}, same, dict(reversed(list(same.items()))),
+            {"commit": "b", "leg": "y"}, same]) + "\n")
+        self.assertEqual([r["leg"] for r in badges.newest_commit_rows(path)], ["x", "y"])
 
     def test_main_writes_four_badges(self):
         (self.dir / "performance-dev.jsonl").write_text(json.dumps(
