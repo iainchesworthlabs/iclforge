@@ -2909,11 +2909,15 @@ jobs:
             sleep 1
           done
           [ -n "$settled" ] || fail "/status did not report the play as ended"
-          # Measured 47,507 on 2026-10-11 with the lane's stack (16 KB) and its enhanced coupling
-          # scratch (23 KB) in PSRAM, against the stream set's 24 KB with no lane and no PSRAM:
-          # a change that puts either back in internal RAM, or grows what the lane keeps there,
-          # shows here. 40,960 leaves room for the run-to-run movement the set's step sees (1 KB).
-          python3 "$console" --title "ESP32-S3 decode lane" --min-heap-free 40960 qemu-lane.txt
+          # The lane's stack (16 KB) and its enhanced coupling scratch (23 KB) are in PSRAM. The
+          # figure is the least heap_free of the plays' progress and lap lines, which the player
+          # samples while the decoder may still hold its working set, and 714-tpn's holds a second
+          # full PCM set at 7.1.4 (a stream the set's step cannot play): its lap line read 47,507
+          # locally on 2026-10-11 and 20,103 in CI's first run, and every other stream's 63,000 or
+          # more. So this is not a margin to the byte. 12,288 is under the worst sample seen, and
+          # a lane that moved its stack or scratch back into internal RAM would fail a play on a
+          # failed allocation long before it reached the floor.
+          python3 "$console" --title "ESP32-S3 decode lane" --min-heap-free 12288 qemu-lane.txt
           kill "$qemu" 2>/dev/null || true
 
       # BUILD ONLY, for the four combinations no step above runs: i2s, sd,
