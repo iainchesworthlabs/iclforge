@@ -243,6 +243,12 @@ The sections below contain the complete change list and fixes.
   code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
   `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
   (planning/karaoke-phase2.md, W13e).
+- **A MIDI karaoke file counted in SMPTE frames is read.** The reader refused a file whose time
+  division is SMPTE (a frame rate and the ticks in a frame, where the other files count ticks in a
+  quarter note). It now reads the four rates the format defines, 24, 25, 29.97 and 30 frames a
+  second: a tick is a fixed length of time, rounded to the nearest millisecond, and the file's tempo
+  events, which name a quarter note, move nothing. Any other rate is refused with the reason, and a
+  frame of no ticks is a damaged file (planning/karaoke-phase2.md, W13e).
 - **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
   `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
   (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
@@ -3972,8 +3978,11 @@ The sections below contain the complete change list and fixes.
   that bit never put a pull request in the queue: nine sat green and unmerged, some for six
   days. (Queueing one with that token is no better: GitHub starts no `merge_group` run for the
   entry, which would wait out the 180-minute check timeout.) The workflow now sets the bit with
-  a person's token, the Dependabot secret `MERGE_QUEUE_TOKEN`, and warns when it is not set;
-  `.github/branch-protection.md` says how to create it.
+  a person's token, the Dependabot secret `MERGE_QUEUE_TOKEN`, and fails the job, enabling
+  nothing, when it is not set or has expired: the first version fell back to `GITHUB_TOKEN`
+  with a warning, and a bit set that way is inert and is not replaced by a later run, so five
+  pull requests stayed stuck after the secret was added. `.github/branch-protection.md` says
+  how to create the token.
 - **Every Linux and macOS package shipped without the `ac3cli` man page or any of the
   four shell completions.** They were guarded by `if(CMAKE_CROSSCOMPILING)` on the
   mistaken assumption this meant only the arm64 cross legs — it's set whenever a

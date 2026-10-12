@@ -213,10 +213,14 @@ its words: the music in it is not played or read. What is taken:
 - every **syllable** is a word of the line with its own start, from its tick through the file's
   **tempo map** (a tempo change on any track moves every later tick), so the fill moves by syllable. A
   syllable that begins with a space is the start of the next word: the space is joined to the one
-  before it. A line ends where the next begins.
+  before it. A line ends where the next begins;
+- a file whose time is counted in **SMPTE frames** (a frame rate and the ticks in a frame, where the
+  other files count ticks in a quarter note) has a tick of a fixed length, and its tempo events mean
+  nothing: 24, 25, 29.97 and 30 frames a second are the four rates the format defines, and all
+  four are read.
 
-A file whose time is in SMPTE frames, that has no words, or that is cut short says so. A MIDI file
-carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
+A file with no words, that is cut short, or that counts SMPTE frames at some other rate says so. A
+MIDI file carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
 are not guessed at, so a Western karaoke file with accented letters saved in Latin-1 (and Hebrew in
 Windows-1255) is refused with the reason, as an LRC file in a code page is. Plain ASCII is UTF-8, and
 most are.
