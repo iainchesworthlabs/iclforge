@@ -1452,13 +1452,14 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
     } else if (choice_.mode == OutputMode::kNetworkGroup) {
         // A programme or presentation a member would not decode from the
         // stream whole goes as PCM alone.
-        opened = group_->open(choice_.group_name,
-                              NetworkGroupSink::Format{.sample_rate = rate,
-                                                       .layout = layout_,
-                                                       .stream = sent_stream(*session_),
-                                                       .coded_channels = facts.channels,
-                                                       .objects = facts.objects,
-                                                       .karaoke = karaoke_choice(facts, settings_)});
+        opened = group_->open(choice_.group_name, NetworkGroupSink::Format{
+                                                      .sample_rate = rate,
+                                                      .layout = layout_,
+                                                      .stream = sent_stream(*session_),
+                                                      .coded_channels = facts.channels,
+                                                      .objects = facts.objects,
+                                                      .objects_alone = facts.objects_alone,
+                                                      .karaoke = karaoke_choice(facts, settings_)});
     } else {
         opened = sink_->open(
             PcmSink::Format{.sample_rate = rate, .layout = layout_, .endpoint_id = choice_.endpoint_id});

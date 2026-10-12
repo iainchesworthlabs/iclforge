@@ -114,7 +114,11 @@ class Snapshot final : public LyricsReader {
     std::int64_t item = -1;
     bool held = false;
     bool timed = false;
-    std::size_t line_count = 0;
+    // The lines with text (a line that only marks a time is not one of the song's) and the place of the
+    // line being shown among them: what the footer says, "Line 2 of 4". Counted when an item arrives and
+    // numbered when its line moves, not on every frame.
+    std::size_t text_lines = 0;
+    std::size_t text_line_number = 0;
     LvString title;
     LvString artist;
     LvString first_name;
@@ -140,7 +144,10 @@ class Snapshot final : public LyricsReader {
                 plain.clear();
                 title.clear();
                 artist.clear();
-                line_count = 0;
+                text_lines = 0;
+                text_line_number = 0;
+                counted_lines_ = 0;
+                numbered_line_ = kNone;
                 timed = false;
                 length_ms.reset();
                 ++generation;
@@ -148,7 +155,15 @@ class Snapshot final : public LyricsReader {
             return;
         }
         timed = lyrics->timed;
-        line_count = lyrics->lines.size();
+        if (item_changed || lyrics->lines.size() != counted_lines_) {
+            text_lines = iclforge::lyrics::text_line_count(*lyrics);
+            counted_lines_ = lyrics->lines.size();
+            numbered_line_ = kNone;
+        }
+        if (at.mode == StageMode::kLine && at.line != numbered_line_) {
+            text_line_number = iclforge::lyrics::text_line_number(*lyrics, at.line);
+            numbered_line_ = at.line;
+        }
         length_ms = lyrics->length_ms;
         bool changed = item_changed;
         changed |= assign(title, lyrics->title);
@@ -227,6 +242,8 @@ class Snapshot final : public LyricsReader {
     }
 
     LvMap<std::size_t, LineText> lines_;
+    std::size_t counted_lines_ = 0;
+    std::size_t numbered_line_ = kNone;
 };
 
 // --- the rows' identity: what a rebuild is for.
@@ -1045,8 +1062,8 @@ void update_header_and_footer(const Stage& stage) {
     }
 
     std::string line;
-    if (stage.mode == StageMode::kLine && g.snap.timed) {
-        line = "Line " + std::to_string(g.snap.stage.line + 1) + " of " + std::to_string(g.snap.line_count);
+    if (stage.mode == StageMode::kLine && g.snap.timed && g.snap.text_line_number > 0) {
+        line = "Line " + std::to_string(g.snap.text_line_number) + " of " + std::to_string(g.snap.text_lines);
     }
     if (line != g.line_text) {
         g.line_text = line;

@@ -80,6 +80,7 @@ public:
                     .sample_rate = format.sample_rate,
                     .coded_channels = format.coded_channels,
                     .objects = format.objects,
+                    .objects_alone = format.objects_alone,
                     .karaoke = format.karaoke,
                     .layout = format.layout});
          for (const render::OutputLayout& layout : planned) {

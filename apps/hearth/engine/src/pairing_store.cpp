@@ -93,10 +93,13 @@ PairingStore::PairingStore(SettingsStore& store, std::function<std::string()> to
         if (!client || !psk || find_locked(*client) != records_.end()) {
             continue;
         }
-        records_.push_back(Record{.client_key = *client,
-                                  .psk = *psk,
-                                  .name = store_.value(field(i, "name")).value_or(std::string{}),
-                                  .paired_on = store_.value(field(i, "paired")).value_or(std::string{})});
+        records_.push_back(
+            Record{.client_key = *client,
+                   .psk = *psk,
+                   .name = store_.value(field(i, "name")).value_or(std::string{}),
+                   .paired_on = store_.value(field(i, "paired")).value_or(std::string{}),
+                   // Anything but "true" is no choice.
+                   .opus = store_.value(field(i, "opus")).value_or(std::string{}) == "true"});
     }
 }
 
@@ -125,6 +128,9 @@ bool PairingStore::save_locked() {
         store_.set_value(field(i, "psk"), hex_of(record.psk));
         store_.set_value(field(i, "name"), record.name);
         store_.set_value(field(i, "paired"), record.paired_on);
+        if (record.opus) {
+            store_.set_value(field(i, "opus"), "true");
+        }
     }
     return store_.sync();
 }
@@ -150,6 +156,13 @@ bool PairingStore::store_record(const Key32& client_key, const Key32& long_term_
                   .psk = long_term_psk,
                   .name = name != names_.end() ? name->second : std::string{},
                   .paired_on = today_ ? today_() : std::string{}};
+    // What was chosen for the client goes with its new record: the old one's, for a client that
+    // pairs again, or the one held for a client that had none.
+    if (const auto existing = find_locked(client_key); existing != records_.end()) {
+        record.opus = existing->opus;
+    } else if (const auto chosen = opuses_.find(client_key); chosen != opuses_.end()) {
+        record.opus = chosen->second;
+    }
     if (auto existing = find_locked(client_key); existing != records_.end()) {
         sendspin::crypto::wipe(existing->psk);
         records_.erase(existing);
@@ -166,6 +179,7 @@ bool PairingStore::store_record(const Key32& client_key, const Key32& long_term_
         pairing_psks_.erase(entered);
     }
     approvals_.erase(client_key);
+    opuses_.erase(client_key);
     return true;
 }
 
@@ -222,6 +236,27 @@ void PairingStore::set_client_name(const Key32& client_key, const std::string& n
         existing->name = name;
         static_cast<void>(save_locked());
     }
+}
+
+bool PairingStore::opus(const Key32& client_key) const {
+    const std::scoped_lock lock(mutex_);
+    if (const auto record = find_locked(client_key); record != records_.end()) {
+        return record->opus;
+    }
+    const auto chosen = opuses_.find(client_key);
+    return chosen != opuses_.end() && chosen->second;
+}
+
+void PairingStore::set_opus(const Key32& client_key, bool opus) {
+    const std::scoped_lock lock(mutex_);
+    if (auto record = find_locked(client_key); record != records_.end()) {
+        if (record->opus != opus) {
+            record->opus = opus;
+            static_cast<void>(save_locked());
+        }
+        return;
+    }
+    opuses_[client_key] = opus;
 }
 
 std::vector<PairingRecordView> PairingStore::records() const {
