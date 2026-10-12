@@ -606,6 +606,13 @@ if(ICLFORGE_BUILD_PYTHON)
     add_subdirectory(bindings/python)
 endif()
 
+# What forge's `lyrics-encoding=` and the Forge GUI's Lyrics row read a code page with: the
+# operating system's conversion, as the decoder libs/lyrics asks a program for
+# (planning/karaoke-formats-options.md, D16). Before both programs, which link it.
+if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI)
+    add_subdirectory(apps/shared/text-encoding)
+endif()
+
 if(ICLFORGE_BUILD_CLI)
     add_subdirectory(apps/forge/cli)
 endif()
@@ -652,6 +659,9 @@ if(ICLFORGE_BUILD_TESTS)
     endif()
     add_subdirectory(apps/shared/media/tests)
     add_subdirectory(apps/shared/cdg-picture/tests)
+    if(TARGET iclforge::app_text_encoding)
+        add_subdirectory(apps/shared/text-encoding/tests)
+    endif()
     add_subdirectory(apps/shared/preferences/tests)
     add_subdirectory(apps/shared/project/tests)
     add_subdirectory(apps/forge/gui/tests)

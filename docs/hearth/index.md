@@ -344,8 +344,17 @@ at start, and take screenshots of the window with nobody at the machine.
 | `--shot <png>` | The same capture with network discovery on, as the window runs. On Windows that asks for a Windows Firewall rule (a UAC prompt), so run it where somebody can answer it |
 
 On Windows the installer registers `.ac3` and `.ec3` to open in Hearth, so a double-click is a
-launch with that file. Nothing hands the file to a Hearth that is already running: a second
-double-click starts a second Hearth beside the first, with its own engine and its own output.
+launch with that file.
+
+**One Hearth plays.** A launch that would play files first offers them, and its `--page`, to a
+Hearth that is already running under the same account. That one queues them behind its queue,
+starts the first, comes to the front and switches to the page asked for, and the second process
+ends without a window. The hand-over is a local socket (a named pipe on Windows) that only the
+same account can open. It is only for a launch that plays: one with no file, with `--seek`, or
+with `--shot` or `--smoke-shot` runs on its own (a capture does not even listen, so a running
+Hearth is never handed to one). If a Hearth is running but does not answer, the launch runs on its
+own as it always did. Where another program's window is in front, Windows may only flash Hearth's
+taskbar button rather than bring its window forward.
 
 A capture runs against a scratch settings store, so it neither reads nor changes a person's own
 queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
