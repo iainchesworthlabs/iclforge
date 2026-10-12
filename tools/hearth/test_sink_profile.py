@@ -30,8 +30,8 @@ REPO = HERE.parents[1]
 
 # Images the release rules know that no profile describes yet. Naming one here is a
 # decision, not a default: the rule lists in tools/ci/check_firmware_package.py and the
-# profiles file are meant to be the same list.
-IMAGES_WITHOUT_A_PROFILE: set[str] = {"hearth-sink-esp32p4-rev3"}
+# profiles file are meant to be the same list. None is left: the P4's v3.x image has its profile.
+IMAGES_WITHOUT_A_PROFILE: set[str] = set()
 
 
 def small_data() -> dict:
@@ -181,6 +181,76 @@ class TheFile(unittest.TestCase):
                     f"the release rules publish {name} and no profile describes it",
                 )
 
+    def test_the_measure_overlay_sets_only_the_keys_it_declares(self) -> None:
+        """An image built with `measure` is the profile's, not a scratch build, because the
+        overlay moves nothing the guard holds: its fragment sets only observation keys, each of
+        them declared, and none of them a stack, a ring, a cache or a placement."""
+        spec = self.data["overlays"]["measure"]
+        self.assertEqual(spec.get("fragment"), "measure")
+        text = (sp.PROJECT / "sdkconfig.measure").read_text("utf-8")
+        keys = [
+            line.split("=", 1)[0]
+            for line in text.splitlines()
+            if line.startswith("CONFIG_") and "=" in line
+        ]
+        self.assertTrue(keys, "sdkconfig.measure sets nothing")
+        for key in keys:
+            self.assertTrue(sp._matches(key, spec["touches"]), f"{key} is not declared")
+            for word in ("STACK", "RING", "CACHE", "IN_PSRAM", "DMA", "LANE", "CORE"):
+                self.assertNotIn(word, key, f"measure may not move {key}")
+
+    def test_a_measure_image_is_the_profile_s_and_its_hash_key_may_differ_from_the_locked_value(
+        self,
+    ) -> None:
+        locked = self.data["profiles"]["p4-rev1-ac4"]["locked"]
+        self.assertEqual(locked["CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH"], "0")
+        moved = sp.touched(self.data, ("measure",))
+        self.assertTrue(sp._matches("CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH", moved))
+        names = sp.fragment_names(self.data, "p4-rev1-ac4", ("measure",))
+        self.assertEqual(names[-1], "sdkconfig.measure")
+
+    def test_the_v3_profile_has_the_screen_s_fragments_in_order_and_no_board_yet(self) -> None:
+        spec = self.data["profiles"]["p4-rev3"]
+        self.assertEqual(
+            spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "panel", "panel-dsi"]
+        )
+        self.assertEqual(spec["target"], "esp32p4")
+        self.assertEqual(spec["boards"], [], "a board is named when one has run the image")
+        self.assertEqual(spec["image"]["name"], "hearth-sink-esp32p4-rev3")
+
+    def test_the_two_p4_images_refuse_each_other_s_chips(self) -> None:
+        """v1.x and v3.x firmware are not interchangeable (Espressif's v3.x guide, 1.1): the
+        revision windows of the two profiles do not overlap, so neither takes the other's chip."""
+        old, new = (self.data["profiles"][i]["image"] for i in ("p4-rev1", "p4-rev3"))
+        self.assertLess(old["highest"], new["lowest"])
+        self.assertEqual(old["refuse_above"], old["highest"])
+        self.assertEqual(new["refuse_above"], new["highest"])
+
+    def test_the_v3_profile_locks_the_screen_task_s_stack_which_is_free_for_every_other(
+        self,
+    ) -> None:
+        key = "CONFIG_ICLFORGE_EXAMPLE_PANEL_STACK_BYTES"
+        self.assertTrue(sp.is_free(self.data, key))
+        self.assertEqual(self.data["profiles"]["p4-rev3"]["locked"][key], "16384")
+        for ident, spec in self.data["profiles"].items():
+            if ident != "p4-rev3":
+                self.assertNotIn(key, spec["locked"], f"{ident} has no screen")
+
+    def test_the_v3_profile_is_on_400_mhz_with_the_screen_on_and_no_other_display(self) -> None:
+        locked = self.data["profiles"]["p4-rev3"]["locked"]
+        self.assertEqual(locked["CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400"], "y")
+        self.assertEqual(locked["CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI"], "y")
+        self.assertEqual(locked["CONFIG_LV_USE_CUSTOM_MALLOC"], "y")
+        self.assertEqual(locked["CONFIG_ESP32P4_REV_MIN_FULL"], "301")
+        self.assertEqual(locked["CONFIG_ESP32P4_REV_MAX_FULL"], "399")
+        self.assertNotIn("CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL", locked)
+
+    def test_the_v3_profile_has_budgets_a_build_can_be_held_to(self) -> None:
+        budget = self.data["profiles"]["p4-rev3"]["budget"]
+        self.assertGreater(budget["app_bytes_max"], 2_400_000)
+        self.assertGreater(budget["internal_static_bytes_max"], 150_000)
+        self.assertEqual(budget["bootloader_bytes_max"], 24576)
+
     def test_the_panel_s_stack_keys_are_free_and_not_unplaced_in_a_profile_without_a_screen(
         self,
     ) -> None:
@@ -222,17 +292,24 @@ class TheFile(unittest.TestCase):
         text = (REPO / ".github" / "workflows" / "_build.yml").read_text("utf-8")
         read = set(re.findall(r'"\$profile" defaults ([a-z0-9-]+)', text))
         checked = set(re.findall(r'"\$profile" verify ([a-z0-9-]+)', text))
-        board_builds = {"s3-n16r8", "s3-n16r8-ac4", "c6-16mb", "c6-4mb", "p4-rev1", "p4-rev1-ac4"}
+        board_builds = {
+            "s3-n16r8",
+            "s3-n16r8-ac4",
+            "c6-16mb",
+            "c6-4mb",
+            "p4-rev1",
+            "p4-rev1-ac4",
+            "p4-rev3",
+        }
         self.assertEqual(read, board_builds)
         self.assertEqual(checked, board_builds)
         spelled = re.findall(
             r'"-DSDKCONFIG_DEFAULTS=(sdkconfig\.defaults;sdkconfig\.hw[^"]*)"', text
         )
-        # The P4X panel's two builds (#1400) are not profiles yet: p4-rev3 is its own change.
-        # Each is an `other_stacks` entry, so a list that is not one of these still fails.
+        # The P4X panel's null-display build (#1400) is a development build, not a board's
+        # image, and is not a profile. It is an `other_stacks` entry, so a list that is not it
+        # still fails. The v3.x image is the profile p4-rev3 and is built from the file.
         unprofiled = {
-            "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;"
-            "sdkconfig.panel;sdkconfig.panel-dsi",
             "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;"
             "sdkconfig.panel-null",
         }
@@ -354,6 +431,17 @@ class Verify(unittest.TestCase):
         self.assertEqual(self.rules(findings), ["locked"])
         self.assertIn("DECODE_STACK_IN_PSRAM is 0", findings[0].message)
         self.assertIn("locks 1", findings[0].message)
+
+    def test_a_key_that_is_free_and_locked_is_held_to_the_locked_value(self) -> None:
+        """The screen task's stack is `free` for every profile with no screen and locked by hand
+        in the one that has one: locked is read first."""
+        self.data["free"]["ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"] = "inert elsewhere"
+        final = dict(FINAL)
+        final["CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"] = "16384"
+        build = make_build(self.root, final)
+        findings = sp.verify(self.data, "a", build)
+        self.assertEqual(self.rules(findings), ["locked"])
+        self.assertIn("DECODE_STACK_BYTES is 16384", findings[0].message)
 
     def test_a_key_the_build_does_not_have_fails_unless_locked_off(self) -> None:
         final = dict(FINAL)

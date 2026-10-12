@@ -3813,22 +3813,34 @@ jobs:
       # the 160 MHz I2S clock source; sdkconfig.panel and sdkconfig.panel-dsi are LVGL and the panel.
       # The two P4 images refuse each other's chips at boot, so a wrong flash cannot happen over the
       # network. What it holds is that LVGL, the panel's drivers and the screen compile and link for
-      # this part with the project's -Werror; nothing of it has run on a board yet.
+      # this part with the project's -Werror; nothing of it has run on a board yet. Its fragments are
+      # the profile p4-rev3's (firmware/hearth-sink/profiles.json) and the build is held to it, as
+      # the boards' are; the screen's own keys are locked in it by hand, since no board has run them.
       - name: Build hearth_sink's Sendspin player with the panel for an ESP32-P4 of revision v3.x (no emulator for this part)
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
+          ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
           cd firmware/hearth-sink
+          profile="$GITHUB_WORKSPACE/tools/hearth/sink_profile.py"
+          guard=()
+          if [ "${ESP32_PROFILE_GUARD:-}" = warn ]; then guard=(--warn-only); fi
           dir="$RUNNER_TEMP/hearth_sink-p4-rev3-panel"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
+          defaults="$(python3 "$profile" defaults p4-rev3)"
+          read -r -a identity <<< "$(python3 "$profile" identity p4-rev3 --cmake)"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 \
-            "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-dsi" \
+            "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
             "-DPROJECT_VER=$version" build >/dev/null
+          idf.py -B "$dir" size --format json2 > "$dir/size.json"
+          python3 "$profile" verify p4-rev3 --build-dir "$dir" --size-json "$dir/size.json" \
+            --github "${guard[@]}"
           python3 "$GITHUB_WORKSPACE/tools/hearth/package_firmware.py" package --build-dir "$dir" \
-            --name hearth-sink-esp32p4-rev3 --out "$GITHUB_WORKSPACE/esp32-firmware"
+            --name hearth-sink-esp32p4-rev3 --profile p4-rev3 "${guard[@]}" \
+            --out "$GITHUB_WORKSPACE/esp32-firmware"
 
       # The panel's other display: LVGL drawing into a frame buffer in PSRAM with no panel behind it
       # (sdkconfig.panel-null), which is what a board with no screen runs to see the screen and to

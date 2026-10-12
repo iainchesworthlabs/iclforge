@@ -14,6 +14,8 @@ add_library(hearth_engine STATIC
     src/engine_thread.cpp
     src/media_info.cpp
     src/media_inspector.cpp
+    src/microphone_input.cpp
+    src/microphone_session.cpp
     src/network_view.cpp
     src/output_decision.cpp
     src/output_selector.cpp
