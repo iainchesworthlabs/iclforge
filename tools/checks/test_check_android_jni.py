@@ -216,12 +216,73 @@ class ClassPaths(Fixture):
         self.assertTrue(any("is not in package com.example.shield" in m for m in self.messages()))
 
 
+class SecondApp(Fixture):
+    """A second Android app that links the same audio backend (planning/hearth-android.md)."""
+
+    SECOND = "apps/hearth/android/app"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.put(f"{self.SECOND}/build.gradle.kts", GRADLE.replace("com.example.shield", "com.example.hearth"))
+        self.put(
+            f"{self.SECOND}/src/main/java/com/example/hearth/NativeBridge.kt",
+            BRIDGE.replace("com.example.shield", "com.example.hearth").replace("example_jni", "hearth_jni"),
+        )
+        self.put(
+            f"{self.SECOND}/src/main/cpp/jni.cpp",
+            NATIVE.replace("com_example_shield", "com_example_hearth"),
+        )
+        self.put(
+            f"{self.SECOND}/src/main/cpp/CMakeLists.txt",
+            "project(hearth_jni_project LANGUAGES CXX)\nadd_library(hearth_jni SHARED jni.cpp)\n",
+        )
+        saved = C.APPS
+        C.APPS = (C.APP, self.SECOND)
+        self.addCleanup(setattr, C, "APPS", saved)
+
+    def all_messages(self) -> list[str]:
+        return [p.message for p in C.check_all(self.root)]
+
+    def test_two_apps_each_in_their_own_package_are_quiet(self) -> None:
+        self.assertEqual(self.all_messages(), [])
+
+    def test_each_app_is_held_to_its_own_package(self) -> None:
+        # the second app's native code defines the FIRST app's package: wrong for the second
+        self.put(f"{self.SECOND}/src/main/cpp/jni.cpp", NATIVE)
+        messages = self.all_messages()
+        self.assertTrue(any("is not in package com.example.hearth" in m for m in messages), messages)
+
+    def test_a_backend_that_exports_a_package_named_function_is_every_apps_problem(self) -> None:
+        # the arrangement this check was written against: libs/audio defined the registration under
+        # the first app's package, so a second app that links it carried a name in no package of its own
+        self.put(
+            "libs/audio/src/backend/android/passthrough.cpp",
+            'extern "C" JNIEXPORT void JNICALL\n'
+            "Java_com_example_shield_NativeBridge_registerPassthroughBridge(JNIEnv*, jclass, jobject) {}\n",
+        )
+        messages = self.all_messages()
+        self.assertTrue(any("com.example.hearth" in m and "registerPassthroughBridge" in m for m in messages), messages)
+
+
 class TheTree(unittest.TestCase):
     def test_the_repository_agrees(self) -> None:
         root = Path(__file__).resolve().parents[2]
         if not (root / C.APP).is_dir():
             self.skipTest("no apps/demos/android in this tree")
-        self.assertEqual([str(p) for p in C.check(root)], [])
+        self.assertEqual([str(p) for p in C.check_all(root)], [])
+
+    def test_the_audio_backend_defines_no_jni_name(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        base = root / "libs/audio/src/backend/android"
+        if not base.is_dir():
+            self.skipTest("no Android audio backend in this tree")
+        for path in base.rglob("*.cpp"):
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                code = line.strip()
+                if code.startswith(("//", "*", "/*")):
+                    continue
+                self.assertNotRegex(code, r"\bJava_[A-Za-z0-9_]+\s*\(", f"{path.name}:{number}")
+                self.assertNotRegex(code, r"\bJNI_OnLoad\s*\(", f"{path.name}:{number}")
 
 
 if __name__ == "__main__":

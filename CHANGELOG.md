@@ -29,6 +29,18 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**The Android audio backend names no Java package**
+
+- **A second Android app can link `iclforge::audio`'s passthrough backend.** The backend exported
+  `JNI_OnLoad` and a native method named for the Shield app's package
+  (`Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge`), and a shared object
+  defines `JNI_OnLoad` once and a JNI name is a package, so only that one app could use it. It is
+  now two plain C++ functions, `iclforge::audio::android::set_java_vm()` and
+  `register_passthrough_bridge()` (`passthrough_bridge.hpp`), called from the app's own
+  `JNI_OnLoad` and its own native method; the Shield app's behaviour and its Kotlin are unchanged.
+  `check_android_jni.py` checks each app of a list against its own package, and a test holds the
+  audio backend to defining no JNI name (planning/hearth-android.md, phase 0a).
+
 **Karaoke: a pitch library**
 
 - **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one

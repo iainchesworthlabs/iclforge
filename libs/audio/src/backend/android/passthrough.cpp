@@ -50,7 +50,7 @@
 // The Kotlin side (app-specific, not part of iclforge::audio - see
 // apps/demos/android/app/src/main/java/.../NativeBridge.kt and
 // PassthroughBridge.kt) is expected to expose exactly this contract, called
-// through the method IDs cached in registerPassthroughBridge() below:
+// through the method IDs cached in register_passthrough_bridge() below:
 //
 //   class PassthroughBridge {
 //       // Probes AudioTrack.isDirectPlaybackSupported() for ENCODING_
@@ -84,12 +84,12 @@
 //       fun flush(): Boolean
 //   }
 //
-// The app registers one bridge instance for the process's lifetime via
-// NativeBridge.registerPassthroughBridge(), which calls the JNI-exported
-// registerPassthroughBridge() below. JNI_OnLoad here captures the process
-// JavaVM so a background thread (there is none today - see the "no separate
-// render thread" note on PassthroughSink::submit - but a future one could)
-// can attach itself.
+// The app registers one bridge instance for the process's lifetime, and tells the backend the
+// process's JavaVM so that a background thread (there is none today - see the "no separate
+// render thread" note on PassthroughSink::submit - but a future one could) can attach
+// itself. Both are plain C++ functions in passthrough_bridge.hpp, called from the app's own
+// JNI_OnLoad and its own native method: neither is exported from here under a Java package
+// name, so more than one app can link this backend.
 
 #include <android/log.h>
 #include <jni.h>
@@ -103,6 +103,7 @@
 #include "iclforge/audio/playback_counter.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "android_support.hpp"
+#include "passthrough_bridge.hpp"
 
 namespace iclforge::audio {
 
@@ -685,34 +686,23 @@ std::expected<void, PassthroughError> PassthroughSink::start(const std::string& 
 
 }  // namespace iclforge::audio
 
-// --- JNI entry points -----------------------------------------------------
-// Deliberately outside namespace iclforge::audio: JNI symbol names are fixed by
-// the mangling convention (Java_<package>_<Class>_<method>), not by us.
-//
-// JNI_OnLoad is defined here, not in the app's own native code
-// (apps/demos/android/app/src/main/cpp/), because capturing the JavaVM is
-// iclforge::audio's own concern (jni_env() above needs it) and a
-// process may load exactly one JNI_OnLoad per shared object - this is the
-// only translation unit in iclforge_jni.so that needs it.
+// --- What the app tells the backend ------------------------------------------
+// passthrough_bridge.hpp has the contract. These are the app's to call, from its own JNI_OnLoad
+// and its own native method, so that no symbol here is named for a Java package.
 
-extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
-    iclforge::audio::g_vm = vm;
-    __android_log_print(ANDROID_LOG_INFO, iclforge::audio::kLogTag,
-                        "JNI_OnLoad: iclforge_jni loaded, JavaVM captured");
-    return JNI_VERSION_1_6;
+namespace iclforge::audio::android {
+
+void set_java_vm(JavaVM* vm) {
+    g_vm = vm;
+    __android_log_print(ANDROID_LOG_INFO, kLogTag, "set_java_vm: JavaVM captured");
 }
 
-// Called once from Kotlin (NativeBridge.registerPassthroughBridge) after
-// System.loadLibrary, before any PassthroughSink::start(). Safe to call
-// again (e.g. on Activity recreation) - drops the previous GlobalRef first.
-extern "C" JNIEXPORT void JNICALL
-Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge(JNIEnv* env, jclass /*clazz*/,
-                                                                 jobject bridge) {
-    std::lock_guard lock(iclforge::audio::g_bridge_mutex);
+void register_passthrough_bridge(JNIEnv* env, jobject bridge) {
+    std::lock_guard lock(g_bridge_mutex);
 
-    if (iclforge::audio::g_bridge != nullptr) {
-        env->DeleteGlobalRef(iclforge::audio::g_bridge);
-        iclforge::audio::g_bridge = nullptr;
+    if (g_bridge != nullptr) {
+        env->DeleteGlobalRef(g_bridge);
+        g_bridge = nullptr;
     }
     if (bridge == nullptr) {
         return;
@@ -722,24 +712,21 @@ Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge(JNIEnv* env, jcl
     if (local_class == nullptr) {
         return;
     }
-    iclforge::audio::g_mid_is_direct_supported =
-        env->GetMethodID(local_class, "isDirectPlaybackSupported", "(IZ)Z");
-    iclforge::audio::g_mid_is_pcm_supported =
-        env->GetMethodID(local_class, "isPcmSupported", "(I)Z");
-    iclforge::audio::g_mid_open = env->GetMethodID(local_class, "open", "(IZ)Z");
-    iclforge::audio::g_mid_submit =
-        env->GetMethodID(local_class, "submit", "(Ljava/nio/ByteBuffer;I)I");
-    iclforge::audio::g_mid_close = env->GetMethodID(local_class, "close", "()V");
+    g_mid_is_direct_supported = env->GetMethodID(local_class, "isDirectPlaybackSupported", "(IZ)Z");
+    g_mid_is_pcm_supported = env->GetMethodID(local_class, "isPcmSupported", "(I)Z");
+    g_mid_open = env->GetMethodID(local_class, "open", "(IZ)Z");
+    g_mid_submit = env->GetMethodID(local_class, "submit", "(Ljava/nio/ByteBuffer;I)I");
+    g_mid_close = env->GetMethodID(local_class, "close", "()V");
     if (env->ExceptionCheck() != 0) {
         env->ExceptionClear();
-        iclforge::audio::g_mid_is_direct_supported = nullptr;
-        iclforge::audio::g_mid_is_pcm_supported = nullptr;
-        iclforge::audio::g_mid_open = nullptr;
-        iclforge::audio::g_mid_submit = nullptr;
-        iclforge::audio::g_mid_close = nullptr;
+        g_mid_is_direct_supported = nullptr;
+        g_mid_is_pcm_supported = nullptr;
+        g_mid_open = nullptr;
+        g_mid_submit = nullptr;
+        g_mid_close = nullptr;
         env->DeleteLocalRef(local_class);
-        __android_log_print(ANDROID_LOG_ERROR, iclforge::audio::kLogTag,
-                            "registerPassthroughBridge: GetMethodID failed - does "
+        __android_log_print(ANDROID_LOG_ERROR, kLogTag,
+                            "register_passthrough_bridge: GetMethodID failed - does "
                             "PassthroughBridge match the expected "
                             "isDirectPlaybackSupported/isPcmSupported/open/submit/close "
                             "signatures?");
@@ -756,13 +743,14 @@ Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge(JNIEnv* env, jcl
         }
         return method;
     };
-    iclforge::audio::g_mid_head_position = optional_method("playbackHeadPosition", "()J");
-    iclforge::audio::g_mid_pause = optional_method("pause", "()Z");
-    iclforge::audio::g_mid_resume = optional_method("resume", "()Z");
-    iclforge::audio::g_mid_flush = optional_method("flush", "()Z");
+    g_mid_head_position = optional_method("playbackHeadPosition", "()J");
+    g_mid_pause = optional_method("pause", "()Z");
+    g_mid_resume = optional_method("resume", "()Z");
+    g_mid_flush = optional_method("flush", "()Z");
 
-    iclforge::audio::g_bridge = env->NewGlobalRef(bridge);
+    g_bridge = env->NewGlobalRef(bridge);
     env->DeleteLocalRef(local_class);
-    __android_log_print(ANDROID_LOG_INFO, iclforge::audio::kLogTag,
-                        "registerPassthroughBridge: bridge registered");
+    __android_log_print(ANDROID_LOG_INFO, kLogTag, "register_passthrough_bridge: bridge registered");
 }
+
+}  // namespace iclforge::audio::android

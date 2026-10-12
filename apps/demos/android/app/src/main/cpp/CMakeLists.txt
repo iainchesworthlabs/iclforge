@@ -97,6 +97,11 @@ add_library(iclforge_jni SHARED
 
 target_compile_features(iclforge_jni PRIVATE cxx_std_23)
 
+# The backend's registration functions (android/passthrough_bridge.hpp) are the one header of
+# iclforge::audio's src/backend tree this app includes, which the project table exposes for it.
+target_include_directories(iclforge_jni PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../../libs/audio/src/backend")
+
 # log: android/log.h, used by jni_entry.cpp and by
 # libs/audio/src/backend/android/passthrough.cpp (linked in transitively via
 # iclforge::audio, which already declares its own aaudio/log deps - see
