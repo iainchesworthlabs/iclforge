@@ -3311,6 +3311,25 @@ The sections below contain the complete change list and fixes.
   linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
   ESP-IDF image, so nothing before the merge saw that break.
 
+**Hearth: what a singer's performance is scored against, and how**
+
+- **Hearth's engine can place a singer's voice in the item and score it** (the microphone, scoring
+  and recording programme, M4's engine half; the Qt window and the microphone itself are later pull
+  requests). `Performance` takes two things and owns no device or thread: where in the item the heard
+  sound is at a time on the steady clock (the engine's `PlayPosition::heard`, which is what a person
+  singing along is hearing), and blocks of the microphone's samples with the time the first was
+  captured. It tracks the pitch, places each frame at the heard position at the moment the sound
+  reached the microphone less the microphone's declared delay plus an offset the person can move,
+  and scores it against a reference with `iclforge::pitch`. Nothing is scored before the first
+  position, or while the item is held; those frames are counted as unplaced, not as wrong. It says
+  how sharp or flat and how early or late the singer is.
+- **`reference_from_karaoke()` takes the reference from the karaoke stream being played.** A karaoke
+  AC-3 decoded as coded leaves the guide melody M and the vocals V1 and V2 in their channels
+  (Annex C, Table C.2.1); the first present of M, V1 and V2 is tracked, or the part the singer has
+  muted (the one they are taking over). A stream that is not karaoke, or whose part has no clear
+  pitch, is refused with the reason. On the repository's karaoke example the tune comes out of M and
+  of V1 note for note, and V2 comes out a diatonic third below.
+
 ### Changed
 
 **Shared code**
