@@ -1429,7 +1429,8 @@ struct KaraokeGroup {
     iclforge::render::OutputLayout master = iclforge::render::OutputLayout::stereo();
 
     KaraokeGroup(const std::string& name, int frames, const iclforge::hearth::DecoderSettings& wanted,
-                 bool decodes_takes_levels = true, std::uint32_t lyrics_bytes = 0)
+                 bool decodes_takes_levels = true, std::uint32_t lyrics_bytes = 0,
+                 std::vector<std::string> decodes_requests = {})
         : scratch(fs::path{ICLFORGE_TEST_SCRATCH_DIR} / (name + "_" + scratch_pid_suffix())),
           item_path((fs::path{ICLFORGE_TEST_SCRATCH_DIR} / (name + "_" + scratch_pid_suffix()) / "programme.ac3")
                          .string()),
@@ -1437,7 +1438,8 @@ struct KaraokeGroup {
         namespace ss = iclforge::sendspin;
         fs::remove_all(scratch);
         const auto make_sink = [&](const std::string& id, bool karaoke, RecordingLog& log,
-                                   std::vector<std::int32_t> widths, bool levels = true) {
+                                   std::vector<std::int32_t> widths, bool levels = true,
+                                   std::vector<std::string> requests = {}) {
             testsink::SinkOptions options;
             options.name = id;
             options.address = "127.0.0.1";
@@ -1450,12 +1452,14 @@ struct KaraokeGroup {
             options.karaoke = karaoke;
             options.karaoke_levels = levels;
             options.lyrics_max_bytes = lyrics_bytes;
+            options.requests = std::move(requests);
             options.pcm_channels = std::move(widths);
             auto started = testsink::Sink::start(options, log);
             REQUIRE(started.has_value());
             return std::move(*started);
         };
-        decodes = make_sink("decodes", true, decodes_log, {2, 6}, decodes_takes_levels);
+        decodes = make_sink("decodes", true, decodes_log, {2, 6}, decodes_takes_levels,
+                            std::move(decodes_requests));
         legacy = make_sink("legacy", false, legacy_log, {6});
 
         store = std::make_unique<iclforge::hearth::PairingStore>(
@@ -1969,6 +1973,53 @@ TEST_CASE("engine: an item with no lyrics tells the boards it has none, and a bo
     // Neither takes them, so neither is sent any.
     CHECK(group.decodes->roles().lyric_commands.empty());
     CHECK(group.legacy->roles().lyric_commands.empty());
+}
+
+TEST_CASE("engine: a member's request for the karaoke choice reaches the application with its group and name (D8)",
+          "[hearth][group][websocket][iclforge][karaoke]") {
+    constexpr int kFrameCount = 30;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    // The decoding board lists the vocals and one level it may ask for; the other lists none.
+    KaraokeGroup group("request_group", kFrameCount, wanted, true, 0, {"karaoke_vocals", "karaoke_vocal1_db"});
+
+    std::mutex mutex;
+    std::vector<iclforge::hearth::NetworkSinks::SinkRequest> heard;
+    group.sinks->set_request_handler([&](const iclforge::hearth::NetworkSinks::SinkRequest& request) {
+        const std::lock_guard lock(mutex);
+        heard.push_back(request);
+    });
+    const auto seen = [&] {
+        const std::lock_guard lock(mutex);
+        return heard;
+    };
+
+    iclforge::sendspin::player::Request ask;
+    ask.decoder.karaoke_vocals = iclforge::sendspin::player::KaraokeVocals::kV1;
+    ask.decoder.karaoke = iclforge::sendspin::player::Karaoke::kOff;
+    group.decodes->send_request(ask);
+    group.await([&] { return !seen().empty(); });
+    const auto first = seen();
+    REQUIRE(first.size() == 1);
+    CHECK(first.front().group_id == group.group_id);
+    CHECK(first.front().sink_name == "decodes");
+    CHECK_FALSE(first.front().sink_id.empty());
+    CHECK(first.front().request.decoder.karaoke_vocals == iclforge::sendspin::player::KaraokeVocals::kV1);
+    // The reproduction was not on the sink's list, so it was cut before it left.
+    CHECK_FALSE(first.front().request.decoder.karaoke.has_value());
+
+    // The board that lists none sends none.
+    iclforge::sendspin::player::Request other;
+    other.decoder.karaoke_vocals = iclforge::sendspin::player::KaraokeVocals::kV2;
+    group.legacy->send_request(other);
+    std::this_thread::sleep_for(300ms);
+    CHECK(seen().size() == 1);
+
+    // Cleared, a request reaches no one.
+    group.sinks->set_request_handler({});
+    group.decodes->send_request(ask);
+    std::this_thread::sleep_for(300ms);
+    CHECK(seen().size() == 1);
 }
 
 TEST_CASE("engine: a board that lists lyrics is told an item has none, so it drops the last item's",

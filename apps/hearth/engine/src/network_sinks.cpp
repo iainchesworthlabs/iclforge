@@ -1398,6 +1398,36 @@ void NetworkSinks::on_pairing_ended(const std::string& client_id,
     publish_locked();
 }
 
+void NetworkSinks::set_request_handler(SinkRequestHandler handler) {
+    std::lock_guard<std::mutex> lock(request_mutex_);
+    request_handler_ = std::move(handler);
+}
+
+void NetworkSinks::on_sink_request(const std::string& group_id, const std::string& client_id,
+                                   const ss::player::Request& request) {
+    SinkRequest heard{.group_id = group_id, .sink_id = {}, .sink_name = {}, .request = request};
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto by_client = instance_by_client_id_.find(client_id);
+        if (by_client != instance_by_client_id_.end()) {
+            heard.sink_id = by_client->second;
+            const auto sink = sinks_.find(by_client->second);
+            if (sink != sinks_.end()) {
+                heard.sink_name = facts_locked(heard.sink_id, sink->second).name;
+            }
+        }
+    }
+    on_log("sink " + (heard.sink_name.empty() ? client_id : heard.sink_name) + " asked for the karaoke choice");
+    SinkRequestHandler handler;
+    {
+        std::lock_guard<std::mutex> lock(request_mutex_);
+        handler = request_handler_;
+    }
+    if (handler) {
+        handler(heard);
+    }
+}
+
 void NetworkSinks::on_log(std::string_view line) {
     // Called from inside the group's lock as well as from the host's thread: only the trail's own
     // mutex is taken here (see log_mutex_).
