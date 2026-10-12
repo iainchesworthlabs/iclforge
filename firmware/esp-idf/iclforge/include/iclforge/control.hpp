@@ -167,6 +167,12 @@ struct ControlNetwork {
 };
 
 struct ControlHandlers {
+    // GET /hardware's "profile" and "profile_hash": which locked build configuration this image
+    // was built as, and a hash of what that configuration locks (firmware/hearth-sink/
+    // profiles.json). The owner knows; left empty they report empty strings, which is what a
+    // build not made as a profile says.
+    std::string profile;
+    std::string profile_hash;
     // POST /play. False means refused (the source cannot take a location, or
     // the location was not acceptable); the reply says so.
     std::function<bool(std::string_view location)> play;

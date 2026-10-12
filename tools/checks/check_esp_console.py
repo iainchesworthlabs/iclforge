@@ -81,6 +81,12 @@ ALLOCATION_FAILED = "could not allocate"
 # holds to a floor: "... ring_low=6144 heap_free=41648".
 HEAP_FREE = re.compile(r"heap_free=(\d+)")
 
+# hearth_sink's boot budget line (main/hearth_sink.cpp, report_budget; planning/esp32-platform-
+# profiles.md): "budget: when=boot net=1 internal_free=90931 largest=31744 ... headroom=23552
+# floor=0 verdict=ok". --min-budget-headroom holds the last one to a margin and to verdict=ok.
+BUDGET_LINE = re.compile(r"^\s*budget: (.*)$")
+BUDGET_FIELD = re.compile(r"([a-z_]+)=(-?[A-Za-z0-9_-]+)")
+
 # The application's verdict, listed beside a finding to show which came first.
 VERDICT = "result="
 
@@ -112,7 +118,23 @@ def least_heap_free(lines: list[str], booted: range) -> tuple[int | None, int | 
     return lowest, where
 
 
-def examine(lines: list[str], min_heap_free: int | None = None) -> tuple[list[str], list[int]]:
+def last_budget(lines: list[str], booted: range) -> tuple[dict[str, str] | None, int | None]:
+    """The last `budget:` line after the first boot banner, as its fields, and its index."""
+    found: dict[str, str] | None = None
+    where: int | None = None
+    for i in booted:
+        match = BUDGET_LINE.match(lines[i])
+        if match is not None:
+            found, where = dict(BUDGET_FIELD.findall(match.group(1))), i
+    return found, where
+
+
+def examine(
+    lines: list[str],
+    min_heap_free: int | None = None,
+    min_budget_headroom: int | None = None,
+    budget_verdict: str = "ok",
+) -> tuple[list[str], list[int]]:
     """The rules `lines` breaks, one sentence each, and the indices of the lines
     to list for them: the ones that broke a rule, and every verdict. Both empty
     for one clean boot."""
@@ -151,6 +173,31 @@ def examine(lines: list[str], min_heap_free: int | None = None) -> tuple[list[st
             )
             if where is not None:
                 shown.add(where)
+    if min_budget_headroom is not None:
+        budget, where = last_budget(lines, booted)
+        if budget is None:
+            problems.append(
+                f"--min-budget-headroom {min_budget_headroom} was asked for, but the capture has "
+                "no budget: line to hold to it"
+            )
+        else:
+            verdict = budget.get("verdict", "")
+            headroom = int(budget.get("headroom", "0"))
+            if verdict != budget_verdict:
+                problems.append(
+                    f"the boot budget says verdict={verdict} (headroom {headroom}), where this "
+                    f"shape is held to verdict={budget_verdict}: what a play asks of internal RAM "
+                    "and what is free are not what the profile says"
+                )
+                if where is not None:
+                    shown.add(where)
+            elif budget_verdict == "ok" and headroom < min_budget_headroom:
+                problems.append(
+                    f"the boot budget leaves {headroom} bytes of headroom, under the "
+                    f"{min_budget_headroom} this shape is held to"
+                )
+                if where is not None:
+                    shown.add(where)
     if len(boots) > 1:
         problems.append(f"the part booted {len(boots)} times, so it reset; a clean run boots once")
         shown.update(boots)
@@ -186,6 +233,20 @@ def main(argv: list[str] | None = None) -> int:
         metavar="BYTES",
         help="fail when the lowest heap_free= figure in the capture is under this",
     )
+    parser.add_argument(
+        "--min-budget-headroom",
+        type=int,
+        default=None,
+        metavar="BYTES",
+        help="fail when the last budget: line is not verdict=ok or leaves less headroom than this",
+    )
+    parser.add_argument(
+        "--budget-verdict",
+        default="ok",
+        choices=["ok", "short-block", "short-total", "below-floor"],
+        help="the verdict the last budget: line is held to (default ok); the C6's profile "
+        "refuses an HTTP play on purpose and says below-floor",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -193,7 +254,9 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as error:
         print(annotation(args.title, f"cannot read the console capture: {error}"))
         return 1
-    problems, listing = examine(lines, args.min_heap_free)
+    problems, listing = examine(
+        lines, args.min_heap_free, args.min_budget_headroom, args.budget_verdict
+    )
     if not problems:
         clean = f"{args.capture}: one boot, no panic output, no failed allocation"
         if args.min_heap_free is not None:

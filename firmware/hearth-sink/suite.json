@@ -1,0 +1,121 @@
+{
+  "format": 1,
+  "note": "The board suite's fixed play list (tools/hearth/board_suite.py, planning/esp32-platform-profiles.md, 'The board suite'). A stream is a file of the repository that the suite serves to the board and plays over POST /play; a profile's plays are the rows it is held to, in order. The figures a row is held to are recorded per profile in baselines/<profile>.json by `board_suite.py run --record`. A new feature is a new row here and a new figure there, in the same PR.",
+  "frame_us": 32000,
+  "tolerance": {
+    "relative": 0.05,
+    "absolute_permille": 5,
+    "stack_free_bytes": 512,
+    "headroom_ms": 2,
+    "largest_block_bytes": 1024,
+    "internal_free_bytes": 2048,
+    "note": "From ten plays a row on S3b (the s3-n16r8 image, 2026-10-12): the decoder 122 to 124 permille of a frame for AC-3 2.0 and 87 to 90 for E-AC-3 2.0, the decode stack 18,076 to 18,256 bytes free, the queue 5 ms, the boot largest block 31,744 and free RAM 86,231 to 86,235. A decoder time may be at most the baseline's plus the larger of 5% of it and 5 permille of a frame; the decode stack's free margin at most 512 bytes under the baseline's; the queue's least headroom at most 2 ms under; the boot largest internal block at most 1,024 bytes under and the boot free RAM at most 2,048 under. S3a is the cross-check, not yet run."
+  },
+  "streams": {
+    "ac3-2.0": {
+      "file": "testdata/external-baseline/ac3-music-stereo-192/ffmpeg.ac3",
+      "codec": "AC-3",
+      "units": 938,
+      "what": "AC-3 2/0, 192 kbit/s, 30 s of music (FFmpeg)"
+    },
+    "eac3-2.0": {
+      "file": "testdata/external-baseline/eac3-music-stereo-96/ffmpeg.ec3",
+      "codec": "E-AC-3",
+      "units": 938,
+      "what": "E-AC-3 2/0, 96 kbit/s, 30 s of music (FFmpeg)"
+    },
+    "ac4-20-music": {
+      "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-192-3frames.ac4",
+      "codec": "AC-4",
+      "units": 3,
+      "pin": "ac4_20_music",
+      "what": "AC-4 2.0 from DEE, A-SPX, 192 kbit/s, three frames"
+    },
+    "ac4-20-acpl": {
+      "file": "testdata/ac4/constructed/2_0-acpl1-stereoproc.ac4",
+      "codec": "AC-4",
+      "pin": "ac4_20_acpl",
+      "what": "AC-4 2.0 constructed, A-CPL"
+    },
+    "ac4-51-music": {
+      "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-51-music-192-3frames.ac4",
+      "codec": "AC-4",
+      "units": 3,
+      "pin": "ac4_51_music",
+      "pin_layout": "5.1",
+      "what": "AC-4 5.1 from DEE, 192 kbit/s, three frames; on a sink of two outputs the decoder folds it to 2.0, which the 5.1 pin is not, and the row is held to its own hash"
+    },
+    "ac4-20-companding": {
+      "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-48-3frames.ac4",
+      "codec": "AC-4",
+      "units": 3,
+      "pin": "ac4_20_companding",
+      "what": "AC-4 2.0 from DEE, A-SPX with companding, 48 kbit/s, three frames"
+    }
+  },
+  "profiles": {
+    "s3-n16r8": {
+      "plays": [
+        {"id": "ac3-2.0", "stream": "ac3-2.0"},
+        {"id": "eac3-2.0", "stream": "eac3-2.0"}
+      ]
+    },
+    "s3-n16r8-ac4": {
+      "plays": [
+        {"id": "ac3-2.0", "stream": "ac3-2.0"},
+        {"id": "eac3-2.0", "stream": "eac3-2.0"},
+        {"id": "ac4-20-music", "stream": "ac4-20-music"},
+        {"id": "ac4-20-acpl", "stream": "ac4-20-acpl"},
+        {"id": "ac4-20-companding", "stream": "ac4-20-companding"}
+      ]
+    },
+    "c6-16mb": {
+      "note": "The C6 refuses an HTTP play on purpose (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES, #1395): its rows are that refusal, clean, with no reboot. Its audio path is Sendspin, which needs a server on the bench and is not in this list yet.",
+      "tolerance": {
+        "largest_block_bytes": 12288,
+                "note": "The C6's boot figures are not one number: on 27 boots of the c6-16mb image (the C6, 2026-10-12) the largest internal block was 96,256 on twenty-one, 94,208 on four, 92,160 on one and 88,064 on one, against the S3's 31,744 on every boot, so the S3's 1,024 bytes would fail one boot in five; free RAM read 108,988 on one boot and 112,204 to 113,128 on the rest. The baseline is the worst of eight boots (--boots 8). Three 4 KB steps is the allowance on the largest block (twice the 8,192 seen); free RAM keeps the suite's 2,048 below that worst boot.",
+        "internal_free_bytes": 2048
+      },
+      "plays": [
+        {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"},
+        {"id": "eac3-2.0-refused", "stream": "eac3-2.0", "expect": "refused-memory"}
+      ]
+    },
+    "c6-4mb": {
+      "note": "No board on the bench: the rows are c6-16mb's, which differs in flash and partition table alone.",
+      "plays": [
+        {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"}
+      ]
+    },
+    "p4-rev1": {
+      "tolerance": {
+        "largest_block_bytes": 8192,
+        "note": "The P4's largest internal block at boot steps by 4 KB: on the ten boots read one by one (the OTA's, a reset's and the record's eight, P4a, 2026-10-12) it was 221,184 on eight and 217,088 on two; free RAM read 291,875 to 292,211. Two 4 KB steps is the allowance (twice the one seen) and free RAM keeps the suite's 2,048. The S3's 1,024 would fail one boot in five."
+      },
+      "plays": [
+        {"id": "ac3-2.0", "stream": "ac3-2.0"},
+        {"id": "eac3-2.0", "stream": "eac3-2.0"}
+      ]
+    },
+    "p4-rev1-ac4": {
+      "tolerance": {
+        "relative": 0.12,
+        "largest_block_bytes": 8192,
+        "internal_free_bytes": 4096,
+        "note": "Measured on P4a with the measure image (2026-10-12). The AC-4 rows are three or four frames long, so a play is noisy by about 6% of itself: ac4-20-music read 220 to 253 permille in five plays, ac4-20-acpl 280 to 302 (a median of two 297 against a recorded 281) and ac4-20-companding 268 to 303, against the S3's AC-3 at 122 to 124. 12% is twice that and still calls a fifth more decoder time a regression. The largest boot block was 217,088 or 221,184 (two steps allowed), and free RAM at boot 289,271 to 289,891 on fifteen of seventeen boots and 286,331 on two: 4,096 under the recorded worst of eight keeps that lower mode inside."
+      },
+      "plays": [
+        {"id": "ac3-2.0", "stream": "ac3-2.0"},
+        {"id": "eac3-2.0", "stream": "eac3-2.0"},
+        {"id": "ac4-20-music", "stream": "ac4-20-music"},
+        {"id": "ac4-20-acpl", "stream": "ac4-20-acpl"},
+        {"id": "ac4-51-music", "stream": "ac4-51-music"},
+        {"id": "ac4-20-companding", "stream": "ac4-20-companding"}
+      ]
+    },
+    "p4-rev3": {
+      "note": "No board of silicon revision v3.x is on the bench (the owner's kit has not arrived): the profile is held by its guard and its budgets and has no play list and no baseline. The first board that runs the image adds its rows, as the v1.x profiles' were.",
+      "plays": []
+    }
+  }
+}
