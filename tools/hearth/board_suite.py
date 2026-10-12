@@ -636,7 +636,9 @@ def run_sendspin_play(
     period = int(spec.get("period_us", suite.get("frame_us", 32000)))
     figures = suite_sendspin.figures(run, period)
     result.frames = figures.pop("frames", None)
-    result.lines.units = result.frames
+    # A play's units held to the stream's are the bursts accounted for: played, or late, or
+    # dropped (a late one is a glitch of the play and is counted as one).
+    result.lines.units = suite_sendspin.accounted(run.stream) if run.stream else None
     result.decoder_permille = figures.pop("decoder_permille", None)
     result.lines.decode_stack_free = figures.pop("decode_stack_free", None)
     # Not `underruns`: that figure is a /play's, and any is a regression there. Over Sendspin a
@@ -835,6 +837,11 @@ def _median(runs: list[PlayResult]) -> PlayResult:
         values = [r.extra[name] for r in runs if r.extra.get(name) is not None]
         if values:
             chosen.extra[name] = sum(values)
+    if all(r.extra.get("via") == "sendspin" for r in runs):
+        # the bursts a play got to the sink: the first play may be a glitched one
+        got = [r.frames for r in runs if r.frames is not None]
+        if got:
+            chosen.frames = max(got)
     worst = [r.extra["worst_error_us"] for r in runs if r.extra.get("worst_error_us") is not None]
     if worst:
         chosen.extra["worst_error_us"] = max(worst, key=abs)
@@ -1040,13 +1047,6 @@ def _print_results(results: list[PlayResult]) -> None:
 def cmd_run(args: argparse.Namespace) -> int:
     suite = load_suite()
     rows = plan(suite, args.profile, args.only)  # no list is refused before a lock is taken
-    # A Sendspin row's server is found before the board is touched, not when it is wanted.
-    testserver: Path | None = None
-    if any(row.get("via") == "sendspin" for row in rows):
-        try:
-            testserver = suite_sendspin.find_testserver(args.testserver, bench.load().locks)
-        except suite_sendspin.SendspinError as error:
-            raise SuiteError(str(error)) from error
     resolve_board(args)
     if args.reset_by == "esptool":
         if not args.restart:
@@ -1064,6 +1064,14 @@ def cmd_run(args: argparse.Namespace) -> int:
             "refused: --lock and --session are required. A board is booked through its lock file "
             "before anything runs on it (see tools/hearth/board_suite.py --help)"
         )
+    # A Sendspin row's server is found after the arguments are checked and before the lock
+    # is taken: not when the first row wants it.
+    testserver: Path | None = None
+    if any(row.get("via") == "sendspin" for row in rows):
+        try:
+            testserver = suite_sendspin.find_testserver(args.testserver, bench.load().locks)
+        except suite_sendspin.SendspinError as error:
+            raise SuiteError(str(error)) from error
     for line in CHECKLIST:
         print(line)
     took, ours = hold_lock(
