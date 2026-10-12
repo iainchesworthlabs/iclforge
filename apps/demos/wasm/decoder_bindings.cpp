@@ -365,7 +365,8 @@ class PushDecoder {
         result.set("channelCount", static_cast<int>(labels.size()));
         result.set("channelLabels", make_string_array(labels));
         result.set("foldChannelCount", fold_channel_count_);
-        // Annex C: an AC-3 stream flagged bsmod 7 above 1/0, whatever reproduction was asked for.
+        // Annex C: an AC-3 stream, or an E-AC-3 programme of one independent substream, flagged bsmod 7
+        // above 1/0, whatever reproduction was asked for.
         result.set("karaoke", unit_karaoke_);
         result.set("objectCount", static_cast<int>(objects.size()));
         result.set("objectLabels", make_string_array(object_labels_));
