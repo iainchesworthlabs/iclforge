@@ -29,6 +29,17 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth for Android: a run on a real Shield and receiver, recorded**
+
+- **The pass-through path on a Shield and an Onkyo receiver** (`planning/hearth-android.md`, phase 1e):
+  the receiver reported `Dolby Audio - DD` 5.1 for an AC-3 stream and `Dolby Audio - DD+` 5.1 for an
+  E-AC-3 one, over 121 s each, with no underrun in any of eleven runs. `apps/hearth/android/README.md`
+  keeps the table and what else it showed: two or three bursts dropped late at a stream age of about
+  9.2 s in three of ten AC-3 runs (cause not found; the output now notes a step of more than 8 ms in the
+  sync offset), and a re-pairing that timed out. Bursts lost while the link was down are now counted as
+  dropped: a Shield whose HDMI link dropped every 20 s played a quarter fewer bursts than were sent and
+  reported none dropped.
+
 **Karaoke in E-AC-3: Hearth's Karaoke page knows it**
 
 - **The Karaoke page names an E-AC-3 karaoke stream and takes its choice.** Hearth's engine had

@@ -87,6 +87,7 @@ std::int64_t PassthroughOutput::frames_to_us(std::uint64_t frames) const {
 void PassthroughOutput::reset_clock_locked() {
     clock_samples_.clear();
     origin_us_.reset();
+    offset_us_.reset();
     moving_ = false;
     underruns_based_ = false;
     opened_at_us_ = now_us_();
@@ -174,6 +175,12 @@ void PassthroughOutput::write(const sendspin::BurstChunk& chunk, std::int64_t lo
         return;
     }
     const std::span<const std::uint8_t> payload = chunk.chunk.data;
+    const std::int64_t offset = local_time - chunk.chunk.timestamp_us;
+    if (options_.note && offset_us_ && (offset > *offset_us_ + 8'000 || offset < *offset_us_ - 8'000)) {
+        options_.note("time offset moved " + std::to_string((offset - *offset_us_) / 1000) + " ms (stream started " +
+                      std::to_string((now_us_() - started_at_us_) / 1000) + " ms ago)");
+    }
+    offset_us_ = offset;
     if (!decoder_) {
         // What the first syncframe says, as a decoder would report it, without decoding it: the
         // receiver decodes. Objects and substreams are not read here (the receiver places them).

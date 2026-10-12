@@ -9,6 +9,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "iclforge/containers/iec61937/iec61937.hpp"
@@ -437,6 +438,40 @@ TEST_CASE("passthrough: bursts that cannot be written because the link is gone a
     // Bursts of the first ten still waiting for their slot when the link went are in that too.
     CHECK(counts.dropped <= 30);
     CHECK(counts.units + counts.dropped == 30);
+}
+
+TEST_CASE("passthrough: a step in the sync offset is noted, since it moves when every burst after is due",
+          "[sink][passthrough]") {
+    Clock clock;
+    ModelLink link{clock};
+    std::vector<std::string> notes;
+    sink::PassthroughOptions options;
+    options.note = [&notes](std::string_view text) { notes.emplace_back(text); };
+    sink::PassthroughOutput out{link, [&clock] { return clock.now; }, options};
+    REQUIRE(out.start({.data_type = ac::DataType::kAc3, .sample_rate = 48000}));
+
+    const auto write_with_offset = [&out](std::size_t index, std::int64_t offset_us) {
+        const std::vector<std::uint8_t> payload = payload_of(index);
+        BurstChunk chunk;
+        chunk.chunk.timestamp_us = 1'000'000 + static_cast<std::int64_t>(index) * kPeriodUs;
+        chunk.chunk.data = payload;
+        chunk.pc = kPcAc3;
+        chunk.pd = static_cast<std::uint16_t>(payload.size() * 8U);
+        out.write(chunk, chunk.chunk.timestamp_us + offset_us);
+    };
+    const auto offset_notes = [&notes] {
+        return std::ranges::count_if(notes, [](const std::string& note) { return note.contains("time offset moved"); });
+    };
+    // The filter's offset drifts a little between bursts: not worth a line.
+    write_with_offset(0, 5'000'000);
+    write_with_offset(1, 5'003'000);
+    write_with_offset(2, 5'005'000);
+    CHECK(offset_notes() == 0);
+    // And steps by 45 ms: the bursts after it are due 45 ms earlier than the device can place them.
+    write_with_offset(3, 4'960'000);
+    REQUIRE(offset_notes() == 1);
+    const auto note = std::ranges::find_if(notes, [](const std::string& text) { return text.contains("time offset moved"); });
+    CHECK(note->contains("-45 ms"));
 }
 
 TEST_CASE("passthrough: a clear flushes the link and starts it again from null bursts", "[sink][passthrough]") {

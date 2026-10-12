@@ -190,6 +190,9 @@ class PassthroughOutput : public BurstStreamOutput {
     // ahead of it, so the least is the closest.
     std::deque<std::int64_t> clock_samples_;
     std::optional<std::int64_t> origin_us_;
+    // The last burst's local time less its server timestamp: the sync filter's offset, which moves
+    // while it converges, and with it when every burst after is due.
+    std::optional<std::int64_t> offset_us_;
     bool moving_ = false;
     std::int64_t opened_at_us_ = 0;
     // When the stream started, and whether its first real burst has been placed (for note).
