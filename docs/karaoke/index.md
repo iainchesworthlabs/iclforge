@@ -337,9 +337,10 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
 - **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
   (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
   player do not offer them.
-- **Finding the times of a file's words.** Hearth's timing window ([Timing the
-  lyrics](../hearth/index.md#timing-the-lyrics)) takes them from your presses, and an estimate by
-  the letters of a word is only where a press starts from; nothing here aligns words to the sound.
+- **Aligning words to the sound.** Hearth's timing window ([Timing the
+  lyrics](../hearth/index.md#timing-the-lyrics)) takes word times from your presses, and an estimate
+  by the letters of a word is only where a press starts from. A forced aligner is outside software,
+  and [Timing a song with a forced aligner](forced-alignment.md) runs one and reads its result in.
 - **Reading a lyrics file in a code page.** UTF-8 and UTF-16 are read; Latin-1, Windows-1255 and the
   other 8-bit encodings are named and not guessed at. A MIDI karaoke file has no way to say its
   encoding, so its words must be UTF-8.

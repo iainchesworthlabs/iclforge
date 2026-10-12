@@ -83,6 +83,14 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke guide has a recipe for timing a song's words with a forced aligner.** [Timing a
+  song with a forced aligner](docs/karaoke/forced-alignment.md) takes a song and its plain lyrics
+  through WhisperX (with Demucs where the vocal has to be separated), both run outside the
+  repository, to an enhanced `.lrc` that Hearth reads and its timing window corrects. It records
+  the versions run, the first-run downloads, the output of one run on a freely licensed
+  recording, and what the aligner got wrong; nothing in the tree depends on either tool. The
+  findings gain E19, the three ways the Forge GUI could offer word timing and what each means for
+  the lyric file it writes (planning/karaoke-phase2-findings.md, decision D13 in the plan).
 - **A sink that decodes a karaoke stream itself applies the part levels.** The Sendspin
   extension's decoder settings take three more keys, `karaoke_melody_db`, `karaoke_vocal1_db` and
   `karaoke_vocal2_db` (-24.0, which is off, to 12.0 dB against Table C.2.3), which a sink lists
