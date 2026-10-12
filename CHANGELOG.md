@@ -544,6 +544,15 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **Hearth's Karaoke page, lyric views and timing window are translated.** The page, the lyric view,
+  the singer view, the timing window, the lyric delay and the shortcuts that go with them are filled
+  in the German, Spanish, French, Arabic, Hebrew and Yiddish catalogues (145 strings, with the singer view's and
+  the single-word timing's own), reusing the
+  Forge GUI's renderings for the words the two share. They are machine-made and have not been read
+  by a speaker, and Settings now says so under the language chooser, as the Forge GUI's and
+  Crucible's do, and which pages are translated; the rest of the window is English in every
+  language, as it was. The catalogues also hold `lupdate`'s own suggestions: a rendering copied to
+  an identical string on another page, marked unfinished ([Languages](docs/hearth/index.md#languages)).
 - **The Network page says whether a board holds lyrics and which line it is on.** The sink report
   has a Lyrics row: "not offered" for a board that lists no lyric commands, "none held", "held,
   before the first line", or "line 3 of 12" with the line's text. The board reports the item and
