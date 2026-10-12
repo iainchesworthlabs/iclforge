@@ -100,6 +100,23 @@ TestCase {
         compare(find(live, "microphoneToggle").enabled, true);
     }
 
+    function test_a_take_has_its_own_controls_and_its_own_indicator() {
+        const card = createTemporaryObject(cardComponent, testCase);
+        verify(card);
+        // Off: no way to record, and no recording indicator; the folder is shown and can be chosen.
+        compare(find(card, "microphoneRecord").visible, false);
+        compare(find(card, "microphoneRecordingIndicator").visible, false);
+        compare(find(card, "microphoneTakesFolder").text, MicrophoneController.takesFolder);
+        verify(find(card, "microphoneChooseFolder").enabled);
+        compare(find(card, "microphoneLastTake").visible, false);
+        // What a take is, in words: the voice alone, lossless, with a description.
+        const note = find(card, "microphoneTakeNote").text;
+        verify(note.indexOf("voice alone") >= 0, note);
+        verify(note.indexOf("lossless") >= 0, note);
+        // The two indicators are two items.
+        verify(find(card, "microphoneIndicator") !== find(card, "microphoneRecordingIndicator"));
+    }
+
     function test_the_page_shows_the_card() {
         const page = createTemporaryObject(pageComponent, testCase);
         verify(page);
