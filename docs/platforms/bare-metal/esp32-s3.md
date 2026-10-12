@@ -99,6 +99,18 @@ a decision rather than a consequence of merging. Add `--with-ac4` to the packer 
 also carries the AC-4 decoder's sources, for `CONFIG_ICLFORGE_AC4`
 ([ESP32-P4](esp32-p4.md#building-with-ac-4)).
 
+The component's link lines are checked without ESP-IDF.
+`tools/checks/check_esp_component_targets.py`, a step of every pull request's static job, runs the
+component's `CMakeLists.txt`, the root's and the libraries' through a small interpreter of the
+CMake language once for each combination of the Kconfig symbols the component reads, and fails a
+`target_link_libraries()` to an `iclforge::` target that the root build, with the options that
+combination sets, never defines. The same holds for the links the libraries behind it make: in a
+combination that configures, every `iclforge::` name that a `target_link_libraries()` or an
+`iclforge_add_library()` link keyword names has to be a target by the end, except inside a
+conditional generator expression such as `$<TARGET_EXISTS:...>`. It reads the guards and not the
+sources, so what it answers is whether CMake would find the target; the build and what the board
+does with the image are the ESP legs' of `ci.yml`, which run after a merge.
+
 ### The probes
 
 `firmware/baremetal/platform/esp32s3/` is the footprint harness, and points `EXTRA_COMPONENT_DIRS` at

@@ -105,8 +105,8 @@ class NetworkController : public QObject {
     Q_PROPERTY(QVariantMap sinkDecoderSettings READ sinkDecoderSettings NOTIFY sinksChanged)
     // What the sink itself has reported (player::State, "WHAT THE SINK
     // REPORTS" in the decoder mockup): settingsRevision, settingsAppliedText,
-    // settingsErrorText, streamText, objectsText, dialogueText, playedText,
-    // problemsText - each already the display string the page shows, the
+    // settingsErrorText, streamText, objectsText, dialogueText, lyricsText,
+    // playedText, problemsText - each already the display string the page shows, the
     // same reason SinkDetail's own fields are (network_view.cpp).
     Q_PROPERTY(QVariantMap sinkReport READ sinkReport NOTIFY sinksChanged)
     // name, slotsText, network, firmware, url - the "ONLY ON THE SINK" panel

@@ -21,6 +21,7 @@ ColumnLayout {
         { label: qsTr("Stream"), value: root.report.streamText ?? "" },
         { label: qsTr("Objects"), value: root.report.objectsText ?? "" },
         { label: qsTr("Dialogue"), value: root.report.dialogueText ?? "" },
+        { label: qsTr("Lyrics"), value: root.report.lyricsText ?? "" },
         { label: qsTr("Played"), value: root.report.playedText ?? "" },
         { label: qsTr("Problems"), value: root.report.problemsText ?? "" }
     ]
