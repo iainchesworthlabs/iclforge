@@ -345,7 +345,7 @@ read from the code.
 | The host's rule | `apps/hearth/engine/src/sink_form.cpp` (`choose_sink_form`) | `StreamNeeds` says the stream is karaoke and a reproduction is asked for: a sink that lists the karaoke keys is sent the stream as coded, one that does not is sent PCM decoded here (the fallback), so a group of both plays one reproduction | S |
 | The host sends the choice | Hearth's per-sink settings (`network_sinks`, `settings_model`) | The singer's choice joins what each sink is sent; a change is a new settings revision, applied at the next burst boundary, as the others are | S to M |
 | The words | W13a's library, then the board | The document and a progress anchor reach the board, which runs the cursor on its own playout clock (option A above); needs `lyrics` reachable from the firmware, which W13a settles | M to L |
-| The panel | the board's own UI | Draws the lines and the fill, in right-to-left for Hebrew and Yiddish, with the fonts those need | L (parked until the board) |
+| The panel | the board's own UI | Draws the lines and the fill, in right-to-left for Hebrew and Yiddish, with the fonts those need | L (built 2026-10-12, [karaoke-p4x-panel.md](karaoke-p4x-panel.md)) |
 
 ### Whether the board can
 
@@ -425,6 +425,16 @@ delay-corrected position, which is a change to the GUI's player and not to the t
   already understands a file. From the source that is not so, which means a double-clicked stream
   opens Hearth empty. This was read from the code and not run on an installed build. It is a
   defect of its own whichever option is chosen, and the argument B needs is the same fix.
+
+**Update, 2026-10-12: the file argument is built, the second instance is not.** Reproduced on a
+build before it was fixed: `hearth --smoke-shot out.png --page karaoke song.ac3` showed "Nothing is
+playing" and exited 0, so the file was dropped without a word. A bare argument (and each argument
+after `--`) is now a file, so `hearth <file>`, the installer's `hearth.exe "%1"` and the Linux
+launcher's `hearth %F` queue it behind the saved queue and play it, and `--page karaoke` goes with
+it ([Hearth's command line](../docs/hearth/index.md#command-line)). That is B's first condition.
+The second is still open and matters more now that a launch plays: nothing hands the file to a
+Hearth that is already running, so a second launch starts a second engine, and the two play over each
+other. It is the owner's call (forward to the running one and raise it, refuse, or leave it).
 
 ### Recommendation
 

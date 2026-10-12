@@ -1415,12 +1415,19 @@ class PublishedImages(Case):
         self.assertEqual(self.chosen(c6, firmware()), "hearth-sink-esp32c6-16mb")
         self.assertEqual(self.chosen(c6, c6_4mb), "hearth-sink-esp32c6")
         self.assertEqual(self.chosen(p4, firmware()), "hearth-sink-esp32p4-rev1")
+        # A P4 of the newer silicon takes the other P4 image, whatever its panel (a v3.2 chip is the
+        # one the 7-inch kit carries): the revision is what separates the two.
+        p4_v3 = dict(p4, revision="3.2")
+        self.assertEqual(self.chosen(p4_v3, firmware()), "hearth-sink-esp32p4-rev3")
 
     def test_a_board_no_image_fits_is_told_why(self) -> None:
-        p4_v3 = {"target": "esp32p4", "chip": "ESP32-P4", "revision": "3.1", "psram_bytes": 1}
-        chosen = self.chosen(p4_v3, firmware())
+        # A chip revision no published image runs on (v3.0 is below the rev3 image's v3.1, and a
+        # v4.x is above its v3.99): told why, image by image.
+        p4_v3_0 = {"target": "esp32p4", "chip": "ESP32-P4", "revision": "3.0", "psram_bytes": 1}
+        chosen = self.chosen(p4_v3_0, firmware())
         self.assertTrue(chosen.startswith("none: "), chosen)
         self.assertIn("hearth-sink-esp32p4-rev1: it runs on chip revisions v1.0 to v1.99", chosen)
+        self.assertIn("hearth-sink-esp32p4-rev3: it runs on chip revisions v3.1 to v3.99", chosen)
         self.assertIn("hearth-sink-esp32s3: it is for ESP32-S3", chosen)
         s3_without_psram = {"target": "esp32s3", "revision": "0.2", "psram_bytes": 0}
         self.assertIn(
@@ -1519,7 +1526,7 @@ class PublishedImages(Case):
         with mock.patch.object(ota, "github_get", side_effect=self.fake_github(files, releases)):
             code, out = run_ota("push", "--release", "latest", "--host", board.host)
         self.assertEqual(code, ota.UPDATED, out)
-        self.assertIn("release v0.11.0: 4 image(s)", out)
+        self.assertIn("release v0.11.0: 5 image(s)", out)
 
     def test_a_release_download_sha512sums_disagrees_with_is_refused(self) -> None:
         files = self.release_files()

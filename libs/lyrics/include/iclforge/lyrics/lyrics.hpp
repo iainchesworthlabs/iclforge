@@ -103,11 +103,27 @@ struct Lyrics {
     std::vector<LyricLine> lines{};
 };
 
+// How text that is neither UTF-8 nor UTF-16 is read, when a program can say what code page it is in.
+// The library carries no table of any page (it is linked into firmware that has no room for one):
+// the program supplies the conversion it has, which is the platform's, and the library asks it only
+// for text that is not valid UTF-8 and has no UTF-16 mark, so a file that is UTF-8 or UTF-16 is read
+// as it always was whatever is given. `decoder` turns `bytes` in the page into UTF-8 in `utf8` and
+// returns false for bytes the page does not have; `context` is handed back as given. Without a
+// decoder such a file is refused with the reason, as before: a code page is never guessed at.
+using LegacyDecoder = bool (*)(void* context, std::string_view bytes, std::string& utf8);
+
+struct TextEncoding {
+    LegacyDecoder decoder = nullptr;
+    void* context = nullptr;
+};
+
 // `text` as the file holds it (its bytes, UTF-8 or UTF-16). `duration_ms` is
 // the item's length, for the end of the last line. The error is a sentence for
 // the page: the file is empty, is not UTF-8 or UTF-16, or has no lyrics in it.
+// `encoding` (here and on the readers below) is what to read a file in a code page with.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_lyrics(
-    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt,
+    const TextEncoding& encoding = {});
 
 // A SubRip (`.srt`) file read as lyrics (planning/karaoke-phase2.md, W13c): the cues of
 //
@@ -129,7 +145,8 @@ struct Lyrics {
 // The same encodings as parse_lyrics (UTF-8 with or without a byte-order mark, or UTF-16 with one),
 // and the same errors, with "no cues" for a file that has none.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_subrip(
-    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt,
+    const TextEncoding& encoding = {});
 
 // An Advanced SubStation Alpha (`.ass`) file read as lyrics (planning/karaoke-phase2.md, W13d). Its
 // `Dialogue:` events are lines, with the start and the end the event has (so, as in SubRip, a gap
@@ -145,7 +162,8 @@ struct Lyrics {
 // the column order is the file's own `Format:` line (the v4+ order where it has none). An event
 // with no karaoke tags is a line without words. Encodings and errors are parse_lyrics's.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_ass(
-    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt,
+    const TextEncoding& encoding = {});
 
 // The words of a MIDI karaoke file (`.kar`, a Standard MIDI File; planning/karaoke-phase2.md,
 // W13e), whose BYTES are given: syllables as Text (or Lyric) meta events, each at its tick, turned
@@ -161,24 +179,60 @@ struct Lyrics {
 // with a SMPTE rate that is none of the four, or with a title, an artist or words that are not
 // UTF-8 (a MIDI file carries no word of its encoding; Latin-1 and code pages are not guessed at)
 // says so.
+// Words that are not UTF-8 are read with `encoding` where one is given, a syllable at a time (a
+// character is never split across two events by a program that wrote the file well).
 [[nodiscard]] std::expected<Lyrics, std::string> parse_midi_karaoke(
-    std::string_view bytes, std::optional<std::int64_t> duration_ms = std::nullopt);
+    std::string_view bytes, std::optional<std::int64_t> duration_ms = std::nullopt,
+    const TextEncoding& encoding = {});
 
 // Any of the above, by what the file is: MIDI karaoke where it begins `MThd`, ASS where it has a
 // `Dialogue:` event, SubRip where it has a cue's `-->` line between two times, LRC otherwise. What a
 // program that is handed a timed-text file by a person, whose extension may be anything, calls.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_timed_text(
-    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
+    std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt,
+    const TextEncoding& encoding = {});
 
 // A file's lyrics (parse_timed_text of its bytes). A file over four MiB is refused, which no lyric
 // file is.
 [[nodiscard]] std::expected<Lyrics, std::string> read_lyrics(
-    const std::filesystem::path& file, std::optional<std::int64_t> duration_ms = std::nullopt);
+    const std::filesystem::path& file, std::optional<std::int64_t> duration_ms = std::nullopt,
+    const TextEncoding& encoding = {});
 
 // The lyrics file of a media item (L1): `name.lrc` in the item's folder, the
 // extension in any case, and where there is none `name.srt`, then `name.ass`, then `name.kar`.
 // `item_path` is the item's path as the queue holds it.
 [[nodiscard]] std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path);
+
+// What became of a lyrics file put beside a stream (place_lyrics_beside).
+enum class PlacementStatus : std::uint8_t {
+    // The stream's own `.lrc` was written.
+    kWritten,
+    // A file of that name was already beside the stream, and was left as it was.
+    kExists,
+    // The lyrics file could not be read, or is not lyrics; `error` says why.
+    kUnreadable,
+    // The `.lrc` could not be written; `error` says why.
+    kFailed,
+};
+
+struct Placement {
+    PlacementStatus status = PlacementStatus::kFailed;
+    // The `.lrc` written, or the one that was already there.
+    std::filesystem::path path{};
+    std::string error{};
+};
+
+// Puts a lyrics file beside a stream as the stream's own, under the stream's name with `.lrc`: where
+// find_lyrics_file looks, and so where every player finds it. Whatever format the file is in (`.lrc`,
+// `.srt`, `.ass` or `.kar`, read as parse_timed_text reads them), what is written is the one format
+// every reader of the stream has: UTF-8 LRC, with a duet's singers and names, word times where the
+// file has them, and the gaps a cue-timed file leaves between its lines marked (write_lrc). An
+// existing file of that name is never overwritten, and is reported as kExists whatever
+// `lyrics_file` holds. `duration_ms` is the stream's length, for the end of the last line.
+[[nodiscard]] Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
+                                            const std::filesystem::path& stream_path,
+                                            std::optional<std::int64_t> duration_ms = std::nullopt,
+                                            const TextEncoding& encoding = {});
 
 // Whether any line has a singer: the file is a duet and a view shows who sings what.
 [[nodiscard]] bool has_singers(const Lyrics& lyrics);

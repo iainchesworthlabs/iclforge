@@ -101,6 +101,14 @@ loop of about 160 ms a cycle, never reaching `app_main`. 187 such cycles were co
 (`CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360`) is this chip revision's ceiling, and every figure on this
 page is measured there — DFRobot's own listing for this board says "360MHz" for the same reason.
 
+**On a v3.x chip** the same firmware family has its own image (`hearth-sink-esp32p4-rev3`, built with
+`sdkconfig.p4-rev3` after `sdkconfig.p4`): revisions v3.1 to v3.99, 400 MHz, PSRAM at 200 MHz by
+ESP-IDF's default, and the I2S controller's 160 MHz PLL as its clock source, which is what the
+sixteen-slot TDM frame needs. Every figure on this page is the v1.3 board's; **none has been
+measured on a v3.x chip**, and the decoders scale with the clock almost exactly, so these are a
+floor. The image carries the lyric screen for a 7-inch panel
+([An ESP32-P4 sink](../../hearth/sink-esp32-p4.md)).
+
 ## Reading the console
 
 This board has no USB-UART bridge chip, so "attach a terminal" is not the formality it is on the
@@ -1078,7 +1086,20 @@ stream is identical with and without the lane.
 | `514-joc-dee`, 12 objects | 7.1.4 | 1.59 | 0.79 |
 
 Every AC-3 and E-AC-3 stream the player was given is in real time on the P4 with the second
-core, the 12-object one included. An object costs about 1 ms of a frame here.
+core, the 12-object one included. An object costs about 1 ms of a frame here over HTTP.
+
+Over Sendspin (`hearth-testserver`, native 7.1.4, null sink, the board's own per-burst decode and
+render time against 32 ms, `main` `ce0e099db`, board 1, 2026-10-12) it costs about 1.4 ms, and
+the objects are what `forge probe` reports, the LFE bed object included:
+
+| JOC objects | 2 | 3 | 4 | 5 | 6 | 8 | 12 | 15 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| x real time | 0.41 | 0.43 | 0.49 | 0.53 | 0.59 | 0.68 | 0.85 | **0.97** |
+| worst burst | 0.62 | 0.68 | 0.83 | 0.79 | 0.86 | 0.89 | 1.24 | 2.44 |
+
+Fifteen objects is at the line and under-runs (24 underruns in a 20 s play); twelve is 0.85, and
+the 12-object `514-joc-dee` 0.85. The coding tools at 7.1.4 are 0.33 (none), 0.43 (all) and 0.62
+(enhanced coupling), 5.1 E-AC-3 0.18; the internal RAM left is never under 108 KB.
 
 ## QEMU
 

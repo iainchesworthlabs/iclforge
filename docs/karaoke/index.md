@@ -261,8 +261,16 @@ and as large as fits (in whole steps, so the small type stays crisp), drawn agai
 what is *heard* and moved by the lyric delay as the words are.
 
 The words of a disc are **part of the picture**. Nothing is read from it as text, so there is no
-fill, no line to follow and nothing to translate or copy, and the page says so. A lyrics file beside
-the stream is shown in its place, since it is what a word-by-word fill and the delay can follow.
+fill, no line to follow and nothing to translate or copy, and the page says so.
+
+**When a lyrics file is beside the stream too**, the words are shown, since they are what a
+word-by-word fill and the delay can follow, and a **Show** choice (Words or Picture) appears in the
+Lyrics card, and on the bar of the full-screen singer view, to show the disc instead. The choice is
+for **this run of Hearth**: it is not kept for the song, it holds from one song to the next while
+Hearth is open, and a song with only a lyrics file or only a disc is not changed by it. Choosing
+the picture takes nothing from the lyrics: the file is still loaded, so the timing window, the
+duet cues and the lyrics a board is sent are as they were. A `.cdg` that cannot be read beside a
+lyrics file is not shown and not reported: the words are.
 
 What is drawn is what the disc's own player draws: the screen preset and the border preset, the
 tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form
@@ -360,17 +368,45 @@ forge decode out.ac3 melody-and-v1.wav karaoke=v1
 coded, and the report says so. The library form is `OutputConfig::karaoke` and
 `OutputConfig::karaoke_vocals`; see [Decoding](../library/decoding.md).
 
+`forge monitor` takes the same choice and plays the reproduction on the output:
+
+```text
+forge monitor out.ac3 karaoke=none      # L, C, R: the backing and the melody, for singing along
+forge monitor out.ac3 karaoke=v1+v2     # V1 left, V2 right
+```
+
+The capable decoder's levels are `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` on
+both commands: each part against Table C.2.3, 0 dB the table, up to 12 dB louder and `-24` or `off`
+at the bottom, the span and the defaults of Hearth's sliders.
+
+```text
+forge decode out.ac3 sing.wav karaoke=none karaoke-melody=-6
+forge monitor out.ac3 karaoke=v1 karaoke-v1=-12 karaoke-melody=3
+```
+
+They move nothing under the aware reproduction, so a level without a choice of vocals
+(`karaoke=none`, `v1`, `v2` or `v1+v2`) is refused.
+
+On an output narrower than the stream, which `monitor` folds to unasked, the 2/0 reproduction
+plays. `forge play` applies the choice where it decodes (its PCM fallback), and `forge spdif`
+and `forge play`'s bitstream legs hand the coded stream on: they accept `karaoke` and say it is
+not applied, since a receiver reproduces the stream. E-AC-3 and AC-4 are ignored with a warning
+by all of them.
+
 ## From a program
 
 The reproduction and the lyric reader are in the libraries, so a program of your own can use them:
 
 | You are in | The reproduction | The lyrics |
 |---|---|---|
+| C or C++ through the C API | `iclforge_decoder_create_with_karaoke()`, [C API](../library/c-api.md#karaoke-streams-annex-c) | `iclforge_lyrics_parse()` and its cursor, [C API](../library/c-api.md#lyrics) |
+| Python | `DecoderConfig(karaoke=...)`, [Python](../library/python-api.md#karaoke-streams-and-lyrics) | `iclforge.lyrics` |
+| Rust | `Decoder::with_karaoke`, [Rust](../library/rust-api.md#karaoke-and-lyrics) | `iclforge::lyrics::Lyrics` |
 | A browser or Node (WebAssembly) | `FoldOptions.karaoke`, [the npm package](../platforms/wasm.md) | `parseLyrics` in the demo's module, which the [decode demo](../wasm-demo.md)'s Words panel uses |
 | C++ | `OutputConfig::karaoke` and its levels, [Decoding](../library/decoding.md) | `iclforge::lyrics`, `libs/lyrics` |
 
-Both take the same choices (as coded, aware or capable; the vocals; the three part levels in dB
-over -24 to +12, where the bottom is off) and the same bytes of a lyrics file, and give the same
+All of them take the same choices (as coded, aware or capable; the vocals; the three part levels in
+dB over -24 to +12, where the bottom is off) and the same bytes of a lyrics file, and give the same
 samples and the same lines as `forge decode` and Hearth do.
 
 ## What it does not do
@@ -384,9 +420,11 @@ samples and the same lines as `forge decode` and Hearth do.
   encoding, so its words must be UTF-8.
 - **Text from a CD+G disc.** Its words are pixels, so Hearth shows the picture and cannot follow the
   words.
-- **A screen on a sink.** A board that decodes for itself is sent the lyrics and where the sound is
-  in them, follows them on its own clock and reports the line; the panel that would draw them waits
-  for a board with a display.
+- **A screen on a sink that has not been run.** A board that decodes for itself is sent the lyrics
+  and where the sound is in them, follows them on its own clock and reports the line. The P4
+  firmware also draws them, with the colour moving as the song does, on a 7-inch panel
+  ([An ESP32-P4 sink](../hearth/sink-esp32-p4.md#the-screen)): drawn and measured on a board with no
+  panel, not yet run on one, and without a microphone, scoring or recording.
 - **Karaoke in E-AC-3 or AC-4.**
 - **A microphone, scoring or recording.** A [draft plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
   sets out the requirements and the design questions and is awaiting approval; nothing of it is

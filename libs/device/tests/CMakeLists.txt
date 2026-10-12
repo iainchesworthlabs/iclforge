@@ -12,6 +12,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_improv.cpp
     test_interleave.cpp
     test_log_ring.cpp
+    test_object_limit.cpp
     test_pairing_records.cpp
     test_pcm_unpack.cpp
     test_playout.cpp

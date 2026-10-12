@@ -38,7 +38,10 @@
     "sdkconfig.defaults;sdkconfig.ac4;sdkconfig.hw": "the bare-metal S3 probe's AC-4 build (firmware/baremetal), a footprint measurement and not the sink",
     "sdkconfig.defaults;sdkconfig.wifi": "the bare-metal C6 probe's network load (firmware/baremetal), not the sink",
     "sdkconfig.defaults;sdkconfig.c6": "the C6 overlay's own header: the part with no Sendspin player, which no image is built for",
-    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4": "the P4 overlay's own header: the part with no Sendspin player, which no image is built for"
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4": "the P4 overlay's own header: the part with no Sendspin player, which no image is built for",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin": "sdkconfig.p4-rev3's own header: the v3.x revision over the P4 shape, before the panel; no image is built from it",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-dsi": "the ESP32-P4 of revision v3.x with the LVGL screen: the release image hearth-sink-esp32p4-rev3 (#1400). It has no profile yet: no board of that revision has run it, and p4-rev3 is its own change, which needs a configured build for its locked values. Until then _build.yml spells its list, and tools/hearth/test_sink_profile.py names it",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-null": "the P4 with the panel's frame buffer in PSRAM and no screen behind it (sdkconfig.panel-null): what a board with no panel runs to see the screen; a development build, built and not run or packaged"
   },
   "overlays": {
     "wifi-credentials": {

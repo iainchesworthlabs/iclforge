@@ -281,6 +281,22 @@ jobs:
         shell: bash
         run: python3 tools/checks/check_esp_efuse_free.py
 
+      # The ESP-IDF component turns its Kconfig symbols into the root build's options, pulls the
+      # root in and links the libraries it needs by name; which of them exist under those options
+      # is decided by if() guards in files its author is not editing. On 2026-10-12 a guard that
+      # left libs/lyrics out of a sink's build met a link to iclforge::lyrics, each passed its own
+      # gate, and the pull-request gate builds no ESP-IDF image to say so. This runs the
+      # component's CMake, the root's and the libraries' through a small interpreter of the
+      # language, once for each combination of the component's Kconfig symbols and with no
+      # ESP-IDF, and fails a link that no run defined, naming the file that defines the target and
+      # the guard that kept it from running. The links the libraries behind the component make
+      # are held to the same rule in every run that configures. Its own suite runs in the Oracle
+      # unit tests step above.
+      - name: ESP-IDF component link targets
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 tools/checks/check_esp_component_targets.py
+
       # The Android app is built in CI only, in a job that takes the better part of an
       # hour to reach the native code, and a JNI name one end spells differently from
       # the other does not fail a build: the function is not found and the first call

@@ -59,6 +59,10 @@ TITLES = {
     "hearth-sink-esp32c6": "ESP32-C6 with 4 MB of flash (any C6 module)",
     "hearth-sink-esp32c6-16mb": "ESP32-C6 with 16 MB of flash",
     "hearth-sink-esp32p4-rev1": "ESP32-P4 of silicon revision v1.x (such as the FireBeetle 2)",
+    "hearth-sink-esp32p4-rev3": (
+        "ESP32-P4 of silicon revision v3.x with a 7-inch panel "
+        "(such as the ESP32-P4-Function-EV-Board)"
+    ),
 }
 
 
