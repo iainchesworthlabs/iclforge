@@ -140,9 +140,40 @@ int karaoke_default_bitrate_kbps(const std::string& mode) {
     return 192;
 }
 
+namespace {
+
+// ASCII lower case, whatever the locale: file names are compared here, not text shown.
+std::string ascii_lower(std::string text) {
+    for (char& c : text) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return text;
+}
+
+}  // namespace
+
 std::string karaoke_lyrics_beside(const std::string& media_path) {
-    const std::optional<std::filesystem::path> found = iclforge::lyrics::find_lyrics_file(media_path);
-    return found ? found->string() : std::string{};
+    namespace fs = std::filesystem;
+    const std::optional<fs::path> found = iclforge::lyrics::find_lyrics_file(media_path);
+    if (!found) {
+        return {};
+    }
+    // On a case-insensitive file system the library answers with the usual spelling of the name
+    // ("Song.lrc"), which is the file "Song.LRC" under another; the row and the copy show the file
+    // as it is on disk, as they did before the library found it.
+    std::error_code ec;
+    const fs::path folder = found->has_parent_path() ? found->parent_path() : fs::path(".");
+    const std::string wanted = ascii_lower(found->filename().string());
+    for (fs::directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
+        if (ascii_lower(it->path().filename().string()) != wanted) {
+            continue;
+        }
+        std::error_code same_ec;
+        if (fs::equivalent(it->path(), *found, same_ec) && !same_ec) {
+            return it->path().string();
+        }
+    }
+    return found->string();
 }
 
 KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path, const std::string& stream_path,
