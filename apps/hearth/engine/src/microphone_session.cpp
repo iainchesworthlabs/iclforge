@@ -56,6 +56,11 @@ std::expected<void, std::string> MicrophoneSession::start(const std::string& dev
 }
 
 void MicrophoneSession::stop() {
+    // Closing the microphone ends a take and keeps what was written: a take that was running when
+    // the page was left is a take, not a loss.
+    if (recorder_.recording()) {
+        (void)end_take();
+    }
     if (open_) {
         input_->stop();
     }
@@ -73,6 +78,7 @@ void MicrophoneSession::set_reference(std::optional<pitch::Contour> reference) {
 }
 
 void MicrophoneSession::anchor(std::int64_t position_ms, bool playing, std::int64_t now_ns) {
+    playhead_.anchor(position_ms, now_ns / 1000, playing ? 1.0 : 0.0);
     anchor_ = Anchor{position_ms, playing ? 1.0 : 0.0, now_ns};
     if (performance_) {
         performance_->anchor(position_ms, now_ns, playing ? 1.0 : 0.0);
@@ -158,11 +164,79 @@ MicrophoneHealth MicrophoneSession::pump(std::int64_t now_ns) {
             performance_->feed_interleaved(block_.samples, static_cast<std::uint16_t>(channels),
                                            block_.first_time_ns);
         }
+        if (recorder_.recording()) {
+            record_block(channels, frames);
+        }
     }
     if (now_ns - last_audio_ns_ > kStallNs) {
         return MicrophoneHealth::kStalled;
     }
     return MicrophoneHealth::kOk;
+}
+
+void MicrophoneSession::record_block(std::size_t channels, std::size_t frames) {
+    if (!take_started_) {
+        // Where the item was when the first sample was sung: the same placement as the score's, the
+        // heard position at the capture time less the microphone's declared delay, plus the timing
+        // the person moved. Unknown until the engine has said where the item is.
+        const std::int64_t sung_us = (block_.first_time_ns - input_delay_ms_ * 1'000'000) / 1000;
+        if (const auto position = playhead_.position_ms(sung_us)) {
+            take_.item_start_ms = *position + offset_ms_;
+        }
+        take_.timing_estimated = block_.time_estimated;
+        take_started_ = true;
+    }
+    // The dry voice, mono: the channels of the device averaged.
+    take_mono_.resize(frames);
+    for (std::size_t i = 0; i < frames; ++i) {
+        double mono = 0.0;
+        for (std::size_t c = 0; c < channels; ++c) {
+            mono += static_cast<double>(block_.samples[i * channels + c]);
+        }
+        take_mono_[i] = static_cast<float>(mono / static_cast<double>(channels));
+    }
+    if (!recorder_.write(take_mono_)) {
+        // The disk failed or filled: what was written is a take, and the person is told why it
+        // ended.
+        take_error_ =
+            "The take stopped because the disk could not be written to; what was recorded is kept.";
+        auto ended = end_take();
+        if (ended) {
+            ended_take_ = std::move(*ended);
+        }
+    }
+}
+
+std::expected<void, std::string> MicrophoneSession::begin_take(const std::filesystem::path& file,
+                                                               const TakeMetadata& partial) {
+    if (!open_) {
+        return std::unexpected(
+            std::string{"The microphone is off, so there is nothing to record."});
+    }
+    auto begun = recorder_.begin(file, input_->sample_rate());
+    if (!begun) {
+        return begun;
+    }
+    take_ = partial;
+    take_.item_start_ms.reset();
+    take_started_ = false;
+    take_error_.clear();
+    ended_take_.reset();
+    return {};
+}
+
+std::expected<TakeInfo, std::string> MicrophoneSession::end_take() {
+    take_.input_delay_ms = input_delay_ms_;
+    take_.offset_ms = offset_ms_;
+    take_.headphones = headphones_;
+    auto info = recorder_.finish(take_);
+    take_started_ = false;
+    return info;
+}
+
+void MicrophoneSession::discard_take() {
+    recorder_.discard();
+    take_started_ = false;
 }
 
 MicrophoneSnapshot MicrophoneSession::snapshot() const {
@@ -176,6 +250,12 @@ MicrophoneSnapshot MicrophoneSession::snapshot() const {
     s.input_delay_ms = input_delay_ms_;
     s.offset_ms = offset_ms_;
     s.timing_estimated = timing_estimated_;
+    s.taking = recorder_.recording();
+    s.take_seconds =
+        recorder_.recording() && input_->sample_rate() > 0
+            ? static_cast<double>(recorder_.frames()) / static_cast<double>(input_->sample_rate())
+            : 0.0;
+    s.take_error = take_error_;
     s.period_frames = open_ ? input_->period_frames() : 0;
     s.sample_rate = open_ ? input_->sample_rate() : 0;
     if (performance_) {

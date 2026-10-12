@@ -1,15 +1,15 @@
 {
   "format": 1,
   "profile": "s3-n16r8-ac4",
-  "profile_hash": "6124ef3f591f",
-  "version": "v0.10.0-beta.1-4460-g12c4fdaaf",
+  "profile_hash": "d7a1513e42b6",
+  "version": "v0.10.0-beta.1-4517-g84efde0e7",
   "chip": "ESP32-S3",
   "board": "S3a",
-  "recorded": "2026-10-12T10:06Z",
+  "recorded": "2026-10-12T11:57Z",
   "boot": {
     "when": "boot",
     "net": 1,
-    "internal_free": 52075,
+    "internal_free": 51699,
     "largest": 31744,
     "ask_total": 8192,
     "ask_biggest": 8192,
@@ -23,7 +23,7 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        121,
+        120,
         120,
         120,
         120,
@@ -31,7 +31,7 @@
       ],
       "decoder_permille": 120,
       "units": 938,
-      "decode_stack_free": 26020,
+      "decode_stack_free": 26024,
       "underruns": 0,
       "dry_ms": 0,
       "min_headroom_ms": 5,
@@ -44,9 +44,9 @@
       "decoder_permille_samples": [
         84,
         83,
+        83,
         84,
-        84,
-        82
+        84
       ],
       "decoder_permille": 84,
       "units": 938,
@@ -61,15 +61,15 @@
       "frames": 3,
       "why": "end of stream",
       "decoder_permille_samples": [
-        506,
-        510,
-        499,
-        514,
-        518
+        520,
+        516,
+        517,
+        522,
+        508
       ],
-      "decoder_permille": 510,
+      "decoder_permille": 517,
       "units": 3,
-      "decode_stack_free": 19712,
+      "decode_stack_free": 19740,
       "underruns": 0,
       "dry_ms": 0,
       "min_headroom_ms": 5,
@@ -81,15 +81,15 @@
       "frames": 4,
       "why": "end of stream",
       "decoder_permille_samples": [
-        645,
+        654,
         644,
-        648,
-        640,
-        649
+        651,
+        643,
+        642
       ],
-      "decoder_permille": 645,
+      "decoder_permille": 644,
       "units": 4,
-      "decode_stack_free": 16432,
+      "decode_stack_free": 16304,
       "underruns": 0,
       "dry_ms": 0,
       "min_headroom_ms": 5,
@@ -101,15 +101,15 @@
       "frames": 3,
       "why": "end of stream",
       "decoder_permille_samples": [
-        609,
-        617,
-        605,
         608,
+        599,
+        613,
+        598,
         605
       ],
-      "decoder_permille": 608,
+      "decoder_permille": 605,
       "units": 3,
-      "decode_stack_free": 16304,
+      "decode_stack_free": 16336,
       "underruns": 0,
       "dry_ms": 0,
       "min_headroom_ms": 5,
@@ -120,14 +120,14 @@
   "findings": {},
   "boot_samples": {
     "internal_free": [
-      52091,
-      52075,
-      52079,
-      52083,
-      52103,
-      52079,
-      52087,
-      52087
+      51927,
+      51927,
+      51699,
+      51935,
+      51927,
+      51927,
+      51931,
+      51927
     ],
     "largest": [
       31744,

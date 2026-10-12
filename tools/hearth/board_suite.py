@@ -23,7 +23,9 @@ refusal:
    profile's.
 3. **Plays.** The repository's fixture streams are served from this machine and each row of the
    profile's list (firmware/hearth-sink/suite.json) is played over POST /play, polled to its end,
-   and its lines read from GET /log.
+   and its lines read from GET /log. A row with `"via": "sendspin"` is played the way the C6's
+   product path is: the repository's `hearth-testserver` pairs the board and sends the stream,
+   and the board's `sendspin.stream=` line is read (tools/hearth/suite_sendspin.py).
 4. **Asserts**, per row: finished and not failed, every unit, no resynchronised byte, no sink
    underrun, no failed allocation, no reboot, and for AC-4 the PCM hash the host pins
    (testdata/ac4-probe-pcm-hashes.json). A row that expects the C6's refusal expects state
@@ -68,6 +70,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bench
 import bench_flash
 import sink_profile
+import suite_sendspin
 
 REPO = Path(__file__).resolve().parents[2]
 PROJECT = REPO / "firmware" / "hearth-sink"
@@ -205,6 +208,23 @@ class Board:
 
     def play(self, url: str) -> int:
         return self._request("POST", "/play", url.encode("utf-8"))[0]
+
+    def sendspin(self) -> dict[str, Any]:
+        """/status's `sendspin` object, the fields the suite reads by name (the network object is
+        another one and is not read)."""
+        raw = self.json("/status").get("sendspin") or {}
+        return {key: raw.get(key) for key in suite_sendspin.SENDSPIN_FIELDS}
+
+    def pairing(self) -> dict[str, Any]:
+        """GET /pairing: the servers the board is paired with (their ids and names)."""
+        return self.json("/pairing")
+
+    def forget(self, server_id: str) -> int:
+        """POST /pairing `forget <server_id>`: that one server's record. Never a bare `forget`,
+        which the board reads as every record, the owner's Hearth among them."""
+        if not server_id or not server_id.strip():
+            raise SuiteError("forget needs a server id: a bare forget drops every pairing record")
+        return self._request("POST", "/pairing", f"forget {server_id.strip()}".encode())[0]
 
     def restart(self, wait: float = 120.0, sleep: float = 2.0) -> None:
         """POST /restart, then wait for the board to answer again and to be stopped."""
@@ -351,6 +371,10 @@ class PlayResult:
     findings: list[str] = field(default_factory=list)
     folded: bool = False
     layout: str | None = None
+    # What a Sendspin row records beyond the /play figures (suite_sendspin.figures), and notes
+    # that are printed and are not findings.
+    extra: dict[str, Any] = field(default_factory=dict)
+    notes: list[str] = field(default_factory=list)
 
     def figures(self) -> dict[str, Any]:
         out: dict[str, Any] = {"state": self.state, "frames": self.frames}
@@ -371,6 +395,9 @@ class PlayResult:
             ("resync_bytes", self.lines.resync_bytes),
             ("pcm_hash", self.lines.ac4_pcm_hash),
         ):
+            if value is not None:
+                out[name] = value
+        for name, value in self.extra.items():
             if value is not None:
                 out[name] = value
         return out
@@ -531,6 +558,103 @@ def _number(text: str) -> Any:
         return text
 
 
+@dataclass
+class SendspinContext:
+    """What a Sendspin row needs: the test server, its state directory (one identity, so one
+    pairing record on the board), the board's pairing as the run found it, and the label the
+    server's report gives the board."""
+
+    testserver: Path
+    state: Path
+    pairing: suite_sendspin.Pairing
+    label: str = "board"
+    timeout: float = 180.0
+    status_port: int = 80
+    # How the server is started and how long the harness waits for the board's totals line: the
+    # defaults are the real ones, and a test sets them.
+    popen: Any = None
+    relay_every: float = 0.4
+    log_wait_s: float = 8.0
+
+
+# The extras a Sendspin row's baseline keeps, by how repeated plays of it are combined.
+_EXTRA_MAX = ("late", "dropped", "invalid", "resyncs", "stream_underruns", "ring_high")
+_EXTRA_SUM = ("plays", "glitched_plays")
+_EXTRA_MIN = ("play_heap_free",)
+
+
+def run_sendspin_play(
+    board: Board,
+    row: dict[str, Any],
+    suite: dict[str, Any],
+    context: SendspinContext | None,
+    mark: int | None,
+) -> tuple[PlayResult, int | None]:
+    """One row played over Sendspin: the test server sends the stream, the board's totals line is
+    read. The figures are the /play rows' where there is one (frames, decoder_permille,
+    decode_stack_free, units, underruns) and the Sendspin ones beside them."""
+    spec = row["stream_spec"]
+    result = PlayResult(id=row["id"], stream=row["stream"], expect=row.get("expect", "pass"))
+    if context is None:
+        result.state = "refused"
+        result.findings.append(
+            "a Sendspin row needs the test server: --testserver, or ICLFORGE_TESTSERVER, or a "
+            "build of it in the bench's suite-testserver directory"
+        )
+        return result, mark
+    options: dict[str, Any] = {
+        "status_port": context.status_port,
+        "timeout_s": context.timeout,
+        "relay_every": context.relay_every,
+        "log_wait_s": context.log_wait_s,
+    }
+    if context.popen is not None:
+        options["popen"] = context.popen
+    try:
+        run = suite_sendspin.play_row(
+            board,
+            context.testserver,
+            context.state,
+            REPO / spec["file"],
+            context.label,
+            context.pairing,
+            **options,
+        )
+    except suite_sendspin.SendspinError as error:
+        result.state = "refused"
+        result.findings.append(str(error))
+        return result, mark
+    hard = suite_sendspin.judge(run, spec)
+    result.findings.extend(hard)
+    result.notes.extend(run.notes)
+    result.rebooted = run.rebooted
+    glitched = suite_sendspin.glitches(run) if not hard else []
+    for line in glitched:
+        result.notes.append(f"a glitch in the play: {line}")
+    played = run.stream is not None and not run.rebooted and not hard
+    result.state = "finished" if played else "failed"
+    period = int(spec.get("period_us", suite.get("frame_us", 32000)))
+    figures = suite_sendspin.figures(run, period)
+    result.frames = figures.pop("frames", None)
+    result.lines.units = result.frames
+    result.decoder_permille = figures.pop("decoder_permille", None)
+    result.lines.decode_stack_free = figures.pop("decode_stack_free", None)
+    # Not `underruns`: that figure is a /play's, and any is a regression there. Over Sendspin a
+    # play's glitches are counted in plays (glitched_plays of plays), as the board's own totals
+    # of the worst play are kept beside them.
+    figures["stream_underruns"] = figures.pop("underruns", None)
+    result.extra = {
+        "via": "sendspin",
+        "plays": 1,
+        "glitched_plays": 1 if glitched else 0,
+        **figures,
+    }
+    # The log is read from where the row's stream started, so a /play row after this one starts
+    # from the end of what it said.
+    _, mark = board.log(mark)
+    return result, mark
+
+
 def run_play(
     board: Board,
     row: dict[str, Any],
@@ -541,8 +665,11 @@ def run_play(
     pins: dict[str, str],
     timeout: float,
     sleep: float,
+    sendspin: SendspinContext | None = None,
 ) -> tuple[PlayResult, int | None]:
     """One row, played; returns its result and the log offset to carry on from."""
+    if row.get("via") == "sendspin":
+        return run_sendspin_play(board, row, suite, sendspin, mark)
     spec = row["stream_spec"]
     result = PlayResult(id=row["id"], stream=row["stream"], expect=row.get("expect", "pass"))
     # Advance the mark past anything printed between plays.
@@ -664,6 +791,7 @@ def run_suite(
     repeat: int = 1,
     timeout: float = 120.0,
     sleep: float = 0.4,
+    sendspin: SendspinContext | None = None,
 ) -> list[PlayResult]:
     rows = plan(suite, profile, only)
     mark: int | None = None
@@ -675,7 +803,7 @@ def run_suite(
         for _ in range(max(1, repeat)):
             counter += 1
             played, mark = run_play(
-                board, row, base_url, counter, mark, suite, pins, timeout, sleep
+                board, row, base_url, counter, mark, suite, pins, timeout, sleep, sendspin
             )
             runs.append(played)
             if played.findings and played.state in (None, "refused"):
@@ -699,10 +827,27 @@ def _median(runs: list[PlayResult]) -> PlayResult:
     heads = [r.lines.min_headroom_ms for r in runs if r.lines.min_headroom_ms is not None]
     if heads:
         chosen.lines.min_headroom_ms = min(heads)
+    for name in _EXTRA_MAX + _EXTRA_MIN:
+        values = [r.extra[name] for r in runs if r.extra.get(name) is not None]
+        if values:
+            chosen.extra[name] = max(values) if name in _EXTRA_MAX else min(values)
+    for name in _EXTRA_SUM:
+        values = [r.extra[name] for r in runs if r.extra.get(name) is not None]
+        if values:
+            chosen.extra[name] = sum(values)
+    worst = [r.extra["worst_error_us"] for r in runs if r.extra.get("worst_error_us") is not None]
+    if worst:
+        chosen.extra["worst_error_us"] = max(worst, key=abs)
+    burst = [r.extra["burst_us"] for r in runs if r.extra.get("burst_us") is not None]
+    if burst:
+        chosen.extra["burst_us"] = int(statistics.median(burst))
     for run in runs[1:]:
         for finding in run.findings:
             if finding not in chosen.findings:
                 chosen.findings.append(finding)
+        for note in run.notes:
+            if note not in chosen.notes:
+                chosen.notes.append(note)
         chosen.rebooted = chosen.rebooted or run.rebooted
         if run.lines.underruns:
             chosen.lines.underruns = max(chosen.lines.underruns or 0, run.lines.underruns)
@@ -740,6 +885,25 @@ def run_record(
             "largest": [b.get("largest") for b in samples],
         }
     return record
+
+
+def baseline_note(run: dict[str, Any], baseline: dict[str, Any]) -> str | None:
+    """One line when the baseline was recorded under another profile hash than the run's image
+    carries, and None when they are the same or either is not known. The hash is the profile's
+    fragments and locked values, so a different one is a different definition, and the baseline's
+    figures are still the ones recorded: `compare` holds the run to them as they are, and this says
+    which definition they were taken under. A profile gains a locked key at the value it already
+    had in effect (a new switch left off) without a figure moving; the baselines are then kept,
+    and this is the note that goes with them (planning/esp32-platform-profiles.md, "Changing a
+    profile")."""
+    recorded, carried = baseline.get("profile_hash"), run.get("profile_hash")
+    if not recorded or not carried or recorded == carried:
+        return None
+    return (
+        f"note: the baseline was recorded under profile hash {recorded} and this run's image "
+        f"carries {carried}: the definition has changed since (git log -p "
+        "firmware/hearth-sink/profiles.json), and the figures are compared as they were recorded"
+    )
 
 
 def compare(
@@ -818,8 +982,37 @@ def compare(
                 f"{play}: the sink queue's least headroom is {now['min_headroom_ms']} ms, the "
                 f"baseline's {base['min_headroom_ms']}"
             )
-        if now.get("underruns"):
+        if now.get("via") == "sendspin":
+            # Plays that glitched, of the plays made: the C6 runs a 30 s AC-3 stream dry in about
+            # one in seven, so none is not the figure. One more than the baseline had is allowed
+            # (the tolerance's glitched_plays), which five plays a row make a real margin.
+            allowed = int(tolerance.get("glitched_plays", 1))
+            now_glitched = int(now.get("glitched_plays") or 0)
+            base_glitched = int(base.get("glitched_plays") or 0)
+            if now_glitched > base_glitched + allowed:
+                regressions.append(
+                    f"{play}: {now_glitched} of {now.get('plays') or '?'} plays glitched, the "
+                    f"baseline's {base_glitched} of {base.get('plays') or '?'} (allowed "
+                    f"{base_glitched + allowed})"
+                )
+        elif now.get("underruns"):
             regressions.append(f"{play}: {now['underruns']} sink underrun(s)")
+        # The least internal heap while a Sendspin stream played. A row has a tolerance for it
+        # where the figure is a stable one (the C6's E-AC-3 plays with about 2.6 KB spare, and a
+        # play that takes any of that is the regression); an AC-3 row's reads 26 to 52 KB from one
+        # play to the next and is recorded without one.
+        heap_slack = tolerance.get("play_heap_free_bytes")
+        slack_for = heap_slack.get(play) if isinstance(heap_slack, dict) else heap_slack
+        if (
+            slack_for is not None
+            and isinstance(base.get("play_heap_free"), int)
+            and isinstance(now.get("play_heap_free"), int)
+            and now["play_heap_free"] < base["play_heap_free"] - int(slack_for)
+        ):
+            regressions.append(
+                f"{play}: the least internal heap while it played is {now['play_heap_free']:,} "
+                f"bytes, the baseline's {base['play_heap_free']:,}"
+            )
         if now.get("units") != base.get("units"):
             regressions.append(f"{play}: {now.get('units')} units, baseline {base.get('units')}")
         if base.get("pcm_hash") and now.get("pcm_hash") != base.get("pcm_hash"):
@@ -840,11 +1033,20 @@ def _print_results(results: list[PlayResult]) -> None:
         print(f"  {verdict:<4} {r.id}: {shown}")
         for finding in r.findings:
             print(f"         - {finding}")
+        for note in r.notes:
+            print(f"         note: {note}")
 
 
 def cmd_run(args: argparse.Namespace) -> int:
     suite = load_suite()
-    plan(suite, args.profile, args.only)  # a profile with no list is refused before a lock is taken
+    rows = plan(suite, args.profile, args.only)  # no list is refused before a lock is taken
+    # A Sendspin row's server is found before the board is touched, not when it is wanted.
+    testserver: Path | None = None
+    if any(row.get("via") == "sendspin" for row in rows):
+        try:
+            testserver = suite_sendspin.find_testserver(args.testserver, bench.load().locks)
+        except suite_sendspin.SendspinError as error:
+            raise SuiteError(str(error)) from error
     resolve_board(args)
     if args.reset_by == "esptool":
         if not args.restart:
@@ -869,8 +1071,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     )
     print(f"booked: {took}" if ours else f"already booked by this session: {took}")
     server = None
+    sendspin: SendspinContext | None = None
     try:
         board = Board(args.host, args.port, args.timeout)
+        # Before any restart: a board that is another image is not worth eight of them.
+        check_identity(board, args.profile, args.profiles)
         boots: list[dict[str, Any]] = []
         if args.restart:
             for number in range(1, args.boots + 1):
@@ -893,6 +1098,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         boot = worst_boot(boots)
         if len(boots) > 1:
             print(f"boot: the worst of {len(boots)}: {boot}")
+        if testserver is not None:
+            locks = bench.load().locks
+            sendspin = SendspinContext(
+                testserver=testserver,
+                state=Path(args.sendspin_state or suite_sendspin.default_state(locks)),
+                pairing=suite_sendspin.Pairing(board, keep=args.keep_pairing),
+                label=args.board or args.host,
+                timeout=args.play_timeout + 60,
+                status_port=args.port,
+            )
+            print(f"sendspin rows: the test server is {sendspin.testserver}")
         address = args.serve_host or lan_address_for(args.host)
         server = serve_fixtures(REPO, address)
         base_url = f"http://{address}:{server.server_address[1]}"
@@ -906,6 +1122,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             args.only,
             args.repeat,
             args.play_timeout,
+            sendspin=sendspin,
         )
         board.stop()
         record = run_record(args.profile, hardware, results, boot, args.board, boots)
@@ -924,6 +1141,9 @@ def cmd_run(args: argparse.Namespace) -> int:
                 print(f"regression: {line}")
             for line in improvements:
                 print(f"improved: {line}")
+            note = baseline_note(record, baseline)
+            if note:
+                print(note)
         if args.record:
             if not boot:
                 print("not recorded: the log holds no boot budget line; run with --restart")
@@ -939,6 +1159,11 @@ def cmd_run(args: argparse.Namespace) -> int:
         if server is not None:
             server.shutdown()
             server.server_close()
+        if sendspin is not None:
+            try:
+                print(sendspin.pairing.close())
+            except SuiteError as error:
+                print(f"pairing: could not tidy the board's pairing table: {error}")
         if ours:
             print(f"lock: {release_lock(Path(args.lock), args.session)}")
         else:
@@ -996,6 +1221,22 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--timeout", type=float, default=10.0, help="one HTTP request, seconds")
     run.add_argument("--play-timeout", type=float, default=120.0, help="one play, seconds")
     run.add_argument("--serve-host", help="the address to serve the streams on")
+    run.add_argument(
+        "--testserver",
+        help="hearth-testserver, for rows with via sendspin (else ICLFORGE_TESTSERVER, else the "
+        "bench's suite-testserver/bin)",
+    )
+    run.add_argument(
+        "--sendspin-state",
+        help="the test server's state directory: its identity and its pairing records (default "
+        "suite-sendspin-state beside the bench's locks; keep one, so that the board holds one "
+        "record of the suite's)",
+    )
+    run.add_argument(
+        "--keep-pairing",
+        action="store_true",
+        help="leave the suite's pairing record on the board (it is forgotten at the end)",
+    )
     run.add_argument("--out", default="board-run.json", help="where to write the run; - for none")
     run.add_argument("--profiles", type=Path, help="a profiles file other than the repository's")
     group = run.add_mutually_exclusive_group()
@@ -1022,7 +1263,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     f"{row['id']}\t{spec['codec']}\t{spec['file']}\t"
                     f"{row.get('expect', 'pass')}\tunits={spec.get('units', '-')}"
-                    f"\tpin={spec.get('pin', '-')}"
+                    f"\tpin={spec.get('pin', '-')}\tvia={row.get('via', 'play')}"
                 )
             return 0
         if args.command == "run":
@@ -1030,15 +1271,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "compare":
             suite = load_suite()
             recorded = json.loads(args.run.read_text("utf-8"))
+            baseline = json.loads(args.baseline.read_text("utf-8"))
             regressions, improvements = compare(
-                recorded,
-                json.loads(args.baseline.read_text("utf-8")),
-                tolerance_for(suite, recorded.get("profile")),
+                recorded, baseline, tolerance_for(suite, recorded.get("profile"))
             )
             for line in regressions:
                 print(f"regression: {line}")
             for line in improvements:
                 print(f"improved: {line}")
+            note = baseline_note(recorded, baseline)
+            if note:
+                print(note)
             if not regressions:
                 print("the run holds to the baseline")
             return 1 if regressions else 0

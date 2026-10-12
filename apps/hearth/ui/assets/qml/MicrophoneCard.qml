@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 
 import Hearth
@@ -34,6 +35,7 @@ Card {
     readonly property bool on: MicrophoneController.on
     readonly property var score: MicrophoneController.score
     readonly property var live: MicrophoneController.live
+    readonly property var lastTake: MicrophoneController.lastTake
     readonly property int labelWidth: Math.round(150 * Theme.fontScale)
 
     // --- which item, and where in it -------------------------------------------------------
@@ -73,6 +75,11 @@ Card {
     }
 
     // --- helpers ---------------------------------------------------------------------------
+    function clockText(seconds) {
+        const total = Math.max(0, Math.floor(seconds));
+        const s = total % 60;
+        return Math.floor(total / 60) + ":" + (s < 10 ? "0" : "") + s;
+    }
     function noteName(hz) {
         if (!(hz > 0)) {
             return "";
@@ -190,6 +197,113 @@ Card {
             }
         }
         Item { Layout.fillWidth: true }
+    }
+
+    // --- a take ---------------------------------------------------------------------------------
+    // Recording is its own switch, with its own indicator: the microphone being on is not a take.
+    // What is kept is the voice alone, never the backing.
+    RowLayout {
+        Layout.fillWidth: true
+        visible: root.on
+        spacing: Theme.gap
+        AppButton {
+            objectName: "microphoneRecord"
+            text: MicrophoneController.recording ? qsTr("Stop recording") : qsTr("Record a take")
+            onClicked: MicrophoneController.recording ? MicrophoneController.stopRecording()
+                                                      : MicrophoneController.startRecording()
+        }
+        Row {
+            objectName: "microphoneRecordingIndicator"
+            visible: MicrophoneController.recording
+            spacing: Math.round(6 * Theme.fontScale)
+            Layout.alignment: Qt.AlignVCenter
+            Rectangle {
+                width: Math.round(10 * Theme.fontScale)
+                height: width
+                color: Theme.accent
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                objectName: "microphoneTakeLength"
+                text: qsTr("Recording %1").arg(root.clockText(MicrophoneController.takeSeconds))
+                color: Theme.accentInk
+                font.pixelSize: Theme.fontNormal
+                font.bold: true
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+        Item { Layout.fillWidth: true }
+    }
+    Text {
+        objectName: "microphoneTakeError"
+        Layout.fillWidth: true
+        visible: MicrophoneController.takeError.length > 0
+        text: MicrophoneController.takeError
+        color: Theme.accentInk
+        font.pixelSize: Theme.fontNormal
+        wrapMode: Text.WordWrap
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: Theme.gap
+        Text {
+            text: qsTr("Takes go to")
+            color: Theme.text
+            font.pixelSize: Theme.fontNormal
+            Layout.preferredWidth: root.labelWidth
+        }
+        Text {
+            objectName: "microphoneTakesFolder"
+            Layout.fillWidth: true
+            text: MicrophoneController.takesFolder
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSmall
+            elide: Text.ElideMiddle
+        }
+        AppButton {
+            objectName: "microphoneChooseFolder"
+            enabled: !MicrophoneController.recording
+            text: qsTr("Choose…")
+            onClicked: takesFolderDialog.open()
+        }
+    }
+    FolderDialog {
+        id: takesFolderDialog
+        title: qsTr("Where takes are kept")
+        onAccepted: MicrophoneController.setTakesFolder(HearthController.urlToLocalFile(selectedFolder))
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        visible: root.lastTake.name !== undefined
+        spacing: Theme.gap
+        Text {
+            objectName: "microphoneLastTake"
+            Layout.fillWidth: true
+            text: qsTr("Saved %1 (%2)").arg(root.lastTake.name ?? "").arg(root.clockText(root.lastTake.seconds ?? 0))
+            color: Theme.text
+            font.pixelSize: Theme.fontNormal
+            elide: Text.ElideMiddle
+        }
+        AppButton {
+            objectName: "microphoneShowTakes"
+            text: qsTr("Show in folder")
+            onClicked: MicrophoneController.showTakes()
+        }
+        AppButton {
+            objectName: "microphoneDeleteTake"
+            text: qsTr("Delete this take")
+            onClicked: MicrophoneController.deleteLastTake()
+        }
+    }
+    Text {
+        objectName: "microphoneTakeNote"
+        Layout.fillWidth: true
+        text: qsTr("A take is your voice alone, not the backing: a lossless file with a small "
+                   + "description beside it saying where in the song it began. Through speakers the "
+                   + "backing is in it too.")
+        color: Theme.textMuted
+        font.pixelSize: Theme.fontSmall
+        wrapMode: Text.WordWrap
     }
 
     Text {

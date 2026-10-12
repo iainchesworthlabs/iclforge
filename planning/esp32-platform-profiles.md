@@ -298,7 +298,7 @@ profile's `budget` is also where the heap table lives:
 | | S3 `s3-n16r8` | C6 `c6-16mb` | Source |
 |---|---|---|---|
 | Largest internal block, Wi-Fi up, Sendspin up | 31,744 | 31,232 | 2026-10-12 deploy, 4065 |
-| Static internal RAM | recorded by the first guard run | same | `idf.py size` |
+| Static internal RAM | 176,854 (budget 185,000) | 144,139 (budget 151,000; [corrected in PR 14](#the-c6s-static-ram-budget-was-wrong-pr-14)) | `idf.py size` |
 | Free low-water over the play list | recorded by the first suite run | same | board suite |
 
 The numbers above are today's, from a failing build: the first PR fixes the build and then the
@@ -368,9 +368,9 @@ source, and the play takes a ring, two stacks, the I2S queue and a decoder out o
 So the C6 profile does not claim HTTP plays. #1395 makes the board refuse one up front, with
 `why: memory`, from `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` (134,008 in the C6 fragment, a
 sum of the sizes the fragment gives a play and the least decoder's peak), and the Sendspin session
-stays up. The C6's suite plays over Sendspin, which is the product's path on that part, and its
-play list needs a Sendspin server on the bench (the repository's test server is one). Whether the
-HTTP play should work on a C6 at all is the owner's call: it needs the Sendspin player's 48 KB ring
+stays up. The C6's suite plays over Sendspin, which is the product's path on that part, with the
+repository's test server on the bench ([Sendspin rows](#sendspin-rows-pr-14)). Whether the HTTP
+play should work on a C6 at all is the owner's call: it needs the Sendspin player's 48 KB ring
 and 24 KB stack given back for the length of a play.
 
 ### 3. The board suite
@@ -420,7 +420,7 @@ It does, in this order, and stops at the first refusal:
    date). `--record` writes `baselines/<profile>.json` from a clean run; `--compare` holds a run to
    a baseline with the tolerance in `suite.json` and prints an improvement as "re-baseline".
 
-Tests (`test_board_suite.py`, 89) run it against a stand-in board that answers with what the real
+Tests (`test_board_suite.py`, 94) run it against a stand-in board that answers with what the real
 boards printed on 2026-10-12, and hold the file to the tree (every stream is in the repository,
 every AC-4 row names a pin the host holds, every profile has a list).
 
@@ -576,8 +576,100 @@ re-recorded**: `s3-n16r8`'s was, on S3b, the worst of eight boots now (AC-3 123 
 permille against 124 and 88; boot free RAM 85,755 against 86,223). Nothing material moved: the new
 image held to the old baseline before it was replaced. The C6 and P4 profiles were not touched:
 their locked values still equal the Kconfig's defaults (and the P4 builds of PR 10 and 11 held).
-`compare` does not look at a baseline's hash, so a stale one is a number that is still right and a
-hash that is not; the PR that changes a locked default carries the re-record.
+`compare` does not hold a run to a baseline's hash, so a stale one is a number that is still right
+and a hash that is not: it says which hash the baseline was recorded under when the run's
+differs (a one-line note), and the PR that changes a locked default carries the re-record.
+
+**Re-recorded (the two AC-4 profiles, the 40 KB decode stack).** #1446 gave the burst player's
+decode task 40,960 bytes where the decoder is, and the two AC-4 profiles locked 32,768
+(`ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES`). The lock commit moves the value, which is a
+changed locked value, so both baselines are re-recorded here (the two keys #1446 added at an
+inert value are not: those baselines were kept and carry the hash note). Same image on both,
+`v0.10.0-beta.1-4517-g84efde0e7` built with the `measure` overlay, five plays a row after eight
+restarts, then a compare run (two plays, three boots) that holds with no finding:
+
+| | hash | boot `internal_free` | `largest` | `headroom` |
+| --- | --- | --- | --- | --- |
+| `p4-rev1-ac4`, P4a | `6cd3fe4b015f` to `85e6b4f66269` | 289,271 to 281,063 | 217,088 to 208,896 | 176,128 to 167,936 |
+| `s3-n16r8-ac4`, S3a | `6124ef3f591f` to `d7a1513e42b6` | 52,075 to 51,699 | 31,744 to 31,744 | 23,552 to 23,552 |
+
+The P4's three boot figures each fall by exactly 8,192 bytes, which is the stack: on the P4 the
+Sendspin decode task's stack is internal SRAM (`..._DECODE_STACK_IN_PSRAM` defaults to 1 only on
+an S3 with PSRAM), so the board pays for it at boot. On the S3 it is in PSRAM, so the internal
+figures do not move (376 bytes of free RAM, inside the S3's bimodal spread, and the largest block
+and headroom equal). The rows hardly moved either way: on the P4 AC-3 and E-AC-3 2.0 at 61 and 40
+permille (61 and 41), `ac4-20-music` 239 (241), `ac4-20-acpl` 289 (281), the folded 5.1 row 603
+(617) and `ac4-20-companding` 286 (282); on the S3 120 and 84 (120 and 84), 517 (510), 644 (645)
+and 605 (608). **Every PCM hash is equal to the one before, and to the host's pin where there is
+one**, and `decode_stack_free` did not move on a row of the P4 (the plays run on the `/play`
+decode task, not the burst player's stack). Both boards were put back on the images they had, and
+their locks released.
+
+### Sendspin rows (PR 14)
+
+**Built.** A row of `suite.json` with `"via": "sendspin"` is played by the repository's
+`hearth-testserver` instead of `POST /play`, and the board's own `sendspin.stream=` line is read
+the way a `/play`'s `result=` line is (`tools/hearth/suite_sendspin.py`; the rules for the
+harness, what it does to a board's pairing table and why it does not poll, are in
+[the bench page](esp32-board-bench.md#sendspin-rows)). It exists because the C6 refuses an HTTP
+play on purpose, so until now nothing held the audio it is sold for.
+
+**The figures** of such a row are the `/play` rows' where there is one (`frames`,
+`decoder_permille`, which is the board's mean time to decode a burst over the burst's 32 ms,
+`decode_stack_free`, `units`) and these: `plays` and `glitched_plays` (below), `play_heap_free` (the
+least internal heap while the stream played, which the board resets at each stream's start), the
+worst of `late`, `dropped`, `invalid` and `resyncs`, and `ring_high`. A play that stops short, a
+board that goes away, a reboot, or a stream of another kind is a finding. A stream that **plays
+through and runs the board dry** is a *glitch*: the C6 does it on about one 30 s AC-3 stream in
+seven (two of the thirteen plays made before the recording on 2026-10-12: three underruns and
+three resyncs in one, one of each in another), so a row holds how many of its plays did, and `compare` allows one more than the
+baseline had (`glitched_plays` in the tolerance), which five plays a row make a real margin. Zero
+cannot be the figure, and a recorded zero from a lucky five would fail the next honest run.
+
+**Recorded, `c6-16mb`** (the C6, `.117`, the image `v0.10.0-beta.1-4520-g26274cd77-` built from this PR's
+tree, profile hash `ebc59bd7d7f8`, five plays a row after eight restarts, 2026-10-12):
+`ac3-2.0-sendspin` plays 938 bursts at 661 permille of a burst
+(the C6's decoder is about 660 against the S3's 120 and the P4's 61), 0 of
+5 plays glitched, `decode_stack_free` 11,120 bytes, and the
+least internal heap during a stream 27,968 bytes (it read 17,124 to 52,560 over
+the plays I made: no tolerance names it). The boot line is the worst of eight:
+`internal_free=108792 largest=88064`.
+
+**E-AC-3 over Sendspin is not in the list, and why.** The same board plays the E-AC-3 stream
+through Sendspin with almost no internal heap spare, and not reliably:
+
+| | plays | outcome | least internal heap |
+|---|---|---|---|
+| 4065 image (a plain build), the board not polled | 3 | clean, 938 bursts each | 2,616, 2,856, 3,192 |
+| 4065 image, the server polling `/status` every second | 2 | one clean, one **rebooted the board** | 2,652 (the clean one) |
+| `c6-16mb` at this tree, the first stream after a boot | 3 | clean, 938 bursts each | 916 (the least of three) |
+| `c6-16mb` at this tree, after three AC-3 streams in the same boot | 3 | the row **failed**: one play stopped at 170 of 938 bursts and another at 401; 51 late chunks and 8 underruns across the three | 4,292 (the least of three), 4,496 (one of them) |
+
+The failing plays print `heap_caps_malloc could not allocate 1848 bytes (caps 0x1800); internal
+free 11016, largest 1824` over and over: the Wi-Fi receive buffer (1,848 bytes) cannot be had
+from a heap that has 11 KB free and no block over 1,824 bytes. It is fragmentation as much as
+total free, the failure the C3 session found on 2026-09-17, and it is why the row is not here:
+a baseline recorded from a lucky first-stream-after-boot play would call a board that fails after
+an AC-3 stream "holding". The row to add when the heap is fixed is
+`{"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"}` in the `c6-16mb` list,
+with a `play_heap_free_bytes` tolerance for it (the suite supports one per row;
+`{"eac3-2.0-sendspin": 1024}` was the proposal), and it should be played **after** the AC-3 row,
+as a user plays. A separate task has been raised for the heap.
+
+### The C6's static RAM budget was wrong (PR 14)
+
+`internal_static_bytes_max` was 108,000 for both C6 profiles, from a figure of 103,823 that PR 3
+took as the C6's. It is not a figure any C6 `hearth_sink` image has had: from the IDF's own
+size tool on the maps of builds back to 2026-10-01 the image's `DIRAM` was 147,123, 144,091,
+137,067, 144,115, 144,139 (and `libiclforge_ac3_minimal.a` alone holds 39,864 bytes of `.bss`, in
+function-local static tables). Nothing flagged it because CI's C6 steps have not run: in the two
+`main` runs read on 2026-10-12 the minimum-footprint leg above them in the same job failed and
+the C6 steps were skipped. The first `bench_flash.py build c6-16mb` of this tree stopped at the
+guard with 144,139 against 108,000, which is how it was found. **The budget is now 151,000** (the
+measured 144,139 and 4.8%, as the S3's 185,000 is its 176,854 and 4.6%). A budget is not in the
+profile hash, so no baseline moves.
+Static RAM is also what the C6's heap is the remainder of: the same tables are the
+reason the E-AC-3 stream above has so little left.
 
 ## Changing a profile
 
@@ -588,6 +680,22 @@ A change to a profile, a fragment it names, or a locked key's Kconfig default is
 3. attaches `board-run.json` from a board booked for the run, and updates
    `baselines/<profile>.json` if a figure moved;
 4. says in the description which keys moved, why, and what the heap table did.
+
+**When a baseline is re-recorded, and when it is only noted (the owner's rule, 2026-10-12).** A
+baseline carries the hash of the profile it was recorded under, and the hash is the fragments and
+the locked values, so it moves whenever the profile is edited. The two kinds of edit are not the
+same:
+
+- **A locked value that changes** (the S3's lyric budget and object count in PR 12) is a change of
+  what the image is, where a figure can have moved: the baseline is re-recorded in the same PR.
+- **A key that is added at the value it already had in effect** (a new Sendspin switch left off,
+  locked so that the guard knows it) re-hashes the profile and moves no figure: **the baselines are
+  kept**, and `board_suite.py` says on every compare against one that it was recorded under the
+  earlier hash and that the figures are compared as recorded. The PR says which keys it locked.
+
+A kept baseline's hash is then not the file's, and that is read from the note, not from a
+failure: the suite still refuses an *image* built under another hash, so a board is only ever
+run on the definition the file has.
 
 CI fails a PR that touches a fragment or the Kconfig defaults of a locked key and not the profile
 file. A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
@@ -620,10 +728,11 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
 | 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
-| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash) and **`s3-n16r8-ac4` built** (S3a, cross-checked on S3b; `s3-n16r8` re-recorded under its new hash). `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
+| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash) and **`s3-n16r8-ac4` built** (S3a, cross-checked on S3b; `s3-n16r8` re-recorded under its new hash); **both AC-4 baselines re-recorded** under the hashes the 40 KB Sendspin decode stack gave them (P4a, S3a). `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
 | 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; no board has run the image, so no list and no baseline |
+| 10 | Sendspin rows: the suite plays a stream the way the C6's product path does, with the test server | yes | **Built** (the harness, tests, the C6's AC-3 row and its baseline); the E-AC-3 row is not in the list because the C6 does not play it reliably yet, see [Sendspin rows](#sendspin-rows-pr-14) |
 
 PR 3 follows 2. `p4-rev3` waited for #1400's fragments to be on main (row 9).
 
@@ -645,6 +754,7 @@ Still open:
    number from it is a smoke floor. The board suite owns the budget. Confirm that is acceptable.
 4. **An HTTP play on the C6.** Left refused. The alternative is giving the Sendspin player's ring
    and stack back for the length of a play, which is a change to the player, not to a profile.
+5. **E-AC-3 on the C6 over Sendspin.** It plays with 0.9 to 4.5 KB of internal heap spare and fails after AC-3 streams in the same boot ([Sendspin rows](#sendspin-rows-pr-14)). Either the heap is fixed (a task is raised: the static tables in `libiclforge_ac3_minimal.a`, 39,864 bytes of `.bss`), or the C6 stops listing E-AC-3 to a server, the way it lists no AC-4. A decision for the owner.
 
 ## What this does not claim
 

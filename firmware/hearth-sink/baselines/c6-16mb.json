@@ -1,19 +1,19 @@
 {
   "format": 1,
   "profile": "c6-16mb",
-  "profile_hash": "c256f286a410",
-  "version": "v0.10.0-beta.1-4175-g79d2e7618-",
+  "profile_hash": "ebc59bd7d7f8",
+  "version": "v0.10.0-beta.1-4520-g26274cd77-",
   "chip": "ESP32-C6",
   "board": "C6",
-  "recorded": "2026-10-12T06:48Z",
+  "recorded": "2026-10-12T13:11Z",
   "boot": {
     "when": "boot",
     "net": 1,
-    "internal_free": 108988,
-    "largest": 94208,
+    "internal_free": 108792,
+    "largest": 88064,
     "ask_total": 73728,
     "ask_biggest": 32768,
-    "headroom": 61440,
+    "headroom": 55296,
     "verdict": "below-floor",
     "floor": 134008
   },
@@ -27,27 +27,53 @@
       "state": "failed",
       "frames": 0,
       "why": "memory"
+    },
+    "ac3-2.0-sendspin": {
+      "state": "finished",
+      "frames": 938,
+      "decoder_permille_samples": [
+        663,
+        650,
+        651,
+        665,
+        661
+      ],
+      "decoder_permille": 661,
+      "units": 938,
+      "decode_stack_free": 11120,
+      "via": "sendspin",
+      "plays": 5,
+      "glitched_plays": 0,
+      "burst_us": 21154,
+      "late": 0,
+      "dropped": 0,
+      "invalid": 0,
+      "resyncs": 0,
+      "worst_error_us": -685,
+      "play_heap_free": 27968,
+      "ring_high": 36900,
+      "stream_underruns": 0
     }
   },
   "findings": {},
   "boot_samples": {
     "internal_free": [
-      112684,
-      112536,
-      112560,
-      112540,
-      112300,
-      108988,
-      112652,
-      112544
+      112448,
+      112108,
+      112460,
+      112100,
+      112216,
+      108792,
+      112556,
+      112428
     ],
     "largest": [
-      96256,
-      96256,
-      96256,
-      96256,
-      94208,
-      94208,
+      90112,
+      90112,
+      90112,
+      92160,
+      92160,
+      88064,
       96256,
       96256
     ]
