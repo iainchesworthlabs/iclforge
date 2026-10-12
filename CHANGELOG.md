@@ -259,6 +259,14 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **Hearth: a lyrics file and a CD+G disc beside a song are a choice, for this run.** A song with
+  both shows its words, as before, and a **Show** choice (Words or Picture) on the Karaoke page's
+  Lyrics card, and on the singer view's bar, shows the disc instead. The choice is not kept for the
+  song and holds from one song to the next until Hearth is closed; a song with only one of the two
+  is unchanged, and choosing the picture takes nothing from the lyrics (they stay loaded for the
+  timing window, the duet cues and a board's lyrics). `KaraokeController` gains `hasPicture`,
+  `pictureFileName`, `preferPicture` and `showingPicture` (planning/karaoke-phase2.md, W13f; the
+  owner's answer to the question of what wins).
 - **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
   offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
   dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
