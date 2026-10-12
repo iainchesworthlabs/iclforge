@@ -199,6 +199,18 @@ jobs:
         shell: bash
         run: python3 tools/checks/check_platform_matrix.py
 
+      # The ESP32 sinks' locked build profiles, firmware/hearth-sink/profiles.json
+      # (planning/esp32-platform-profiles.md). Every `sdkconfig.defaults;sdkconfig.x;...` the
+      # README, the platform pages, the planning notes and the fragments' own headers spell is a
+      # profile's, a CI shape's or listed with its reason in the file's other_stacks, and the
+      # profile table in the sink's README is the file's: a stack typed by hand that no profile
+      # has is the drift that sent sessions to measure and deploy different shapes of one board.
+      # Not gated on an event, for the reason the step above gives.
+      - name: ESP32 sink profiles in the docs
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 tools/hearth/sink_profile.py check-docs
+
       # The projects of the tree (libraries, programs, bindings, firmware, examples) form a
       # graph with no cycle that runs one way, and nothing but the habit of the people editing it
       # keeps it so. tools/checks/projects.json lists each project, its kind and the projects it

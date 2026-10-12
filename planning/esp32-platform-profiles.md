@@ -2,9 +2,11 @@
 
 **Status, 2026-10-12, later the same day:** the design was merged (#1369) and the owner approved the
 first steps. Built: the S3 fix (#1387, verified on S3a and S3b), the C6's clean refusal (#1395,
-verified on the C6), and the profiles file with its reader and guard (`firmware/hearth-sink/profiles.json`,
-`tools/hearth/sink_profile.py`); nothing reads them yet but their own tests. Not built: everything
-from the boot budget line on ([Order of work](#order-of-work)). Two things this page said before the
+verified on the C6), the profiles file with its reader and guard (`firmware/hearth-sink/profiles.json`,
+`tools/hearth/sink_profile.py`), and CI reading it: every board build in `_build.yml` takes its
+fragments from the file and is held to it, packaging checks the profile, and the docs' fragment
+lists are held to it. Not built: everything from the boot budget line on
+([Order of work](#order-of-work)). Two things this page said before the
 boards ran are corrected where they stood: the C6 is not a config value away
 ([the C6](#the-c6-is-not-a-config-value-away)), and `realtime_permille` is not a speed figure on a
 paced sink ([the board suite](#3-the-board-suite)).
@@ -409,7 +411,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 1 | **The fix**, as profile values: `DECODE_STACK_IN_PSRAM` defaults to 1 on S3 with PSRAM (the AC-4 condition goes) and `sdkconfig.psram` says so in words | yes | **Built, #1387**: A/B/A on S3b (4065 fails, the fix plays AC-3 and E-AC-3 2.0, 938 frames, stack in PSRAM) and the same on S3a. The C6's half did not work as config; see [the C6](#the-c6-is-not-a-config-value-away) |
 | 1b | The C6 refuses a play it cannot hold: `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` | yes | **Built, #1395**: refused in under half a second with `why: memory`, no reboot, Sendspin stayed connected |
 | 2 | `profiles.json` and `sink_profile.py`, with tests and the guard; no consumer yet | no | **Built**: six profiles; its tests hold the file to `_build.yml`'s fragment lists and to `check_firmware_package.py`'s rules |
-| 3 | `_build.yml`, `package_firmware.py`, `check_firmware_package.py` and the docs tables read it; the guard on every profile build | no | The README's seven stacks become one generated table |
+| 3 | `_build.yml`, `package_firmware.py` and the docs read it; the guard on every profile build | no | **Built**: each board build takes `sink_profile.py defaults <id>` and is held by `verify` (with `idf.py size` for the static-RAM budget); `package_firmware.py package --profile` refuses a build that is not the profile; `check-docs` holds every fragment list the tree spells to a profile or to `other_stacks`, and the README's profile table is generated; `s3-n16r8-ac4` gets a CI build for the first time. Left: `check_firmware_package.py`'s `IMAGES` still carries its own copy, held to the file by a test, until #1400 lands its row. The repository variable `ESP32_PROFILE_GUARD=warn` turns a finding into an annotation |
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | |
 | 5 | The QEMU twin of `s3-n16r8` | no | A spike first (PSRAM mode, XIP): the PR says what ran and what did not |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | |

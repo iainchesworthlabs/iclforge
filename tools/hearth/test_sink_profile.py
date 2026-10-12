@@ -173,17 +173,19 @@ class TheFile(unittest.TestCase):
                     f"the release rules publish {name} and no profile describes it",
                 )
 
-    def test_the_workflow_builds_what_the_profiles_say(self) -> None:
-        """_build.yml spells each published image's fragments by hand until it reads
-        `sink_profile.py defaults`; until then they are held to the profiles here."""
+    def test_the_workflow_builds_each_profile_from_the_file_and_verifies_it(self) -> None:
+        """_build.yml takes each board's fragments from `sink_profile.py defaults` and holds
+        the build to the profile with `verify`; no board build spells its own list."""
         text = (REPO / ".github" / "workflows" / "_build.yml").read_text("utf-8")
-        spelled = set(re.findall(r'"-DSDKCONFIG_DEFAULTS=([^"]+)"', text))
-        for ident in ("s3-n16r8", "c6-16mb", "c6-4mb", "p4-rev1", "p4-rev1-ac4"):
-            self.assertIn(
-                sp.defaults_string(self.data, ident),
-                spelled,
-                f"_build.yml does not build {ident} as the profile says",
-            )
+        read = set(re.findall(r'"\$profile" defaults ([a-z0-9-]+)', text))
+        checked = set(re.findall(r'"\$profile" verify ([a-z0-9-]+)', text))
+        board_builds = {"s3-n16r8", "s3-n16r8-ac4", "c6-16mb", "c6-4mb", "p4-rev1", "p4-rev1-ac4"}
+        self.assertEqual(read, board_builds)
+        self.assertEqual(checked, board_builds)
+        spelled = re.findall(
+            r'"-DSDKCONFIG_DEFAULTS=(sdkconfig\.defaults;sdkconfig\.hw[^"]*)"', text
+        )
+        self.assertEqual(spelled, [], "a board build in _build.yml spells its own fragment list")
 
     def test_the_profiles_are_distinct_builds(self) -> None:
         seen: dict[str, str] = {}
@@ -353,6 +355,103 @@ class Verify(unittest.TestCase):
         self.data["profiles"]["a"]["locked"] = {}
         build = make_build(self.root, dict(FINAL))
         self.assertIn("locked", self.rules(sp.verify(self.data, "a", build)))
+
+
+def size_report(diram_used: int) -> str:
+    """`idf.py size --format json2`, with the CMake chatter a re-run puts before it."""
+    report = {
+        "version": "1.2",
+        "total_size": 1,
+        "layout": [
+            {"name": "Flash Code", "total": 0, "used": 5, "free": 0, "parts": {}},
+            {"name": "DIRAM", "total": 341760, "used": diram_used, "free": 1, "parts": {}},
+        ],
+    }
+    return "[0/1] Re-running CMake...\n-- {note}\n" + json.dumps(report, indent=4) + "\nERROR: x\n"
+
+
+class StaticRam(unittest.TestCase):
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+        self.data = small_data()
+        self.data["profiles"]["a"]["budget"]["internal_static_bytes_max"] = 1000
+        self.build = make_build(self.root, dict(FINAL))
+
+    def tearDown(self) -> None:
+        self.dir.cleanup()
+
+    def test_the_report_is_found_after_other_output(self) -> None:
+        path = self.root / "size.json"
+        path.write_text(size_report(900), "utf-8")
+        self.assertEqual(sp.read_size_report(path)["DIRAM"], 900)
+
+    def test_static_internal_ram_inside_the_budget_passes(self) -> None:
+        path = self.root / "size.json"
+        path.write_text(size_report(1000), "utf-8")
+        self.assertEqual(sp.verify(self.data, "a", self.build, size_json=path), [])
+
+    def test_static_internal_ram_over_the_budget_is_found(self) -> None:
+        path = self.root / "size.json"
+        path.write_text(size_report(1001), "utf-8")
+        findings = sp.verify(self.data, "a", self.build, size_json=path)
+        self.assertEqual([finding.rule for finding in findings], ["budget"])
+        self.assertIn("1,001", findings[0].message)
+
+    def test_without_a_report_the_budget_is_not_judged(self) -> None:
+        self.assertEqual(sp.verify(self.data, "a", self.build), [])
+
+    def test_a_file_with_no_report_is_an_error(self) -> None:
+        path = self.root / "size.json"
+        path.write_text("nothing here\n", "utf-8")
+        with self.assertRaises(sp.ProfileError):
+            sp.read_size_report(path)
+
+
+class Docs(unittest.TestCase):
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+        self.data = small_data()
+        self.data["other_stacks"] = {"sdkconfig.defaults;sdkconfig.hw": "the probe's"}
+
+    def tearDown(self) -> None:
+        self.dir.cleanup()
+
+    def doc(self, text: str) -> Path:
+        path = self.root / "page.md"
+        path.write_text(text, "utf-8")
+        return path
+
+    def test_a_profile_a_listed_stack_and_a_ci_shape_are_known(self) -> None:
+        path = self.doc(
+            "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram\n"
+            "and sdkconfig.defaults;sdkconfig.hw for the probe,\n"
+            "and sdkconfig.defaults;sdkconfig.ci-http for CI.\n"
+        )
+        self.assertEqual(sp.check_docs(self.data, self.root, [path]), [])
+
+    def test_a_stack_nobody_listed_is_found_with_its_line(self) -> None:
+        path = self.doc("fine\nbuild with sdkconfig.defaults;sdkconfig.psram;sdkconfig.hw now\n")
+        findings = sp.check_docs(self.data, self.root, [path])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("page.md:2", findings[0].message)
+
+    def test_a_stale_generated_table_is_found_and_can_be_written(self) -> None:
+        path = self.doc(f"{sp.TABLE_BEGIN}\n\nold\n\n{sp.TABLE_END}\n")
+        findings = sp.check_docs(self.data, self.root, [path])
+        self.assertEqual([finding.rule for finding in findings], ["docs"])
+        self.assertEqual(sp.check_docs(self.data, self.root, [path], write=True), [])
+        self.assertEqual(sp.check_docs(self.data, self.root, [path]), [])
+        self.assertIn("`hearth-sink-esp32s3`", path.read_text("utf-8"))
+
+    def test_a_table_with_no_end_is_found(self) -> None:
+        path = self.doc(f"{sp.TABLE_BEGIN}\nnever closed\n")
+        findings = sp.check_docs(self.data, self.root, [path])
+        self.assertIn(sp.TABLE_END, findings[0].message)
+
+    def test_the_real_tree_holds(self) -> None:
+        self.assertEqual(sp.check_docs(sp.load()), [])
 
 
 class Snapshot(unittest.TestCase):

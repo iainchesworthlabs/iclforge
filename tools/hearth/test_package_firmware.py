@@ -180,5 +180,77 @@ class Package(unittest.TestCase):
         )
 
 
+class PackageToAProfile(unittest.TestCase):
+    """--profile: the build is held to firmware/hearth-sink/profiles.json before it is published."""
+
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+        self.out = self.root / "out"
+        self.profiles = self.root / "profiles.json"
+        self.profiles.write_text(
+            json.dumps(
+                {
+                    "format": 1,
+                    "watch": [],
+                    "free": {"ICLFORGE_EXAMPLE_WIFI_*": "the board's own"},
+                    "overlays": {},
+                    "profiles": {
+                        "s": {
+                            "target": "esp32s3",
+                            "fragments": [],
+                            "image": {
+                                "name": "hearth-sink-esp32s3",
+                                "flash_size": "16MB",
+                                "psram": True,
+                                "lowest": 0,
+                                "highest": 99,
+                                "refuse_above": None,
+                            },
+                            "budget": {},
+                            "locked": {"CONFIG_IDF_TARGET": "esp32s3", "CONFIG_SPIRAM": "y"},
+                        }
+                    },
+                }
+            ),
+            "utf-8",
+        )
+
+    def tearDown(self) -> None:
+        self.dir.cleanup()
+
+    def build(self, **kwargs) -> Path:
+        build = fixture.make_build(self.root / "b", **kwargs)
+        (build / "CMakeCache.txt").write_text(
+            "SDKCONFIG_DEFAULTS:UNINITIALIZED=sdkconfig.defaults\n", "utf-8"
+        )
+        return build
+
+    def test_a_build_of_the_profile_is_packaged_and_says_which(self) -> None:
+        fragment = packager.package(
+            self.build(), "hearth-sink-esp32s3", self.out, "s", self.profiles
+        )
+        self.assertEqual(fragment["profile"], "s")
+
+    def test_a_build_that_is_not_the_profile_is_refused_with_the_key(self) -> None:
+        with self.assertRaisesRegex(packager.PackageError, r"not profile s.*CONFIG_SPIRAM"):
+            packager.package(
+                self.build(psram=False), "hearth-sink-esp32s3", self.out, "s", self.profiles
+            )
+        self.assertFalse(self.out.exists())
+
+    def test_an_image_name_the_profile_does_not_publish_is_refused(self) -> None:
+        with self.assertRaisesRegex(packager.PackageError, "does not publish an image named"):
+            packager.package(self.build(), "hearth-sink-esp32c6", self.out, "s", self.profiles)
+
+    def test_an_unknown_profile_is_refused(self) -> None:
+        with self.assertRaisesRegex(packager.PackageError, "no profile 'z'"):
+            packager.package(self.build(), "hearth-sink-esp32s3", self.out, "z", self.profiles)
+
+    def test_without_a_profile_a_build_is_packaged_as_it_was(self) -> None:
+        fragment = packager.package(self.build(psram=False), "hearth-sink-esp32s3", self.out)
+        self.assertEqual(fragment["profile"], "")
+
+
 if __name__ == "__main__":
     unittest.main()

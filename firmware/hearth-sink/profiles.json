@@ -32,6 +32,14 @@
     "ICLFORGE_EXAMPLE_WIFI_*": "the board's network is its own, kept in NVS; a published image has none built in (package_firmware.py refuses one)",
     "ICLFORGE_EXAMPLE_HTTP_URL": "the stream a build plays at boot: empty on a board, a test server's on a CI shape"
   },
+  "other_stacks": {
+    "sdkconfig.defaults;sdkconfig.hw": "the S3 with neither PSRAM nor a network: the i2s_player example's shape, the bare-metal probe's and the README's first sections'; not a board's image",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram": "the S3 with PSRAM and a network before the Sendspin player: the HTTP-source shapes of the 714 and device-UI plans and the stream set; not a board's image",
+    "sdkconfig.defaults;sdkconfig.ac4;sdkconfig.hw": "the bare-metal S3 probe's AC-4 build (firmware/baremetal), a footprint measurement and not the sink",
+    "sdkconfig.defaults;sdkconfig.wifi": "the bare-metal C6 probe's network load (firmware/baremetal), not the sink",
+    "sdkconfig.defaults;sdkconfig.c6": "the C6 overlay's own header: the part with no Sendspin player, which no image is built for",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4": "the P4 overlay's own header: the part with no Sendspin player, which no image is built for"
+  },
   "overlays": {
     "wifi-credentials": {
       "touches": [
@@ -71,7 +79,8 @@
       },
       "budget": {
         "app_bytes_max": 1600000,
-        "bootloader_bytes_max": 32768
+        "bootloader_bytes_max": 32768,
+        "internal_static_bytes_max": 185000
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -206,7 +215,8 @@
       "image": null,
       "budget": {
         "app_bytes_max": null,
-        "bootloader_bytes_max": 32768
+        "bootloader_bytes_max": 32768,
+        "internal_static_bytes_max": null
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -351,7 +361,8 @@
       },
       "budget": {
         "app_bytes_max": 1880000,
-        "bootloader_bytes_max": 32768
+        "bootloader_bytes_max": 32768,
+        "internal_static_bytes_max": 108000
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -468,7 +479,8 @@
       },
       "budget": {
         "app_bytes_max": 1835008,
-        "bootloader_bytes_max": 32768
+        "bootloader_bytes_max": 32768,
+        "internal_static_bytes_max": 108000
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -587,7 +599,8 @@
       },
       "budget": {
         "app_bytes_max": null,
-        "bootloader_bytes_max": 24576
+        "bootloader_bytes_max": 24576,
+        "internal_static_bytes_max": null
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -729,7 +742,8 @@
       "image": null,
       "budget": {
         "app_bytes_max": null,
-        "bootloader_bytes_max": 24576
+        "bootloader_bytes_max": 24576,
+        "internal_static_bytes_max": null
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
