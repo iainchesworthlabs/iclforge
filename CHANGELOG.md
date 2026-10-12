@@ -29,6 +29,29 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Browser: a microphone and a pitch score in the decode demo**
+
+- **A karaoke stream in the WebAssembly decode demo gains a Microphone card** (the microphone,
+  scoring and recording programme, M7). The page's tune is the guide melody's channel as coded,
+  read by the library's pitch tracker compiled into the demo's module (`pitch_bindings.cpp`:
+  `PitchTracker`, `ReferenceBuilder`, `ReferenceContour`, `PitchScorer`; the module grew by about
+  26 KB); the microphone is the browser's, with its own echo cancellation, through an
+  `AudioWorklet`; the score is `libs/pitch`'s, the library Hearth's microphone is built on. The
+  card shows a level meter, the pitch you are singing and how sharp or flat of the tune, a ribbon
+  of the tune's notes with your voice over it, a pitch score so far with how early or late you are,
+  and a summary when it is turned off.
+- **What it promises is checked.** The microphone is off until the button is pressed (the page asks
+  the browser for none before); the score is shown only when the person says they wear headphones,
+  and no summary is made without it; nothing is sent; closing it ends every track. A new
+  `microphone` Playwright project (5 tests, Chromium's fake device, no real microphone) holds those
+  and the arithmetic: the tracker at 44.1, 48 and 96 kHz, a contour read in slices, octaves folded,
+  a voice placed at where the sound it sang along to was (with the microphone's and the output's
+  latency and the person's timing), a dropped stretch of quanta, nothing scored while paused. Thirteen
+  mutants of `mic.js` were applied and all killed.
+- **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
+  microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
+  into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
+
 **Audio: when a packet was captured**
 
 - **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
