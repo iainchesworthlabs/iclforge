@@ -345,6 +345,81 @@ the bar is held at, and the song moves there when you let go, whether it was pla
 queue beside the words: the song that is playing is marked, and pressing another plays it from
 its start. `Q` or the button closes it again.
 
+## Sing into a microphone
+
+The Karaoke page has a **Microphone** card. It shows you how close your pitch is to the tune while
+you sing, and it can keep a take of your voice. It records nothing unless you press **Record a
+take**, and nothing leaves your computer.
+
+- **It is off until you turn it on.** Choosing an input does not open it, and neither does having
+  used it last time. It closes when you turn it off, when you leave the page, and when the item
+  ends or is changed. While it is on the card shows **Microphone on**, and the operating system
+  shows its own sign as well.
+- **Choose the input** from the list, or take the computer's default. **Refresh** looks again after
+  you plug one in.
+- **Say whether you are wearing headphones.** Through open speakers the microphone hears the
+  backing as well as you, and a pitch score reads as nearly perfect for no singing at all, so the
+  score is shown only when you have said you are wearing headphones.
+- **The level** shows what the microphone hears. **Too loud** means a sample reached full scale.
+  If nothing arrives the card says the microphone may be muted or the wrong input is chosen.
+
+### What it scores against
+
+The card names the part it is scoring you against. A karaoke stream carries its tune in its own
+channels, so the **melody guide (M)** is used when the stream has one. If you have taken a vocal away
+(Capable, with the vocals you chose), the vocal you took away is the one you are replacing, and that
+is the one used. A stream with no clear tune in the part, a stream that is not karaoke, and the
+other formats, have **no melody to score against**, and the card says so; it still shows the pitch
+you are singing and how sharp or flat it is.
+
+### What the score is
+
+**The share of the tune's time during which your pitch was within a semitone of it, in any octave.**
+It hears pitch and nothing else: not the words, not the timing, not the feeling. A singer on pitch
+and out of time with the words scores well on it. The card also says when you are consistently
+behind or ahead of the tune, which is usually a delay in the microphone and not in you.
+
+### The delay
+
+A microphone's sound reaches the program a little after it was sung, and some take a tenth of a
+second or more (a webcam's microphone measured about 130 ms through the whole path, in the Windows
+shared mode that Hearth uses). The **Microphone delay** slider is how long, and **Move your timing**
+is for the rest: raise the delay if you are told you are behind the tune and are not.
+
+### A take
+
+With the microphone on, **Record a take** keeps your voice. The card shows **Recording** and how long
+it has run, which is a second sign beside **Microphone on**, since having the microphone on is not
+recording. **Stop recording** keeps it, and turning the microphone off, leaving the page or
+the item ending does the same.
+
+- **It is your voice alone**, not the backing: the microphone's own sound mixed to one channel, at the
+  microphone's rate, as a lossless FLAC file at 24 bits. It can be placed against any copy of the
+  backing and re-mixed. Through open speakers the backing is in it too, which is the other reason
+  to wear headphones.
+- **A small file beside it**, `Song - 2026-10-12 211500.take.json`, says which item it was, where
+  in the item its first sample was sung (taken from where the song was when the sound reached the
+  microphone, less the microphone's delay, plus the timing you moved), and the alignment in force,
+  so that any editor can place it and you can move it if you disagree.
+- **Where it goes** is shown on the card and changed with **Choose…**: your documents, in a folder
+  called "Hearth takes", unless you chose another. The folder is not made until the first take.
+  Takes are never put beside the song file.
+- **The last take** is offered with **Show in folder** and **Delete this take**, which removes the
+  file and its description.
+
+Turning a take into a karaoke stream with your voice as a vocal part is what the Forge GUI's
+Karaoke flow already does with any mono file: decode the stream's parts with `forge decode`, give
+the take as **Vocal 1** or **Vocal 2** with its offset, and encode. A mix that contains the backing is
+a recording of somebody else's work as well as your voice: keep it for yourself.
+
+### What it does not do
+
+- It does not play your voice back to you. A microphone through the operating system's own audio
+  path adds a tenth of a second on common equipment, which is too late to sing along with; use your
+  headset's own monitoring if it has one.
+- It does not send your voice to other speakers or other devices.
+- It cannot tell a singer from a loud speaker, which is why the headphones answer matters.
+
 ## Make one in the Forge GUI
 
 Choose **Karaoke** in the Controls switch. Four steps build the stream from the recordings it is
