@@ -329,6 +329,10 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **Crucible's lyric strip draws a CD+G disc.** A `.cdg` file imported against an application is
+  drawn as its picture under the file's name (the shared `CdgPicture`: 300 by 216, as large as
+  fits in whole-pixel steps) and followed by the same Start and nudge an `.lrc` has; its words are
+  pixels, so none are read as text and the page says so (planning/karaoke-phase2.md, W13f and D11).
 - **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
   offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
   dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
