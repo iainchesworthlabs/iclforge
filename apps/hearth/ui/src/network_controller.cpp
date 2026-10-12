@@ -37,6 +37,7 @@
 #include "server_identity.hpp"
 #include "settings_model.hpp"
 #include "sink_lyrics_text.hpp"
+#include "sink_output_text.hpp"
 #include "shared_pairing_store.hpp"
 #include "sink_firmware.hpp"
 #include "sink_firmware_view.hpp"
@@ -379,6 +380,7 @@ struct LayoutFields {
         dialogue_text = QObject::tr("dialnorm %1").arg(decoder.dialnorm, 0, 'f', 0);
     }
     map[QStringLiteral("streamText")] = stream_text;
+    map[QStringLiteral("outputText")] = sink_output_text(facts);
     map[QStringLiteral("objectsText")] = objects_text;
     map[QStringLiteral("dialogueText")] = dialogue_text;
     map[QStringLiteral("lyricsText")] = sink_lyrics_text(facts);
