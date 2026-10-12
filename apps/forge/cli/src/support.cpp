@@ -2900,11 +2900,24 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.lyrics_path = std::string{value};
             continue;
         }
+        if (key == "overwrite") {
+            if (command != "lyrics-to-lrc") {
+                fmt::println(stderr, "error: overwrite= goes with lyrics-to-lrc");
+                return false;
+            }
+            if (value != "1" && value != "0") {
+                fmt::println(stderr, "error: overwrite must be 1 or 0 (got '{}')", token);
+                return false;
+            }
+            out.lyrics_overwrite = value == "1";
+            continue;
+        }
         if (key == "lyrics-encoding") {
-            if (command != "encode" && command != "eac3-encode" && command != "ac4-encode") {
+            if (command != "encode" && command != "eac3-encode" && command != "ac4-encode" &&
+                command != "lyrics-to-lrc") {
                 fmt::println(stderr,
-                             "error: lyrics-encoding= goes with lyrics=, on encode, eac3-encode "
-                             "and ac4-encode");
+                             "error: lyrics-encoding= goes with lyrics= on encode, eac3-encode "
+                             "and ac4-encode, and with lyrics-to-lrc");
                 return false;
             }
             const auto* page = iclforge::apps::find_code_page(value);

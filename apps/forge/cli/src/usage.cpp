@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 111> kOptionTokens{{
+constexpr std::array<OptionToken, 112> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -140,8 +140,9 @@ constexpr std::array<OptionToken, 111> kOptionTokens{{
     {"src=", "an additional input source; repeat for more than one"},
     {"lyrics=", "encode/eac3-encode/ac4-encode: a lyrics file (.lrc, .srt, .ass, .kar) to write beside "
                 "the stream as its own UTF-8 .lrc"},
-    {"lyrics-encoding=", "encode/eac3-encode/ac4-encode: the code page a lyrics= file is in when it is "
-                         "not UTF-8 or UTF-16 (windows-1252, shift-jis, gbk, big5, ...)"},
+    {"lyrics-encoding=", "encode/eac3-encode/ac4-encode/lyrics-to-lrc: the code page a lyrics file is in "
+                         "when it is not UTF-8 or UTF-16 (windows-1252, shift-jis, gbk, big5, ...)"},
+    {"overwrite=", "lyrics-to-lrc: 1 replaces the output file where there is one"},
     {"map=", "where each source channel goes"},
     {"offset=", "<sourceIndex>:<seconds> leading silence for that source"},
     {"capture2=", "live: a second capture device, clock-conformed to the first"},
@@ -989,6 +990,17 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("                    onto <layout> (71|512|514|714) and meter that too");
         fmt::println("                    (BS.1770-5 Annex 4); dynamic-object-only programmes");
         fmt::println("                    only");
+    }
+    if ((mask & topic::kLyricsConvert) != 0) {
+        fmt::println("");
+        fmt::println("lyrics-to-lrc options (lyrics-to-lrc; any order, after the positional "
+                     "arguments):");
+        fmt::println("  lyrics-encoding=<page>  the code page of an input that is not UTF-8 or "
+                     "UTF-16 (windows-1252, windows-1251, shift-jis, gbk, big5, euc-kr, ...);");
+        fmt::println("                    never guessed at: without it such a file is refused. "
+                     "A UTF-8 or UTF-16 file is read as it is");
+        fmt::println("  overwrite=1       replace the output file where there is one; the file "
+                     "read is never written over");
     }
     if ((mask & topic::kProbe) != 0) {
         fmt::println("");

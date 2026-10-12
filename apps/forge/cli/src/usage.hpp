@@ -76,8 +76,10 @@ inline constexpr std::uint32_t kAc4Encode = 1U << 20;
 // What reads an AC-4 stream: which presentation (presentation=, language=,
 // ...), its mix, and decode/monitor/play's output processing.
 inline constexpr std::uint32_t kAc4Decode = 1U << 21;
+// lyrics-to-lrc's own option block: lyrics-encoding=, overwrite=.
+inline constexpr std::uint32_t kLyricsConvert = 1U << 22;
 
-inline constexpr std::uint32_t kAll = 0x3FFFFFU;
+inline constexpr std::uint32_t kAll = 0x7FFFFFU;
 
 }  // namespace topic
 

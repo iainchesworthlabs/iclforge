@@ -27,7 +27,7 @@ iclforge::lyrics::TextEncoding encoding_of(const Options& meta) {
 // The library says a file is not UTF-8 or UTF-16 and cannot say what to do about it, which is a
 // thing only a command line has: name the page.
 std::string with_hint(const Options& meta, std::string error) {
-    if (meta.lyrics_encoding.empty() && error.find("not UTF-8 or UTF-16") != std::string::npos) {
+    if (meta.lyrics_encoding.empty() && iclforge::lyrics::is_code_page_refusal(error)) {
         error += " If it is in a code page, name it with lyrics-encoding= (for example windows-1252, "
                  "windows-1251 or shift-jis).";
     }
@@ -87,6 +87,36 @@ int place_lyrics_option(const Options& meta, std::string_view out_path) {
             break;
     }
     fmt::println(stderr, "error: lyrics={}: {}", placed.path.string(), placed.error);
+    return kExitOutput;
+}
+
+int run_lyrics_convert(std::string_view in_path, std::string_view out_path, const Options& meta) {
+    if (is_stdio_path(in_path) || is_stdio_path(out_path)) {
+        fmt::println(stderr,
+                     "error: lyrics-to-lrc reads and writes named files, not standard input or "
+                     "output");
+        return kExitUsage;
+    }
+    const auto placed =
+        iclforge::lyrics::convert_lyrics_file(std::filesystem::path{std::string{in_path}},
+                                              std::filesystem::path{std::string{out_path}},
+                                              std::nullopt, encoding_of(meta), meta.lyrics_overwrite);
+    switch (placed.status) {
+        case iclforge::lyrics::PlacementStatus::kWritten:
+            status_println(status_stream(out_path), "wrote {} (UTF-8 LRC from {})",
+                           placed.path.string(), in_path);
+            return kExitOk;
+        case iclforge::lyrics::PlacementStatus::kExists:
+            fmt::println(stderr, "error: {} is already there; overwrite=1 replaces it",
+                         placed.path.string());
+            return kExitOutput;
+        case iclforge::lyrics::PlacementStatus::kUnreadable:
+            fmt::println(stderr, "error: {}: {}", in_path, with_hint(meta, placed.error));
+            return kExitInput;
+        case iclforge::lyrics::PlacementStatus::kFailed:
+            break;
+    }
+    fmt::println(stderr, "error: {}: {}", placed.path.string(), placed.error);
     return kExitOutput;
 }
 

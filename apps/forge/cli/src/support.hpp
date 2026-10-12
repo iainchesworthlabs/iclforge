@@ -331,6 +331,8 @@ struct Options {
     // lyrics-encoding= (with lyrics=): the code page lyrics= is read in when it is neither UTF-8
     // nor UTF-16, by its canonical name (apps/shared/text-encoding). Empty: such a file is refused.
     std::string lyrics_encoding;
+    // overwrite= (lyrics-to-lrc): replace the output file where there is one. Never the file read.
+    bool lyrics_overwrite = false;
     // Each offset= occurrence: (sourceIndex, seconds) - leading silence ahead
     // of that source's own audio, in the same 0-based numbering src=
     // establishes (0 = the primary positional argument, 1..N = each src= in
