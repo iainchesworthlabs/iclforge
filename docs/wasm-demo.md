@@ -40,6 +40,28 @@ The page decodes AC-3 and E-AC-3 only. The AC-4 decoder is a separate WebAssembl
 `iclforge_wasm_ac4`, built in the same CI job; it has no demo page yet. See
 [WebAssembly → AC-4 module](platforms/wasm.md#ac-4-module).
 
+## Sing along (karaoke streams)
+
+Drop in a karaoke stream (Annex C: a guide melody where a centre would be, and the vocals where
+the surrounds would be; the repository's `examples/karaoke/` has two) and the page gains a
+**Microphone** card. It shows how close your pitch is to the tune while you sing:
+
+- **The tune** is the guide melody's channel as coded, read by the library's pitch tracker, compiled
+  into this page's module. It is drawn as a ribbon of notes, with your voice as a line over it.
+- **The microphone is off until you turn it on.** The browser asks you first; nothing is recorded
+  and nothing leaves the page. Closing it ends the tracks.
+- **The score is shown only when you say you are wearing headphones**, because through open
+  speakers the microphone hears the backing as well as you and the score reads as nearly perfect
+  for no singing. The browser's own echo cancellation is asked for either way.
+- **It counts how much of the tune's time your pitch was within a semitone of it, in any octave.**
+  It hears pitch only, not timing, words or feeling.
+- **A delay and a timing slider** are for the rest: the microphone's own latency (the browser's
+  figure where it gives one) and where you want to move your timing.
+
+The tracker and scorer are `libs/pitch`, the library Hearth's microphone is built on, so a number
+here and a number there mean the same thing. [WebAssembly → Microphone in the decode demo](platforms/wasm.md#microphone-in-the-decode-demo)
+has how it is put together and what has and has not been checked.
+
 ## Third-party notices
 
 The module this page loads carries more than `iclforge::ac3`. It statically links **{fmt}**
