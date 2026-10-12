@@ -3685,6 +3685,14 @@ The sections below contain the complete change list and fixes.
   through, which the first board run showed it had not been (every frame after a late first chunk
   was dropped). `hearth-testserver` plays an `.ac4` file; `libs/device`'s `ac4_sync_frame.hpp` is
   the raw frame of a sync frame without a list, tested on the host.
+- **The board's AC-4 decoder does not reconstruct objects it would throw away**
+  (`Ac4Stream::Config::skip_objects`, on, through `DecoderConfig::skip_objects`): a 5.1 bed beside
+  A-JOC or direct-coded objects plays as the bed. On a P4 over Sendspin a bed with 16 A-JOC objects
+  took 2.51 of real time and now takes 0.59, with 4 objects 1.26 and now 0.58, with direct-coded
+  objects 1.00 and now 0.56; the bed's level is the host decoder's to 0.01 dB, and the least
+  internal RAM free over a play rose from 1.0 to 9.6 KB (4 objects: 2.7 to 18 KB). A presentation of
+  objects alone is refused with a reason where it was decoded and dropped (1.62 of real time, 186
+  chunks late).
 
 **Library internals**
 
