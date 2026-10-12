@@ -91,7 +91,7 @@ The sections below contain the complete change list and fixes.
   where a cue ends before the next begins. The file is read before the encode (a code page is
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
-  `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+  `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
 - **The lyric library reads a code page when a program supplies the conversion.**
   `iclforge::lyrics::TextEncoding` carries a decoder callback (the library holds no table of any
   page, as it is linked into firmware), and every reader (`parse_lyrics`, `parse_subrip`,
