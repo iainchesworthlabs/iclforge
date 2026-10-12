@@ -17,6 +17,8 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -26,6 +28,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include "iclforge/pitch/synth.hpp"
 #include "microphone_controller.hpp"
 #include "microphone_input.hpp"
 
@@ -103,6 +106,49 @@ QString plain_stream() {
                                            .parent_path();
     return QString::fromStdString(
         (root / "firmware" / "hearth-sink" / "www" / "ac3-20.ac3").string());
+}
+
+// A singer's voice for the notes of the tune that end by `to_ms` (ribbon()'s flat start, end, MIDI
+// triples), `shift` semitones away from it: what a microphone would deliver, with the item's time 0
+// at the first sample.
+std::vector<float> sing(const QVariantList& notes, double to_ms, double shift) {
+    std::vector<iclforge::pitch::VoiceNote> voice;
+    for (int i = 0; i + 2 < notes.size(); i += 3) {
+        const double start = notes[i].toDouble();
+        const double end = notes[i + 1].toDouble();
+        if (end > to_ms) {
+            break;
+        }
+        voice.push_back({start / 1000.0, (end - start) / 1000.0, notes[i + 2].toDouble() + shift});
+    }
+    iclforge::pitch::VoiceOptions options;
+    options.sample_rate = 48000;
+    options.lead_s = 0.0;
+    options.tail_s = 0.2;
+    options.vibrato_cents = 20.0;
+    options.snr_db = 30.0;
+    options.seed = 7;
+    std::vector<float> samples = iclforge::pitch::synthesize_voice(voice, options).samples;
+    // To the end of the stretch, so that the input never looks stalled after the last note.
+    samples.resize(std::max(samples.size(), static_cast<std::size_t>(to_ms * 48.0)), 0.0F);
+    return samples;
+}
+
+// Plays the item for `milliseconds` with `samples` at the microphone, 20 ms at a time, as the
+// window's timer would: the position is told, the microphone read. Takes a second more of the
+// clock each time so that one scenario follows another.
+void perform(Rig& rig, std::vector<float> samples, int milliseconds) {
+    const std::int64_t base = rig.now + 1'000'000'000LL;
+    rig.input->script(std::move(samples), base);
+    rig.now = base;
+    rig.input->set_now_ns(base);
+    rig.controller->anchor(0, true);
+    for (int t = 20; t <= milliseconds; t += 20) {
+        rig.now = base + static_cast<std::int64_t>(t) * 1'000'000LL;
+        rig.input->set_now_ns(rig.now);
+        rig.controller->anchor(t, true);
+        rig.controller->tick();
+    }
 }
 
 }  // namespace
@@ -261,6 +307,174 @@ TEST_CASE("microphone controller: the reference is read from the karaoke stream,
     // Nothing playing.
     rig->controller->load("", "");
     CHECK(rig->controller->referenceStatus() == "none");
+}
+
+TEST_CASE("microphone controller: a line's three levels fall at 45 and 75 percent",
+          "[hearth][microphone][score]") {
+    CHECK(MicrophoneController::levelFor(100) == 3);
+    CHECK(MicrophoneController::levelFor(75) == 3);
+    CHECK(MicrophoneController::levelFor(74) == 2);
+    CHECK(MicrophoneController::levelFor(45) == 2);
+    CHECK(MicrophoneController::levelFor(44) == 1);
+    CHECK(MicrophoneController::levelFor(0) == 1);
+}
+
+TEST_CASE("microphone controller: a performance is drawn, marked line by line and summed up",
+          "[hearth][microphone][score]") {
+    Room room;
+    application();
+    auto rig = make_rig();
+    rig->controller->setHeadphones(true);
+    rig->controller->load(example_stream(), "m");
+    REQUIRE(wait_for([&] { return rig->controller->referenceStatus() == "ready"; }, 60000));
+
+    // --- the tune as the ribbon asks for it: notes in the window, nothing of the singer yet -----
+    const QVariantMap tune = rig->controller->ribbon(0, 20000);
+    CHECK(tune.value("hasReference").toBool());
+    const QVariantList notes = tune.value("notes").toList();
+    REQUIRE(notes.size() >= 3 * 6);
+    CHECK(notes.size() % 3 == 0);
+    CHECK(tune.value("lowMidi").toDouble() < tune.value("highMidi").toDouble());
+    CHECK(tune.value("trace").toList().isEmpty());
+    for (int i = 0; i + 2 < notes.size(); i += 3) {
+        CHECK(notes[i].toDouble() < 20000.0);  // starts inside the window
+        CHECK(notes[i + 1].toDouble() > 0.0);  // and ends after its start
+        CHECK(notes[i + 1].toDouble() > notes[i].toDouble());
+    }
+    // A window further on holds other notes, and none of these.
+    const QVariantList later = rig->controller->ribbon(40000, 50000).value("notes").toList();
+    for (int i = 0; i + 2 < later.size(); i += 3) {
+        CHECK(later[i + 1].toDouble() > 40000.0);
+        CHECK(later[i].toDouble() < 50000.0);
+    }
+    // A line is the first three notes.
+    const qlonglong line_start = static_cast<qlonglong>(notes[0].toDouble());
+    const qlonglong line_end = static_cast<qlonglong>(notes[7].toDouble());
+    REQUIRE(line_end > line_start);
+
+    // --- a singer on the tune
+    // ----------------------------------------------------------------------
+    REQUIRE(rig->controller->start());
+    // A mark binds to the revision, which has to move when the score does.
+    const int revision_before = rig->controller->scoreRevision();
+    perform(*rig, sing(notes, 20000, 0.0), 20000);
+    CHECK(rig->controller->scoreRevision() > revision_before);
+    const QVariantMap good = rig->controller->lineResult(line_start, line_end);
+    CHECK(good.value("scored").toBool());
+    CHECK(!good.value("withheld").toBool());
+    CHECK(!good.value("notSung").toBool());
+    CHECK(good.value("percent").toInt() >= 75);
+    CHECK(good.value("level").toInt() == 3);
+    // And the ribbon holds the voice, most of it within the tolerance.
+    const QVariantList trace =
+        rig->controller->ribbon(line_start - 300, line_end + 300).value("trace").toList();
+    REQUIRE(trace.size() >= 3 * 20);
+    int voiced = 0;
+    int hit = 0;
+    for (int i = 0; i + 2 < trace.size(); i += 3) {
+        if (trace[i + 1].toDouble() >= 0.0) {
+            ++voiced;
+            hit += trace[i + 2].toDouble() > 0.0 ? 1 : 0;
+        }
+    }
+    CHECK(voiced > 10);
+    CHECK(hit > voiced * 8 / 10);
+    // A stretch with no note of the tune in it has no mark, which is not a zero.
+    const QVariantMap none = rig->controller->lineResult(10'000'000, 10'001'000);
+    CHECK(!none.value("scored").toBool());
+    CHECK(none.value("percent").toInt() == -1);
+    // The score and the summary agree, and the summary is kept when it is turned off.
+    rig->controller->stop();
+    const QVariantMap summary_good = rig->controller->summary();
+    REQUIRE(summary_good.contains("percent"));
+    CHECK(summary_good.value("percent").toInt() > 0);
+    CHECK(summary_good.value("reference").toString() == "the melody guide (M)");
+    CHECK(summary_good.value("toleranceCents").toDouble() == Catch::Approx(100.0));
+    CHECK(summary_good.value("hit").toInt() <= summary_good.value("counted").toInt());
+    // Off, there is no line to mark.
+    CHECK(!rig->controller->lineResult(line_start, line_end).value("scored").toBool());
+
+    // --- the same singer a tritone away: not on the tune, and it says so
+    // ------------------------------
+    REQUIRE(rig->controller->start());
+    CHECK(rig->controller->summary().isEmpty());  // a new performance has no summary yet
+    perform(*rig, sing(notes, 20000, -6.0), 20000);
+    const QVariantMap bad = rig->controller->lineResult(line_start, line_end);
+    CHECK(bad.value("scored").toBool());
+    CHECK(!bad.value("notSung").toBool());
+    CHECK(bad.value("percent").toInt() < 25);
+    CHECK(bad.value("level").toInt() == 1);
+    // The ribbon draws it as off the tune: few of its frames are within the tolerance.
+    {
+        const QVariantList away =
+            rig->controller->ribbon(line_start - 300, line_end + 300).value("trace").toList();
+        int away_voiced = 0;
+        int away_hit = 0;
+        for (int i = 0; i + 2 < away.size(); i += 3) {
+            if (away[i + 1].toDouble() >= 0.0) {
+                ++away_voiced;
+                away_hit += away[i + 2].toDouble() > 0.0 ? 1 : 0;
+            }
+        }
+        CHECK(away_voiced > 10);
+        CHECK(away_hit < away_voiced * 2 / 10);
+    }
+    rig->controller->stop();
+    CHECK(rig->controller->summary().value("percent").toInt() <
+          summary_good.value("percent").toInt());
+
+    // --- an octave below is right, and is drawn on the tune's octave
+    // ---------------------------------
+    REQUIRE(rig->controller->start());
+    perform(*rig, sing(notes, 20000, -12.0), 20000);
+    const QVariantMap octave = rig->controller->lineResult(line_start, line_end);
+    CHECK(octave.value("scored").toBool());
+    CHECK(octave.value("level").toInt() == 3);
+    {
+        const QVariantMap window = rig->controller->ribbon(line_start - 300, line_end + 300);
+        const QVariantList below = window.value("trace").toList();
+        const double low = window.value("lowMidi").toDouble();
+        const double high = window.value("highMidi").toDouble();
+        int below_voiced = 0;
+        int below_hit = 0;
+        bool on_the_tunes_octave = true;
+        for (int i = 0; i + 2 < below.size(); i += 3) {
+            const double midi = below[i + 1].toDouble();
+            if (midi >= 0.0) {
+                ++below_voiced;
+                below_hit += below[i + 2].toDouble() > 0.0 ? 1 : 0;
+                on_the_tunes_octave = on_the_tunes_octave && midi >= low && midi <= high;
+            }
+        }
+        CHECK(below_voiced > 10);
+        CHECK(below_hit > below_voiced * 8 / 10);
+        CHECK(on_the_tunes_octave);
+    }
+    rig->controller->stop();
+
+    // --- a singer who does not sing: "not sung", not a bad score, and no summary
+    // -------------------------
+    REQUIRE(rig->controller->start());
+    perform(*rig, std::vector<float>(48000 * 20, 0.0F), 20000);
+    const QVariantMap silent = rig->controller->lineResult(line_start, line_end);
+    CHECK(silent.value("scored").toBool());
+    CHECK(silent.value("notSung").toBool());
+    CHECK(silent.value("percent").toInt() == -1);
+    CHECK(silent.value("level").toInt() == 0);
+    rig->controller->stop();
+    CHECK(rig->controller->summary().isEmpty());
+
+    // --- without the headphones answer there is no number at all, in a line or in a summary
+    // --------------
+    rig->controller->setHeadphones(false);
+    REQUIRE(rig->controller->start());
+    perform(*rig, sing(notes, 20000, 0.0), 20000);
+    const QVariantMap withheld = rig->controller->lineResult(line_start, line_end);
+    CHECK(withheld.value("withheld").toBool());
+    CHECK(!withheld.value("scored").toBool());
+    CHECK(withheld.value("percent").toInt() == -1);
+    rig->controller->stop();
+    CHECK(rig->controller->summary().isEmpty());
 }
 
 TEST_CASE("microphone controller: a take needs the microphone, is its own switch, and is kept",

@@ -283,6 +283,32 @@ std::vector<std::int32_t> decode_take(const std::filesystem::path& p, std::uint3
 
 }  // namespace
 
+TEST_CASE("microphone session: a line's counts and the voice's trace are asked for",
+          "[microphone]") {
+    Rig r = rig(voice());
+    // Nothing before there is a performance.
+    CHECK(r.session->trace() == nullptr);
+    CHECK(!r.session->tally(0, 700).scored());
+
+    r.session->set_reference(iclforge::pitch::contour_of_notes(melody(), 10, 2600));
+    CHECK(r.session->reference().has_value());
+    REQUIRE(r.session->start("").has_value());
+    r.session->set_headphones(true);
+    run(r, kT0, kT0 + 2'900'000'000);
+
+    const auto first_note = r.session->tally(0, 700);
+    CHECK(first_note.scored());
+    CHECK(first_note.fraction() > 0.8);
+    // A stretch with no note of the reference in it has no score, which is not a score of zero.
+    CHECK(!r.session->tally(2450, 2600).scored());
+
+    REQUIRE(r.session->trace() != nullptr);
+    CHECK(r.session->trace()->size() > 150);
+
+    r.session->stop();
+    CHECK(r.session->trace() == nullptr);
+}
+
 TEST_CASE("microphone session: a take needs the microphone on", "[microphone][take]") {
     Rig r = rig(sine(440.0, 1.0, 0.1));
     TakeFolder folder;
