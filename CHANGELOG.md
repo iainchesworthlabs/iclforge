@@ -265,6 +265,15 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
+  offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
+  dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
+  now shown shifted by the offset the last scroll command set (the border stays a ring, and a value
+  past the largest is read as the largest, so the shift never leaves the memory). Instruction 28,
+  *define transparent colour*, was skipped; the colour it names now has an alpha of 0 in
+  `CdgScreen::pixels()` and `colour()`, so a picture's backdrop shows where the disc meant video to.
+  Both are state of the replay, so a seek back lands where a seek from the start does
+  (`iclforge::lyrics`, `cdg.hpp`; planning/karaoke-phase2.md, W13f).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the
