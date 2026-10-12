@@ -29,6 +29,19 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke: a pitch library**
+
+- **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one
+  against the other** (the microphone, scoring and recording programme, M1). A fundamental-frequency
+  tracker (the McLeod Pitch Method, written from the paper) that takes samples at any rate that is a
+  whole multiple of its analysis rate, low-passes and decimates them, and answers a pitch, a clarity and
+  a level every 10 ms; a reference as a contour on a fixed grid, from audio or from MIDI-style notes,
+  and the notes of a contour; and a scorer that counts, for a stretch of an item, how much of the
+  reference's voiced time the singer was within a tolerance of it (octaves folded, a key shift
+  optional), with how sharp or flat on average and an estimate of how early or late the singer is. It
+  also holds a deterministic synthetic singing voice with a known pitch, which is what its tests and
+  the later microphone tests are made of (no recording is bundled). Standard library only, internal,
+  and nothing links it yet.
 **Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
 
 - **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
