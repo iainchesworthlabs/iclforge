@@ -41,7 +41,9 @@
     <string name="a_server">a server</string>
     <string name="waiting_server">Waiting for a server</string>
     <string name="waiting_server_hint">Choose this sink in Hearth.</string>
-    <string name="unpaired_hint">Not paired yet. Choose this sink in Hearth and a code appears here.</string>
+    <string name="unpaired_hint">Not paired yet. In Hearth, open the Network page and choose this sink: a code appears here.</string>
+    <!-- A paired sink that has never played: pairing is not yet a group (the desktop's first-run dialog). -->
+    <string name="group_hint">To play, add this sink to a group on Hearth\'s Network page: a group of one plays to a single sink.</string>
     <string name="passes_through">Passes through %1$s</string>
     <string name="attention">Attention</string>
     <string name="attention_not_started_hint">Quit and open Hearth again. If it keeps happening, restart the box.</string>

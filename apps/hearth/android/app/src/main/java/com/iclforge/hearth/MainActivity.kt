@@ -107,7 +107,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(build())
-        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        val prefs = preferences
         lyrics.delayMs = prefs.getInt(KEY_DELAY_MS, 0)
         lyrics.textStep = prefs.getInt(KEY_TEXT_STEP, 1)
         lyrics.onDelayChanged = { prefs.edit().putInt(KEY_DELAY_MS, it).apply() }
@@ -147,6 +147,20 @@ class MainActivity : Activity() {
         }
     }
 
+    private val preferences by lazy { getSharedPreferences(PREFS, MODE_PRIVATE) }
+
+    /**
+     * The first run: this sink has not played a stream yet, so the idle screen says what a person does next
+     * (the desktop's first-run dialog says the same: pair, then add the sink to a group). The first stream
+     * ends it, for good.
+     */
+    private fun firstRun(playing: Boolean): Boolean {
+        if (playing && !preferences.getBoolean(KEY_HAS_PLAYED, false)) {
+            preferences.edit().putBoolean(KEY_HAS_PLAYED, true).apply()
+        }
+        return !preferences.getBoolean(KEY_HAS_PLAYED, false)
+    }
+
     /** Reads what the sink, the network and the route say, and chooses and fills the status screen. */
     private fun updateStatus() {
         val native = NativeSink.available
@@ -174,7 +188,7 @@ class MainActivity : Activity() {
         val note = SinkService.advertiserState?.failure
         statusView.content = StatusView.Content(
             choice = choice, name = name, where = where, status = status, formats = formats,
-            error = startError, note = note,
+            error = startError, note = note, firstRun = firstRun(streaming),
         )
         // The footer's route chip: how the server's stream leaves this sink, while it plays one.
         lyrics.route = status.playingFor?.output
@@ -186,6 +200,7 @@ class MainActivity : Activity() {
         const val PREFS = "hearth"
         const val KEY_DELAY_MS = "lyric_delay_ms"
         const val KEY_TEXT_STEP = "text_step"
+        const val KEY_HAS_PLAYED = "has_played"
         const val POLL_MS = 500L
 
         /** How much of the lyric shows behind an attention sentence (S10). */
