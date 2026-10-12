@@ -234,6 +234,14 @@ jobs:
         shell: bash
         run: python3 tools/checks/generate_project_pages.py --check
 
+      # The sink screen's tokens (planning/hearth-sink-screen.md) are one file; the Android app's
+      # Tokens.kt is generated from it, and the desktop's Signal palette and the P4X panel's screen are
+      # held to the same values.
+      - name: Sink screen tokens
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 tools/checks/sink_screen_tokens.py --check
+
       # sonar-project.properties divides the tree three ways with patterns, and a move of files
       # changes which side one falls on without a word from anyone: a pattern that matches nothing
       # (an issue-ignore rule for a file that moved stops applying, silently) and a test scanned as

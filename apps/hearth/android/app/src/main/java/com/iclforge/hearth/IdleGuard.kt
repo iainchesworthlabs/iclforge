@@ -10,17 +10,19 @@ package com.iclforge.hearth
  * Pure: the caller says how long nothing has changed and applies the answer to its view.
  */
 object IdleGuard {
+    // The numbers are the tokens' (docs/hearth/design/sink-screen-tokens.json).
+
     /** How long nothing changes before the screen dims and starts to move. */
-    const val QUIET_MS = 120_000L
+    const val QUIET_MS = Tokens.IDLE_QUIET_MS
 
     /** How often it moves once it has. */
-    const val STEP_MS = 60_000L
+    const val STEP_MS = Tokens.IDLE_STEP_MS
 
     /** The brightness of a dimmed screen, as a fraction of full. */
-    const val DIMMED = 0.4f
+    const val DIMMED = Tokens.IDLE_DIMMED
 
-    /** How far a step moves it, in u. The screen walks a small ring and is never more than 2 steps out. */
-    const val STEP_U = 6f
+    /** How far a step moves it, in u. The screen walks a small ring and is never more than 1 step out. */
+    const val STEP_U = Tokens.IDLE_STEP_U
 
     private val RING = arrayOf(
         0f to 0f, 1f to 0f, 1f to 1f, 0f to 1f, -1f to 1f, -1f to 0f, -1f to -1f, 0f to -1f,

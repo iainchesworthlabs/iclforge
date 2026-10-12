@@ -72,6 +72,17 @@ The sections below contain the complete change list and fixes.
   stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
   needs a case of its own (`planning/karaoke-eac3.md`, D10).
 
+**Hearth for Android: the sink screen's tokens in one file**
+
+- **`docs/hearth/design/sink-screen-tokens.json`** (phase 3a of `planning/hearth-android.md`, D13): the
+  Signal dark palette, the layout units, the length rule's sizes, the delay's steps and the timings
+  the sink screen is drawn with, written once. The Android app's `Tokens.kt` is generated from it
+  (`tools/checks/sink_screen_tokens.py --write`), and the same script, run by the static lane, holds the
+  desktop's Signal dark palette (`Theme.qml`) and the P4X panel's screen (`lyric_screen.cpp`) to the
+  same values without writing to either, naming the value each holds when one drifts. The sung line is
+  70% accent in the file, the panel and the app; the desktop's 55% is the owner's call (open item 1 of
+  the spec) and the check does not read it.
+
 **Hearth for Android: the lyric screen against the spec's fixtures**
 
 - **The conformance fixtures at fixed positions** (`planning/hearth-android.md`, phase 2's exit, AR3):

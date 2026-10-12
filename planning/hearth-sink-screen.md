@@ -131,6 +131,10 @@ in its state ([the model](#the-model)).
 
 ## Tokens
 
+The values below are written once, in `docs/hearth/design/sink-screen-tokens.json`, and held there by
+`tools/checks/sink_screen_tokens.py` (the Android app's `Tokens.kt` is generated from the file; the
+desktop's palette and the panel's screen are checked against it).
+
 The family's tokens are `apps/shared/theme/assets/qml/Theme.qml`'s, in the Signal palette's dark
 mode, which is also what `LyricScreen.qml` hard-codes and the panel takes. A sink is a thing in a
 dim room and **always draws dark, whatever the OS theme is** (the singer view's own rule).
@@ -260,6 +264,6 @@ they are checked in beside the fixture so a renderer's test and the library's ag
 | 4 | The viewing distance the panel is designed for: **narrowed, as stated above, 2026-10-12** | Settled |
 | 5 | `format` and `route` in the role's state, for the panel's footer. The P4X session will draw them when they exist on `main` | The plan's D6 |
 | 6 | A request path from a sink to the server for the vocals and the reproduction | The plan's D8; a protocol PR, shared with the panel's Q6 |
-| 7 | Where tokens live: one file generating QML, Kotlin and a C header, or this page only | The plan's D13 |
+| 7 | Where tokens live: one file generating QML, Kotlin and a C header, or this page only | **Settled** (the plan's D13): `docs/hearth/design/sink-screen-tokens.json`. The Android app's `Tokens.kt` is generated from it, and `tools/checks/sink_screen_tokens.py` holds the desktop's Signal dark palette and the panel's screen to the same values without writing to either; moving either to a generated file is its owner's |
 | 8 | Where `title` and `artist` come from for an item with no lyric document | The plan's D7 |
 | 9 | Greek and Cyrillic have no face bundled with the family: Archivo does not cover them. The panel bundles Noto Sans for both; the desktop and Android rely on the system's fallback, which changes the look of a Cyrillic line | Owner; the P4X session's panel PR corrects its own rows |
