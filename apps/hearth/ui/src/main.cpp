@@ -41,6 +41,12 @@
 // run (the "Before you play anything" dialog says where the sound goes and
 // comes first), with a capture, and with `--seek`. `--` ends the options, so
 // `hearth -- --page` opens a file called `--page`.
+// One Hearth plays: a launch that would play files first hands them (and its
+// `--page`) to the Hearth already running under the same account, which queues
+// them, plays the first, comes forward and switches page, and the second
+// process ends before it has a window (src/single_instance.hpp). A launch with
+// no files, a `--seek` or a capture takes no part in it, apart from listening
+// (a capture does not even listen).
 // `--seek <ms>` starts that item at a position and holds it paused there (a
 // stopped item has no position to show, and a seek on it is kept for its next
 // start), so a lyric view shows a word part way through; that is a moment of
@@ -87,6 +93,7 @@
 #include "native_log_sink.hpp"
 #include "network_controller.hpp"
 #include "settings_migration.hpp"
+#include "single_instance.hpp"
 
 namespace {
 
@@ -185,6 +192,30 @@ int main(int argc, char** argv) {
         iclforge::hearth::ui::NetworkController::set_network_discovery(false);
     }
 
+    // One Hearth to play (src/single_instance.hpp). A launch that would play files first
+    // offers them to the Hearth that is already running under this account, and is done when
+    // that one takes them - before any window or engine of its own exists. Every other launch
+    // listens for the next one, except a capture, which runs on a scratch store of its own and
+    // is neither handed anything nor the one a later double-click is handed to. A listen that
+    // fails (a Hearth is running and was not asked, or the system said no) runs on as it
+    // always did. Absolute paths: the sender's working directory is not the receiver's, and the
+    // queue keeps them.
+    QStringList launch_files;
+    launch_files.reserve(command_line.open_files.size());
+    for (const QString& file : command_line.open_files) {
+        launch_files.push_back(QDir::cleanPath(QFileInfo(file).absoluteFilePath()));
+    }
+    iclforge::hearth::ui::SingleInstance single_instance(
+        iclforge::hearth::ui::SingleInstance::default_name());
+    if (command_line.plays_at_launch() &&
+        iclforge::hearth::ui::SingleInstance::hand_over(
+            iclforge::hearth::ui::SingleInstance::default_name(), launch_files, page)) {
+        return 0;
+    }
+    if (shot_path.isEmpty() && !single_instance.listen()) {
+        qInfo("hearth: another Hearth already takes what is handed over; this one runs on its own");
+    }
+
     // A --shot capture must not touch the real, persistent per-user settings
     // store (issue #884): HearthController builds settings_ from
     // QSettings::defaultFormat() rather than a fixed native format
@@ -262,6 +293,40 @@ int main(int argc, char** argv) {
         QMetaObject::invokeMethod(engine.rootObjects().first(), "openOutputPicker");
     }
 
+    // What another launch hands over (single_instance above) is what a launch with
+    // those files is - behind the queue, the first becomes the item playing and
+    // starts, unless this is the first run - and the window comes forward, on the
+    // page the sender asked for if it asked for one. (Windows may only flash the
+    // taskbar button when another program's window is in front.)
+    if (shot_path.isEmpty()) {
+        auto* const receiver =
+            engine.singletonInstance<iclforge::hearth::ui::HearthController*>("Hearth",
+                                                                              "HearthController");
+        QObject::connect(
+            &single_instance, &iclforge::hearth::ui::SingleInstance::received, &app,
+            [&engine, receiver](const QStringList& files, const QString& requested_page) {
+                if (receiver != nullptr) {
+                    if (receiver->firstRunSeen()) {
+                        receiver->openAndPlay(files);
+                    } else {
+                        receiver->addFiles(files);
+                    }
+                }
+                QObject* const root =
+                    engine.rootObjects().isEmpty() ? nullptr : engine.rootObjects().first();
+                if (root != nullptr && !requested_page.isEmpty()) {
+                    root->setProperty("page", requested_page);
+                }
+                if (auto* window = qobject_cast<QQuickWindow*>(root)) {
+                    if ((window->windowStates() & Qt::WindowMinimized) != 0) {
+                        window->showNormal();
+                    }
+                    window->raise();
+                    window->requestActivate();
+                }
+            });
+    }
+
     // --open and a file on its own: the files join the queue behind whatever is
     // in it, and with an empty queue (a capture's scratch store always is) the
     // first becomes the current item, loaded and cued, which is what a page
@@ -279,11 +344,7 @@ int main(int argc, char** argv) {
     QString first_path;
     bool plays = false;
     if (controller != nullptr) {
-        QStringList paths;
-        paths.reserve(command_line.open_files.size());
-        for (const QString& file : command_line.open_files) {
-            paths.push_back(QDir::cleanPath(QFileInfo(file).absoluteFilePath()));
-        }
+        const QStringList& paths = launch_files;
         first_path = paths.first();
         plays = command_line.plays_at_launch() && controller->firstRunSeen();
         if (plays) {
