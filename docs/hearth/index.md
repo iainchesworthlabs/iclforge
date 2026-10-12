@@ -240,18 +240,24 @@ bound. On Windows every note Hearth records for the report is also sent to the d
 
 ### Command line
 
-`hearth` takes a few options. None is needed to use it: they open a file at start, and take
-screenshots of the window with nobody at the machine.
+`hearth` takes the files to open, and a few options. None is needed to use it: they open a file
+at start, and take screenshots of the window with nobody at the machine.
 
 | Option | What it does |
 |---|---|
-| `--open <file>` | Adds the file to the queue, once for each `--open`. With nothing in the queue the first file is the item that is loaded and cued (not playing), so the Play, Media and Karaoke pages show it |
-| `--seek <ms>` | Starts the first `--open` item at that position in milliseconds and holds it paused there, so a lyric view shows a word part way through (a stopped item has no position to show). It plays a moment of sound at the output it goes to, and needs an `--open` |
+| `<file>` | Opens the file, as `hearth song.ac3`, as Windows runs `hearth.exe "%1"` for a double-clicked `.ac3` or `.ec3`, and as the Linux launcher runs `hearth %F`: it is added behind the queue the window brings back, and it starts. Several files are queued in the order given and the first starts. It waits, cued and not started, on a first run (the dialog that says where the sound goes comes first), and with `--seek`, `--shot` or `--smoke-shot` |
+| `--` | Ends the options: everything after it is a file, so `hearth -- --page` opens a file called `--page` |
+| `--open <file>` | A file named as an option, once for each `--open`, in the order given with any others: it cannot be read as anything else, so it is the form to write in a script. It queues and plays as a file on its own does; a capture or `--seek` cues the first file instead (loaded, not playing), so the Play, Media and Karaoke pages show it |
+| `--seek <ms>` | Starts the first file at that position in milliseconds and holds it paused there, so a lyric view shows a word part way through (a stopped item has no position to show). It plays a moment of sound at the output it goes to, and needs a file |
 | `--page <name>` | Opens on a page (`play`, `media`, `speakers`, `decoder`, `network`, `settings` or `karaoke`), or on a dialog over the Play page (`firstrun`, `shortcuts`, `about` or `licences`) |
 | `--decoder-format <eac3\|ac4>` | Which tab the Decoder page opens on |
 | `--open-output-picker` | Opens the output picker over the page |
 | `--smoke-shot <png>` | Saves the window to a PNG once it has settled, and quits, **with network discovery off**: nothing browses the network, so there is no firewall prompt and no sink from the network in the picture. This is the one to put in a script |
 | `--shot <png>` | The same capture with network discovery on, as the window runs. On Windows that asks for a Windows Firewall rule (a UAC prompt), so run it where somebody can answer it |
+
+On Windows the installer registers `.ac3` and `.ec3` to open in Hearth, so a double-click is a
+launch with that file. Nothing hands the file to a Hearth that is already running: a second
+double-click starts a second Hearth beside the first, with its own engine and its own output.
 
 A capture runs against a scratch settings store, so it neither reads nor changes a person's own
 queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
