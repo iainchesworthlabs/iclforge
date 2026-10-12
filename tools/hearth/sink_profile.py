@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import re
 import sys
@@ -215,6 +216,51 @@ def cache_defaults(build: Path) -> list[str] | None:
     return []
 
 
+def cache_value(build: Path, name: str) -> str | None:
+    """A variable of the build's CMakeCache.txt, or None if it has none by that name."""
+    try:
+        text = (build / "CMakeCache.txt").read_text("utf-8", "replace")
+    except OSError:
+        return None
+    prefix = f"{name}:"
+    for line in text.splitlines():
+        if line.startswith(prefix):
+            _, _, value = line.partition("=")
+            return value.strip()
+    return None
+
+
+def profile_hash(data: dict[str, Any], ident: str) -> str:
+    """A short hash of what a profile is: its fragments and its locked values. A board reports
+    the one its image was built with, so one running an older definition is seen."""
+    spec = profile(data, ident)
+    canon = json.dumps(
+        {"fragments": spec["fragments"], "locked": spec.get("locked", {})},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()[:12]
+
+
+def read_size_report(path: Path) -> dict[str, int]:
+    """The memory types of `idf.py size --format json2`, as name -> bytes used.
+
+    The report may follow other output (a CMake run the command made first), so the
+    first JSON object with a `layout` is the one."""
+    text = path.read_text("utf-8", "replace")
+    decoder = json.JSONDecoder()
+    start = text.find("{")
+    while start != -1:
+        try:
+            found, _ = decoder.raw_decode(text[start:])
+        except ValueError:
+            found = None
+        if isinstance(found, dict) and isinstance(found.get("layout"), list):
+            return {str(item["name"]): int(item["used"]) for item in found["layout"]}
+        start = text.find("{", start + 1)
+    raise ProfileError(f"{path} holds no `idf.py size --format json2` report")
+
+
 def read_final(build: Path) -> dict[str, str]:
     path = build / "sdkconfig"
     try:
@@ -231,6 +277,7 @@ def verify(
     ident: str,
     build: Path,
     overlays: tuple[str, ...] = (),
+    size_json: Path | None = None,
 ) -> list[Finding]:
     spec = profile(data, ident)
     findings: list[Finding] = []
@@ -263,6 +310,30 @@ def verify(
                 Finding(
                     "fragments",
                     f"the build was given {';'.join(extras)}, which no declared overlay is",
+                )
+            )
+
+    # 1b. The profile the image says it is (main/CMakeLists.txt, ICLFORGE_PROFILE), which is
+    # what GET /hardware reports and what the board suite refuses a board for.
+    if actual is not None:
+        built_as = cache_value(build, "ICLFORGE_PROFILE")
+        built_hash = cache_value(build, "ICLFORGE_PROFILE_HASH")
+        if not built_as:
+            findings.append(
+                Finding(
+                    "identity",
+                    "the build does not carry its profile: configure it with "
+                    f"`sink_profile.py identity {ident} --cmake`",
+                )
+            )
+        elif built_as != ident:
+            findings.append(Finding("identity", f"the build says it is {built_as}, not {ident}"))
+        elif built_hash != profile_hash(data, ident):
+            findings.append(
+                Finding(
+                    "identity",
+                    f"the build carries hash {built_hash or '(none)'} and profile {ident} is "
+                    f"{profile_hash(data, ident)}: it was configured from another definition",
                 )
             )
 
@@ -317,6 +388,20 @@ def verify(
                     f"{budget['bootloader_bytes_max']:,}",
                 )
             )
+    # Static internal RAM: each byte of it is a byte less in the heap's largest block on any
+    # board, so this is the figure that makes "RAM erodes as features land" a build failure.
+    if size_json is not None and budget.get("internal_static_bytes_max") is not None:
+        used = read_size_report(size_json).get("DIRAM")
+        if used is None:
+            findings.append(Finding("budget", f"{size_json} has no DIRAM in its layout"))
+        elif used > budget["internal_static_bytes_max"]:
+            findings.append(
+                Finding(
+                    "budget",
+                    f"static internal RAM (DIRAM) is {used:,} bytes, over the profile's "
+                    f"{budget['internal_static_bytes_max']:,}",
+                )
+            )
     return findings
 
 
@@ -344,6 +429,36 @@ def image_rule(data: dict[str, Any], name: str) -> dict[str, Any]:
     raise ProfileError(f"no profile publishes an image named '{name}'")
 
 
+def expected_console(data: dict[str, Any], ident: str) -> list[str]:
+    """The console lines a play and the Sendspin player print that say where the profile put
+    its rings and stacks: what the QEMU twin of the release shape is held to, so that a stack
+    that falls back to internal RAM is a missing line, whatever the emulated heap could spare.
+    Only what the profile locks is expected: a profile with no PSRAM expects none of the
+    PSRAM lines."""
+    locked = profile(data, ident).get("locked", {})
+
+    def value(name: str) -> str | None:
+        return locked.get(f"CONFIG_ICLFORGE_EXAMPLE_{name}")
+
+    lines: list[str] = []
+    if locked.get("CONFIG_SPIRAM") == "y":
+        if value("RING_IN_PSRAM") == "1":
+            lines.append(f"player: ring {value('RING_BYTES')} bytes in PSRAM")
+        if value("DECODE_STACK_IN_PSRAM") == "1":
+            lines.append(f"player: decode stack {value('DECODE_STACK_BYTES')} bytes in PSRAM")
+        if locked.get("CONFIG_ICLFORGE_SENDSPIN") == "y":
+            lines.append(
+                f"burst player: ring {value('SENDSPIN_RING_BYTES')} bytes and buffers in PSRAM"
+            )
+            if value("SENDSPIN_DECODE_STACK_IN_PSRAM") == "1":
+                stack = value("SENDSPIN_DECODE_STACK_BYTES")
+                lines.append(f"burst player: decode stack {stack} bytes in PSRAM")
+    core = value("DECODE_CORE")
+    if value("DECODE_LANE") == "1" and core in ("0", "1"):
+        lines.append(f"player: decode stages on cores {core} and {1 - int(core)}")
+    return lines
+
+
 def table(data: dict[str, Any], idents: list[str]) -> str:
     rows = [
         "| Profile | Fragments after `sdkconfig.defaults`, in order | Release image | Boards |",
@@ -363,13 +478,94 @@ def table(data: dict[str, Any], idents: list[str]) -> str:
     return "\n".join(rows) + "\n"
 
 
+# --- the docs -------------------------------------------------------------------------
+
+STACK = re.compile(r"sdkconfig\.defaults(?:;sdkconfig\.[A-Za-z0-9_-]+)+")
+TABLE_BEGIN = "<!-- sink-profiles:begin -->"
+TABLE_END = "<!-- sink-profiles:end -->"
+
+# Where the tree states which fragments a build takes, as globs from the repository root.
+DOC_FILES = (
+    "firmware/hearth-sink/README.md",
+    "firmware/hearth-sink/CMakeLists.txt",
+    "firmware/hearth-sink/sdkconfig.*",
+    "firmware/esp-idf/iclforge/README.md",
+    "docs/hearth/*.md",
+    "docs/platforms/bare-metal/esp32-*.md",
+    "planning/esp32-*.md",
+    "apps/demos/wasm/tests/device-ui/payloads/README.md",
+)
+
+
+def known_stacks(data: dict[str, Any]) -> dict[str, str]:
+    """Every fragment list the tree may spell: the profiles', and the others listed with why."""
+    known = {defaults_string(data, ident): f"profile {ident}" for ident in data.get("profiles", {})}
+    known.update(data.get("other_stacks", {}))
+    return known
+
+
+def check_docs(
+    data: dict[str, Any], root: Path = REPO, files: list[Path] | None = None, write: bool = False
+) -> list[Finding]:
+    """Every `sdkconfig.defaults;sdkconfig.x;...` the docs and fragments spell is a profile's,
+    a CI shape's or listed in `other_stacks`; and a generated table is the file's own."""
+    known = known_stacks(data)
+    findings: list[Finding] = []
+    paths = files
+    if paths is None:
+        paths = sorted({path for pattern in DOC_FILES for path in root.glob(pattern)})
+    for path in paths:
+        try:
+            text = path.read_text("utf-8", "replace")
+        except OSError as error:
+            raise ProfileError(f"{path} cannot be read: {error}") from error
+        try:
+            where = path.relative_to(root).as_posix()
+        except ValueError:
+            where = path.as_posix()
+        for number, line in enumerate(text.splitlines(), 1):
+            for stack in STACK.findall(line):
+                if stack in known or "sdkconfig.ci" in stack:
+                    continue
+                findings.append(
+                    Finding(
+                        "docs",
+                        f"{where}:{number}: '{stack}' is no profile's fragment list, and "
+                        "profiles.json's other_stacks does not list it",
+                    )
+                )
+        begin = text.find(TABLE_BEGIN)
+        if begin == -1:
+            continue
+        end = text.find(TABLE_END, begin)
+        if end == -1:
+            findings.append(Finding("docs", f"{where}: {TABLE_BEGIN} has no {TABLE_END}"))
+            continue
+        inner = text[begin + len(TABLE_BEGIN) : end]
+        wanted = "\n\n" + table(data, []) + "\n"
+        if inner.replace("\r\n", "\n") != wanted:
+            if write:
+                path.write_text(
+                    text[: begin + len(TABLE_BEGIN)] + wanted + text[end:], "utf-8", newline="\n"
+                )
+            else:
+                findings.append(
+                    Finding(
+                        "docs",
+                        f"{where}: the profile table is not the file's: run "
+                        "`sink_profile.py check-docs --write`",
+                    )
+                )
+    return findings
+
+
 # --- command line ---------------------------------------------------------------------
 
 
-def _report(findings: list[Finding], ident: str, github: bool) -> None:
+def _report(findings: list[Finding], ident: str, github: bool, level: str = "error") -> None:
     for finding in findings:
         if github:
-            print(f"::error title=profile {ident}, {finding.rule}::{finding.message}")
+            print(f"::{level} title=profile {ident}, {finding.rule}::{finding.message}")
         else:
             print(f"{ident}: [{finding.rule}] {finding.message}")
 
@@ -391,6 +587,29 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--build-dir", type=Path, required=True)
     check.add_argument("--overlay", action="append", default=[])
     check.add_argument("--github", action="store_true", help="print GitHub annotations")
+    check.add_argument(
+        "--size-json", type=Path, help="`idf.py size --format json2` output, for the RAM budget"
+    )
+    check.add_argument(
+        "--warn-only",
+        action="store_true",
+        help="report findings as warnings and exit 0 (the repository's ESP32_PROFILE_GUARD=warn)",
+    )
+
+    expect = commands.add_parser(
+        "expect-console",
+        help="the console lines that say where a profile puts its rings and stacks",
+    )
+    expect.add_argument("profile")
+
+    who = commands.add_parser("identity", help="a profile's id and the hash of what it locks")
+    who.add_argument("profile")
+    who.add_argument("--cmake", action="store_true", help="as the -D options of a configure")
+
+    docs = commands.add_parser("check-docs", help="the fragment lists the docs spell")
+    docs.add_argument("--write", action="store_true", help="refresh a generated table")
+    docs.add_argument("--root", type=Path, default=REPO)
+    docs.add_argument("files", nargs="*", type=Path)
 
     snap = commands.add_parser("snapshot", help="the locked values a configured build resolved")
     snap.add_argument("profile")
@@ -413,11 +632,29 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "defaults":
             print(defaults_string(data, args.profile, tuple(args.overlay), args.wifi))
         elif args.command == "verify":
-            findings = verify(data, args.profile, args.build_dir, tuple(args.overlay))
-            _report(findings, args.profile, args.github)
+            findings = verify(
+                data, args.profile, args.build_dir, tuple(args.overlay), args.size_json
+            )
+            _report(findings, args.profile, args.github, "warning" if args.warn_only else "error")
+            if findings and not args.warn_only:
+                return 1
+            if not findings:
+                print(f"{args.profile}: the build holds to its profile")
+        elif args.command == "expect-console":
+            for line in expected_console(data, args.profile):
+                print(line)
+        elif args.command == "identity":
+            digest = profile_hash(data, args.profile)
+            if args.cmake:
+                print(f"-DICLFORGE_PROFILE={args.profile} -DICLFORGE_PROFILE_HASH={digest}")
+            else:
+                print(f"{args.profile} {digest}")
+        elif args.command == "check-docs":
+            findings = check_docs(data, args.root, args.files or None, args.write)
+            _report(findings, "docs", False)
             if findings:
                 return 1
-            print(f"{args.profile}: the build holds to its profile")
+            print("check-docs: every fragment list the tree spells is a profile's or a listed one")
         elif args.command == "snapshot":
             final = read_final(args.build_dir)
             asked = requested(data, args.profile)
