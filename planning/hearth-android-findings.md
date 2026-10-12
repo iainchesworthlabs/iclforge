@@ -476,3 +476,25 @@ that the key and what it signs stay off the public remote.
 | Atmos lock of a stream **this project signs** | Measured above: a stream signed with the owner's test key locks as Atmos |
 | HOME, standby and reboot (S3), beyond the display-sleep finding | Not run |
 | AC-4 over `ENCODING_IEC61937` | No AC-4 receiver; the route lists no AC-4 profile |
+
+## F13: what the build found since (2026-10-13)
+
+Read from the build's own runs and logs after phases 1 to 3 and D6 to D8; **Measured** unless a line
+says otherwise.
+
+| Finding | Evidence | Consequence |
+|---|---|---|
+| **A receiver in standby is no route at all.** With the Onkyo's power at `00` (standby, input 05, volume 0, mute off, Direct), the Shield's `isDirectPlaybackSupported` is `false` for both carriers the sink asks about (48,000 Hz AC-3 and 192,000 Hz E-AC-3), so the sink lists **no extension role**: a server sees `player@v1 metadata@v1` and no `_iclforge_player@v1`. A test server sent to it cannot play (the run exits non-zero), and the sink's screen is S0, "Waiting for the receiver" | `PassthroughBridge`'s log lines on 2026-10-13, and the server's report of the paired roles | The first thing to check before a Shield run is the receiver's power, read over eISCP with a query. A sink on a TV that is switched off is, correctly, a sink with nothing to offer; the S0 sentence is the right one |
+| **A test server's second pairing, with a new identity but the same client id, got no code in 90 s.** Run 1 paired in 3.7 s; run 2, with a fresh state directory and the same label, was closed ("client gone") after 5 s and then saw no code. Not explained: the same client id (`7wQR23d_`) showed in both runs, and the sink logged "displaced by another server" for the older connection | The `hearth-testserver` logs and the sink's `HearthSink` lines | A leftover to root-cause (the plan's list on [the phase 4 and 5 page](hearth-android-phases-4-5.md#the-small-leftovers-before-phase-4)); for runs now, use a distinct label for each identity |
+| **The late bursts at a stream age of about 9.2 s** ([README](../apps/hearth/android/README.md#a-run-on-a-shield-and-a-receiver-phase-1e)) were looked for in 2026-10-13's runs and **not seen**, because none of them reached a stream (above) | The same | Still open; it needs the receiver on |
+| **The idle screen's QR decodes with an independent decoder.** Sixteen payloads, versions 1 to 6, 16 of 16 read by OpenCV 5.0.0's `QRCodeDetector`; the token's code (version 4) reads at 1, 0.5 and 0.35 of the drawn size. One version 1 symbol is located by the detector only at some renderings | The QR PR's checker script and its `QrCodeTest` (both in #1480) | The encoder is in the app and is held by a pinned matrix; a phone's own scanner and a server that asks for the QR form are not tested ([#1480](https://github.com/iainchesworthlabs/iclforge/pull/1480)) |
+| **Hearth's own server always asks for digits** (`CodeFormat::kDigits`, `network_sinks.cpp`); the QR form is for other servers | Read | The QR is the way a phone's scanner pairs with a server that is not Hearth's; with Hearth the person types six digits |
+
+### What the build settled that the plan left open
+
+| Question | Answer | Where |
+|---|---|---|
+| D6's wire form | An optional `output` key in the extension role's state, `passthrough` or `pcm`, **written last**; a name the reader does not know is read as absent, a non-string is malformed | `libs/sendspin` `State::output`, #1464 |
+| D7's source | The engine feeds `metadata@v1` to a group's members; the sink prefers it and falls back to the document's tags | #1468, #1469 |
+| D8's wire form | A `client/command` carrying an `_iclforge_player` object `{"command":"decoder","decoder":{...}}`; **advice, with no reply**; the server cuts it to the keys the sink lists under `requests`; the host applies it for the group being played to, last request winning | #1471, #1473 |
+| Which vocals request | "Both" asks `aware`; V1, V2 and None ask `capable` with the vocals (the owner, 2026-10-13) | the phase 4 and 5 page |
