@@ -1796,19 +1796,24 @@ left out):
 | `ac4-stereo-64` (A-SPX) | 23.44 | 0.57 to 0.58 | 0.85 to 0.91 | 6 to 27 | 0 | 87 KB |
 | `ac4-20-music-192` (SIMPLE) | 23.44 | 0.48 | 0.88 | 4 | 0 | 89 KB |
 | `ac4-20-speech-128` | 23.44 | 0.59 | 0.88 | 8 | 0 | 87 KB |
-| `ac4-ims-film-96-24` | 24 | 0.80 | 11.6 (0.49 s, the first frame) | 12 to 13 | 0 to 2 | 86 KB |
-| `ac4-ims-music-128-25` | 25 | 0.77 to 0.78 | 1.13 | 3 to 4 | 0 | 87 KB |
-| `ac4-ims-music-64-2997` | 29.97 | 0.99 | 9.6 (0.41 s, the first frame) | 12 to 13 | 0 and 39 | 85 KB |
+| `ac4-ims-film-96-24` | 24 | 0.74 | 1.2 | 7 | 0 | 83 KB |
+| `ac4-ims-music-128-25` | 25 | 0.76 | 1.3 | 4 | 0 | 83 KB |
+| `ac4-ims-music-64-2997` | 29.97 | 0.97 (0.99 with the first frame in it) | 1.7 (the first frame) | 3 | 0 and 39 | 85 KB |
 | `ac4-51-music-128` | 23.44 | refused: more than 2 channels | | | | |
 
-The first frame of a stream that goes through the converter (every rate but 23.44) takes 0.4 to
-0.5 s once, so a play opens with 12 or 13 chunks dropped as late. A frame at 24, 25 or 29.97 costs
-31 to 33 ms whatever the rate, which is why the limit is a rate and not a codec tool: 25 a second
-leaves 0.78 and 29.97 leaves 0.99, with no room for the Wi-Fi traffic, and the play that took 39
-underruns went on to a second that took none. E-AC-3 on the same image is unchanged (5.1 at 0.37,
-7.1.4 at 0.72, 0 under), with its internal RAM at its least 0.2 and 1.1 KB as `sdkconfig.s3-dcache`
-says: the decoder places an AC-4 play's allocations of 512 bytes and over in PSRAM, which is why
-the AC-4 plays have the most internal RAM.
+The first frame of a stream whose frames are 1,920, 1,536, 960, 768 or 384 samples (24, 29.97 and
+30 fps and the high frame rates, frame rate indices 0, 1, 3, 4, 5, 6, 8, 9, 11 and 12) took 0.41 to
+0.49 s, so a play opened with 12 or 13 chunks dropped as late. It was not the converter (6.7 to
+11 ms): the inverse transform's tables for those lengths were built when the frame arrived, in
+software double, and the built-in tables stopped at the lengths of a 2,048-sample frame
+(`ac4_reconstruct`'s own time in the first frame 468 and 384 ms against 20 and 21). Every length of
+Table 186 is built in now (89 KB more), and the first frame of 24 and 29.97 takes 47 and 54 ms.
+A frame at 24, 25 or 29.97 costs 30 to 33 ms whatever the rate, which is why the limit is a rate
+and not a codec tool: 25 a second leaves 0.76 and 29.97 leaves 0.97, with no room for the Wi-Fi
+traffic, and the play that took 39 underruns went on to a second that took none. E-AC-3 on the same
+image is unchanged (5.1 at 0.37, 7.1.4 at 0.72, 0 under), with its internal RAM at its least 0.2 and
+1.1 KB as `sdkconfig.s3-dcache` says: the decoder places an AC-4 play's allocations of 512 bytes and
+over in PSRAM, which is why the AC-4 plays have the most internal RAM.
 
 ## What the port required from the library
 
