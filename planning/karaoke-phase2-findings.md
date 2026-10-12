@@ -390,15 +390,18 @@ delay-corrected position, which is a change to the GUI's player and not to the t
   opens Hearth empty. This was read from the code and not run on an installed build. It is a
   defect of its own whichever option is chosen, and the argument B needs is the same fix.
 
-**Update, 2026-10-12: the file argument is built, the second instance is not.** Reproduced on a
+**Update, 2026-10-12: the file argument and the second-instance hand-over are built.** Reproduced on a
 build before it was fixed: `hearth --smoke-shot out.png --page karaoke song.ac3` showed "Nothing is
 playing" and exited 0, so the file was dropped without a word. A bare argument (and each argument
 after `--`) is now a file, so `hearth <file>`, the installer's `hearth.exe "%1"` and the Linux
 launcher's `hearth %F` queue it behind the saved queue and play it, and `--page karaoke` goes with
 it ([Hearth's command line](../docs/hearth/index.md#command-line)). That is B's first condition.
-The second is still open and matters more now that a launch plays: nothing hands the file to a
-Hearth that is already running, so a second launch starts a second engine, and the two play over each
-other. It is the owner's call (forward to the running one and raise it, refuse, or leave it).
+The second, a second Hearth must not start beside a running one, mattered more once a launch
+played (two engines play over each other). The owner chose to hand the file to the running Hearth
+and play it: a second launch with files gives them, and its `--page`, to the one that is running
+over a per-account local socket, which queues them, plays the first, comes forward and switches
+page, and the second process ends. So B's button can start `hearth --page karaoke <file>` whether or
+not Hearth is already open.
 
 ### Recommendation
 
