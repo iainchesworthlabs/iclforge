@@ -22,10 +22,12 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_network_view.cpp
     test_output_decision.cpp
     test_output_selector.cpp
+    test_performance.cpp
     test_play_meters.cpp
     test_player.cpp
     test_player_bitstream.cpp
     test_queue.cpp
+    test_reference_melody.cpp
     test_session.cpp
     test_settings_model.cpp
     test_sink_form.cpp
