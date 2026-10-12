@@ -1105,7 +1105,8 @@ struct BurstPlayer::Impl {
             if (!ac4->open({.fold = serving.fold,
                             .executor = lane.has_value() ? &*lane : nullptr,
                             .max_channels = config.max_ac4_channels,
-                            .sample_rate_hz = config.sample_rate})) {
+                            .sample_rate_hz = config.sample_rate,
+                            .max_frame_rate = config.max_ac4_frame_rate})) {
                 ac4_failed = true;
                 std::printf("burst player: cannot decode this AC-4 stream: %.*s\n",
                             static_cast<int>(ac4->reason().size()), ac4->reason().data());

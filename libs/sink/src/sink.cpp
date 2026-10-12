@@ -658,6 +658,9 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         if (options_.max_objects) {
             support.max_objects.fill(options_.max_objects);
         }
+        if (options_.max_frame_rate != 0) {
+            support.max_frame_rate.fill(options_.max_frame_rate);
+        }
         support.lyrics_max_bytes = options_.lyrics_max_bytes;
         config.iclforge_support = std::move(support);
         // What the sink's streams are rendered to, as its own page would say.

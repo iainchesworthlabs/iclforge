@@ -401,6 +401,51 @@ TEST_CASE("iclforge_player: the object limit a sink states per data type", "[sen
     CHECK_FALSE(with_limits("null"));
 }
 
+TEST_CASE("iclforge_player: the frame rate a sink states per data type", "[sendspin][iclforge]") {
+    // Written only when some type has one, so a sink that states none writes what it always did.
+    ac::Support support = board_support();
+    CHECK(written(support, ac::write_support).find("max_frame_rate") == std::string::npos);
+
+    support.max_frame_rate[static_cast<std::size_t>(ac::DataType::kAc4)] = 25;
+    const std::string text = written(support, ac::write_support);
+    CHECK(text.ends_with(R"("buffer_capacity":1048576,"max_frame_rate":{"ac4":25}})"));
+    const std::optional<ac::Support> read = ac::read_support(Parsed(text).root());
+    REQUIRE(read.has_value());
+    CHECK(read->max_frame_rate_of(ac::DataType::kAc4) == 25);
+    // A type the object does not name states none: 0, which a server reads as no limit.
+    CHECK(read->max_frame_rate_of(ac::DataType::kAc3) == 0);
+    CHECK(read->max_frame_rate_of(ac::DataType::kEac3) == 0);
+
+    // A sink from before the key sends none, and every type reads as stating none.
+    const std::optional<ac::Support> before =
+        ac::read_support(Parsed(written(board_support(), ac::write_support)).root());
+    REQUIRE(before.has_value());
+    for (const ac::DataType type : {ac::DataType::kAc3, ac::DataType::kEac3, ac::DataType::kAc4}) {
+        CHECK(before->max_frame_rate_of(type) == 0);
+    }
+
+    const auto with_limits = [&](const std::string& value) {
+        std::string source = written(board_support(), ac::write_support);
+        source.pop_back();  // the closing brace
+        return ac::read_support(Parsed(source + R"(,"max_frame_rate":)" + value + "}").root());
+    };
+    // A name this reader does not know is skipped, as an unknown key is.
+    const std::optional<ac::Support> future = with_limits(R"({"ac4":30,"dts":60})");
+    REQUIRE(future.has_value());
+    CHECK(future->max_frame_rate_of(ac::DataType::kAc4) == 30);
+    CHECK(with_limits("{}").has_value());
+    CHECK(with_limits(R"({"ac4":1000})").has_value());
+    // A rate that is not a rate, or a limit that is not an object, is refused with the object.
+    CHECK_FALSE(with_limits(R"({"ac4":0})"));
+    CHECK_FALSE(with_limits(R"({"ac4":1001})"));
+    CHECK_FALSE(with_limits(R"({"ac4":-25})"));
+    CHECK_FALSE(with_limits(R"({"ac4":29.97})"));
+    CHECK_FALSE(with_limits(R"({"ac4":"25"})"));
+    CHECK_FALSE(with_limits("25"));
+    CHECK_FALSE(with_limits("[25]"));
+    CHECK_FALSE(with_limits("null"));
+}
+
 TEST_CASE("iclforge_player: the layout a sink states", "[sendspin][iclforge]") {
     ac::State state;
     state.supported_commands = {ac::Command::kVolume};

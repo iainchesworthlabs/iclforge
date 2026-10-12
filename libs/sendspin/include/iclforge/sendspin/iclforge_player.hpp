@@ -131,6 +131,17 @@ struct Support {
     [[nodiscard]] std::optional<std::uint8_t> max_objects_of(DataType type) const {
         return max_objects[static_cast<std::size_t>(type)];
     }
+    // Per data type, the most frames (access units, one a burst chunk) a second the sink decodes
+    // of a stream of that type in real time, indexed by DataType; 0 when it states none, which a
+    // server reads as "no limit stated". A stream whose frames come faster is sent another way, as
+    // for max_coded_channels: an ESP32-S3 keeps up with AC-4 at 25 frames a second and falls behind
+    // at 29.97, where a frame's decode, the frame-rate converter's, takes the same time. A frame
+    // rate is compared as it is, so a limit of 30 takes 29.97 and 30 and one of 25 takes 24 and 25.
+    std::array<std::uint16_t, 3> max_frame_rate{};
+
+    [[nodiscard]] std::uint16_t max_frame_rate_of(DataType type) const {
+        return max_frame_rate[static_cast<std::size_t>(type)];
+    }
     // The most bytes of lyric document (an LRC text, UTF-8) the sink holds for the item playing,
     // 1 to kMaxLyricsBytes; 0 when it does not say, which is a sink that takes no lyrics. A sink
     // that states one lists the `lyrics` and `lyrics_position` commands too.

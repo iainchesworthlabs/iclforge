@@ -146,6 +146,70 @@ TEST_CASE("sink form: a channel limit the sink states sends a wider stream as PC
     }
 }
 
+TEST_CASE("sink form: a frame rate limit the sink states sends a faster stream as PCM",
+          "[hearth][sink_form]") {
+    // The S3's build with AC-4: 2 channels, and 25 frames a second.
+    SinkFacts s3 = hearth_sink({sp::DataType::kAc3, sp::DataType::kEac3, sp::DataType::kAc4});
+    limit(s3, sp::DataType::kAc4, 2);
+    s3.iclforge_support->max_frame_rate[static_cast<std::size_t>(sp::DataType::kAc4)] = 25;
+    configured(s3, "2.0");
+    const auto ac4_at = [](double frames_per_second) {
+        return StreamNeeds{.stream = BitstreamFormat::kAc4,
+                           .sample_rate = k48k,
+                           .coded_channels = 2,
+                           .frame_rate = frames_per_second};
+    };
+
+    SECTION("a stream at or under the limit is sent as it is") {
+        CHECK(choose_sink_form(ac4_at(48000.0 / 2048.0), s3).form == SinkForm::kCoded);
+        CHECK(choose_sink_form(ac4_at(24000.0 / 1001.0), s3).form == SinkForm::kCoded);
+        CHECK(choose_sink_form(ac4_at(24.0), s3).form == SinkForm::kCoded);
+        CHECK(choose_sink_form(ac4_at(25.0), s3).form == SinkForm::kCoded);
+        // A rate read from sample counts is a few parts in a thousand off a round 25.
+        CHECK(choose_sink_form(ac4_at(25.02), s3).form == SinkForm::kCoded);
+    }
+    SECTION("29.97 and over are decoded here and sent as PCM at the sink's layout") {
+        for (const double rate : {30000.0 / 1001.0, 30.0, 50.0, 59.94, 120.0}) {
+            const auto choice = choose_sink_form(ac4_at(rate), s3);
+            REQUIRE(choice.form == SinkForm::kPcm);
+            REQUIRE(choice.layout.has_value());
+            CHECK(choice.layout->slots() == 2);
+            CHECK(mentions(choice.reason, "up to 25 frames a second"));
+            CHECK(mentions(choice.reason, "PCM"));
+        }
+        const auto choice = choose_sink_form(ac4_at(30000.0 / 1001.0), s3);
+        CHECK(mentions(choice.reason, "has 29.97"));
+        CHECK(mentions(choose_sink_form(ac4_at(30.0), s3).reason, "has 30"));
+    }
+    SECTION("with the fallback off it is sent nothing, and the reason says both why") {
+        const auto choice = choose_sink_form(ac4_at(29.97), s3, {.pcm_fallback = false});
+        CHECK(choice.form == SinkForm::kNone);
+        CHECK(mentions(choice.reason, "up to 25 frames a second"));
+        CHECK(mentions(choice.reason, "switched off"));
+    }
+    SECTION("a rate that is not known is not compared with the limit") {
+        CHECK(choose_sink_form(ac4_at(0.0), s3).form == SinkForm::kCoded);
+    }
+    SECTION("a limit stated for AC-4 is not one for E-AC-3, and a sink that states none has none") {
+        const StreamNeeds eac3{.stream = BitstreamFormat::kEac3,
+                               .sample_rate = k48k,
+                               .coded_channels = 2,
+                               .frame_rate = 187.5};
+        CHECK(choose_sink_form(eac3, s3).form == SinkForm::kCoded);
+        SinkFacts none = hearth_sink({sp::DataType::kAc4});
+        CHECK(choose_sink_form(ac4_at(120.0), none).form == SinkForm::kCoded);
+    }
+    SECTION("the channel limit still applies to a stream whose rate is within the limit") {
+        const StreamNeeds wide{.stream = BitstreamFormat::kAc4,
+                               .sample_rate = k48k,
+                               .coded_channels = 6,
+                               .frame_rate = 23.44};
+        const auto choice = choose_sink_form(wide, s3);
+        CHECK(choice.form == SinkForm::kPcm);
+        CHECK(mentions(choice.reason, "up to 2 channels"));
+    }
+}
+
 TEST_CASE("sink form: a sink that states no limit is not taken to have none of a stream",
           "[hearth][sink_form]") {
     // 0 is "not stated", and a stream is sent: the sink refuses it itself if it must.

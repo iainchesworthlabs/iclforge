@@ -268,16 +268,38 @@ class TheFile(unittest.TestCase):
         self.assertFalse(sp.is_free(data, "CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"))
 
     def test_every_profile_locks_the_sendspin_ac4_listing_keys(self) -> None:
-        """#1446's two keys are declared with no dependency, so they are in every profile's
-        configuration and match the watch pattern: a profile that does not lock them is reported
-        [unplaced] by the first build after main is merged in."""
+        """#1446's two keys and the frame rate one are declared with no dependency, so they are
+        in every profile's configuration and match the watch pattern: a profile that does not
+        lock them is reported [unplaced] by the first build after main is merged in."""
         for ident, spec in self.data["profiles"].items():
             locked = spec["locked"]
             self.assertIn("CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4", locked, ident)
             self.assertIn("CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS", locked, ident)
+            self.assertIn("CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE", locked, ident)
             self.assertTrue(
                 sp.is_watched(self.data, "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4"), "the pattern"
             )
+
+    def test_the_boards_that_list_ac4_state_what_keeps_up(self) -> None:
+        """An S3 with the decoder and the data cache lists AC-4 at 2 channels and 25 frames a
+        second (an S3 over Sendspin falls behind at 29.97), a P4 with the decoder at 6 channels
+        and no rate limit; no other profile lists it."""
+        listed = {
+            "s3-n16r8-ac4": ("1", "2", "25"),
+            "p4-rev1-ac4": ("1", "6", "0"),
+        }
+        for ident, spec in self.data["profiles"].items():
+            locked = spec["locked"]
+            got = (
+                locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4"],
+                locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS"],
+                locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE"],
+            )
+            if ident in listed:
+                self.assertEqual(got, listed[ident], ident)
+            else:
+                self.assertEqual(got[0], "0", ident)
+                self.assertEqual(got[2], "0", ident)
 
     def test_the_ac4_profiles_lock_the_burst_player_s_40_kb_decode_stack(self) -> None:
         for ident in ("s3-n16r8-ac4", "p4-rev1-ac4"):

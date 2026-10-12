@@ -1489,6 +1489,7 @@ Player::OpenFailure Player::open_chosen(std::size_t item, PumpReport* report) {
                                                       .coded_channels = facts.channels,
                                                       .objects = facts.objects,
                                                       .objects_alone = facts.objects_alone,
+                                                      .frame_rate = facts.frame_rate,
                                                       .karaoke = karaoke_choice(facts, settings_)});
     } else {
         opened = sink_->open(
