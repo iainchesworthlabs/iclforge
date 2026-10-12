@@ -42,6 +42,22 @@ The sections below contain the complete change list and fixes.
   also holds a deterministic synthetic singing voice with a known pitch, which is what its tests and
   the later microphone tests are made of (no recording is bundled). Standard library only, internal,
   and nothing links it yet.
+**Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
+
+- **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
+  field (`bsmod` 7 above 1/0 in Table E1.2 by reference to Table 5.7; a service-type value in
+  Annex G and EN 300 468) and defines no reproduction; Dolby's reference decoder reproduces it with
+  Annex C's coefficients, taking `clev` and `slev` from the Lo/Ro mixing group. AC-4 has no karaoke
+  value at all. `planning/karaoke-eac3-findings.md` gives the clauses and the commands, and the
+  corrections to what the repository said (`planning/karaoke-eac3.md`, E0).
+- **A support matrix, AC-3 beside E-AC-3.** Every karaoke capability by platform and feature, each
+  cell with its test or command and its owner, and two AC-3 gaps found by measuring: `forge
+  transcode` drops `bsmod`, and the LFE's level in the reproduction differs from Dolby's
+  (`planning/karaoke-support-matrix.md`).
+- **The AC-4 options.** Presentations, a dialogue substream with the listener's gain, and a vocal
+  object, side by side with what each does on a stock decoder, how it is authored from stems and
+  carried to a sink, measured with the repository's own decoder (`planning/karaoke-ac4-options.md`).
+
 **Hearth for Android: the plan**
 
 - **A plan, its findings and one screen design for Hearth's three surfaces.** `planning/hearth-android.md`
@@ -78,6 +94,27 @@ The sections below contain the complete change list and fixes.
   same lossless rewrite `strip_objects` does, so the bed is bit-identical and the result plays in
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
+
+**Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
+
+- **`iclforge/base/karaoke.hpp`.** `KaraokeReproduction` (off, aware, capable), `KaraokeVocals`
+  (none, V1, V2, both), the part levels' -24 to +12 dB span and `karaoke_gain_from_db` move from
+  `iclforge/ac3/decoder/output.hpp` into `iclforge::base`, header-only, so that the E-AC-3
+  decoder, the wire's converters and a later AC-4 mapping name the same types. `iclforge::ac3`
+  re-exports every name, so no caller changes and no symbol is exported or removed
+  (`planning/karaoke-eac3.md`, E1, D5).
+- **`Eac3Decoder` reproduces Annex C's karaoke when `OutputConfig::karaoke` asks.** A programme
+  that is one independent substream with `bsmod` 7 above 1/0, no dependent substream and no object
+  layer comes back as L, C, R and the LFE (aware), or with the listener's vocals and levels
+  (capable), through the same output stage as AC-3, in the access-unit, block and flush paths.
+  A/52 gives E-AC-3 the signalling and no reproduction; Dolby's decoder reproduces Annex C's, and
+  the tests hold the same ratios (V1 into L and V2 into R at the Lo/Ro surround level, the melody
+  at the centre at L's gain), the levels coming from `mixmdate`'s `lorocmixlev` and
+  `lorosurmixlev` and being -3 dB when it is absent. A programme with a dependent substream is
+  decoded as coded. `DecodedAccessUnit::layout` still names the coded bed and `channels` holds the
+  reproduction; `ac3::output_mode()` says what it is. The CLI, Hearth, the GUI, the WebAssembly
+  glue and the firmware read it in the pull requests that follow
+  (`planning/karaoke-eac3.md`, E2, D1 to D3).
 
 **E-AC-3: an associated service mixed into the main**
 
