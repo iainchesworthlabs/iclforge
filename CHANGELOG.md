@@ -4162,6 +4162,23 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**WebAssembly demo: the lyrics test**
+
+- **The browser demo's "follows a lyrics file" test failed against the example it loads, and had
+  from the day it was added.** It asked the seek bar for 8.5 / 16.0 of its thousand steps, but
+  `auld-lang-syne.ac3` is 516 frames, 16.512 s, and the bar takes whole steps: 531 is 8.77 s, which
+  the 600 ms delay shows in the third line's first word, not the second line's last, "mind?". The
+  case also expected the first line at the end, after the page had been left at the second.
+  The test now reads the stream's length from the page and asks for 8.55 s, the middle of the
+  100 ms in which the second word of the third line and, less the delay, the second line's last
+  word are both being sung. The third line has the first's words, so what tells them apart is
+  checked as well: the second line before it and the fourth after it. After a file in a code page
+  is refused (named, with the reader's reason), a seek proves the words already on the page are
+  still the ones followed: a page that dropped them would go on showing the last lines it drew.
+  The page and the module are unchanged. Run against a build of the module in headless Chromium,
+  the five cases of `decode.spec.js` pass; a page that drops its document on a refused file fails
+  the new seek check.
+
 **Lyrics on a board**
 
 - **The P4 panel's footer counted a line that only marks a time.** A lyric file that ends with a
