@@ -68,15 +68,17 @@ constexpr std::uint64_t kBurstFrames = 1536;
 // An AC-4 chunk is one frame, which lasts what its frame rate says: 2,048 samples at frame rate 13
 // and 48 kHz, until the first decoded frame says.
 constexpr std::uint64_t kAc4FrameFrames = 2048;
-// A late AC-4 chunk is decoded and its output thrown away, rather than dropped, when the decoder
-// would be caught up with the stream again within this long: the longest the audio lost by it may
-// be (planning/ac4.md, I6). Past it the chunk is dropped and the decoder waits for an I-frame, as
-// every late chunk was, which a stream whose I-frames are a second or two apart takes about as long
-// to deliver.
-constexpr std::int64_t kMaxLateDecodeUs = 1'000'000;
-// What a frame costs of its duration before any has been timed: the P4's 0.2 to 0.7 and the S3's
-// 0.5 to 0.8 (docs/platforms/bare-metal/esp32-p4.md and esp32-s3.md, AC-4 from a server).
-constexpr double kAc4PriorRatio = 0.75;
+// What waiting for an I-frame costs a stream whose decoder has lost its state: the average of the
+// time to the next one, taken as half of a second (DEE's streams and the encoder's default have
+// one every 24 frames, 1 s; broadcast and streaming content a second or two). A late AC-4 chunk is
+// decoded and its output thrown away, rather than dropped, when that loses less than dropping it
+// and waiting would (late_ac4_is_kept()).
+constexpr std::int64_t kExpectedIFrameWaitUs = 500'000;
+// What a frame costs of its duration before any has been timed, for each stream: between the P4's
+// 0.2 to 0.7 and the S3's 0.5 to 0.8 (docs/platforms/bare-metal/esp32-p4.md and esp32-s3.md, AC-4
+// from a server), where the first chunks of a play, which are the ones that are late, are
+// weighed. Not kept from the stream before, whose frames may have cost another share.
+constexpr double kAc4PriorRatio = 0.6;
 // The ratio above which a decoder does not catch up with a stream in any time worth waiting for.
 constexpr double kAc4CatchUpRatioLimit = 0.95;
 // Ring bytes a chunk may not take, so a stream start, clear or end always
@@ -234,9 +236,10 @@ struct BurstPlayer::Impl {
     // The samples the last decoded AC-4 frame lasted, for the late check.
     std::uint64_t ac4_frame_samples = 0;
     // What the decode and render of an AC-4 frame has cost of the frame's own duration, smoothed
-    // over the chunks timed, and kept from one stream to the next: what a late chunk is weighed
-    // with (play_burst).
+    // over the chunks timed of this stream (the first, which makes the decoder's tables and
+    // buffers, is not): what a late chunk is weighed with (play_burst).
     double ac4_decode_ratio = kAc4PriorRatio;
+    std::uint32_t ac4_cost_samples = 0;
     // Late AC-4 chunks decoded for their state and not played.
     std::uint64_t late_kept_chunks = 0;
     // The stream's frames that were never handed to the sink: where the timeline is anchored again
@@ -245,7 +248,10 @@ struct BurstPlayer::Impl {
     // What a stall costs the listener, which `late` and the playout's silence do not say: the
     // playout pads a gap only where it had pushed nothing.
     std::uint64_t lost_frames = 0;
-    std::uint64_t pushed_end_frame = 0;
+    // The stream frame up to which every frame is accounted for: pushed, or counted lost. A decoder
+    // that waits for an I-frame anchors the timeline again at every chunk it waits through, so
+    // what an anchor adds is the distance from here, once.
+    std::uint64_t accounted_frame = 0;
     std::array<std::int16_t, OpusStream::kMaxFrames * 2> opus_pcm{};
     std::optional<iclforge::ac3::FrameDecoder> ac3_decoder;
     // The decode lane (BurstPlayerConfig::decode_lane): started by the task, given back by it.
@@ -623,7 +629,9 @@ struct BurstPlayer::Impl {
         late_chunks = 0;
         late_kept_chunks = 0;
         lost_frames = 0;
-        pushed_end_frame = 0;
+        accounted_frame = 0;
+        ac4_decode_ratio = kAc4PriorRatio;
+        ac4_cost_samples = 0;
         dropped_chunks.store(0);
         invalid_chunks.store(0);
         channels_refused_warned = false;
@@ -873,7 +881,7 @@ struct BurstPlayer::Impl {
 
         const std::uint64_t first = decoded_frame;
         decoded_frame += n;
-        pushed_end_frame = decoded_frame;
+        accounted_frame = std::max(accounted_frame, decoded_frame);
         std::optional<std::int64_t> target = target_of(first);
         if (!target) {
             return;  // frames from before any burst this decode knows of
@@ -1214,6 +1222,9 @@ struct BurstPlayer::Impl {
 
     // `us` of decode and render for one AC-4 frame, folded into what a frame costs of its duration.
     void note_ac4_cost(std::uint64_t us) {
+        if (ac4_cost_samples++ == 0) {
+            return;
+        }
         const std::uint64_t frames = ac4_frame_samples != 0 ? ac4_frame_samples : kAc4FrameFrames;
         const double frame_us =
             static_cast<double>(frames) * 1e6 / static_cast<double>(config.sample_rate);
@@ -1222,10 +1233,13 @@ struct BurstPlayer::Impl {
 
     // Whether a chunk `late_us` past the sink's next play time is worth decoding for the state it
     // leaves the decoder in. Each chunk decoded takes a fraction `r` of the time the next one's
-    // audio lasts, so the lateness falls by 1 - r of a frame with each, and the audio lost is the
-    // lateness over 1 - r. A stream whose decoder could not be made or has had a frame refused has
-    // no state to keep; one not yet open is made for the chunk, as a first chunk that is late is
-    // the stream's I-frame and the one most worth keeping.
+    // audio lasts, so the lateness falls by 1 - r of a frame with each, and the audio lost by
+    // decoding through it is the lateness over 1 - r. Dropping the chunk loses the lateness itself
+    // and then everything up to the next I-frame, which averages kExpectedIFrameWaitUs. Keeping
+    // is the better when late / (1 - r) <= late + wait, that is when late * r <= (1 - r) * wait.
+    // A stream whose decoder could not be made or has had a frame refused has no state to keep;
+    // one not yet open is made for the chunk, as a first chunk that is late is the stream's
+    // I-frame and the one most worth keeping.
     [[nodiscard]] bool late_ac4_is_kept(std::int64_t late_us, std::int64_t frame_us) const {
         if (!ac4 || ac4_failed || frame_us <= 0) {
             return false;
@@ -1233,8 +1247,8 @@ struct BurstPlayer::Impl {
         if (ac4_decode_ratio >= kAc4CatchUpRatioLimit) {
             return false;
         }
-        const double lost_us = static_cast<double>(late_us) / (1.0 - ac4_decode_ratio);
-        return lost_us <= static_cast<double>(kMaxLateDecodeUs);
+        return static_cast<double>(late_us) * ac4_decode_ratio <=
+               (1.0 - ac4_decode_ratio) * static_cast<double>(kExpectedIFrameWaitUs);
     }
 
     static void ac4_discard_block(void* /*self*/, const Ac4Stream::Block& /*block*/) {}
@@ -1312,8 +1326,9 @@ struct BurstPlayer::Impl {
         if (!decoded_frame_set) {
             decoded_frame_set = true;
             decoded_frame = frame;
-            if (frame > pushed_end_frame) {
-                lost_frames += frame - pushed_end_frame;
+            if (frame > accounted_frame) {
+                lost_frames += frame - accounted_frame;
+                accounted_frame = frame;
             }
         }
         mark(frame, local_us);
