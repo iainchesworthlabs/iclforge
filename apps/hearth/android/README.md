@@ -91,6 +91,21 @@ open that undoes it, the native status as the JNI writes it (read by the parser)
 1080p and probed (the code is the accent, the sentence is a banner over a dimmed lyric, Quit has the ring
 and the centre presses it).
 
+**The pairing code as a QR (S1).** A server that asks to pair by a dynamic code may ask for its QR
+form, the `SP:1` token; the idle screen then draws a QR at the right, large, on a light card (a scanner
+wants dark on light, and the card's margin is the standard's four-module quiet zone), with the token
+under it for a person who would type it. The encoder is `QrCode.kt`: byte mode, error correction
+level M, versions 1 to 6 (up to 106 bytes; the token is 43, version 4), no dependency, and a token too
+long for it is shown as text and not as a wrong code. It is held by structure tests on the Shield (the
+finder and timing patterns, the dark module, a format word that is a valid BCH codeword for level M, the
+size of each version and the limit) and by an independent decoder: `tools/hearth/check_qr_matrices.py`
+decodes the matrices `QrCodeTest` writes with OpenCV (16 of 16 payloads, versions 1 to 6, UTF-8
+included), the token's matrix is pinned after that, and the whole 1080p idle-screen picture decodes to
+the token at full size and at half and 0.35 scale (a phone camera's view of a TV). **Not tested:** a
+phone's own scanner app and a real server's pairing flow with the QR form of the code.
+
+![The idle screen with the pairing code as a QR: the name and address at the left, the code on a light card at the right and the token under it](../../../docs/hearth/screenshots/android-idle-qr.png)
+
 ## The lyric screen (phase 2)
 
 When a document is held or a stream is playing, the app's one screen is the lyric view

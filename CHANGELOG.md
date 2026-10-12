@@ -3552,6 +3552,16 @@ The sections below contain the complete change list and fixes.
   pressed, the eight seconds, a file with no times having no delay row, a tap), which is AR7's "a focus
   walk", and draws it with the ring on the focused control (`android-lyric-sheet.png`).
 
+**Hearth for Android shows the pairing code as a QR**
+
+- **A server that asks for the QR form of its dynamic pairing code is shown a QR on the idle screen.**
+  The `SP:1` token was drawn as one cut-off line; it is now a code at the right of the screen on a
+  light card with the token under it, and the words say to scan it or type the token. The encoder is a
+  small one in the app (byte mode, level M, versions 1 to 6, no dependency), and a token it cannot hold
+  is shown as text and not as a wrong code. Checked by decoding with OpenCV: 16 of 16 payloads, and the
+  whole idle-screen picture at full size and at half and 0.35 scale. `tools/hearth/check_qr_matrices.py`
+  is the check.
+
 **Hearth for Android: the sink screen's tokens in one file**
 
 - **`docs/hearth/design/sink-screen-tokens.json`** (phase 3a of `planning/hearth-android.md`, D13): the

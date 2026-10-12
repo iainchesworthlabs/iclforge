@@ -11,6 +11,8 @@
     <string name="listening_unadvertised">Listening on port %1$d (not advertised yet)</string>
     <string name="waiting">Waiting for Hearth. Choose this sink there, and its pairing code appears here.</string>
     <string name="enter_code">Enter this code in Hearth</string>
+    <!-- The server asked for the QR form of its code (the SP:1 token), drawn at the right. -->
+    <string name="scan_code">Scan this code to pair, or type the token under it.</string>
     <string name="activity">%1$d connection(s) · %2$d stream(s) · %3$d chunk(s) · %4$d burst(s)</string>
     <!-- The lyric screen (planning/hearth-sink-screen.md, S2 to S8). -->
     <string name="no_lyrics">No lyrics for this item</string>
