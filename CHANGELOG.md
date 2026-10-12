@@ -29,6 +29,21 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: the documentation says what the decoder does**
+
+- **The user guide, Hearth's page and the plan stop saying "E-AC-3 has no karaoke mode, this is
+  AC-3 only".** The Karaoke guide has an "E-AC-3 and AC-4" section: E-AC-3 carries the service
+  type and is reproduced by analogy with Annex C, as Dolby's decoder does, for a programme of one
+  independent substream with no object layer, at the stream's Lo/Ro mixing group; AC-4 has no
+  karaoke mode. It gives the `forge eac3-encode` and `forge decode` lines (run, not written from
+  memory), says which Hearth sinks reproduce an E-AC-3 stream themselves, and says what
+  is not known (a TV or a receiver). "How it is checked" names Dolby's decoder and
+  `tools/checks/verify_karaoke_oracle.py`, and not "no outside decoder".
+- **The support catalogue has an E-AC-3 karaoke row**, so the generated application-capabilities
+  table lists it, and the karaoke support matrix, the programme plan, the findings' correction
+  list, the phase 1 plan and the ROADMAP row say which cells are built, in review, or open
+  (`planning/karaoke-eac3.md`, E8).
+
 **Karaoke: a pitch library**
 
 - **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one
