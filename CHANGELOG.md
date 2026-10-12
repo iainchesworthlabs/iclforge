@@ -332,6 +332,13 @@ The sections below contain the complete change list and fixes.
   nothing recorded, in 8.7 MB. The parts and words are held to the generator by a unit test, the
   stream is probed and encoded again by `iclforge-forge-cli-tests`, the words are read by
   Hearth's reader, and the Forge GUI test opens the project and writes the stream's bytes.
+- **The browser decode demo shows the words of a karaoke stream.** A **Words** panel takes a `.lrc`,
+  `.srt`, `.ass` or `.kar` file and follows it against the playing position: the line being sung
+  large, the word being sung filled and underlined, the lines round it small, a duet's singers
+  named and indented, and a delay slider. The reader is `libs/lyrics`, compiled into the demo's
+  module (`parseLyrics` and `LyricsDocument`, `apps/demos/wasm/lyrics_bindings.cpp`) and not a
+  second one in JavaScript, so the page reads UTF-16, SubRip, ASS and MIDI karaoke as Hearth does
+  (planning/karaoke-phase2.md, W8).
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 

@@ -211,6 +211,16 @@ resolves an AC-3 core's fold levels from its own `cmixlev`/`surmixlev` as the de
 is three channels (four with an LFE) in `foldPcm`; at a stereo target it is Annex C's own 2/0
 reproduction. The demo page shows a vocals control for a stream that is karaoke.
 
+The words follow the sound. `lyrics_bindings.cpp` compiles the timed-lyrics reader (`libs/lyrics`,
+the one Hearth, Crucible and the sink firmware use) into the same module as `parseLyrics(bytes,
+durationMs)` and a `LyricsDocument` class: `describe()` hands the lines and their words over once,
+and `position(ms, delayMs)` and `wordState(line, word, ms)` are the library's stateless cursor,
+asked on every animation frame. The page's **Words** panel takes an LRC, SubRip, ASS or MIDI karaoke
+file (told by what it holds), shows the line being sung with the word being sung filled and the
+lines round it, names a duet's singers, and has a delay slider. A file in a code page is refused
+with the reader's sentence. It is the C++ reader and not a second one in JavaScript, so the page
+shows what Hearth would.
+
 `bindings/js/` is the package itself (not published — see [Publishing](#publishing) below):
 `push-decoder.ts` (the typed wrapper over the Embind class above), `decode-file.ts` (the
 whole-file convenience helper the demo's scrub/solo experience needs),
