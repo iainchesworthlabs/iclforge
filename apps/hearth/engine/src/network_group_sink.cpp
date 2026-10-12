@@ -81,6 +81,7 @@ public:
                     .coded_channels = format.coded_channels,
                     .objects = format.objects,
                     .objects_alone = format.objects_alone,
+                    .frame_rate = format.frame_rate,
                     .karaoke = format.karaoke,
                     .layout = format.layout});
          for (const render::OutputLayout& layout : planned) {

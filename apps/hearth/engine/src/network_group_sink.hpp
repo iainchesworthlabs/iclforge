@@ -71,6 +71,8 @@ public:
         std::uint16_t objects = 0;
         // ItemFacts::objects_alone.
         bool objects_alone = false;
+        // ItemFacts::frame_rate; 0 when not known.
+        double frame_rate = 0.0;
         // The karaoke reproduction the item is to be heard in, when it is a karaoke stream and
         // one is wanted (StreamNeeds::karaoke).
         std::optional<KaraokeChoice> karaoke{};
@@ -188,6 +190,7 @@ struct GroupPlanRequest {
     std::uint16_t coded_channels = 0;
     std::uint16_t objects = 0;
     bool objects_alone = false;
+    double frame_rate = 0.0;
     // As NetworkGroupSink::Format::karaoke.
     std::optional<KaraokeChoice> karaoke{};
     // The layout the player renders to, which a member that wants it is sent.

@@ -52,6 +52,11 @@ struct ItemFacts {
     // places no objects has no bed to play and plays nothing. False for every E-AC-3 stream,
     // whose bed is its core, and for an AC-4 presentation that carries channels.
     bool objects_alone = false;
+    // The frames (access units, one a burst chunk) a second the programme is coded at, as its
+    // samples and its frame count give it: 31.25 for AC-3 and for E-AC-3 at six blocks a unit,
+    // and for AC-4 the stream's own rate (23.44, 24, 25, 29.97 and on). What a sink's stated
+    // limit (`max_frame_rate`) is compared with; 0 where it is not known.
+    double frame_rate = 0.0;
     // Measured over the whole programme, the same definition
     // io::ProbeReport::bitrate_kbps uses: its bytes * 8, over its duration.
     // Unset until the item has been probed, the same as the fields above.

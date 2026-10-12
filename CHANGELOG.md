@@ -3588,6 +3588,16 @@ The sections below contain the complete change list and fixes.
   through, which the first board run showed it had not been (every frame after a late first chunk
   was dropped). `hearth-testserver` plays an `.ac4` file; `libs/device`'s `ac4_sync_frame.hpp` is
   the raw frame of a sync frame without a list, tested on the host.
+- **An ESP32-S3 with the AC-4 decoder lists `ac4` at 2 channels and 25 frames a second**
+  (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4` defaults to 1 with `ESP32S3_DATA_CACHE_64KB`, and the new
+  `..._AC4_MAX_FRAME_RATE` is 25 there): the support object gains `max_frame_rate`, per data type,
+  which a sink states and a server compares with the item's frame rate
+  (`ItemFacts::frame_rate`, from the samples and frames of the stream; `StreamNeeds::frame_rate`).
+  A faster stream is sent as PCM, and a frame of one that reaches the board is refused. Over
+  Sendspin on an S3 every 2.0 stream at 23.44, 24 and 25 frames a second took 0.48 to 0.80 of its
+  frame with no underruns, and 29.97 took 0.99 (39 underruns in one play, none in another): the
+  frame-rate converter costs a frame the same at 24 as at 29.97, so the limit is a rate and not a
+  codec tool. The release image has no decoder, and an S3 without the cache does not list AC-4.
 - **The board's AC-4 decoder does not reconstruct objects it would throw away**
   (`Ac4Stream::Config::skip_objects`, on, through `DecoderConfig::skip_objects`): a 5.1 bed beside
   A-JOC or direct-coded objects plays as the bed. On a P4 over Sendspin a bed with 16 A-JOC objects

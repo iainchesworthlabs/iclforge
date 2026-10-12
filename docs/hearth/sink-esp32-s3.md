@@ -14,8 +14,10 @@ contain implementation details and measurements. For the stereo ESP32-C6 player,
     The desktop app discovers sinks, pairs, plays to groups and updates firmware over the network
     ([Hearth index](index.md)). These boards play AC-3 and E-AC-3 in a group, and the sink lists
     `ac3` and `eac3`, not `ac4`, as the streams its Sendspin role takes. Built with
-    `CONFIG_ICLFORGE_AC4` an ESP32-S3 decodes AC-4 from an HTTP source, not from a group: correctly,
-    and in real time for 2.0 in SIMPLE mode only ([ESP32-S3](../platforms/bare-metal/esp32-s3.md#on-the-board));
+    `CONFIG_ICLFORGE_AC4` and the 64 KB data cache an ESP32-S3 lists `ac4` too, at 2 channels and
+    25 frames a second, and decodes 2.0 AC-4 from a group in real time
+    ([ESP32-S3](../platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)); the release image has no
+    decoder and lists none;
     an ESP32-C6 does not fit it beside Wi-Fi and refuses the play; an ESP32-P4 decodes it to 5.1 in
     real time ([ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4)). For development without
     Hearth, `hearth-testserver` still plays E-AC-3 to boards

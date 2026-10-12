@@ -61,6 +61,10 @@ class Ac4Stream {
         std::size_t max_channels = 0;
         // The one rate the player plays; a frame at another is refused.
         std::uint32_t sample_rate_hz = 48000;
+        // The most frames a second a stream may have, which the board states as max_frame_rate
+        // (the S3's 25): a frame of a stream above it is refused once the decoder has said how
+        // long a frame is, which a server that read the figure never sends. 0 refuses none.
+        std::uint32_t max_frame_rate = 0;
         // The decoder leaves a presentation's object audio undecoded (DecoderConfig::skip_objects):
         // the board places none, and states so (max_objects of 0), so what it would reconstruct is
         // dropped by decode_by_block(). A presentation of objects alone is then refused, which

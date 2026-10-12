@@ -106,6 +106,8 @@ constexpr std::int32_t kMaxCodedChannels = 64;
 // The most objects a sink may state it places: a JOC programme carries sixteen, an AC-4
 // presentation more, and the count is a byte.
 constexpr std::int32_t kMaxObjects = 255;
+// AC-4's fastest frame rate is 120 fps; a limit above 1000 is not a limit.
+constexpr std::int32_t kMaxFrameRate = 1000;
 // The longest layout text a state may carry. A layout is a name or a speaker list, a few hundred
 // characters at the most.
 constexpr std::size_t kMaxLayoutText = 512;
@@ -271,6 +273,17 @@ void write_support(json::Writer& w, const Support& support) {
         }
         w.end_object();
     }
+    const bool any_rate_limit =
+        std::ranges::any_of(support.max_frame_rate, [](std::uint16_t limit) { return limit != 0; });
+    if (any_rate_limit) {
+        w.key("max_frame_rate").begin_object();
+        for (const Named<DataType>& entry : kDataTypes) {
+            if (const std::uint16_t limit = support.max_frame_rate_of(entry.value); limit != 0) {
+                w.member(entry.name, static_cast<std::int32_t>(limit));
+            }
+        }
+        w.end_object();
+    }
     if (support.lyrics_max_bytes != 0) {
         w.key("lyrics").begin_object().key("max_bytes").unsigned_integer(support.lyrics_max_bytes).end_object();
     }
@@ -420,6 +433,25 @@ std::optional<Support> read_support(json::Value value) {
             }
             support.max_objects[static_cast<std::size_t>(entry.value)] =
                 static_cast<std::uint8_t>(*objects);
+        }
+    }
+    // The frames a second a sink keeps up with, the same shape as the channel count: a type the
+    // object does not name states none, and a rate that is not a rate refuses the object.
+    if (const json::Value limits = value["max_frame_rate"]; limits.exists()) {
+        if (!limits.is_object()) {
+            return std::nullopt;
+        }
+        for (const Named<DataType>& entry : kDataTypes) {
+            const json::Value limit = limits[entry.name];
+            if (!limit.exists()) {
+                continue;
+            }
+            const std::optional<std::int32_t> rate = read_int32(limit, 1, kMaxFrameRate);
+            if (!rate) {
+                return std::nullopt;
+            }
+            support.max_frame_rate[static_cast<std::size_t>(entry.value)] =
+                static_cast<std::uint16_t>(*rate);
         }
     }
     // The lyric document a sink holds: an object with the size, absent for a sink that takes none.
