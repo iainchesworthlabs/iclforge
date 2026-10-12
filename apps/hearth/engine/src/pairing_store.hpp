@@ -21,8 +21,10 @@
 // store of its own: a settings file in its settings folder that only the
 // person's account can read. The keys sit under "pairing/", as QSettings
 // writes an array: "pairing/size", then "pairing/1/client", "pairing/1/psk",
-// "pairing/1/name" and "pairing/1/paired", with the keys in hex. The
-// diagnostics file withholds everything under "pairing/".
+// "pairing/1/name" and "pairing/1/paired", with the keys in hex, and
+// "pairing/1/opus" as "true" for a client the person chose Opus for (set_opus(),
+// written only then). The diagnostics file withholds everything under
+// "pairing/".
 //
 // What pairing.md does not keep beyond a session is kept in memory only, as
 // sendspin::MemoryServerStore keeps it: a pairing PSK typed in from a
@@ -79,6 +81,14 @@ public:
     // completes, carries it, and a record already made takes it.
     void set_client_name(const sendspin::crypto::Key32& client_key, const std::string& name);
 
+    // The person's choice for audio Hearth decodes for this client: Opus, which is lossy and a
+    // twelfth of PCM's bytes, rather than PCM. Kept with the client's record, so that the next
+    // start has it, and forgotten with the record; for a client with no record yet it is held
+    // until the record is made, as a name is. False for a client nothing was chosen for. A write
+    // the settings store does not take leaves the choice standing for this process.
+    [[nodiscard]] bool opus(const sendspin::crypto::Key32& client_key) const;
+    void set_opus(const sendspin::crypto::Key32& client_key, bool opus);
+
     // The records, in the order they were made.
     [[nodiscard]] std::vector<PairingRecordView> records() const;
 
@@ -91,6 +101,7 @@ private:
         sendspin::crypto::Key32 psk{};
         std::string name;
         std::string paired_on;
+        bool opus = false;
     };
 
     // Writes every record; false when the store did not take them.
@@ -104,6 +115,8 @@ private:
     mutable std::mutex mutex_;
     std::vector<Record> records_;
     std::map<sendspin::crypto::Key32, std::string> names_;
+    // The choices made for clients with no record: a record, once made, holds its own.
+    std::map<sendspin::crypto::Key32, bool> opuses_;
     std::map<sendspin::crypto::Key32, sendspin::crypto::Key32> pairing_psks_;
     std::map<sendspin::crypto::Key32, bool> approvals_;
 };
