@@ -42,6 +42,7 @@ const char* iclforge_status_message(iclforge_status_t status) {
             return "AC-4 substream needs an I-frame not yet seen";
         case ICLFORGE_ERROR_AC4_ENCODE_INVALID_CONFIG: return "invalid AC-4 encoder configuration";
         case ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT: return "invalid AC-4 encoder input";
+        case ICLFORGE_ERROR_LYRICS_UNREADABLE: return "not lyrics";
     }
     return "unknown status";
 }

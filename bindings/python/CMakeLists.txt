@@ -59,6 +59,24 @@ if(TARGET iclforge::ac4)
 else()
     target_sources(_iclforge PRIVATE src/iclforge_ext/ac4/absent/ac4_module.cpp)
 endif()
+# Timed lyrics (iclforge::lyrics, the reader Hearth, Crucible and the sink firmware use): an
+# internal static library, standard library only, left out of the minimum-footprint profiles.
+# Linked into the extension, which is not an installed library, so what the C API's install rules
+# could not do with it (libs/capi/CMakeLists.txt) is not a problem here. It reads files through
+# std::filesystem, which the Intel macOS wheels' deployment target (10.9 to 10.13) does not have
+# (the root CMakeLists.txt's note on libs/lyrics), so a compiler that cannot use it builds the
+# extension without the submodule, as a build without the library does.
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles(
+    "#include <filesystem>
+     int main() { const std::filesystem::path p{\"a\"}; return static_cast<int>(p.string().size()); }"
+    ICLFORGE_HAS_STD_FILESYSTEM)
+if(TARGET iclforge::lyrics AND ICLFORGE_HAS_STD_FILESYSTEM)
+    target_link_libraries(_iclforge PRIVATE iclforge::lyrics)
+    target_sources(_iclforge PRIVATE src/iclforge_ext/lyrics/present/lyrics_module.cpp)
+else()
+    target_sources(_iclforge PRIVATE src/iclforge_ext/lyrics/absent/lyrics_module.cpp)
+endif()
 
 # scikit-build-core's wheel.install-dir (see bindings/python/pyproject.toml) is the
 # package root, so a relative DESTINATION here lands the compiled extension
