@@ -981,6 +981,10 @@
             <translation>[Éncõdé nõw ~~~~]</translation>
         </message>
         <message>
+            <source>Choose the code page…</source>
+            <translation>[Chõõsé thé cõdé pàgé… ~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>The lyrics are beside the stream, as the same name with .lrc.</source>
             <translation>[Thé lyrîcs àré bésîdé thé stréàm, às thé sàmé nàmé wîth .lrc. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
@@ -1233,6 +1237,18 @@
             <translation>[nõné ~~]</translation>
         </message>
         <message>
+            <source>Choose the code page this file was written in. Nothing is guessed: the first lines show how the page chosen reads it.</source>
+            <translation>[Chõõsé thé cõdé pàgé thîs fîlé wàs wrîttén în. Nõthîng îs gûésséd: thé fîrst lînés shõw hõw thé pàgé chõsén réàds ît. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Code page</source>
+            <translation>[Cõdé pàgé ~~~~]</translation>
+        </message>
+        <message>
+            <source>It reads as:</source>
+            <translation>[Ît réàds às: ~~~~~]</translation>
+        </message>
+        <message>
             <source>Lyrics (*.lrc *.srt *.ass *.kar)</source>
             <translation>[Lyrîcs (*.lrc *.srt *.àss *.kàr) ~~~~~~~~~~~~~]</translation>
         </message>
@@ -1454,6 +1470,65 @@
         <message>
             <source>dialnorm — programme 2</source>
             <translation>[dîàlnõrm — prõgràmmé 2 ~~~~~~~~~]</translation>
+        </message>
+    </context>
+    <context>
+        <name>LyricsEncoding</name>
+        <message>
+            <source>Western European</source>
+            <translation>[Wéstérn Éûrõpéàn ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Central European</source>
+            <translation>[Céntràl Éûrõpéàn ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Cyrillic</source>
+            <translation>[Cyrîllîc ~~~]</translation>
+        </message>
+        <message>
+            <source>Greek</source>
+            <translation>[Gréék ~~]</translation>
+        </message>
+        <message>
+            <source>Turkish</source>
+            <translation>[Tûrkîsh ~~~]</translation>
+        </message>
+        <message>
+            <source>Hebrew</source>
+            <translation>[Hébréw ~~]</translation>
+        </message>
+        <message>
+            <source>Arabic</source>
+            <translation>[Àràbîc ~~]</translation>
+        </message>
+        <message>
+            <source>Baltic</source>
+            <translation>[Bàltîc ~~]</translation>
+        </message>
+        <message>
+            <source>Vietnamese</source>
+            <translation>[Vîétnàmésé ~~~~]</translation>
+        </message>
+        <message>
+            <source>Thai</source>
+            <translation>[Thàî ~~]</translation>
+        </message>
+        <message>
+            <source>Japanese</source>
+            <translation>[Jàpànésé ~~~]</translation>
+        </message>
+        <message>
+            <source>Simplified Chinese</source>
+            <translation>[Sîmplîfîéd Chînésé ~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Traditional Chinese</source>
+            <translation>[Tràdîtîõnàl Chînésé ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Korean</source>
+            <translation>[Kõréàn ~~]</translation>
         </message>
     </context>
     <context>
