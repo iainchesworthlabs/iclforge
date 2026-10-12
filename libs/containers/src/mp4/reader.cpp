@@ -40,6 +40,7 @@ constexpr std::uint32_t kEdts = fourcc("edts");
 constexpr std::uint32_t kElst = fourcc("elst");
 constexpr std::uint32_t kMdia = fourcc("mdia");
 constexpr std::uint32_t kMdhd = fourcc("mdhd");
+constexpr std::uint32_t kHdlr = fourcc("hdlr");
 constexpr std::uint32_t kMinf = fourcc("minf");
 constexpr std::uint32_t kStbl = fourcc("stbl");
 constexpr std::uint32_t kStsd = fourcc("stsd");
@@ -74,8 +75,8 @@ constexpr std::uint32_t kDac4 = fourcc("dac4");
 // than a plain container, so it is read whole and its one sample entry
 // parsed in place - it is a few dozen bytes, not a table.
 [[nodiscard]] bool is_wanted_leaf(std::uint32_t type) {
-    return type == kMvhd || type == kTkhd || type == kElst || type == kMdhd || type == kStsd ||
-           type == kStsc || type == kStsz || type == kStz2 || type == kStco || type == kCo64 ||
+    return type == kMvhd || type == kTkhd || type == kElst || type == kMdhd || type == kHdlr ||
+           type == kStsd || type == kStsc || type == kStsz || type == kStz2 || type == kStco || type == kCo64 ||
            type == kTrex || type == kTfhd || type == kTrun;
 }
 
@@ -180,6 +181,10 @@ struct PendingTrack {
     std::uint32_t track_id = 0;
     std::uint32_t timescale = 0;
     std::string language{"und"};
+    // hdlr's handler_type, and the first sample entry's type whatever it is: what a track that is
+    // not selected is listed by.
+    std::uint32_t handler = 0;
+    std::uint32_t first_entry = 0;
     bool has_entry = false;
     std::uint32_t entry_type = 0;
     std::uint32_t sample_rate = 0;
@@ -204,6 +209,40 @@ struct PendingTrack {
         }
         out.push_back(static_cast<char>('a' + letter - 1));
     }
+    return out;
+}
+
+// How many tracks a file may have listed beside the one that is read: a hostile moov declares as
+// many as it likes, and each is a small string.
+constexpr std::size_t kMaxSkippedTracks = 64;
+
+// A fourcc as four characters, anything that is not printable ASCII shown as '?'.
+[[nodiscard]] std::string fourcc_text(std::uint32_t value) {
+    std::string out;
+    for (int shift = 24; shift >= 0; shift -= 8) {
+        const auto c = static_cast<unsigned>((value >> shift) & 0xFFU);
+        out.push_back(c >= 0x20U && c <= 0x7EU ? static_cast<char>(c) : '?');
+    }
+    return out;
+}
+
+// What a track that was not selected is listed as: its handler decides the kind, and its first
+// sample entry (whatever it is) the codec.
+[[nodiscard]] SkippedTrack skipped_of(const PendingTrack& track) {
+    SkippedTrack out;
+    out.track_id = track.track_id;
+    if (track.handler == fourcc("soun")) {
+        out.kind = TrackKind::kAudio;
+    } else if (track.handler == fourcc("vide")) {
+        out.kind = TrackKind::kVideo;
+    } else if (track.handler == fourcc("text") || track.handler == fourcc("sbtl") ||
+               track.handler == fourcc("subt") || track.handler == fourcc("clcp")) {
+        out.kind = TrackKind::kText;
+    }
+    if (track.first_entry != 0) {
+        out.codec_id = fourcc_text(track.first_entry);
+    }
+    out.language = track.language;
     return out;
 }
 
@@ -320,6 +359,8 @@ struct ReaderState {
 
     ReadTrack track;
     bool track_found = false;
+    // The tracks that were not selected, to kMaxSkippedTracks.
+    std::vector<SkippedTrack> skipped;
     bool saw_box = false;
     bool saw_mdat = false;
     // A moov that arrived after mdat: fatal for the streaming Reader, fine
@@ -366,6 +407,7 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
             return {};
         }
         if (top.type == kTrak) {
+            bool selected_now = false;
             if (s.in_trak && !s.track_found && s.pending.has_entry) {
                 const bool wanted = options.track_id != 0
                                         ? s.pending.track_id == options.track_id
@@ -388,12 +430,17 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
                         .edits = s.pending.edits,
                     };
                     s.track_found = true;
+                    selected_now = true;
                     // The plain path's samples exist the moment the table is
                     // whole; the fragmented path's arrive per moof later.
                     if (!build_sample_refs(s.pending, options, s.samples)) {
                         return std::unexpected(DemuxError::kMalformed);
                     }
                 }
+            }
+            if (s.in_trak && !selected_now && s.pending.track_id != 0 &&
+                s.skipped.size() < kMaxSkippedTracks) {
+                s.skipped.push_back(skipped_of(s.pending));
             }
             s.in_trak = false;
         }
@@ -420,6 +467,14 @@ std::expected<void, DemuxError> close_finished(ReaderState& s, const ReadOptions
     }
     track.track_id = get_u32(body, at);
     return true;
+}
+
+// §8.4.3: version and flags (4), pre_defined (4), then the handler_type four characters. A body
+// too short for it is left as no handler, which lists as "other" and is not an error.
+void parse_hdlr(std::span<const std::byte> body, PendingTrack& track) {
+    if (body.size() >= 12) {
+        track.handler = get_u32(body, 8);
+    }
 }
 
 [[nodiscard]] bool parse_mdhd(std::span<const std::byte> body, PendingTrack& track) {
@@ -511,6 +566,9 @@ void parse_elst(std::span<const std::byte> body, const ReadOptions& options,
         }
         if (entry.size > body.size() - at) {
             return false;
+        }
+        if (track.first_entry == 0) {
+            track.first_entry = entry.type;
         }
         if (entry.type == kAc3Entry || entry.type == kEc3Entry || entry.type == kAc4Entry) {
             // §12.2.3's AudioSampleEntry, on top of §8.5.2's SampleEntry:
@@ -920,6 +978,9 @@ std::expected<void, DemuxError> walk(ReaderState& s, std::span<const std::byte> 
             case kMdhd:
                 ok = parse_mdhd(body, s.pending);
                 break;
+            case kHdlr:
+                parse_hdlr(body, s.pending);
+                break;
             case kStsd:
                 ok = parse_stsd(body, s.pending);
                 break;
@@ -1014,6 +1075,7 @@ std::expected<Demuxed, DemuxError> demux(std::span<const std::byte> file,
         return std::unexpected(drained.error());
     }
     out.track = s.track;
+    out.skipped = s.skipped;
     return out;
 }
 
