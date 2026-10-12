@@ -36,6 +36,7 @@
 #include "qsettings_store.hpp"
 #include "server_identity.hpp"
 #include "settings_model.hpp"
+#include "sink_lyrics_text.hpp"
 #include "shared_pairing_store.hpp"
 #include "sink_firmware.hpp"
 #include "sink_firmware_view.hpp"
@@ -377,31 +378,10 @@ struct LayoutFields {
                                                                                           : QObject::tr("not placed"));
         dialogue_text = QObject::tr("dialnorm %1").arg(decoder.dialnorm, 0, 'f', 0);
     }
-    // The lyrics (W7d): whether the sink takes them, whether it holds the item playing's, and where
-    // in them its own clock has the sound. The sink reports the item and the line's index; the text
-    // and the count are this computer's reading of the document it sent (SinkFacts::lyrics_*).
-    QString lyrics_text = QObject::tr("not offered");
-    if (facts.iclforge_support && facts.iclforge_support->lyrics_max_bytes != 0) {
-        lyrics_text = QObject::tr("none held");
-        if (facts.iclforge_state && facts.iclforge_state->lyrics) {
-            const std::int32_t line = facts.iclforge_state->lyrics->line;
-            if (line < 0) {
-                lyrics_text = QObject::tr("held · before the first line");
-            } else if (facts.lyrics_lines) {
-                lyrics_text = QObject::tr("line %1 of %2").arg(line + 1).arg(*facts.lyrics_lines);
-            } else {
-                lyrics_text = QObject::tr("line %1").arg(line + 1);
-            }
-            if (line >= 0 && !facts.lyrics_line_text.empty()) {
-                lyrics_text += QStringLiteral(" · ") + QString::fromStdString(facts.lyrics_line_text);
-            }
-        }
-    }
-
     map[QStringLiteral("streamText")] = stream_text;
     map[QStringLiteral("objectsText")] = objects_text;
     map[QStringLiteral("dialogueText")] = dialogue_text;
-    map[QStringLiteral("lyricsText")] = lyrics_text;
+    map[QStringLiteral("lyricsText")] = sink_lyrics_text(facts);
 
     const forge::Counters counters = facts.iclforge_state ? facts.iclforge_state->counters : forge::Counters{};
     map[QStringLiteral("playedText")] = QObject::tr("%1 bursts").arg(counters.bursts_played);

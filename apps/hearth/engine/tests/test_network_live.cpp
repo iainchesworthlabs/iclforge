@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <numbers>
 #include <optional>
@@ -144,7 +145,7 @@ std::vector<std::byte> eac3_stream(int frames) {
 
 // Calls tick() and prints what changed, until `done` holds or `timeout` passes.
 bool drive(iclforge::hearth::NetworkSinks& sinks, const std::function<bool(const iclforge::hearth::NetworkStatus&)>& done,
-           std::chrono::seconds timeout) {
+           std::chrono::seconds timeout, std::chrono::milliseconds poll = 100ms) {
     const auto until = std::chrono::steady_clock::now() + timeout;
     std::uint64_t seen = 0;
     while (true) {
@@ -168,7 +169,7 @@ bool drive(iclforge::hearth::NetworkSinks& sinks, const std::function<bool(const
         if (std::chrono::steady_clock::now() >= until) {
             return false;
         }
-        std::this_thread::sleep_for(100ms);
+        std::this_thread::sleep_for(poll);
     }
 }
 
@@ -710,8 +711,13 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
 //   ICLFORGE_HEARTH_LIVE_LYRICS_BYTES  pad the file to at least this many bytes with word-timed lines
 //                                      after the item's end: what a board does with a document near
 //                                      the size it states
+//   ICLFORGE_HEARTH_LIVE_LYRICS_PLAIN  set: the padding is plain lines of 40 characters, as a song's
+//                                      usually are, and not word-timed ones (the most a document costs)
 //   ICLFORGE_HEARTH_LIVE_LYRICS_STEREO set: play a stereo E-AC-3 tone instead of the karaoke 5.1
 //                                      stream, for a board that decodes two channels (the C6)
+//   ICLFORGE_HEARTH_LIVE_LYRICS_PROGRAMME  a .ac3 or .ec3 file to play (repeated to last the
+//                                      seconds asked) instead: what a heavy E-AC-3 stream does to
+//                                      the heap a document is held in
 
 namespace {
 
@@ -736,12 +742,18 @@ namespace {
         out += live_line_text(n);
         out += '\n';
     }
+    const bool plain = environment("ICLFORGE_HEARTH_LIVE_LYRICS_PLAIN").has_value();
     for (int n = 0; out.size() < min_bytes && n < 2000; ++n) {
         const int start = 120000 + 2500 * n;
         out += stamp('[', ']', start);
-        for (int word = 0; word < 5; ++word) {
-            out += stamp('<', '>', start + 400 * word);
-            out += "padding ";
+        if (plain) {
+            // A line of 40 characters, as a song's usually are, with no word times.
+            out += "Should auld acquaintance be forgot, and";
+        } else {
+            for (int word = 0; word < 5; ++word) {
+                out += stamp('<', '>', start + 400 * word);
+                out += "padding ";
+            }
         }
         out += '\n';
     }
@@ -753,6 +765,21 @@ namespace {
 // channels itself (the C6) is sent a six-channel stream as PCM over player@v1, which carries no lyrics,
 // so a stereo stream is how a case reaches it with lyrics.
 [[nodiscard]] std::vector<std::byte> live_lyrics_programme(int frames) {
+    if (const std::optional<std::string> path = environment("ICLFORGE_HEARTH_LIVE_LYRICS_PROGRAMME")) {
+        // A file of the tree's own, repeated until it lasts about as long as asked: a second of any
+        // of them is no more than a few access units over, so a copy a second is enough.
+        std::ifstream in(*path, std::ios::binary);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        REQUIRE_FALSE(text.empty());
+        const int seconds = std::max(1, frames * 1536 / 48000);
+        std::vector<std::byte> programme;
+        for (int copy = 0; copy < seconds + 1; ++copy) {
+            for (const char c : text) {
+                programme.push_back(static_cast<std::byte>(static_cast<unsigned char>(c)));
+            }
+        }
+        return programme;
+    }
     if (environment("ICLFORGE_HEARTH_LIVE_LYRICS_STEREO")) {
         return eac3_stream(frames);
     }
@@ -964,7 +991,7 @@ TEST_CASE("network sinks live: a board that holds lyrics follows them with the s
             const iclforge::hearth::EngineStatus status_now = engine.status();
             return status_now.state == iclforge::hearth::TransportState::kStopped && !status_now.history.empty();
         },
-        std::chrono::seconds(seconds + 60)));
+        std::chrono::seconds(seconds + 60), 5ms));
 
     REQUIRE(reported_item.has_value());
     REQUIRE(sound.has_value());
@@ -979,7 +1006,7 @@ TEST_CASE("network sinks live: a board that holds lyrics follows them with the s
     const double first = seconds_between(*sound, line_at.at(0));
     const double second = seconds_between(line_at.at(0), line_at.at(1));
     const double third = seconds_between(line_at.at(1), line_at.at(2));
-    std::printf("  sound -> line 0: %.2f s (2.00), line 0 -> 1: %.2f s (3.00), line 1 -> 2: %.2f s (3.00)\n",
+    std::printf("  sound -> line 0: %.3f s (2.00), line 0 -> 1: %.3f s (3.00), line 1 -> 2: %.3f s (3.00)\n",
                 first, second, third);
     std::fflush(stdout);
     CHECK(std::abs(first - 2.0) < 0.6);
@@ -1165,7 +1192,7 @@ TEST_CASE("network sinks live: a board that restarts mid-item is sent the lyrics
             }
             return observed.size() >= 4;
         },
-        45s);
+        45s, 5ms);
 
     // The board came back on a line at or past the one it was on, and then goes through the file's
     // lines in order, 3 s apart.
