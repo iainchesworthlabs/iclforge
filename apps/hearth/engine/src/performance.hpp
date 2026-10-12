@@ -63,8 +63,19 @@ struct PerformanceLive {
     float reference_hz = 0.0F;
 };
 
+// One placed frame of the singer's voice, for drawing: where in the item it was sung and its pitch,
+// 0 when the singer was not voiced.
+struct TracePoint {
+    std::int64_t item_ms = 0;
+    float hz = 0.0F;
+};
+
 class Performance {
    public:
+    // How many placed frames are kept for drawing: 30 seconds at the 10 ms hop. The score does not
+    // depend on them; a view of the last few seconds does.
+    static constexpr std::size_t kTraceCapacity = 3000;
+
     // Nothing for a reference with no voiced point (there is nothing to score against), or an
     // input rate no tracker can work at.
     [[nodiscard]] static std::optional<Performance> make(pitch::Contour reference,
@@ -107,6 +118,10 @@ class Performance {
         return scorer_.key_offset_cents();
     }
 
+    // The singer's last placed frames in the order they were placed, oldest first: at most
+    // kTraceCapacity. After a seek the item positions jump; a view breaks its line there.
+    [[nodiscard]] const std::deque<TracePoint>& trace() const { return trace_; }
+
     [[nodiscard]] std::optional<PerformanceLive> live() const { return live_; }
     // Frames of the voice that could not be placed (before the first anchor, or while the item was
     // not moving): not scored, and not counted wrong.
@@ -135,6 +150,7 @@ class Performance {
     std::vector<float> mono_scratch_;
 
     std::optional<PerformanceLive> live_{};
+    std::deque<TracePoint> trace_;
     std::uint64_t unplaced_ = 0;
     std::uint64_t frames_ = 0;
 };

@@ -52,6 +52,7 @@ void Performance::clear_singer() {
     samples_fed_ = 0;
     blocks_.clear();
     live_.reset();
+    trace_.clear();
     unplaced_ = 0;
     frames_ = 0;
 }
@@ -112,6 +113,10 @@ void Performance::place(const pitch::Frame& frame) {
     }
     const std::int64_t item_ms = *position + options_.offset_ms;
     scorer_.add(item_ms, frame.hz);
+    trace_.push_back({item_ms, frame.voiced() ? frame.hz : 0.0F});
+    if (trace_.size() > kTraceCapacity) {
+        trace_.pop_front();
+    }
 
     PerformanceLive live;
     live.item_ms = item_ms;
