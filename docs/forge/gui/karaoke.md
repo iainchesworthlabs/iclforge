@@ -43,7 +43,7 @@ an LFE are still nothing to sing along to) and it is coded after the full-bandwi
 channel assigned to the LFE ([Source assignment](source-assignment.md)); `forge encode` writes a
 channel mapped to `LFE` as it is given, so give the command line a file that is already
 band-limited if you want its bytes to match the window's. A karaoke reproduction passes the LFE
-through (L, C, R and then the LFE), and a stereo fold leaves it out.
+through (L, C, R and then the LFE, scaled down with them), and a stereo fold leaves it out.
 
 - A file that cannot be used is named, not fixed: a backing that is not stereo, a part that is
   not one channel, a vocal 2 without a vocal 1, a backing with nothing to sing along to, or a
