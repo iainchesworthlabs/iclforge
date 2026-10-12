@@ -487,6 +487,12 @@ add_subdirectory(libs/device)
 if((NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER) OR ICLFORGE_SENDSPIN_PLAYER_ONLY)
     add_subdirectory(libs/lyrics EXCLUDE_FROM_ALL)
 endif()
+# A singing voice's pitch, a reference melody and a score of one against the other (planning/karaoke-
+# microphone.md): standard library only, for Hearth, the browser and the sink firmware alike. The
+# minimum-footprint profile carries none, and it is built when a program or its tests link it.
+if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
+    add_subdirectory(libs/pitch EXCLUDE_FROM_ALL)
+endif()
 add_subdirectory(libs/ac3)
 
 # The containers, codec-blind and one library: IEC 61937 burst packing, always, and the Matroska,
@@ -645,7 +651,7 @@ if(ICLFORGE_BUILD_TESTS)
         add_subdirectory(apps/hearth/engine/tests)
     endif()
     add_subdirectory(apps/crucible/engine/tests)
-    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics ac3 containers audio ac4 iab adm capi sendspin)
+    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics pitch ac3 containers audio ac4 iab adm capi sendspin)
         set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
         if(_iclforge_lib STREQUAL "capi")
             set(_iclforge_lib_target "iclforge::c")

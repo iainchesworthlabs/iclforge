@@ -1197,169 +1197,190 @@
         <translation>%1 · שורה %2 מתוך %3</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="549"/>
+        <location filename="../qml/KaraokePage.qml" line="551"/>
         <source>, word-timed</source>
         <translation>, בתזמון לפי מילה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="550"/>
+        <location filename="../qml/KaraokePage.qml" line="552"/>
         <source>, line-timed</source>
         <translation>, בתזמון לפי שורה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="560"/>
+        <location filename="../qml/KaraokePage.qml" line="562"/>
         <source>Time the lyrics…</source>
         <translation>סנכרון המילים…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="565"/>
+        <location filename="../qml/KaraokePage.qml" line="567"/>
         <source>Full screen · F11</source>
         <translation>מסך מלא · F11</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="586"/>
+        <location filename="../qml/KaraokePage.qml" line="583"/>
+        <location filename="../qml/KaraokePage.qml" line="591"/>
+        <source>Show</source>
+        <translation>הצגה</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="594"/>
+        <source>Words</source>
+        <translation>מילים</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="595"/>
+        <source>Picture</source>
+        <translation>תמונה</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="617"/>
+        <source>This is the picture of the CD+G disc beside the lyrics. Its words are part of the picture; choose Words to follow the lyrics file.</source>
+        <translation>זו התמונה של דיסק ה-CD+G שלצד המילים. המילים שלה הן חלק מהתמונה; בחרו „מילים” כדי לעקוב אחרי קובץ המילים.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="621"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
         <translation>למילים האלה אין זמנים, ולכן הן מוצגות במלואן ואינן נעקבות.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="588"/>
+        <location filename="../qml/KaraokePage.qml" line="614"/>
         <source>This is the picture of a CD+G disc. Its words are part of the picture, so there is no text to follow.</source>
         <translation>זו התמונה של דיסק CD+G. המילים שלו הן חלק מהתמונה, ולכן אין טקסט לעקוב אחריו.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="591"/>
+        <location filename="../qml/KaraokePage.qml" line="623"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
         <translation>הקובץ הזה מתזמן שורות, לא מילים: שורה שלמה מודגשת בזמן שהיא מושרת.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="611"/>
+        <location filename="../qml/KaraokePage.qml" line="643"/>
         <source>First singer</source>
         <translation>זמר ראשון</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="620"/>
+        <location filename="../qml/KaraokePage.qml" line="652"/>
         <source>Name of the first singer (V1)</source>
         <translation>שם הזמר הראשון (V1)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="627"/>
+        <location filename="../qml/KaraokePage.qml" line="659"/>
         <source>Second singer</source>
         <translation>זמר שני</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="636"/>
+        <location filename="../qml/KaraokePage.qml" line="668"/>
         <source>Name of the second singer (V2)</source>
         <translation>שם הזמר השני (V2)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="670"/>
+        <location filename="../qml/KaraokePage.qml" line="702"/>
         <source>The stream</source>
         <translation>הזרם</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="675"/>
+        <location filename="../qml/KaraokePage.qml" line="707"/>
         <source>Backing left</source>
         <translation>ליווי שמאל</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="676"/>
+        <location filename="../qml/KaraokePage.qml" line="708"/>
         <source>Backing right</source>
         <translation>ליווי ימין</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="677"/>
+        <location filename="../qml/KaraokePage.qml" line="709"/>
         <source>Melody guide</source>
         <translation>מנגינת הנחיה</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="390"/>
-        <location filename="../qml/KaraokePage.qml" line="678"/>
+        <location filename="../qml/KaraokePage.qml" line="710"/>
         <source>Vocal 1</source>
         <translation>שירה 1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="391"/>
-        <location filename="../qml/KaraokePage.qml" line="679"/>
+        <location filename="../qml/KaraokePage.qml" line="711"/>
         <source>Vocal 2</source>
         <translation>שירה 2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="696"/>
+        <location filename="../qml/KaraokePage.qml" line="728"/>
         <source>not in this stream</source>
         <translation>לא בזרם הזה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="697"/>
+        <location filename="../qml/KaraokePage.qml" line="729"/>
         <source>heard</source>
         <translation>נשמע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="697"/>
+        <location filename="../qml/KaraokePage.qml" line="729"/>
         <source>muted</source>
         <translation>מושתק</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="707"/>
+        <location filename="../qml/KaraokePage.qml" line="739"/>
         <source>What plays</source>
         <translation>מה מושמע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="745"/>
+        <location filename="../qml/KaraokePage.qml" line="777"/>
         <source>Nothing karaoke is playing.</source>
         <translation>לא מושמע קריוקי.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="753"/>
+        <location filename="../qml/KaraokePage.qml" line="785"/>
         <source>Signal path</source>
         <translation>נתיב האות</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="761"/>
+        <location filename="../qml/KaraokePage.qml" line="793"/>
         <source>Decoded as the stream says.</source>
         <translation>מפוענח כפי שהזרם קובע.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="764"/>
+        <location filename="../qml/KaraokePage.qml" line="796"/>
         <source>as coded</source>
         <translation>כפי שמקודד</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="765"/>
+        <location filename="../qml/KaraokePage.qml" line="797"/>
         <source>aware</source>
         <translation>מודע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="766"/>
+        <location filename="../qml/KaraokePage.qml" line="798"/>
         <source>capable, vocals: %1</source>
         <translation>בעל יכולת, שירה: %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="767"/>
+        <location filename="../qml/KaraokePage.qml" line="799"/>
         <source>none</source>
         <translation>ללא</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="768"/>
+        <location filename="../qml/KaraokePage.qml" line="800"/>
         <source>both</source>
         <translation>שתיהן</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="771"/>
+        <location filename="../qml/KaraokePage.qml" line="803"/>
         <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
         <translation>קריוקי AC-3, %1: לא משוחזר (ראו את ההודעה).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="772"/>
+        <location filename="../qml/KaraokePage.qml" line="804"/>
         <source>AC-3 karaoke, %1.</source>
         <translation>קריוקי AC-3, %1.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="784"/>
+        <location filename="../qml/KaraokePage.qml" line="816"/>
         <source>Nothing is playing.</source>
         <translation>שום דבר לא מושמע.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="786"/>
+        <location filename="../qml/KaraokePage.qml" line="818"/>
         <source>%1 · %2 ch at %3 Hz</source>
         <translation>%1 · %2 ערוצים ב-%3 הרץ</translation>
     </message>
@@ -1431,27 +1452,42 @@
         <translation>הבא</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="487"/>
+        <location filename="../qml/LyricScreen.qml" line="488"/>
+        <source>Show</source>
+        <translation>הצגה</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="501"/>
+        <source>Words</source>
+        <translation>מילים</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="502"/>
+        <source>Picture</source>
+        <translation>תמונה</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="516"/>
         <source>Vocals</source>
         <translation>שירה</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="500"/>
+        <location filename="../qml/LyricScreen.qml" line="529"/>
         <source>None</source>
         <translation>ללא</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="501"/>
+        <location filename="../qml/LyricScreen.qml" line="530"/>
         <source>V1</source>
         <translation>V1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="502"/>
+        <location filename="../qml/LyricScreen.qml" line="531"/>
         <source>V2</source>
         <translation>V2</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="503"/>
+        <location filename="../qml/LyricScreen.qml" line="532"/>
         <source>Both</source>
         <translation>שתיהן</translation>
     </message>
@@ -1693,47 +1729,47 @@
 <context>
     <name>LyricView</name>
     <message>
-        <location filename="../qml/LyricView.qml" line="68"/>
+        <location filename="../qml/LyricView.qml" line="73"/>
         <source>%1 + %2</source>
         <translation>%1 + %2</translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="94"/>
+        <location filename="../qml/LyricView.qml" line="99"/>
         <source>guide</source>
         <translation>מנחה</translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="95"/>
+        <location filename="../qml/LyricView.qml" line="100"/>
         <source>you</source>
         <translation>אתם</translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="96"/>
+        <location filename="../qml/LyricView.qml" line="101"/>
         <source>shared</source>
         <translation>משותפת</translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="107"/>
+        <location filename="../qml/LyricView.qml" line="112"/>
         <source>%1 · %2</source>
         <translation>%1 · %2</translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="423"/>
+        <location filename="../qml/LyricView.qml" line="428"/>
         <source>CD+G picture</source>
         <translation>תמונת CD+G</translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="439"/>
+        <location filename="../qml/LyricView.qml" line="444"/>
         <source>%1 Playback is not affected.</source>
         <translation>%1 ההשמעה אינה מושפעת.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="443"/>
+        <location filename="../qml/LyricView.qml" line="448"/>
         <source>Nothing is playing.</source>
         <translation>שום דבר לא מושמע.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="445"/>
+        <location filename="../qml/LyricView.qml" line="450"/>
         <source>No lyrics. Hearth looks for %1 next to the stream.</source>
         <translation>אין מילים. Hearth מחפש את %1 לצד הזרם.</translation>
     </message>

@@ -138,6 +138,19 @@ namespace {
     return ac3::eac3::chanmap::expand(map);
 }
 
+// Whether the one syncframe `header` heads is a karaoke programme the decoder reproduces when
+// asked to: Annex C's karaoke type for AC-3, and for E-AC-3 the decoder's own rule
+// (ac3::is_karaoke_programme) with the syncframe standing alone as one independent substream.
+// Read from the header, since the block form hands the samples over during the decode.
+[[nodiscard]] bool karaoke_syncframe(const ac3::io::FrameHeader& header) {
+    const auto bsmod = static_cast<ac3::meta::BitstreamMode>(header.bsmod);
+    if (header.kind == ac3::io::StreamKind::kAc3) {
+        return ac3::meta::is_karaoke(bsmod, header.acmod);
+    }
+    return ac3::is_karaoke_programme(bsmod, header.acmod, 1,
+                                     header.oba_complexity_index.has_value());
+}
+
 [[nodiscard]] bool same_layout(const ac3::eac3::chanmap::Layout& a,
                                const ac3::eac3::chanmap::Layout& b) {
     if (a.count != b.count) {
@@ -221,7 +234,8 @@ void report_frame(const ac3::DecodedFrame& frame, const ac3::OutputConfig& outpu
     out.ac4.reset();
 }
 
-void report_unit(const ac3::DecodedAccessUnit& unit, UnitReport& out) {
+void report_unit(const ac3::DecodedAccessUnit& unit, const ac3::OutputConfig& output,
+                 UnitReport& out) {
     out.acmod = unit.acmod;
     out.layout = unit.acmod == ac3::Acmod::kDualMono ? ac3::eac3::chanmap::Layout{} : unit.layout;
     out.lfe = unit.layout.index_of(ac3::eac3::chanmap::Location::kLfe) >= 0;
@@ -238,9 +252,10 @@ void report_unit(const ac3::DecodedAccessUnit& unit, UnitReport& out) {
     out.concealed = unit.concealed;
     out.objects = unit.object_metadata;
     out.ac4.reset();
-    // Karaoke is AC-3's: an E-AC-3 decoder never sets the flag.
-    out.karaoke = false;
-    out.karaoke_reproduced = false;
+    // Annex C's karaoke type, for the programme the decoder reproduces it for: one independent
+    // substream, no object layer.
+    out.karaoke = ac3::is_karaoke_programme(unit);
+    out.karaoke_reproduced = karaoke_reproduced(output, unit.acmod, out.karaoke);
 }
 
 // What an AC-4 frame's concealment did, in the report's terms. Its error is
@@ -447,13 +462,13 @@ std::expected<std::size_t, std::string> StreamDecoder::decode_unit(std::span<con
     // unit is the coded one except under Annex C's reproduction: a karaoke
     // stream comes out as L, C, R and the LFE, three or four channels for the
     // four to six coded, and laid out from the coded acmod the vocals would be
-    // placed where the surrounds were. (A fold has no bed; the renderer takes
-    // its channels as they come.)
+    // placed where the surrounds were. An E-AC-3 programme of one independent
+    // substream is reproduced the same way (is_karaoke_programme), so a unit
+    // that is one syncframe asks the same question. (A fold has no bed; the
+    // renderer takes its channels as they come.)
     ac3::eac3::chanmap::Layout unit_bed = *bed;
-    if (!serving_.fold && header->kind == ac3::io::StreamKind::kAc3 &&
-        header->bytes == unit.size()) {
-        const bool karaoke = ac3::meta::is_karaoke(
-            static_cast<ac3::meta::BitstreamMode>(header->bsmod), header->acmod);
+    if (!serving_.fold && header->bytes == unit.size()) {
+        const bool karaoke = karaoke_syncframe(*header);
         const ac3::OutputMode mode =
             ac3::output_mode(config_.output, header->acmod, header->lfe, karaoke);
         if (mode.acmod != header->acmod) {
@@ -495,7 +510,7 @@ std::expected<std::size_t, std::string> StreamDecoder::decode_unit(std::span<con
     // Nothing comes back for a unit held back; what does is the unit whose
     // blocks this call delivered.
     if (*decoded && reported) {
-        report_unit(**decoded, report_);
+        report_unit(**decoded, config_.output, report_);
         finish_report(report_, unit.size());
         reported(report_);
     }
@@ -889,43 +904,65 @@ std::size_t StreamDecoder::render_flushed(std::span<ac3::DecodedSubstream> subst
             length = std::max(length, dependent->channels.front().size());
         }
     }
-    const ac3::eac3::chanmap::Layout layout = ac3::eac3::chanmap::expand(map);
-    std::vector<std::vector<float>> channels(static_cast<std::size_t>(layout.count),
-                                             std::vector<float>(length, 0.0F));
-    const auto lay_over = [&](const ac3::DecodedSubstream& substream) {
-        const ac3::eac3::chanmap::Layout own = ac3::eac3::chanmap::expand(substream.location_map());
-        for (int i = 0; i < own.count && static_cast<std::size_t>(i) < substream.channels.size();
-             ++i) {
-            const int at = layout.index_of(own[i]);
-            if (at < 0) {
-                continue;
-            }
-            const std::vector<float>& source = substream.channels[static_cast<std::size_t>(i)];
-            std::copy_n(source.begin(), std::min(length, source.size()),
-                        channels[static_cast<std::size_t>(at)].begin());
-        }
-    };
-    lay_over(*independent);
-    for (const ac3::DecodedSubstream* dependent : dependents) {
-        lay_over(*dependent);
-    }
+    const ac3::eac3::chanmap::Layout coded = ac3::eac3::chanmap::expand(map);
 
-    // The output stage the decoder would have run on the assembled
-    // programme: dialnorm for line mode, and the fold when there is one. A
-    // fresh stage - see the header on what that costs.
-    std::vector<std::span<float>> stage_spans;
-    stage_spans.reserve(channels.size());
-    for (std::vector<float>& channel : channels) {
-        stage_spans.emplace_back(channel);
+    // A programme that is one independent substream and karaoke came out of flush() already
+    // reproduced, by the rule its units run by (Eac3Decoder::flush): what it holds is L, C, R and
+    // the LFE (a fold's channels, under a fold), not the coded bed, and the output stage has run
+    // on it. It is laid out as the shape the stage gave it and the stage is not run a second time.
+    const bool karaoke =
+        dependents.empty() && config_.output.karaoke != ac3::KaraokeReproduction::kOff &&
+        ac3::is_karaoke_programme(independent->info, independent->acmod, 1,
+                                  independent->object_metadata.has_value());
+    const ac3::OutputMode shaped =
+        ac3::output_mode(config_.output, independent->acmod, independent->lfe, karaoke);
+    // The layout the renderer's bed is: the coded one, and under the reproduction the one it names.
+    const ac3::eac3::chanmap::Layout layout =
+        karaoke && shaped.acmod != independent->acmod
+            ? ac3::eac3::chanmap::expand(ac3::eac3::chanmap::acmod_map(shaped.acmod, shaped.lfe))
+            : coded;
+    std::vector<std::vector<float>> channels;
+    if (karaoke) {
+        channels = independent->channels;
+    } else {
+        channels.assign(static_cast<std::size_t>(coded.count), std::vector<float>(length, 0.0F));
+        const auto lay_over = [&](const ac3::DecodedSubstream& substream) {
+            const ac3::eac3::chanmap::Layout own =
+                ac3::eac3::chanmap::expand(substream.location_map());
+            for (int i = 0;
+                 i < own.count && static_cast<std::size_t>(i) < substream.channels.size(); ++i) {
+                const int at = coded.index_of(own[i]);
+                if (at < 0) {
+                    continue;
+                }
+                const std::vector<float>& source = substream.channels[static_cast<std::size_t>(i)];
+                std::copy_n(source.begin(), std::min(length, source.size()),
+                            channels[static_cast<std::size_t>(at)].begin());
+            }
+        };
+        lay_over(*independent);
+        for (const ac3::DecodedSubstream* dependent : dependents) {
+            lay_over(*dependent);
+        }
+
+        // The output stage the decoder would have run on the assembled
+        // programme: dialnorm for line mode, and the fold when there is one. A
+        // fresh stage - see the header on what that costs.
+        std::vector<std::span<float>> stage_spans;
+        stage_spans.reserve(channels.size());
+        for (std::vector<float>& channel : channels) {
+            stage_spans.emplace_back(channel);
+        }
+        ac3::OutputStage stage{config_.output};
+        stage.apply(std::span<const std::span<float>>(stage_spans), coded, independent->acmod,
+                    independent->lfe, levels_of(*independent), independent->dialnorm,
+                    independent->dialnorm2);
     }
-    ac3::OutputStage stage{config_.output};
-    stage.apply(std::span<const std::span<float>>(stage_spans), layout, independent->acmod,
-                independent->lfe, levels_of(*independent), independent->dialnorm,
-                independent->dialnorm2);
     const std::size_t count =
-        serving_.fold ? static_cast<std::size_t>(
-                            output_channel_count(config_.output, independent->acmod, independent->lfe))
-                      : channels.size();
+        serving_.fold && !karaoke
+            ? static_cast<std::size_t>(
+                  output_channel_count(config_.output, independent->acmod, independent->lfe))
+            : channels.size();
 
     // Reconstructed objects travel with the independent substream when the
     // decoder produced them; the renderer places the bed alone otherwise.
@@ -977,7 +1014,7 @@ std::size_t StreamDecoder::render_flushed(std::span<ac3::DecodedSubstream> subst
         report_.lfe = independent->lfe;
         report_.substreams = static_cast<int>(1 + dependents.size());
         report_.layout =
-            independent->acmod == ac3::Acmod::kDualMono ? ac3::eac3::chanmap::Layout{} : layout;
+            independent->acmod == ac3::Acmod::kDualMono ? ac3::eac3::chanmap::Layout{} : coded;
         report_.bsmod = bsmod_of(independent->info);
         report_.dialnorm = independent->dialnorm;
         report_.dialnorm2 = independent->dialnorm2;

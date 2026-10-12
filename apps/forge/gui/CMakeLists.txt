@@ -64,6 +64,13 @@ qt_add_executable(forge-gui
     ../../shared/media/src/ac4_objects_core.cpp
     ../../shared/media/src/ac4_objects_core.hpp
     ../../shared/media/src/ac4_channels.hpp
+    # The picture of a CD+G disc beside the stream, shared with Hearth's lyric view and
+    # Crucible's lyric strip (apps/shared/cdg-picture).
+    ../../shared/cdg-picture/src/cdg_frame_source.hpp
+    ../../shared/cdg-picture/src/cdg_frames.cpp
+    ../../shared/cdg-picture/src/cdg_frames.hpp
+    ../../shared/cdg-picture/src/cdg_picture.cpp
+    ../../shared/cdg-picture/src/cdg_picture.hpp
     ../../shared/theme/src/system_theme.cpp
     ../../shared/theme/src/system_theme.hpp
     ../../shared/preferences/src/language_manager.cpp
@@ -88,6 +95,7 @@ qt_add_executable(forge-gui
 # stream player (stream_player_controller.cpp) plays ONE programme of an E-AC-3
 # stream that carries several, as forge's monitor/play do, and it is device-free.
 target_include_directories(forge-gui PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/cdg-picture/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/preferences/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/project/src"
@@ -350,6 +358,8 @@ target_link_libraries(forge-gui
         # The project file's reader and writer (apps/shared/project), which `forge` compiles in
         # too.
         iclforge::json
+        # What the CD+G picture's frames are decoded with (apps/shared/cdg-picture).
+        iclforge::lyrics
         # Unlike iclforge::ac3's own PRIVATE, $<BUILD_INTERFACE:...>-wrapped link
         # (libs/ac3/CMakeLists.txt), this app has no intermediate engine
         # library of its own to hang the profiling header pair on the way

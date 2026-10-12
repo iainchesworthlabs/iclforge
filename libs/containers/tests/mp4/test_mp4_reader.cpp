@@ -1728,6 +1728,152 @@ TEST_CASE("MP4 explicit ReadOptions::track_id selects a specific track", "[mp4][
     }
 }
 
+namespace {
+
+// A trak that carries no audio: a handler and one sample entry of its own four characters, as a
+// picture or a subtitle track has them. Its sample table is empty: the reader lists it and reads
+// nothing of it.
+Bytes extra_trak(std::uint32_t track_id, std::string_view handler, std::string_view entry,
+                 std::uint16_t packed_language = 0x15C7) {
+    Bytes entry_body;  // SampleEntry: reserved[6], data_reference_index
+    put_u32(entry_body, 0);
+    put_u16(entry_body, 0);
+    put_u16(entry_body, 1);
+    Bytes stsd_body;
+    put_u32(stsd_body, 1);  // entry_count
+    put_bytes(stsd_body, box(entry, entry_body));
+    Bytes stbl;
+    put_bytes(stbl, fullbox("stsd", 0, 0, stsd_body));
+    Bytes minf;
+    put_bytes(minf, box("stbl", stbl));
+
+    Bytes hdlr;
+    put_u32(hdlr, 0);  // pre_defined
+    put_fourcc(hdlr, handler);
+    for (int i = 0; i < 3; ++i) {
+        put_u32(hdlr, 0);  // reserved
+    }
+    put_u8(hdlr, 0);  // an empty name
+
+    Bytes mdhd;
+    put_u32(mdhd, 0);
+    put_u32(mdhd, 0);     // creation/modification
+    put_u32(mdhd, 1000);  // timescale
+    put_u32(mdhd, 0);     // duration
+    put_u16(mdhd, packed_language);
+    put_u16(mdhd, 0);
+
+    Bytes mdia;
+    put_bytes(mdia, fullbox("mdhd", 0, 0, mdhd));
+    put_bytes(mdia, fullbox("hdlr", 0, 0, hdlr));
+    put_bytes(mdia, box("minf", minf));
+
+    Bytes tkhd;
+    put_u32(tkhd, 0);
+    put_u32(tkhd, 0);         // creation/modification
+    put_u32(tkhd, track_id);  // track_ID
+    put_u32(tkhd, 0);         // reserved
+    put_u32(tkhd, 0);         // duration
+    for (int i = 0; i < 15; ++i) {
+        put_u32(tkhd, 0);
+    }
+    Bytes trak;
+    put_bytes(trak, fullbox("tkhd", 0, 0x000007, tkhd));
+    put_bytes(trak, box("mdia", mdia));
+    return box("trak", trak);
+}
+
+}  // namespace
+
+TEST_CASE("MP4 lists the tracks it does not read, by handler, sample entry and language",
+          "[mp4][reader][skipped]") {
+    // Around the audio track: a picture before it, then subtitle, audio, metadata, text and
+    // closed-caption tracks after it, as a rip or a karaoke video lays them out.
+    MoovSpec spec{.sizes = {32}, .track_id = 1};
+    const auto with_extras = [](const Bytes& moov) {
+        const Bytes body(moov.begin() + 8, moov.end());  // past the moov header
+        Bytes out;
+        put_bytes(out, extra_trak(2, "vide", "avc1"));
+        put_bytes(out, body);
+        put_bytes(out, extra_trak(3, "sbtl", "tx3g", 0x1A41));  // "fra"
+        put_bytes(out, extra_trak(4, "soun", "mp4a"));
+        put_bytes(out, extra_trak(5, "meta", "mett"));
+        put_bytes(out, extra_trak(6, "text", "text"));
+        put_bytes(out, extra_trak(7, "subt", "wvtt"));
+        put_bytes(out, extra_trak(8, "clcp", "c608"));
+        return box("moov", out);
+    };
+    spec.mdat_data_offset = 0;
+    const auto measured = with_extras(build_moov(spec));
+    spec.mdat_data_offset = ftyp().size() + measured.size() + 8;
+    const auto moov = with_extras(build_moov(spec));
+    Bytes file = ftyp();
+    file.insert(file.end(), moov.begin(), moov.end());
+    const auto mdat = box("mdat", frame_of(32, 0xAA));
+    file.insert(file.end(), mdat.begin(), mdat.end());
+
+    const auto out = iclforge::containers::mp4::demux(file);
+    REQUIRE(out.has_value());
+    // The audio is read as before, and is not among the skipped.
+    CHECK(out->track.track_id == 1);
+    CHECK(out->samples.size() == 1);
+
+    using iclforge::containers::mp4::TrackKind;
+    REQUIRE(out->skipped.size() == 7);
+    const auto& skipped = out->skipped;
+    CHECK(skipped[0].track_id == 2);
+    CHECK(skipped[0].kind == TrackKind::kVideo);
+    CHECK(skipped[0].codec_id == "avc1");
+    CHECK(skipped[0].language == "eng");
+    CHECK(skipped[1].track_id == 3);
+    CHECK(skipped[1].kind == TrackKind::kText);
+    CHECK(skipped[1].codec_id == "tx3g");
+    CHECK(skipped[1].language == "fra");
+    CHECK(skipped[2].track_id == 4);
+    CHECK(skipped[2].kind == TrackKind::kAudio);
+    CHECK(skipped[2].codec_id == "mp4a");
+    CHECK(skipped[3].track_id == 5);
+    CHECK(skipped[3].kind == TrackKind::kOther);
+    CHECK(skipped[3].codec_id == "mett");
+    CHECK(skipped[4].kind == TrackKind::kText);
+    CHECK(skipped[5].kind == TrackKind::kText);
+    CHECK(skipped[5].codec_id == "wvtt");
+    CHECK(skipped[6].kind == TrackKind::kText);
+    CHECK(skipped[6].codec_id == "c608");
+
+    CHECK(iclforge::containers::mp4::describe(TrackKind::kText) == "text");
+    CHECK(iclforge::containers::mp4::describe(TrackKind::kVideo) == "video");
+}
+
+TEST_CASE("MP4 lists no more than 64 skipped tracks, however many the moov declares",
+          "[mp4][reader][skipped]") {
+    MoovSpec spec{.sizes = {32}, .track_id = 1};
+    const auto with_extras = [](const Bytes& moov) {
+        const Bytes body(moov.begin() + 8, moov.end());
+        Bytes out;
+        put_bytes(out, body);
+        for (std::uint32_t id = 2; id < 102; ++id) {
+            put_bytes(out, extra_trak(id, "vide", "avc1"));
+        }
+        return box("moov", out);
+    };
+    spec.mdat_data_offset = 0;
+    const auto measured = with_extras(build_moov(spec));
+    spec.mdat_data_offset = ftyp().size() + measured.size() + 8;
+    const auto moov = with_extras(build_moov(spec));
+    Bytes file = ftyp();
+    file.insert(file.end(), moov.begin(), moov.end());
+    const auto mdat = box("mdat", frame_of(32, 0xAA));
+    file.insert(file.end(), mdat.begin(), mdat.end());
+
+    const auto out = iclforge::containers::mp4::demux(file);
+    REQUIRE(out.has_value());
+    CHECK(out->track.track_id == 1);
+    REQUIRE(out->skipped.size() == 64);
+    CHECK(out->skipped.front().track_id == 2);
+    CHECK(out->skipped.back().track_id == 65);
+}
+
 TEST_CASE("MP4 fragmented reader across tfhd/trun flag combinations", "[mp4][reader]") {
     constexpr std::uint32_t kTrackId = 1;
     const MoovSpec spec{.sizes = {}, .track_id = kTrackId};

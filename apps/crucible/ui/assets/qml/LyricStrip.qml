@@ -5,9 +5,10 @@ import QtQuick.Layouts
 
 import Crucible
 
-// Lyrics for the selected application (planning/karaoke-phase2.md, W13b, D9): import an `.lrc`,
-// press Start as the song begins, and read the line being sung. The position is the one D9 names
-// for an application that publishes none: start-and-nudge (CrucibleLyrics, which says why).
+// Lyrics for the selected application (planning/karaoke-phase2.md, W13b, D9): import an `.lrc` and
+// read the line being sung. The position is the application's media session where it publishes
+// one (the player's own, so a pause and a seek are followed), and start-and-nudge where it does
+// not: press Start as the song begins. CrucibleLyrics keeps which, and says so here in a sentence.
 //
 // Three states for a word, in three colours and a cue that is not colour: *sung* is the accent, *not
 // yet sung* is muted, and the word being sung is in the text colour with the sung part of it filled
@@ -50,6 +51,24 @@ ColumnLayout {
         running: root.following
         onTriggered: root.nowMs = CrucibleLyrics.nowMs()
     }
+    Connections {
+        target: CrucibleLyrics
+        function onSessionsChanged() {
+            root.sessionsRevision++;
+        }
+    }
+
+    // CrucibleLyrics matches the application to a session by what the room knows of it.
+    // The id is the object's own: this runs from onAppChanged, which can come before appId has
+    // been re-evaluated from it.
+    function describeApp() {
+        if (root.app) {
+            CrucibleLyrics.setApplication(root.app.app, root.app.name ?? "", root.app.imagePath ?? "",
+                                          root.app.appId ?? "");
+        }
+    }
+    onAppChanged: root.describeApp()
+    Component.onCompleted: root.describeApp()
 
     // Each reads `revision` in a condition that is always true, which is what makes the binding
     // depend on it: a bare `root.revision;` statement is dropped by the compiled QML and the
@@ -72,6 +91,50 @@ ColumnLayout {
                                   : ({ line: -1, inLine: false, word: -1, fraction: 0, positionMs: -1, fills: [] })
     // A file with times or a disc: what Start, Stop and the nudge are for.
     readonly property bool followable: root.status === "timed" || root.status === "picture"
+
+    // Where the position comes from: "session" (the media session, where there is one) or "hand".
+    readonly property string positionSource: root.revision >= 0 && root.appId >= 0
+                                             ? CrucibleLyrics.positionSource(root.appId) : "session"
+    // Where that stands, as CrucibleLyrics.sessionState() says: following, waiting, no-timeline,
+    // changed, unavailable, lost, hand or none.
+    readonly property string sessionState: root.revision >= 0 && root.appId >= 0
+                                           ? CrucibleLyrics.sessionState(root.appId) : "none"
+    readonly property string sessionLabel: root.revision >= 0 && root.appId >= 0
+                                           ? CrucibleLyrics.sessionLabel(root.appId) : ""
+    readonly property string sessionTrack: root.revision >= 0 && root.appId >= 0
+                                           ? CrucibleLyrics.sessionTrack(root.appId) : ""
+    // The sessions the system has now, for choosing one when none was matched.
+    property int sessionsRevision: 0
+    readonly property var sessionChoices: root.sessionsRevision >= 0 && root.revision >= 0 && root.appId >= 0
+                                          ? CrucibleLyrics.sessions(root.appId) : []
+    readonly property string sourceText: {
+        switch (root.sessionState) {
+        case "following":
+            return root.sessionTrack.length > 0
+                   ? qsTr("Following %1: %2").arg(root.sessionLabel).arg(root.sessionTrack)
+                   : qsTr("Following %1.").arg(root.sessionLabel);
+        case "waiting":
+            return root.sessionChoices.length > 0
+                   ? qsTr("This application has not published where it is in the song (a media session). "
+                          + "Press Start to begin by hand, or follow one that is playing:")
+                   : qsTr("Waiting for this application to publish where it is in the song (a media session). "
+                          + "Press Start to begin by hand.");
+        case "no-timeline":
+            return qsTr("%1 does not publish where it is in the song. Press Start to begin by hand.")
+                   .arg(root.sessionLabel);
+        case "unavailable":
+            return qsTr("Media sessions cannot be read here: %1 Press Start to begin by hand.")
+                   .arg(CrucibleLyrics.sessionsUnavailableReason());
+        case "changed":
+            return qsTr("The track changed to “%1”, so these lyrics are not followed. "
+                        + "Import the lyrics for it, or follow it anyway.").arg(root.sessionTrack);
+        case "lost":
+            return qsTr("The media session went away, so the words carry on by the clock from where they were.");
+        default:
+            return qsTr("Press Start as the song begins. This application's position is not read, so a "
+                        + "pause or a seek in it is not followed: press Start again, or nudge the words.");
+        }
+    }
     // The song's position for a disc's picture: where the clock has it, and the first picture
     // before it has begun.
     readonly property real pictureMs: root.revision >= 0 && root.nowMs >= 0 && root.appId >= 0
@@ -175,6 +238,12 @@ ColumnLayout {
                 text: qsTr("Stop")
                 enabled: root.following
                 onClicked: CrucibleLyrics.stop(root.appId)
+            }
+            CrucibleButton {
+                objectName: "lyricsUseSession"
+                visible: root.positionSource === "hand" || root.sessionState === "changed"
+                text: qsTr("Follow the media session")
+                onClicked: CrucibleLyrics.useSession(root.appId)
             }
             Item { Layout.fillWidth: true }
             CrucibleButton {
@@ -336,11 +405,27 @@ ColumnLayout {
             objectName: "lyricsHint"
             Layout.fillWidth: true
             visible: root.followable
-            text: qsTr("Press Start as the song begins. This application's position is not read, so a "
-                       + "pause or a seek in it is not followed: press Start again, or nudge the words.")
-            color: Theme.textMuted
+            text: root.sourceText
+            color: root.sessionState === "changed" || root.sessionState === "unavailable" ? Theme.text : Theme.textMuted
             font.pixelSize: Theme.fontSmall
             wrapMode: Text.WordWrap
+        }
+
+        // None matched this application, and some are playing: follow one of them.
+        Flow {
+            objectName: "lyricsSessions"
+            Layout.fillWidth: true
+            spacing: Theme.space2
+            visible: root.followable && root.sessionState === "waiting" && root.sessionChoices.length > 0
+            Repeater {
+                model: root.sessionChoices
+                delegate: CrucibleButton {
+                    required property var modelData
+                    objectName: "lyricsSession"
+                    text: modelData.title.length > 0 ? modelData.name + " \u00b7 " + modelData.title : modelData.name
+                    onClicked: CrucibleLyrics.useSession(root.appId, modelData.id)
+                }
+            }
         }
     }
 }
