@@ -1,15 +1,25 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <numbers>
+#include <string>
+#include <system_error>
 #include <vector>
 
 #include "iclforge/pitch/reference.hpp"
 #include "iclforge/pitch/synth.hpp"
+#include "iclforge/sendspin/codec.hpp"
+#include "iclforge/sendspin/messages.hpp"
 #include "microphone_input.hpp"
 #include "microphone_session.hpp"
 
@@ -61,11 +71,12 @@ struct Rig {
     std::unique_ptr<MicrophoneSession> session;
 };
 
-Rig rig(std::vector<float> samples, std::int64_t first_time_ns = kT0) {
+Rig rig(std::vector<float> samples, std::int64_t first_time_ns = kT0, std::uint16_t channels = 1) {
     auto input = std::make_unique<ScriptedMicrophoneInput>(
         std::move(samples), kRate, first_time_ns,
         std::vector<InputDevice>{{"mic-a", "Headset", false, kRate, 1},
-                                 {"mic-b", "Desk microphone", true, kRate, 2}});
+                                 {"mic-b", "Desk microphone", true, kRate, 2}},
+        channels);
     Rig r;
     r.input = input.get();
     r.session = std::make_unique<MicrophoneSession>(std::move(input));
@@ -223,6 +234,161 @@ TEST_CASE("microphone session: an alignment set before the start is the one it s
     const auto s = r.session->snapshot();
     CHECK(s.input_delay_ms == 130);
     CHECK(s.total.fraction() > 0.85);
+}
+
+namespace {
+
+// A folder of this test's own under the system's temporary one.
+struct TakeFolder {
+    std::filesystem::path path;
+    TakeFolder() {
+        path = std::filesystem::temp_directory_path() /
+               ("iclforge-session-take-" +
+                std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        std::filesystem::create_directories(path);
+    }
+    ~TakeFolder() {
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
+};
+
+std::string read_text(const std::filesystem::path& p) {
+    std::ifstream in(p, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+}
+
+// The samples of a take's FLAC file, 24-bit integers.
+std::vector<std::int32_t> decode_take(const std::filesystem::path& p, std::uint32_t rate) {
+    std::ifstream in(p, std::ios::binary);
+    const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(in)),
+                                          std::istreambuf_iterator<char>());
+    if (bytes.size() <= 42) {
+        return {};
+    }
+    iclforge::sendspin::messages::PlayerStream stream;
+    stream.format.codec = iclforge::sendspin::messages::Codec::kFlac;
+    stream.format.channels = 1;
+    stream.format.sample_rate = static_cast<std::int32_t>(rate);
+    stream.format.bit_depth = 24;
+    stream.codec_header.assign(bytes.begin(), bytes.begin() + 42);
+    auto decoder = iclforge::sendspin::codec::make_decoder(stream);
+    if (!decoder) {
+        return {};
+    }
+    const auto decoded =
+        decoder->decode(std::vector<std::uint8_t>(bytes.begin() + 42, bytes.end()));
+    return decoded ? *decoded : std::vector<std::int32_t>{};
+}
+
+}  // namespace
+
+TEST_CASE("microphone session: a take needs the microphone on", "[microphone][take]") {
+    Rig r = rig(sine(440.0, 1.0, 0.1));
+    TakeFolder folder;
+    const auto refused = r.session->begin_take(folder.path / "x.flac", {});
+    REQUIRE(!refused.has_value());
+    CHECK(refused.error().find("off") != std::string::npos);
+    CHECK(!r.session->taking());
+}
+
+TEST_CASE("microphone session: a take is the dry voice, and says where in the item it begins",
+          "[microphone][take]") {
+    // The voice reaches the stamps 130 ms after it was sung, and 130 ms is declared.
+    Rig r = rig(voice(), kT0 + 130'000'000);
+    r.session->set_input_delay_ms(130);
+    r.session->set_offset_ms(20);
+    TakeFolder folder;
+    REQUIRE(r.session->start("").has_value());
+    r.session->set_headphones(true);
+    iclforge::hearth::TakeMetadata partial;
+    partial.item_title = "Song";
+    partial.item_path = "x/song.ac3";
+    partial.reference = "the melody guide (M)";
+    // The take begins half a second in: the stream has delivered 370 ms of the voice by then (its
+    // first sample was stamped 130 ms after the item began).
+    run(r, kT0, kT0 + 500'000'000);
+    REQUIRE(r.session->begin_take(folder.path / "song.flac", partial).has_value());
+    CHECK(r.session->taking());
+    run(r, kT0 + 520'000'000, kT0 + 2'500'000'000);
+    const auto snapshot = r.session->snapshot();
+    CHECK(snapshot.taking);
+    CHECK(snapshot.take_seconds > 1.5);
+
+    const auto info = r.session->end_take();
+    REQUIRE(info.has_value());
+    CHECK(!r.session->taking());
+    CHECK(info->frames > static_cast<std::uint64_t>(kRate) * 3 / 2);
+    CHECK(info->sample_rate == kRate);
+
+    // The sidecar: the item was where the voice's first written sample was sung, and the 20 ms the
+    // person moved it is in the figure.
+    const std::string json = read_text(info->sidecar);
+    CHECK(json.find("\"input_delay_ms\": 130") != std::string::npos);
+    CHECK(json.find("\"offset_ms\": 20") != std::string::npos);
+    CHECK(json.find("\"headphones\": true") != std::string::npos);
+    CHECK(json.find("\"reference\": \"the melody guide (M)\"") != std::string::npos);
+    CHECK(json.find("\"item_start_ms\": null") == std::string::npos);
+    // A voice sung at item time t is captured at t + 130 ms and placed by the declared delay at t.
+    // The take's first sample is the 370 ms one (500 ms of the clock less the 130 ms), so it was
+    // sung at item time 370 ms, and 390 ms with the person's 20 ms, to within a poll.
+    const auto at = json.find("\"item_start_ms\": ");
+    REQUIRE(at != std::string::npos);
+    const long start = std::stol(json.substr(at + 17));
+    CHECK(start >= 370 + 20 - 5);
+    CHECK(start <= 370 + 20 + 5);
+}
+
+TEST_CASE("microphone session: closing the microphone ends a take and keeps it",
+          "[microphone][take]") {
+    Rig r = rig(voice());
+    TakeFolder folder;
+    REQUIRE(r.session->start("").has_value());
+    run(r, kT0, kT0 + 100'000'000);
+    REQUIRE(r.session->begin_take(folder.path / "kept.flac", {}).has_value());
+    run(r, kT0 + 120'000'000, kT0 + 1'000'000'000);
+    r.session->stop();
+    CHECK(!r.session->taking());
+    CHECK(std::filesystem::exists(folder.path / "kept.flac"));
+    CHECK(std::filesystem::exists(folder.path / "kept.take.json"));
+    CHECK(std::filesystem::file_size(folder.path / "kept.flac") > 1000);
+}
+
+TEST_CASE("microphone session: a stereo microphone is kept as the mean of its channels",
+          "[microphone][take]") {
+    // The left channel carries a tone of 0.4 and the right is silent: one channel of 0.2, not 0.4.
+    const std::vector<float> left = sine(440.0, 1.0, 0.4);
+    std::vector<float> stereo(left.size() * 2, 0.0F);
+    for (std::size_t i = 0; i < left.size(); ++i) {
+        stereo[2 * i] = left[i];
+    }
+    Rig r = rig(std::move(stereo), kT0, 2);
+    TakeFolder folder;
+    REQUIRE(r.session->start("").has_value());
+    REQUIRE(r.session->begin_take(folder.path / "stereo.flac", {}).has_value());
+    run(r, kT0, kT0 + 1'200'000'000);
+    const auto info = r.session->end_take();
+    REQUIRE(info.has_value());
+    CHECK(info->frames == left.size());
+
+    const std::vector<std::int32_t> decoded = decode_take(info->audio, kRate);
+    REQUIRE(decoded.size() == left.size());
+    std::int32_t peak = 0;
+    for (const std::int32_t v : decoded) {
+        peak = std::max(peak, std::abs(v));
+    }
+    CHECK(peak == Catch::Approx(0.2 * 8388607.0).epsilon(0.01));
+}
+
+TEST_CASE("microphone session: a discarded take is gone", "[microphone][take]") {
+    Rig r = rig(voice());
+    TakeFolder folder;
+    REQUIRE(r.session->start("").has_value());
+    REQUIRE(r.session->begin_take(folder.path / "gone.flac", {}).has_value());
+    run(r, kT0, kT0 + 500'000'000);
+    r.session->discard_take();
+    CHECK(!r.session->taking());
+    CHECK(!std::filesystem::exists(folder.path / "gone.flac"));
 }
 
 TEST_CASE("microphone session: a device that goes away or stalls is reported", "[microphone]") {

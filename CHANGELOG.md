@@ -582,6 +582,25 @@ The sections below contain the complete change list and fixes.
   a group still plays one reproduction. No board lists it yet, so every board is sent PCM for
   such a stream (`planning/karaoke-eac3.md`, E4a, D6; `planning/hearth-sendspin-extension.md`).
 
+**Hearth: a singer can keep a take of their voice**
+
+- **"Record a take" keeps the singer's voice from the microphone, and only when pressed** (the
+  microphone, scoring and recording programme, M6). The Microphone card gains **Record a take** and
+  **Stop recording**, a **Recording** indicator with the elapsed time (a second sign beside
+  **Microphone on**: having the microphone on is not recording), the folder takes go to with
+  **Choose…**, and **Show in folder** and **Delete this take** for the last one. A take stops when the
+  microphone goes off, the page is left, the item ends, the device goes away or the disk fails, and
+  says why. Turning the microphone on never starts one.
+- **A take is the voice alone, lossless, with a description beside it.** One mono 24-bit FLAC at the
+  microphone's rate through the existing encoder, and a `.take.json` that says which item it was,
+  where in the item the first sample was sung (the heard position when the sound reached the
+  microphone, less the microphone's declared delay, plus the singer's timing), and that alignment, so
+  any editor can place it. The backing is never mixed in. Takes go to the documents folder under
+  "Hearth takes" unless the person chose another, never beside the song file, and the folder is not
+  made until the first take, and a take begun in the same second as another is numbered, not
+  written over it. `TakeRecorder` in the engine is Qt-free and is tested with no device.
+  Hearth's user guide has a section on it.
+
 **Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
 
 - **`iclforge/base/karaoke.hpp`.** `KaraokeReproduction` (off, aware, capable), `KaraokeVocals`
