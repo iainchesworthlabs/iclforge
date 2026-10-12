@@ -3,6 +3,7 @@
 # They were libs/ac3/tests/io's, built against the ESP-IDF component's include directory; the
 # headers they hold to the host are libs/device's now, and a test of a header is the header's.
 iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
+    test_ac4_sync_frame.cpp
     test_block_ring.cpp
     test_dac_queue_model.cpp
     test_firmware_image.cpp

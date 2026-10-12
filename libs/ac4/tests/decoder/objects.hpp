@@ -76,6 +76,10 @@ struct ObjectCase {
     bool common = false;
     bool extras = false;
     bool bed_info = false;  // b_oamd_extension_present with ajoc_bed_info()
+    // A channel-coded 5.1 group (SIMPLE, tones of its own) as the presentation's music and effects
+    // (Part 2 Table 53's configuration 0), the objects' group its dialogue: a presentation with a
+    // bed, which a decoder that places no objects plays alone.
+    bool channels = false;
 };
 
 struct ExpectedObject {

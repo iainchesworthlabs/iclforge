@@ -84,6 +84,13 @@ if(CONFIG_ICLFORGE_SENDSPIN)
     else()
         list(APPEND ICLFORGE_COMPONENT_SRCS "src/opus_stream_none.cpp")
     endif()
+    # The AC-4 decoder the player calls: libs/ac4's through src/ac4_stream.hpp, or the one that
+    # decodes nothing. Chosen here, as the Opus decoder is.
+    if(CONFIG_ICLFORGE_AC4)
+        list(APPEND ICLFORGE_COMPONENT_SRCS "src/ac4_stream.cpp")
+    else()
+        list(APPEND ICLFORGE_COMPONENT_SRCS "src/ac4_stream_none.cpp")
+    endif()
 endif()
 idf_component_register(
     SRCS ${ICLFORGE_COMPONENT_SRCS}

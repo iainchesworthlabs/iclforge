@@ -22,10 +22,12 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_network_view.cpp
     test_output_decision.cpp
     test_output_selector.cpp
+    test_performance.cpp
     test_play_meters.cpp
     test_player.cpp
     test_player_bitstream.cpp
     test_queue.cpp
+    test_reference_melody.cpp
     test_session.cpp
     test_settings_model.cpp
     test_sink_form.cpp
@@ -184,6 +186,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     # itself - all of which need libs/sendspin's server half, which a
     # core-only build leaves out.
     target_sources(iclforge-hearth-tests PRIVATE
+        test_ac4_object_facts.cpp
         test_pairing_store.cpp
         test_network_sinks.cpp
         test_network_sinks_rows.cpp
