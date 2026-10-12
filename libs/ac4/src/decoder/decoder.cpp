@@ -2543,6 +2543,16 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
         if (!is_object(m)) {
             continue;
         }
+        // Told to place no objects, the decoder leaves a substream of them undecoded, unless it
+        // carries an intermediate spatial format, which is rendered into the channels here.
+        if (d.config.skip_objects) {
+            const CapturedAudio& skipped = capture.audio[m];
+            const IsfPlace isf =
+                d.config.decoding == DecodingMode::kFull ? skipped.isf_full : skipped.isf_core;
+            if (isf.count == 0) {
+                continue;
+            }
+        }
         if (const detail::ParseResult decoded = d.decode_objects(capture.audio[m], inputs, frame);
             !decoded) {
             d.refusal = decoded.error().reason;
@@ -2552,6 +2562,12 @@ std::expected<bool, DecodeError> Decoder::Impl::decode_into(
         d.latency = d.pcm[capture.audio[m].state_key].output_delay_samples();
     }
     frame.objects.resize(d.objects_used);
+    if (!channel_anchor && d.config.skip_objects && d.isf_used == 0) {
+        // A presentation of object audio alone, which this decoder was told to leave undecoded:
+        // there is nothing in it to play.
+        d.refusal = "a presentation of object audio alone, which this decoder is set not to decode";
+        return d.conceal_or(DecodeError::kUnsupported, frame);
+    }
     if (!channel_anchor) {
         // A presentation of object audio alone: no channels, but an
         // intermediate spatial format's.

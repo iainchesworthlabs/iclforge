@@ -22,6 +22,10 @@ CONFIG_ICLFORGE_AC4=y
 # the example's default of 32 KB leaves under 10 KB in the widest mode and this takes
 # 40 KB. stream.decode_stack_free says what a play left.
 CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES=40960
+# The same for the task that decodes a Sendspin stream's bursts, which an AC-4 stream of them
+# runs the decoder on (ICLFORGE_EXAMPLE_SENDSPIN_AC4; its default of 32 KB is what AC-3 and
+# E-AC-3 need).
+CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES=40960
 
 # Each frame's per-channel stages on both cores (planning/ac4.md, D14g). On a part with two
 # cores and the decode task pinned to one (CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE, which
