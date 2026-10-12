@@ -463,10 +463,33 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **Hearth: a lyrics file and a CD+G disc beside a song are a choice, for this run.** A song with
+  both shows its words, as before, and a **Show** choice (Words or Picture) on the Karaoke page's
+  Lyrics card, and on the singer view's bar, shows the disc instead. The choice is not kept for the
+  song and holds from one song to the next until Hearth is closed; a song with only one of the two
+  is unchanged, and choosing the picture takes nothing from the lyrics (they stay loaded for the
+  timing window, the duet cues and a board's lyrics). `KaraokeController` gains `hasPicture`,
+  `pictureFileName`, `preferPicture` and `showingPicture` (planning/karaoke-phase2.md, W13f; the
+  owner's answer to the question of what wins).
 - **Crucible's lyric strip draws a CD+G disc.** A `.cdg` file imported against an application is
   drawn as its picture under the file's name (the shared `CdgPicture`: 300 by 216, as large as
   fits in whole-pixel steps) and followed by the same Start and nudge an `.lrc` has; its words are
   pixels, so none are read as text and the page says so (planning/karaoke-phase2.md, W13f and D11).
+- **Crucible's lyric strip follows an application's media session.** The position is the player's
+  own where it publishes one (the System Media Transport Controls on Windows, MPRIS on Linux, the
+  now-playing information on macOS), so a pause and a seek are followed with no press of Start; the
+  words carry on by the clock if the session goes away, and are not followed against a new track's
+  title, artist or length. Start is by hand and **Follow the media session** takes it back; a
+  session that is not matched is offered when others are playing. The sessions are read on a
+  thread of their own, only while an application with lyrics waits on one. The macOS reader is the
+  private now-playing framework, which developers report macOS 15.4 and later withholds, and no
+  Mac has run it (planning/karaoke-phase2.md, D9; planning/karaoke-phase2-findings.md).
+- **Crucible's lyric strip can say what it follows over OSC.** Settings has a **Lyric events out**
+  block, off until turned on: an IPv4 address and a UDP port (9000 to start with), and which of
+  `/crucible/lyrics/state`, `/line`, `/word` and `/position` are sent, each beginning with the
+  application's name, as single OSC 1.0 messages for a lighting or show-control rig. The sending
+  half of the audio library's socket layer is published as `iclforge::audio::UdpSender`
+  (planning/karaoke-phase2.md, D9's rejected alternative, built on the owner's ask).
 - **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
   offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
   dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
@@ -476,6 +499,12 @@ The sections below contain the complete change list and fixes.
   `CdgScreen::pixels()` and `colour()`, so a picture's backdrop shows where the disc meant video to.
   Both are state of the replay, so a seek back lands where a seek from the start does
   (`iclforge::lyrics`, `cdg.hpp`; planning/karaoke-phase2.md, W13f).
+- **The Forge GUI's Open stream dialog shows a karaoke disc's picture.** A `name.cdg` beside the
+  stream (any case) is drawn under the transport as Hearth draws it, through the shared
+  `apps/shared/cdg-picture` item, against the position of what is heard (the transport's position
+  less what the output has been handed and not yet played). A file of that name that is not CD+G
+  says why and the stream plays on. Three new strings in the seven catalogues
+  (planning/karaoke-phase2.md, W13f).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the
