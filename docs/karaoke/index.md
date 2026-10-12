@@ -261,8 +261,16 @@ and as large as fits (in whole steps, so the small type stays crisp), drawn agai
 what is *heard* and moved by the lyric delay as the words are.
 
 The words of a disc are **part of the picture**. Nothing is read from it as text, so there is no
-fill, no line to follow and nothing to translate or copy, and the page says so. A lyrics file beside
-the stream is shown in its place, since it is what a word-by-word fill and the delay can follow.
+fill, no line to follow and nothing to translate or copy, and the page says so.
+
+**When a lyrics file is beside the stream too**, the words are shown, since they are what a
+word-by-word fill and the delay can follow, and a **Show** choice (Words or Picture) appears in the
+Lyrics card, and on the bar of the full-screen singer view, to show the disc instead. The choice is
+for **this run of Hearth**: it is not kept for the song, it holds from one song to the next while
+Hearth is open, and a song with only a lyrics file or only a disc is not changed by it. Choosing
+the picture takes nothing from the lyrics: the file is still loaded, so the timing window, the
+duet cues and the lyrics a board is sent are as they were. A `.cdg` that cannot be read beside a
+lyrics file is not shown and not reported: the words are.
 
 What is drawn is what the disc's own player draws: the screen preset and the border preset, the
 tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form
@@ -434,6 +442,31 @@ forge decode out.ac3 melody-and-v1.wav karaoke=v1
 `karaoke`, as Annex C defines no Lt/Rt reproduction. A stream that is not karaoke is decoded as
 coded, and the report says so. The library form is `OutputConfig::karaoke` and
 `OutputConfig::karaoke_vocals`; see [Decoding](../library/decoding.md).
+
+`forge monitor` takes the same choice and plays the reproduction on the output:
+
+```text
+forge monitor out.ac3 karaoke=none      # L, C, R: the backing and the melody, for singing along
+forge monitor out.ac3 karaoke=v1+v2     # V1 left, V2 right
+```
+
+The capable decoder's levels are `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` on
+both commands: each part against Table C.2.3, 0 dB the table, up to 12 dB louder and `-24` or `off`
+at the bottom, the span and the defaults of Hearth's sliders.
+
+```text
+forge decode out.ac3 sing.wav karaoke=none karaoke-melody=-6
+forge monitor out.ac3 karaoke=v1 karaoke-v1=-12 karaoke-melody=3
+```
+
+They move nothing under the aware reproduction, so a level without a choice of vocals
+(`karaoke=none`, `v1`, `v2` or `v1+v2`) is refused.
+
+On an output narrower than the stream, which `monitor` folds to unasked, the 2/0 reproduction
+plays. `forge play` applies the choice where it decodes (its PCM fallback), and `forge spdif`
+and `forge play`'s bitstream legs hand the coded stream on: they accept `karaoke` and say it is
+not applied, since a receiver reproduces the stream. E-AC-3 and AC-4 are ignored with a warning
+by all of them.
 
 ## From a program
 

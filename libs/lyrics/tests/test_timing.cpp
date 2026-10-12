@@ -325,3 +325,50 @@ TEST_CASE("timing: the whole tap pass, from plain text to a file that reads back
     CHECK(back.lines[2].text == "Should auld acquaintance");
     CHECK(back.lines[2].end_ms == 15000);
 }
+
+TEST_CASE("timing: a gap between cues is written as a time with no text when asked, and reads back as an end",
+          "[lyrics][timing][gaps]") {
+    // A SubRip file has an end for each cue. The second and third cues touch, so nothing is sung
+    // between them; the first and second have two seconds of silence between them.
+    const auto subrip = iclforge::lyrics::parse_subrip(
+        "1\n00:00:01,000 --> 00:00:03,000\nOne\n\n"
+        "2\n00:00:05,000 --> 00:00:07,000\nTwo\n\n"
+        "3\n00:00:07,000 --> 00:00:09,000\nThree\n");
+    REQUIRE(subrip.has_value());
+
+    // By default an LRC line ends where the next begins, so the gap is not written.
+    CHECK(iclforge::lyrics::write_lrc(*subrip) == "[00:01.00]One\n[00:05.00]Two\n[00:07.00]Three\n");
+
+    const std::string marked =
+        iclforge::lyrics::write_lrc(*subrip, iclforge::lyrics::LrcWriteOptions{.mark_gaps = true});
+    // The gap after One is marked; Two runs into Three, and the last line's end is not written.
+    CHECK(marked == "[00:01.00]One\n[00:03.00]\n[00:05.00]Two\n[00:07.00]Three\n");
+
+    // Read back, One ends where its cue did, and not at the next line's start.
+    const Lyrics again = parsed(marked);
+    REQUIRE(again.lines.size() == 4);
+    CHECK(again.lines[0].text == "One");
+    CHECK(again.lines[0].end_ms == 3000);
+    CHECK(again.lines[1].text.empty());
+    CHECK(again.lines[2].text == "Two");
+    CHECK(again.lines[2].end_ms == 7000);
+}
+
+TEST_CASE("timing: marking gaps leaves an LRC file as it was", "[lyrics][timing][gaps]") {
+    // Each line of an LRC file ends where the next begins, so there is no gap to mark.
+    const std::string source = "[00:01.00]One\n[00:03.00]Two\n[00:05.00]Three\n";
+    const Lyrics lyrics = parsed(source);
+    CHECK(iclforge::lyrics::write_lrc(lyrics, iclforge::lyrics::LrcWriteOptions{.mark_gaps = true}) ==
+          iclforge::lyrics::write_lrc(lyrics));
+
+    // An end that is not a hundredth of a second past the start is not a gap either, and a line
+    // that is only a time is not given another.
+    Lyrics built;
+    built.timed = true;
+    built.lines.push_back({.start_ms = 1000, .end_ms = 1004, .text = "Blink"});
+    built.lines.push_back({.start_ms = 3000, .end_ms = 4000, .text = ""});
+    built.lines.push_back({.start_ms = 6000, .end_ms = 7000, .text = "After"});
+    CHECK(iclforge::lyrics::write_lrc(built, iclforge::lyrics::LrcWriteOptions{.mark_gaps = true}) ==
+          "[00:01.00]Blink\n[00:03.00]\n[00:06.00]After\n");
+}
+
