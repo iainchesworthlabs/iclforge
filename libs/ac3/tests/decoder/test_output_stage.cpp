@@ -1164,7 +1164,11 @@ TEST_CASE("karaoke: the LFE is kept and follows Rk", "[decoder][output][karaoke]
     REQUIRE(channels.size() == 4);
     CHECK(static_cast<double>(channels[0][0]) ==
           Catch::Approx(kSlev / (1.0 + kSlev)).margin(1e-6));  // V1 reached Lk
-    CHECK(static_cast<double>(channels[3][0]) == Catch::Approx(0.25).margin(1e-9));  // the LFE
+    // The LFE is in none of Annex C's equations, so it takes the scale-down the three sums took
+    // (D8, planning/karaoke-eac3.md): its level against L, C and R is as the mix put it, which is
+    // what Dolby's decoder gives by scaling nothing.
+    CHECK(static_cast<double>(channels[3][0]) ==
+          Catch::Approx(0.25 / (1.0 + kSlev)).margin(1e-9));  // the LFE
 
     CHECK(ac3::output_channel_count(karaoke_config(), ac3::Acmod::k3_2, true, true) == 4);
     CHECK(ac3::output_channel_count(karaoke_config(), ac3::Acmod::k3_2, false, true) == 3);
@@ -1545,7 +1549,8 @@ TEST_CASE("karaoke capable: channel counts, and the LFE follows Rk", "[decoder][
     stage.apply(channels, ac3::Acmod::k3_2, true, capable_levels(), 31);
     REQUIRE(channels.size() == 4);
     CHECK(static_cast<double>(channels[1][0]) == Catch::Approx(0.5).margin(1e-6));  // 1/(1 + 1)
-    CHECK(static_cast<double>(channels[3][0]) == Catch::Approx(0.25).margin(1e-9));
+    // The LFE with them, over the same 1 + 1.
+    CHECK(static_cast<double>(channels[3][0]) == Catch::Approx(0.125).margin(1e-9));
 }
 
 TEST_CASE("karaoke: a real karaoke stream decodes to L C R through the decoder",
@@ -1810,12 +1815,19 @@ TEST_CASE("karaoke: output_mode is the layout a real decoder's channels come out
             CHECK(heard->channels.size() ==
                   full_bandwidth_channels(mode.acmod) + (mode.lfe ? 1U : 0U));
             if (mode.acmod == ac3::Acmod::k3_0 && mode.lfe) {
-                // L, C, R, then the LFE as it was coded.
+                // L, C, R, then the LFE as it was coded, scaled down as L, C and R are: by
+                // 1/(1 + slev) for the aware decoder, and by 1/(1 + 1) for the capable one with
+                // both vocals, whose a and h are 1.
                 REQUIRE(heard->channels.size() == 4);
                 REQUIRE(coded->channels.size() == 6);
+                REQUIRE(heard->surmixlev.has_value());
+                const double slev = config.karaoke == ac3::KaraokeReproduction::kCapable
+                                        ? 1.0
+                                        : ac3::meta::coefficient(*heard->surmixlev);
+                const double scale = 1.0 / (1.0 + slev);
                 for (std::size_t i = 0; i < heard->channels[3].size(); ++i) {
                     REQUIRE(static_cast<double>(heard->channels[3][i]) ==
-                            Catch::Approx(static_cast<double>(coded->channels[5][i]))
+                            Catch::Approx(static_cast<double>(coded->channels[5][i]) * scale)
                                 .margin(1e-6));
                 }
             }
@@ -2040,7 +2052,8 @@ TEST_CASE("karaoke re-levelling: a gain that is not a finite number of 0 or more
 
 TEST_CASE("karaoke re-levelling: the LFE and the parts a stream lacks are untouched",
           "[decoder][output][karaoke][capable][releveling]") {
-    // The LFE comes out after Rk as it was coded, whatever the gains say.
+    // The LFE comes out after Rk, scaled down as the three sums are; with the three parts at 0
+    // nothing is scaled down, so it comes out as it was coded whatever the gains say.
     const auto lfe = response(releveled(ac3::KaraokeVocals::kBoth, 0.0, 0.0, 0.0), ac3::Acmod::k3_2, 5, true);
     REQUIRE(lfe.size() == 4);
     CHECK(lfe[3] == Catch::Approx(1.0).margin(1e-6));

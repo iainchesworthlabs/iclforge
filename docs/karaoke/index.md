@@ -360,6 +360,31 @@ forge decode out.ac3 melody-and-v1.wav karaoke=v1
 coded, and the report says so. The library form is `OutputConfig::karaoke` and
 `OutputConfig::karaoke_vocals`; see [Decoding](../library/decoding.md).
 
+`forge monitor` takes the same choice and plays the reproduction on the output:
+
+```text
+forge monitor out.ac3 karaoke=none      # L, C, R: the backing and the melody, for singing along
+forge monitor out.ac3 karaoke=v1+v2     # V1 left, V2 right
+```
+
+The capable decoder's levels are `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` on
+both commands: each part against Table C.2.3, 0 dB the table, up to 12 dB louder and `-24` or `off`
+at the bottom, the span and the defaults of Hearth's sliders.
+
+```text
+forge decode out.ac3 sing.wav karaoke=none karaoke-melody=-6
+forge monitor out.ac3 karaoke=v1 karaoke-v1=-12 karaoke-melody=3
+```
+
+They move nothing under the aware reproduction, so a level without a choice of vocals
+(`karaoke=none`, `v1`, `v2` or `v1+v2`) is refused.
+
+On an output narrower than the stream, which `monitor` folds to unasked, the 2/0 reproduction
+plays. `forge play` applies the choice where it decodes (its PCM fallback), and `forge spdif`
+and `forge play`'s bitstream legs hand the coded stream on: they accept `karaoke` and say it is
+not applied, since a receiver reproduces the stream. E-AC-3 and AC-4 are ignored with a warning
+by all of them.
+
 ## From a program
 
 The reproduction and the lyric reader are in the libraries, so a program of your own can use them:
