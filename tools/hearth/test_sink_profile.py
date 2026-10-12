@@ -195,6 +195,26 @@ class TheFile(unittest.TestCase):
         )
         self.assertEqual(spelled, [], "a board build in _build.yml spells its own fragment list")
 
+    def test_the_qemu_overlay_moves_no_stack_ring_cache_or_feature(self) -> None:
+        """The twin is the release shape because the overlay touches only what QEMU has no
+        hardware for. A pattern that could move a stack, a ring or a cache is a different
+        shape, which CI would then be running in place of the board's."""
+        touches = self.data["overlays"]["qemu-net"]["touches"]
+        locked = self.data["profiles"]["s3-n16r8"]["locked"]
+        moved = [key for key in locked if sp._matches(key, touches)]
+        self.assertTrue(moved, "the overlay touches nothing the profile locks")
+        for key in moved:
+            for word in ("STACK", "RING", "CACHE", "IN_PSRAM", "DMA", "AC4", "SENDSPIN", "LANE"):
+                self.assertNotIn(word, key, f"qemu-net may move {key}")
+        # What it does move is each one of the four things QEMU has no hardware for.
+        for key in (
+            "CONFIG_ICLFORGE_EXAMPLE_NETWORK_OPENETH",
+            "CONFIG_ICLFORGE_EXAMPLE_SINK_CAPTURE",
+            "CONFIG_SPIRAM_MODE_QUAD",
+            "CONFIG_ESP_CONSOLE_UART_DEFAULT",
+        ):
+            self.assertTrue(sp._matches(key, touches), f"qemu-net does not declare {key}")
+
     def test_the_profiles_are_distinct_builds(self) -> None:
         seen: dict[str, str] = {}
         for ident in self.data["profiles"]:
@@ -484,6 +504,61 @@ class Docs(unittest.TestCase):
 
     def test_the_real_tree_holds(self) -> None:
         self.assertEqual(sp.check_docs(sp.load()), [])
+
+
+class ExpectedConsole(unittest.TestCase):
+    """The lines that say where a profile put its rings and stacks (the QEMU twin's checks)."""
+
+    def data(self, **locked: str) -> dict:
+        data = small_data()
+        data["profiles"]["a"]["locked"] = {f"CONFIG_{key}": value for key, value in locked.items()}
+        return data
+
+    def test_a_profile_with_psram_expects_its_stacks_and_rings_there(self) -> None:
+        data = self.data(
+            SPIRAM="y",
+            ICLFORGE_SENDSPIN="y",
+            ICLFORGE_EXAMPLE_RING_IN_PSRAM="1",
+            ICLFORGE_EXAMPLE_RING_BYTES="32768",
+            ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM="1",
+            ICLFORGE_EXAMPLE_DECODE_STACK_BYTES="40960",
+            ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES="262144",
+            ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM="1",
+            ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES="32768",
+            ICLFORGE_EXAMPLE_DECODE_LANE="1",
+            ICLFORGE_EXAMPLE_DECODE_CORE="1",
+        )
+        self.assertEqual(
+            sp.expected_console(data, "a"),
+            [
+                "player: ring 32768 bytes in PSRAM",
+                "player: decode stack 40960 bytes in PSRAM",
+                "burst player: ring 262144 bytes and buffers in PSRAM",
+                "burst player: decode stack 32768 bytes in PSRAM",
+                "player: decode stages on cores 1 and 0",
+            ],
+        )
+
+    def test_a_stack_the_profile_leaves_internal_is_not_expected_in_psram(self) -> None:
+        data = self.data(
+            SPIRAM="y",
+            ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM="0",
+            ICLFORGE_EXAMPLE_DECODE_STACK_BYTES="32768",
+        )
+        self.assertEqual(sp.expected_console(data, "a"), [])
+
+    def test_a_profile_with_no_psram_expects_none_of_the_psram_lines(self) -> None:
+        data = self.data(
+            ICLFORGE_EXAMPLE_RING_IN_PSRAM="1",
+            ICLFORGE_EXAMPLE_RING_BYTES="32768",
+            ICLFORGE_EXAMPLE_DECODE_CORE="-1",
+        )
+        self.assertEqual(sp.expected_console(data, "a"), [])
+
+    def test_the_release_profile_expects_the_http_stack_in_psram(self) -> None:
+        """The 2026-10-12 failure, as a line a build has to print."""
+        lines = sp.expected_console(sp.load(), "s3-n16r8")
+        self.assertIn("player: decode stack 32768 bytes in PSRAM", lines)
 
 
 class Snapshot(unittest.TestCase):

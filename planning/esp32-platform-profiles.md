@@ -286,27 +286,52 @@ baseline PRs replace them with numbers from a passing one.
 
 ### 2. A QEMU twin of the release shape
 
-CI runs the HTTP play only on a shape that is not a board's. The twin keeps the release profile's
-fragments, and adds one declared overlay (`qemu-net`) that changes only what QEMU cannot do:
-Ethernet in place of Wi-Fi, the capture sink in place of I2S, and QEMU's PSRAM mode. Then it runs
-what the existing step runs: the boot play, `/status`, `POST /play` of a second stream, `/stop`,
-the console check.
+**Built (PR 5).** CI ran the HTTP play only on a shape that is not a board's. The twin is the
+release profile's own fragments (`s3-n16r8`) with one declared overlay, `qemu-net`
+(`sdkconfig.qemu-net`), which changes only what QEMU has no hardware for: Ethernet in place of
+Wi-Fi, the capture sink in place of I2S, QUAD PSRAM in place of octal (QEMU started with
+`-m 8M`), and the console on UART0 (QEMU's `-serial`; `sdkconfig.hw` puts it on USB-Serial-JTAG,
+which QEMU does not model, so the console was silent until this was added). A test holds the
+overlay to those: it may not name a key with a stack, a ring, a cache, a DMA queue, AC-4, the
+Sendspin player or the lane in it.
 
-What this buys and what it does not:
+The step "Play the S3 board's release shape over QEMU's Ethernet" in the ESP lane (`_build.yml`):
 
-- It runs the **same tasks, stacks, ring placement, PSRAM stack path and Kconfig defaults** as the
-  release image. The 2026-10-12 failure was a `could not start the decode task`; this catches it.
-- It does **not** reproduce Wi-Fi's share of internal RAM (QEMU has no Wi-Fi). Heap figures stay a
-  board's. Its `--min-heap-free` floor is a smoke test, not the budget.
-- **Open until tried:** QEMU emulates quad PSRAM at `-m 8M` and fails the flash mapping at 32M
-  (`sdkconfig.ci-lane` has the story), so the twin uses quad where the board is octal; and whether
-  `SPIRAM_FETCH_INSTRUCTIONS` and `SPIRAM_RODATA` run under QEMU's MMU is not known. If they do
-  not, the overlay declares exactly those two keys and the guard lists them as "not exercised under
-  QEMU", so that the board suite is known to be the only place they run.
-- It lives in the existing ESP lane job, as another step, so it adds minutes, not a runner.
+1. configures the twin with the profile's identity and holds it to the profile with
+   `verify --overlay qemu-net` (without the overlay named, `verify` names the extra fragment
+   and the console, network and PSRAM-mode keys, and nothing else, which is the check that the
+   overlay is only them);
+2. boots it and waits for the boot `budget:` line;
+3. reads `GET /hardware`: the profile and its hash are `sink_profile.py identity`'s;
+4. plays over `POST /play`, as a board gets it: an AC-3 2/0, an E-AC-3 2/0 and the 5.1 with
+   objects, each to `result=pass` with every unit and no resynchronised byte, the demo at the
+   host's Lo/Ro levels (56,673 and 47,346, the same figures the HTTP step holds);
+5. holds the console to `sink_profile.py expect-console s3-n16r8`: the lines that say the HTTP
+   play's ring and decode stack, the Sendspin ring and its decode stack are in PSRAM, at the sizes
+   the profile locks, and that the decode lane started on cores 1 and 0;
+6. runs `check_esp_console.py --min-budget-headroom 4096`: one boot, no panic, no failed
+   allocation, and a boot budget with a margin.
+
+What the spike found, run locally under QEMU's esp_develop 9.2.2 on Windows:
+
+- **PSRAM execution runs.** With quad PSRAM at `-m 8M` and `SPIRAM_FETCH_INSTRUCTIONS` and
+  `SPIRAM_RODATA` on, as the release shape has them, the image boots, brings the network up,
+  starts the Sendspin player and the control surface, and plays. `GET /hardware` says
+  `psram_bytes: 8388608`. Nothing needed declaring as "not exercised under QEMU".
+- **It does not reproduce the 2026-10-12 failure's symptom.** QEMU has no Wi-Fi, so its internal
+  RAM is far larger than a board's with the network up: 226,679 bytes free and a 135,168-byte
+  largest block at boot against the S3b's 86,231 and 31,744. A 32,768-byte stack in internal RAM
+  would be made without trouble, and the play would pass. What the twin catches is the **cause**:
+  the stack's placement. A build whose HTTP stack is internal fails `verify` (the key) and fails the
+  console expectation (the line `player: decode stack 32768 bytes in PSRAM` is not printed), as
+  4065's S3b console did not print it. Heap stays the board's: the twin's budget line is a smoke
+  floor, and the board suite owns the budget.
+- **The stream set's level checker is for the 7.1.4 shapes.** `check_stream_set.py` holds a play
+  to the twelve slots of the layout the CI shapes render to; the release shape plays 2.0, so the
+  step checks the verdicts and the demo's two levels itself, as the HTTP step does.
+- **Cost:** one more S3 build in the ESP lane, and about two minutes of QEMU for the three plays.
 
 The C6 and the P4 have no emulator, so for them layer 1 and layer 3 are the whole suite.
-
 ### The C6 is not a config value away
 
 The brief's config-only candidate for the C6 (the decode stack at 24,576, as `sdkconfig.ci-http`
@@ -424,7 +449,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 2 | `profiles.json` and `sink_profile.py`, with tests and the guard; no consumer yet | no | **Built**: six profiles; its tests hold the file to `_build.yml`'s fragment lists and to `check_firmware_package.py`'s rules |
 | 3 | `_build.yml`, `package_firmware.py` and the docs read it; the guard on every profile build | no | **Built**: each board build takes `sink_profile.py defaults <id>` and is held by `verify` (with `idf.py size` for the static-RAM budget); `package_firmware.py package --profile` refuses a build that is not the profile; `check-docs` holds every fragment list the tree spells to a profile or to `other_stacks`, and the README's profile table is generated; `s3-n16r8-ac4` gets a CI build for the first time. Left: `check_firmware_package.py`'s `IMAGES` still carries its own copy, held to the file by a test, until #1400 lands its row. The repository variable `ESP32_PROFILE_GUARD=warn` turns a finding into an annotation |
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
-| 5 | The QEMU twin of `s3-n16r8` | no | A spike first (PSRAM mode, XIP): the PR says what ran and what did not |
+| 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | |
 | 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | |

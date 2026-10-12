@@ -53,6 +53,19 @@
         "ICLFORGE_EXAMPLE_REPORT_EVERY_FRAMES"
       ],
       "note": "observation only: the PCM hash an AC-4 play carries and how often progress lines print; no placement, size or cache"
+    },
+    "qemu-net": {
+      "touches": [
+        "ICLFORGE_EXAMPLE_NETWORK_*",
+        "ETH_USE_OPENETH",
+        "ICLFORGE_EXAMPLE_SINK_*",
+        "SPIRAM_MODE_*",
+        "SPIRAM_SPEED*",
+        "ESP_CONSOLE_*",
+        "ESP_CONSOLE*"
+      ],
+      "fragment": "qemu-net",
+      "note": "the release shape on QEMU (planning/esp32-platform-profiles.md): Ethernet in place of Wi-Fi, the capture sink in place of I2S, quad PSRAM in place of octal, the console on UART0; nothing about stacks, rings, caches or features"
     }
   },
   "profiles": {

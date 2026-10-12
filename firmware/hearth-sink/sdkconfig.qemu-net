@@ -1,0 +1,31 @@
+# The S3 release shape (profile s3-n16r8) on QEMU: what QEMU cannot do, and nothing else.
+# (planning/esp32-platform-profiles.md, "A QEMU twin of the release shape")
+#
+#   SDKCONFIG_DEFAULTS="$(sink_profile.py defaults s3-n16r8 --overlay qemu-net)"
+#
+# The twin keeps the profile's fragments, so the tasks, the stacks and where they live, the
+# ring, the player's two cores and the lane are the board's. It changes only the things an
+# emulated board has no hardware for:
+#
+# QEMU has no Wi-Fi: its OpenCores Ethernet MAC, on the host's network, is the link
+# (sdkconfig.ci-http has the story). The control surface and the Sendspin player come up on it
+# as they do on a board.
+CONFIG_ICLFORGE_EXAMPLE_NETWORK_OPENETH=y
+CONFIG_ETH_USE_OPENETH=y
+
+# QEMU has no I2S peripheral: the capture sink converts exactly as the I2S sink does and
+# checks what it wrote (sdkconfig.ci), with no DMA behind it.
+CONFIG_ICLFORGE_EXAMPLE_SINK_CAPTURE=y
+
+# QEMU emulates QUAD PSRAM, started with `-m 8M`, the board's size, and not the board's octal
+# mode (sdkconfig.ci-lane has why: at -m 32M the PSRAM takes the whole external address window
+# and the partition table's flash mapping finds none). Everything else about the PSRAM in
+# sdkconfig.psram and sdkconfig.s3-fast stands: what goes to it and what stays out, the code and
+# the constants executed from it.
+# CONFIG_SPIRAM_MODE_OCT is not set
+CONFIG_SPIRAM_MODE_QUAD=y
+
+# QEMU's -serial is UART0. sdkconfig.hw puts the console on the S3's USB-Serial-JTAG, which QEMU
+# does not model, so the console would be silent and a panic or a reset unseen.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG is not set

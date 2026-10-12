@@ -429,6 +429,36 @@ def image_rule(data: dict[str, Any], name: str) -> dict[str, Any]:
     raise ProfileError(f"no profile publishes an image named '{name}'")
 
 
+def expected_console(data: dict[str, Any], ident: str) -> list[str]:
+    """The console lines a play and the Sendspin player print that say where the profile put
+    its rings and stacks: what the QEMU twin of the release shape is held to, so that a stack
+    that falls back to internal RAM is a missing line, whatever the emulated heap could spare.
+    Only what the profile locks is expected: a profile with no PSRAM expects none of the
+    PSRAM lines."""
+    locked = profile(data, ident).get("locked", {})
+
+    def value(name: str) -> str | None:
+        return locked.get(f"CONFIG_ICLFORGE_EXAMPLE_{name}")
+
+    lines: list[str] = []
+    if locked.get("CONFIG_SPIRAM") == "y":
+        if value("RING_IN_PSRAM") == "1":
+            lines.append(f"player: ring {value('RING_BYTES')} bytes in PSRAM")
+        if value("DECODE_STACK_IN_PSRAM") == "1":
+            lines.append(f"player: decode stack {value('DECODE_STACK_BYTES')} bytes in PSRAM")
+        if locked.get("CONFIG_ICLFORGE_SENDSPIN") == "y":
+            lines.append(
+                f"burst player: ring {value('SENDSPIN_RING_BYTES')} bytes and buffers in PSRAM"
+            )
+            if value("SENDSPIN_DECODE_STACK_IN_PSRAM") == "1":
+                stack = value("SENDSPIN_DECODE_STACK_BYTES")
+                lines.append(f"burst player: decode stack {stack} bytes in PSRAM")
+    core = value("DECODE_CORE")
+    if value("DECODE_LANE") == "1" and core in ("0", "1"):
+        lines.append(f"player: decode stages on cores {core} and {1 - int(core)}")
+    return lines
+
+
 def table(data: dict[str, Any], idents: list[str]) -> str:
     rows = [
         "| Profile | Fragments after `sdkconfig.defaults`, in order | Release image | Boards |",
@@ -566,6 +596,12 @@ def main(argv: list[str] | None = None) -> int:
         help="report findings as warnings and exit 0 (the repository's ESP32_PROFILE_GUARD=warn)",
     )
 
+    expect = commands.add_parser(
+        "expect-console",
+        help="the console lines that say where a profile puts its rings and stacks",
+    )
+    expect.add_argument("profile")
+
     who = commands.add_parser("identity", help="a profile's id and the hash of what it locks")
     who.add_argument("profile")
     who.add_argument("--cmake", action="store_true", help="as the -D options of a configure")
@@ -604,6 +640,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             if not findings:
                 print(f"{args.profile}: the build holds to its profile")
+        elif args.command == "expect-console":
+            for line in expected_console(data, args.profile):
+                print(line)
         elif args.command == "identity":
             digest = profile_hash(data, args.profile)
             if args.cmake:
