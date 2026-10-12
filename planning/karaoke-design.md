@@ -210,10 +210,11 @@ stream is, the three reproductions and the listener's choice, lyrics (the format
 with an example), and making a stream in the Forge GUI. `docs/hearth/index.md` and
 `docs/forge/gui` link to it. The development-status rows record what is checked against what, and
 use the blue dot only for a stated, accepted gap (no outside decoder; word-timed files rarer than
-line-timed ones). Screenshots come from the running app with `--smoke-shot`, never `--shot`. *As built:* Hearth has
-no `--smoke-shot` and its `--shot` opens no item, so the guide's four screenshots were taken by a
+line-timed ones). Screenshots come from the running app with `--smoke-shot`, never `--shot`. *As built:* Hearth
+had no `--smoke-shot` and its `--shot` opened no item, so the guide's four screenshots were taken by a
 throwaway QML script in the test binaries (a generated stream, a fake output, the bundled fonts on
-`QT_QPA_FONTDIR`).
+`QT_QPA_FONTDIR`). *Since:* Hearth has `--smoke-shot`, `--open` and `--seek` (PR #1361), and the
+Karaoke page's screenshot is the running window's.
 
 ## Risks
 
