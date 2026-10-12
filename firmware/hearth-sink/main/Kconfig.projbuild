@@ -693,6 +693,8 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
     int "Largest lyric document held for the item playing, bytes (0 = none)"
+    default 0 if !SPIRAM
+    default 2048 if IDF_TARGET_ESP32S3
     default 16384
     range 0 60000
     help
@@ -700,10 +702,28 @@ config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
         lists the `lyrics` command, as an LRC text, and then where in the item
         the sound is; the board follows them on its own playout clock and
         reports the line it has the sound in. The document is parsed into
-        lines and words, which take about three times its size in heap, and a
-        server keeps its message within the largest chunk taken above, so the
-        smaller of the two is what it sends. 0 lists neither command and
-        holds nothing, for a part with no heap to spare.
+        lines and words, which are many small blocks: measured with Wi-Fi up
+        and a stream playing, word-timed lines take about ten times their
+        text of heap at the peak, while read, and six times once held (plain
+        lines about half that). In internal RAM that is what Wi-Fi's receive
+        buffers and the decoder come out of: an S3 was left 27 KB at its
+        least with a 64-byte document, 7.8 KB with 2,000 bytes and 0.4 KB
+        with 4,000; a P4 223 KB, 182 KB with 4,000 bytes and 66 KB with
+        16,000; a C6's Wi-Fi receive buffers failed to allocate at 2,000.
+        So a part with PSRAM reads and holds the document there
+        (main/sendspin/player/psram_scope.hpp), which leaves the message as
+        it arrives (a few times its size, for a moment) and the receive
+        buffer that keeps the room of the largest message: an S3 with 5.1
+        playing was left 27 KB at its least with a 64-byte document, 19.5 KB
+        with 2,000 bytes, 9.3 KB with 8,000, and 16,000 broke the play. The
+        defaults are what each part spares: none without PSRAM, 2,048 on an
+        S3, 16,384 otherwise. A server keeps its message within the largest
+        chunk taken above as well, so the smaller of the two is what it
+        sends, and a document that does not fit is sent as none. The board
+        takes a document only while three times its size (twelve times of
+        internal RAM where PSRAM has no room) and 8 KB of internal heap are
+        free, and otherwise holds none and says why on its console. 0 lists
+        neither command and holds nothing.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS
     int "Lead a stream's first chunk needs, milliseconds (required_lead_time_ms)"
