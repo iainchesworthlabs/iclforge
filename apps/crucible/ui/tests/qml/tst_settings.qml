@@ -259,5 +259,35 @@ TestCase {
         compare(message.visible, CrucibleController.diagnosticsMessage.length > 0);
     }
 
+    function test_pageCarriesTheLyricEventsOutChoices() {
+        CrucibleLyrics.oscEnabled = false;
+        CrucibleLyrics.oscHost = "127.0.0.1";
+        CrucibleLyrics.oscPort = 9000;
+        const page = createTemporaryObject(settingsPage, testCase.parent);
+        verify(page);
+        waitForRendering(page);
+        const enabled = findChild(page, "oscEnabledCheck");
+        verify(enabled, "the events-out switch carries objectName oscEnabledCheck");
+        compare(enabled.checked, false);
+        // The destination is not offered while it is off.
+        compare(findChild(page, "oscHostRow").visible, false);
+        compare(findChild(page, "oscPortRow").visible, false);
+
+        // Turning it on is the property, and shows where it goes.
+        CrucibleLyrics.oscEnabled = true;
+        tryCompare(findChild(page, "oscHostRow"), "visible", true, 5000);
+        compare(findChild(page, "oscPortRow").visible, true);
+        compare(findChild(page, "oscLinesCheck").checked, true);
+        compare(findChild(page, "oscWordsCheck").checked, true);
+        compare(findChild(page, "oscPositionCheck").checked, false);
+        compare(findChild(page, "oscProblem").visible, false);
+
+        // An address that is not IPv4 is said on the page.
+        CrucibleLyrics.oscHost = "example.com";
+        tryCompare(findChild(page, "oscProblem"), "visible", true, 5000);
+        CrucibleLyrics.oscHost = "127.0.0.1";
+        CrucibleLyrics.oscEnabled = false;
+    }
+
     Component { id: spyComponent; SignalSpy {} }
 }

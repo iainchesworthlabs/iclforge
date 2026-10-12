@@ -1078,7 +1078,7 @@ TEST_CASE("spdif reads karaoke and wraps the stream as it was, saying a receiver
     CHECK(read_log(asked) == plain_bytes);
 }
 
-TEST_CASE("monitor, spdif and spatial say karaoke is AC-3's, and ignore it, for an E-AC-3 stream",
+TEST_CASE("for an E-AC-3 stream spdif leaves karaoke to the receiver, spatial ignores it, and monitor reproduces it",
           "[cli][audio-io][karaoke][concurrency]") {
     const auto dir = scratch_dir();
     const auto stream = write_two_programme_stream("karaoke_eac3");
@@ -1090,8 +1090,11 @@ TEST_CASE("monitor, spdif and spatial say karaoke is AC-3's, and ignore it, for 
                         log) == 0);
         const auto out = read_log(log);
         INFO(out);
-        CHECK(out.find("warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored") !=
+        // A receiver decodes what spdif wraps, and E-AC-3's karaoke is reproduced there as AC-3's
+        // is (planning/karaoke-eac3.md): the same words as for an AC-3 stream.
+        CHECK(out.find("warning: karaoke is ignored by spdif: it wraps the coded stream") !=
               std::string::npos);
+        CHECK(out.find("the receiver reproduces it") != std::string::npos);
     }
     SECTION("monitor, before an output is touched") {
         const auto log = dir / "karaoke_eac3_monitor.log";
@@ -1102,8 +1105,13 @@ TEST_CASE("monitor, spdif and spatial say karaoke is AC-3's, and ignore it, for 
             return;
         }
         CHECK(out.find("unknown option") == std::string::npos);
-        CHECK(out.find("warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored") !=
-              std::string::npos);
+        // Not ignored: the E-AC-3 decoder reproduces a karaoke programme, and this stream is a
+        // main service, which the report says in the words an AC-3 stream gets.
+        CHECK(out.find("karaoke is AC-3's") == std::string::npos);
+        if (rc == 0) {
+            CHECK(out.find("note: karaoke applies to a stream with bsmod 7 above 1/0") !=
+                  std::string::npos);
+        }
         check_spoke_either_way(rc, out);
     }
     SECTION("spatial, which places an E-AC-3 stream's objects") {
@@ -1115,8 +1123,8 @@ TEST_CASE("monitor, spdif and spatial say karaoke is AC-3's, and ignore it, for 
             return;
         }
         CHECK(out.find("unknown option") == std::string::npos);
-        CHECK(out.find("warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored") !=
-              std::string::npos);
+        CHECK(out.find("warning: karaoke is ignored by spatial: it places an E-AC-3 stream's "
+                       "objects") != std::string::npos);
         check_spoke_either_way(rc, out);
     }
 }

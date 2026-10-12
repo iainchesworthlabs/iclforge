@@ -19,7 +19,9 @@ import Hearth
 //
 // A `.cdg` beside the item with no lyrics file is the picture of a karaoke disc
 // (planning/karaoke-phase2.md, W13f): it has no text to follow, so it is shown as
-// the picture it is, against the same position and the same delay.
+// the picture it is, against the same position and the same delay. With a lyrics
+// file beside it too, the words are shown unless the singer chose the picture
+// (KaraokeController.preferPicture, for this run of the app): `showingPicture`.
 //
 // Nothing here owns a clock or reads a file: `positionMs` is the reading of a
 // LyricClock, and the words come from KaraokeController. The item playing is
@@ -43,6 +45,9 @@ Item {
 
     // --- what the controller holds -----------------------------------------
     readonly property string status: KaraokeController.status
+    // The picture of a disc instead of the words: where it is all there is, or where it is
+    // beside a lyrics file and chosen. `status` stays the lyrics file's own.
+    readonly property bool showingPicture: KaraokeController.showingPicture
     readonly property var lines: KaraokeController.lines
 
     // --- a duet (planning/karaoke-phase2.md, W11b) --------------------------
@@ -212,7 +217,7 @@ Item {
         id: stage
         objectName: "lyricStage"
         anchors.fill: parent
-        visible: root.status === "timed"
+        visible: root.status === "timed" && !root.showingPicture
 
         Column {
             id: pastColumn
@@ -389,7 +394,7 @@ Item {
         id: plain
         objectName: "lyricPlain"
         anchors.fill: parent
-        visible: root.status === "plain"
+        visible: root.status === "plain" && !root.showingPicture
         contentWidth: width
         contentHeight: plainText.implicitHeight
         clip: true
@@ -416,7 +421,7 @@ Item {
         id: picture
         objectName: "lyricPicture"
         anchors.fill: parent
-        visible: root.status === "picture"
+        visible: root.showingPicture
         source: KaraokeController
         positionMs: root.positionMs
         Accessible.role: Accessible.Graphic
@@ -429,7 +434,7 @@ Item {
         objectName: "lyricMessage"
         anchors.centerIn: parent
         width: parent.width - root.unit * 2
-        visible: root.status === "none" || root.status === "error"
+        visible: !root.showingPicture && (root.status === "none" || root.status === "error")
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
         color: root.restColor

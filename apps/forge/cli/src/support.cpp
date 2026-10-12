@@ -2885,6 +2885,20 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.p.mixdepth.blkmixcfginfo = words;
             continue;
         }
+        if (key == "lyrics") {
+            if (command != "encode" && command != "eac3-encode" && command != "ac4-encode") {
+                fmt::println(stderr,
+                             "error: lyrics= goes with encode, eac3-encode and ac4-encode: it puts "
+                             "a lyrics file beside the stream they write");
+                return false;
+            }
+            if (value.empty()) {
+                fmt::println(stderr, "error: lyrics= needs a file path");
+                return false;
+            }
+            out.lyrics_path = std::string{value};
+            continue;
+        }
         if (key == "src") {
             if (value.empty()) {
                 fmt::println(stderr, "error: src= needs a file path");
@@ -3572,6 +3586,35 @@ void warn_karaoke_not_ac3(const Options& meta, std::string_view codec) {
                  codec);
 }
 
+void warn_karaoke_not_spatial(const Options& meta) {
+    if (!wants_karaoke(meta)) {
+        return;
+    }
+    fmt::println(stderr,
+                 "warning: karaoke is ignored by spatial: it places an E-AC-3 stream's objects and "
+                 "has no karaoke bed ('forge decode' and 'forge monitor' reproduce it)");
+}
+
+void warn_karaoke_service_layout(const iclforge::ac3::plan::Metadata& meta,
+                                 iclforge::ac3::Acmod acmod, std::string_view whose) {
+    if (!meta.infomdat ||
+        meta.info.bsmod != iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke) {
+        return;
+    }
+    if (acmod == iclforge::ac3::Acmod::k1_0) {
+        fmt::println(stderr,
+                     "warning: {}bsmod 7 on a mono stream is Table 5.7's voice-over service, not "
+                     "karaoke: there are no vocals to reproduce",
+                     whose);
+    } else if (acmod == iclforge::ac3::Acmod::kDualMono) {
+        fmt::println(stderr,
+                     "warning: {}bsmod 7 is not defined for 1+1: Annex A (Table A5.2) and Annex G "
+                     "(Table G.2) prohibit a karaoke service on mono and on 1+1, so a receiver "
+                     "may not take it as one; the stream is written as asked",
+                     whose);
+    }
+}
+
 bool refuse_karaoke_with_ltrt(const iclforge::ac3::OutputConfig& output) {
     if (output.karaoke == iclforge::ac3::KaraokeReproduction::kOff ||
         output.target != iclforge::ac3::DownmixTarget::kLtRt) {
@@ -3585,13 +3628,57 @@ bool refuse_karaoke_with_ltrt(const iclforge::ac3::OutputConfig& output) {
     return true;
 }
 
+namespace {
+
+// Whether the reproduction changed the layout: its mode, not its channel count. A 2/1 stream's
+// reproduction is three channels (L, C, R) where three were coded (L, R, S), so the counts agree
+// and the channels do not, and a count comparison would have labelled the reproduction as the
+// coded layout (the oracle script found it: the vocal came out in the file's right channel).
+bool mode_changed(const iclforge::ac3::OutputConfig& output, iclforge::ac3::Acmod acmod,
+                  bool lfe, bool karaoke) {
+    const iclforge::ac3::OutputMode with = iclforge::ac3::output_mode(output, acmod, lfe, karaoke);
+    const iclforge::ac3::OutputMode without = iclforge::ac3::output_mode(output, acmod, lfe, false);
+    return with.acmod != without.acmod || with.lfe != without.lfe;
+}
+
+}  // namespace
+
 bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
                         const iclforge::ac3::DecodedFrame& frame) {
     const bool karaoke = iclforge::ac3::meta::is_karaoke(
         static_cast<iclforge::ac3::meta::BitstreamMode>(frame.bsmod), frame.acmod);
     return output.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
-           iclforge::ac3::output_channel_count(output, frame.acmod, frame.lfe, karaoke) !=
-               iclforge::ac3::output_channel_count(output, frame.acmod, frame.lfe, false);
+           mode_changed(output, frame.acmod, frame.lfe, karaoke);
+}
+
+namespace {
+
+// Whether the unit's bed has an LFE: its layout names the coded one, which a reproduction keeps
+// the LFE of, and a dual-mono unit has no layout at all.
+bool unit_has_lfe(const iclforge::ac3::DecodedAccessUnit& unit) {
+    return unit.layout.index_of(iclforge::ac3::eac3::chanmap::Location::kLfe) >= 0;
+}
+
+}  // namespace
+
+bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
+                        const iclforge::ac3::DecodedAccessUnit& unit) {
+    if (output.karaoke == iclforge::ac3::KaraokeReproduction::kOff ||
+        !iclforge::ac3::is_karaoke_programme(unit)) {
+        return false;
+    }
+    return mode_changed(output, unit.acmod, unit_has_lfe(unit), true);
+}
+
+iclforge::ac3::eac3::chanmap::Layout reproduced_layout(
+    const iclforge::ac3::OutputConfig& output, const iclforge::ac3::DecodedAccessUnit& unit) {
+    if (!karaoke_reproduced(output, unit)) {
+        return unit.layout;
+    }
+    const iclforge::ac3::OutputMode mode =
+        iclforge::ac3::output_mode(output, unit.acmod, unit_has_lfe(unit), true);
+    return iclforge::ac3::eac3::chanmap::expand(
+        iclforge::ac3::eac3::chanmap::acmod_map(mode.acmod, mode.lfe));
 }
 
 namespace {
@@ -3677,6 +3764,62 @@ void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
                        "note: a karaoke stream at {} is already what Annex C's reproduction "
                        "gives; {} as coded",
                        iclforge::ac3::analysis::layout_name(first.acmod, first.lfe), verb);
+    }
+}
+
+void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
+                    const iclforge::ac3::DecodedAccessUnit& first, bool folded, bool reproduced,
+                    std::string_view verb) {
+    if (output.karaoke == iclforge::ac3::KaraokeReproduction::kOff) {
+        return;
+    }
+    namespace ac3 = iclforge::ac3;
+    const int bsmod = first.info.has_value() ? static_cast<int>(first.info->bsmod) : 0;
+    const bool flagged = first.info.has_value() && ac3::meta::is_karaoke(first.info->bsmod, first.acmod);
+    const bool lfe = unit_has_lfe(first);
+    const bool capable = output.karaoke == ac3::KaraokeReproduction::kCapable;
+    if (reproduced && capable) {
+        status_println(status,
+                       "  karaoke (Annex C.2.3.2, Table C.2.3, applied to E-AC-3 as Dolby's decoder "
+                       "does): melody M to the centre, listener's vocals: {}{}",
+                       vocals_name(output.karaoke_vocals), karaoke_levels_words(output));
+    } else if (reproduced) {
+        // The levels the decoder used: the stream's Lo/Ro surround level where it sent mixmdate,
+        // and -3 dB where it did not (planning/karaoke-eac3.md, D2).
+        const double slev = first.mixing.has_value()
+                                ? ac3::meta::coefficient(first.mixing->lorosurmixlev)
+                                : ac3::meta::level::kMinus3dB;
+        status_println(status,
+                       "  karaoke (Annex C.2.3.1, applied to E-AC-3 as Dolby's decoder does): "
+                       "melody M to the centre, the vocals at the stream's Lo/Ro surround level "
+                       "({:.1f} dB)",
+                       ac3::meta::to_db(output.mix_override.loro_slev.value_or(slev)));
+    } else if (!flagged) {
+        status_println(status,
+                       "note: karaoke applies to a stream with bsmod 7 above 1/0 (Annex C.2.1); "
+                       "this one is bsmod {} at {}, and was {} as coded",
+                       bsmod, ac3::analysis::layout_name(first.acmod, lfe), verb);
+    } else if (first.substream_count != 1 || first.object_metadata.has_value()) {
+        // D3: a dependent substream's chanmap has no V1 or V2, and an object layer is not a bed.
+        status_println(status,
+                       "note: this is a karaoke programme of {} substreams{}; Annex E gives a "
+                       "dependent substream no vocal, so it was {} as coded",
+                       first.substream_count,
+                       first.object_metadata.has_value() ? " with an object layer" : "", verb);
+    } else if (folded && capable && first.acmod != ac3::Acmod::k2_0) {
+        status_println(status,
+                       "  karaoke (Annex C.2.3.2, Table C.2.3): 2/0 reproduction, melody M at "
+                       "clev, listener's vocals: {}{}",
+                       vocals_name(output.karaoke_vocals), karaoke_levels_words(output));
+    } else if (folded) {
+        status_println(status,
+                       "note: karaoke at a stereo or mono target is Annex C's 2/0 "
+                       "reproduction, which is this Lo/Ro downmix");
+    } else {
+        status_println(status,
+                       "note: a karaoke stream at {} is already what Annex C's reproduction "
+                       "gives; {} as coded",
+                       ac3::analysis::layout_name(first.acmod, lfe), verb);
     }
 }
 

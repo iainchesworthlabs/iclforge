@@ -1235,3 +1235,245 @@ TEST_CASE("decode karaoke-melody=, karaoke-v1= and karaoke-v2= re-level the capa
     const auto after = decode_to_wav(stream, dir / "k32l_after.wav", "karaoke-melody=-6 karaoke=none");
     CHECK(worst_against(after, 2, 2, std::pow(10.0, -6.0 / 20.0)) < 1e-6);
 }
+
+// ---------------------------------------------------------------------------
+// Karaoke in E-AC-3 (planning/karaoke-eac3.md, E3): the decoder reproduces it, as Dolby's does
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// The same five tones as an E-AC-3 stream: one independent substream, flagged `bsmod`, with
+// `options` after the layout.
+fs::path write_eac3_karaoke_candidate(const fs::path& dir, const std::string& name,
+                                      const std::string& options, std::size_t channels = 5,
+                                      const std::string& layout = "L,C,R,Ls,Rs",
+                                      int kbps = 448) {
+    const auto source = write_wav(dir / (name + "_src.wav"), channels);
+    const auto stream = dir / (name + ".ec3");
+    fs::remove(stream);
+    const auto log = dir / (name + "_encode.log");
+    REQUIRE(run_cli("eac3-encode " + quoted(source) + " " + quoted(stream) + " " +
+                        std::to_string(kbps) + " none " + layout + " " + options,
+                    log) == 0);
+    return stream;
+}
+
+}  // namespace
+
+TEST_CASE("decode karaoke reproduces an E-AC-3 karaoke stream, at the mixing group's Lo/Ro level",
+          "[cli][decode][karaoke][eac3]") {
+    const auto dir = scratch_dir();
+    // surmixlev=-6 is the group's lorosurmixlev: the vocals at half. bsmod=7 writes the group
+    // without `mixmeta` being asked for (planning/karaoke-eac3.md, D4).
+    const auto stream =
+        write_eac3_karaoke_candidate(dir, "e32", "bsmod=7 cmixlev=-3 surmixlev=-6");
+
+    std::string report;
+    const auto coded = decode_to_wav(stream, dir / "e32_coded.wav", "");
+    const auto heard = decode_to_wav(stream, dir / "e32_heard.wav", "karaoke", &report);
+    INFO(report);
+
+    REQUIRE(coded.channels.size() == 5);
+    REQUIRE(heard.channels.size() == 3);
+    CHECK(heard.channel_mask == (kFL | kFR | kFC));
+    CHECK(report.find("applied to E-AC-3") != std::string::npos);
+    CHECK(report.find("-6.0 dB") != std::string::npos);
+    CHECK(report.find("was ignored") == std::string::npos);
+
+    // Table C.2.2, 3/0, the same sums as the AC-3 case: V1 and V2 at the surround level (0.5)
+    // into L and R, the melody into the centre, all over 1 + 0.5.
+    constexpr double kScale = 1.0 / 1.5;
+    REQUIRE(heard.frame_count() == coded.frame_count());
+    double worst = 0.0;
+    double loudest = 0.0;
+    for (std::size_t i = 0; i < heard.frame_count(); ++i) {
+        const double l = static_cast<double>(coded.channels[0][i]);
+        const double r = static_cast<double>(coded.channels[1][i]);
+        const double m = static_cast<double>(coded.channels[2][i]);
+        const double v1 = static_cast<double>(coded.channels[3][i]);
+        const double v2 = static_cast<double>(coded.channels[4][i]);
+        worst = std::max(worst, std::abs(static_cast<double>(heard.channels[0][i]) - (l + 0.5 * v1) * kScale));
+        worst = std::max(worst, std::abs(static_cast<double>(heard.channels[1][i]) - (r + 0.5 * v2) * kScale));
+        worst = std::max(worst, std::abs(static_cast<double>(heard.channels[2][i]) - m * kScale));
+        loudest = std::max(loudest, std::abs(static_cast<double>(heard.channels[2][i])));
+    }
+    CHECK(worst < 1e-6);
+    CHECK(loudest > 0.05);
+}
+
+TEST_CASE("eac3-encode bsmod=7 alone writes the mixing group at the encoder's defaults",
+          "[cli][decode][karaoke][eac3]") {
+    // No `mixmeta`, no levels: the stream still carries lorosurmixlev (the encoder's -6 dB
+    // surround default, the same level an AC-3 karaoke stream is made at), so the reproduction
+    // does not fall to the decoder's own default of -3 dB (planning/karaoke-eac3.md, D4).
+    const auto dir = scratch_dir();
+    const auto stream = write_eac3_karaoke_candidate(dir, "e32d", "bsmod=7");
+
+    std::string report;
+    const auto coded = decode_to_wav(stream, dir / "e32d_coded.wav", "");
+    const auto heard = decode_to_wav(stream, dir / "e32d_heard.wav", "karaoke", &report);
+    INFO(report);
+    REQUIRE(coded.channels.size() == 5);
+    REQUIRE(heard.channels.size() == 3);
+    CHECK(report.find("-6.0 dB") != std::string::npos);
+
+    constexpr double kSlev = 0.5;
+    const double scale = 1.0 / (1.0 + kSlev);
+    double worst = 0.0;
+    for (std::size_t i = 0; i < heard.frame_count(); ++i) {
+        const double l = static_cast<double>(coded.channels[0][i]);
+        const double v1 = static_cast<double>(coded.channels[3][i]);
+        worst = std::max(worst, std::abs(static_cast<double>(heard.channels[0][i]) -
+                                         (l + kSlev * v1) * scale));
+    }
+    CHECK(worst < 1e-6);
+
+    // The capable choice reaches it too: Table C.2.3, 3/0, no vocals leaves L, M and R as coded.
+    const auto none = decode_to_wav(stream, dir / "e32d_none.wav", "karaoke=none");
+    REQUIRE(none.channels.size() == 3);
+    double left_worst = 0.0;
+    for (std::size_t i = 0; i < none.frame_count(); ++i) {
+        left_worst = std::max(left_worst, std::abs(static_cast<double>(none.channels[0][i]) -
+                                                   static_cast<double>(coded.channels[0][i])));
+    }
+    CHECK(left_worst < 1e-6);
+}
+
+TEST_CASE("decode karaoke leaves an E-AC-3 karaoke programme with a dependent substream as coded",
+          "[cli][decode][karaoke][eac3]") {
+    // 7.1: a 5.1 independent substream flagged bsmod 7 and the rear pair in a dependent. Annex E
+    // gives a dependent no vocal, so nothing is reproduced and the report says why.
+    const auto dir = scratch_dir();
+    const auto stream =
+        write_eac3_karaoke_candidate(dir, "e71", "bsmod=7", 8, "71", 640);
+    std::string report;
+    const auto coded = decode_to_wav(stream, dir / "e71_coded.wav", "");
+    const auto asked = decode_to_wav(stream, dir / "e71_asked.wav", "karaoke", &report);
+    INFO(report);
+    REQUIRE(coded.channels.size() == 8);
+    CHECK(asked.channels == coded.channels);
+    CHECK(asked.channel_mask == coded.channel_mask);
+    CHECK(report.find("karaoke programme of 2 substreams") != std::string::npos);
+    CHECK(report.find("as coded") != std::string::npos);
+}
+
+TEST_CASE("transcode carries the service type between AC-3 and E-AC-3, and bsmod= names another",
+          "[cli][transcode][karaoke][eac3]") {
+    const auto dir = scratch_dir();
+    const auto ac3_stream = write_karaoke_candidate(dir, "tk", "bsmod=7");
+    const auto eac3_stream = write_eac3_karaoke_candidate(dir, "tke", "bsmod=7");
+    const auto bsmod_of = [&](const fs::path& stream, const std::string& tag) {
+        const auto log = dir / (tag + "_probe.log");
+        REQUIRE(run_cli("probe " + quoted(stream), log) == 0);
+        const auto text = read_log(log);
+        const auto at = text.find("bsmod");
+        REQUIRE(at != std::string::npos);
+        return text.substr(at, text.find('\n', at) - at);
+    };
+    // The sources probe as karaoke, E-AC-3 included.
+    CHECK(bsmod_of(eac3_stream, "src_e").find("7 (karaoke)") != std::string::npos);
+
+    const auto to_eac3 = dir / "tk_to.ec3";
+    fs::remove(to_eac3);
+    REQUIRE(run_cli("transcode " + quoted(ac3_stream) + " " + quoted(to_eac3) + " 384",
+                    dir / "tk_to.log") == 0);
+    CHECK(bsmod_of(to_eac3, "to_e").find("7 (karaoke)") != std::string::npos);
+
+    const auto to_ac3 = dir / "tke_to.ac3";
+    fs::remove(to_ac3);
+    REQUIRE(run_cli("transcode " + quoted(eac3_stream) + " " + quoted(to_ac3) + " 384",
+                    dir / "tke_to.log") == 0);
+    CHECK(bsmod_of(to_ac3, "to_a").find("7 (karaoke)") != std::string::npos);
+
+    // An operator's bsmod= is the service the output is.
+    const auto named = dir / "tke_named.ac3";
+    fs::remove(named);
+    REQUIRE(run_cli("transcode " + quoted(eac3_stream) + " " + quoted(named) + " 384 bsmod=0",
+                    dir / "tke_named.log") == 0);
+    CHECK(bsmod_of(named, "named").find("0 (complete main)") != std::string::npos);
+}
+
+TEST_CASE("bsmod=7 on mono or 1+1 is written as asked, with a word about what it is",
+          "[cli][encode][karaoke][eac3]") {
+    // Mono's code 7 is Table 5.7's voice-over, and Annex A (Table A5.2) and Annex G (Table G.2)
+    // prohibit a karaoke service on 1+1 (planning/karaoke-eac3.md, D4). Both encoders accept it
+    // and said nothing.
+    const auto dir = scratch_dir();
+    const auto encode = [&](const std::string& command, const std::string& name,
+                            std::size_t channels, const std::string& tail) {
+        const auto source = write_wav(dir / (name + "_src.wav"), channels);
+        const auto stream = dir / (name + ".out");
+        fs::remove(stream);
+        const auto log = dir / (name + ".log");
+        REQUIRE(run_cli(command + " " + quoted(source) + " " + quoted(stream) + " " + tail, log) == 0);
+        return read_log(log);
+    };
+    const auto says = [](const std::string& log, const std::string& text) {
+        return log.find(text) != std::string::npos;
+    };
+
+    const auto eac3_mono = encode("eac3-encode", "km_e", 1, "128 none mono bsmod=7");
+    CHECK(says(eac3_mono, "voice-over service, not karaoke"));
+    const auto ac3_mono = encode("encode", "km_a", 1, "128 mono bsmod=7");
+    CHECK(says(ac3_mono, "voice-over service, not karaoke"));
+
+    const auto eac3_dual = encode("eac3-encode", "kd_e", 2, "192 none 1+1 bsmod=7");
+    CHECK(says(eac3_dual, "not defined for 1+1"));
+    const auto ac3_dual = encode("encode", "kd_a", 2, "192 1+1 bsmod=7");
+    CHECK(says(ac3_dual, "not defined for 1+1"));
+
+    // Every other layout and service type is left alone.
+    const auto surround = encode("eac3-encode", "ks_e", 5, "448 none L,C,R,Ls,Rs bsmod=7");
+    CHECK_FALSE(says(surround, "bsmod 7"));
+    const auto plain_mono = encode("eac3-encode", "kp_e", 1, "128 none mono bsmod=0");
+    CHECK_FALSE(says(plain_mono, "bsmod 7"));
+}
+
+TEST_CASE("decode karaoke labels a 2/1 stream's reproduction as the 3/0 it is, for AC-3 and E-AC-3",
+          "[cli][decode][karaoke][eac3]") {
+    // L, R and one vocal V1: three channels coded and three reproduced, so the counts agree and the
+    // layouts do not. Table C.2.2's 3/0, one vocal: L and R as they are, V1 into the centre at the
+    // stream's surround level, nothing to scale down. The oracle script
+    // (tools/checks/verify_karaoke_oracle.py) found the reproduction written under the coded
+    // layout's labels, the vocal in the file's right channel.
+    const auto dir = scratch_dir();
+    const auto check = [&](const fs::path& stream, const std::string& name) {
+        std::string report;
+        const auto coded = decode_to_wav(stream, dir / (name + "_coded.wav"), "");
+        const auto heard = decode_to_wav(stream, dir / (name + "_heard.wav"), "karaoke", &report);
+        INFO(name << ": " << report);
+        REQUIRE(coded.channels.size() == 3);
+        REQUIRE(heard.channels.size() == 3);
+        CHECK(coded.channel_mask == (kFL | kFR | kBC));
+        CHECK(heard.channel_mask == (kFL | kFR | kFC));
+        REQUIRE(heard.frame_count() == coded.frame_count());
+        double worst = 0.0;
+        double centre = 0.0;
+        for (std::size_t i = 0; i < heard.frame_count(); ++i) {
+            const double l = static_cast<double>(coded.channels[0][i]);
+            const double r = static_cast<double>(coded.channels[1][i]);
+            const double v1 = static_cast<double>(coded.channels[2][i]);
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[0][i]) - l));
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[1][i]) - r));
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[2][i]) - 0.5 * v1));
+            centre = std::max(centre, std::abs(static_cast<double>(heard.channels[2][i])));
+        }
+        CHECK(worst < 1e-6);
+        CHECK(centre > 0.02);  // a real vocal in the centre, not silence agreeing with silence
+    };
+
+    const auto source = write_wav(dir / "k21_src.wav", 3);
+    const auto ac3 = dir / "k21.ac3";
+    fs::remove(ac3);
+    REQUIRE(run_cli("encode " + quoted(source) + " " + quoted(ac3) +
+                        " 192 L,R,Cs surmixlev=-6 cmixlev=-3 bsmod=7",
+                    dir / "k21_ac3.log") == 0);
+    check(ac3, "k21_ac3");
+
+    const auto eac3 = dir / "k21.ec3";
+    fs::remove(eac3);
+    REQUIRE(run_cli("eac3-encode " + quoted(source) + " " + quoted(eac3) +
+                        " 192 none L,R,Cs bsmod=7 mixmeta cmixlev=-3 surmixlev=-6",
+                    dir / "k21_eac3.log") == 0);
+    check(eac3, "k21_eac3");
+}

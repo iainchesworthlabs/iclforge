@@ -261,8 +261,16 @@ and as large as fits (in whole steps, so the small type stays crisp), drawn agai
 what is *heard* and moved by the lyric delay as the words are.
 
 The words of a disc are **part of the picture**. Nothing is read from it as text, so there is no
-fill, no line to follow and nothing to translate or copy, and the page says so. A lyrics file beside
-the stream is shown in its place, since it is what a word-by-word fill and the delay can follow.
+fill, no line to follow and nothing to translate or copy, and the page says so.
+
+**When a lyrics file is beside the stream too**, the words are shown, since they are what a
+word-by-word fill and the delay can follow, and a **Show** choice (Words or Picture) appears in the
+Lyrics card, and on the bar of the full-screen singer view, to show the disc instead. The choice is
+for **this run of Hearth**: it is not kept for the song, it holds from one song to the next while
+Hearth is open, and a song with only a lyrics file or only a disc is not changed by it. Choosing
+the picture takes nothing from the lyrics: the file is still loaded, so the timing window, the
+duet cues and the lyrics a board is sent are as they were. A `.cdg` that cannot be read beside a
+lyrics file is not shown and not reported: the words are.
 
 What is drawn is what the disc's own player draws: the screen preset and the border preset, the
 tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form

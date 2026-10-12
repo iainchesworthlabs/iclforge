@@ -252,10 +252,15 @@ ColumnLayout {
     property bool rateChosen: false
 
     // ---- the lyrics file that goes beside the stream --------------------------------
-    // A `.lrc` the player finds by the stream's name (Hearth's L1). Offered from beside the
-    // first part when one of its name is there; the author's own choice, or removal, wins.
+    // A lyrics file (.lrc, .srt, .ass or .kar), written beside the stream as its own UTF-8 `.lrc`
+    // that the player finds by the stream's name (Hearth's L1). Offered from beside the first part
+    // when one of its name is there; the author's own choice, or removal, wins.
     property string lyricsUrl: ""
     property bool lyricsChosen: false
+    // Why the file cannot be used as lyrics (a code page is named, not guessed at), as the
+    // reader says it, or empty. Asked when a file is chosen, so that it is not found out at save.
+    readonly property string lyricsProblem: flow.lyricsUrl.length > 0
+                                            ? KaraokeAuthoring.lyricsProblem(flow.lyricsUrl) : ""
     // What became of the copy, as a sentence; empty until a stream has been saved.
     property string lyricsNote: ""
 
@@ -277,7 +282,8 @@ ColumnLayout {
                                    + "was left as it is.");
             break;
         case "unreadable":
-            flow.lyricsNote = qsTr("The lyrics file could not be read, so none was put beside the stream.");
+            flow.lyricsNote = qsTr("The lyrics file could not be read, so none was put beside the "
+                                   + "stream: %1").arg(KaraokeAuthoring.lyricsProblem(flow.lyricsUrl));
             break;
         default:
             flow.lyricsNote = qsTr("The lyrics could not be written beside the stream.");
@@ -1351,11 +1357,23 @@ ColumnLayout {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: qsTr("An .lrc file is put beside the stream under the stream's name, where "
-                                   + "Hearth finds it. One of the backing's name beside it is offered.")
+                        text: qsTr("A lyrics file (.lrc, .srt, .ass or .kar) is written beside the stream "
+                                   + "as the stream's own .lrc, in UTF-8, where Hearth finds it. One of "
+                                   + "the backing's name beside it is offered.")
                         wrapMode: Text.WordWrap
                         font.pixelSize: Theme.fontSmall
                         color: Theme.textMuted
+                    }
+                    Text {
+                        objectName: "karaokeLyricsProblem"
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        text: flow.lyricsProblem.length > 0
+                              ? qsTr("These lyrics cannot be used: %1").arg(flow.lyricsProblem) : ""
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        font.bold: true
+                        color: Theme.text
                     }
                     Text {
                         objectName: "karaokeLyricsNote"
@@ -1566,7 +1584,7 @@ ColumnLayout {
         objectName: "karaokeLyricsDialog"
         title: qsTr("Choose the lyrics")
         fileMode: FileDialog.OpenFile
-        nameFilters: [qsTr("Lyrics (*.lrc)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("Lyrics (*.lrc *.srt *.ass *.kar)"), qsTr("All files (*)")]
         onAccepted: {
             flow.lyricsChosen = true;
             flow.lyricsUrl = selectedFile.toString();
