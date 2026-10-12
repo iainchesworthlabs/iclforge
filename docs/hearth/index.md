@@ -122,8 +122,19 @@ a long path is where it is needed, because what Hearth follows is the output's o
 position, and a file's times are rarely right to the frame.
 
 **Full screen** (`F11`, or the button on the page; `Esc` leaves) is the singer view: dark, with
-larger type and more lines, and Previous, Play/Pause, Next and the vocals chooser kept at the
-bottom. `Space` pauses. Choosing a vocal there chooses the capable reproduction with it.
+larger type and more lines, and a position bar, Previous, Play/Pause, Next, **Queue** and the
+vocals chooser kept at the bottom. `Space` pauses. Choosing a vocal there chooses the capable
+reproduction with it. Press the position bar, or drag along it, to move the item: while the bar is
+held the words and the clock show the place held, and the item moves when it is let go. `Left`
+and `Right` move it five seconds either way, and stop at the ends of the item. **Queue** (or `Q`)
+opens the queue beside the words, with the item that is playing marked and a press playing that
+item; the strip at the top names the item that comes next.
+
+**On the Play page**, an item that has lyrics, or a CD+G picture, gets a **Lyrics** card with the
+same view and a **Full screen** button. It has a column of its own beside the queue when the
+window is 1,580 pixels wide or more, and is the first card of the monitor column in a narrower
+one, so that starting a song with lyrics does not move the rest of the page. An item with none
+gets no card.
 
 #### Timing the lyrics
 
@@ -137,6 +148,17 @@ are for lines and not words. It opens a window over the page, and the item plays
 2. **Words.** Each stamped line has its words spread over it by their letters, drawn slanted and
    muted: a guess. Play, and press `Space` as each word starts; a word that was pressed turns solid
    and keeps its time. A line's words are guessed again only where no press has set them.
+
+   **To put one word right**, choose it with a click, in either pass. It is outlined, the item is
+   cued 1.5 s before it, and the window says which word it is and when it starts. The next `Space`
+   in the words pass presses that word in place of the next guess, once, with the reaction time
+   taken off as for any press; **Stamp again** presses it at the position now, and **-10 ms** and
+   **+10 ms** move it by that, the word and not its line. Choosing the word again cues it again and
+   lets `Space` press it again; choosing its line lets the word go, and the buttons are the line's
+   again. This is how a file that came with the times of its words, from a forced aligner for one,
+   is corrected: the words of such a file are taken as given, so the words pass has none to press
+   until one is chosen. A word stays between its neighbours (stamped long after the next word, it
+   stops at the next word's time), so move the neighbour first when a word has to go past it.
 
 3. **A duet.** Choose a line and set its **Singer** (not marked, V1, V2 or both); the row shows the
    marker as it is written. The two **Name** fields are what the file calls the singers (`[v1:]`
