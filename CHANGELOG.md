@@ -619,6 +619,16 @@ The sections below contain the complete change list and fixes.
   The parsing is `command_line.hpp`, held by `hearth_controller_tests`. The Karaoke guide's page
   screenshot is retaken from the running window, and a duet one is added; the options are in
   [Hearth's command line](docs/hearth/index.md#command-line).
+- **Hearth opens a file it is given.** A file named on its own, as in `hearth song.ac3`, as
+  Windows runs `hearth.exe "%1"` for a double-clicked `.ac3` or `.ec3`, and as the Linux launcher
+  runs `hearth %F` (both registered when the association moved to Hearth, and Hearth read no file
+  from its command line, so the window opened empty), is added behind the queue the window brings
+  back and starts. It waits, cued, on a first run (the "Before you play anything" dialog comes first) and
+  with `--seek`, `--shot` or `--smoke-shot`; `--` ends the options, and `--open <file>` is the
+  same file named as an option. The item to start is chosen on the engine thread
+  (`Engine::add_and_play()`), so the saved queue that is restored at start cannot move it. A
+  second double-click still starts a second Hearth beside the first
+  ([Hearth's command line](docs/hearth/index.md#command-line)).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while

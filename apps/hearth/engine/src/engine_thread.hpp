@@ -176,6 +176,14 @@ public:
     void previous();
     void seek(std::chrono::milliseconds to);
     void add(std::vector<QueueItem> items);
+    // add(), then play_item() for the first of `items`: what a file handed to the program on
+    // its command line asks for. One command and not the two because the index of the first
+    // item is the queue's size when the command runs, which a caller cannot read off status()
+    // - that is the queue as it was some commands ago, and at start the restore() that brings
+    // the saved queue back may not have been carried out yet. Nothing is added or played when
+    // `items` is empty. It is noted as the two commands are, and a first item that cannot be
+    // played says why in the same way a play_item() of it does.
+    void add_and_play(std::vector<QueueItem> items);
     void insert(std::size_t index, QueueItem item);
     void remove(std::size_t index);
     void move(std::size_t from, std::size_t to);
