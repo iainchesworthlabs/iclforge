@@ -11,7 +11,8 @@ export enum DownmixTarget {
 }
 
 /**
- * Annex C's reproduction of an AC-3 karaoke stream (bsmod 7 above 1/0), in iclforge::ac3::KaraokeReproduction's
+ * Annex C's reproduction of a karaoke stream (bsmod 7 above 1/0: AC-3, or E-AC-3 of one independent
+ * substream), in iclforge::ac3::KaraokeReproduction's
  * own numeric order. Applied to the fold, so it only changes anything for a stream that is karaoke.
  */
 export enum KaraokeReproduction {
@@ -41,7 +42,8 @@ export interface FoldOptions {
   /** §7.8's optional LFE contribution to the fold. */
   mixLfe?: boolean;
   /**
-   * Annex C's reproduction of a karaoke AC-3 stream. At a stereo or mono `target` it is Annex C's own 2/0
+   * Annex C's reproduction of a karaoke stream (AC-3, or E-AC-3 of one independent substream). At a stereo
+   * or mono `target` it is Annex C's own 2/0
    * reproduction; at `AsCoded` it is three channels (four with the LFE): L, C and R. Default `AsCoded` (none).
    */
   karaoke?: KaraokeReproduction;
@@ -58,7 +60,7 @@ export interface PushMetadata {
   channelLabels: string[];
   /** 0 when no fold was requested at construction. */
   foldChannelCount: number;
-  /** Whether this unit is Annex C karaoke type: an AC-3 syncframe flagged bsmod 7 above 1/0. Never an E-AC-3 or AC-4 unit. */
+  /** Whether this unit is Annex C karaoke type: an AC-3 syncframe, or an E-AC-3 syncframe that is one independent substream with no object layer, flagged bsmod 7 above 1/0. Never an AC-4 unit. */
   karaoke: boolean;
   objectCount: number;
   objectLabels: string[];

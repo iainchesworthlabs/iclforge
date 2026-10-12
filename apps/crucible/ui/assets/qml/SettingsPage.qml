@@ -522,6 +522,80 @@ Flickable {
                 }
                 Note { objectName: "diagnosticsMessage"; visible: CrucibleController.diagnosticsMessage.length > 0; text: CrucibleController.diagnosticsMessage }
             }
+
+            // What the lyric strip follows, said over OSC for a rig that reads it. Off until it is
+            // turned on; the destination is an IPv4 address and a port (lyric_osc.hpp has the
+            // addresses, docs/crucible/settings.md says them to a person).
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.space3
+                RailBlock { ordinal: "08"; label: qsTr("LYRIC EVENTS OUT"); Layout.fillWidth: true; Layout.fillHeight: false }
+                CrucibleCheck {
+                    objectName: "oscEnabledCheck"
+                    Layout.fillWidth: true
+                    text: qsTr("Send the lyric strip's events over OSC")
+                    note: qsTr("The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.")
+                    checked: CrucibleLyrics.oscEnabled
+                    onToggled: function(on) { CrucibleLyrics.oscEnabled = on; }
+                }
+                SettingRow {
+                    objectName: "oscHostRow"
+                    visible: CrucibleLyrics.oscEnabled
+                    label: qsTr("Send to")
+                    Field {
+                        objectId: "oscHostInput"
+                        accessibleName: qsTr("Send to")
+                        text: CrucibleLyrics.oscHost
+                        input.onEditingFinished: CrucibleLyrics.oscHost = input.text
+                    }
+                }
+                SettingRow {
+                    objectName: "oscPortRow"
+                    visible: CrucibleLyrics.oscEnabled
+                    label: qsTr("Port")
+                    Field {
+                        objectId: "oscPortInput"
+                        accessibleName: qsTr("Port")
+                        text: String(CrucibleLyrics.oscPort)
+                        input.onEditingFinished: {
+                            const port = parseInt(input.text);
+                            if (port >= 1 && port <= 65535) {
+                                CrucibleLyrics.oscPort = port;
+                            }
+                            input.text = String(CrucibleLyrics.oscPort);
+                        }
+                    }
+                }
+                Note { objectName: "oscProblem"; visible: CrucibleLyrics.oscEnabled && CrucibleLyrics.oscProblem.length > 0; text: CrucibleLyrics.oscProblem }
+                CrucibleCheck {
+                    objectName: "oscLinesCheck"
+                    Layout.fillWidth: true
+                    visible: CrucibleLyrics.oscEnabled
+                    text: qsTr("Lines")
+                    checked: CrucibleLyrics.oscLines
+                    onToggled: function(on) { CrucibleLyrics.oscLines = on; }
+                }
+                CrucibleCheck {
+                    objectName: "oscWordsCheck"
+                    Layout.fillWidth: true
+                    visible: CrucibleLyrics.oscEnabled
+                    text: qsTr("Words")
+                    checked: CrucibleLyrics.oscWords
+                    onToggled: function(on) { CrucibleLyrics.oscWords = on; }
+                }
+                CrucibleCheck {
+                    objectName: "oscPositionCheck"
+                    Layout.fillWidth: true
+                    visible: CrucibleLyrics.oscEnabled
+                    text: qsTr("Position, ten times a second")
+                    checked: CrucibleLyrics.oscPosition
+                    onToggled: function(on) { CrucibleLyrics.oscPosition = on; }
+                }
+                Note {
+                    visible: CrucibleLyrics.oscEnabled
+                    text: qsTr("Each message begins with the application's name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line's number, text and times; /word the same for a word of a word-timed line; /position the song's place in milliseconds. Times are milliseconds from the start of the song.")
+                }
+            }
         }
     }
 }
