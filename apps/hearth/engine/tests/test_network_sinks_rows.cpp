@@ -378,6 +378,97 @@ TEST_CASE("network sinks rows: a sink can be set to Opus only where it lists Opu
     CHECK_FALSE(fallback_of("opus-player"));
 }
 
+// The choice outlives the run: it is kept with the sink's pairing record, and read back when the
+// sink first says hello, so the next group to play is planned with it before anyone opens the page.
+TEST_CASE("network sinks rows: a sink's Opus choice is read back at its first hello of a later run",
+          "[hearth][network-sinks]") {
+    ss::crypto::Key32 key{};
+    key[0] = 0x51;
+    ss::crypto::Key32 other_key{};
+    other_key[0] = 0x52;
+    const auto opus_client = [&](const ss::discovery::Service& service, std::string id,
+                                 const ss::crypto::Key32& client_key) {
+        auto client = connected(service, std::move(id));
+        client.client_key = client_key;
+        client.psk = ss::handshake::PskCategory::kLongTerm;
+        ss::messages::PlayerSupport support;
+        support.supported_formats = {{.codec = ss::messages::Codec::kPcm,
+                                      .channels = 2,
+                                      .sample_rate = 48000,
+                                      .bit_depth = 16},
+                                     {.codec = ss::messages::Codec::kOpus,
+                                      .channels = 2,
+                                      .sample_rate = 48000,
+                                      .bit_depth = 16}};
+        client.player_support = support;
+        return client;
+    };
+    const auto fallback_of = [](NetworkSinks& sinks, const std::string& id) {
+        for (const auto& sink : sinks.status().sinks) {
+            if (sink.id == id) {
+                return sink.opus_fallback;
+            }
+        }
+        return false;
+    };
+
+    MemorySettingsStore settings;
+    {
+        PairingStore store{settings, today};
+        REQUIRE(store.store_record(key, key));
+        REQUIRE(store.store_record(other_key, key));
+        const auto identity = ss::noise::KeyPair::generate();
+        REQUIRE(identity.has_value());
+        NetworkSinks sinks(*identity, "Test Hearth", store,
+                           iclforge::hearth::NetworkSinksOptions{.browse = false});
+        REQUIRE(sinks.started());
+        const auto kitchen = service_named("kitchen", 1);
+        const auto den = service_named("den", 2);
+        sinks.on_found(kitchen);
+        sinks.on_found(den);
+        sinks.on_client(opus_client(kitchen, "client-kitchen", key));
+        sinks.on_client(opus_client(den, "client-den", other_key));
+        CHECK_FALSE(fallback_of(sinks, "kitchen"));
+        REQUIRE(sinks.set_sink_opus_fallback("kitchen", true));
+        CHECK(fallback_of(sinks, "kitchen"));
+        CHECK_FALSE(fallback_of(sinks, "den"));
+    }
+
+    // A later run: a new store over what the first wrote, and sinks that have not said hello.
+    MemorySettingsStore reopened{settings.synced()};
+    PairingStore store{reopened, today};
+    const auto identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    NetworkSinks sinks(*identity, "Test Hearth", store,
+                       iclforge::hearth::NetworkSinksOptions{.browse = false});
+    REQUIRE(sinks.started());
+    const auto kitchen = service_named("kitchen", 1);
+    const auto den = service_named("den", 2);
+    sinks.on_found(kitchen);
+    sinks.on_found(den);
+    CHECK_FALSE(fallback_of(sinks, "kitchen"));
+    sinks.on_client(opus_client(kitchen, "client-kitchen", key));
+    sinks.on_client(opus_client(den, "client-den", other_key));
+    CHECK(fallback_of(sinks, "kitchen"));
+    CHECK_FALSE(fallback_of(sinks, "den"));
+
+    // Chosen again this run, it is the run's, and the store has the new value.
+    REQUIRE(sinks.set_sink_opus_fallback("kitchen", false));
+    sinks.on_client(opus_client(kitchen, "client-kitchen", key));
+    CHECK_FALSE(fallback_of(sinks, "kitchen"));
+    CHECK_FALSE(store.opus(key));
+
+    // Forgetting the pairing forgets the choice with it.
+    REQUIRE(sinks.set_sink_opus_fallback("den", true));
+    CHECK(store.opus(other_key));
+    // Not connected, so that it is the store that forgets: this host holds no connection by that
+    // id, and one it does not hold has nothing to unpair.
+    sinks.on_client_gone("client-den");
+    sinks.forget_pairing("den");
+    CHECK_FALSE(fallback_of(sinks, "den"));
+    CHECK_FALSE(store.opus(other_key));
+}
+
 TEST_CASE("network sinks rows: a group is looked up by its id, and an unknown id finds none",
           "[hearth][network-sinks]") {
     Rig rig;

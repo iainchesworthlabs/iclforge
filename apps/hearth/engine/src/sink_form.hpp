@@ -37,7 +37,9 @@
 //      places (`max_objects`, per data type) and would place this stream's -
 //      its settings ask for objects, or leave it to its layout, which has
 //      height speakers - is sent PCM decoded here where that is possible, and
-//      the stream as it is, to be played as its bed, where it is not.
+//      the stream as it is, to be played as its bed, where it is not. A stream of objects alone
+//      (an AC-4 presentation that decodes to no channels) has no bed to be played as: it is
+//      sent PCM, folded where the sink's formats need it, and else nothing.
 //      One more condition for a karaoke AC-3 or E-AC-3 stream the singer wants reproduced (not "as
 //      coded"): the sink's decoder settings list `karaoke`, and `karaoke_vocals` for the capable
 //      reproduction, and its `karaoke_codecs` list the stream's data type (a sink that lists
@@ -111,6 +113,9 @@ struct StreamNeeds {
     // a sink's stated limit is compared with; 0 for a programme with none, or
     // where it is not known.
     std::uint16_t objects = 0;
+    // ItemFacts::objects_alone: the programme decodes to its objects and nothing else, so a sink
+    // that places fewer than it has plays no bed - it plays nothing.
+    bool objects_alone = false;
     // Set for a karaoke AC-3 stream whose reproduction is wanted (ItemFacts::karaoke with a
     // reproduction other than "as coded"), which a sink must be told for itself or be sent PCM
     // that has it applied. Unset for every other stream, and for a karaoke one played as coded.
