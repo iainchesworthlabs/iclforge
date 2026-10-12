@@ -938,6 +938,8 @@ int play_via_ac3_transcode(std::string_view in_path, const std::string& device_i
                            std::string_view device_name, const Options& meta) {
     warn_associated_not_mixed(meta, "play",
                               "it transcodes one programme to AC-3 for the receiver without mixing");
+    // Only an E-AC-3 stream comes here, and Annex C is AC-3's.
+    warn_karaoke_not_ac3(meta, "E-AC-3");
     const auto temp_path = make_temp_ac3_path();
     if (!claim_temp_path(temp_path)) {
         fmt::println(stderr, "error: could not claim temp path {}", temp_path.string());
@@ -1139,6 +1141,13 @@ int run_play(std::string_view in_path, int device_index, const Options& meta) {
     // Before the sink opens, as the other legs say theirs.
     warn_associated_not_mixed(meta, "play",
                               "it passes one coded programme to a receiver without decoding it");
+    // The receiver decodes this stream, and the reproduction is its to apply.
+    if (eac3) {
+        warn_karaoke_not_ac3(meta, "E-AC-3");
+    } else {
+        warn_karaoke_not_applied(meta, "play",
+                                 "it passes the coded stream to a receiver without decoding it");
+    }
     iclforge::audio::PassthroughSink sink;
     const auto started = sink.start(
         device_id, content_rate,

@@ -641,7 +641,7 @@ the stereo or mono fold *is* Annex C's 2/0 reproduction - "any AC-3 decoder will
 appropriate output if it is set to perform an Lo, Ro 2-channel downmix" - so `karaoke` changes
 nothing there, and `downmix=ltrt` is refused, since Annex C has no Lt/Rt. A stream that is not
 karaoke is decoded as coded and the report says so; E-AC-3 and AC-4 streams warn and ignore the
-option.
+option. `monitor` takes it too and plays the same reproduction on the output (see below).
 
 `karaoke=none|v1|v2|v1+v2` is the karaoke-*capable* decoder (C.2.3.2, Table C.2.3): the same
 reproduction with the listener choosing which vocals are heard rather than the stream's own
@@ -659,6 +659,18 @@ forge decode sing-along.ac3 backing.wav karaoke=none  # L C R with the vocals mu
 forge decode sing-along.ac3 duet.wav karaoke=v1+v2    # V1 left, V2 right, melody centre
 forge decode sing-along.ac3 lead.wav channels=2 karaoke=v1   # stereo with V1 in the middle
 ```
+
+`monitor` reproduces a karaoke stream the same way, and plays it: `forge monitor sing-along.ac3
+karaoke=none` plays L, C and R (and the LFE) with the vocals out. The channels are laid out as the
+3/0 mode they are, not as the 3/2 layout the stream codes, and on an output narrower than the
+stream (a stereo endpoint, which `monitor` folds to unasked) the 2/0 reproduction is what plays.
+The report says which. `downmix=ltrt` is refused with `karaoke` here as it is by `decode`.
+
+`play` applies the choice where it decodes, which is its PCM fallback for an output that takes no
+bitstream. Its bitstream legs, and `spdif`, hand the coded stream on without decoding it, so a
+receiver reproduces it (as coded unless it is karaoke-capable): they accept `karaoke` and say, on
+stderr, that it is not applied. `spatial` places an E-AC-3 stream's objects and says that
+karaoke is AC-3's.
 
 `downmix=auto` lets the stream choose between the two stereo folds, the third option A/52
 §D3.1.1 describes. The stream's preference is its `dmixmod` (Table D2.2): in AC-3's Annex D

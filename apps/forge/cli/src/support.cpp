@@ -1567,6 +1567,11 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
     const bool plays_ac4 = command == "decode" || command == "monitor" || command == "play";
     const bool decodes_ac4 = plays_ac4 || command == "transcode" || command == "qc" ||
                              command == "levels" || command == "loudness";
+    // The commands that read the karaoke choice: decode and monitor apply it
+    // (and so does play, on the leg that decodes), while spdif, spatial and
+    // play's bitstream legs hand a stream on or place it undecoded and say so.
+    const bool takes_karaoke = command == "decode" || command == "monitor" || command == "play" ||
+                               command == "spdif" || command == "spatial";
     for (char* raw : tokens) {
         const std::string_view token{raw};
         const auto eq = token.find('=');
@@ -1901,11 +1906,14 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                          token);
             return false;
         }
-        if (command == "decode" && (token == "karaoke" || key == "karaoke")) {
-            // Annex C's karaoke-aware 3/0 reproduction, for a decode: its
-            // output has fewer channels than the stream codes and is named by
-            // a layout (L C R) the other commands that read this stage's
-            // output do not know, so it is `decode`'s alone.
+        if (takes_karaoke && (token == "karaoke" || key == "karaoke")) {
+            // Annex C's karaoke-aware 3/0 reproduction, for a decode or a
+            // monitor: its output has fewer channels than the stream codes
+            // and is named by a layout (L C R) that those two lay out
+            // themselves. A command that hands the coded stream on (play's
+            // bitstream legs, spdif, spatial) reads the token too and says it
+            // does not apply it - see warn_karaoke_not_applied() - the way
+            // associated= is read by every command and mixed by two.
             // Bare, on and aware are the karaoke-AWARE decoder (C.2.3.1); none,
             // v1, v2 and v1+v2 are the karaoke-CAPABLE one's listener choices
             // (C.2.3.2, Table C.2.3), which also pick the vocals a stereo or
@@ -3501,6 +3509,111 @@ void warn_associated_not_mixed(const Options& meta, std::string_view command,
     }
     fmt::println(stderr, "warning: associated= is ignored by {}: {}; 'forge monitor' mixes one",
                  command, why);
+}
+
+bool wants_karaoke(const Options& meta) {
+    return meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff;
+}
+
+void warn_karaoke_not_applied(const Options& meta, std::string_view command,
+                              std::string_view why) {
+    if (!wants_karaoke(meta)) {
+        return;
+    }
+    fmt::println(stderr,
+                 "warning: karaoke is ignored by {}: {}; the receiver reproduces it, as coded "
+                 "unless it is karaoke-capable ('forge decode' and 'forge monitor' reproduce it)",
+                 command, why);
+}
+
+void warn_karaoke_not_ac3(const Options& meta, std::string_view codec) {
+    if (!wants_karaoke(meta)) {
+        return;
+    }
+    fmt::println(stderr, "warning: the stream is {}: karaoke is AC-3's (Annex C), and ignored",
+                 codec);
+}
+
+bool refuse_karaoke_with_ltrt(const iclforge::ac3::OutputConfig& output) {
+    if (output.karaoke == iclforge::ac3::KaraokeReproduction::kOff ||
+        output.target != iclforge::ac3::DownmixTarget::kLtRt) {
+        return false;
+    }
+    // Annex C defines a 2/0 reproduction as Lo/Ro and a 3/0 one; there is no
+    // Lt/Rt karaoke. Said rather than quietly taking the one or the other.
+    fmt::println(stderr,
+                 "error: karaoke reproduces through the 3/0 or the Lo/Ro downmix (Annex C); "
+                 "it defines no Lt/Rt - drop karaoke or use downmix=loro");
+    return true;
+}
+
+bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
+                        const iclforge::ac3::DecodedFrame& frame) {
+    const bool karaoke = iclforge::ac3::meta::is_karaoke(
+        static_cast<iclforge::ac3::meta::BitstreamMode>(frame.bsmod), frame.acmod);
+    return output.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
+           iclforge::ac3::output_channel_count(output, frame.acmod, frame.lfe, karaoke) !=
+               iclforge::ac3::output_channel_count(output, frame.acmod, frame.lfe, false);
+}
+
+namespace {
+
+// What the listener's choice of vocals is called in the report.
+std::string_view vocals_name(iclforge::ac3::KaraokeVocals vocals) {
+    switch (vocals) {
+        case iclforge::ac3::KaraokeVocals::kNone: return "no vocals";
+        case iclforge::ac3::KaraokeVocals::kV1: return "V1";
+        case iclforge::ac3::KaraokeVocals::kV2: return "V2";
+        case iclforge::ac3::KaraokeVocals::kBoth: return "V1 and V2";
+    }
+    return "no vocals";
+}
+
+}  // namespace
+
+void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
+                    const iclforge::ac3::DecodedFrame& first, bool folded, bool reproduced,
+                    std::string_view verb) {
+    if (output.karaoke == iclforge::ac3::KaraokeReproduction::kOff) {
+        return;
+    }
+    const bool karaoke_stream = iclforge::ac3::meta::is_karaoke(
+        static_cast<iclforge::ac3::meta::BitstreamMode>(first.bsmod), first.acmod);
+    const bool capable = output.karaoke == iclforge::ac3::KaraokeReproduction::kCapable;
+    if (reproduced && capable) {
+        status_println(status,
+                       "  karaoke (Annex C.2.3.2, Table C.2.3): melody M to the centre, "
+                       "listener's vocals: {}",
+                       vocals_name(output.karaoke_vocals));
+    } else if (reproduced) {
+        const auto levels = iclforge::ac3::mix_levels(first.acmod, first.cmixlev, first.surmixlev,
+                                                      first.alternate_bsi);
+        status_println(status,
+                       "  karaoke (Annex C.2.3.1): melody M to the centre, the vocals at the "
+                       "stream's surround level ({:.1f} dB)",
+                       iclforge::ac3::meta::to_db(
+                           output.mix_override.loro_slev.value_or(levels.loro_slev)));
+    } else if (!karaoke_stream) {
+        status_println(status,
+                       "note: karaoke applies to a stream with bsmod 7 above 1/0 (Annex C.2.1); "
+                       "this one is bsmod {} at {}, and was {} as coded",
+                       first.bsmod, iclforge::ac3::analysis::layout_name(first.acmod, first.lfe),
+                       verb);
+    } else if (folded && capable && first.acmod != iclforge::ac3::Acmod::k2_0) {
+        status_println(status,
+                       "  karaoke (Annex C.2.3.2, Table C.2.3): 2/0 reproduction, melody M at "
+                       "clev, listener's vocals: {}",
+                       vocals_name(output.karaoke_vocals));
+    } else if (folded) {
+        status_println(status,
+                       "note: karaoke at a stereo or mono target is Annex C's 2/0 "
+                       "reproduction, which is this Lo/Ro downmix");
+    } else {
+        status_println(status,
+                       "note: a karaoke stream at {} is already what Annex C's reproduction "
+                       "gives; {} as coded",
+                       iclforge::ac3::analysis::layout_name(first.acmod, first.lfe), verb);
+    }
 }
 
 std::string describe_associated(const iclforge::apps::AssociatedChoice& choice) {

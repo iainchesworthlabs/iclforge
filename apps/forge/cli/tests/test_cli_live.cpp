@@ -1027,3 +1027,149 @@ TEST_CASE("spatial names the programme it renders from a stream that carries two
     CHECK(out.find("  programme 1 of 2 (0, 1)") != std::string::npos);
     check_spoke_either_way(rc, out);
 }
+
+// ---------------------------------------------------------------------------
+// Annex C karaoke through the commands that play a stream or hand it on. `decode` has always
+// taken the choice. `monitor` applies it (and `play` does where it decodes), and `spdif`,
+// `spatial` and `play`'s bitstream legs read it and say what they do with it: they hand the coded
+// stream to a receiver, which reproduces it. What a reproduction is, level for level, is held by
+// the decode cases in test_cli_encode_paths.cpp and by libs/ac3's output-stage tests; these hold
+// the commands around it.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A second of a 5.1 AC-3 stream flagged bsmod 7: Annex C's karaoke main service at 3/2 with its
+// LFE, so a reproduction of it is four channels (L, C, R and the LFE) where six are coded.
+fs::path write_karaoke_stream(const std::string& name) {
+    const auto stream = scratch_dir() / (name + ".ac3");
+    REQUIRE(run_cli("sine \"" + stream.string() + "\" 1 448 440 1 51 bsmod=voiceover",
+                    scratch_dir() / (name + "_make.log")) == 0);
+    return stream;
+}
+
+}  // namespace
+
+TEST_CASE("spdif reads karaoke and wraps the stream as it was, saying a receiver reproduces it",
+          "[cli][karaoke]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_karaoke_stream("karaoke_spdif");
+    const auto plain = dir / "karaoke_spdif_plain.wav";
+    const auto asked = dir / "karaoke_spdif_asked.wav";
+    fs::remove(plain);
+    fs::remove(asked);
+
+    REQUIRE(run_cli("spdif \"" + stream.string() + "\" \"" + plain.string() + "\"",
+                    dir / "karaoke_spdif_plain.log") == 0);
+    const auto log = dir / "karaoke_spdif_asked.log";
+    REQUIRE(run_cli("spdif \"" + stream.string() + "\" \"" + asked.string() + "\" karaoke=v1",
+                    log) == 0);
+    const auto out = read_log(log);
+    INFO(out);
+    // Accepted, not "unknown option", and not applied: nothing is decoded to apply it to.
+    CHECK(out.find("unknown option") == std::string::npos);
+    CHECK(out.find("warning: karaoke is ignored by spdif: it wraps the coded stream") !=
+          std::string::npos);
+    CHECK(out.find("the receiver reproduces it, as coded unless it is karaoke-capable") !=
+          std::string::npos);
+    // The carrier is the one it always was.
+    const auto plain_bytes = read_log(plain);
+    CHECK_FALSE(plain_bytes.empty());
+    CHECK(read_log(asked) == plain_bytes);
+}
+
+TEST_CASE("monitor, spdif and spatial say karaoke is AC-3's, and ignore it, for an E-AC-3 stream",
+          "[cli][audio-io][karaoke][concurrency]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_two_programme_stream("karaoke_eac3");
+
+    SECTION("spdif") {
+        const auto log = dir / "karaoke_eac3_spdif.log";
+        REQUIRE(run_cli("spdif \"" + stream.string() + "\" \"" +
+                            (dir / "karaoke_eac3_spdif.wav").string() + "\" karaoke=v1+v2",
+                        log) == 0);
+        const auto out = read_log(log);
+        INFO(out);
+        CHECK(out.find("warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored") !=
+              std::string::npos);
+    }
+    SECTION("monitor, before an output is touched") {
+        const auto log = dir / "karaoke_eac3_monitor.log";
+        const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 karaoke=v1", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(out.find("unknown option") == std::string::npos);
+        CHECK(out.find("warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored") !=
+              std::string::npos);
+        check_spoke_either_way(rc, out);
+    }
+    SECTION("spatial, which places an E-AC-3 stream's objects") {
+        const auto log = dir / "karaoke_eac3_spatial.log";
+        const auto rc = run_cli("spatial \"" + stream.string() + "\" -1 karaoke", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(out.find("unknown option") == std::string::npos);
+        CHECK(out.find("warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored") !=
+              std::string::npos);
+        check_spoke_either_way(rc, out);
+    }
+}
+
+TEST_CASE("monitor refuses karaoke with downmix=ltrt in decode's words, before an output is touched",
+          "[cli][audio-io][karaoke][concurrency]") {
+    const auto stream = write_karaoke_stream("karaoke_ltrt");
+    const auto log = scratch_dir() / "karaoke_ltrt.log";
+    const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 karaoke downmix=ltrt", log);
+    const auto out = read_log(log);
+    INFO(out);
+    if (out.find("is unavailable on this platform") != std::string::npos) {
+        return;
+    }
+    CHECK(rc == 1);
+    CHECK(out.find("error: karaoke reproduces through the 3/0 or the Lo/Ro downmix (Annex C); "
+                   "it defines no Lt/Rt - drop karaoke or use downmix=loro") != std::string::npos);
+    CHECK(out.find("monitoring") == std::string::npos);
+}
+
+TEST_CASE("monitor and play take karaoke for an AC-3 karaoke stream, and play or refuse by name",
+          "[cli][audio-io][karaoke][concurrency]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_karaoke_stream("karaoke_plays");
+
+    SECTION("monitor") {
+        const auto log = dir / "karaoke_plays_monitor.log";
+        const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 karaoke=v1", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(out.find("unknown option") == std::string::npos);
+        if (rc == 0) {
+            // A device took it: the report says which reproduction it was given - Annex C's 3/0
+            // on a device wide enough, the 2/0 form where monitor folds to the output's width.
+            const bool three_zero = out.find("(4 channels, ") != std::string::npos;
+            CHECK(out.find("karaoke (Annex C.2.3.2, Table C.2.3)") != std::string::npos);
+            CHECK((three_zero || out.find("2/0 reproduction") != std::string::npos));
+            CHECK(out.find("played 32 frames") != std::string::npos);
+        }
+        check_spoke_either_way(rc, out);
+    }
+    SECTION("play") {
+        const auto log = dir / "karaoke_plays_play.log";
+        const auto rc = run_cli("play \"" + stream.string() + "\" -1 karaoke=v1", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(out.find("unknown option") == std::string::npos);
+        check_spoke_either_way(rc, out);
+    }
+}

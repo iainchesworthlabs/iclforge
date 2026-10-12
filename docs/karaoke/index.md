@@ -332,6 +332,19 @@ forge decode out.ac3 melody-and-v1.wav karaoke=v1
 coded, and the report says so. The library form is `OutputConfig::karaoke` and
 `OutputConfig::karaoke_vocals`; see [Decoding](../library/decoding.md).
 
+`forge monitor` takes the same choice and plays the reproduction on the output:
+
+```text
+forge monitor out.ac3 karaoke=none      # L, C, R: the backing and the melody, for singing along
+forge monitor out.ac3 karaoke=v1+v2     # V1 left, V2 right
+```
+
+On an output narrower than the stream, which `monitor` folds to unasked, the 2/0 reproduction
+plays. `forge play` applies the choice where it decodes (its PCM fallback), and `forge spdif`
+and `forge play`'s bitstream legs hand the coded stream on: they accept `karaoke` and say it is
+not applied, since a receiver reproduces the stream. E-AC-3 and AC-4 are ignored with a warning
+by all of them.
+
 ## What it does not do
 
 - **Re-levelling outside Hearth's Karaoke page.** The library has the three levels

@@ -52,8 +52,9 @@ constexpr std::array<OptionToken, 106> kOptionTokens{{
     {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
-    {"karaoke", "decode: an AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R"},
-    {"karaoke=", "decode: on or aware; none, v1, v2 or v1+v2 for the karaoke-capable decoder's vocals; off (the default)"},
+    {"karaoke", "decode/monitor: an AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R; "
+                "play, spdif and spatial hand the stream on and say it is not applied"},
+    {"karaoke=", "decode/monitor: on or aware; none, v1, v2 or v1+v2 for the karaoke-capable decoder's vocals; off (the default)"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
     {"fast-imdct", "names the default inverse MDCT (the fast §7.9.4 step 3)"},
     {"quiet", "no status output at all - errors and the payload only"},
@@ -452,7 +453,7 @@ void print_decode_topic() {
     fmt::println("       command; monitor also folds on its own initiative when the output");
     fmt::println("       endpoint renders fewer channels than the programme.");
     fmt::println("");
-    fmt::println("decode alone takes karaoke (or karaoke=on) for an AC-3 karaoke stream,");
+    fmt::println("decode and monitor take karaoke (or karaoke=on) for an AC-3 karaoke stream,");
     fmt::println("       bsmod 7 with an acmod above 1/0 (Annex C): it writes what a");
     fmt::println("       karaoke-aware multi-channel decoder reproduces - L, C, R (and the LFE) -");
     fmt::println("       with the guide melody M in the centre and the vocals V1, V2 mixed at");
@@ -466,6 +467,11 @@ void print_decode_topic() {
     fmt::println("       only the chosen vocals in it (V1 or V2 alone in the centre, a pair");
     fmt::println("       left and right at unity), and at channels=2 or 1 the 2/0 form with");
     fmt::println("       the melody at clev and a single vocal at 0.7 in both channels.");
+    fmt::println("       monitor plays the same reproduction on its output (L, C, R when the");
+    fmt::println("       device is wide enough, the 2/0 form when it folds); play does where it");
+    fmt::println("       decodes, which is its PCM fallback. spdif, play's bitstream legs and");
+    fmt::println("       spatial hand the coded stream on and say karaoke is not applied: a");
+    fmt::println("       receiver reproduces it, as coded unless it is karaoke-capable.");
 }
 
 void print_ac4_decode_topic() {

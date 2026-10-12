@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -24,6 +25,7 @@
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
+#include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "alsa_null_device.hpp"
 
@@ -1127,4 +1129,131 @@ TEST_CASE("monitor plays the associated service into the programme, and only whe
         CHECK(contains(text, "no programme 5 in this stream (it carries 0, 1)"));
         CHECK_FALSE(contains(text, "played "));
     }
+}
+
+// ---------------------------------------------------------------------------
+// Annex C karaoke: monitor reproduces the stream on the output, and lays the reproduction's
+// channels out as the 3/0 mode they are (L, R, C and then the LFE in the order a device takes
+// them), not as the 3/2 layout the stream codes. What a reproduction is, level for level, is held
+// by the decode cases in test_cli_encode_paths.cpp; these hold what reaches the device.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A second of a 5.1 karaoke stream (bsmod 7 at 3/2 with its LFE) whose only signal is a tone in the
+// guide melody M, which Annex C's Table C.2.1 puts in the slot a programme uses for its centre:
+// everything that reaches the device is the melody, and the place it arrives in says whether the
+// reproduction was laid out as L R C.
+fs::path write_melody_only_karaoke_stream(const fs::path& dir, const std::string& name) {
+    constexpr std::uint32_t kRate = 48000;
+    // WAV order, which is what the `51` layout reads a six-column file as: L R C LFE Ls Rs.
+    std::vector<std::vector<float>> channels(6, std::vector<float>(kRate, 0.0F));
+    for (std::size_t i = 0; i < channels[2].size(); ++i) {
+        channels[2][i] = static_cast<float>(
+            0.3 * std::sin(2.0 * std::numbers::pi * 440.0 * static_cast<double>(i) / kRate));
+    }
+    const auto wav = dir / (name + "_src.wav");
+    REQUIRE(iclforge::ac3::io::write_wav_f32(wav.string(), channels, kRate).has_value());
+    const auto stream = dir / (name + ".ac3");
+    fs::remove(stream);
+    REQUIRE(run_cli(null_config(),
+                    "encode \"" + wav.string() + "\" \"" + stream.string() + "\" 448 51 bsmod=voiceover",
+                    dir / (name + "_make.log")) == 0);
+    return stream;
+}
+
+// The energy of each of `channels` interleaved float32 channels in a raw capture.
+std::vector<double> channel_energy(const std::vector<std::byte>& raw, std::size_t channels) {
+    std::vector<double> energy(channels, 0.0);
+    const std::size_t samples = raw.size() / sizeof(float);
+    for (std::size_t i = 0; i < samples; ++i) {
+        float value = 0.0F;
+        std::memcpy(&value, raw.data() + i * sizeof(float), sizeof(float));
+        energy[i % channels] += static_cast<double>(value) * static_cast<double>(value);
+    }
+    return energy;
+}
+
+}  // namespace
+
+TEST_CASE("monitor plays a karaoke stream's reproduction as L R C and the LFE, not the coded layout",
+          "[cli][audio-io][alsa-null][concurrency][karaoke]") {
+    const auto dir = scratch_dir();
+    const auto stream = write_melody_only_karaoke_stream(dir, "karaoke_monitor");
+    constexpr std::size_t kFrames = 32 * 1536;
+
+    SECTION("not asked for, the six coded channels play") {
+        const auto out = dir / "karaoke_coded.raw";
+        fs::remove(out);
+        const auto config = capture_playback_config(dir / "karaoke_coded.conf", out);
+        const auto log = dir / "karaoke_coded.log";
+        REQUIRE(run_cli(config, "monitor \"" + stream.string() + "\"", log) == 0);
+        const auto text = read_text(log);
+        check_clean(text);
+        CHECK(contains(text, "(6 channels, 48000 Hz)"));
+        CHECK_FALSE(contains(text, "karaoke ("));
+    }
+    SECTION("asked for, L R C and the LFE play, and the melody is in the centre's place") {
+        const auto out = dir / "karaoke_none.raw";
+        fs::remove(out);
+        const auto config = capture_playback_config(dir / "karaoke_none.conf", out);
+        const auto log = dir / "karaoke_none.log";
+        REQUIRE(run_cli(config, "monitor \"" + stream.string() + "\" -1 karaoke=none", log) == 0);
+        const auto text = read_text(log);
+        check_clean(text);
+        CHECK(contains(text, "(4 channels, 48000 Hz)"));
+        CHECK(contains(text,
+                       "karaoke (Annex C.2.3.2, Table C.2.3): melody M to the centre, listener's "
+                       "vocals: no vocals"));
+        CHECK(contains(text, "played 32 frames"));
+        REQUIRE(fs::exists(out));
+        const auto raw = read_bytes(out);
+        REQUIRE(raw.size() == kFrames * 4 * sizeof(float));
+        const auto energy = channel_energy(raw, 4);
+        // The melody and nothing else: the third place of the four, which is a device's centre.
+        CHECK(energy[2] > 1.0);
+        CHECK(energy[0] == 0.0);
+        CHECK(energy[1] == 0.0);
+        CHECK(energy[3] == 0.0);
+    }
+    SECTION("the aware reproduction, asked for bare, is the same layout") {
+        const auto out = dir / "karaoke_aware.raw";
+        fs::remove(out);
+        const auto config = capture_playback_config(dir / "karaoke_aware.conf", out);
+        const auto log = dir / "karaoke_aware.log";
+        REQUIRE(run_cli(config, "monitor \"" + stream.string() + "\" -1 karaoke", log) == 0);
+        const auto text = read_text(log);
+        CHECK(contains(text, "(4 channels, 48000 Hz)"));
+        CHECK(contains(text, "karaoke (Annex C.2.3.1): melody M to the centre"));
+        const auto energy = channel_energy(read_bytes(out), 4);
+        CHECK(energy[2] > 1.0);
+        CHECK(energy[0] == 0.0);
+    }
+}
+
+TEST_CASE("monitor names a layout that changes mid-stream instead of reading past a narrower frame",
+          "[cli][audio-io][alsa-null][concurrency][karaoke]") {
+    // Four reproduced channels, then six coded: karaoke switching off at bsmod, which the sink
+    // opened for the first frame's width cannot play.
+    const auto dir = scratch_dir();
+    const auto karaoke = write_melody_only_karaoke_stream(dir, "karaoke_switch");
+    const auto plain = dir / "karaoke_switch_plain.ac3";
+    REQUIRE(run_cli(null_config(), "sine \"" + plain.string() + "\" 1 448 440 1 51",
+                    dir / "karaoke_switch_plain_make.log") == 0);
+    const auto joined = dir / "karaoke_switch.ac3";
+    {
+        std::ofstream out{joined, std::ios::binary};
+        REQUIRE(out.is_open());
+        for (const auto* part : {&karaoke, &plain}) {
+            const auto bytes = read_bytes(*part);
+            out.write(reinterpret_cast<const char*>(bytes.data()),
+                      static_cast<std::streamsize>(bytes.size()));
+        }
+    }
+    const auto log = dir / "karaoke_switch.log";
+    CHECK(run_cli(null_config(), "monitor \"" + joined.string() + "\" -1 karaoke=v1", log) ==
+          kExitInput);
+    const auto text = read_text(log);
+    check_clean(text);
+    CHECK(contains(text, "the channel layout changes mid-stream (4 channels, then 6)"));
 }
