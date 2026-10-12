@@ -366,9 +366,10 @@ source, and the play takes a ring, two stacks, the I2S queue and a decoder out o
 | ring 8,192, stack 24,576 | AC-3 2.0 played beside 129 failed Wi-Fi buffer allocations and an underrun; E-AC-3 2.0 failed a 7,168-byte allocation with 12,476 free and `abort()`ed |
 
 So the C6 profile does not claim HTTP plays. #1395 makes the board refuse one up front, with
-`why: memory`, from `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` (134,008 in the C6 fragment, a
-sum of the sizes the fragment gives a play and the least decoder's peak), and the Sendspin session
-stays up. The C6's suite plays over Sendspin, which is the product's path on that part, with the
+`why: memory`, from `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` (160,796 in the C6 fragment: a
+sum of the sizes the fragment gives a play and the least decoder's peak, 134,008, and the 26,788
+bytes the network needs free beside a decoder, the least a Sendspin E-AC-3 stream left), and the
+Sendspin session stays up. The C6's suite plays over Sendspin, which is the product's path on that part, with the
 repository's test server on the bench ([Sendspin rows](#sendspin-rows-pr-14)). Whether the HTTP
 play should work on a C6 at all is the owner's call: it needs the Sendspin player's 48 KB ring
 and 24 KB stack given back for the length of a play.
@@ -626,17 +627,37 @@ three resyncs in one, one of each in another), so a row holds how many of its pl
 baseline had (`glitched_plays` in the tolerance), which five plays a row make a real margin. Zero
 cannot be the figure, and a recorded zero from a lucky five would fail the next honest run.
 
-**Recorded, `c6-16mb`** (the C6, `.117`, the image `v0.10.0-beta.1-4520-g26274cd77-` built from this PR's
-tree, profile hash `ebc59bd7d7f8`, five plays a row after eight restarts, 2026-10-12):
-`ac3-2.0-sendspin` plays 938 bursts at 661 permille of a burst
-(the C6's decoder is about 660 against the S3's 120 and the P4's 61), 0 of
-5 plays glitched, `decode_stack_free` 11,120 bytes, and the
-least internal heap during a stream 27,968 bytes (it read 17,124 to 52,560 over
-the plays I made: no tolerance names it). The boot line is the worst of eight:
-`internal_free=108792 largest=88064`.
+**Recorded, `c6-16mb`, first** (the C6, `.117`, the image `v0.10.0-beta.1-4520-g26274cd77-` built
+from this PR's tree, profile hash `ebc59bd7d7f8`, five plays a row after eight restarts,
+2026-10-12): `ac3-2.0-sendspin` plays 938 bursts at 661 permille of a burst (the C6's decoder is
+about 660 against the S3's 120 and the P4's 61), 0 of 5 plays glitched, `decode_stack_free`
+11,120 bytes, and the least internal heap during a stream 27,968 bytes (it read 17,124 to 52,560
+over the plays made). The boot line is the worst of eight: `internal_free=108792 largest=88064`.
 
-**E-AC-3 over Sendspin is not in the list, and why.** The same board plays the E-AC-3 stream
-through Sendspin with almost no internal heap spare, and not reliably:
+**Recorded again with the E-AC-3 row** (PR 15, the image `v0.10.0-beta.1-4569-g9643eba39-`, profile
+hash `cc71ee4908ff`, five plays a row after eight restarts, the decoder's feature tables out of
+static RAM and the play floor at 160,796, 2026-10-12):
+
+| | Before (4520) | After (4569) |
+|---|---|---|
+| static internal RAM (DIRAM) | 144,139 | 116,307 |
+| boot, worst of eight: free, largest block | 108,792, 88,064 | 134,196, 116,736 |
+| `ac3-2.0-sendspin`: permille, glitched of 5, least heap | 661, 0, 27,968 | 658, 0, 53,536 |
+| `eac3-2.0-sendspin`: permille, glitched of 5, least heap | not in the list | 743, 1, 6,836 |
+| E-AC-3 least heap, other plays after AC-3 streams in the same boot | 916 to 4,496, and the row failed | 26,788 (least of 3); 30,920, 18,936, 26,144, 24,868, 23,288 and 27,732 (single plays) |
+
+The E-AC-3 stream plays all 938 bursts every time, after AC-3 streams in the same boot, which is
+where it failed to allocate its Wi-Fi receive buffers. One E-AC-3 play in five to six ran the board
+dry (an underrun and a resynchronisation; the decoder is at 743 permille of a burst against the
+AC-3's 658, so it has less to give a late chunk), which is what a row's `glitched_plays` is for.
+The recorded 6,836 is the least of five and was not seen again in nine single plays, which read
+18,936 and up; the row's tolerance on it is 3,072 bytes, so a play that took the room back to
+where it was (916 to 4,496) fails.
+
+**What the E-AC-3 stream's plays were before** (kept for what it measured, 2026-10-12):
+
+The same board played the E-AC-3 stream through Sendspin with almost no internal heap spare,
+and not reliably:
 
 | | plays | outcome | least internal heap |
 |---|---|---|---|
@@ -648,13 +669,10 @@ through Sendspin with almost no internal heap spare, and not reliably:
 The failing plays print `heap_caps_malloc could not allocate 1848 bytes (caps 0x1800); internal
 free 11016, largest 1824` over and over: the Wi-Fi receive buffer (1,848 bytes) cannot be had
 from a heap that has 11 KB free and no block over 1,824 bytes. It is fragmentation as much as
-total free, the failure the C3 session found on 2026-09-17, and it is why the row is not here:
-a baseline recorded from a lucky first-stream-after-boot play would call a board that fails after
-an AC-3 stream "holding". The row to add when the heap is fixed is
-`{"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"}` in the `c6-16mb` list,
-with a `play_heap_free_bytes` tolerance for it (the suite supports one per row;
-`{"eac3-2.0-sendspin": 1024}` was the proposal), and it should be played **after** the AC-3 row,
-as a user plays. A separate task has been raised for the heap.
+total free, the failure the C3 session found on 2026-09-17. It was why the row was not in the
+list: a baseline recorded from a lucky first-stream-after-boot play would have called a board
+that fails after an AC-3 stream "holding". The row is in the list since PR 15, after the AC-3 one,
+as a user plays them.
 
 ### The C6's static RAM budget was wrong (PR 14)
 
@@ -685,6 +703,16 @@ tables (8,928) are not linked. DIRAM of both C6 images 144,139 -> **116,307**
 (`.dram0.bss` 81,736 -> 53,904), budget 116,307 and 4.9% = 122,000. What is left of the
 library's 11,976 bytes is `fixed_imdct_tables` (5,728), JOC's float MDCT tables (4,496, which
 only an object stream in the MDCT domain reads) and 1,752 of small tables.
+
+**The play floor went up with it.** The HTTP play's refusal (134,008, above) was a sum of what a
+play takes, and it refused every play because the part had 117 KB free with the Sendspin player
+up. With 136,648 to 140,404 free at boot (the worst and the best of eight) the same floor let an
+AC-3 2.0 play start and run its 938 units beside Wi-Fi buffer allocations failing at 6 to 14 KB
+free, which is the failure the refusal is for: the suite's `*-refused` rows played, and the
+harness died on a `/status` that timed out. The floor is now 160,796: the 134,008 and the 26,788
+bytes the network and the session were left at their least beside an E-AC-3 stream, so a play
+over HTTP is refused unless it leaves them their room. Whether HTTP plays should work on the C6
+is still the owner's call; this keeps the answer the profile gave.
 
 ## Changing a profile
 
@@ -747,7 +775,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
 | 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; no board has run the image, so no list and no baseline |
-| 10 | Sendspin rows: the suite plays a stream the way the C6's product path does, with the test server | yes | **Built** (the harness, tests, the C6's AC-3 row and its baseline); the E-AC-3 row is not in the list because the C6 does not play it reliably yet, see [Sendspin rows](#sendspin-rows-pr-14) |
+| 10 | Sendspin rows: the suite plays a stream the way the C6's product path does, with the test server | yes | **Built** (the harness, tests, the C6's AC-3 row and its baseline); the E-AC-3 row joined it in PR 15, once the decoder's feature tables were out of static RAM, see [Sendspin rows](#sendspin-rows-pr-14) |
 
 PR 3 follows 2. `p4-rev3` waited for #1400's fragments to be on main (row 9).
 
@@ -769,7 +797,7 @@ Still open:
    number from it is a smoke floor. The board suite owns the budget. Confirm that is acceptable.
 4. **An HTTP play on the C6.** Left refused. The alternative is giving the Sendspin player's ring
    and stack back for the length of a play, which is a change to the player, not to a profile.
-5. **E-AC-3 on the C6 over Sendspin.** It plays with 0.9 to 4.5 KB of internal heap spare and fails after AC-3 streams in the same boot ([Sendspin rows](#sendspin-rows-pr-14)). Either the heap is fixed (a task is raised: the static tables in `libiclforge_ac3_minimal.a`, 39,864 bytes of `.bss`), or the C6 stops listing E-AC-3 to a server, the way it lists no AC-4. A decision for the owner.
+5. ~~**E-AC-3 on the C6 over Sendspin.**~~ Done in PR 15: the heap was fixed (27,776 bytes of the decoder library's feature tables out of static RAM), the row is in the list and recorded ([Sendspin rows](#sendspin-rows-pr-14)); the C6 lists E-AC-3 to a server, as before.
 
 ## What this does not claim
 

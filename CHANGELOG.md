@@ -5047,6 +5047,32 @@ The sections below contain the complete change list and fixes.
   9,600 of 14,400 frames each of three times. The karaoke group cases' waits for a board's
   totals now report what each board holds and what both sides logged when they expire.
 
+**ESP32-C6 internal RAM**
+
+- **The decoder's tool tables were 27,776 bytes of a C6's static RAM, and an E-AC-3 stream over
+  Sendspin was left 0.9 to 4.5 KB of heap and failed after an AC-3 stream in the same boot.** The
+  `c6-16mb` image's static internal RAM was 144,139 bytes, 39,752 of it the AC-3 library's
+  `.bss`, and nearly all of that was function-local tables of tools a plain stereo stream never
+  uses: enhanced coupling's double tables (10,240, read once to be narrowed into the scratch's own
+  copies, which now evaluate the same expressions where they are made) and its 512-point DFT's
+  twiddles (5,536), the transient pre-noise cross-fades (3,072) and the double MDCT tables that
+  only JOC's direct-form branches named, in a profile that has no direct form and refuses it
+  before it gets there (8,928). The DFT's twiddles and the cross-fades are members of heap
+  objects that exist only for a stream that uses those tools; the rest are not linked. The
+  image's DIRAM is 116,307 (budget 122,000, was a wrong 108,000 and then 151,000), and on the C6
+  at the record: boot free 134,196 to 140,428 and largest block 116,736 to 124,928 (108,792 and
+  88,064 to 96,256 before), the E-AC-3 stream's least heap 18,936 to 30,920 on single plays after
+  AC-3 streams (6,836 once in five), every play of 938 bursts, and the AC-3 stream's 48,148 to
+  85,100. The decoders' output is the same: the ac3 test binary's results on the fixed tier are
+  the same 7 failing cases of 1,011 before and after, and all 1,011 pass on the double tier.
+  `eac3-2.0-sendspin` is a row of the C6's board suite, after the AC-3 one.
+- **The C6 refused an HTTP play only because it had too little free RAM to start one.** With the
+  RAM back, the 134,008-byte floor of `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` stopped
+  refusing, and an AC-3 2.0 play over HTTP ran beside Wi-Fi buffer allocations failing at 6 to
+  14 KB free. The floor is 160,796 in both C6 profiles: what a play takes (134,008) and the
+  26,788 bytes the network was left at its least beside an E-AC-3 stream. The C6 still refuses
+  an HTTP play with `why: memory` and plays over Sendspin.
+
 ## [0.10.0-beta.1] - 2026-09-01
 
 Tenth tagged release. The E-AC-3 encoder catches up with the decision quality AC-3 got in 0.7.0,
