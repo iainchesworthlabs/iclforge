@@ -227,7 +227,8 @@ A file with no words, that is cut short, or that counts SMPTE frames at some oth
 MIDI file carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
 are not guessed at, so a Western karaoke file with accented letters saved in Latin-1 (and Hebrew in
 Windows-1255) is refused with the reason, as an LRC file in a code page is. Plain ASCII is UTF-8, and
-most are.
+most are. Only the title, the artist and the words are checked: the other `@` lines are not shown,
+so a copyright or key line in a code page does not refuse a file whose words are fine.
 
 ### What is shown
 

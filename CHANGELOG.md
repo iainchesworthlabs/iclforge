@@ -305,6 +305,10 @@ The sections below contain the complete change list and fixes.
   second: a tick is a fixed length of time, rounded to the nearest millisecond, and the file's tempo
   events, which name a quarter note, move nothing. Any other rate is refused with the reason, and a
   frame of no ticks is a damaged file (planning/karaoke-phase2.md, W13e).
+- **A `.kar` file's other `@` lines may be in a code page.** The reader checked every Text event as
+  UTF-8, so a copyright line (`@I`) or a key line (`@K`) in Latin-1 refused a file whose words were
+  fine. Only the title and the artist (`@T`) and the words are checked now; the other `@` lines are
+  not shown and are skipped (planning/karaoke-phase2.md, W13e).
 - **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
   `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
   (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
