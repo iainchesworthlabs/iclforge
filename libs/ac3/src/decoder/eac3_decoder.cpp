@@ -4345,21 +4345,6 @@ MixLevels resolve_mix_levels(int bsid, Acmod acmod, const std::optional<meta::Mi
     return mix_levels(mixing);
 }
 
-// D2: the levels a karaoke programme reproduces at are `clev` and `slev` of Annex C, which an
-// E-AC-3 bsi has no fields for; the Lo/Ro group of mixmdate takes their place. Where mixmdate is
-// absent a genuine E-AC-3 stream (bsid above 8) gets -3 dB for both, which is what Dolby's decoder
-// used, measured, and not AC-3's -4.5 and -6 dB defaults that MixLevels starts from. This is
-// scoped to a karaoke programme on purpose: the same measurement shows Dolby's decoder folding
-// every E-AC-3 stream without mixmdate at -3 and -3, which is a change to every such fold and is
-// put to the owner on its own (planning/karaoke-eac3.md, D10).
-void karaoke_default_levels(MixLevels& levels, int bsid,
-                            const std::optional<meta::MixMetadata>& mixing) {
-    if (bsid > 8 && !mixing.has_value()) {
-        levels.loro_clev = meta::level::kMinus3dB;
-        levels.loro_slev = meta::level::kMinus3dB;
-    }
-}
-
 // §6.3.2.2 Table 47: which Annex E channel locations a JOC downmix of
 // `dmx_config_idx` needs, in JOC channel order. Table 53 (§6.3.5.2) confirms
 // channel POSITIONS 5/6 are generic in the reconstruction maths themselves,
@@ -4461,7 +4446,6 @@ std::vector<DecodedSubstream> Eac3Decoder::flush() {
                                  substream.object_metadata.has_value());
         levels.karaoke = karaoke;
         if (karaoke) {
-            karaoke_default_levels(levels, substream.bsid, substream.mixing);
             // One independent substream, so its channels are the coded ones in Table 5.8's order,
             // which is the order the output stage's acmod form takes.
             impl_->output_.apply(views, substream.acmod, substream.lfe, levels, substream.dialnorm,
@@ -4546,7 +4530,6 @@ void Eac3Decoder::apply_output(DecodedAccessUnit& out, std::span<const std::span
             is_karaoke_programme(out.info, out.acmod, static_cast<std::size_t>(out.substream_count),
                               out.object_metadata.has_value());
         if (levels.karaoke) {
-            karaoke_default_levels(levels, out.bsid, out.mixing);
             impl_->output_.apply(impl_->au_views_, out.acmod, rendered_lfe, levels, out.dialnorm,
                                  out.dialnorm2);
         } else {
