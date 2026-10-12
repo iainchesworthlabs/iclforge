@@ -289,7 +289,18 @@ bool configure_line(Line& line, const iclforge::SinkLinePlan& plan, const LineGp
         // than reverted to DEFAULT: it is still strictly better here (DEFAULT cannot
         // open TDM at ANY width past two channels on this revision, APLL can up to
         // ~13), and it is exactly correct, with full headroom, on >=v3.0 silicon.
+#if CONFIG_IDF_TARGET_ESP32P4 && !CONFIG_ESP32P4_SELECTS_REV_LESS_V3
+        // Chip revision v3.x (sdkconfig.p4-rev3): the controller has the 160 MHz PLL as a clock
+        // source, which clears what the line above this block says cannot be cleared. The sixteen
+        // 32-bit slots of the full frame are 512 bits, 24.576 MHz of bit clock at 48 kHz; the
+        // controller's mclk is three times the frame (73.728 MHz) and needs a source at least twice
+        // that, 147.456 MHz, so 160 MHz it is, divided by 2.17. Chosen at build time, not read from
+        // the chip, because the two revisions are two images (planning/karaoke-p4x-panel.md, D7).
+        // NOT RUN ON A v3.x BOARD YET: this is the line the kit's first TDM open checks.
+        tdm_cfg.clk_cfg.clk_src = I2S_CLK_SRC_PLL_160M;
+#else
         tdm_cfg.clk_cfg.clk_src = I2S_CLK_SRC_APLL;
+#endif
         tdm_cfg.slot_cfg = I2S_TDM_PHILIPS_SLOT_DEFAULT_CONFIG(data_bits(), I2S_SLOT_MODE_STEREO,
                                                                slot_mask(plan.slots));
         tdm_cfg.gpio_cfg.mclk = I2S_GPIO_UNUSED;

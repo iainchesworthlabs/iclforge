@@ -29,6 +29,19 @@ CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES=0
 CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES=24576
 CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS=0
 
+# What an HTTP play (POST /play) needs free before it starts, and refuses with the reason
+# "memory" under, instead of being met as an abort() inside the decoder. 134,008 bytes: the
+# ring (32,768) and the decode task's stack (32,768) and the fetch task's (8,192) that the
+# example's Kconfig gives a play, the I2S queue (12 buffers of 256 frames of 16-bit stereo,
+# 12,288 bytes, and 384 for its descriptors: 12,672) and the least a decoder has asked for, the
+# fixed tier's AC-3 1/0 at 47,608 (docs/platforms/bare-metal/esp32-c6.md). With the
+# Sendspin player up the part has 117 KB free when a play opens its source (2026-10-12, main
+# 3d6b2aa0a), so every play is refused, which is the answer the board gives today in a worse form:
+# the stack's allocation fails, or a smaller stack and ring get as far as the decoder's
+# and it aborts (E-AC-3 2.0), or AC-3 plays beside 129 failed Wi-Fi buffer allocations. A floor and
+# not a fit: a wider stream asks for more. Sendspin plays are not tested by it.
+CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES=134008
+
 # 2.0 played every fixture measured on this board; AC-3 and E-AC-3 5.1 each aborted
 # within about 10 to 12 seconds, the decoder's own scratch failing an allocation the
 # heap no longer had room for. Past 2 coded channels a syncframe is refused before a
