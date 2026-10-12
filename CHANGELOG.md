@@ -3965,8 +3965,11 @@ The sections below contain the complete change list and fixes.
   that bit never put a pull request in the queue: nine sat green and unmerged, some for six
   days. (Queueing one with that token is no better: GitHub starts no `merge_group` run for the
   entry, which would wait out the 180-minute check timeout.) The workflow now sets the bit with
-  a person's token, the Dependabot secret `MERGE_QUEUE_TOKEN`, and warns when it is not set;
-  `.github/branch-protection.md` says how to create it.
+  a person's token, the Dependabot secret `MERGE_QUEUE_TOKEN`, and fails the job, enabling
+  nothing, when it is not set or has expired: the first version fell back to `GITHUB_TOKEN`
+  with a warning, and a bit set that way is inert and is not replaced by a later run, so five
+  pull requests stayed stuck after the secret was added. `.github/branch-protection.md` says
+  how to create the token.
 - **Every Linux and macOS package shipped without the `ac3cli` man page or any of the
   four shell completions.** They were guarded by `if(CMAKE_CROSSCOMPILING)` on the
   mistaken assumption this meant only the arm64 cross legs — it's set whenever a
