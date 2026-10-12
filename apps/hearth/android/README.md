@@ -98,6 +98,8 @@ desktop's first-run dialog says the same, because a paired sink alone is not som
 The first stream ends it for good, by one flag in the app's preferences (`has_played`), set the first time
 the sink streams, so a long-time sink's idle screen is not nagging. It is held by `StatusScreenTest`.
 
+![A paired sink that has never played: "To play, add this sink to a group on Hearth's Network page" under the formats it passes through](../../../docs/hearth/screenshots/android-idle-first-run.png)
+
 ![The idle screen: the sink's name, its address, the code a server asked for in the accent, and Quit](../../../docs/hearth/screenshots/android-status-idle-code.png)
 ![The starting screen: the name and what it is waiting for](../../../docs/hearth/screenshots/android-status-starting.png)
 ![An attention banner over the dimmed lyric](../../../docs/hearth/screenshots/android-status-attention.png)
