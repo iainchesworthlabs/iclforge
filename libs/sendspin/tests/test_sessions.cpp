@@ -1384,7 +1384,8 @@ struct LegacyServer {
     std::vector<std::string> sent;
     std::size_t answered = 0;
 
-    LegacyServer() : player(player_config(true), client_keys, pairing_state, events, clock) {
+    explicit LegacyServer(PlayerConfig config = player_config(true))
+        : player(std::move(config), client_keys, pairing_state, events, clock) {
         events.keys = &client_keys;
         const SessionOutput opened = player.open();
         REQUIRE(opened.frames.size() == 1);
@@ -1608,4 +1609,350 @@ TEST_CASE("sessions: deactivating a player before the clock's first exchange del
     REQUIRE(server.events.audio.size() == 2);
     CHECK(server.events.audio[0].frame[0] == 1);
     CHECK(server.events.audio[1].frame[0] == 2);
+}
+
+namespace {
+
+namespace pm = iclforge::sendspin::pairing_messages;
+
+// The tokens a session counts in `text`: one for every value, key and container.
+std::size_t tokens_in(const std::string& text) {
+    const iclforge::sendspin::json::TokenCount counted = iclforge::sendspin::json::count_tokens(text, 1'000'000);
+    REQUIRE(counted.result);
+    return counted.tokens;
+}
+
+struct Message {
+    std::string name;
+    std::string text;
+};
+
+// A sink as Hearth builds one at its largest: sixteen outputs (render::OutputLayout::kMaxSlots) and
+// every decoder key the role names.
+PlayerConfig sink_config() {
+    PlayerConfig config = extension_config();
+    config.max_json_tokens = iclforge::sendspin::kSinkMaxJsonTokens;
+    ac::Support& support = *config.iclforge_support;
+    support.outputs.count = 16;
+    support.decoder_settings.assign(ac::kDecoderSettingNames.begin(), ac::kDecoderSettingNames.end());
+    return config;
+}
+
+// The settings command that fills sink_config()'s every field: all sixteen decoder keys.
+ac::CommandMessage full_settings() {
+    ac::CommandMessage command;
+    command.command = ac::Command::kSettings;
+    ac::Settings& settings = command.settings;
+    settings.revision = 4'000'000'000;
+    settings.layout = "7.1.4";
+    settings.routing = "0:L,1:R,2:C,3:LFE,4:Ls,5:Rs,6:Lrs,7:Rrs,8:Ltf,9:Rtf,10:Ltr,11:Rtr";
+    settings.trim_db = std::vector<double>(16, -6.5);
+    settings.delay_ms = std::vector<double>(16, 12.5);
+    settings.crossover_hz = 80.0;
+    ac::DecoderSettings& decoder = settings.decoder;
+    decoder.mode = ac::DecoderMode::kCustom;
+    decoder.drc_cut = 0.5;
+    decoder.drc_boost = 0.25;
+    decoder.heavy_compression = true;
+    decoder.dialnorm = true;
+    decoder.downmix = ac::Downmix::kLtRt;
+    decoder.ltrt_phase_shift = true;
+    decoder.mix_lfe = true;
+    decoder.has_programme = true;
+    decoder.programme = 255;
+    decoder.objects = ac::ObjectsPolicy::kAlways;
+    decoder.concealment = ac::Concealment::kRepeatFade;
+    decoder.karaoke = ac::Karaoke::kCapable;
+    decoder.karaoke_vocals = ac::KaraokeVocals::kBoth;
+    decoder.karaoke_melody_db = 6.0;
+    decoder.karaoke_vocal1_db = -3.0;
+    decoder.karaoke_vocal2_db = 12.0;
+    return command;
+}
+
+// Every message a server sends a player, with every field it can carry set and each list as long
+// as the roles and the sink allow (the specification bounds none of `languages`: a hundred stands
+// for any server's). Both dialects where the form differs.
+std::vector<Message> full_server_messages() {
+    using iclforge::sendspin::Dialect;
+    const std::vector<std::string> roles = {"_iclforge_player@v1", "player@v1",   "metadata@v1",   "controller@v1",
+                                            "color@v1",            "artwork@v1", "visualizer@v1", "source@v1"};
+    const std::vector<std::string> languages(100, "en-GB");
+
+    metadata::State track;
+    track.timestamp = 9'000'000'000'000;
+    track.title = "Flamenco Sketches";
+    track.artist = "Miles Davis";
+    track.album_artist = "Miles Davis";
+    track.album = "Kind of Blue";
+    track.artwork_url = "https://example.test/cover.jpg";
+    track.year = 1959;
+    track.track = 5;
+    track.progress = metadata::Progress{.track_progress_ms = 123'456, .track_duration_ms = 566'000, .playback_speed = 1000};
+    controller::State controls;
+    controls.supported_commands = {
+        controller::Command::kPlay,      controller::Command::kPause,     controller::Command::kStop,
+        controller::Command::kNext,      controller::Command::kPrevious,  controller::Command::kVolume,
+        controller::Command::kMute,      controller::Command::kRepeatOff, controller::Command::kRepeatOne,
+        controller::Command::kRepeatAll, controller::Command::kShuffle,   controller::Command::kUnshuffle,
+        controller::Command::kSwitch,    controller::Command::kSeek,      controller::Command::kSeekRelative};
+    controls.volume = 60;
+    controls.muted = true;
+    controls.repeat = controller::Repeat::kAll;
+    controls.shuffle = true;
+    controls.seek_max_ms = 566'000;
+    color::State colours;
+    colours.timestamp = 9'000'000'000'000;
+    colours.background_dark = color::Rgb{.r = 1, .g = 2, .b = 3};
+    colours.background_light = color::Rgb{.r = 250, .g = 251, .b = 252};
+    colours.primary = color::Rgb{.r = 100, .g = 110, .b = 120};
+    colours.accent = color::Rgb{.r = 200, .g = 10, .b = 20};
+    colours.on_dark = color::Rgb{.r = 255, .g = 255, .b = 255};
+    colours.on_light = color::Rgb{.r = 0, .g = 0, .b = 0};
+    m::ServerState state;
+    state.metadata = track;
+    state.controller = controls;
+    state.color = colours;
+
+    artwork::Channels channels;
+    for (int i = 0; i < 4; ++i) {
+        channels.channels.push_back({.source = artwork::Source::kAlbum, .format = artwork::Format::kPng, .width = 3000, .height = 3000});
+    }
+    visualizer::StreamStart spectrum;
+    spectrum.types = {visualizer::Type::kLoudness, visualizer::Type::kBeat, visualizer::Type::kFPeak,
+                      visualizer::Type::kSpectrum, visualizer::Type::kPeak};
+    spectrum.rate_max = 60;
+    spectrum.tracks_downbeats = true;
+    spectrum.spectrum = visualizer::Spectrum{.n_disp_bins = 64, .scale = visualizer::Scale::kMel, .f_min = 20, .f_max = 20000};
+    const m::StreamStart start{
+        .server_transmitted = 9'000'000'000'000,
+        .player = m::PlayerStream{.format = kPcm, .codec_header = std::vector<std::uint8_t>(64, 0xA5)},
+        .iclforge = ac::StreamStart{.data_type = ac::DataType::kEac3, .sample_rate = 48000},
+        .artwork = channels,
+        .visualizer = spectrum};
+
+    m::ServerCommand command;
+    m::PlayerCommandMessage volume;
+    volume.command = m::PlayerCommand::kVolume;
+    volume.volume = 100;
+    command.player = volume;
+    command.iclforge = full_settings();
+    command.source = source::Command::kStart;
+
+    std::vector<Message> out;
+    out.push_back({"server/hello, 100 languages", m::write_server_hello({.name = "Music Assistant", .languages = languages})});
+    out.push_back({"server/time", m::write_server_time({.client_transmitted = 9'000'000'000'000,
+                                                       .server_received = 9'000'000'000'001,
+                                                       .server_transmitted = 9'000'000'000'002})});
+    out.push_back({"server/command, every key", m::write_server_command(command, Dialect::kSpecification)});
+    out.push_back({"stream/start, every role", m::write_stream_start(start)});
+    // A lyric document is one string, whatever its bytes: a role's largest, and an anchor.
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = ac::LyricsDocument{.item = 4'000'000'000, .text = std::string(ac::kMaxLyricsBytes, 'l')};
+    m::ServerCommand lyrics;
+    lyrics.iclforge = document;
+    out.push_back({"server/command, a lyric document", m::write_server_command(lyrics, Dialect::kSpecification)});
+    ac::CommandMessage lyric_anchor;
+    lyric_anchor.command = ac::Command::kLyricsPosition;
+    lyric_anchor.lyrics_position = ac::LyricsAnchor{
+        .item = 4'000'000'000, .position_ms = 4'233'600'000, .at_us = 9'000'000'000'000, .speed = 1.0};
+    m::ServerCommand position;
+    position.iclforge = lyric_anchor;
+    out.push_back({"server/command, lyrics_position", m::write_server_command(position, Dialect::kSpecification)});
+    out.push_back({"stream/clear, 8 roles", m::write_stream_clear({.server_transmitted = 9'000'000'000'000, .roles = roles})});
+    out.push_back({"stream/end, 8 roles", m::write_stream_end({.roles = roles})});
+    out.push_back({"group/update", m::write_group_update({.playback_state = m::PlaybackState::kPlaying,
+                                                         .group_id = std::string(36, 'g'),
+                                                         .group_name = std::string(64, 'n')})});
+    out.push_back({"server/unpair", m::write_server_unpair()});
+    out.push_back({"server/pair-init", pm::write_server_pair_init({.nonce_a = pm::Key32{}})});
+    out.push_back({"server/pair-auth", pm::write_server_pair_auth(pm::Key32{})});
+    out.push_back({"server/pair-confirm", pm::write_server_pair_confirm(pm::Digest64{})});
+    out.push_back({"server/pair-finalize", pm::write_server_pair_finalize()});
+    for (const Dialect dialect : {Dialect::kSpecification, Dialect::kAiosendspin911}) {
+        const std::string tag = dialect == Dialect::kSpecification ? ", spec" : ", 9.1.1";
+        out.push_back({"server/state, 3 roles" + tag, m::write_server_state(state, dialect)});
+        if (dialect == Dialect::kAiosendspin911) {
+            // Music Assistant's metadata also carries repeat and shuffle (planning/hearth-sendspin-extension.md,
+            // C38): the reader ignores them and a session counts them all the same.
+            std::string extended = m::write_server_state(state, dialect);
+            const std::string anchor = R"("metadata":{)";
+            const std::size_t at = extended.find(anchor);
+            REQUIRE(at != std::string::npos);
+            extended.insert(at + anchor.size(), R"("repeat":"all","shuffle":true,)");
+            out.push_back({"server/state, 3 roles, as Music Assistant sends it", extended});
+        }
+        const m::Activate activate{.activities = {m::Activity::kPairing},
+                                   .active_roles = roles,
+                                   .pairing = m::PairingActivation{.method = m::PairMethod::kDynamicCode,
+                                                                   .format = m::CodeFormat::kDigits,
+                                                                   .pin_length = 12,
+                                                                   .languages = languages}};
+        out.push_back({"server/activate, 8 roles + 100 languages" + tag, m::write_activate(activate, dialect)});
+        out.push_back({"server/pair-pending" + tag,
+                       pm::write_pair_pending({.pairing_index = 4'000'000'000U, .message = std::string(200, 'm')}, dialect)});
+        out.push_back({"pair/abort" + tag, pm::write_pair_abort(pm::AbortReason::kUserCancelled, dialect)});
+    }
+    return out;
+}
+
+}  // namespace
+
+// What a sink's cap (kSinkMaxJsonTokens, 512) must hold. The largest message a server sends, with
+// every optional field the readers take set, is server/state with all three of its roles: 94
+// tokens, 98 as Music Assistant sends it, whose metadata also carries repeat and shuffle.
+// stream/start with every role is 88, and the settings command for sixteen outputs and every
+// decoder key is 89 (99 with a player and a source command beside it). Only `languages` is
+// unbounded: a hundred make server/hello 109 and server/activate 126. So no message a server
+// legitimately sends comes within twice the cap; one would need 230 language tags, more than ISO
+// 639-1 has. A lyric document is one string, one token, whatever its bytes. If a field is added
+// and this fails, the cap is to be reconsidered, not the message trimmed.
+TEST_CASE("sessions: no message a server sends comes within twice a sink's token cap", "[sendspin][sessions][json]") {
+    const std::vector<Message> messages = full_server_messages();
+    REQUIRE_FALSE(messages.empty());
+    for (const Message& message : messages) {
+        INFO(message.name);
+        CHECK(tokens_in(message.text) * 2 <= iclforge::sendspin::kSinkMaxJsonTokens);
+    }
+    const auto assistant = std::find_if(messages.begin(), messages.end(), [](const Message& message) {
+        return message.name == "server/state, 3 roles, as Music Assistant sends it";
+    });
+    REQUIRE(assistant != messages.end());
+    CHECK(tokens_in(assistant->text) == 98);
+    // The settings command alone, which is what scales with a sink: two numbers for each output.
+    m::ServerCommand settings;
+    settings.iclforge = full_settings();
+    CHECK(tokens_in(m::write_server_command(settings, iclforge::sendspin::Dialect::kSpecification)) == 89);
+}
+
+namespace {
+
+// A stream/start the player takes whole, with an unknown key of one-digit values after it so that
+// the message holds exactly `tokens` tokens (at least 19): the reader ignores a key it does not
+// know, so the message is valid at any length.
+std::string stream_start_of(std::size_t tokens) {
+    REQUIRE(tokens >= 19);
+    std::string text =
+        R"({"type":"stream/start","payload":{"server_transmitted":0,)"
+        R"("player":{"codec":"pcm","sample_rate":48000,"channels":2,"bit_depth":16},"x":[)";
+    for (std::size_t i = 0; i + 19 < tokens; ++i) {
+        text += i == 0 ? "1" : ",1";
+    }
+    text += "]}}";
+    REQUIRE(tokens_in(text) == tokens);
+    return text;
+}
+
+}  // namespace
+
+TEST_CASE("sessions: a player drops a message over its token cap and carries on", "[sendspin][sessions][json]") {
+    const std::size_t cap = iclforge::sendspin::kSinkMaxJsonTokens;
+    PlayerConfig config = player_config(true);
+    config.max_json_tokens = cap;
+    LegacyServer server(std::move(config));
+    REQUIRE(server.player.phase() == PlayerSession::Phase::kActive);
+
+    // At the cap the message is read; one token over, it is dropped like a malformed one, with no
+    // callback and no answer - and the connection stays up.
+    server.send_json(stream_start_of(cap));
+    CHECK(server.events.starts.size() == 1);
+    server.send_json(stream_start_of(cap + 1));
+    server.send_json(stream_start_of(4096));
+    CHECK(server.events.starts.size() == 1);
+    CHECK(server.player.phase() == PlayerSession::Phase::kActive);
+    server.send_json(stream_start_of(19));
+    CHECK(server.events.starts.size() == 2);
+}
+
+TEST_CASE("sessions: the token cap is the config's, and a host's default is unchanged", "[sendspin][sessions][json]") {
+    CHECK(PlayerConfig{}.max_json_tokens == 4096);
+    CHECK(iclforge::sendspin::kSinkMaxJsonTokens < 4096);
+
+    // The default reads what the sessions always did: 4,096 tokens, and not one more.
+    LegacyServer host;
+    host.send_json(stream_start_of(4096));
+    CHECK(host.events.starts.size() == 1);
+    host.send_json(stream_start_of(4097));
+    CHECK(host.events.starts.size() == 1);
+
+    // A cap under the 64 tokens kept in the session's own frame bounds those too: a stream/start
+    // of the smallest shape is 19 tokens.
+    PlayerConfig tight = player_config(true);
+    tight.max_json_tokens = 19;
+    LegacyServer small(std::move(tight));
+    small.send_json(stream_start_of(19));
+    CHECK(small.events.starts.size() == 1);
+    small.send_json(stream_start_of(20));
+    CHECK(small.events.starts.size() == 1);
+    // The server's own hello and activation were 7 and 11 tokens, and passed.
+    CHECK(small.player.phase() == PlayerSession::Phase::kActive);
+
+    // 0 refuses every message, the hello included: the connection never gets past it.
+    PlayerConfig none = player_config(true);
+    none.max_json_tokens = 0;
+    LegacyServer nothing(std::move(none));
+    CHECK(nothing.player.phase() == PlayerSession::Phase::kHello);
+}
+
+TEST_CASE("sessions: a sink's cap refuses a valid 4 KB text of 2,000 values before it takes a block",
+          "[sendspin][sessions][json]") {
+    // The text the cap exists for: "[1,1,...]" is valid JSON and 4,001 bytes, inside the board's
+    // 4,160-byte message window, and read by value it needs 32,016 bytes of tokens in one block.
+    std::string text = "[1";
+    for (int i = 1; i < 2000; ++i) {
+        text += ",1";
+    }
+    text += "]";
+    REQUIRE(text.size() == 4001);
+
+    iclforge::sendspin::json::TokenStorage storage;
+    iclforge::sendspin::json::Document document;
+    const iclforge::sendspin::json::ParseResult result =
+        document.parse(text, storage, iclforge::sendspin::kSinkMaxJsonTokens);
+    CHECK(result.error == iclforge::sendspin::json::Error::kTooManyTokens);
+    CHECK(storage.heap_tokens() == 0);
+    CHECK(document.empty());
+    // Counted, not read: nothing is stored, so nothing is asked for.
+    const iclforge::sendspin::json::TokenCount counted =
+        iclforge::sendspin::json::count_tokens(text, iclforge::sendspin::kSinkMaxJsonTokens);
+    CHECK(counted.result.error == iclforge::sendspin::json::Error::kTooManyTokens);
+
+    // Under the host's default the same text is read, in one block of 32,016 bytes.
+    REQUIRE(document.parse(text, storage, PlayerConfig{}.max_json_tokens));
+    CHECK(storage.heap_tokens() == 2001);
+}
+
+TEST_CASE("sessions: a sink's cap takes the largest settings command a sixteen-output sink is sent",
+          "[sendspin][sessions][iclforge][json]") {
+    PlayerConfig config = sink_config();
+    REQUIRE(config.max_json_tokens == iclforge::sendspin::kSinkMaxJsonTokens);
+    Rig rig(std::move(config), 0, hs::sentinel_choice(), {});
+    REQUIRE(rig.run_until([&] { return !rig.server_events.hellos.empty(); }, 1'000'000));
+    rig.send(rig.server.activate(extension_playback()));
+    REQUIRE(rig.run_until([&] { return rig.available(); }, 5'000'000));
+
+    const ac::CommandMessage settings = full_settings();
+    rig.send(rig.server.iclforge_command(settings));
+    REQUIRE(rig.run_until([&] { return !rig.player_events.iclforge_commands.empty(); }, 100'000));
+    REQUIRE(rig.player_events.iclforge_commands.size() == 1);
+    const ac::Settings& got = rig.player_events.iclforge_commands[0].settings;
+    CHECK(got.revision == settings.settings.revision);
+    CHECK(got.trim_db == settings.settings.trim_db);
+    CHECK(got.delay_ms == settings.settings.delay_ms);
+    CHECK(got.decoder.karaoke_vocals == ac::KaraokeVocals::kBoth);
+    CHECK(rig.player_events.refused_settings.empty());
+}
+
+TEST_CASE("sessions: a sink's cap takes stream/start with every role", "[sendspin][sessions][json]") {
+    const std::vector<Message> messages = full_server_messages();
+    const auto found = std::find_if(messages.begin(), messages.end(),
+                                    [](const Message& message) { return message.name == "stream/start, every role"; });
+    REQUIRE(found != messages.end());
+    PlayerConfig config = player_config(true);
+    config.max_json_tokens = iclforge::sendspin::kSinkMaxJsonTokens;
+    LegacyServer server(std::move(config));
+    server.send_json(found->text);
+    REQUIRE(server.events.starts.size() == 1);
+    CHECK(server.events.starts[0].format == kPcm);
 }
