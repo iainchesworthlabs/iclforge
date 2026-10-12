@@ -338,9 +338,6 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
 
 ## What it does not do
 
-- **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
-  (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
-  player do not offer them.
 - **Finding the times of a file's words.** Hearth's timing window ([Timing the
   lyrics](../hearth/index.md#timing-the-lyrics)) takes them from your presses, and an estimate by
   the letters of a word is only where a press starts from; nothing here aligns words to the sound.

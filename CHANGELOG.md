@@ -153,6 +153,13 @@ The sections below contain the complete change list and fixes.
   offset and a channel trim set on a part survive another part being added, replaced or removed;
   and a `.lrc` of the backing's name beside it (or one the author chooses) is put beside the saved
   stream under the stream's name, where Hearth finds it, never over a file already there.
+- **The Forge GUI's Hear step re-levels the capable player's parts.** Under **Capable**, a slider
+  for the melody and for each vocal sets its level against Table C.2.3 (0 dB is the table, -24 is
+  off, 12 dB the top: Hearth's span and `forge decode karaoke-melody=`'s), a part the stream lacks has
+  none, **Reset levels** puts them back, and the What plays table leaves out a part pulled to off.
+  The stream player takes the three levels (`karaokeMelodyDb`, `karaokeVocal1Db`,
+  `karaokeVocal2Db`, held to the library's span) and decodes the stream again when one moves
+  (planning/karaoke-phase2.md, W10).
 - **Hearth reproduces a karaoke stream.** `DecoderSettings` gains `karaoke` (aware by default,
   or capable, or off) and `karaoke_vocals`, which `decoder_setup()` hands to the output stage, and
   the stream decoder lays an AC-3 unit out from `output_mode()`: a karaoke stream played to a 5.1

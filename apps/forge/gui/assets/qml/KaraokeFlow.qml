@@ -516,6 +516,50 @@ ColumnLayout {
         return parts.length > 0 ? parts.join(" + ") : qsTr("silent");
     }
 
+    // The level of each part against Table C.2.3 (Annex C.2.3's "additional flexibility", the
+    // capable decoder's): the span is the library's, the one Hearth's sliders use, and the bottom
+    // of it is off.
+    readonly property real levelMinDb: -24
+    readonly property real levelMaxDb: 12
+
+    function partDb(part) {
+        switch (part) {
+        case "M": return StreamPlayerController.karaokeMelodyDb;
+        case "V1": return StreamPlayerController.karaokeVocal1Db;
+        case "V2": return StreamPlayerController.karaokeVocal2Db;
+        }
+        return 0;
+    }
+
+    function setPartDb(part, db) {
+        switch (part) {
+        case "M": StreamPlayerController.karaokeMelodyDb = db; break;
+        case "V1": StreamPlayerController.karaokeVocal1Db = db; break;
+        case "V2": StreamPlayerController.karaokeVocal2Db = db; break;
+        }
+    }
+
+    function levelText(db) {
+        if (db <= flow.levelMinDb) {
+            return qsTr("off");
+        }
+        return qsTr("%1 dB").arg((db > 0 ? "+" : "") + Math.round(db));
+    }
+
+    // A part pulled to the bottom of its control is not heard: the capable decoder takes it out of
+    // the sums. Only the capable decoder has levels.
+    function partOff(part) {
+        return flow.listening === "capable" && flow.partDb(part) <= flow.levelMinDb;
+    }
+
+    function audibleParts(parts) {
+        return parts.filter((part) => !flow.partOff(part));
+    }
+
+    readonly property bool levelsMoved: StreamPlayerController.karaokeMelodyDb !== 0
+                                        || StreamPlayerController.karaokeVocal1Db !== 0
+                                        || StreamPlayerController.karaokeVocal2Db !== 0
+
     function listeningText() {
         if (flow.listening === "asCoded") {
             return qsTr("As a plain surround player plays it: the vocals come from the rear speakers.");
@@ -1023,6 +1067,89 @@ ColumnLayout {
                             }
                         }
 
+                        // The level of each part: the capable decoder's, so closed under the
+                        // others, and closed for a part the stream does not have.
+                        ColumnLayout {
+                            objectName: "karaokePartLevels"
+                            Layout.fillWidth: true
+                            spacing: Theme.space2
+                            enabled: flow.listening === "capable"
+                            opacity: enabled ? 1.0 : 0.45
+
+                            Repeater {
+                                model: [
+                                    { part: "M", label: qsTr("Melody"), present: flow.plan.melody === true },
+                                    { part: "V1", label: qsTr("Vocal 1"), present: flow.plan.vocals >= 1 },
+                                    { part: "V2", label: qsTr("Vocal 2"), present: flow.plan.vocals >= 2 }
+                                ]
+                                delegate: RowLayout {
+                                    id: levelRow
+                                    required property var modelData
+                                    readonly property real db: flow.partDb(levelRow.modelData.part)
+                                    Layout.fillWidth: true
+                                    spacing: Theme.space3
+                                    enabled: levelRow.modelData.present
+                                    opacity: enabled ? 1.0 : 0.45
+                                    Text {
+                                        Layout.preferredWidth: Math.round(110 * Theme.fontScale)
+                                        text: qsTr("%1 level").arg(levelRow.modelData.label)
+                                        font.pixelSize: Theme.fontNormal
+                                        color: Theme.text
+                                    }
+                                    Slider {
+                                        id: levelSlider
+                                        objectName: "karaokeLevel-" + levelRow.modelData.part
+                                        Layout.fillWidth: true
+                                        from: flow.levelMinDb
+                                        to: flow.levelMaxDb
+                                        stepSize: 1
+                                        snapMode: Slider.SnapAlways
+                                        value: levelRow.db
+                                        Accessible.name: qsTr("%1 level, dB").arg(levelRow.modelData.label)
+                                        Accessible.description: flow.levelText(levelRow.db)
+                                        onMoved: flow.setPartDb(levelRow.modelData.part, value)
+                                        // A drag writes `value` and the binding above is gone, so
+                                        // it is put back from the controller.
+                                        Connections {
+                                            target: StreamPlayerController
+                                            function onKaraokeChanged() {
+                                                levelSlider.value = levelRow.db;
+                                            }
+                                        }
+                                    }
+                                    Text {
+                                        objectName: "karaokeLevelText-" + levelRow.modelData.part
+                                        Layout.preferredWidth: Math.round(60 * Theme.fontScale)
+                                        horizontalAlignment: Text.AlignRight
+                                        text: flow.levelText(levelRow.db)
+                                        font.pixelSize: Theme.fontNormal
+                                        font.family: Theme.monoFamily
+                                        color: Theme.text
+                                    }
+                                }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.space3
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: qsTr("Each part's level against Table C.2.3: 0 dB is the table, and "
+                                               + "the bottom of the control is off. Raising one part far enough "
+                                               + "lowers the others, so that no speaker is driven past full scale. "
+                                               + "The capable player only.")
+                                    wrapMode: Text.WordWrap
+                                    font.pixelSize: Theme.fontSmall
+                                    color: Theme.neutral700
+                                }
+                                Button {
+                                    objectName: "karaokeResetLevels"
+                                    text: qsTr("Reset levels")
+                                    enabled: flow.levelsMoved
+                                    onClicked: StreamPlayerController.resetKaraokeLevels()
+                                }
+                            }
+                        }
+
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: Theme.space3
@@ -1078,13 +1205,13 @@ ColumnLayout {
                                 Repeater {
                                     model: {
                                         const rows = [
-                                            { speaker: "L", parts: flow.outputs.l },
-                                            { speaker: "C", parts: flow.outputs.c },
-                                            { speaker: "R", parts: flow.outputs.r }
+                                            { speaker: "L", parts: flow.audibleParts(flow.outputs.l) },
+                                            { speaker: "C", parts: flow.audibleParts(flow.outputs.c) },
+                                            { speaker: "R", parts: flow.audibleParts(flow.outputs.r) }
                                         ];
                                         if (flow.listening === "asCoded") {
-                                            rows.push({ speaker: "Ls", parts: flow.outputs.ls });
-                                            rows.push({ speaker: "Rs", parts: flow.outputs.rs });
+                                            rows.push({ speaker: "Ls", parts: flow.audibleParts(flow.outputs.ls) });
+                                            rows.push({ speaker: "Rs", parts: flow.audibleParts(flow.outputs.rs) });
                                         }
                                         if (flow.plan.lfe === true) {
                                             rows.push({ speaker: "LFE", parts: flow.outputs.lfe });
