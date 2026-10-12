@@ -94,8 +94,10 @@ class HostEvents final : public iclforge::sendspin::ServerHostEvents {
 // so this does too rather than guessing the extension role also works
 // unpaired.
 std::unique_ptr<testsink::Sink> start_sink(const fs::path& directory, std::string name, bool extension_role,
-                                           bool unpaired_access, QuietLog& log) {
+                                           bool unpaired_access, QuietLog& log,
+                                           std::vector<std::string> other_roles = {}) {
     testsink::SinkOptions options;
+    options.other_roles = std::move(other_roles);
     options.name = std::move(name);
     options.address = "127.0.0.1";
     options.port = 0;
@@ -426,4 +428,103 @@ TEST_CASE("LyricsAnchors: a seek is an anchor at once, and a new item forgets th
     const auto fresh = anchors.sample(0, 200 * kMs);
     REQUIRE(fresh.has_value());
     CHECK(fresh->position_ms == 0);
+}
+
+// --- what is playing, for the members that show it (D7, planning/hearth-android.md) ---------------
+
+TEST_CASE("network group sink: the item playing reaches a member that shows it, and goes when the group closes",
+          "[hearth][group][websocket][metadata]") {
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_sink_now_playing_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    // One member lists metadata@v1 and one does not.
+    const std::unique_ptr<testsink::Sink> shows = start_sink(
+        scratch / "shows", "Shows", /*extension_role=*/false, /*unpaired_access=*/true, log, {"metadata@v1"});
+    const std::unique_ptr<testsink::Sink> silent =
+        start_sink(scratch / "silent", "Silent", /*extension_role=*/false, /*unpaired_access=*/true, log);
+
+    std::optional<iclforge::sendspin::noise::KeyPair> identity = iclforge::sendspin::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    iclforge::sendspin::MemoryServerStore store;
+    HostEvents events;
+    auto host = iclforge::sendspin::ServerHost::start(
+        {.identity = *identity, .name = "Test host", .languages = {"en"}, .address = "127.0.0.1",
+         .port = std::nullopt, .advertise = false, .browse = false, .mdns_interfaces = {}},
+        store, events);
+    REQUIRE(host.has_value());
+    (*host)->dial("ws://127.0.0.1:" + std::to_string(shows->port()) + "/sendspin");
+    (*host)->dial("ws://127.0.0.1:" + std::to_string(silent->port()) + "/sendspin");
+    REQUIRE(events.wait([](const auto& clients) { return clients.size() == 2; }, 15s));
+    REQUIRE((*host)->approve(shows->client_id(), true));
+    REQUIRE((*host)->approve(silent->client_id(), true));
+    REQUIRE(events.wait(
+        [](const auto& clients) {
+            return clients.size() == 2 && std::all_of(clients.begin(), clients.end(), [](const auto& entry) {
+                       return entry.second.playing && entry.second.available;
+                   });
+        },
+        20s));
+
+    std::shared_ptr<iclforge::sendspin::Group> group = (*host)->make_group("Test group");
+    for (const iclforge::sendspin::ClientView& client : (*host)->clients()) {
+        group->add(client.client_id);
+    }
+    const std::unique_ptr<iclforge::hearth::NetworkGroupSink> sink =
+        iclforge::hearth::make_group_sink([&](const std::string&) { return group; });
+    const auto opened = sink->open(
+        "Test group", iclforge::hearth::NetworkGroupSink::Format{
+                          .sample_rate = 48000, .layout = iclforge::render::OutputLayout::named("2.0").value()});
+    REQUIRE(opened.has_value());
+
+    const auto eventually = [](const auto& done) {
+        const auto deadline = std::chrono::steady_clock::now() + 15s;
+        while (std::chrono::steady_clock::now() < deadline) {
+            if (done()) {
+                return true;
+            }
+            std::this_thread::sleep_for(20ms);
+        }
+        return done();
+    };
+    const auto metadata = [&] { return shows->roles().metadata; };
+    CHECK_FALSE(metadata().has_value());
+
+    // The item: its tags go out at once, with no position yet, and what is left out is not guessed.
+    sink->set_now_playing(7, {.title = "Spring", .artist = "Hearth", .album = std::nullopt, .duration_ms = 180'000});
+    REQUIRE(eventually([&] { return metadata() && metadata()->title == "Spring"; }));
+    CHECK(metadata()->artist == "Hearth");
+    CHECK_FALSE(metadata()->album.has_value());
+    CHECK_FALSE(metadata()->progress.has_value());
+
+    // Where the sound is: the first sample is a position at speed 1, with the item's length.
+    sink->follow_now_playing(7, 5000);
+    REQUIRE(eventually([&] { return metadata() && metadata()->progress.has_value(); }));
+    CHECK(metadata()->progress->track_progress_ms == 5000);
+    CHECK(metadata()->progress->track_duration_ms == 180'000);
+    CHECK(metadata()->progress->playback_speed == 1000);
+    CHECK(metadata()->title == "Spring");
+
+    // A position of another item is ignored.
+    const auto before = metadata()->timestamp;
+    sink->follow_now_playing(8, 90'000);
+    std::this_thread::sleep_for(300ms);
+    CHECK(metadata()->timestamp == before);
+    CHECK(metadata()->progress->track_progress_ms == 5000);
+
+    // The position standing still is a pause: the speed goes to 0, held where it is.
+    std::this_thread::sleep_for(80ms);
+    sink->follow_now_playing(7, 5000);
+    REQUIRE(eventually([&] { return metadata() && metadata()->progress && metadata()->progress->playback_speed == 0; }));
+    CHECK(metadata()->progress->track_progress_ms == 5000);
+
+    // The member that lists no metadata role is told nothing.
+    CHECK_FALSE(silent->roles().metadata.has_value());
+
+    // The group closing is nothing playing: the member stops showing the item.
+    sink->close();
+    REQUIRE(eventually([&] { return !metadata().has_value(); }));
+
+    group.reset();
+    host->reset();
 }
