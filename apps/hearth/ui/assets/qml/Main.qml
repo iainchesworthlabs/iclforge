@@ -310,7 +310,7 @@ ApplicationWindow {
         anchors.fill: parent
         currentIndex: window.pageOrder.indexOf(window.page)
 
-        PlayPage { }
+        PlayPage { onLyricsFullScreenRequested: window.openLyricScreen() }
         Media { }
         Speakers { }
         DecoderPage { format: window.decoderFormat; onKaraokePageRequested: window.page = "karaoke" }

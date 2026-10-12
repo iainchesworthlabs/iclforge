@@ -153,13 +153,14 @@ struct Lyrics {
 // frame rate of 24, 25, 29.97 or 30 and the ticks in a frame, which fix the length of a tick and
 // leave the tempo events meaning nothing), through that. The words are taken from the track named
 // "Words" where there is one, else from the Lyric events, else from the Text events; the `@T` lines
-// are the title and the artist (the first and the second) and the other `@` lines are not words. A
-// `/` begins a new line and a `\` a new verse (a line too, here), and a syllable that begins with a
-// space is joined to the one before it, so a word is a syllable, with its own start and end, and
-// the fill moves by syllable. A line ends where the next begins. Only the words are read: the music
-// in the file is not, and a file with no words, with a SMPTE rate that is none of the four, or with
-// words that are not UTF-8 (a MIDI file carries no word of its encoding; Latin-1 and code pages are
-// not guessed at) says so.
+// are the title and the artist (the first and the second) and the other `@` lines are not words and
+// are not looked at, so they need not be UTF-8. A `/` begins a new line and a `\` a new verse (a
+// line too, here), and a syllable that begins with a space is joined to the one before it, so a
+// word is a syllable, with its own start and end, and the fill moves by syllable. A line ends where
+// the next begins. Only the words are read: the music in the file is not, and a file with no words,
+// with a SMPTE rate that is none of the four, or with a title, an artist or words that are not
+// UTF-8 (a MIDI file carries no word of its encoding; Latin-1 and code pages are not guessed at)
+// says so.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_midi_karaoke(
     std::string_view bytes, std::optional<std::int64_t> duration_ms = std::nullopt);
 
