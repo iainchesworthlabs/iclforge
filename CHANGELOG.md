@@ -355,7 +355,8 @@ The sections below contain the complete change list and fixes.
   (planning/karaoke-phase2.md, W7d).
 - **Hearth's Karaoke page, lyric views and timing window are translated.** The page, the lyric view,
   the singer view, the timing window, the lyric delay and the shortcuts that go with them are filled
-  in the German, Spanish, French, Arabic, Hebrew and Yiddish catalogues (133 strings), reusing the
+  in the German, Spanish, French, Arabic, Hebrew and Yiddish catalogues (145 strings, with the singer view's and
+  the single-word timing's own), reusing the
   Forge GUI's renderings for the words the two share. They are machine-made and have not been read
   by a speaker, and Settings now says so under the language chooser, as the Forge GUI's and
   Crucible's do, and which pages are translated; the rest of the window is English in every
