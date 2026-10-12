@@ -156,6 +156,7 @@ above.
 | NetworkSinkSettings::test_nothingSelectedLeavesEveryPropertyAtItsEmptyDefault | Every sink property is empty while no sink is selected |
 | NetworkSinkSettings::test_everySetterIsASafeNoOpWithNoSinkSelected | Every sink setter and identify call does nothing, without an error, while no sink is selected |
 | NetworkSinkSettings::test_everyPageRendersSafelyWithNoSinkSelected | The sink's Speakers, Decoder, Report and Only-on-sink pages render against empty data |
+| Playback::test_aFileHandedAtLaunchGoesBehindTheQueueAndPlays | `openAndPlay` (what `main()` calls for a file on the command line, and so for a double-clicked `.ac3`) adds the file behind the queue and starts that file, not the item the queue was waiting at |
 | PlayQueue::test_urlToLocalFileConvertsAUrlWithoutThrowing | `urlToLocalFile` converts a `url` value as a file dialog hands it over. Its failure was the crash the Add files and Add folder dialogs and the drop area hit |
 | PlayQueue::test_addFilesAppendsRowsWithTitleFromTheFileName | `addFiles` appends rows titled by file name |
 | PlayQueue::test_addFilesReflectedInThePageQueueList | The page's queue list follows additions and removals |

@@ -786,16 +786,80 @@ TEST_CASE("KaraokeController: the picture is shifted by a scroll's fine offset a
     CHECK(controller.pictureFrame(1100).pixel(100, 100) == 0xFF00FF00U);
 }
 
-TEST_CASE("KaraokeController: a lyrics file beside the item is shown in place of a picture",
+TEST_CASE("KaraokeController: a lyrics file beside the item is shown first, and the disc beside it is held",
           "[hearth][hearth-controller][karaoke][lyrics][cdg]") {
     Room room;
     room.write("song.cdg", cdg_disc());
     room.write("song.lrc", kEnhanced);
     KaraokeController controller;
+    CHECK_FALSE(controller.hasPicture());
     controller.load(room.path("song.ac3"), 10000);
+    // The words are the default: the status, the file and the lines are the lyrics file's.
     CHECK(controller.status().toStdString() == "timed");
     CHECK(controller.fileName().toStdString() == "song.lrc");
-    CHECK(controller.pictureFrame(500).isNull());
+    CHECK(controller.lineCount() == 3);
+    CHECK_FALSE(controller.showingPicture());
+    // And the disc is there to choose: its file, and its picture at a position.
+    CHECK(controller.hasPicture());
+    CHECK(controller.pictureFileName().toStdString() == "song.cdg");
+    CHECK(controller.pictureFrame(500).pixel(100, 100) == 0xFFFF0000U);
+}
+
+TEST_CASE("KaraokeController: the singer chooses the picture over the words for this run of the app",
+          "[hearth][hearth-controller][karaoke][lyrics][cdg]") {
+    Room room;
+    room.write("both.cdg", cdg_disc());
+    room.write("both.lrc", kEnhanced);
+    room.write("words.lrc", kEnhanced);
+    room.write("disc.cdg", cdg_disc());
+    room.write("broken.lrc", kEnhanced);
+    room.write("broken.cdg", QByteArray(25, 'x'));
+    KaraokeController controller;
+    int changes = 0;
+    QObject::connect(&controller, &KaraokeController::pictureShownChanged, [&changes] { ++changes; });
+
+    CHECK_FALSE(controller.preferPicture());
+    controller.load(room.path("both.ac3"), 10000);
+    changes = 0;
+    controller.setPreferPicture(true);
+    CHECK(controller.preferPicture());
+    CHECK(controller.showingPicture());
+    CHECK(changes == 1);
+    // The choice does not touch the lyrics: their status, file and lines are as they were, so the
+    // timing window and the singers' cues still have them.
+    CHECK(controller.status().toStdString() == "timed");
+    CHECK(controller.fileName().toStdString() == "both.lrc");
+    CHECK(controller.lineCount() == 3);
+    CHECK(controller.cursor(1500).value("line").toInt() == 0);
+    // Choosing what is already chosen says nothing.
+    controller.setPreferPicture(true);
+    CHECK(changes == 1);
+
+    // It holds from one item to the next, and an item with no disc shows its words whatever
+    // was chosen: there is nothing to choose.
+    controller.load(room.path("words.ac3"), 10000);
+    CHECK(controller.preferPicture());
+    CHECK_FALSE(controller.hasPicture());
+    CHECK_FALSE(controller.showingPicture());
+    controller.load(room.path("both.ac3"), 10000);
+    CHECK(controller.showingPicture());
+    // A disc that cannot be read beside a lyrics file is no disc here, and the lyrics are shown.
+    controller.load(room.path("broken.ac3"), 10000);
+    CHECK(controller.status().toStdString() == "timed");
+    CHECK_FALSE(controller.hasPicture());
+    CHECK_FALSE(controller.showingPicture());
+
+    // A disc with no lyrics file is the picture whatever was chosen.
+    controller.setPreferPicture(false);
+    controller.load(room.path("disc.ac3"), 10000);
+    CHECK(controller.status().toStdString() == "picture");
+    CHECK(controller.hasPicture());
+    CHECK(controller.pictureFileName().toStdString() == "disc.cdg");
+    CHECK(controller.showingPicture());
+
+    // Back to words for the item with both.
+    controller.load(room.path("both.ac3"), 10000);
+    CHECK_FALSE(controller.showingPicture());
 }
 
 TEST_CASE("KaraokeController: a CD+G file in any case, and one that is not CD+G says why",

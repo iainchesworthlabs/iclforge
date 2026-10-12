@@ -11,4 +11,14 @@ Open Font License, Version 1.1, reproduced below as it ships with Archivo;
 the same text, under the Noto copyright lines above, governs the two Noto
 faces.
 
+The image of Hearth's ESP32-P4 sink with a screen embeds three of these for
+its lyric screen: Archivo (Regular and SemiBold), Noto Sans Hebrew (Regular
+and SemiBold), and Noto Sans Greek and Cyrillic (Regular and SemiBold; the
+Greek and Cyrillic letters of Noto Sans, Copyright 2022 The Noto Project
+Authors, https://github.com/notofonts/latin-greek-cyrillic), for Greek and
+for Russian and the other Cyrillic languages. Noto Sans Greek and Cyrillic is
+licensed under the same SIL Open Font License, Version 1.1, with its own
+copyright line as above; the files are static instances cut from the
+variable fonts, which that licence allows for a font with no reserved name.
+
 {{FILE:OFL}}

@@ -34,6 +34,11 @@ std::optional<bool> sendspin_forget_server(std::string_view /*server_id*/) { ret
 
 bool sendspin_console(std::string_view /*line*/) { return false; }
 
+bool sendspin_read_lyrics(LyricsReader& /*reader*/, std::int64_t /*delay_ms*/,
+                          const iclforge::lyrics::StageOptions& /*options*/) {
+    return false;
+}
+
 void sendspin_poll() {}
 
 }  // namespace player

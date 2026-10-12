@@ -157,7 +157,7 @@ class Package(unittest.TestCase):
         written = json.loads((self.out / packager.MANIFEST_NAME).read_text("utf-8"))
         self.assertEqual(written, manifest)
         # Merged again, the manifest is not read as an image of its own.
-        self.assertEqual(len(packager.merge_manifest(self.out)["images"]), 4)
+        self.assertEqual(len(packager.merge_manifest(self.out)["images"]), 5)
 
     def test_main_reports_a_refusal_on_stderr_and_exits_1(self) -> None:
         build = fixture.make_build(self.root / "s3", wifi_ssid="home")
