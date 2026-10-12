@@ -30,7 +30,9 @@
   ],
   "free": {
     "ICLFORGE_EXAMPLE_WIFI_*": "the board's network is its own, kept in NVS; a published image has none built in (package_firmware.py refuses one)",
-    "ICLFORGE_EXAMPLE_HTTP_URL": "the stream a build plays at boot: empty on a board, a test server's on a CI shape"
+    "ICLFORGE_EXAMPLE_HTTP_URL": "the stream a build plays at boot: empty on a board, a test server's on a CI shape",
+    "ICLFORGE_EXAMPLE_PANEL_STACK_BYTES": "the screen task's stack, in PSRAM: declared for every target and inert in a profile whose panel is NONE (every one here); a profile that enables the screen locks it by hand, which verify honours before this",
+    "LV_SPAN_SNIPPET_STACK_SIZE": "LVGL's own count of text-span snippets it keeps on its stack, not a task's stack: there on every P4 build, which carries the library, and used only where the screen is"
   },
   "other_stacks": {
     "sdkconfig.defaults;sdkconfig.hw": "the S3 with neither PSRAM nor a network: the i2s_player example's shape, the bare-metal probe's and the README's first sections'; not a board's image",
