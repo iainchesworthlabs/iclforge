@@ -3595,6 +3595,26 @@ void warn_karaoke_not_spatial(const Options& meta) {
                  "has no karaoke bed ('forge decode' and 'forge monitor' reproduce it)");
 }
 
+void warn_karaoke_service_layout(const iclforge::ac3::plan::Metadata& meta,
+                                 iclforge::ac3::Acmod acmod, std::string_view whose) {
+    if (!meta.infomdat ||
+        meta.info.bsmod != iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke) {
+        return;
+    }
+    if (acmod == iclforge::ac3::Acmod::k1_0) {
+        fmt::println(stderr,
+                     "warning: {}bsmod 7 on a mono stream is Table 5.7's voice-over service, not "
+                     "karaoke: there are no vocals to reproduce",
+                     whose);
+    } else if (acmod == iclforge::ac3::Acmod::kDualMono) {
+        fmt::println(stderr,
+                     "warning: {}bsmod 7 is not defined for 1+1: Annex A (Table A5.2) and Annex G "
+                     "(Table G.2) prohibit a karaoke service on mono and on 1+1, so a receiver "
+                     "may not take it as one; the stream is written as asked",
+                     whose);
+    }
+}
+
 bool refuse_karaoke_with_ltrt(const iclforge::ac3::OutputConfig& output) {
     if (output.karaoke == iclforge::ac3::KaraokeReproduction::kOff ||
         output.target != iclforge::ac3::DownmixTarget::kLtRt) {

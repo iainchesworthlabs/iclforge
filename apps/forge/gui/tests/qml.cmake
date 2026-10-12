@@ -187,6 +187,9 @@ target_link_libraries(forge_gui_qmltests
         iclforge::audio
         iclforge::containers
         iclforge::ac4
+        # karaoke_authoring.cpp, recompiled here, writes a lyrics file beside a stream
+        # through it, as forge-gui does (../CMakeLists.txt).
+        iclforge::lyrics
         iclforge::warnings
         iclforge::fmt
         iclforge::json
