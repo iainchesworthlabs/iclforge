@@ -424,6 +424,7 @@ class Build(Fixture):
             "overlay": [],
             "wifi": False,
             "no_verify": False,
+            "configure_only": False,
         }
         return namespace(**{**base, **more})
 
@@ -503,6 +504,20 @@ class Build(Fixture):
             {"describe": (0, "v1\n"), "sink_profile.py": (1, "error: DECODE_STACK_IN_PSRAM is 0")}
         )
         self.assertEqual(bf.cmd_build(self.table, self.args(), run, self.out), 1)
+
+    def test_configure_only_reconfigures_and_holds_the_guard_without_sizing(self) -> None:
+        run = Recorder({"describe": (0, "v1\n")})
+        code = bf.cmd_build(self.table, self.args(configure_only=True), run, self.out)
+        self.assertEqual(code, 0)
+        configured = next(
+            argv for argv, _, idf in run.calls if idf and argv[0] == "idf.py" and "-B" in argv
+        )
+        self.assertEqual(configured[-1], "reconfigure")
+        self.assertNotIn("build", configured)
+        self.assertEqual(run.commands("json2"), [], "no size of a configure")
+        (verified,) = run.commands("sink_profile.py")
+        self.assertNotIn("--size-json", verified)
+        self.assertTrue(any(line.startswith("configured") for line in self.output))
 
     def test_no_verify_skips_the_size_and_the_guard(self) -> None:
         run = Recorder({"describe": (0, "v1\n")})
