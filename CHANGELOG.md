@@ -41,6 +41,17 @@ The sections below contain the complete change list and fixes.
   stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
   needs a case of its own (`planning/karaoke-eac3.md`, D10).
 
+**Audio: when a packet was captured**
+
+- **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
+  programme, M2). `Capture::stamps()` is a second lock-free ring of `CaptureStamp`s (the packet's
+  first frame in the stream, and its time in nanoseconds on `std::chrono::steady_clock`'s clock);
+  `CaptureTimeline` fits a line through the last 64 and gives the time of any frame, the frame at a
+  time, and the device's measured rate; `Capture::start()` takes `CaptureOptions` with a requested
+  packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
+  `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
+  consumer must treat as "no time", and a caller that does not use any of it sees no change.
+
 **Karaoke: a plan for a microphone, scoring and recording**
 
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
@@ -115,6 +126,14 @@ The sections below contain the complete change list and fixes.
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
   `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The lyric library reads a code page when a program supplies the conversion.**
+  `iclforge::lyrics::TextEncoding` carries a decoder callback (the library holds no table of any
+  page, as it is linked into firmware), and every reader (`parse_lyrics`, `parse_subrip`,
+  `parse_ass`, `parse_midi_karaoke`, `parse_timed_text`, `read_lyrics`, `place_lyrics_beside`) takes
+  one as its last argument. It is asked only for text that is not UTF-8 and has no UTF-16 mark, a
+  MIDI file's title, artist and syllables one at a time and never its other `@` lines; a file that
+  is UTF-8 or UTF-16 is read as it was whatever is given, and without a decoder a code page is still
+  refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
   name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
   dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
@@ -274,6 +293,15 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
+  `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
+  part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table
+  C.2.3 (the span and defaults of Hearth's sliders), and a decoded frame says `bsmod`, `is_karaoke`,
+  `output_acmod`, `output_lfe` and `karaoke_reproduced`, with `channel_labels` for the channels that
+  are there. `iclforge.lyrics` reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke files into
+  lines of timed words with their singers (`parse`, `read`, `find_file`) and gives the cursor
+  (`Lyrics.position`, `word_state`): the reader Hearth uses, bound as it is (planning/karaoke-phase2.md,
+  W5).
 - **`forge decode` and `forge monitor` re-level the karaoke-capable decoder's parts.**
   `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
   flexibility" in the units, the span and the defaults of Hearth's sliders and the wire's
@@ -556,6 +584,15 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **Hearth's Karaoke page, lyric views and timing window are translated.** The page, the lyric view,
+  the singer view, the timing window, the lyric delay and the shortcuts that go with them are filled
+  in the German, Spanish, French, Arabic, Hebrew and Yiddish catalogues (145 strings, with the singer view's and
+  the single-word timing's own), reusing the
+  Forge GUI's renderings for the words the two share. They are machine-made and have not been read
+  by a speaker, and Settings now says so under the language chooser, as the Forge GUI's and
+  Crucible's do, and which pages are translated; the rest of the window is English in every
+  language, as it was. The catalogues also hold `lupdate`'s own suggestions: a rendering copied to
+  an identical string on another page, marked unfinished ([Languages](docs/hearth/index.md#languages)).
 - **The Network page says whether a board holds lyrics and which line it is on.** The sink report
   has a Lyrics row: "not offered" for a board that lists no lyric commands, "none held", "held,
   before the first line", or "line 3 of 12" with the line's text. The board reports the item and
@@ -585,6 +622,13 @@ The sections below contain the complete change list and fixes.
   nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
   by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
+- **The Rust binding reproduces a karaoke stream and reads lyrics.** `Decoder::with_karaoke` takes a
+  `KaraokeConfig` (`KaraokeReproduction`, `KaraokeVocals` and the three part levels in dB against
+  Table C.2.3, the span and defaults of Hearth's sliders) and a `DecodedFrame` says `bsmod`,
+  `is_karaoke`, `output_acmod`, `output_lfe` and `karaoke_reproduced`. `iclforge::lyrics::Lyrics`
+  reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke bytes into lines of timed words with
+  their singers, borrowing them, with the stateless cursor; a refusal is
+  `LyricsError::Unreadable` with the reader's reason (planning/karaoke-phase2.md, W5).
 - **The Karaoke flow takes an LFE part.** An optional mono file, the stream's low-frequency
   channel: it chooses no mode, is coded after the full-bandwidth channels (a 3/2 stream with one is
   a 5.1 bed), is band-limited by the window as any channel assigned to the LFE is, and comes out of
@@ -3301,6 +3345,14 @@ The sections below contain the complete change list and fixes.
   for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
   sink, applies at the group's next play, and is kept for the run. The group editor says which a
   member is sent.
+- **The Sendspin player plays a stream's bed when it declares more objects than the board says it
+  places** (`BurstPlayerConfig::max_objects`, `iclforge/object_limit.hpp`,
+  `Eac3Decoder::set_skip_object_reconstruction()`): the decision is made from the first unit's
+  header (the complexity index less the LFE), before the object reconstruction allocates its 147 KB,
+  with the decoder the player already holds and no other made; a listener who chose objects
+  "always" is not overruled. On an ESP32-S3 (release image, lane on, null sink, 7.1.4, over
+  Sendspin) streams of 3 to 11 declared objects that took 1.07 to 2.27 of real time with 63 to
+  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun.
 
 **Library internals**
 

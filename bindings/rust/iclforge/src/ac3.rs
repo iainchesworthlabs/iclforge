@@ -7,8 +7,8 @@ use std::ptr;
 use crate::bytes::Bytes;
 use crate::error::Error;
 use crate::types::{
-    Acmod, CentreMixLevel, DecoderConfig, DrcProfile, HeavyConfig, Latency, SampleRate,
-    SurroundMixLevel,
+    Acmod, CentreMixLevel, DecoderConfig, DrcProfile, HeavyConfig, KaraokeConfig, Latency,
+    SampleRate, SurroundMixLevel,
 };
 
 /// Mirrors `iclforge_encoder_config_t`. Construct with [`EncoderConfig::default`] (which calls
@@ -211,6 +211,28 @@ impl Decoder {
         Ok(Decoder { raw })
     }
 
+    /// A decoder that reproduces an Annex C karaoke stream as `karaoke` asks
+    /// (`iclforge_decoder_create_with_karaoke`). A frame that is not karaoke, and every frame
+    /// when [`KaraokeConfig::reproduction`] is `Off`, goes through as [`Decoder::new`] leaves it.
+    ///
+    /// A reproduced frame has fewer channels than it codes: three (L, C, R), or four with the
+    /// LFE, where [`DecodedFrame::acmod`] still says what was coded. [`DecodedFrame::output_acmod`]
+    /// says what the channels are.
+    pub fn with_karaoke(config: &DecoderConfig, karaoke: &KaraokeConfig) -> Result<Self, Error> {
+        let raw_config = config.to_raw();
+        let raw_karaoke = karaoke.to_raw();
+        let mut out: *mut sys::iclforge_decoder_t = ptr::null_mut();
+        // SAFETY: both configs are valid for the duration of the call; `out` is a valid
+        // out-parameter, left untouched on failure.
+        let status = unsafe {
+            sys::iclforge_decoder_create_with_karaoke(&raw_config, &raw_karaoke, &mut out)
+        };
+        Error::check(status)?;
+        let raw = ptr::NonNull::new(out)
+            .expect("iclforge_decoder_create_with_karaoke returned OK with a null decoder");
+        Ok(Decoder { raw })
+    }
+
     /// The delay this decoder adds on top of the encoder's own budget - always 0 for AC-3 (see
     /// `iclforge_decoder_latency_samples`'s own comment).
     pub fn latency_samples(&self) -> i32 {
@@ -266,6 +288,33 @@ impl DecodedFrame {
 
     pub fn lfe(&self) -> bool {
         unsafe { sys::iclforge_decoded_frame_lfe(self.raw.as_ptr()) != 0 }
+    }
+
+    /// The frame's `bsmod` (A/52 Table 5.7): 7 with an [`Acmod`] above mono is karaoke.
+    pub fn bsmod(&self) -> i32 {
+        unsafe { sys::iclforge_decoded_frame_bsmod(self.raw.as_ptr()) }
+    }
+
+    /// Whether the frame is Annex C's karaoke main service, however the decoder was made.
+    pub fn is_karaoke(&self) -> bool {
+        unsafe { sys::iclforge_decoded_frame_is_karaoke(self.raw.as_ptr()) != 0 }
+    }
+
+    /// What the frame's channels are once the decoder has run: [`DecodedFrame::acmod`] for
+    /// everything it left alone, `Channels3_0` (L, C, R, then the LFE) for a karaoke frame it
+    /// reproduced. [`DecodedFrame::channel_count`] is this layout's.
+    pub fn output_acmod(&self) -> Option<Acmod> {
+        Acmod::from_raw(unsafe { sys::iclforge_decoded_frame_output_acmod(self.raw.as_ptr()) })
+    }
+
+    /// Whether [`DecodedFrame::output_acmod`]'s layout has the LFE channel, last.
+    pub fn output_lfe(&self) -> bool {
+        unsafe { sys::iclforge_decoded_frame_output_lfe(self.raw.as_ptr()) != 0 }
+    }
+
+    /// Whether the decoder replaced the coded layout with a karaoke reproduction for this frame.
+    pub fn karaoke_reproduced(&self) -> bool {
+        unsafe { sys::iclforge_decoded_frame_karaoke_reproduced(self.raw.as_ptr()) != 0 }
     }
 
     pub fn dialnorm(&self) -> i32 {
