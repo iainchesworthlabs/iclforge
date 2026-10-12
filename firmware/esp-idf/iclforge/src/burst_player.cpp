@@ -68,6 +68,19 @@ constexpr std::uint64_t kBurstFrames = 1536;
 // An AC-4 chunk is one frame, which lasts what its frame rate says: 2,048 samples at frame rate 13
 // and 48 kHz, until the first decoded frame says.
 constexpr std::uint64_t kAc4FrameFrames = 2048;
+// What waiting for an I-frame costs a stream whose decoder has lost its state: the average of the
+// time to the next one, taken as half of a second (DEE's streams and the encoder's default have
+// one every 24 frames, 1 s; broadcast and streaming content a second or two). A late AC-4 chunk is
+// decoded and its output thrown away, rather than dropped, when that loses less than dropping it
+// and waiting would (late_ac4_is_kept()).
+constexpr std::int64_t kExpectedIFrameWaitUs = 500'000;
+// What a frame costs of its duration before any has been timed, for each stream: between the P4's
+// 0.2 to 0.7 and the S3's 0.5 to 0.8 (docs/platforms/bare-metal/esp32-p4.md and esp32-s3.md, AC-4
+// from a server), where the first chunks of a play, which are the ones that are late, are
+// weighed. Not kept from the stream before, whose frames may have cost another share.
+constexpr double kAc4PriorRatio = 0.6;
+// The ratio above which a decoder does not catch up with a stream in any time worth waiting for.
+constexpr double kAc4CatchUpRatioLimit = 0.95;
 // Ring bytes a chunk may not take, so a stream start, clear or end always
 // fits behind it.
 constexpr std::size_t kControlReserve = 512;
@@ -222,6 +235,23 @@ struct BurstPlayer::Impl {
     bool ac4_failed = false;
     // The samples the last decoded AC-4 frame lasted, for the late check.
     std::uint64_t ac4_frame_samples = 0;
+    // What the decode and render of an AC-4 frame has cost of the frame's own duration, smoothed
+    // over the chunks timed of this stream (the first, which makes the decoder's tables and
+    // buffers, is not): what a late chunk is weighed with (play_burst).
+    double ac4_decode_ratio = kAc4PriorRatio;
+    std::uint32_t ac4_cost_samples = 0;
+    // Late AC-4 chunks decoded for their state and not played.
+    std::uint64_t late_kept_chunks = 0;
+    // The stream's frames that were never handed to the sink: where the timeline is anchored again
+    // after the frames it last pushed (the chunks dropped for being late, the ones the decoder
+    // waited an I-frame through or decoded and discarded), counted from the stream's first chunk.
+    // What a stall costs the listener, which `late` and the playout's silence do not say: the
+    // playout pads a gap only where it had pushed nothing.
+    std::uint64_t lost_frames = 0;
+    // The stream frame up to which every frame is accounted for: pushed, or counted lost. A decoder
+    // that waits for an I-frame anchors the timeline again at every chunk it waits through, so
+    // what an anchor adds is the distance from here, once.
+    std::uint64_t accounted_frame = 0;
     std::array<std::int16_t, OpusStream::kMaxFrames * 2> opus_pcm{};
     std::optional<iclforge::ac3::FrameDecoder> ac3_decoder;
     // The decode lane (BurstPlayerConfig::decode_lane): started by the task, given back by it.
@@ -571,6 +601,14 @@ struct BurstPlayer::Impl {
         if (ac4) {
             ac4->reset();
         }
+        reset_output();
+    }
+
+    // What follows the decoders: the programme and the bed it chose, the renderer's and the trim's
+    // history, and the timeline, which the next chunk anchors again. A late AC-4 chunk that is
+    // decoded for its state and not played makes it too (play_burst), since the next frame that is
+    // played does not follow the last one that was.
+    void reset_output() {
         programme.reset();
         bed_head = 0;
         bed_count = 0;
@@ -589,6 +627,11 @@ struct BurstPlayer::Impl {
         have_decoder_report = false;
         bursts_played = 0;
         late_chunks = 0;
+        late_kept_chunks = 0;
+        lost_frames = 0;
+        accounted_frame = 0;
+        ac4_decode_ratio = kAc4PriorRatio;
+        ac4_cost_samples = 0;
         dropped_chunks.store(0);
         invalid_chunks.store(0);
         channels_refused_warned = false;
@@ -663,20 +706,28 @@ struct BurstPlayer::Impl {
         const std::size_t least_heap = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
         (void)heap_caps_monitor_local_minimum_free_size_stop();
         const Playout::Stats& p = playout->stats();
-        std::printf("sendspin.stream=%s bursts=%llu late=%llu dropped=%llu invalid=%llu underruns=%llu "
-                    "resyncs=%u silence_frames=%llu skipped_frames=%llu dropped_frames=%llu repeated_frames=%llu "
-                    "worst_error_us=%lld burst_us=%llu sink_us=%llu ring_high=%lu heap_free=%lu\n",
-                    stream == Stream::kBursts ? "bursts" : "pcm", static_cast<unsigned long long>(bursts_played),
-                    static_cast<unsigned long long>(late_chunks),
-                    static_cast<unsigned long long>(dropped_chunks.load()),
-                    static_cast<unsigned long long>(invalid_chunks.load()),
-                    static_cast<unsigned long long>(p.underruns), static_cast<unsigned>(p.resyncs),
-                    static_cast<unsigned long long>(p.silence_frames), static_cast<unsigned long long>(p.skipped_frames),
-                    static_cast<unsigned long long>(p.dropped_frames),
-                    static_cast<unsigned long long>(p.repeated_frames), static_cast<long long>(p.worst_error_us),
-                    static_cast<unsigned long long>(timed_bursts > 0 ? decode_us_total / timed_bursts : 0),
-                    static_cast<unsigned long long>(timed_bursts > 0 ? sink_us_total / timed_bursts : 0),
-                    static_cast<unsigned long>(ring_high), static_cast<unsigned long>(least_heap));
+        std::printf(
+            "sendspin.stream=%s bursts=%llu late=%llu late_kept=%llu lost_frames=%llu dropped=%llu "
+            "invalid=%llu underruns=%llu "
+            "resyncs=%u silence_frames=%llu skipped_frames=%llu dropped_frames=%llu "
+            "repeated_frames=%llu "
+            "worst_error_us=%lld burst_us=%llu sink_us=%llu ring_high=%lu heap_free=%lu\n",
+            stream == Stream::kBursts ? "bursts" : "pcm",
+            static_cast<unsigned long long>(bursts_played),
+            static_cast<unsigned long long>(late_chunks),
+            static_cast<unsigned long long>(late_kept_chunks),
+            static_cast<unsigned long long>(lost_frames),
+            static_cast<unsigned long long>(dropped_chunks.load()),
+            static_cast<unsigned long long>(invalid_chunks.load()),
+            static_cast<unsigned long long>(p.underruns), static_cast<unsigned>(p.resyncs),
+            static_cast<unsigned long long>(p.silence_frames),
+            static_cast<unsigned long long>(p.skipped_frames),
+            static_cast<unsigned long long>(p.dropped_frames),
+            static_cast<unsigned long long>(p.repeated_frames),
+            static_cast<long long>(p.worst_error_us),
+            static_cast<unsigned long long>(timed_bursts > 0 ? decode_us_total / timed_bursts : 0),
+            static_cast<unsigned long long>(timed_bursts > 0 ? sink_us_total / timed_bursts : 0),
+            static_cast<unsigned long>(ring_high), static_cast<unsigned long>(least_heap));
         for (std::size_t o = 0; o < outputs_open; ++o) {
             std::printf("sendspin.rms[%u]=%lu\n", static_cast<unsigned>(o),
                         static_cast<unsigned long>(stream_rms(o)));
@@ -830,6 +881,7 @@ struct BurstPlayer::Impl {
 
         const std::uint64_t first = decoded_frame;
         decoded_frame += n;
+        accounted_frame = std::max(accounted_frame, decoded_frame);
         std::optional<std::int64_t> target = target_of(first);
         if (!target) {
             return;  // frames from before any burst this decode knows of
@@ -1094,6 +1146,26 @@ struct BurstPlayer::Impl {
         emit(block.samples);
     }
 
+    // The AC-4 decoder made, when it is not: false, with the stream refused for good and its chunk
+    // counted invalid, when it cannot be.
+    [[nodiscard]] bool ensure_ac4_open() {
+        if (ac4->is_open()) {
+            return true;
+        }
+        if (ac4->open({.fold = serving.fold,
+                       .executor = lane.has_value() ? &*lane : nullptr,
+                       .max_channels = config.max_ac4_channels,
+                       .sample_rate_hz = config.sample_rate,
+                       .max_frame_rate = config.max_ac4_frame_rate})) {
+            return true;
+        }
+        ac4_failed = true;
+        std::printf("burst player: cannot decode this AC-4 stream: %.*s\n",
+                    static_cast<int>(ac4->reason().size()), ac4->reason().data());
+        invalid_chunks.fetch_add(1);
+        return false;
+    }
+
     // One chunk of an AC-4 stream: its sync frame decoded. False when it was not one, which starts
     // the decoder again.
     [[nodiscard]] bool decode_ac4(std::span<const std::byte> sync_frame) {
@@ -1101,18 +1173,8 @@ struct BurstPlayer::Impl {
             invalid_chunks.fetch_add(1);
             return true;
         }
-        if (!ac4->is_open()) {
-            if (!ac4->open({.fold = serving.fold,
-                            .executor = lane.has_value() ? &*lane : nullptr,
-                            .max_channels = config.max_ac4_channels,
-                            .sample_rate_hz = config.sample_rate,
-                            .max_frame_rate = config.max_ac4_frame_rate})) {
-                ac4_failed = true;
-                std::printf("burst player: cannot decode this AC-4 stream: %.*s\n",
-                            static_cast<int>(ac4->reason().size()), ac4->reason().data());
-                invalid_chunks.fetch_add(1);
-                return true;
-            }
+        if (!ensure_ac4_open()) {
+            return true;
         }
         switch (ac4->decode(sync_frame, &Impl::ac4_block, this)) {
             case Ac4Stream::Result::kDecoded: {
@@ -1158,6 +1220,71 @@ struct BurstPlayer::Impl {
         reset_decoding();
     }
 
+    // `us` of decode and render for one AC-4 frame, folded into what a frame costs of its duration.
+    void note_ac4_cost(std::uint64_t us) {
+        if (ac4_cost_samples++ == 0) {
+            return;
+        }
+        const std::uint64_t frames = ac4_frame_samples != 0 ? ac4_frame_samples : kAc4FrameFrames;
+        const double frame_us =
+            static_cast<double>(frames) * 1e6 / static_cast<double>(config.sample_rate);
+        ac4_decode_ratio += 0.125 * ((static_cast<double>(us) / frame_us) - ac4_decode_ratio);
+    }
+
+    // Whether a chunk `late_us` past the sink's next play time is worth decoding for the state it
+    // leaves the decoder in. Each chunk decoded takes a fraction `r` of the time the next one's
+    // audio lasts, so the lateness falls by 1 - r of a frame with each, and the audio lost by
+    // decoding through it is the lateness over 1 - r. Dropping the chunk loses the lateness itself
+    // and then everything up to the next I-frame, which averages kExpectedIFrameWaitUs. Keeping
+    // is the better when late / (1 - r) <= late + wait, that is when late * r <= (1 - r) * wait.
+    // A stream whose decoder could not be made or has had a frame refused has no state to keep;
+    // one not yet open is made for the chunk, as a first chunk that is late is the stream's
+    // I-frame and the one most worth keeping.
+    [[nodiscard]] bool late_ac4_is_kept(std::int64_t late_us, std::int64_t frame_us) const {
+        if (!ac4 || ac4_failed || frame_us <= 0) {
+            return false;
+        }
+        if (ac4_decode_ratio >= kAc4CatchUpRatioLimit) {
+            return false;
+        }
+        return static_cast<double>(late_us) * ac4_decode_ratio <=
+               (1.0 - ac4_decode_ratio) * static_cast<double>(kExpectedIFrameWaitUs);
+    }
+
+    static void ac4_discard_block(void* /*self*/, const Ac4Stream::Block& /*block*/) {}
+
+    // The chunk decoded and its output thrown away: nothing is rendered or handed to the sink.
+    // What follows is anchored again by the next chunk that is played, with the renderer's history
+    // cleared, as after a drop; the decoder keeps its state.
+    void keep_late_ac4(std::span<const std::byte> sync_frame) {
+        if (!ensure_ac4_open()) {
+            return;
+        }
+        const std::int64_t started = esp_timer_get_time();
+        const Ac4Stream::Result result = ac4->decode(sync_frame, &Impl::ac4_discard_block, this);
+        const std::uint64_t spent = static_cast<std::uint64_t>(esp_timer_get_time() - started);
+        reset_output();
+        switch (result) {
+            case Ac4Stream::Result::kDecoded:
+                ac4_frame_samples = ac4->frame_samples();
+                ++late_kept_chunks;
+                note_ac4_cost(spent);
+                return;
+            case Ac4Stream::Result::kWaiting:
+                // Waiting for an I-frame still, and this chunk was not one: the same as before.
+                return;
+            case Ac4Stream::Result::kRefused:
+                ac4_failed = true;
+                std::printf("burst player: refusing this AC-4 stream: %.*s\n",
+                            static_cast<int>(ac4->reason().size()), ac4->reason().data());
+                invalid_chunks.fetch_add(1);
+                return;
+            case Ac4Stream::Result::kInvalid:
+                break;
+        }
+        restart_after_error();
+    }
+
     void play_burst(const Header& header, std::span<const std::uint8_t> payload) {
         if (stream != Stream::kBursts) {
             return;
@@ -1179,10 +1306,19 @@ struct BurstPlayer::Impl {
                 data_type == ac::DataType::kAc4
                     ? (ac4_frame_samples != 0 ? ac4_frame_samples : kAc4FrameFrames)
                     : kBurstFrames;
-            const std::int64_t end =
-                local_us + static_cast<std::int64_t>((frames * 1'000'000) / config.sample_rate);
+            const std::int64_t frame_us =
+                static_cast<std::int64_t>((frames * 1'000'000) / config.sample_rate);
+            const std::int64_t end = local_us + frame_us;
             if (end < *next) {
                 ++late_chunks;
+                // An AC-4 frame depends on the ones before it, so a dropped chunk costs the decoder
+                // its state and the stream everything up to the next I-frame, which can be a second
+                // or more away for a chunk that was a few milliseconds late. One the decoder
+                // catches up on soon enough is decoded and discarded instead.
+                if (data_type == ac::DataType::kAc4 && late_ac4_is_kept(*next - end, frame_us)) {
+                    keep_late_ac4(std::as_bytes(payload));
+                    return;
+                }
                 reset_decoding();
                 return;
             }
@@ -1190,6 +1326,10 @@ struct BurstPlayer::Impl {
         if (!decoded_frame_set) {
             decoded_frame_set = true;
             decoded_frame = frame;
+            if (frame > accounted_frame) {
+                lost_frames += frame - accounted_frame;
+                accounted_frame = frame;
+            }
         }
         mark(frame, local_us);
         ++bursts_played;
@@ -1217,6 +1357,9 @@ struct BurstPlayer::Impl {
         decode_us_total += own;
         sink_us_total += in_sink;
         ++timed_bursts;
+        if (data_type == ac::DataType::kAc4) {
+            note_ac4_cost(own);
+        }
         worst_burst_us = std::max(worst_burst_us, static_cast<std::uint32_t>(own));
         if (config.report_every_chunks > 0 && timed_bursts % config.report_every_chunks == 0) {
             report_progress();

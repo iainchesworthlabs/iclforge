@@ -102,6 +102,13 @@ _iclforge_player@v1, and writes a report of what each said about it.
                        at each pass, as Hearth's engine sends them
   --seconds N          play the file over and over for at least N seconds
                        (default: once through)
+  --stall-after N      N seconds into the play, send nothing for --stall-ms, then
+                       send what fell due in the time at once: a network stall,
+                       for what a player does with chunks that arrive late. The
+                       group reads a buffered source about 1.85 s ahead of play,
+                       so a stall shorter than that is absorbed and a longer one
+                       makes the first chunk after it late by what is over
+  --stall-ms N         how long the stall lasts, in milliseconds (default 2500)
   --sink DIRECTORY     also play to a test sink in this process, which writes
                        its WAV and play-time log to DIRECTORY/out
   --sink-layout LAYOUT the test sink's speaker layout (default 2.0)
@@ -940,6 +947,8 @@ int main(int argc, char** argv) {
     fs::path state_directory = "hearth-testserver-state";
     std::string server_name = "Hearth test server";
     long timeout_seconds = 60;
+    std::optional<long> stall_after;
+    long stall_ms = 2500;
     std::optional<fs::path> report_path;
 
     const std::vector<std::string_view> arguments(argv + 1, argv + argc);
@@ -1058,6 +1067,19 @@ int main(int argc, char** argv) {
                 std::cerr << "--seconds takes a whole number of seconds\n";
                 return kExitUsage;
             }
+        } else if (argument == "--stall-after") {
+            stall_after = parse_number(value);
+            if (!stall_after) {
+                std::cerr << "--stall-after takes a whole number of seconds\n";
+                return kExitUsage;
+            }
+        } else if (argument == "--stall-ms") {
+            const std::optional<long> parsed = parse_number(value);
+            if (!parsed || *parsed == 0) {
+                std::cerr << "--stall-ms takes a whole number of milliseconds\n";
+                return kExitUsage;
+            }
+            stall_ms = *parsed;
         } else if (argument == "--sink") {
             sink_directory = fs::path(value);
         } else if (argument == "--sink-layout") {
@@ -1439,7 +1461,16 @@ int main(int argc, char** argv) {
     std::vector<std::int32_t> tone_block(kToneBlockFrames * 2);
     std::uint64_t tone_next = 0;
     bool tone_block_ready = false;
+    // --stall-after: the pushes stop for --stall-ms from that time in the play.
+    std::optional<SteadyClock::time_point> stall_until;
+    bool stalled = false;
     while (failure.empty()) {
+        if (stall_after && !stalled &&
+            SteadyClock::now() >= play_started + std::chrono::seconds(*stall_after)) {
+            stalled = true;
+            stall_until = SteadyClock::now() + std::chrono::milliseconds(stall_ms);
+            note("stalling for " + std::to_string(stall_ms) + " ms");
+        }
         if (tone) {
             if (tone_next >= tone_frames) {
                 break;
@@ -1474,7 +1505,9 @@ int main(int argc, char** argv) {
                     break;
                 }
             }
-            if (group->push_burst(*burst)) {
+            if (stall_until && SteadyClock::now() < *stall_until) {
+                std::this_thread::sleep_for(5ms);
+            } else if (group->push_burst(*burst)) {
                 ++sent;
                 end_frame = burst->frame + burst->frames;
                 send_anchor(burst->frame, burst->frames);

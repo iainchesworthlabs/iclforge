@@ -1231,7 +1231,9 @@ decode and render per burst with the sink's time left out):
 
 Every output's RMS over a play is the host decoder's to 0.01 dB (0.23 dB under on `ac4-stereo-64`,
 whose first second was silent: the player had dropped its first chunk as late, and the decoder waits
-for an I-frame after one). The converter stream's worst burst, 229 ms, came within its first 125
+for an I-frame after one; a late AC-4 chunk is decoded and discarded now where that loses less, which
+an S3 measured at 0.0 to 0.1 s lost in place of 0.9 to 1.0 s at 23.44 fps, and a P4 has not been run
+since). The converter stream's worst burst, 229 ms, came within its first 125
 chunks and not again; the ring held it and nothing ran dry. E-AC-3 plays on the same image are unchanged (`dee-eac3-51` 5.1 0.18,
 internal RAM free 211 to 218 KB), and a player switched from E-AC-3 to AC-4 and back plays each as it
 did alone: the decoders go in turn, and the AC-4 one's 286 KB with them.

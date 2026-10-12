@@ -3908,6 +3908,19 @@ The sections below contain the complete change list and fixes.
   through, which the first board run showed it had not been (every frame after a late first chunk
   was dropped). `hearth-testserver` plays an `.ac4` file; `libs/device`'s `ac4_sync_frame.hpp` is
   the raw frame of a sync frame without a list, tested on the host.
+- **A late AC-4 chunk is decoded and discarded, not dropped, when that loses less audio**
+  (`burst_player.cpp`, `late_ac4_is_kept()`; `late_kept` and `lost_frames` in the
+  `sendspin.stream=` line): an AC-4 frame depends on the ones before it, so a chunk dropped for being
+  late cost the stream everything up to the next I-frame, 0.96 s in every play of these streams (24
+  frames), whether the chunk was a few frames late at a play's start or came after a network stall.
+  The player decodes it and throws the output away when `late * r <= (1 - r) * 0.5 s`, `r` being a
+  frame's decode time over its duration (0.6 until measured, per stream), which is where keeping
+  loses less than dropping and waiting half the I-frames' interval. On an ESP32-S3 over Sendspin the
+  audio lost at the start of a play fell from 0.90 to 0.98 s to 0.00 to 0.09 s at 23.44 fps and 0.05
+  to 0.92 s at 24 and 25 fps, and a stall of 2.2 s from 1.6 to 2.6 s to 0.6 to 1.0 s; `ac4-stereo-64`'s
+  RMS went from 0.43 dB under the host's to equal; no play had an invalid chunk. AC-3 and E-AC-3 are
+  dropped as they were. `lost_frames` counts the stream's frames never handed to the sink; the
+  test server's `--stall-after N --stall-ms M` simulates a network stall.
 - **The AC-4 decoder's inverse transform has built-in tables for every frame length**
   (`gen_ac4_transform_tables.py`, `libs/dsp/src/tiered/transform_tables.cpp`): the FFT roots, the
   IMDCT's pre-twiddles and the KBD windows were built in for the five block lengths of a 2,048-sample
