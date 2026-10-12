@@ -286,6 +286,13 @@ void write_support(json::Writer& w, const Support& support) {
         }
         w.end_object();
     }
+    if (!support.karaoke_codecs.empty()) {
+        w.key("karaoke_codecs").begin_array();
+        for (const DataType type : support.karaoke_codecs) {
+            w.string(data_type_name(type));
+        }
+        w.end_array();
+    }
     w.end_object();
 }
 
@@ -426,6 +433,22 @@ std::optional<Support> read_support(json::Value value) {
             return std::nullopt;
         }
         support.lyrics_max_bytes = static_cast<std::uint32_t>(*bytes);
+    }
+    // The codecs karaoke is reproduced for, by the names `data_types` uses; one this reader does
+    // not know is skipped as there, and an element that is not a string refuses the array. An
+    // empty array states none, which reads as AC-3 alone (Support::reproduces_karaoke).
+    if (const json::Value codecs = value["karaoke_codecs"]; codecs.exists()) {
+        if (!codecs.is_array()) {
+            return std::nullopt;
+        }
+        for (const json::Value element : codecs.elements()) {
+            if (!element.is_string()) {
+                return std::nullopt;
+            }
+            if (const std::optional<DataType> type = value_of(kDataTypes, element)) {
+                support.karaoke_codecs.push_back(*type);
+            }
+        }
     }
     return support;
 }

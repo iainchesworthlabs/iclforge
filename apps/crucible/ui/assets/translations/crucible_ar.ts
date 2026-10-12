@@ -329,87 +329,132 @@
 <context>
     <name>LyricStrip</name>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="112"/>
+        <location filename="../qml/LyricStrip.qml" line="114"/>
+        <source>Following %1: %2</source>
+        <translation>تتم متابعة %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="115"/>
+        <source>Following %1.</source>
+        <translation>تتم متابعة %1.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="118"/>
+        <source>This application has not published where it is in the song (a media session). Press Start to begin by hand, or follow one that is playing:</source>
+        <translation>لم يُعلن هذا التطبيق عن موضعه في الأغنية (جلسة وسائط). اضغط بدء للبدء يدويًا، أو تابع أحد التطبيقات التي تعمل الآن:</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="120"/>
+        <source>Waiting for this application to publish where it is in the song (a media session). Press Start to begin by hand.</source>
+        <translation>في انتظار أن ينشر هذا التطبيق موضعه في الأغنية (جلسة وسائط). اضغط بدء للبدء يدويًا.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="123"/>
+        <source>%1 does not publish where it is in the song. Press Start to begin by hand.</source>
+        <translation>%1 لا ينشر موضعه في الأغنية. اضغط بدء للبدء يدويًا.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="126"/>
+        <source>Media sessions cannot be read here: %1 Press Start to begin by hand.</source>
+        <translation>لا يمكن قراءة جلسات الوسائط هنا: %1 اضغط بدء للبدء يدويًا.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="129"/>
+        <source>The track changed to “%1”, so these lyrics are not followed. Import the lyrics for it, or follow it anyway.</source>
+        <translation>تغيّر المقطع إلى «%1»، لذا لا تُتابَع هذه الكلمات. استورد كلمات المقطع الجديد، أو تابعه على أي حال.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="132"/>
+        <source>The media session went away, so the words carry on by the clock from where they were.</source>
+        <translation>اختفت جلسة الوسائط، لذا تستمر الكلمات بحسب الساعة من حيث كانت.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="175"/>
         <source>Choose the lyrics</source>
         <translation>اختيار كلمات الأغنية</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="113"/>
+        <location filename="../qml/LyricStrip.qml" line="176"/>
         <source>All files (*)</source>
         <translation>كل الملفات (*)</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="113"/>
+        <location filename="../qml/LyricStrip.qml" line="176"/>
         <source>Lyrics and CD+G (*.lrc *.srt *.ass *.kar *.txt *.cdg)</source>
         <translation>كلمات الأغاني وCD+G (*.lrc *.srt *.ass *.kar *.txt *.cdg)</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="121"/>
+        <location filename="../qml/LyricStrip.qml" line="184"/>
         <source>Select an application to give it lyrics.</source>
         <translation>اختر تطبيقًا لإضافة كلمات أغنية إليه.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="137"/>
+        <location filename="../qml/LyricStrip.qml" line="200"/>
         <source>Import lyrics…</source>
         <translation>استيراد كلمات الأغنية…</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="142"/>
+        <location filename="../qml/LyricStrip.qml" line="205"/>
         <source>Clear</source>
         <translation>مسح</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="154"/>
+        <location filename="../qml/LyricStrip.qml" line="217"/>
         <source>%1 · %2 lines</source>
         <translation>%1 · %2 أسطر</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="156"/>
+        <location filename="../qml/LyricStrip.qml" line="219"/>
         <source>%1 · a CD+G picture: its words are pixels, so none are read</source>
         <translation>%1 · صورة CD+G: كلماتها بكسلات، لذا لا تُقرأ منها أي كلمة</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="157"/>
+        <location filename="../qml/LyricStrip.qml" line="220"/>
         <source>%1 · no times, so shown whole and not followed</source>
         <translation>%1 · بلا توقيت، لذا تُعرض كاملة ولا تُتابَع</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="170"/>
+        <location filename="../qml/LyricStrip.qml" line="233"/>
         <source>Start again</source>
         <translation>ابدأ من جديد</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="170"/>
+        <location filename="../qml/LyricStrip.qml" line="233"/>
         <source>Start</source>
         <translation>بدء</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="175"/>
+        <location filename="../qml/LyricStrip.qml" line="238"/>
         <source>Stop</source>
         <translation>إيقاف</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="183"/>
+        <location filename="../qml/LyricStrip.qml" line="245"/>
+        <source>Follow the media session</source>
+        <translation>تابع جلسة الوسائط</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="252"/>
         <source>Show the words earlier</source>
         <translation>عرض الكلمات أبكر</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="192"/>
+        <location filename="../qml/LyricStrip.qml" line="261"/>
         <source>Words shifted by %1</source>
         <translation>الكلمات مزاحة بمقدار %1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="197"/>
+        <location filename="../qml/LyricStrip.qml" line="266"/>
         <source>Show the words later</source>
         <translation>عرض الكلمات لاحقًا</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="332"/>
+        <location filename="../qml/LyricStrip.qml" line="401"/>
         <source>CD+G picture</source>
         <translation>صورة CD+G</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="339"/>
+        <location filename="../qml/LyricStrip.qml" line="134"/>
         <source>Press Start as the song begins. This application&apos;s position is not read, so a pause or a seek in it is not followed: press Start again, or nudge the words.</source>
         <translation>اضغط بدء عند بدء الأغنية. لا يُقرأ موضع هذا التطبيق، لذا لا يُتابَع أي إيقاف مؤقت أو قفز فيه: اضغط بدء مرة أخرى أو أزِح الكلمات.</translation>
     </message>
@@ -1843,6 +1888,53 @@
         <location filename="../qml/SettingsPage.qml" line="521"/>
         <source>Save diagnostics…</source>
         <translation>احفظ التشخيصات…</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="532"/>
+        <source>LYRIC EVENTS OUT</source>
+        <translation>أحداث الكلمات الصادرة</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="536"/>
+        <source>Send the lyric strip&apos;s events over OSC</source>
+        <translation>إرسال أحداث شريط الكلمات عبر OSC</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="537"/>
+        <source>The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.</source>
+        <translation>السطر والكلمة اللذان يُغنّيان، كرسائل OSC عبر UDP، لجهاز إضاءة أو تحكم في العروض يتابعهما. متوقف حتى تشغّله.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="544"/>
+        <location filename="../qml/SettingsPage.qml" line="547"/>
+        <source>Send to</source>
+        <translation>إرسال إلى</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="555"/>
+        <location filename="../qml/SettingsPage.qml" line="558"/>
+        <source>Port</source>
+        <translation>المنفذ</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="574"/>
+        <source>Lines</source>
+        <translation>الأسطر</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="582"/>
+        <source>Words</source>
+        <translation>الكلمات</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="590"/>
+        <source>Position, ten times a second</source>
+        <translation>الموضع، عشر مرات في الثانية</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="596"/>
+        <source>Each message begins with the application&apos;s name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line&apos;s number, text and times; /word the same for a word of a word-timed line; /position the song&apos;s place in milliseconds. Times are milliseconds from the start of the song.</source>
+        <translation>تبدأ كل رسالة باسم التطبيق. يقول /crucible/lyrics/state إن المتابعة جارية أو متوقفة أو مُسحت؛ ويعطي /line رقم السطر ونصه وتوقيته؛ و/word الشيء نفسه لكلمة من سطر موقَّت الكلمات؛ و/position موضع الأغنية بالميلي ثانية. الأزمنة بالميلي ثانية من بداية الأغنية.</translation>
     </message>
     <message>
         <location filename="../qml/SettingsPage.qml" line="370"/>
