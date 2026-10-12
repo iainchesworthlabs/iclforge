@@ -68,6 +68,43 @@ let decoded = decoder
 
 That excerpt is from `encode_decode_eac3.rs`.
 
+## Karaoke and lyrics
+
+`Decoder::with_karaoke(&DecoderConfig, &KaraokeConfig)` (`iclforge_decoder_create_with_karaoke`)
+reproduces an Annex C karaoke stream - `bsmod` 7 with a layout above mono, L and R, a guide melody
+and one or two vocals - as a karaoke-aware or karaoke-capable decoder does. Build a
+`KaraokeConfig` from `Default::default()` (off, both vocals, every level 0 dB) and override what
+you need:
+
+```rust
+let karaoke = KaraokeConfig {
+    reproduction: KaraokeReproduction::Capable,
+    vocals: KaraokeVocals::V1,
+    melody_db: -6.0, // against Table C.2.3; 0.0 is the table, KARAOKE_MIN_LEVEL_DB is off
+    ..Default::default()
+};
+let mut decoder = Decoder::with_karaoke(&DecoderConfig::default(), &karaoke)?;
+let frame = decoder.decode_frame(syncframe)?;
+if frame.karaoke_reproduced() {
+    // three channels (four with the LFE): L, C, R where five were coded.
+    assert_eq!(frame.output_acmod(), Some(Acmod::Channels3_0));
+}
+```
+
+`DecodedFrame::acmod()` still says what was coded; `output_acmod()` and `output_lfe()` say what
+`channel_count()` and `channel_samples()` are, `is_karaoke()` and `bsmod()` what the stream is, and
+`karaoke_reproduced()` whether the decoder replaced the layout. The levels are the capable
+decoder's alone, over `KARAOKE_MIN_LEVEL_DB` to `KARAOKE_MAX_LEVEL_DB` (-24, which is off, to 12),
+the span and units Hearth's sliders use. The reproduction is the 3/0 form; `Eac3Decoder` and AC-4
+have none ([C API](c-api.md#karaoke-streams-annex-c)).
+
+`iclforge::lyrics::Lyrics::parse(&bytes, duration_ms)` reads a lyrics file's bytes - LRC in UTF-8
+or UTF-16, SubRip, Advanced SubStation Alpha or MIDI karaoke, told by their content - and refuses
+the rest with `LyricsError::Unreadable(reason)`. `lines()` and `Line::words()` borrow the lyrics;
+`position(position_ms, delay_ms)` is the stateless cursor and `Word::state(position_ms)` says
+whether a word is sung, being sung or not yet. The reader is compiled into the C library from
+`libs/lyrics`; reading a file is the caller's, as the C API's is.
+
 ## AC-4
 
 `iclforge::ac4` wraps `iclforge_ac4_decoder_t`/`iclforge_ac4_encoder_t` (ETSI TS 103 190-1 V1.4.1,
@@ -201,6 +238,8 @@ and the experimental flags held to the encoder.
 | `iclforge::ac3::eac3` | `Eac3Encoder`, `Eac3FrameConfig` (the Annex E tools through `auto_tools` or the individual flags; substream identity and `chanmap`), `Eac3FrameMetadata`, `AccessUnitEncoder` and `AccessUnit` for wide layouts built from several substreams, `Eac3Decoder` with `decode_substream`, `decode_access_unit` and `flush`, `DecodedSubstream`, `DecodedAccessUnit` |
 | `iclforge::atmos` | `AtmosEncoder`, `AtmosConfig`, `ObjectPlacement`; the OAMD and JOC accessors (`has_object_metadata`, `dynamic_object`, `object_audio` and their counts) on `DecodedSubstream` and `DecodedAccessUnit` |
 | `iclforge::ac4` | `Encoder`, `EncoderConfig` (with `ObjectsConfig`, `ObjectConfig`, `Experimental`, `iframes` and `fragment_starts`), `ObjectMetadataUpdate`, `ObjectProperties`, `Decoder`, `DecoderConfig`, `OutputConfig`, `PresentationChoice`, `DecodedFrame` (channels, speakers, concealment, objects and their `ObjectUpdate`s), `PresentationInfo`, `LoudnessInfo`, `Toc` and `sync_frame` — see [AC-4](#ac-4) above |
+| `iclforge::ac3` (karaoke) | `Decoder::with_karaoke`, `KaraokeConfig`, `KaraokeReproduction`, `KaraokeVocals`, and the `bsmod`, `is_karaoke`, `output_acmod`, `output_lfe` and `karaoke_reproduced` accessors of `DecodedFrame` |
+| `iclforge::lyrics` | `Lyrics::parse`, `LyricsError`, `Line`, `Word`, `Singer`, `WordState`, `LyricPosition` |
 | `iclforge::stream` | `split_frames`, `split_access_units`, `stream_bsid`, `scan` and `ScannedStream` (kind, sample rate, layout, rendered channel count, each access unit's slice and sample count, `bsid`, the Atmos complexity index). The slices borrow the input buffer |
 | `iclforge::meter` | `LoudnessMeter` (the `acmod`/`lfe` constructor and the BS.1770-5 `chanmap` constructor) and `dialnorm_from_lkfs` |
 | `iclforge` | `Bytes` (an owned encoded buffer that derefs to `[u8]`), `Error`, `Latency` and the latency accessors on the encoders and decoders, `version()`, `SAMPLES_PER_FRAME` |
@@ -208,7 +247,8 @@ and the experimental flags held to the encoder.
 `iclforge::Error` mirrors `iclforge_status_t` and adds `Error::Other(u32)` for a status value this
 crate does not know, so a newer library cannot make it panic or report the wrong error. It has no
 variants for the scan errors (`ICLFORGE_ERROR_SCAN_*`); a failed `stream::scan` reports
-`Error::Other` with the raw code.
+`Error::Other` with the raw code. A lyrics file the reader refuses is `Error::LyricsUnreadable`,
+which `lyrics::Lyrics::parse` returns with the reason as `LyricsError::Unreadable`.
 
 Tests are in `bindings/rust/iclforge/tests/`: round trips for every `acmod`/LFE combination, a wide-layout
 5.1.2 encode and decode, Atmos objects round-tripped with their positions and audio, and the

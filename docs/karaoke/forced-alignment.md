@@ -215,16 +215,25 @@ and choose the Karaoke page. The Lyrics card says `song.lrc, word-timed`, and th
 as they are sung.
 
 **Time the lyrics...** then opens the window with the aligner's word times as they are, drawn as set
-and not as guesses. What it offers for correcting them is **by line**:
+and not as guesses. It corrects them a line at a time or a word at a time:
 
-- Choose a line to play from it, listen, and press **Stamp again** at the moment its first word
-  starts, or move it with **-10 ms** and **+10 ms**. The line's words move with it.
-- A word that already has a time is skipped by the word pass, and the window has no control for
-  moving one word on its own. A single word that is wrong is corrected by editing its `<mm:ss.xx>`
-  tag in the file, which is text. Pressing the words in the window means starting without the
-  aligner's times: move the `.lrc` away and reopen the stream, and the window asks for a text file.
+- **A line.** Choose it to play from it, listen, and press **Stamp again** at the moment its first
+  word starts, or move it with **-10 ms** and **+10 ms**. The line's words move with it.
+- **A word.** Click the word that is wrong. It is outlined, the item is cued 1.5 s before it, and the
+  window says which word it is and when it starts. Play, and press `Space` as the word starts (in
+  the **Words** pass the next `Space` is for that word, once, with the reaction time taken off),
+  or press **Stamp again** at that moment, or move it with **-10 ms** and **+10 ms**. Nothing else
+  moves: its line and the line's other words keep their times. A word stays between its
+  neighbours, so to put one past the next word, move the next word first. Clicking the line lets the
+  word go, and the buttons are the line's again.
+- The word pass skips a word that already has a time, which is every word of this file, so with no
+  word chosen `Space` has nothing to press there. Pressing all the words in the window means starting
+  without the aligner's times: move the `.lrc` away and reopen the stream, and the window asks for a
+  text file. A word can also be corrected by editing its `<mm:ss.xx>` tag in the file, which is text.
 - **Save** writes the word starts and keeps the first file as `song.lrc.bak`. It does not write the
   tag after a line's last word, so after a save that word runs to the next line.
+
+The window's steps are in [Timing the lyrics](../hearth/index.md#timing-the-lyrics).
 
 ## What one run produced
 
@@ -286,7 +295,10 @@ going backwards or of no length, and `find_lyrics_file` paired it with a stream 
 round trip through `write_lrc`, which is what the window's **Save** calls, kept every word and its
 start and dropped the tag after each line's last word. The timing window itself was not opened on
 this file: what it does with a word-timed file is from its controller's code and the test that
-holds it (`a file that is timed opens as given`).
+holds it (`a file that is timed opens as given`). Correcting one word of such a file is held by
+`tst_karaoke_timing.qml`, which opens a three-line enhanced `.lrc` of that shape (a time for each
+line and a tag before each word), chooses a word, and checks what a press, a stamp again and a nudge
+do to it and to nothing else; it runs offscreen and not on a display.
 
 ## Limits
 
@@ -302,4 +314,6 @@ holds it (`a file that is timed opens as given`).
   the last word of this song), and where the voice stops is the aligner's guess.
 - **The installation is large and slow to resolve,** and a new release of any of its parts can
   change the result. The versions are the ones stated above.
-- **Correction in Hearth is by line.** See [step 5](#5-open-it-in-hearth).
+- **Correction in Hearth is by ear, a line or a word at a time.** The window does not re-align a
+  stretch, so a run of wrong words is a press or a nudge for each, or a nudge of the line when the
+  whole line is early or late. See [step 5](#5-open-it-in-hearth).
