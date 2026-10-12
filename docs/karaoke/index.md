@@ -400,9 +400,6 @@ samples and the same lines as `forge decode` and Hearth do.
 
 ## What it does not do
 
-- **Re-levelling in the Forge GUI's player.** The library has the three levels
-  (`OutputConfig::karaoke_melody_gain` and its two siblings), and Hearth's Karaoke page and
-  `forge decode` and `forge monitor` offer them; the Forge GUI's player does not.
 - **Aligning words to the sound.** Hearth's timing window ([Timing the
   lyrics](../hearth/index.md#timing-the-lyrics)) takes word times from your presses, and an estimate
   by the letters of a word is only where a press starts from. A forced aligner is outside software,
