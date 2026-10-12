@@ -292,18 +292,35 @@ test('the page follows a lyrics file against the playing position, word by word'
     await expect(view.locator('.lyric.next')).toContainText('And never brought to mind?');
     await expect(view.locator('.word.now')).toHaveText('Should ');
 
-    // A seek is only another position: 8.5 s is the third line's second word (the verse comes round).
-    await page.evaluate(() => {
-        const seek = /** @type {HTMLInputElement} */ (document.getElementById('seek'));
-        seek.value = String((8.5 / 16.0) * 1000);
-        seek.dispatchEvent(new Event('input', { bubbles: true }));
-        seek.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    // The seek bar is a thousand whole steps of the stream's length, which the page shows beside the
+    // position (the example is 16.512 s: 516 frames of 1536 samples at 48 kHz, shown as 16.5), so a
+    // position is reached to a step, 16.5 ms here, and not exactly.
+    const seekTo = async (seconds) => {
+        const shown = (await page.locator('#scrubTime').textContent()) ?? '';
+        const length = Number(/\/ ([0-9.]+)s$/.exec(shown.trim())?.[1]);
+        expect(length, `the position reads "${shown}"`).toBeGreaterThan(seconds);
+        const step = Math.round((seconds / length) * 1000);
+        await page.evaluate((value) => {
+            const seek = /** @type {HTMLInputElement} */ (document.getElementById('seek'));
+            seek.value = String(value);
+            seek.dispatchEvent(new Event('input', { bubbles: true }));
+            seek.dispatchEvent(new Event('change', { bubbles: true }));
+        }, step);
+    };
+
+    // A seek is only another position. The third line is the first again (the verse comes round), so
+    // what tells it from the first is its neighbours: the line before it is the second, the one after
+    // it the fourth. Its second word, "auld", is sung from 8.5 to 9.25 s. The delay below takes 0.6 s
+    // off the position and the second line's last word ends at 8.0 s, so only 8.5 to 8.6 s serves
+    // both: 8.55 s is asked for, the middle of that.
+    await seekTo(8.55);
     await expect(view.locator('.lyric.current')).toContainText('Should auld acquaintance be forgot,');
+    await expect(view.locator('.lyric.previous')).toContainText('And never brought to mind?');
+    await expect(view.locator('.lyric.next')).toContainText('And auld lang syne!');
     await expect(view.locator('.word.now')).toHaveText('auld ');
     await expect(view.locator('.word.sung')).toHaveText(['Should ']);
 
-    // The delay shows the words later: 8.5 s less 0.6 s is 7.9 s, which is the second line's last
+    // The delay shows the words later: 8.55 s less 0.6 s is 7.95 s, which is the second line's last
     // word, "mind?", sung from 6.5 to 8.0.
     await page.evaluate(() => {
         const delay = /** @type {HTMLInputElement} */ (document.getElementById('lyricsDelay'));
@@ -314,14 +331,24 @@ test('the page follows a lyrics file against the playing position, word by word'
     await expect(view.locator('.lyric.current')).toContainText('And never brought to mind?');
     await expect(view.locator('.word.now')).toHaveText('mind?');
 
-    // A file that is not lyrics is named, and the words already on the page stay.
+    // A file in a code page is named with the reader's reason (the case above holds that the reader
+    // refuses it with a sentence), and the words already on the page stay: still at the second
+    // line's "mind?", and still the ones the position is followed in.
     await page.setInputFiles('#lyricsInput', {
         name: 'latin1.lrc',
         mimeType: 'text/plain',
         buffer: Buffer.from([0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x2e, 0x30, 0x30, 0x5d, 0xe9]),
     });
-    await expect(page.locator('#lyricsStatus')).toContainText('latin1.lrc');
+    await expect(page.locator('#lyricsStatus')).toHaveText(/^latin1\.lrc: .+/);
     await expect(page.locator('#lyricsStatus')).toHaveClass(/error/);
-    await expect(view.locator('.lyric.current')).toContainText('Should auld acquaintance');
+    await expect(view.locator('.lyric.current')).toContainText('And never brought to mind?');
+    await expect(view.locator('.word.now')).toHaveText('mind?');
+    // A page that had dropped them would go on showing the last lines it drew, so the proof that the
+    // file is still the one followed is a seek: 1.0 s less the delay is 0.4 s, in the first line's
+    // first word, "Should" (0 to 0.5 s), and the line after it is the second.
+    await seekTo(1.0);
+    await expect(view.locator('.lyric.current')).toContainText('Should auld acquaintance be forgot,');
+    await expect(view.locator('.lyric.next')).toContainText('And never brought to mind?');
+    await expect(view.locator('.word.now')).toHaveText('Should ');
     expect(pageErrors).toEqual([]);
 });
