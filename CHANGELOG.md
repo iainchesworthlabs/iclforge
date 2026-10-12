@@ -259,6 +259,15 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
+  offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
+  dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
+  now shown shifted by the offset the last scroll command set (the border stays a ring, and a value
+  past the largest is read as the largest, so the shift never leaves the memory). Instruction 28,
+  *define transparent colour*, was skipped; the colour it names now has an alpha of 0 in
+  `CdgScreen::pixels()` and `colour()`, so a picture's backdrop shows where the disc meant video to.
+  Both are state of the replay, so a seek back lands where a seek from the start does
+  (`iclforge::lyrics`, `cdg.hpp`; planning/karaoke-phase2.md, W13f).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the
@@ -3160,6 +3169,17 @@ The sections below contain the complete change list and fixes.
   no heap, against 32 KB reserved first. A text of 2,000 one-digit values still needs 32 KB of
   tokens, which only the token cap bounds. A re-handshake is entered after the message's tokens
   are released, so its X25519 does not sit on top of them.
+- **A sink's session takes at most 8 KB of tokens for a message, where a host's takes 64 KB.**
+  `PlayerConfig::max_json_tokens` (4,096 by default, so a host reads what it did) bounds the one
+  block a session takes for a message of more than 64 values, and Hearth's sink sets
+  `kSinkMaxJsonTokens`, 512. The largest message a server legitimately sends is 98 tokens
+  (`server/state` with metadata, controller and color, as Music Assistant sends it;
+  `stream/start` with every role is 88 and a settings command for sixteen outputs and every
+  decoder key 89); only `languages` has no bound, and a hundred of them make `server/activate`
+  126. A lyric document is one string, one token, whatever its bytes. No message comes within
+  twice the cap, and a valid 4 KB text of 2,000 one-digit values, which needed one 32 KB block,
+  is refused at its 513th token with no block taken. A message over the cap is dropped as a
+  malformed one is.
 
 **Object signing**
 
