@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
-"""Writes notices/licences/ESP-IDF-components.txt: the licence texts of what the ESP32 sink images link.
+"""Writes notices/licences/ESP-IDF-components.txt: the licences of what the ESP32 sink images link.
 
-The firmware images (firmware/hearth-sink, built in the espressif/idf container) link ESP-IDF and the
-third-party components it carries, and the managed LVGL. Their licences ask that the copyright
-notice and the licence text travel with a binary, so Hearth's NOTICES.txt (notices/fragments/
-hearth-firmware.txt, which includes this file) carries them. The texts are copied from the
-components' own files, not retyped, so this reads an ESP-IDF checkout and the LVGL component:
+The firmware images (firmware/hearth-sink, built in the espressif/idf container) link ESP-IDF
+and the third-party components it carries, and the managed LVGL. Their licences ask that the
+copyright notice and the licence text travel with a binary, so Hearth's NOTICES.txt
+(notices/fragments/hearth-firmware.txt, which includes this file) carries them. The texts are
+copied from the components' own files, not retyped, so this reads an ESP-IDF checkout and the
+LVGL component:
 
     python tools/generators/gen_esp_idf_notices.py --idf D:/esp/esp-idf \\
         --lvgl firmware/hearth-sink/managed_components/lvgl__lvgl \\
         --out notices/licences/ESP-IDF-components.txt
 
-Which components are the ones linked comes from `esp-idf-sbom create --rem-unused` of the S3, C6 and
-P4 sink builds (2026-10-12): FreeRTOS, lwIP, Mbed TLS and TF-PSA-Crypto, picolibc, HTTP Parser,
-argtable3, TLSF, wpa_supplicant, the Xtensa HAL headers (S3), and the Wi-Fi, PHY and coexistence
-libraries. When ESP-IDF's version changes, run this again against the new checkout; the version
-the file was made from is on its first line, and tools/ci/test_firmware_notices.py fails when that is
-not the version `.github/workflows/_build.yml` builds with.
+Which components are the ones linked comes from `esp-idf-sbom create --rem-unused` of the S3, C6
+and P4 sink builds (2026-10-12): FreeRTOS, lwIP, Mbed TLS and TF-PSA-Crypto, picolibc, HTTP
+Parser, argtable3, TLSF, wpa_supplicant, the Xtensa HAL headers (S3), and the Wi-Fi, PHY and
+coexistence libraries. When ESP-IDF's version changes, run this again against the new
+checkout; the version the file was made from is on its first line, and
+tools/ci/test_firmware_notices.py fails when that is not the version
+`.github/workflows/_build.yml` builds with.
 
 The input is untrusted data: it is only read as text and nothing in it is executed.
 """
@@ -27,6 +29,34 @@ import sys
 from pathlib import Path
 
 RULE = "=" * 78
+
+# The standard text of the BSD 3-Clause licence, for a component whose files carry its SPDX
+# identifier and copyright line but not the text.
+BSD_3_CLAUSE = """\
+Redistribution and use in source and binary forms, with or without modification, are
+permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list
+   of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list
+   of conditions and the following disclaimer in the documentation and/or other
+   materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be
+   used to endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
+WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""
 
 
 def decode(raw: bytes) -> str:
@@ -167,16 +197,17 @@ def main() -> int:
     parts: list[str] = []
     parts.append(
         f"ESP-IDF version: {version}\n"
-        "Made by tools/generators/gen_esp_idf_notices.py from the files named under each heading.\n\n"
+        "Made by tools/generators/gen_esp_idf_notices.py from the files named under each\n"
+        "heading.\n\n"
     )
 
     parts.append(section(
         "ESP-IDF and the Espressif components it links",
-        "every sink image; ESP-IDF itself, its Wi-Fi, PHY and coexistence libraries, esp_hosted, mDNS "
-        "and the LCD and touch drivers are Espressif's",
+        "every sink image; ESP-IDF itself, its Wi-Fi, PHY and coexistence libraries, "
+        "esp_hosted, mDNS and the LCD and touch drivers are Espressif's",
         "Apache-2.0",
-        "ESP-IDF's LICENSE, which is also the licence file of components/esp_wifi/lib, esp_phy/lib and "
-        "esp_coex/lib",
+        "ESP-IDF's LICENSE, which is also the licence file of components/esp_wifi/lib, "
+        "esp_phy/lib and esp_coex/lib",
         read(idf / "LICENSE"),
     ))
 
@@ -232,33 +263,16 @@ def main() -> int:
     match = re.search(r"SPDX-FileCopyrightText:\s*([^\n]+)", tlsf)
     licence = re.search(r"SPDX-License-Identifier:\s*([^\n]+)", tlsf)
     if not match or not licence or licence.group(1).strip() != "BSD-3-Clause":
-        raise SystemExit("components/heap/tlsf/tlsf.c no longer declares BSD-3-Clause in its header")
+        raise SystemExit(
+            "components/heap/tlsf/tlsf.c no longer declares BSD-3-Clause in its header"
+        )
     parts.append(section(
         "TLSF allocator",
         "ESP-IDF's heap in every sink image",
         "BSD-3-Clause",
         "the SPDX header of components/heap/tlsf/tlsf.c (the file carries the identifier and the "
         "copyright line; this is the standard text of that licence)",
-        f"Copyright (c) {match.group(1).strip()}. All rights reserved.\n\n"
-        "Redistribution and use in source and binary forms, with or without modification, are\n"
-        "permitted provided that the following conditions are met:\n\n"
-        "1. Redistributions of source code must retain the above copyright notice, this list of\n"
-        "   conditions and the following disclaimer.\n\n"
-        "2. Redistributions in binary form must reproduce the above copyright notice, this list of\n"
-        "   conditions and the following disclaimer in the documentation and/or other materials\n"
-        "   provided with the distribution.\n\n"
-        "3. Neither the name of the copyright holder nor the names of its contributors may be used\n"
-        "   to endorse or promote products derived from this software without specific prior\n"
-        "   written permission.\n\n"
-        "THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY\n"
-        "EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF\n"
-        "MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE\n"
-        "COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\n"
-        "EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF\n"
-        "SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)\n"
-        "HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR\n"
-        "TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\n"
-        "SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n",
+        f"Copyright (c) {match.group(1).strip()}. All rights reserved.\n\n" + BSD_3_CLAUSE,
     ))
 
     xtensa = comp / "xtensa" / "esp32s3" / "include" / "xtensa" / "config" / "core-isa.h"

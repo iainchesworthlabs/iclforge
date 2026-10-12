@@ -199,8 +199,13 @@ class NoticesContentTest(unittest.TestCase):
         # The ESP32 sink images carry ESP-IDF and what it links, and the P4's screen LVGL and a Noto
         # Sans for Greek and Cyrillic: all are named in Hearth's notices although no desktop binary
         # holds them.
-        markers = ("LVGL\n", "Noto Sans Greek and Cyrillic\n", "ESP-IDF 6.1\n", "FreeRTOS kernel 10.5.1\n",
-                   "picolibc 1.8.10\n")
+        markers = (
+            "LVGL\n",
+            "Noto Sans Greek and Cyrillic\n",
+            "ESP-IDF 6.1\n",
+            "FreeRTOS kernel 10.5.1\n",
+            "picolibc 1.8.10\n",
+        )
         for marker in markers:
             with self.subTest(marker=marker), tempfile.TemporaryDirectory() as directory:
                 without = WINDOWS_NOTICES.replace(marker, "")

@@ -32,7 +32,8 @@ COMMAND = (
 def container_tags() -> set[str]:
     tags: set[str] = set()
     for workflow in sorted(WORKFLOWS.glob("*.yml")):
-        tags.update(re.findall(r"espressif/idf:(v\d+\.\d+(?:\.\d+)?)", workflow.read_text(encoding="utf-8")))
+        text = workflow.read_text(encoding="utf-8")
+        tags.update(re.findall(r"espressif/idf:(v\d+\.\d+(?:\.\d+)?)", text))
     return tags
 
 
@@ -40,7 +41,9 @@ class FirmwareNotices(unittest.TestCase):
     def test_builds_use_one_idf(self):
         tags = container_tags()
         self.assertTrue(tags, "no workflow names an espressif/idf container any more")
-        self.assertEqual(len(tags), 1, f"the workflows build with more than one ESP-IDF: {sorted(tags)}")
+        self.assertEqual(
+            len(tags), 1, f"the workflows build with more than one ESP-IDF: {sorted(tags)}"
+        )
 
     def test_notices_file_is_for_that_idf(self):
         (tag,) = container_tags()
@@ -48,8 +51,8 @@ class FirmwareNotices(unittest.TestCase):
         self.assertEqual(
             first,
             f"ESP-IDF version: {tag}",
-            f"the workflows build with ESP-IDF {tag} and {NOTICES_FILE.name} was made from another: "
-            f"make it again with\n  {COMMAND}\nand look at what changed",
+            f"the workflows build with ESP-IDF {tag} and {NOTICES_FILE.name} was made from "
+            f"another: make it again with\n  {COMMAND}\nand look at what changed",
         )
 
     def test_fragment_names_that_idf(self):
