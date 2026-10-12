@@ -181,6 +181,22 @@ class TheFile(unittest.TestCase):
                     f"the release rules publish {name} and no profile describes it",
                 )
 
+    def test_the_panel_s_stack_keys_are_free_and_not_unplaced_in_a_profile_without_a_screen(
+        self,
+    ) -> None:
+        """Main's P4X work (#1400) put ICLFORGE_EXAMPLE_PANEL_STACK_BYTES in every target's
+        Kconfig and LVGL's LV_SPAN_SNIPPET_STACK_SIZE in every P4 build. Both match `*STACK*`,
+        and a build of any profile had two findings for keys that place nothing there."""
+        data = sp.load()
+        for key in (
+            "CONFIG_ICLFORGE_EXAMPLE_PANEL_STACK_BYTES",
+            "CONFIG_LV_SPAN_SNIPPET_STACK_SIZE",
+        ):
+            self.assertTrue(sp.is_watched(data, key), key)
+            self.assertTrue(sp.is_free(data, key), key)
+        # a real stack key that is not one of these is still not free
+        self.assertFalse(sp.is_free(data, "CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"))
+
     def test_the_workflow_builds_each_profile_from_the_file_and_verifies_it(self) -> None:
         """_build.yml takes each board's fragments from `sink_profile.py defaults` and holds
         the build to the profile with `verify`; no board build spells its own list."""
