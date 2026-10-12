@@ -476,12 +476,15 @@ add_subdirectory(libs/device)
 # Timed lyrics (an LRC file read, and the cursor over it): standard library only, for Hearth,
 # Crucible and the sink firmware alike (libs/lyrics/CMakeLists.txt). The minimum-footprint profile
 # carries none, and the ESP-IDF component's archive does not stage the directory, so it is not
-# reached there (tools/packaging/pack_esp_component.py).
+# reached there (tools/packaging/pack_esp_component.py) - except for a sink's player
+# (ICLFORGE_SENDSPIN_PLAYER_ONLY, which firmware/esp-idf/iclforge/CMakeLists.txt sets with
+# CONFIG_ICLFORGE_SENDSPIN): it follows an item's words and links the library, in a checkout, which
+# has libs/sendspin as the archive has not.
 #
 # EXCLUDE_FROM_ALL: it is built when a program links it (Hearth, the tests) and not otherwise. It
 # reads files through std::filesystem, which the Python wheel's Intel macOS target (10.9) does not
 # have, and the wheel links nothing of it (bindings/python/pyproject.toml).
-if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
+if((NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER) OR ICLFORGE_SENDSPIN_PLAYER_ONLY)
     add_subdirectory(libs/lyrics EXCLUDE_FROM_ALL)
 endif()
 add_subdirectory(libs/ac3)

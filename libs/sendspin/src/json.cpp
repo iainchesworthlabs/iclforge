@@ -456,10 +456,14 @@ std::string_view describe(Error error) {
     return "unknown error";
 }
 
-ParseResult Document::parse(std::string_view text, std::span<Token> tokens, const Limits& limits) {
-    text_ = {};
-    tokens_ = nullptr;
-    count_ = 0;
+namespace {
+
+// The one parse loop, behind Document::parse and count_tokens. With `out` it writes each
+// token to out[0..count); without, it only counts, and leaves the duplicate-key check,
+// which reads the tokens back, to the call that stores them. Either way a token past
+// `capacity` is kTooManyTokens. `count_out` is set when the text parses.
+[[nodiscard]] ParseResult read_tokens(std::string_view text, Token* out, std::size_t capacity,
+                                      const Limits& limits, std::uint32_t& count_out) {
     if (text.size() >= std::numeric_limits<std::uint32_t>::max()) {
         return {Error::kTooLarge, 0};
     }
@@ -477,21 +481,26 @@ ParseResult Document::parse(std::string_view text, std::span<Token> tokens, cons
 
     std::array<std::uint32_t, kMaxDepth> open{};
     std::array<std::size_t, kMaxDepth> members{};
+    // Bit d set: the container open at depth d is an object. Kept here, not read back
+    // from the token, so that counting needs no tokens.
+    std::uint64_t object_bits = 0;
     std::size_t depth = 0;
     std::uint32_t count = 0;
     std::size_t pos = 0;
     Expect expect = Expect::kValue;
 
     const auto push = [&](Type type, std::size_t offset, std::size_t end, std::uint8_t flags) {
-        if (count >= tokens.size()) {
+        if (count >= capacity) {
             return false;
         }
-        tokens[count] = Token{.offset = static_cast<std::uint32_t>(offset),
-                              .length = static_cast<std::uint32_t>(end - offset),
-                              .next = count + 1,
-                              .type = type,
-                              .flags = flags,
-                              .reserved = 0};
+        if (out != nullptr) {
+            out[count] = Token{.offset = static_cast<std::uint32_t>(offset),
+                               .length = static_cast<std::uint32_t>(end - offset),
+                               .next = count + 1,
+                               .type = type,
+                               .flags = flags,
+                               .reserved = 0};
+        }
         ++count;
         return true;
     };
@@ -520,7 +529,8 @@ ParseResult Document::parse(std::string_view text, std::span<Token> tokens, cons
                 expect = Expect::kValue;
                 continue;
             case Expect::kCommaOrClose: {
-                const Type container = tokens[open[depth - 1]].type;
+                const Type container =
+                    ((object_bits >> (depth - 1U)) & 1U) != 0 ? Type::kObject : Type::kArray;
                 if (c == ',') {
                     ++pos;
                     expect = container == Type::kObject ? Expect::kKey : Expect::kValue;
@@ -574,6 +584,9 @@ ParseResult Document::parse(std::string_view text, std::span<Token> tokens, cons
                     }
                     open[depth] = count - 1;
                     members[depth] = 0;
+                    const std::uint64_t bit = std::uint64_t{1} << depth;
+                    object_bits =
+                        type == Type::kObject ? (object_bits | bit) : (object_bits & ~bit);
                     ++depth;
                     ++pos;
                     expect = type == Type::kObject ? Expect::kKeyOrClose : Expect::kValueOrClose;
@@ -607,29 +620,71 @@ ParseResult Document::parse(std::string_view text, std::span<Token> tokens, cons
         if (!closing) {
             return {Error::kSyntax, pos};
         }
-        const std::uint32_t index = open[depth - 1];
-        Token& container = tokens[index];
-        container.length = static_cast<std::uint32_t>(pos + 1 - container.offset);
-        container.next = count;
-        if (container.type == Type::kObject &&
-            has_duplicate_keys(text, std::span<const Token>(tokens.data(), count), index)) {
-            return {Error::kDuplicateKey, pos};
+        if (out != nullptr) {
+            const std::uint32_t index = open[depth - 1];
+            Token& container = out[index];
+            container.length = static_cast<std::uint32_t>(pos + 1 - container.offset);
+            container.next = count;
+            if (container.type == Type::kObject &&
+                has_duplicate_keys(text, std::span<const Token>(out, count), index)) {
+                return {Error::kDuplicateKey, pos};
+            }
         }
         --depth;
         ++pos;
         after_value();
     }
 
-    text_ = text;
-    tokens_ = tokens.data();
-    count_ = count;
+    count_out = count;
     return {Error::kNone, text.size()};
+}
+
+}  // namespace
+
+TokenCount count_tokens(std::string_view text, std::size_t max_tokens, const Limits& limits) {
+    std::uint32_t count = 0;
+    const ParseResult result = read_tokens(text, nullptr, max_tokens, limits, count);
+    return {result, result ? std::size_t{count} : std::size_t{0}};
+}
+
+ParseResult Document::parse(std::string_view text, std::span<Token> tokens, const Limits& limits) {
+    text_ = {};
+    tokens_ = nullptr;
+    count_ = 0;
+    std::uint32_t count = 0;
+    const ParseResult result = read_tokens(text, tokens.data(), tokens.size(), limits, count);
+    if (result) {
+        text_ = text;
+        tokens_ = tokens.data();
+        count_ = count;
+    }
+    return result;
 }
 
 ParseResult Document::parse(std::string_view text, std::vector<Token>& storage,
                             std::size_t max_tokens, const Limits& limits) {
     storage.resize(std::min(max_tokens, (text.size() / 2) + 1));
     return parse(text, std::span<Token>(storage), limits);
+}
+
+ParseResult Document::parse(std::string_view text, TokenStorage& storage, std::size_t max_tokens,
+                            const Limits& limits) {
+    storage.heap_.clear();
+    const std::size_t inline_tokens = std::min(TokenStorage::kInlineTokens, max_tokens);
+    const ParseResult placed =
+        parse(text, std::span<Token>(storage.inline_.data(), inline_tokens), limits);
+    if (placed.error != Error::kTooManyTokens || inline_tokens == max_tokens) {
+        return placed;
+    }
+    // More values than the object holds. Count them first: that also turns away, with
+    // no allocation, a text that is malformed or too deep further on, and a text with
+    // more than max_tokens values. Then read once into a block of exactly that size.
+    const TokenCount needed = count_tokens(text, max_tokens, limits);
+    if (!needed.result) {
+        return needed.result;
+    }
+    storage.heap_.resize(needed.tokens);
+    return parse(text, std::span<Token>(storage.heap_), limits);
 }
 
 const Token* Value::token() const { return doc_ == nullptr ? nullptr : &doc_->tokens_[index_]; }
