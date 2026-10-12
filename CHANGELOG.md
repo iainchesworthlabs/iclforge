@@ -72,6 +72,16 @@ The sections below contain the complete change list and fixes.
   stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
   needs a case of its own (`planning/karaoke-eac3.md`, D10).
 
+**Hearth for Android: the controls sheet and a focus walk**
+
+- **The lyric screen's controls** (phase 3b of `planning/hearth-android.md`; S9 of
+  `planning/hearth-sink-screen.md`): the D-pad's centre or a tap opens a sheet with the lyric delay's "-"
+  and "+" and the text size S, M and L, a focus ring moves through them by the four directions, the centre
+  presses, Back closes it and it hides itself after eight seconds without a key. The text size is the
+  person's (SS8) and is kept. `LyricControlsTest` walks it with key events (every control reached and
+  pressed, the eight seconds, a file with no times having no delay row, a tap), which is AR7's "a focus
+  walk", and draws it with the ring on the focused control (`android-lyric-sheet.png`).
+
 **Hearth for Android: the sink screen's tokens in one file**
 
 - **`docs/hearth/design/sink-screen-tokens.json`** (phase 3a of `planning/hearth-android.md`, D13): the

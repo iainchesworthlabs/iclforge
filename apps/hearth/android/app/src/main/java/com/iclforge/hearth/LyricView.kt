@@ -11,6 +11,7 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import kotlin.math.max
 import kotlin.math.min
@@ -93,15 +94,104 @@ class LyricView(context: Context) : View(context) {
 
     // --- keys --------------------------------------------------------------------------------
 
+    /** The controls sheet (S9): the delay and the text size, which the D-pad's centre opens. */
+    val sheet = ControlsSheet()
+
+    /** The time the sheet's hiding is judged by; a test sets its own. */
+    var clock: () -> Long = { SystemClock.uptimeMillis() }
+
+    /** Called when the singer changes the text size from the sheet, with the step (0, 1 or 2). */
+    var onTextStepChanged: ((Int) -> Unit)? = null
+
+    /** Whether the delay row is on the sheet: a file with no times has no delay to set. */
+    private val hasDelayRow: Boolean get() = frame.mode != LyricFrame.Mode.PLAIN
+
+    /** Whether the controls sheet is up now. */
+    val sheetVisible: Boolean get() = sheet.visible(clock())
+
+    private val controlRects = HashMap<ControlsSheet.Control, RectF>()
+
+    /** Where [control] was drawn last, in the view's pixels: for a tap's hit test and the tests'. */
+    fun controlBounds(control: ControlsSheet.Control): RectF? = controlRects[control]?.let { RectF(it) }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val now = clock()
+        if (sheet.visible(now)) {
+            when (val outcome = sheet.onKey(keyCode, now, hasDelayRow, textStep)) {
+                is ControlsSheet.Outcome.Pressed -> press(outcome.control)
+                ControlsSheet.Outcome.Ignored -> return super.onKeyDown(keyCode, event)
+                else -> Unit
+            }
+            invalidate()
+            return true
+        }
         val step = Tokens.DELAY_STEP_MS
         return when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                sheet.open(now, hasDelayRow, textStep)
+                invalidate()
+                true
+            }
             KeyEvent.KEYCODE_DPAD_LEFT -> nudge(-step)
             KeyEvent.KEYCODE_DPAD_RIGHT -> nudge(step)
             KeyEvent.KEYCODE_DPAD_UP -> scroll(-1)
             KeyEvent.KEYCODE_DPAD_DOWN -> scroll(1)
             else -> super.onKeyDown(keyCode, event)
         }
+    }
+
+    /** The Back key: hides the sheet if it is up. False when it was not, for the activity's own. */
+    fun handleBack(): Boolean {
+        if (!sheet.visible(clock())) {
+            return false
+        }
+        sheet.hide()
+        invalidate()
+        return true
+    }
+
+    private fun press(control: ControlsSheet.Control) {
+        when (control) {
+            ControlsSheet.Control.DELAY_MINUS -> nudge(-Tokens.DELAY_STEP_MS)
+            ControlsSheet.Control.DELAY_PLUS -> nudge(Tokens.DELAY_STEP_MS)
+            ControlsSheet.Control.SIZE_SMALL -> setStep(0)
+            ControlsSheet.Control.SIZE_MEDIUM -> setStep(1)
+            ControlsSheet.Control.SIZE_LARGE -> setStep(2)
+        }
+    }
+
+    private fun setStep(step: Int) {
+        if (textStep != step) {
+            textStep = step
+            onTextStepChanged?.invoke(step)
+        }
+    }
+
+    /** A tap opens the sheet, a tap on one of its controls presses it, a tap elsewhere closes it. */
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked != MotionEvent.ACTION_UP) {
+            return event.actionMasked == MotionEvent.ACTION_DOWN
+        }
+        val now = clock()
+        if (!sheet.visible(now)) {
+            sheet.open(now, hasDelayRow, textStep)
+        } else {
+            val hit = controlRects.entries.firstOrNull { it.value.contains(event.x, event.y) }?.key
+            if (hit != null) {
+                sheet.focus(hit, now)
+                press(hit)
+            } else {
+                sheet.hide()
+            }
+        }
+        invalidate()
+        performClick()
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 
     private fun nudge(by: Int): Boolean {
@@ -222,9 +312,106 @@ class LyricView(context: Context) : View(context) {
         if (!speaking) {
             return
         }
+        val sheetUp = sheet.visible(clock())
+        // With the sheet up the stage is what is left above it, so the line being sung is not under it.
+        val stageBottom = if (sheetUp) footerTop - sheetHeight(u) else footerTop
         drawHeader(canvas, u, left, right, headerTop, headerBottom)
-        drawStage(canvas, u, left, (right - left).toInt(), headerBottom, footerTop)
+        drawStage(canvas, u, left, (right - left).toInt(), headerBottom, stageBottom)
         drawFooter(canvas, u, left, right, footerTop, footerBottom)
+        if (sheetUp) {
+            drawSheet(canvas, u, left, right, footerTop)
+        } else {
+            controlRects.clear()
+        }
+    }
+
+    /** The sheet's height: a row of targets for the delay (when there is one) and one for the size. */
+    private fun sheetHeight(u: Float): Float {
+        val rows = if (hasDelayRow) 2 else 1
+        return rows * Tokens.MIN_TARGET_U * u + (rows + 1) * Tokens.ROW_GAP_U * u
+    }
+
+    /**
+     * The controls sheet (S9), on the bottom of the stage above the footer: the delay's "-" and "+"
+     * with its value between them, and the three text sizes with the current one filled, each a target
+     * of at least [Tokens.MIN_TARGET_U], and the focus ring (the accent, 2 u wide, 2 u out) on the one
+     * the D-pad is on.
+     */
+    private fun drawSheet(canvas: Canvas, u: Float, left: Float, right: Float, bottom: Float) {
+        val target = Tokens.MIN_TARGET_U * u
+        val gap = Tokens.ROW_GAP_U * u
+        val top = bottom - sheetHeight(u)
+        val paint = Paint()
+        paint.color = Tokens.SURFACE
+        canvas.drawRect(left - Tokens.MARGIN_U * u / 2, top, right + Tokens.MARGIN_U * u / 2, bottom, paint)
+        paint.color = Tokens.RULE
+        canvas.drawRect(left - Tokens.MARGIN_U * u / 2, top, right + Tokens.MARGIN_U * u / 2, top + max(1f, Tokens.HAIRLINE_U * u), paint)
+
+        controlRects.clear()
+        var y = top + gap
+        val labelWidth = 260f * u
+        val x0 = left + labelWidth
+
+        fun label(text: String, rowTop: Float) {
+            val layout = layoutOf(text.uppercase(), Tokens.SMALL_U, u, labelWidth.toInt(), 400, 1, tracked = true)
+            layout.paint.color = Tokens.MUTED
+            canvas.save()
+            canvas.translate(left, rowTop + (target - layout.height) / 2f)
+            layout.draw(canvas)
+            canvas.restore()
+        }
+
+        fun button(control: ControlsSheet.Control, rect: RectF, text: String, selected: Boolean) {
+            controlRects[control] = rect
+            paint.color = if (selected) Tokens.ACCENT else Tokens.RULE
+            canvas.drawRect(rect, paint)
+            val layout = layoutOf(text, 28f, u, rect.width().toInt(), 600, 1, centred = true)
+            layout.paint.color = if (selected) Tokens.BG else Tokens.TEXT
+            canvas.save()
+            canvas.translate(rect.left, rect.top + (rect.height() - layout.height) / 2f)
+            layout.draw(canvas)
+            canvas.restore()
+        }
+
+        if (hasDelayRow) {
+            label(context.getString(R.string.sheet_delay), y)
+            val minus = RectF(x0, y, x0 + target, y + target)
+            val plus = RectF(x0 + target + 200f * u, y, x0 + 2 * target + 200f * u, y + target)
+            button(ControlsSheet.Control.DELAY_MINUS, minus, context.getString(R.string.sheet_minus), false)
+            button(ControlsSheet.Control.DELAY_PLUS, plus, context.getString(R.string.sheet_plus), false)
+            val value = if (delayMs > 0) "+$delayMs" else "$delayMs"
+            val text = layoutOf(context.getString(R.string.ms_value, value), 28f, u, (200f * u).toInt(), 600, 1,
+                centred = true)
+            text.paint.color = if (delayMs == 0) Tokens.MUTED else Tokens.TEXT
+            canvas.save()
+            canvas.translate(minus.right, y + (target - text.height) / 2f)
+            text.draw(canvas)
+            canvas.restore()
+            y += target + gap
+        }
+        label(context.getString(R.string.sheet_size), y)
+        val sizes = listOf(
+            ControlsSheet.Control.SIZE_SMALL to R.string.size_small,
+            ControlsSheet.Control.SIZE_MEDIUM to R.string.size_medium,
+            ControlsSheet.Control.SIZE_LARGE to R.string.size_large,
+        )
+        for ((index, entry) in sizes.withIndex()) {
+            val x = x0 + index * (target + gap)
+            button(entry.first, RectF(x, y, x + target, y + target), context.getString(entry.second), index == textStep)
+        }
+
+        // The focus ring: the accent, 2 u wide, 2 u outside the control.
+        controlRects[sheet.focused]?.let { rect ->
+            val ring = Tokens.HAIRLINE_U * u
+            val offset = 2 * u
+            paint.color = Tokens.ACCENT
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = ring
+            val outer = RectF(rect)
+            outer.inset(-(offset + ring / 2), -(offset + ring / 2))
+            canvas.drawRect(outer, paint)
+            paint.style = Paint.Style.FILL
+        }
     }
 
     private fun noLyricsGraceOver(): Boolean {

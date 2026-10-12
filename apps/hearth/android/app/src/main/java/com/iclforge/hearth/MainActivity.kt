@@ -112,6 +112,7 @@ class MainActivity : Activity() {
         lyrics.delayMs = prefs.getInt(KEY_DELAY_MS, 0)
         lyrics.textStep = prefs.getInt(KEY_TEXT_STEP, 1)
         lyrics.onDelayChanged = { prefs.edit().putInt(KEY_DELAY_MS, it).apply() }
+        lyrics.onTextStepChanged = { prefs.edit().putInt(KEY_TEXT_STEP, it).apply() }
         // A TV box that lets its display sleep loses its HDMI audio route with it, and a bitstream with
         // it (planning/hearth-android-findings.md, F12). While this screen is the one shown, the
         // display stays on; what keeps it on once the person leaves is the next phase's (spike S3).

@@ -79,9 +79,16 @@ Greek, Cyrillic and CJK).
 ![An instrumental gap: four dots that go out one a second, the line before above and the next line under](../../../docs/hearth/screenshots/android-lyric-count-in.png)
 ![A Hebrew line: right-aligned, its words flowing right to left](../../../docs/hearth/screenshots/android-lyric-hebrew.png)
 
-The D-pad's left and right nudge the lyric delay by 50 ms (kept, and drawn in the footer when it is not
-0); up and down scroll a file with no times. The settings screen of the plan's phase 3 gives these a
-home; the keys are what the view takes until then.
+**Controls** ([S9](../../../planning/hearth-sink-screen.md#the-screens)): the D-pad's centre (or a tap)
+opens a sheet over the foot of the stage: the lyric delay's "-" and "+", and the text size, S, M and L. The
+four directions move a focus ring (the accent, 2 u wide and 2 u out) through them, the centre presses the
+one it is on, Back closes it, and it hides itself after eight seconds without a key; a file with no times
+has no delay row. The delay (kept, -1,000 to +1,000 ms in 50 ms steps, drawn in the footer when it is not
+0) and the text size (kept) are what a sink owns of its screen; the vocals and the reproduction are the
+server's, and a request path for them is the plan's D8. With the sheet down, left and right still nudge
+the delay by 50 ms and up and down scroll a file with no times.
+
+![The controls sheet: the delay's minus and plus, the three text sizes with the large one filled and the focus ring on it, the line being sung above](../../../docs/hearth/screenshots/android-lyric-sheet.png)
 
 **How it is checked.** `LyricViewRenderTest` (`src/androidTest`) takes the karaoke examples' documents
 (`examples/karaoke`, staged by Gradle) through the library's own frame (`Harness.lyricFrameJson`: the

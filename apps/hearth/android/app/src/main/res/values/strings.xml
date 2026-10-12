@@ -20,6 +20,15 @@
     <string name="line_of">Line %1$d of %2$d</string>
     <string name="not_timed">Not timed</string>
     <string name="delay_ms">Delay %1$s ms</string>
+    <!-- The controls sheet (S9). -->
+    <string name="sheet_delay">Lyric delay</string>
+    <string name="sheet_size">Text size</string>
+    <string name="ms_value">%1$s ms</string>
+    <string name="sheet_minus">−</string>
+    <string name="sheet_plus">+</string>
+    <string name="size_small">S</string>
+    <string name="size_medium">M</string>
+    <string name="size_large">L</string>
     <!-- SS5: a line the screen's faces cannot draw is said, not drawn as boxes. -->
     <string name="script_undrawable">This line is in a script this screen cannot show.</string>
 </resources>
