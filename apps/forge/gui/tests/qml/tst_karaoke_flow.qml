@@ -578,6 +578,122 @@ TestCase {
         }
     }
 
+    // ---- The format (planning/karaoke-eac3.md, E6, D7) -----------------------------------
+    // AC-3 is what Annex C defines and the default; E-AC-3 carries the same service type, and a
+    // note says what is this project's to reproduce and what a player may not.
+    function test_theFormatIsAc3ByDefaultAndEac3IsAChoiceThatSaysWhatIsOurs() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        ctx.flow.currentStepKey = "save";
+        const format = findByName(ctx.win, "karaokeFormat");
+        compare(format.currentIndex, 0);
+        compare(EncoderController.codecIndex, 0);
+        compare(findByName(ctx.win, "karaokeFormatNote").visible, false);
+        verify(findByName(ctx.win, "karaokeCommandLine").text.indexOf("forge encode") === 0);
+
+        ctx.flow.setFormat("eac3");
+        tryCompare(EncoderController, "codecIndex", 1, 5000);
+        // The parts are loaded again under the codec, and the plan with them.
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        compare(format.currentIndex, 1);
+        compare(findByName(ctx.win, "karaokeFormatNote").visible, true);
+        const line = findByName(ctx.win, "karaokeCommandLine").text;
+        verify(line.indexOf("forge eac3-encode") === 0, line);
+        verify(line.indexOf("bsmod=") >= 0, line);
+        verify(line.indexOf(".ec3") >= 0, line);
+
+        ctx.flow.setFormat("ac3");
+        tryCompare(EncoderController, "codecIndex", 0, 5000);
+        compare(findByName(ctx.win, "karaokeFormatNote").visible, false);
+    }
+
+    function test_saveAsEac3WritesAKaraokeStreamThePlayerReproducesAndTheCommandLineWritesTheSame() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        ctx.flow.setFormat("eac3");
+        tryCompare(EncoderController, "codecIndex", 1, 5000);
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        ctx.flow.currentStepKey = "save";
+        const line = findByName(ctx.win, "karaokeCommandLine").text;
+        verify(line.indexOf("forge eac3-encode") === 0, line);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_flow_eac3.ec3");
+        press(ctx, "karaokeNextButton");
+        const dialog = findByName(ctx.win, "saveDialog");
+        tryCompare(dialog, "visible", true, 5000);
+        dialog.selectedFile = out;
+        dialog.accepted();
+        dialog.close();
+        tryCompare(EncoderController, "busy", false, 60000);
+
+        // A karaoke stream the player names, as coded and reproduced: bsmod 7 at 3/1 is L, C, R
+        // and V1, which the aware reproduction folds to L, C and R.
+        StreamPlayerController.karaokeReproduction = "asCoded";
+        StreamPlayerController.openFile(out);
+        tryCompare(StreamPlayerController, "hasResult", true, 30000);
+        compare(StreamPlayerController.isKaraoke, true);
+        verify(StreamPlayerController.codedLayoutLabel.indexOf("3/1") >= 0,
+               StreamPlayerController.codedLayoutLabel);
+        tryVerify(() => StreamPlayerController.channelMeta.length === 4, 30000);
+
+        StreamPlayerController.karaokeReproduction = "aware";
+        tryCompare(StreamPlayerController, "karaokeReproduced", true, 30000);
+        tryVerify(() => StreamPlayerController.channelMeta.length === 3, 30000);
+
+        if (cliRunner.available()) {
+            const folder = Qt.resolvedUrl("_test_output/tst_karaoke_flow_eac3_cli");
+            verify(cliRunner.prepare(folder, backing));
+            verify(cliRunner.copyInto(folder, melody));
+            verify(cliRunner.copyInto(folder, lead));
+            compare(cliRunner.run(line, folder), 0, line);
+            verify(cliRunner.sameBytes(out, Qt.resolvedUrl("_test_output/tst_karaoke_flow_eac3_cli/out.ec3")),
+                   "the command line wrote different bytes than the window did");
+        }
+    }
+
+    function test_theHearStepPlaysTheEac3StreamUnderTheSameChoicesAndLevels() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        ctx.flow.setFormat("eac3");
+        tryCompare(EncoderController, "codecIndex", 1, 5000);
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        press(ctx, "karaokeNextButton");   // Levels
+        press(ctx, "karaokeNextButton");   // Hear: the stream is built
+        tryCompare(ctx.flow, "currentStepKey", "hear", 5000);
+        tryCompare(ctx.flow, "previewState", "ready", 60000);
+        compare(StreamPlayerController.isKaraoke, true);
+        verify(StreamPlayerController.codedLayoutLabel.indexOf("3/2") >= 0,
+               StreamPlayerController.codedLayoutLabel);
+
+        // Aware: L, C and R, the vocals mixed, from an E-AC-3 stream as from an AC-3 one.
+        tryCompare(StreamPlayerController, "karaokeReproduction", "aware", 5000);
+        tryVerify(() => StreamPlayerController.channelMeta.length === 3, 30000);
+        compare(StreamPlayerController.karaokeReproduced, true);
+        compare(findByName(ctx.win, "karaokePlays-L").text, "L + V1");
+        compare(findByName(ctx.win, "karaokePlays-C").text, "M");
+        compare(findByName(ctx.win, "karaokePlays-R").text, "R + V2");
+
+        // As coded: the five a plain surround player decodes, the vocals in the rear.
+        mouseClick(findByName(findByName(ctx.win, "karaokeListening"), "seg-asCoded"));
+        tryCompare(StreamPlayerController, "karaokeReproduction", "asCoded", 5000);
+        tryVerify(() => StreamPlayerController.channelMeta.length === 5, 30000);
+        compare(StreamPlayerController.karaokeReproduced, false);
+        compare(findByName(ctx.win, "karaokePlays-Ls").text, "V1");
+        compare(findByName(ctx.win, "karaokePlays-Rs").text, "V2");
+
+        // Capable takes the singer's vocals, as it does for AC-3.
+        mouseClick(findByName(findByName(ctx.win, "karaokeListening"), "seg-capable"));
+        tryCompare(StreamPlayerController, "karaokeReproduction", "capable", 5000);
+        mouseClick(findByName(findByName(ctx.win, "karaokeVocals"), "seg-v1"));
+        tryCompare(StreamPlayerController, "karaokeVocals", "v1", 5000);
+        tryVerify(() => StreamPlayerController.channelMeta.length === 3, 30000);
+        compare(findByName(ctx.win, "karaokePlays-C").text, "M + V1");
+        compare(findByName(ctx.win, "karaokePlays-L").text, "L");
+    }
+
     // ---- Naming, the rate, edits, the preview and the lyrics ---------------------------
     function test_aKaraokeDraftIsNamedForWhatItIs() {
         const ctx = openFlow();
@@ -590,6 +706,12 @@ TestCase {
         // The same five channels with another service are a 5.0 again.
         EncoderController.bsmodIndex = 0;
         compare(EncoderController.planLabel, "5.0");
+        // And in E-AC-3, which carries the same service type, they are named the same way.
+        EncoderController.bsmodIndex = 7;
+        ctx.flow.setFormat("eac3");
+        tryCompare(EncoderController, "codecIndex", 1, 5000);
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        compare(EncoderController.planLabel, "Karaoke 3/2");
     }
 
     function test_theRateStartsAtTheModesAndTheAuthorsChoiceIsKept() {
