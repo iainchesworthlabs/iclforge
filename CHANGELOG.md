@@ -43,6 +43,7 @@ The sections below contain the complete change list and fixes.
   table lists it, and the karaoke support matrix, the programme plan, the findings' correction
   list, the phase 1 plan and the ROADMAP row say which cells are built, in review, or open
   (`planning/karaoke-eac3.md`, E8).
+
 **Karaoke: a plan for a microphone, scoring and recording**
 
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
