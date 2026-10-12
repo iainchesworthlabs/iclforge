@@ -14,6 +14,8 @@ add_library(hearth_engine STATIC
     src/engine_thread.cpp
     src/media_info.cpp
     src/media_inspector.cpp
+    src/microphone_input.cpp
+    src/microphone_session.cpp
     src/network_view.cpp
     src/output_decision.cpp
     src/output_selector.cpp
@@ -27,6 +29,7 @@ add_library(hearth_engine STATIC
     src/settings_model.cpp
     src/sink_form.cpp
     src/stream_decoder.cpp
+    src/take_recorder.cpp
     src/transport.cpp
     src/unit_reports.cpp)
 target_include_directories(hearth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")

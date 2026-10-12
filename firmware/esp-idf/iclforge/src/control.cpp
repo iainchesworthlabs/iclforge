@@ -300,6 +300,8 @@ std::string build_hardware_json(const ControlHandlers& handlers) {
     append_string(out, "project", app_field(app->project_name));
     append_string(out, "version", app_field(app->version));
     append_string(out, "idf_version", app_field(app->idf_ver));
+    append_string(out, "profile", handlers.profile);
+    append_string(out, "profile_hash", handlers.profile_hash);
     append_strings(out, "capabilities", report.capabilities);
     append_strings(out, "notices", report.notices);
     out += "}\n";
