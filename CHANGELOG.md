@@ -70,6 +70,22 @@ The sections below contain the complete change list and fixes.
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
 
+**A Sendspin sink library, which Hearth's test sink is the first program of**
+
+- **`iclforge::sink` (`libs/sink`): a sink a program runs, with the program's own audio output.**
+  What `hearth-testsink` did that is not writing a WAV file or decoding a burst (it listens and
+  advertises, pairs, admits servers as the specification ranks them, keeps its identity and pairing
+  records, answers the roles a server lists and counts what it was given) is a library, so that the
+  Android app (`planning/hearth-android.md`, D3) does not have to be a third copy beside the test sink
+  and the firmware. A program supplies `iclforge::sink::Outputs`: a `StreamOutput` for `player@v1` and
+  a `BurstStreamOutput` for `_iclforge_player@v1` per connection, which the sink starts, feeds, clears
+  and ends and asks for its counts and its decoder report. The test sink's `WavOutput` and
+  `BurstOutput` are those outputs, and its `Sink` and `SinkOptions` are the same names with the same
+  members, so its suites, and the ones that run it in process, are unchanged. A new project row
+  (`sink`, internal, never installed) and a test binary with outputs that only write down what they
+  were given.
+  This is a move: no message, log line or file the test sink writes is different.
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
