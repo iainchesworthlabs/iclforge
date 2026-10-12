@@ -63,6 +63,13 @@ qt_add_executable(forge_gui_qmltests
     ../../shared/media/src/ac4_objects_core.cpp
     ../../shared/media/src/ac4_objects_core.hpp
     ../../shared/media/src/ac4_channels.hpp
+    # CdgPicture is a QML_ELEMENT, registered only by a target that compiles it, and the stream
+    # player is its CdgFrameSource (apps/shared/cdg-picture).
+    ../../shared/cdg-picture/src/cdg_frame_source.hpp
+    ../../shared/cdg-picture/src/cdg_frames.cpp
+    ../../shared/cdg-picture/src/cdg_frames.hpp
+    ../../shared/cdg-picture/src/cdg_picture.cpp
+    ../../shared/cdg-picture/src/cdg_picture.hpp
     ../../shared/theme/src/system_theme.cpp
     ../../shared/theme/src/system_theme.hpp
     ../../shared/preferences/src/language_manager.cpp
@@ -76,6 +83,7 @@ qt_add_executable(forge_gui_qmltests
 # iclforge::apps::elementary_stream_from_bytes too, so it needs the same
 # definition forge-gui's own target links.
 target_include_directories(forge_gui_qmltests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/cdg-picture/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/media/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/preferences/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/project/src"
@@ -179,9 +187,13 @@ target_link_libraries(forge_gui_qmltests
         iclforge::audio
         iclforge::containers
         iclforge::ac4
+        # karaoke_authoring.cpp, recompiled here, writes a lyrics file beside a stream
+        # through it, as forge-gui does (../CMakeLists.txt).
+        iclforge::lyrics
         iclforge::warnings
         iclforge::fmt
         iclforge::json
+        iclforge::lyrics
         # This target recompiles encoder_controller.cpp/stream_player_controller.cpp
         # from scratch (this file's own header comment), so it needs the same
         # profiling header pair ../CMakeLists.txt's forge-gui target links -

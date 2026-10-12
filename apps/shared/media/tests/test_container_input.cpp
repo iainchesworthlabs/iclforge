@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <span>
 #include <string>
@@ -238,6 +239,94 @@ TEST_CASE("elementary_stream_from_bytes reports what each container says about i
         CHECK(facts.packet_size == 188);
     }
     CHECK(iclforge::apps::container_token(ContainerKind::kUnknown).empty());
+}
+
+namespace {
+
+// One EBML element with an eight-byte size, as much Matroska as the reader's Tracks and one
+// cluster need. Built here, not with the project's writer, which has one audio track.
+Bytes ebml_element(std::uint32_t id, const Bytes& body) {
+    Bytes out;
+    const int width = id <= 0xFF ? 1 : id <= 0xFFFF ? 2 : id <= 0xFFFFFF ? 3 : 4;
+    for (int i = width - 1; i >= 0; --i) {
+        out.push_back(static_cast<std::byte>((id >> (8 * i)) & 0xFFU));
+    }
+    out.push_back(std::byte{0x01});
+    for (int i = 6; i >= 0; --i) {
+        out.push_back(static_cast<std::byte>((static_cast<std::uint64_t>(body.size()) >> (8 * i)) & 0xFFU));
+    }
+    out.insert(out.end(), body.begin(), body.end());
+    return out;
+}
+
+Bytes ebml_uint(std::uint32_t id, std::uint64_t value) {
+    return ebml_element(id, Bytes{static_cast<std::byte>(value)});
+}
+
+Bytes ebml_text(std::uint32_t id, std::string_view text) {
+    Bytes body;
+    for (const char c : text) {
+        body.push_back(static_cast<std::byte>(c));
+    }
+    return ebml_element(id, body);
+}
+
+Bytes concat(std::initializer_list<Bytes> parts) {
+    Bytes out;
+    for (const Bytes& part : parts) {
+        out.insert(out.end(), part.begin(), part.end());
+    }
+    return out;
+}
+
+// A track entry: its number, type (1 video, 2 audio, 17 subtitle), codec and language, and for
+// audio the Audio master the reader needs.
+Bytes ebml_track(std::uint64_t number, std::uint64_t type, std::string_view codec,
+                 std::string_view language) {
+    Bytes entry = concat({ebml_uint(0xD7, number), ebml_uint(0x83, type), ebml_text(0x86, codec),
+                          ebml_text(0x22B59C, language)});
+    if (type == 2) {
+        // SamplingFrequency as a 32-bit float, 48000, and six channels.
+        const Bytes rate{std::byte{0x47}, std::byte{0x3B}, std::byte{0x80}, std::byte{0x00}};
+        const Bytes audio = concat({ebml_element(0xB5, rate), ebml_uint(0x9F, 6)});
+        const Bytes master = ebml_element(0xE1, audio);
+        entry.insert(entry.end(), master.begin(), master.end());
+    }
+    return ebml_element(0xAE, entry);
+}
+
+}  // namespace
+
+TEST_CASE("elementary_stream_from_bytes lists the other tracks of a Matroska file",
+          "[containers][io2]") {
+    using iclforge::apps::ContainerKind;
+    // A karaoke video's shape: a picture, the AC-3 audio, and a text subtitle track.
+    const Bytes tracks = concat({ebml_track(1, 1, "V_MPEG4/ISO/AVC", "eng"),
+                                 ebml_track(2, 2, "A_AC3", "eng"),
+                                 ebml_track(3, 17, "S_TEXT/UTF8", "fra")});
+    // One SimpleBlock for track 2: a track vint, a relative timestamp, flags, then its frame.
+    const Bytes block = concat({Bytes{std::byte{0x82}, std::byte{0x00}, std::byte{0x00}, std::byte{0x80}},
+                                Bytes(16, std::byte{0x5A})});
+    const Bytes cluster = concat({ebml_uint(0xE7, 0), ebml_element(0xA3, block)});
+    const Bytes segment = concat({ebml_element(0x1654AE6B, tracks), ebml_element(0x1F43B675, cluster)});
+    const Bytes file = concat({ebml_element(0x1A45DFA3, ebml_text(0x4282, "matroska")),
+                               ebml_element(0x18538067, segment)});
+
+    const auto result = iclforge::apps::elementary_stream_from_bytes(file);
+    REQUIRE(result.error.empty());
+    const auto& facts = result.container;
+    CHECK(facts.kind == ContainerKind::kMatroska);
+    CHECK(facts.codec_id == "A_AC3");
+    CHECK(facts.track == 2);
+    REQUIRE(facts.other_tracks.size() == 2);
+    CHECK(facts.other_tracks[0].id == 1);
+    CHECK(facts.other_tracks[0].kind == "video");
+    CHECK(facts.other_tracks[0].codec_id == "V_MPEG4/ISO/AVC");
+    CHECK(facts.other_tracks[0].language == "eng");
+    CHECK(facts.other_tracks[1].id == 3);
+    CHECK(facts.other_tracks[1].kind == "text");
+    CHECK(facts.other_tracks[1].codec_id == "S_TEXT/UTF8");
+    CHECK(facts.other_tracks[1].language == "fra");
 }
 
 // An MP4 edit list, read as the part of the stream a player should play.

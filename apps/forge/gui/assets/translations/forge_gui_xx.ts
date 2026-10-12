@@ -993,10 +993,6 @@
             <translation>[À lyrîcs fîlé õf thàt nàmé wàs àlréàdy bésîdé thé stréàm, ànd wàs léft às ît îs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
-            <source>The lyrics file could not be read, so none was put beside the stream.</source>
-            <translation>[Thé lyrîcs fîlé cõûld nõt bé réàd, sõ nõné wàs pût bésîdé thé stréàm. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
-        </message>
-        <message>
             <source>The lyrics could not be written beside the stream.</source>
             <translation>[Thé lyrîcs cõûld nõt bé wrîttén bésîdé thé stréàm. ~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
@@ -1105,6 +1101,14 @@
             <translation>[sîlént ~~]</translation>
         </message>
         <message>
+            <source>off</source>
+            <translation>[õff ~]</translation>
+        </message>
+        <message>
+            <source>%1 dB</source>
+            <translation>[%1 dB ~~]</translation>
+        </message>
+        <message>
             <source>As a plain surround player plays it: the vocals come from the rear speakers.</source>
             <translation>[Às à plàîn sûrrõûnd plàyér plàys ît: thé võcàls cõmé frõm thé réàr spéàkérs. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
@@ -1201,6 +1205,26 @@
             <translation>[Rémõvé ~~]</translation>
         </message>
         <message>
+            <source>Melody</source>
+            <translation>[Mélõdy ~~]</translation>
+        </message>
+        <message>
+            <source>%1 level</source>
+            <translation>[%1 lévél ~~~]</translation>
+        </message>
+        <message>
+            <source>%1 level, dB</source>
+            <translation>[%1 lévél, dB ~~~~~]</translation>
+        </message>
+        <message>
+            <source>Each part's level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable player only.</source>
+            <translation>[Éàch pàrt's lévél àgàînst Tàblé C.2.3: 0 dB îs thé tàblé, ànd thé bõttõm õf thé cõntrõl îs õff. Ràîsîng õné pàrt fàr énõûgh lõwérs thé õthérs, sõ thàt nõ spéàkér îs drîvén pàst fûll scàlé. Thé càpàblé plàyér õnly. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Reset levels</source>
+            <translation>[Rését lévéls ~~~~~]</translation>
+        </message>
+        <message>
             <source>Lyrics</source>
             <translation>[Lyrîcs ~~]</translation>
         </message>
@@ -1209,8 +1233,8 @@
             <translation>[nõné ~~]</translation>
         </message>
         <message>
-            <source>An .lrc file is put beside the stream under the stream's name, where Hearth finds it. One of the backing's name beside it is offered.</source>
-            <translation>[Àn .lrc fîlé îs pût bésîdé thé stréàm ûndér thé stréàm's nàmé, whéré Héàrth fînds ît. Õné õf thé bàckîng's nàmé bésîdé ît îs õfféréd. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+            <source>Lyrics (*.lrc *.srt *.ass *.kar)</source>
+            <translation>[Lyrîcs (*.lrc *.srt *.àss *.kàr) ~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>CODING MODE</source>
@@ -1227,6 +1251,10 @@
         <message>
             <source>A WAV whose speakers are already named L C R Ls Rs (or L R S, L C R S, L R Ls Rs), with an LFE if it has one.</source>
             <translation>[À WÀV whõsé spéàkérs àré àlréàdy nàméd L C R Ls Rs (õr L R S, L C R S, L R Ls Rs), wîth àn LFÉ îf ît hàs õné. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The lyrics file could not be read, so none was put beside the stream: %1</source>
+            <translation>[Thé lyrîcs fîlé cõûld nõt bé réàd, sõ nõné wàs pût bésîdé thé stréàm: %1 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>How loud do the melody and the vocals sit?</source>
@@ -1365,6 +1393,14 @@
             <translation>[kbps ~~]</translation>
         </message>
         <message>
+            <source>A lyrics file (.lrc, .srt, .ass or .kar) is written beside the stream as the stream's own .lrc, in UTF-8, where Hearth finds it. One of the backing's name beside it is offered.</source>
+            <translation>[À lyrîcs fîlé (.lrc, .srt, .àss õr .kàr) îs wrîttén bésîdé thé stréàm às thé stréàm's õwn .lrc, în ÛTF-8, whéré Héàrth fînds ît. Õné õf thé bàckîng's nàmé bésîdé ît îs õfféréd. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>These lyrics cannot be used: %1</source>
+            <translation>[Thésé lyrîcs cànnõt bé ûséd: %1 ~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>THE SAME FROM THE COMMAND LINE</source>
             <translation>[THÉ SÀMÉ FRÕM THÉ CÕMMÀND LÎNÉ ~~~~~~~~~~~~]</translation>
         </message>
@@ -1379,10 +1415,6 @@
         <message>
             <source>Choose the lyrics</source>
             <translation>[Chõõsé thé lyrîcs ~~~~~~~]</translation>
-        </message>
-        <message>
-            <source>Lyrics (*.lrc)</source>
-            <translation>[Lyrîcs (*.lrc) ~~~~~~]</translation>
         </message>
         <message>
             <source>Choose %1</source>
@@ -3883,6 +3915,18 @@
         <message>
             <source>%1 / %2 s</source>
             <translation>[%1 / %2 s ~~~~]</translation>
+        </message>
+        <message>
+            <source>CD+G picture</source>
+            <translation>[CD+G pîctûré ~~~~~]</translation>
+        </message>
+        <message>
+            <source>The picture of the karaoke disc in %1 beside the stream. Its words are part of the picture.</source>
+            <translation>[Thé pîctûré õf thé kàràõké dîsc în %1 bésîdé thé stréàm. Îts wõrds àré pàrt õf thé pîctûré. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The picture in %1 could not be shown: %2</source>
+            <translation>[Thé pîctûré în %1 cõûld nõt bé shõwn: %2 ~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>Export decoded WAV…</source>

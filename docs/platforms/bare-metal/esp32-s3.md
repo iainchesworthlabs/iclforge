@@ -99,6 +99,18 @@ a decision rather than a consequence of merging. Add `--with-ac4` to the packer 
 also carries the AC-4 decoder's sources, for `CONFIG_ICLFORGE_AC4`
 ([ESP32-P4](esp32-p4.md#building-with-ac-4)).
 
+The component's link lines are checked without ESP-IDF.
+`tools/checks/check_esp_component_targets.py`, a step of every pull request's static job, runs the
+component's `CMakeLists.txt`, the root's and the libraries' through a small interpreter of the
+CMake language once for each combination of the Kconfig symbols the component reads, and fails a
+`target_link_libraries()` to an `iclforge::` target that the root build, with the options that
+combination sets, never defines. The same holds for the links the libraries behind it make: in a
+combination that configures, every `iclforge::` name that a `target_link_libraries()` or an
+`iclforge_add_library()` link keyword names has to be a target by the end, except inside a
+conditional generator expression such as `$<TARGET_EXISTS:...>`. It reads the guards and not the
+sources, so what it answers is whether CMake would find the target; the build and what the board
+does with the image are the ESP legs' of `ci.yml`, which run after a merge.
+
 ### The probes
 
 `firmware/baremetal/platform/esp32s3/` is the footprint harness, and points `EXTRA_COMPONENT_DIRS` at
@@ -1200,6 +1212,28 @@ side data, so `DecoderConfig::skip_object_reconstruction` decodes the bed withou
 asserts the rendered channels are bit-for-bit what a full decode produces. `object_metadata`
 still arrives, parsed out of a block's skip field.
 
+**The Sendspin player falls back to the bed by itself.** A board states how many objects it places
+in real time (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS`, which the support object carries as
+`max_objects`), and a stream whose first unit declares more (the OBA complexity index less the
+LFE, `iclforge/object_limit.hpp`) is played as its bed: `Eac3Decoder::set_skip_object_reconstruction()`
+on the decoder the player already holds, so the 147 KB is never asked for and no decoder is made.
+Measured on the release image (`sdkconfig.s3-fast`, decode lane on, null sink, 7.1.4, over Sendspin,
+a 32 ms frame, S3a 2026-10-12) with the board stating 2:
+
+| Stream | declared objects | Before (the same streams, S3b) | With the fallback |
+|---|---|---|---|
+| joc4 | 3 | 1.13, 96 late | 0.55, 1 late |
+| demo | 3 | 1.07, 63 late | 0.51, 3 late |
+| objects-mdct | 4 | 1.14, 92 late | 0.47, 5 late, 1 under |
+| height | 5 | 1.35, 174 late | 0.50, 10 late |
+| 514-joc-dee | 11 | 2.27, 360 late (S3a) | 0.54, 0 late |
+| joc3 | 2 (within the figure) | 0.98, 370 under | 0.98, 680 under: reconstructed, as stated |
+| 714-none | channel-based | 0.78 | 0.78 |
+
+The bed of an object stream costs less than a channel-based 7.1.4 stream (5.1 core, rendered to
+7.1.4), so the fallback lands under it. The within-the-figure row is why the S3 states 0: 2 objects
+still do not keep up over Sendspin.
+
 ### Placed on loudspeakers
 
 Reconstructed objects are mono signals with a position each; a part driving a 7.1.4 DAC has to
@@ -1281,6 +1315,38 @@ the QIO flash and the 64 byte lines are worth 8 to 25% of it by themselves
 | `height`, 6 objects | 7.1.4 | | 1.41 | **1.15** |
 | `514-joc-dee`, 12 objects | 7.1.4 | | 2.57 | **1.95** |
 
+**Over Sendspin it is slower, and that is the path a board is normally played on.** The table
+above is the HTTP player (`POST /play`). Played by a Sendspin server (`hearth-testserver`, native
+layout, null sink, the board's own per-burst decode and render time against 32 ms, `main`
+`ce0e099db`, S3b, 2026-10-12) the same decode takes 0.15 to 0.25 more, because the Wi-Fi and lwIP
+tasks share the two cores:
+
+| Stream | To | HTTP, second core | Sendspin, second core | Sendspin, one core |
+|---|---|---:|---:|---:|
+| `714-none` | 7.1.4 | 0.61 | 0.78 | 0.87 |
+| `714-walk` | 7.1.4 | 0.68 | 0.82 | 0.93 |
+| `714-all` | 7.1.4 | 0.80 | 0.95 | 0.99 |
+| `714-ecpl` | 7.1.4 | 1.25 | **1.33** (168 late bursts) | 1.61 |
+| `dee-eac3-51`, E-AC-3 | 5.1 | 0.31 | 0.38 | 0.42 |
+| `dee-ac3-51`, AC-3 | 5.1 | 0.32 | 0.42 | 0.42 |
+| JOC, 2 objects | 7.1.4 | | **0.95** (113 underruns) | 0.98 |
+| JOC, 3 objects | 7.1.4 | | **0.98** (370 underruns) | 1.13 |
+| JOC, 4 objects (`demo`) | 7.1.4 | 0.92 | **1.07** | 1.26 |
+| JOC, 5 objects (`objects-mdct`) | 7.1.4 | 1.02 | **1.14** | 1.39 |
+| JOC, 6 objects (`height`) | 7.1.4 | 1.15 | **1.35** | 1.57 |
+
+The objects are what `forge probe` reports, the LFE bed object included. Folded to 2.0 the JOC
+streams take 0.29 to 0.36 over Sendspin, because no object is reconstructed. So on the S3 over
+Sendspin **no object count at 7.1.4 has a margin**: two objects is at 0.95 and under-runs, and
+four is past real time. The second core is worth 10 to 20% on this path (the last column). Before
+this work no JOC stream played at all over Sendspin on the S3: the double QMF bank was 12 to 28
+times real time.
+
+The internal RAM that is left is the other limit: the least free over a Sendspin play of a 7.1.4
+E-AC-3 stream is 23 to 1,100 bytes, on the build before this work and on the one with it alike
+(AC-3 5.1 leaves 21 to 79 KB, E-AC-3 5.1 0.8 to 14 KB), so anything added to the player's internal
+allocations is a risk there.
+
 What changed, in the order it was found:
 
 - **The decoder stopped zeroing what it was about to overwrite.** An E-AC-3 substream's six blocks
@@ -1325,8 +1391,9 @@ The second core takes a fifth off the JOC reconstruction on this part (22.4 to 1
 `demo`'s frame) where it takes 44% off the whole frame on the P4: both cores read the same PSRAM
 through the same cache, and each object's bank is 4 to 5 KB of state and 2.5 KB of window against a
 32 KB cache. An object costs 3.1 to 3.7 ms of a frame here
-(1.0 to 1.1 on the P4), so **four objects is what the S3 decodes in real time with a margin**
-(0.92); a fifth takes it to 1.02. Enhanced coupling's spectrum (three inverse transforms and a DFT
+(1.0 to 1.1 on the P4 over HTTP, 1.4 over Sendspin), so four objects is what the S3
+decodes in real time over the HTTP player (0.92) and a fifth takes it to 1.02; over Sendspin it is
+two at 0.95 and none with a margin (above). Enhanced coupling's spectrum (three inverse transforms and a DFT
 per block, 14 ms of the 46 ms frame before the lane) is bound by the same PSRAM; each block's
 transforms are computed three times, once for itself and once for each neighbour, and sharing
 them is not done. The C6 is not in this table:

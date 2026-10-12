@@ -1700,7 +1700,9 @@ int run_spdif(std::string_view in_path, std::string_view out_path, const Options
     // decodes nothing: said once, as 'play' says it, since wrapping the main
     // alone would read as the service having been mixed.
     warn_associated_not_mixed(meta, "spdif", "it wraps one coded programme without decoding it");
+    // karaoke is a decoder's choice, and a receiver decodes what this writes.
     if (is_ac4_stream(stream)) {
+        warn_karaoke_not_ac3(meta, "AC-4");
         return run_spdif_ac4(stream, in_path, out_path);
     }
     const auto bsid = iclforge::ac3::stream_bsid(stream);
@@ -1709,6 +1711,8 @@ int run_spdif(std::string_view in_path, std::string_view out_path, const Options
         return kExitInput;
     }
     const bool eac3 = *bsid > 8;
+    warn_karaoke_not_applied(meta, "spdif",
+                             "it wraps the coded stream in IEC 61937 bursts without decoding it");
 
     // One programme goes into the carrier, never the stream's programmes one
     // burst each - the choice 'play' makes for the same receiver, so the WAV

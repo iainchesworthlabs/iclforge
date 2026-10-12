@@ -26,13 +26,14 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `adm` | `libs/adm/` | ADM and BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder and decoder. | `iab`, `objects` | `examples`, `forge` | core |
 | `audio` (internal) | `libs/audio/` | Live capture, IEC 61937 passthrough delivery, shared-mode monitor playback and the OSC object-position source: the OS-specific audio code of the project. Internal; never installed. | `base`, `render`, `containers`, `objects` | `crucible`, `demo-android`, `forge`, `hearth` | core |
 | `base` | `libs/base/` | What every codec and service builds on and none owns: the bit reader and writer, the speaker vocabulary, the level and loudness meters, WAV reading and writing, the CPU probe, the signing key with SHA-256 and HMAC-SHA-256, the scalar building blocks of the arithmetic tiers and the build version. | nothing | `ac3`, `ac4`, `audio`, `baremetal`, `containers`, `crucible`, `demo-android`, `dsp`, `esp-idf`, `examples`, `forge`, `hearth`, `iab`, `objects`, `python`, `render` | core |
-| `capi` | `libs/capi/` | The C API over the AC-3 and AC-4 libraries: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23. | `ac3`, `ac4` | `examples`, `rust` | core |
+| `capi` | `libs/capi/` | The C API over the AC-3 and AC-4 libraries and the lyrics reader: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23. | `ac3`, `ac4`, `lyrics` | `examples`, `rust` | core |
 | `containers` | `libs/containers/` | The codec-blind carriage: IEC 61937 burst packing and detection, the Matroska, MP4 and MPEG-TS writers and readers, and IAMF reading and writing. | `base` | `app-media`, `audio`, `crucible`, `demo-android`, `examples`, `forge`, `hearth`, `python` | core |
 | `device` (internal) | `libs/device/` | The device-side logic of the ESP32 sinks and players that needs no SDK, so that the host tests it: the interleave and the slot conversion, the playout and DAC queue models, the sink planner, the Improv provisioning protocol, the pairing records and the firmware image rules. Header-only. Internal; never installed. | nothing | `esp-idf`, `hearth`, `hearth-sink` | core |
 | `dsp` | `libs/dsp/` | The signal processing more than one library uses: the FFT, the QMF bank, the offline sample-rate converter and filter sections, and the tiered (float and fixed-point) kernels AC-4 builds at its decode tier. | `base` | `ac3`, `ac4`, `baremetal`, `esp-idf`, `forge`, `objects`, `tests` | core |
 | `iab` | `libs/iab/` | SMPTE ST 2098-2 Immersive Audio Bitstream reading and writing, as bare bitstreams and in MXF. | `base` | `adm`, `examples`, `forge` | core |
-| `lyrics` (internal) | `libs/lyrics/` | Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words and written back, the file's place beside a media item, the stateless cursor that says which line and word a playing position is in, and the editing a tap timer needs (a line's start, a word's start, an estimate by letters). Standard library only, so that Hearth, Crucible, the sink firmware and the browser can all link it. Internal; never installed. | nothing | `app-cdg-picture`, `crucible`, `esp-idf`, `hearth`, `hearth-sink` | core |
+| `lyrics` (internal) | `libs/lyrics/` | Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words and written back, the file's place beside a media item, the stateless cursor that says which line and word a playing position is in, and the editing a tap timer needs (a line's start, a word's start, an estimate by letters). Standard library only, so that Hearth, Crucible, the sink firmware and the browser can all link it. Internal; never installed. | nothing | `app-cdg-picture`, `capi`, `crucible`, `demo-wasm`, `esp-idf`, `forge`, `hearth`, `hearth-sink`, `python` | core |
 | `objects` | `libs/objects/` | The object-audio model: an object's position and path over time, the placement an encoder is handed each frame, and the Object Audio Metadata payload of ETSI TS 103 420 with the EMDF container it travels in. | `base`, `dsp` | `ac3`, `ac4`, `adm`, `app-media`, `audio`, `baremetal`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `render` | core |
+| `pitch` (internal) | `libs/pitch/` | A singing voice's pitch: a fundamental-frequency tracker (the McLeod Pitch Method, written from the paper), a reference melody as a contour on a fixed grid or as notes, and a pitch score of one against the other with an estimate of how early or late the singer is. Standard library only, so that Hearth, the browser and the sink firmware can all link it. Internal; never installed. | nothing | `hearth` | core |
 | `render` | `libs/render/` | From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it. | `base`, `objects` | `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink` | core |
 | `sendspin` (internal) | `libs/sendspin/` | The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed. | `time-filter` | `esp-idf`, `hearth`, `hearth-sink` | core |
 
@@ -46,7 +47,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
-| `app-cdg-picture` (internal) | `apps/shared/cdg-picture/` | The picture of a CD+G disc as a window shows it: the disc as images by position, the source a controller gives them through, and the Qt Quick item that draws them. Internal; compiled into the programs. | `lyrics` | `crucible`, `hearth` | windows, linux, macos |
+| `app-cdg-picture` (internal) | `apps/shared/cdg-picture/` | The picture of a CD+G disc as a window shows it: the disc as images by position, the source a controller gives them through, and the Qt Quick item that draws them. Internal; compiled into the programs. | `lyrics` | `crucible`, `forge`, `hearth` | windows, linux, macos |
 | `app-media` (internal) | `apps/shared/media/` | The media code the programs compile in: container input, stream playback, recording sinks, the AC-4 object renderer. Internal; compiled into Forge, Hearth and Crucible. | `ac3`, `ac4`, `containers`, `objects`, `render` | `forge`, `hearth` | windows, linux, macos |
 | `app-preferences` (internal) | `apps/shared/preferences/` | The settings store and its migration, shared by the desktop programs. Internal; compiled into the programs. | nothing | `crucible`, `forge`, `hearth` | windows, linux, macos |
 | `app-project` (internal) | `apps/shared/project/` | The project file the Forge GUI and forge share: its document and the command line it stands for. Internal; compiled into the programs. | `ac3` | `forge` | windows, linux, macos |
@@ -58,16 +59,16 @@ tests are beside it, and `ctest -L <project>` runs them.
 |---|---|---|---|---|---|
 | `crucible` | `apps/crucible/` | Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS. | `ac3`, `ac4`, `audio`, `base`, `containers`, `lyrics`, `objects`, `app-cdg-picture`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 | `demo-android` | `apps/demos/android/` | The Android (Shield) demo application. | `ac3`, `audio`, `base`, `containers` | nothing | android |
-| `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `objects` | nothing | wasm |
-| `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `objects`, `render`, `app-media`, `app-preferences`, `app-project`, `app-theme` | nothing | windows, linux, macos |
-| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `render`, `sendspin`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
+| `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `lyrics`, `objects` | nothing | wasm |
+| `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `lyrics`, `objects`, `render`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-project`, `app-theme` | nothing | windows, linux, macos |
+| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `pitch`, `render`, `sendspin`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 
 ## Bindings
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
 | `js` | `bindings/js/` | The npm package over the WebAssembly build. | nothing | nothing | wasm, npm |
-| `python` | `bindings/python/` | The Python binding: the iclforge wheel, built with scikit-build-core. | `ac3`, `ac4`, `base`, `containers`, `objects` | nothing | python |
+| `python` | `bindings/python/` | The Python binding: the iclforge wheel, built with scikit-build-core. | `ac3`, `ac4`, `base`, `containers`, `lyrics`, `objects` | nothing | python |
 | `rust` | `bindings/rust/` | The Rust crates: iclforge and iclforge-sys over the C API. | `capi` | nothing | rust |
 
 ## Firmware libraries
@@ -112,6 +113,7 @@ flowchart LR
     iab["iab"]
     lyrics(["lyrics"])
     objects["objects"]
+    pitch(["pitch"])
     render["render"]
     sendspin(["sendspin"])
     time_filter["time-filter"]
@@ -131,6 +133,7 @@ flowchart LR
     audio --> objects
     capi --> ac3
     capi --> ac4
+    capi --> lyrics
     containers --> base
     dsp --> base
     iab --> base

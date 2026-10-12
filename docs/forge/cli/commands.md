@@ -356,6 +356,28 @@ forge ac4-encode me_51.wav out.mp4 448 substream1-content=music-and-effects \
     substream3=german.wav substream3-content=dialogue substream3-language=de \
     presentation1=1,2 presentation1-config=0 presentation2=1,3 presentation2-config=0
 ```
+### Lyrics beside the stream: `lyrics=`
+
+`lyrics=<file>` on `encode`, `eac3-encode` and `ac4-encode` puts a lyrics file beside the stream as
+its own, so that what Forge makes is a stream and its words. The file may be an `.lrc`, a SubRip
+`.srt`, an Advanced SubStation Alpha `.ass` or a MIDI karaoke `.kar`, in UTF-8 or UTF-16. What is
+written is `<stream>.lrc` (the stream's name with the extension replaced), the one format
+[Hearth](../../hearth/index.md) finds by name and sends to every sink: UTF-8, with a duet's `V1:`
+and `V2:` markers and the singers' names, word times where the file has them (an ASS script's
+karaoke syllables, a MIDI file's), and a time with no text where a cue ends before the next one
+begins, so that the gap is not shown as the line going on. Styling and positions are not carried.
+
+The file is read before the encode, so a file that is not lyrics is refused first, with exit code
+2, and a code page such as Latin-1 or Shift-JIS is named and not guessed at. A `.lrc` of that name
+already beside the stream is left as it was, and the run says so. `-` as the output has no name to
+put a file beside and is refused (exit code 1).
+
+```bash
+forge encode backing.wav sing-along.ac3 384 L,C,R,Cs src=melody.wav src=lead.wav \
+    map=0.0:L,0.1:R,1.0:C,2.0:Cs bsmod=voiceover lyrics=words.srt
+# writes sing-along.ac3 and sing-along.lrc
+```
+
 ### ADM ingest — professional master files (opt-in)
 
 **Only *runnable* in a build with `-DICLFORGE_BUILD_ADM=ON`** — but always *listed*, the same
@@ -627,7 +649,7 @@ matrix comes from the stream's own `cmixlev`/`surmixlev` or `mixmdate` levels, a
 normalisation means the fold can never be louder than the loudest coded sample. `mix-lfe` folds
 the LFE in as well — §7.8 makes that optional and this decoder drops it by default.
 
-`karaoke` (or `karaoke=on`) decodes an AC-3 **karaoke** stream - `bsmod` 7 with an `acmod` above
+`karaoke` (or `karaoke=on`) decodes an AC-3 or E-AC-3 **karaoke** stream - `bsmod` 7 with an `acmod` above
 1/0 (Annex C, informative) - the way a karaoke-aware decoder with three outputs does. Such a
 stream carries L and R (the music), a guide melody M where a centre would be, and one or two
 vocal channels V1 and V2 where the surrounds would be (3/0 is L M R, 2/1 is L R V1, 3/1 is
@@ -640,8 +662,26 @@ and a 2/0 one has nothing but L and R, so both decode as coded. At `channels=2` 
 the stereo or mono fold *is* Annex C's 2/0 reproduction - "any AC-3 decoder will produce the
 appropriate output if it is set to perform an Lo, Ro 2-channel downmix" - so `karaoke` changes
 nothing there, and `downmix=ltrt` is refused, since Annex C has no Lt/Rt. A stream that is not
-karaoke is decoded as coded and the report says so; E-AC-3 and AC-4 streams warn and ignore the
-option.
+karaoke is decoded as coded and the report says so; an AC-4 stream warns and ignores the option.
+`monitor` takes it too and plays the same reproduction on the output (see below).
+
+An **E-AC-3** karaoke stream is reproduced the same way. A/52 carries its signalling field for
+field - `bsmod` in `infomdate` (Table E1.2), read as Table 5.7 reads it - and defines no
+reproduction for it; Dolby's decoder applies Annex C's to an E-AC-3 stream as it does to an AC-3
+one, and this decoder does what it does, for a programme that is **one independent substream**
+with no object layer. The vocals sit at the stream's Lo/Ro surround level, `lorosurmixlev` of
+`mixmdate` (an E-AC-3 `bsi` has no `surmixlev`), and the melody at `lorocmixlev` in the 2/0 form;
+where the stream sends no `mixmdate` both are -3 dB, which is what Dolby's decoder used. A
+programme with a dependent substream (Annex E gives a dependent's channel map no vocal), or with
+an object layer, is decoded as coded and the report says why. `eac3-encode` with `bsmod=7` above
+1/0 writes that `mixmdate` group whether or not `mixmeta` is given, its `lorocmixlev` and
+`lorosurmixlev` taken from `cmixlev=` and `surmixlev=` (-4.5 and -6 dB by default, the level an
+AC-3 karaoke stream is made at), so a player is told the level the author set and not left to
+its own default; `bsmod=7` on mono is Table 5.7's voice-over and on `1+1` a service Annex A and
+Annex G prohibit, and both encoders write them as asked with a warning. This reproduction is this
+project's by analogy with Annex C and by that decoder; a player built on FFmpeg flags the stream
+as karaoke and plays the vocals from the surround channels, as it does an AC-3 one
+(`planning/karaoke-eac3-findings.md` has the clauses and the measurements).
 
 `karaoke=none|v1|v2|v1+v2` is the karaoke-*capable* decoder (C.2.3.2, Table C.2.3): the same
 reproduction with the listener choosing which vocals are heard rather than the stream's own
@@ -659,6 +699,33 @@ forge decode sing-along.ac3 backing.wav karaoke=none  # L C R with the vocals mu
 forge decode sing-along.ac3 duet.wav karaoke=v1+v2    # V1 left, V2 right, melody centre
 forge decode sing-along.ac3 lead.wav channels=2 karaoke=v1   # stereo with V1 in the middle
 ```
+
+`karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
+flexibility": the listener moves the level of each part of the capable decoder's reproduction against
+Table C.2.3. 0 dB is the table as it stands (bit for bit), up to 12 dB louder, and `-24` or `off`, the
+bottom, mutes the part. They are the span, the units and the defaults of Hearth's sliders and of the
+wire's `karaoke_*_db` keys. A part raised far enough lowers the others, because every output's
+coefficients are scaled down together when their sum would pass 1 (§7.8.1's way). They are the
+capable decoder's alone, so a level with `karaoke` bare, `karaoke=off` or no `karaoke` at all is
+refused rather than quietly dropped, and a value outside the span is refused rather than clamped.
+
+```bash
+forge decode sing-along.ac3 sing.wav karaoke=none karaoke-melody=-6     # the guide melody 6 dB down
+forge decode sing-along.ac3 lead.wav karaoke=v1 karaoke-v1=-12          # V1 a quarter as loud
+forge decode sing-along.ac3 duet.wav karaoke=v1+v2 karaoke-v2=off       # V1 only, on the left
+```
+
+`monitor` reproduces a karaoke stream the same way, and plays it: `forge monitor sing-along.ac3
+karaoke=none` plays L, C and R (and the LFE) with the vocals out. The channels are laid out as the
+3/0 mode they are, not as the 3/2 layout the stream codes, and on an output narrower than the
+stream (a stereo endpoint, which `monitor` folds to unasked) the 2/0 reproduction is what plays.
+The report says which. `downmix=ltrt` is refused with `karaoke` here as it is by `decode`.
+
+`play` applies the choice where it decodes, which is its PCM fallback for an output that takes no
+bitstream. Its bitstream legs, and `spdif`, hand the coded stream on without decoding it, so a
+receiver reproduces it (as coded unless it is karaoke-capable): they accept `karaoke` and say, on
+stderr, that it is not applied. `spatial` places an E-AC-3 stream's objects, has no karaoke bed to
+reproduce, and says so.
 
 `downmix=auto` lets the stream choose between the two stereo folds, the third option A/52
 §D3.1.1 describes. The stream's preference is its `dmixmod` (Table D2.2): in AC-3's Annex D
@@ -992,8 +1059,11 @@ Top level:
 `container`, for a container input: `format` (`"matroska"`, `"mp4"` or `"mpegts"`), `codec_id` (the
 Matroska CodecID or MP4 sample entry, such as `"A_EAC3"`, `"ec-3"` or `"ac-4"`; `null` for
 MPEG-TS), `track`, `language`, `samples`, `sample_rate_hz` and `channels` (each `null` where the
-container does not state it, as MPEG-TS does not), and two members of which the one for another
-format is `null`. `mp4`: `timescale`, `movie_timescale`, `edits` and `codec_box`, the sample
+container does not state it, as MPEG-TS does not), `other_tracks` (an array of the tracks the
+file declares and the command reads none of, in file order and up to 64: `track`, `kind` of
+`"audio"`, `"video"`, `"text"` or `"other"`, `codec_id` as the container names it, such as
+`"avc1"`, `"tx3g"` or `"S_TEXT/UTF8"`, and `language`; empty for a file with none and for MPEG-TS),
+and two members of which the one for another format is `null`. `mp4`: `timescale`, `movie_timescale`, `edits` and `codec_box`, the sample
 entry's `dac3`, `dec3` or `dac4` as `type`, `bytes`, `fscod`, `bsid`, `bsmod`, `bsmod_label`,
 `acmod`, `lfeon`, `bit_rate_code`, `data_rate_kbps`, `independent_substreams`, `num_dep_sub`,
 `chan_loc`, `asvc`, `asvc_label` and `complexity_index` (a `dac4` reads as zero in the fields that

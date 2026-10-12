@@ -205,11 +205,22 @@ channel/energy buffers, object position/audio bookkeeping, the stereo fold) now 
 The same side fold carries Annex C's karaoke reproduction: `PushDecoder` takes two more constructor
 arguments (the `OutputConfig::karaoke` and `karaoke_vocals` numbers, a three-argument form that asks
 for none being kept), reads whether the unit is karaoke from its own syncframe header (a lone AC-3
-syncframe flagged `bsmod` 7 above 1/0 - the decoded unit does not carry an AC-3 core's `bsmod`),
+syncframe, or an E-AC-3 syncframe standing alone as one independent substream with no object
+layer, flagged `bsmod` 7 above 1/0 - the decoded unit does not carry an AC-3 core's `bsmod`),
 resolves an AC-3 core's fold levels from its own `cmixlev`/`surmixlev` as the decoder's own fold does
 (an E-AC-3 bed's from `mixmdate`), and reports `karaoke` in each result. At `AsCoded` the reproduction
 is three channels (four with an LFE) in `foldPcm`; at a stereo target it is Annex C's own 2/0
 reproduction. The demo page shows a vocals control for a stream that is karaoke.
+
+The words follow the sound. `lyrics_bindings.cpp` compiles the timed-lyrics reader (`libs/lyrics`,
+the one Hearth, Crucible and the sink firmware use) into the same module as `parseLyrics(bytes,
+durationMs)` and a `LyricsDocument` class: `describe()` hands the lines and their words over once,
+and `position(ms, delayMs)` and `wordState(line, word, ms)` are the library's stateless cursor,
+asked on every animation frame. The page's **Words** panel takes an LRC, SubRip, ASS or MIDI karaoke
+file (told by what it holds), shows the line being sung with the word being sung filled and the
+lines round it, names a duet's singers, and has a delay slider. A file in a code page is refused
+with the reader's sentence. It is the C++ reader and not a second one in JavaScript, so the page
+shows what Hearth would.
 
 `bindings/js/` is the package itself (not published — see [Publishing](#publishing) below):
 `push-decoder.ts` (the typed wrapper over the Embind class above), `decode-file.ts` (the

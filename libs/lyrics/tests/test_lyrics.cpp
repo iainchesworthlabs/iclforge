@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
@@ -1004,6 +1005,40 @@ TEST_CASE("midi karaoke: words in the common code pages are refused by name, not
     }
 }
 
+TEST_CASE("midi karaoke: only the title, the artist and the words have to be UTF-8, not the other @ lines",
+          "[lyrics][midi][encoding]") {
+    const auto bytes = [](std::initializer_list<int> values) {
+        std::string out;
+        for (const int value : values) {
+            out += midi_byte(value);
+        }
+        return out;
+    };
+    // A copyright line, a key line and a language line with a Latin-1 copyright sign and e acute in
+    // them: the reader never shows them, so they do not refuse a file whose words are plain.
+    const std::string words = midi_words_track(
+        midi_text(0, "@KMIDI KARAOKE FILE" + bytes({0xE9})) + midi_text(0, "@TCafe Song") +
+        midi_text(0, "@TTraditional") + midi_text(0, "@I" + bytes({0xA9}) + " 1985 Caf" + bytes({0xE9})) +
+        midi_text(0, "@LFRAN") + midi_text(100, "Sing") + midi_text(100, " along"));
+    const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({words}));
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->title == "Cafe Song");
+    CHECK(lyrics->artist == "Traditional");
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "Sing along");
+
+    // The title and the artist are kept, so they are checked: the file is refused, naming UTF-8.
+    for (const bool artist : {false, true}) {
+        const std::string first = artist ? std::string{"@TA Title"} : "@TCaf" + bytes({0xE9});
+        const std::string second = artist ? "@TCaf" + bytes({0xE9}) : std::string{"@TTraditional"};
+        const std::string refused = midi_words_track(midi_text(0, first) + midi_text(0, second) +
+                                                     midi_text(100, "Sing") + midi_text(100, " along"));
+        const auto result = iclforge::lyrics::parse_midi_karaoke(midi_file({refused}));
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().find("not UTF-8") != std::string::npos);
+    }
+}
+
 TEST_CASE("midi karaoke: a file is read as MIDI by its header, and a .kar is found beside an item",
           "[lyrics][midi]") {
     const std::string file = midi_file({midi_words_track(midi_text(200, "Sing") + midi_text(200, " along"))});
@@ -1279,3 +1314,96 @@ TEST_CASE("lyrics: a UTF-16 file on disk is read, and its time is the item's", "
     CHECK(lyrics->lines[0].text == kHebrewUtf8);
     CHECK(lyrics->lines[0].end_ms == 5000);
 }
+
+// ---- a lyrics file beside a stream (place_lyrics_beside) --------------------------------------
+
+namespace {
+
+std::string read_text_file(const fs::path& path) {
+    std::ifstream in(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>{in}, std::istreambuf_iterator<char>{}};
+}
+
+}  // namespace
+
+TEST_CASE("place_lyrics_beside writes the stream's own .lrc from a SubRip file, gaps marked",
+          "[lyrics][place]") {
+    const Folder folder;
+    const fs::path srt = folder.write(
+        "words.srt",
+        "1\n00:00:01,000 --> 00:00:03,000\nOne\n\n2\n00:00:05,000 --> 00:00:07,000\nTwo\n");
+    const fs::path stream = folder.path() / "song.ac3";
+
+    const auto placed = iclforge::lyrics::place_lyrics_beside(srt, stream);
+    REQUIRE(placed.status == iclforge::lyrics::PlacementStatus::kWritten);
+    CHECK(placed.path == folder.path() / "song.lrc");
+    CHECK(read_text_file(placed.path) == "[00:01.00]One\n[00:03.00]\n[00:05.00]Two\n");
+    // What a player looks for beside the stream is found by name, and is not the half-written file.
+    const auto found = iclforge::lyrics::find_lyrics_file(stream.string());
+    REQUIRE(found.has_value());
+    CHECK(*found == placed.path);
+    CHECK_FALSE(fs::exists(folder.path() / "song.lrc.part"));
+}
+
+TEST_CASE("place_lyrics_beside keeps an ASS script's word times and a duet's singers",
+          "[lyrics][place]") {
+    const Folder folder;
+    const fs::path ass = folder.write(
+        "script.ass",
+        "[Script Info]\nScriptType: v4.00+\n\n[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\k100}Hel{\\k100}lo\n");
+    const auto placed =
+        iclforge::lyrics::place_lyrics_beside(ass, folder.path() / "karaoke.ac3");
+    REQUIRE(placed.status == iclforge::lyrics::PlacementStatus::kWritten);
+    // The syllables are words with their own times: "Hel" at 1.00 s and "lo" at 2.00 s.
+    CHECK(read_text_file(placed.path) == "[00:01.00]<00:01.00>Hel<00:02.00>lo\n");
+
+    const fs::path duet = folder.write("duet.lrc", "[v1:Anna]\n[v2:Ben]\n[00:01.00]V1: Hello\n[00:03.00]V2: Hi\n");
+    const auto second = iclforge::lyrics::place_lyrics_beside(duet, folder.path() / "pair.mp4");
+    REQUIRE(second.status == iclforge::lyrics::PlacementStatus::kWritten);
+    CHECK(second.path == folder.path() / "pair.lrc");
+    const auto reread = iclforge::lyrics::read_lyrics(second.path);
+    REQUIRE(reread.has_value());
+    CHECK(reread->first_singer_name == "Anna");
+    REQUIRE(reread->lines.size() == 2);
+    CHECK(reread->lines[1].singer == iclforge::lyrics::Singer::kSecond);
+}
+
+TEST_CASE("place_lyrics_beside never overwrites a file of that name", "[lyrics][place]") {
+    const Folder folder;
+    const fs::path srt = folder.write("words.srt", "1\n00:00:01,000 --> 00:00:03,000\nNew\n");
+    const fs::path existing = folder.write("song.lrc", "[00:00.00]Mine\n");
+    const fs::path stream = folder.path() / "song.ac3";
+
+    const auto placed = iclforge::lyrics::place_lyrics_beside(srt, stream);
+    CHECK(placed.status == iclforge::lyrics::PlacementStatus::kExists);
+    CHECK(placed.path == existing);
+    CHECK(read_text_file(existing) == "[00:00.00]Mine\n");
+
+    // Giving the file that is already there is the same answer, and it is left as it was.
+    const auto itself = iclforge::lyrics::place_lyrics_beside(existing, stream);
+    CHECK(itself.status == iclforge::lyrics::PlacementStatus::kExists);
+    CHECK(read_text_file(existing) == "[00:00.00]Mine\n");
+}
+
+TEST_CASE("place_lyrics_beside says why a file is not lyrics, and writes nothing",
+          "[lyrics][place]") {
+    const Folder folder;
+    const fs::path stream = folder.path() / "song.ac3";
+
+    // Latin-1: a code page is named and not guessed at.
+    const fs::path latin1 = folder.write("cafe.lrc", "[00:01.00]Caf\xE9\n");
+    const auto coded = iclforge::lyrics::place_lyrics_beside(latin1, stream);
+    CHECK(coded.status == iclforge::lyrics::PlacementStatus::kUnreadable);
+    CHECK(coded.error.find("not UTF-8") != std::string::npos);
+
+    // A file that is not there.
+    const auto missing = iclforge::lyrics::place_lyrics_beside(folder.path() / "nothing.lrc", stream);
+    CHECK(missing.status == iclforge::lyrics::PlacementStatus::kUnreadable);
+    CHECK_FALSE(missing.error.empty());
+
+    CHECK_FALSE(fs::exists(folder.path() / "song.lrc"));
+    CHECK_FALSE(fs::exists(folder.path() / "song.lrc.part"));
+}
+

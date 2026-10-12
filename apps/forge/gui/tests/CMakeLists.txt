@@ -30,4 +30,5 @@ target_link_libraries(iclforge-forge-gui-tests
         iclforge::ac3
         iclforge::audio
         iclforge::containers
-        iclforge::ac4)
+        iclforge::ac4
+        iclforge::lyrics)

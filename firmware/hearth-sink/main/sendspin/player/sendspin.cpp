@@ -42,6 +42,7 @@
 
 #include "audio_sink.hpp"
 #include "network.hpp"
+#include "psram_scope.hpp"
 #include "settings.hpp"
 
 namespace player {
@@ -68,6 +69,14 @@ constexpr int kMaxObjects = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS;
 // The most bytes of lyric document the board holds for the item playing (0 = takes none: the commands
 // are not listed, so a server sends none).
 constexpr std::uint32_t kLyricsMaxBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES;
+// What a lyric document needs of the heap it is made in, beyond a reserve, to be read and held:
+// measured at about ten times its text at the peak, on S3 and P4 (planning/hearth-sendspin-
+// extension.md, Lyrics). The internal heap always keeps `kLyricsHeapReserve`, and PSRAM, where the
+// document goes when there is room, `kLyricsPsramReserve`.
+constexpr std::size_t kLyricsHeapFactor = 12;
+constexpr std::size_t kLyricsTransientFactor = 3;
+constexpr std::size_t kLyricsHeapReserve = 8192;
+constexpr std::size_t kLyricsPsramReserve = 262144;
 static_assert(kLyricsMaxBytes <= ac::kMaxLyricsBytes, "a lyric document fits one message");
 constexpr std::uint32_t kReportEveryChunks = CONFIG_ICLFORGE_EXAMPLE_REPORT_EVERY_FRAMES;
 constexpr std::int32_t kLeadMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS;
@@ -220,6 +229,12 @@ bool g_board_changed = false;
             static_cast<std::uint8_t>(kMaxObjects);
     }
     s.lyrics_max_bytes = kLyricsMaxBytes;
+    // The codecs it reproduces karaoke for when told to (the `karaoke` setting): every one it
+    // decodes. burst_player.cpp lays a karaoke AC-3 syncframe and an E-AC-3 programme of one
+    // independent substream out from the reproduction alike, so a server sends either as it is
+    // (planning/karaoke-eac3.md, D6); a board that said nothing here would be taken for AC-3's
+    // alone.
+    s.karaoke_codecs = s.data_types;
     return s;
 }
 
@@ -463,10 +478,41 @@ class Events final : public iclforge::SendspinEvents {
                 if (!g_lyrics) {
                     g_lyrics = std::make_unique<iclforge::lyrics::Follower>();
                 }
-                const bool held = g_lyrics->set_document(command.lyrics.item, command.lyrics.text, kLyricsMaxBytes);
-                std::printf("sendspin: lyrics for item %lld: %s (%u bytes)\n",
+                // The last document goes first, so that what is free is what this one has to fit in.
+                g_lyrics->set_document(command.lyrics.item, std::string_view{}, kLyricsMaxBytes);
+                // A parsed document is lines and words: measured on boards, about ten times its text
+                // at the peak and six times once held, of whichever heap it is made in. The internal
+                // heap a stream leaves is what Wi-Fi's receive buffers and the decoder's scratch come
+                // out of (an S3 playing E-AC-3 has a few hundred bytes to spare), so a part with PSRAM
+                // reads and holds it there (iclforge::player::PsramScope), and a document is taken
+                // only while what it costs of the heap it goes to is free beyond a reserve; otherwise
+                // the board holds none, and says why.
+                const std::size_t size = command.lyrics.text.size();
+                const std::size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+                const std::size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+                const bool in_psram = free_psram >= kLyricsHeapFactor * size + kLyricsPsramReserve;
+                // In PSRAM the internal heap still holds the message as it arrives and is read (the
+                // channel's buffer and the command's text, a few times its size at once).
+                const std::size_t needed =
+                    (in_psram ? kLyricsTransientFactor : kLyricsHeapFactor) * size + kLyricsHeapReserve;
+                const bool affordable = size == 0 || free_internal >= needed;
+                bool held = false;
+                const std::int64_t began_us = esp_timer_get_time();
+                if (affordable) {
+                    std::optional<iclforge::player::PsramScope> scope;
+                    if (in_psram) {
+                        scope.emplace();
+                    }
+                    held = g_lyrics->set_document(command.lyrics.item, command.lyrics.text, kLyricsMaxBytes);
+                }
+                std::printf("sendspin: lyrics for item %lld: %s (%u bytes, in %s, read in %lld us)\n",
                             static_cast<long long>(command.lyrics.item), held ? "held" : "none",
-                            static_cast<unsigned>(command.lyrics.text.size()));
+                            static_cast<unsigned>(size), in_psram ? "PSRAM" : "internal RAM",
+                            static_cast<long long>(esp_timer_get_time() - began_us));
+                if (!affordable) {
+                    std::printf("sendspin: lyrics not taken: %u bytes of internal heap free, %u needed\n",
+                                static_cast<unsigned>(free_internal), static_cast<unsigned>(needed));
+                }
                 break;
             }
             case ac::Command::kLyricsPosition: {
@@ -622,6 +668,11 @@ void start_player(const iclforge::render::OutputLayout& layout) {
                                                static_cast<std::size_t>(std::max(sink_max_slots(), 1)));
     config.max_delay_ms = static_cast<double>(kMaxDelayMs);
     config.max_coded_channels = kMaxCodedChannels;
+    // A stream declaring more objects than the board states it places is played as its bed
+    // (iclforge/object_limit.hpp): the figure the support object carries is the one it keeps to.
+    if (kMaxObjects >= 0) {
+        config.max_objects = static_cast<std::uint8_t>(kMaxObjects);
+    }
     config.core = kDecodeCore;
     config.stack_bytes = kDecodeStackBytes;
     config.stack_in_psram = kDecodeStackInPsram;

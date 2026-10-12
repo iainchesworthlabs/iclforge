@@ -153,13 +153,14 @@ struct Lyrics {
 // frame rate of 24, 25, 29.97 or 30 and the ticks in a frame, which fix the length of a tick and
 // leave the tempo events meaning nothing), through that. The words are taken from the track named
 // "Words" where there is one, else from the Lyric events, else from the Text events; the `@T` lines
-// are the title and the artist (the first and the second) and the other `@` lines are not words. A
-// `/` begins a new line and a `\` a new verse (a line too, here), and a syllable that begins with a
-// space is joined to the one before it, so a word is a syllable, with its own start and end, and
-// the fill moves by syllable. A line ends where the next begins. Only the words are read: the music
-// in the file is not, and a file with no words, with a SMPTE rate that is none of the four, or with
-// words that are not UTF-8 (a MIDI file carries no word of its encoding; Latin-1 and code pages are
-// not guessed at) says so.
+// are the title and the artist (the first and the second) and the other `@` lines are not words and
+// are not looked at, so they need not be UTF-8. A `/` begins a new line and a `\` a new verse (a
+// line too, here), and a syllable that begins with a space is joined to the one before it, so a
+// word is a syllable, with its own start and end, and the fill moves by syllable. A line ends where
+// the next begins. Only the words are read: the music in the file is not, and a file with no words,
+// with a SMPTE rate that is none of the four, or with a title, an artist or words that are not
+// UTF-8 (a MIDI file carries no word of its encoding; Latin-1 and code pages are not guessed at)
+// says so.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_midi_karaoke(
     std::string_view bytes, std::optional<std::int64_t> duration_ms = std::nullopt);
 
@@ -178,6 +179,36 @@ struct Lyrics {
 // extension in any case, and where there is none `name.srt`, then `name.ass`, then `name.kar`.
 // `item_path` is the item's path as the queue holds it.
 [[nodiscard]] std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path);
+
+// What became of a lyrics file put beside a stream (place_lyrics_beside).
+enum class PlacementStatus : std::uint8_t {
+    // The stream's own `.lrc` was written.
+    kWritten,
+    // A file of that name was already beside the stream, and was left as it was.
+    kExists,
+    // The lyrics file could not be read, or is not lyrics; `error` says why.
+    kUnreadable,
+    // The `.lrc` could not be written; `error` says why.
+    kFailed,
+};
+
+struct Placement {
+    PlacementStatus status = PlacementStatus::kFailed;
+    // The `.lrc` written, or the one that was already there.
+    std::filesystem::path path{};
+    std::string error{};
+};
+
+// Puts a lyrics file beside a stream as the stream's own, under the stream's name with `.lrc`: where
+// find_lyrics_file looks, and so where every player finds it. Whatever format the file is in (`.lrc`,
+// `.srt`, `.ass` or `.kar`, read as parse_timed_text reads them), what is written is the one format
+// every reader of the stream has: UTF-8 LRC, with a duet's singers and names, word times where the
+// file has them, and the gaps a cue-timed file leaves between its lines marked (write_lrc). An
+// existing file of that name is never overwritten, and is reported as kExists whatever
+// `lyrics_file` holds. `duration_ms` is the stream's length, for the end of the last line.
+[[nodiscard]] Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
+                                            const std::filesystem::path& stream_path,
+                                            std::optional<std::int64_t> duration_ms = std::nullopt);
 
 // Whether any line has a singer: the file is a duet and a view shows who sings what.
 [[nodiscard]] bool has_singers(const Lyrics& lyrics);

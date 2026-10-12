@@ -544,20 +544,24 @@ config ICLFORGE_EXAMPLE_DECODE_STACK_BYTES
 
 config ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM
     int "Put the decode task's stack in PSRAM when present (1) or internal SRAM (0)"
-    default 1 if ICLFORGE_AC4 && IDF_TARGET_ESP32S3 && SPIRAM
+    default 1 if IDF_TARGET_ESP32S3 && SPIRAM
     default 0
     range 0 1
     help
         An int rather than a bool so it reaches C++ as a plain constant.
         For a part whose internal RAM is what Wi-Fi leaves it: on an
         ESP32-S3 with Wi-Fi and the player up no internal block is over
-        31,744 bytes, which is less than an AC-4 5.1 play with A-CPL needs
-        (planning/ac4.md, D14c). Needs CONFIG_SPIRAM and
-        CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM; without PSRAM present the
-        stack is internal as before. On by default for an ESP32-S3 image
-        with AC-4 and PSRAM. The stack is then read through the data cache:
-        measured on a board, a 2.0 A-SPX frame took 5% longer and AC-3 and
-        E-AC-3 frames the same (docs/platforms/bare-metal/esp32-s3.md, AC-4).
+        31,744 bytes, which is less than this option's 32,768-byte stack
+        and less than an AC-4 5.1 play with A-CPL needs (planning/ac4.md,
+        D14c). Needs CONFIG_SPIRAM and CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM;
+        without PSRAM present the stack is internal as before. On by default
+        for an ESP32-S3 image with PSRAM, whether or not it has AC-4: it was
+        on only with AC-4 until 2026-10-12, when an HTTP POST /play on the
+        S3 release image, which has none, could not start its decode task
+        (planning/esp32-platform-profiles.md). The stack is then read
+        through the data cache: measured on a board, a 2.0 A-SPX frame took
+        5% longer and AC-3 and E-AC-3 frames the same
+        (docs/platforms/bare-metal/esp32-s3.md, AC-4).
 
 # A PLAY'S START - PlayerConfig::hold_first_unit. The first access unit held
 # until the second has decoded, so the sink starts with two frames queued;
@@ -694,7 +698,8 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS
 config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
     int "E-AC-3 objects reconstructed and placed in real time (-1 = none stated, 0 = none)"
     default 0 if IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C3
-    default 4 if IDF_TARGET_ESP32S3 && ICLFORGE_EXAMPLE_DECODE_LANE = 1
+    default 0 if IDF_TARGET_ESP32S3
+    default 12 if IDF_TARGET_ESP32P4
     default -1
     range -1 15
     help
@@ -703,16 +708,45 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
         than this (planning/hearth-sendspin-extension.md): decoded on the board, a stream past it
         plays its bed alone. 0 is a statement, not an absence: the fixed-point decoder of an
         ESP32-C6 or ESP32-C3 plays the bed and reconstructs no objects. -1 states nothing, which a
-        server reads as the board placing whatever the format carries (the ESP32-P4: 12 objects
-        take 0.79 of real time, 15 extrapolate to about 0.9).
+        server reads as the board placing whatever the format carries; no build here uses it now.
 
-        The ESP32-S3's 4 is its release image's (sdkconfig.s3-fast) with the decode lane on:
-        a 32 ms frame of JOC 7.1.4 takes 0.92 of real time with 4 objects, 1.02 with 5 and 1.15
-        with 6, about 3.1 to 3.7 ms an object; without the lane 4 objects take 1.11
-        (planning/esp32-714-realtime.md, measured 2026-10-11).
+        The ESP32-P4's 12 is its figure over Sendspin (release image, lane on, null sink, 7.1.4,
+        x real time of a 32 ms frame, 2026-10-12): 2 objects 0.41, 4 0.49, 6 0.59, 8 0.68
+        (11 bursts late), 12 0.85 (worst burst 1.24), and 15 0.97 with 24 underruns, about 1.5 to
+        1.8 ms an object. 8 is the comfortable value and 12 is the margin; 9 to 11 and 13 to 14
+        were not run.
+
+        The ESP32-S3's 0 is its figure over Sendspin at 7.1.4, which is the path and the layout a
+        Hearth server plays it with (release image sdkconfig.s3-fast, decode lane on, null sink, x
+        real time of a 32 ms frame, S3b, 2026-10-12): channel-based 7.1.4 0.78 with no coding
+        tool and 0.95 with all, and JOC with 2 objects (the probe's count, LFE bed object
+        included) 0.95 with 113 underruns, 3 0.98 with 370, 4 1.13 with 96 late, 5 1.26, 6 1.41,
+        enhanced coupling 1.33. No count of objects has a margin there. Over HTTP the same streams
+        are 0.15 to 0.25 lower, which is where 4 objects at 0.92 came from, and that is not the
+        path a board is played by. With the lane off every figure is worse (3 objects 1.13).
+        0 is what a server needs to know: past it a stream with objects goes to the board as PCM
+        rendered on the host where the board lists wide enough PCM, and otherwise as its bed.
+
+        The ESP32-P4's 12 is its figure over Sendspin (release image, lane on, null sink, 7.1.4,
+        x real time of a 32 ms frame, 2026-10-12): 2 objects 0.41, 4 0.49, 6 0.59, 8 0.68
+        (11 bursts late), 12 0.85 (worst burst 1.24), and 15 0.97 with 24 underruns, about 1.5 to
+        1.8 ms an object. 8 is the comfortable value and 12 is the margin; 9 to 11 and 13 to 14
+        were not run.
+
+        The ESP32-S3's 2 is its release image's (sdkconfig.s3-fast) with the decode lane on, over
+        Sendspin, which is the path a Hearth server plays it by. A 32 ms frame of channel-based
+        7.1.4 takes 0.77 of real time there with no coding tool and 0.95 with all of them, and each
+        object adds about 0.1 (3.1 to 3.7 ms): 2 objects about 0.97, where the demo stream (about
+        4 objects) took 1.08 with 72 chunks late, objects-mdct 1.17 with 108 late, height 1.38 with
+        190, and a 15-object DEE stream 2.27 (null sink, 2026-10-12). Over HTTP the same streams are
+        0.15 to 0.25 lower, which is where 4 objects at 0.92 came from; that figure is not the
+        Sendspin path's. Without the lane 4 objects take 1.11 even over HTTP
+        (planning/esp32-714-realtime.md).
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
     int "Largest lyric document held for the item playing, bytes (0 = none)"
+    default 0 if !SPIRAM
+    default 2048 if IDF_TARGET_ESP32S3
     default 16384
     range 0 60000
     help
@@ -720,10 +754,28 @@ config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
         lists the `lyrics` command, as an LRC text, and then where in the item
         the sound is; the board follows them on its own playout clock and
         reports the line it has the sound in. The document is parsed into
-        lines and words, which take about three times its size in heap, and a
-        server keeps its message within the largest chunk taken above, so the
-        smaller of the two is what it sends. 0 lists neither command and
-        holds nothing, for a part with no heap to spare.
+        lines and words, which are many small blocks: measured with Wi-Fi up
+        and a stream playing, word-timed lines take about ten times their
+        text of heap at the peak, while read, and six times once held (plain
+        lines about half that). In internal RAM that is what Wi-Fi's receive
+        buffers and the decoder come out of: an S3 was left 27 KB at its
+        least with a 64-byte document, 7.8 KB with 2,000 bytes and 0.4 KB
+        with 4,000; a P4 223 KB, 182 KB with 4,000 bytes and 66 KB with
+        16,000; a C6's Wi-Fi receive buffers failed to allocate at 2,000.
+        So a part with PSRAM reads and holds the document there
+        (main/sendspin/player/psram_scope.hpp), which leaves the message as
+        it arrives (a few times its size, for a moment) and the receive
+        buffer that keeps the room of the largest message: an S3 with 5.1
+        playing was left 27 KB at its least with a 64-byte document, 19.5 KB
+        with 2,000 bytes, 9.3 KB with 8,000, and 16,000 broke the play. The
+        defaults are what each part spares: none without PSRAM, 2,048 on an
+        S3, 16,384 otherwise. A server keeps its message within the largest
+        chunk taken above as well, so the smaller of the two is what it
+        sends, and a document that does not fit is sent as none. The board
+        takes a document only while three times its size (twelve times of
+        internal RAM where PSRAM has no room) and 8 KB of internal heap are
+        free, and otherwise holds none and says why on its console. 0 lists
+        neither command and holds nothing.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS
     int "Lead a stream's first chunk needs, milliseconds (required_lead_time_ms)"
