@@ -2767,6 +2767,17 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Shared code**
+
+- **The picture of a CD+G disc is shared code, `apps/shared/cdg-picture`.** Hearth's picture item
+  and the frame cache that was in its `KaraokeController` moved to a project of their own so that
+  Crucible and the Forge GUI can draw a disc as well: `CdgFrames` (a disc as images by position,
+  Qt Gui only), `CdgFrameSource` (what a window asks for a frame, `pictureFrame(key, positionMs)`,
+  and is told changed by `pictureChanged(key)`) and `CdgPicture` (the Qt Quick item, which takes a
+  `source` where it took a `controller`). A program may not use another program, and Crucible's
+  row did not list Hearth, so the item could not be reached where it was. Nothing is drawn or
+  timed differently (planning/karaoke-phase2.md, W13f).
+
 **JSON**
 
 - **An object scene file is read with nlohmann/json, not a hand-written tokenizer.** `iclforge::objects`
