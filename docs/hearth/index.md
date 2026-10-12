@@ -265,6 +265,40 @@ only, and stays off when the variable is unset, does not name a port, or names o
 bound. On Windows every note Hearth records for the report is also sent to the debugger output
 (`OutputDebugString`), where DebugView or an attached debugger shows it.
 
+### Command line
+
+`hearth` takes a few options. None is needed to use it: they open a file at start, and take
+screenshots of the window with nobody at the machine.
+
+| Option | What it does |
+|---|---|
+| `--open <file>` | Adds the file to the queue, once for each `--open`. With nothing in the queue the first file is the item that is loaded and cued (not playing), so the Play, Media and Karaoke pages show it |
+| `--seek <ms>` | Starts the first `--open` item at that position in milliseconds and holds it paused there, so a lyric view shows a word part way through (a stopped item has no position to show). It plays a moment of sound at the output it goes to, and needs an `--open` |
+| `--page <name>` | Opens on a page (`play`, `media`, `speakers`, `decoder`, `network`, `settings` or `karaoke`), or on a dialog over the Play page (`firstrun`, `shortcuts`, `about` or `licences`) |
+| `--decoder-format <eac3\|ac4>` | Which tab the Decoder page opens on |
+| `--open-output-picker` | Opens the output picker over the page |
+| `--smoke-shot <png>` | Saves the window to a PNG once it has settled, and quits, **with network discovery off**: nothing browses the network, so there is no firewall prompt and no sink from the network in the picture. This is the one to put in a script |
+| `--shot <png>` | The same capture with network discovery on, as the window runs. On Windows that asks for a Windows Firewall rule (a UAC prompt), so run it where somebody can answer it |
+
+A capture runs against a scratch settings store, so it neither reads nor changes a person's own
+queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
+asks for it. Its exit code is 0 for a picture saved, 2 when the picture could not be saved, and
+3 when an `--open` file did not load, or did not reach its `--seek` position, within fifteen seconds
+(the picture is saved all the same, for what the window said about the file). A script that
+regenerates screenshots can stop on that.
+
+```sh
+QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=C:\Windows\Fonts \
+  hearth --smoke-shot karaoke.png --page karaoke \
+         --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 5000
+```
+
+`QT_QPA_PLATFORM=offscreen` keeps a window from appearing, and `QT_QPA_FONTDIR` gives the
+offscreen platform a font directory, without which the text is drawn as boxes. The lyrics file
+beside the item is found as it is when the item is played. `ICLFORGE_GUI_LOCALE=de` (or `fr`,
+`es`, `ar`, `he`, `yi`) takes the picture in that language, for a run that leaves the person's own
+choice alone.
+
 ## ESP32 sinks
 
 `hearth_sink` uses Improv Wi-Fi for initial network setup and Sendspin to pair with a server and
