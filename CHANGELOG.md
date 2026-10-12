@@ -29,6 +29,22 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
+
+- **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
+  field (`bsmod` 7 above 1/0 in Table E1.2 by reference to Table 5.7; a service-type value in
+  Annex G and EN 300 468) and defines no reproduction; Dolby's reference decoder reproduces it with
+  Annex C's coefficients, taking `clev` and `slev` from the Lo/Ro mixing group. AC-4 has no karaoke
+  value at all. `planning/karaoke-eac3-findings.md` gives the clauses and the commands, and the
+  corrections to what the repository said (`planning/karaoke-eac3.md`, E0).
+- **A support matrix, AC-3 beside E-AC-3.** Every karaoke capability by platform and feature, each
+  cell with its test or command and its owner, and two AC-3 gaps found by measuring: `forge
+  transcode` drops `bsmod`, and the LFE's level in the reproduction differs from Dolby's
+  (`planning/karaoke-support-matrix.md`).
+- **The AC-4 options.** Presentations, a dialogue substream with the listener's gain, and a vocal
+  object, side by side with what each does on a stock decoder, how it is authored from stems and
+  carried to a sink, measured with the repository's own decoder (`planning/karaoke-ac4-options.md`).
+
 **Hearth for Android: the plan**
 
 - **A plan, its findings and one screen design for Hearth's three surfaces.** `planning/hearth-android.md`
