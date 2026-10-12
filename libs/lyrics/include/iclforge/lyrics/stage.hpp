@@ -98,6 +98,15 @@ struct Stage {
 [[nodiscard]] Stage make_stage(const Lyrics* lyrics, std::optional<std::int64_t> position_ms,
                                std::int64_t delay_ms = 0, const StageOptions& options = {});
 
+// How many lines of `lyrics` have text: the lines of the song a singer sees. A line that only marks a
+// time (where the last line ends, or an instrumental break begins) is in `lines` and is not one of
+// them, so a screen that says "line 3 of 12" counts these and not lines.size().
+[[nodiscard]] std::size_t text_line_count(const Lyrics& lyrics);
+
+// The place, from 1, of line `index` among the lines that have text (the number a screen says); 0
+// for a line with no text and for an index past the end.
+[[nodiscard]] std::size_t text_line_number(const Lyrics& lyrics, std::size_t index);
+
 // Whether `text` (UTF-8) reads right to left: its first strong character is Hebrew, Arabic, Syriac,
 // Thaana or N'Ko, which is the Unicode bidirectional algorithm's rule for a paragraph's base direction
 // (P2, P3) over those scripts. Digits, punctuation, spaces, symbols and bytes that are not UTF-8 are

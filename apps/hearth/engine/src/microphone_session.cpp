@@ -143,8 +143,9 @@ MicrophoneHealth MicrophoneSession::pump(std::int64_t now_ns) {
         const double since_s =
             last_level_ns_ == 0 ? 0.0 : static_cast<double>(now_ns - last_level_ns_) / 1e9;
         last_level_ns_ = now_ns;
-        level_db_ =
-            std::max(block_db, static_cast<float>(level_db_ - kMeterReleaseDbPerSecond * since_s));
+        // The meter falls at a fixed rate; the arithmetic is in double and narrowed once.
+        const double released = static_cast<double>(level_db_) - kMeterReleaseDbPerSecond * since_s;
+        level_db_ = std::max(block_db, static_cast<float>(released));
         if (peak >= 0.99F) {
             ever_clipped_ = true;
             clipped_at_ns_ = now_ns;
