@@ -492,15 +492,23 @@ line.
 
 **What the server sends, and when.** The document at the start of each item, to every member that
 holds lyrics, and again to one whose state does not report that item (one that joined while it
-played, or came back). An anchor when the sound's speed changes, when the position jumps or drifts
+played, or came back, or restarted), but not within two seconds of sending it, which is a round
+trip and the sink's polling, and not an item the sink was told has none. An anchor when the sound's speed changes, when the position jumps or drifts
 more than 150 ms from what the last anchor predicts, and at least every five seconds. The speed is
 the one measured from the position the server hears, not the transport's: a pause takes the length
 of the members' buffer to be heard, and the position stops by itself when it is.
 
 **What the sink does.** A `stream/clear` drops the position and keeps the document; `stream/end`
 drops both. The sink reports `lyrics` in its state when it takes a document and whenever the line
-changes. It keeps what it holds in the space `max_bytes` states: a parsed document is lines and
-words, about three times its text.
+changes. It keeps what it holds in the space `max_bytes` states, and a parsed document is lines
+and words: measured on boards with Wi-Fi up, word-timed lines cost about ten times their text of
+heap at the peak, while the document is read, and six times once held (plain lines about half
+that), in many small blocks. Held in internal RAM that is what the Wi-Fi receive buffers and the
+decoder come out of (an S3 playing a 5.1 stream was left 27 KB at its least with a 64-byte
+document, 7.8 KB with 2,000 bytes and 0.4 KB with 4,000; a P4 223 KB, 182 KB with 4,000 bytes and
+66 KB with 16,000; an S3 playing E-AC-3 has a few hundred bytes to spare before any), so a sink
+with PSRAM reads and holds the document there, and takes it only while twelve times its size and a
+reserve are free, otherwise holding none, which it reports as it does an item with none.
 
 ### Errors and limits
 

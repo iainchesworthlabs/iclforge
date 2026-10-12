@@ -36,6 +36,7 @@
 #include "qsettings_store.hpp"
 #include "server_identity.hpp"
 #include "settings_model.hpp"
+#include "sink_lyrics_text.hpp"
 #include "shared_pairing_store.hpp"
 #include "sink_firmware.hpp"
 #include "sink_firmware_view.hpp"
@@ -380,6 +381,7 @@ struct LayoutFields {
     map[QStringLiteral("streamText")] = stream_text;
     map[QStringLiteral("objectsText")] = objects_text;
     map[QStringLiteral("dialogueText")] = dialogue_text;
+    map[QStringLiteral("lyricsText")] = sink_lyrics_text(facts);
 
     const forge::Counters counters = facts.iclforge_state ? facts.iclforge_state->counters : forge::Counters{};
     map[QStringLiteral("playedText")] = QObject::tr("%1 bursts").arg(counters.bursts_played);
