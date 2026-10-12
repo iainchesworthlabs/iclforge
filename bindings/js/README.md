@@ -78,7 +78,8 @@ const program = decodeFile(module, bytes, {
 ### Karaoke streams
 
 An AC-3 stream flagged `bsmod` 7 with a layout wider than mono is an Annex C karaoke stream (ETSI
-TS 102 366): L and R, a guide melody where a centre would be, and one or two vocals where the
+TS 102 366), and so is an E-AC-3 programme of one independent substream with the same flag: L and
+R, a guide melody where a centre would be, and one or two vocals where the
 surrounds would be. `FoldOptions` takes the reproduction a karaoke-aware or karaoke-capable
 decoder gives it, and `program.karaoke` (and each push's `outcome.karaoke`) says whether the stream
 is one:
@@ -102,7 +103,8 @@ const lead = decodeFile(module, bytes, {
 
 The reproduction is applied to the fold, so `program.fold` is where it comes out: three channels
 (four with an LFE) at `AsCoded`, two at `LoRo`. It changes nothing for a stream that is not
-karaoke (E-AC-3 and AC-4 never are). These are the library's own output stage: the same samples
+karaoke (an E-AC-3 programme with a dependent substream or an object layer, and AC-4, never
+are). These are the library's own output stage: the same samples
 `forge decode karaoke` and `channels=2 karaoke=v1` write.
 
 ## Push-frame decode

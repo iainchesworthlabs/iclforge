@@ -15,9 +15,12 @@
 #include <string>
 #include <vector>
 
+#include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
+#include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/oba/joc.hpp"
 #include "iclforge/base/bitreader.hpp"
 #include "iclforge/objects/emdf.hpp"
@@ -298,4 +301,99 @@ TEST_CASE("session: each unit the item plays is reported with its frames, and no
         sum += frames;
     }
     CHECK(sum == delivered);
+}
+
+// Whether an item is karaoke, for the sinks that decode it themselves (ItemFacts::karaoke): an AC-3
+// stream flagged bsmod 7 above 1/0, as it always was, and an E-AC-3 programme the decoder would
+// reproduce (ac3::is_karaoke_programme): the same flag, one independent substream, no object layer
+// (planning/karaoke-eac3.md, D1 to D3).
+namespace {
+
+std::vector<std::byte> eac3_stream(iclforge::ac3::meta::BitstreamMode bsmod,
+                                   iclforge::ac3::Acmod acmod, bool lfe, bool dependent) {
+    iclforge::ac3::eac3::FrameConfig bed;
+    bed.bitrate_kbps = 448;
+    bed.acmod = acmod;
+    bed.lfe = lfe;
+    bed.info = iclforge::ac3::meta::BsiInfo{.bsmod = bsmod};
+    iclforge::ac3::eac3::AccessUnitConfig config;
+    config.independent = bed;
+    if (dependent) {
+        iclforge::ac3::eac3::FrameConfig rear;
+        rear.bitrate_kbps = 320;
+        rear.acmod = iclforge::ac3::Acmod::k2_2;
+        rear.chanmap = iclforge::ac3::eac3::chanmap::k71Rear;
+        config.dependents.push_back(rear);
+    }
+    iclforge::ac3::eac3::AccessUnitEncoder encoder{config};
+    const auto channels = static_cast<std::size_t>(encoder.channel_count());
+    std::vector<std::byte> out;
+    for (int f = 0; f < 4; ++f) {
+        std::vector<std::vector<float>> pcm(channels, std::vector<float>(iclforge::ac3::kSamplesPerFrame));
+        std::vector<std::span<const float>> views;
+        for (std::size_t ch = 0; ch < channels; ++ch) {
+            for (std::size_t n = 0; n < pcm[ch].size(); ++n) {
+                pcm[ch][n] = static_cast<float>(
+                    0.3 * std::sin(2.0 * std::numbers::pi * (300.0 + 100.0 * static_cast<double>(ch)) *
+                                   static_cast<double>(n + static_cast<std::size_t>(f) * 1536) /
+                                   48000.0));
+            }
+            views.emplace_back(pcm[ch]);
+        }
+        const auto unit = encoder.encode_access_unit(views);
+        REQUIRE(unit.has_value());
+        out.insert(out.end(), unit->bytes.begin(), unit->bytes.end());
+    }
+    return out;
+}
+
+bool opens_as_karaoke(std::vector<std::byte> stream) {
+    const ItemLoader loader = [&stream](const std::string&) -> std::expected<LoadedItem, std::string> {
+        return LoadedItem{.bytes = stream};
+    };
+    auto session = Session::open("karaoke", loader);
+    REQUIRE(session.has_value());
+    return session->facts().karaoke;
+}
+
+}  // namespace
+
+TEST_CASE("session: an E-AC-3 karaoke programme of one independent substream is karaoke",
+          "[hearth][session][karaoke]") {
+    using iclforge::ac3::Acmod;
+    using iclforge::ac3::meta::BitstreamMode;
+    const BitstreamMode karaoke = BitstreamMode::kVoiceOverOrKaraoke;
+
+    CHECK(opens_as_karaoke(eac3_stream(karaoke, Acmod::k3_2, true, false)));
+    CHECK(opens_as_karaoke(eac3_stream(karaoke, Acmod::k2_2, false, false)));
+    CHECK(opens_as_karaoke(eac3_stream(karaoke, Acmod::k3_0, false, false)));
+
+    // The rule's other terms: not flagged, a service type that is not karaoke, below 2/0, and a
+    // dependent substream (the specification gives it no V1 or V2, so the decoder plays it as coded).
+    CHECK_FALSE(opens_as_karaoke(eac3_stream(BitstreamMode::kCompleteMain, Acmod::k3_2, true, false)));
+    CHECK_FALSE(opens_as_karaoke(eac3_stream(karaoke, Acmod::k1_0, false, false)));
+    CHECK_FALSE(opens_as_karaoke(eac3_stream(karaoke, Acmod::k3_2, true, true)));
+}
+
+TEST_CASE("session: an AC-3 karaoke stream is karaoke, as it was", "[hearth][session][karaoke]") {
+    const auto ac3_stream = [](iclforge::ac3::meta::BitstreamMode bsmod) {
+        iclforge::ac3::EncoderConfig config;
+        config.bitrate_kbps = 448;
+        config.acmod = iclforge::ac3::Acmod::k3_2;
+        config.lfe = true;
+        config.info.bsmod = bsmod;
+        iclforge::ac3::FrameEncoder encoder{config};
+        const auto channels = static_cast<std::size_t>(encoder.channel_count());
+        std::vector<std::byte> out;
+        for (int f = 0; f < 4; ++f) {
+            const std::vector<float> samples(iclforge::ac3::kSamplesPerFrame, 0.1F);
+            const std::vector<std::span<const float>> views(channels, samples);
+            const auto frame = encoder.encode_frame(views);
+            REQUIRE(frame.has_value());
+            out.insert(out.end(), frame->begin(), frame->end());
+        }
+        return out;
+    };
+    CHECK(opens_as_karaoke(ac3_stream(iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke)));
+    CHECK_FALSE(opens_as_karaoke(ac3_stream(iclforge::ac3::meta::BitstreamMode::kCompleteMain)));
 }
