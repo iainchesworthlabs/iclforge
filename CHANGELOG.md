@@ -301,6 +301,19 @@ The sections below contain the complete change list and fixes.
   project) when E-AC-3's mixing metadata, or AC-3's Annex D, was off and the stream had neither, so
   the line and the project were a different stream than the window encoded; they are now written
   with their group, and a project that names either asks for it, as `forge` reads it.
+- **The C API reproduces a karaoke stream and reads lyrics.** `iclforge_decoder_create_with_karaoke()`
+  takes an `iclforge_karaoke_config_t` - the reproduction (`ICLFORGE_KARAOKE_OFF`, `_AWARE`,
+  `_CAPABLE`), the listener's vocals and the three part levels in dB against Table C.2.3, the span,
+  units and defaults Hearth's sliders and `forge decode karaoke-melody=` use - and a decoded frame
+  says `bsmod`, `is_karaoke`, `output_acmod`, `output_lfe` and `karaoke_reproduced`, so that a caller
+  lays out the three or four channels of a reproduction and not the five or six it coded. The AC-3
+  decoder had no output configuration at all before. `iclforge_lyrics_parse()` reads the bytes of an
+  LRC (UTF-8 or UTF-16), SubRip, Advanced SubStation Alpha or MIDI karaoke file into lines of timed
+  words with their singers, and `iclforge_lyrics_position()` is the stateless cursor Hearth uses.
+  31 functions are added, and a status, `ICLFORGE_ERROR_LYRICS_UNREADABLE`, with the reason in
+  `iclforge_lyrics_error_message()`. The reader is `libs/lyrics`, compiled into the library; a
+  build whose compiler has no `<filesystem>` answers the lyrics functions with
+  `ICLFORGE_ERROR_UNSUPPORTED` (planning/karaoke-phase2.md, W5).
 - **The browser decode demo reproduces karaoke streams.** `PushDecoder` and the npm package's
   `FoldOptions` take `karaoke` (as coded, aware, capable) and `karaokeVocals` (none, V1, V2, both),
   and every push says whether the unit is Annex C karaoke type. The demo page shows a control for
