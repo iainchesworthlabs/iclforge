@@ -29,6 +29,22 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: the Forge GUI's Karaoke flow offers it**
+
+- **The Karaoke flow's Save step has a Format: AC-3 (the default) or E-AC-3.** Annex C is
+  AC-3's and AC-3 stays what the flow writes unless it is asked otherwise; E-AC-3 writes the
+  same parts as one independent substream flagged `bsmod` 7 with its Lo/Ro mixing group (as
+  `forge eac3-encode` does, and the command line the step shows is that one), and a note beside
+  the choice says that E-AC-3's specification gives no reproduction for it, that Hearth, forge
+  and Dolby's reference decoder apply Annex C's, and that a player that does not reproduce it
+  plays the vocals from the surrounds. The Hear step plays the stream under the same three listenings
+  and part levels. A project file that names E-AC-3 opens the flow with that format.
+- **The stream player decodes an E-AC-3 karaoke stream under the choice.** It handed the
+  decoder no choice for E-AC-3, so a karaoke stream played as coded whatever the Hear step
+  said; one independent substream with no object layer now takes the reproduction and
+  reports L, C, R and the LFE, with the coded layout named beside it, as AC-3 does
+  (`planning/karaoke-eac3.md`, E6, D7).
+
 **E-AC-3 folds a stream with no `mixmdate` at -3 dB, as Dolby's decoder does**
 
 - **The default Lo/Ro levels of an E-AC-3 stream that sends no `mixmdate` are -3 dB for the centre
