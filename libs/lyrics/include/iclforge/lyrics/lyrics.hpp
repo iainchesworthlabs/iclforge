@@ -144,6 +144,20 @@ struct Lyrics {
 // dropped, `{\N}` is a space, an event that draws (`{\p1}`) and a `Comment:` are not lyrics, and
 // the column order is the file's own `Format:` line (the v4+ order where it has none). An event
 // with no karaoke tags is a line without words. Encodings and errors are parse_lyrics's.
+//
+// Two fields of an event are read for what they say about who sings and what is shown, and the
+// styles and positions are still not:
+//
+//   - Who sings a sung line (one with karaoke tags): where exactly two different actors (the Name
+//     column) are named on the sung lines, they are the two singers, in the order they first appear,
+//     and their names are the file's `first_singer_name` and `second_singer_name`; else where
+//     exactly two different styles are used on them, those are, with no names (a style's name is its
+//     author's own label). One, three or none marks nobody: it is not clear who is who.
+//   - Which of the lines at one time is read: a line that repeats another exactly (the same time,
+//     style, actor and syllables; a line written on two layers) is read once; and of lines at
+//     exactly one start and end in different styles, where some are sung the ones that are not, in a
+//     style of their own (a translation, a romanisation), are dropped, and where none is, the
+//     styles but the commonest in the file are. Lines at one time in one style are all read.
 [[nodiscard]] std::expected<Lyrics, std::string> parse_ass(
     std::string_view text, std::optional<std::int64_t> duration_ms = std::nullopt);
 

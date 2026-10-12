@@ -199,9 +199,24 @@ Each `Dialogue:` event is a line from its start to its end. Each `{\k50}` (and `
 the same duration, drawn differently) begins a **syllable** that lasts that many hundredths of a
 second after the one before; a syllable is a word of the line, so the fill moves by syllable, as
 the script's own sweep does. Everything else is dropped: the other override tags (`{\an8}`,
-`{\pos(...)}`), the styles, and any event that draws (`{\p1}`) or is a `Comment:`. `\N` is a
-space. The columns are the script's own `Format:` line, with the v4+ order where it has none, and
-an event with no karaoke tags is a line with no words.
+`{\pos(...)}`), the styles' fonts, colours and positions, and any event that draws (`{\p1}`) or is
+a `Comment:`. `\N` is a space. The columns are the script's own `Format:` line, with the v4+ order
+where it has none, and an event with no karaoke tags is a line with no words.
+
+Two columns are read for what they say and not for how they look:
+
+- **Who sings.** Where exactly two different **actors** (the `Name` column) are named on the sung
+  lines, the ones with karaoke tags, they are the two singers, the one who appears first being the
+  first vocal, and their names are the file's. Failing that, where exactly two different
+  **styles** are used on the sung lines, those are the two singers; a style's name is its
+  author's own label, so it is not shown as a name. One, three or none marks nobody, because it is
+  not clear who is who. Hearth's [duet view](#a-duet) then tells each line's singer, as it does for
+  a `V1:` or `V2:` marker in an `.lrc`.
+- **Which line at one time.** A line written on two layers, an outline under a fill, is one line.
+  Where lines in different styles share a start and an end, a line that is not sung and is in a
+  style of its own (a translation, a romanisation) is dropped beside the sung one, and where none
+  is sung the style that is commonest in the file is the one read. Lines of one style at one time
+  are all read, and a line that ends at another time than the sung one is a line of its own.
 
 ### MIDI karaoke
 
