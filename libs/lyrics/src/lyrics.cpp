@@ -383,9 +383,21 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
     }
 }
 
+// Bytes in a code page as the UTF-8 the program's decoder says they are, or nothing where it says the
+// page does not have them (or hands back something that is not UTF-8, which is no better).
+[[nodiscard]] std::optional<std::string> decode_legacy(const TextEncoding& encoding, std::string_view bytes) {
+    std::string utf8;
+    if (encoding.decoder == nullptr || !encoding.decoder(encoding.context, bytes, utf8) || !valid_utf8(utf8)) {
+        return std::nullopt;
+    }
+    return utf8;
+}
+
 // The bytes of a file as the UTF-8 they say: UTF-16 with a byte-order mark converted, a UTF-8 mark
-// dropped, anything else that is not UTF-8 refused with the reason, for both readers.
-[[nodiscard]] std::expected<std::string, std::string> decode_text(std::string_view text) {
+// dropped, anything else that is not UTF-8 read with the program's decoder where it gave one and
+// refused with the reason where it did not, for both readers.
+[[nodiscard]] std::expected<std::string, std::string> decode_text(std::string_view text,
+                                                                  const TextEncoding& encoding = {}) {
     // UTF-32 would begin with the same two bytes as UTF-16's little-endian mark,
     // then two zero bytes; no lyrics file starts with a NUL character.
     if (text.starts_with(std::string_view{"\xFF\xFE\x00\x00", 4}) ||
@@ -406,7 +418,15 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
         text.remove_prefix(3);
     }
     if (!valid_utf8(text)) {
-        return std::unexpected(std::string{"The lyrics file is not UTF-8 or UTF-16."});
+        if (encoding.decoder == nullptr) {
+            return std::unexpected(std::string{"The lyrics file is not UTF-8 or UTF-16."});
+        }
+        auto legacy = decode_legacy(encoding, text);
+        if (!legacy) {
+            return std::unexpected(std::string{"The lyrics file is not valid in the code page it was read as."});
+        }
+        converted = std::move(*legacy);
+        text = converted;
     }
     if (trim(text).empty()) {
         return std::unexpected(std::string{"The lyrics file is empty."});
@@ -787,6 +807,204 @@ struct AssText {
     return out;
 }
 
+// One Dialogue event, with the two fields that decide who sings it and which of the lines that share
+// a time is read: its Style, and its Name (the actor).
+struct AssEvent {
+    std::int64_t start = 0;
+    std::int64_t end = 0;
+    AssText text;
+    std::string style;
+    std::string actor;
+    Singer singer = Singer::kUnmarked;
+};
+
+[[nodiscard]] bool same_ass_syllables(const AssText& a, const AssText& b) {
+    if (a.karaoke != b.karaoke || a.syllables.size() != b.syllables.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < a.syllables.size(); ++i) {
+        if (a.syllables[i].centis != b.syllables[i].centis || a.syllables[i].text != b.syllables[i].text) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Which of the events that share a time are read. `events` are in order of start. Two things go:
+//
+//   - an event that says exactly what another does (the same time, style, actor and syllables), as a
+//     script that writes a line on two layers, an outline under a fill, does: it is one line;
+//   - of the lines at exactly one time in different styles, the ones that are not the sung line: where
+//     some carry karaoke tags, the ones that do not and are in a style of their own (a translation, a
+//     romanisation beside the kana), else, where none does, every style but the commonest in the file
+//     (the first, at a tie). Lines in one style stay, whatever their number: a top and a bottom
+//     line are two lines.
+//
+// Nothing is dropped from a time with one style, and a time never loses all its lines.
+void filter_ass_events(std::vector<AssEvent>& events) {
+    std::vector<bool> drop(events.size(), false);
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        if (drop[i]) {
+            continue;
+        }
+        for (std::size_t j = i + 1; j < events.size() && events[j].start == events[i].start; ++j) {
+            if (!drop[j] && events[j].end == events[i].end && events[j].style == events[i].style &&
+                events[j].actor == events[i].actor && same_ass_syllables(events[j].text, events[i].text)) {
+                drop[j] = true;
+            }
+        }
+    }
+
+    // How many events each style has, for the file's commonest, in order of first appearance.
+    std::vector<std::pair<std::string, std::size_t>> counts;
+    const auto count_of = [&counts](const std::string& style) -> std::size_t {
+        for (const auto& entry : counts) {
+            if (entry.first == style) {
+                return entry.second;
+            }
+        }
+        return 0;
+    };
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        if (drop[i]) {
+            continue;
+        }
+        const std::string key = lowercase(events[i].style);
+        bool found = false;
+        for (auto& entry : counts) {
+            if (entry.first == key) {
+                ++entry.second;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            counts.emplace_back(key, 1);
+        }
+    }
+
+    // The events still read, by their time, in file order within one.
+    std::vector<std::size_t> order;
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        if (!drop[i]) {
+            order.push_back(i);
+        }
+    }
+    std::stable_sort(order.begin(), order.end(), [&events](std::size_t a, std::size_t b) {
+        return events[a].start != events[b].start ? events[a].start < events[b].start
+                                                  : events[a].end < events[b].end;
+    });
+    for (std::size_t run = 0; run < order.size();) {
+        std::size_t stop = run + 1;
+        while (stop < order.size() && events[order[stop]].start == events[order[run]].start &&
+               events[order[stop]].end == events[order[run]].end) {
+            ++stop;
+        }
+        if (stop - run > 1) {
+            // The styles at this time, and the ones of its sung lines.
+            std::vector<std::string> styles;
+            std::vector<std::string> sung;
+            for (std::size_t k = run; k < stop; ++k) {
+                const std::string key = lowercase(events[order[k]].style);
+                if (std::find(styles.begin(), styles.end(), key) == styles.end()) {
+                    styles.push_back(key);
+                }
+                if (events[order[k]].text.karaoke && std::find(sung.begin(), sung.end(), key) == sung.end()) {
+                    sung.push_back(key);
+                }
+            }
+            if (styles.size() > 1) {
+                std::string kept;
+                if (sung.empty()) {
+                    std::size_t best = 0;
+                    for (const std::string& style : styles) {
+                        if (count_of(style) > best) {
+                            best = count_of(style);
+                            kept = style;
+                        }
+                    }
+                }
+                for (std::size_t k = run; k < stop; ++k) {
+                    const AssEvent& event = events[order[k]];
+                    const std::string key = lowercase(event.style);
+                    const bool read = sung.empty()
+                                          ? key == kept
+                                          : event.text.karaoke ||
+                                                std::find(sung.begin(), sung.end(), key) != sung.end();
+                    if (!read) {
+                        drop[order[k]] = true;
+                    }
+                }
+            }
+        }
+        run = stop;
+    }
+
+    std::size_t kept_count = 0;
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        if (!drop[i]) {
+            if (kept_count != i) {
+                events[kept_count] = std::move(events[i]);
+            }
+            ++kept_count;
+        }
+    }
+    events.resize(kept_count);
+}
+
+// Who sings each sung line (the ones with karaoke tags), from the fields that name a singer: the
+// actor where exactly two different actors are named on them, else the style where exactly two
+// different styles are. The one that comes first in the file is the first vocal. Anything else
+// (one, three, or none) marks nobody, because it is not clear who is who; a sung line of neither of
+// the two, or with no actor where actors are used, is for nobody in particular. Actors are the
+// singers' names when they are what told them apart; a style's name is the author's own label
+// and is not shown as one.
+void assign_ass_singers(std::vector<AssEvent>& events, Lyrics& lyrics) {
+    const auto distinct = [&events](std::string AssEvent::*field) {
+        std::vector<std::string> out;
+        for (const AssEvent& event : events) {
+            const std::string& value = event.*field;
+            if (!event.text.karaoke || value.empty()) {
+                continue;
+            }
+            const std::string key = lowercase(value);
+            const bool seen = std::any_of(out.begin(), out.end(), [&key](const std::string& known) {
+                return lowercase(known) == key;
+            });
+            if (!seen) {
+                out.push_back(value);
+            }
+        }
+        return out;
+    };
+    std::string AssEvent::*field = &AssEvent::actor;
+    std::vector<std::string> values = distinct(field);
+    if (values.size() != 2) {
+        field = &AssEvent::style;
+        values = distinct(field);
+        if (values.size() != 2) {
+            return;
+        }
+    }
+    const std::string first = lowercase(values[0]);
+    const std::string second = lowercase(values[1]);
+    for (AssEvent& event : events) {
+        if (!event.text.karaoke) {
+            continue;
+        }
+        const std::string key = lowercase(event.*field);
+        if (key == first) {
+            event.singer = Singer::kFirst;
+        } else if (key == second) {
+            event.singer = Singer::kSecond;
+        }
+    }
+    if (field == &AssEvent::actor) {
+        lyrics.first_singer_name = values[0];
+        lyrics.second_singer_name = values[1];
+    }
+}
+
 [[nodiscard]] bool looks_like_ass(std::string_view text) {
     std::size_t begin = 0;
     for (std::size_t i = 0; i <= text.size(); ++i) {
@@ -818,8 +1036,9 @@ struct AssText {
 }  // namespace
 
 std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
-                                                std::optional<std::int64_t> duration_ms) {
-    const auto decoded = decode_text(text);
+                                                std::optional<std::int64_t> duration_ms,
+                                                const TextEncoding& encoding) {
+    const auto decoded = decode_text(text, encoding);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }
@@ -991,8 +1210,9 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
 }
 
 std::expected<Lyrics, std::string> parse_subrip(std::string_view text,
-                                                std::optional<std::int64_t> duration_ms) {
-    const auto decoded = decode_text(text);
+                                                std::optional<std::int64_t> duration_ms,
+                                                const TextEncoding& encoding) {
+    const auto decoded = decode_text(text, encoding);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }
@@ -1069,8 +1289,9 @@ std::expected<Lyrics, std::string> parse_subrip(std::string_view text,
 }
 
 std::expected<Lyrics, std::string> parse_ass(std::string_view text,
-                                             std::optional<std::int64_t> duration_ms) {
-    const auto decoded = decode_text(text);
+                                             std::optional<std::int64_t> duration_ms,
+                                             const TextEncoding& encoding) {
+    const auto decoded = decode_text(text, encoding);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }
@@ -1079,13 +1300,13 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
     std::size_t end_column = 2;
     std::size_t text_column = 9;
     std::size_t columns = 10;
+    // The Style and Name columns, which are the v4+ order's fourth and fifth where there is no
+    // Format line, and nothing where there is one that does not name them.
+    constexpr std::size_t kNoColumn = static_cast<std::size_t>(-1);
+    std::size_t style_column = 3;
+    std::size_t actor_column = 4;
     bool in_events = false;
-    struct Event {
-        std::int64_t start = 0;
-        std::int64_t end = 0;
-        AssText text;
-    };
-    std::vector<Event> events;
+    std::vector<AssEvent> events;
     std::size_t begin = 0;
     const std::string_view all = *decoded;
     for (std::size_t i = 0; i <= all.size(); ++i) {
@@ -1108,6 +1329,8 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
         if (starts_with_nocase(line, "Format:")) {
             std::size_t found = 0;
             std::size_t column = 0;
+            style_column = kNoColumn;
+            actor_column = kNoColumn;
             std::string_view rest = line.substr(7);
             std::size_t from = 0;
             while (from <= rest.size()) {
@@ -1125,6 +1348,10 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
                 } else if (name == "text") {
                     text_column = column;
                     ++found;
+                } else if (name == "style") {
+                    style_column = column;
+                } else if (name == "name" || name == "actor") {
+                    actor_column = column;
                 }
                 ++column;
                 from = comma + 1;
@@ -1161,21 +1388,36 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
         if (parsed.drawing) {
             continue;
         }
-        events.push_back(Event{.start = *start, .end = std::max(*stop, *start), .text = std::move(parsed)});
+        AssEvent event;
+        event.start = *start;
+        event.end = std::max(*stop, *start);
+        event.text = std::move(parsed);
+        if (style_column != kNoColumn && style_column < fields.size()) {
+            event.style = std::string{trim(fields[style_column])};
+        }
+        if (actor_column != kNoColumn && actor_column < fields.size()) {
+            event.actor = std::string{trim(fields[actor_column])};
+        }
+        events.push_back(std::move(event));
     }
     if (events.empty()) {
         return std::unexpected(std::string{"The subtitle file has no dialogue in it."});
     }
     std::stable_sort(events.begin(), events.end(),
-                     [](const Event& a, const Event& b) { return a.start < b.start; });
+                     [](const AssEvent& a, const AssEvent& b) { return a.start < b.start; });
+    // Lines that share a time are read once, and who sings a sung line is read from its actor or
+    // its style (filter_ass_events, assign_ass_singers).
+    filter_ass_events(events);
 
     Lyrics lyrics;
     lyrics.timed = true;
+    assign_ass_singers(events, lyrics);
     lyrics.lines.reserve(events.size());
-    for (Event& event : events) {
+    for (AssEvent& event : events) {
         LyricLine line;
         line.start_ms = event.start;
         line.end_ms = event.end;
+        line.singer = event.singer;
         std::int64_t at = event.start;
         std::string joined;
         for (AssSyllable& syllable : event.text.syllables) {
@@ -1221,7 +1463,8 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
 }
 
 std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
-                                                      std::optional<std::int64_t> duration_ms) {
+                                                      std::optional<std::int64_t> duration_ms,
+                                                      const TextEncoding& encoding) {
     const std::string damaged = "The MIDI file is damaged.";
     if (!bytes.starts_with("MThd")) {
         return std::unexpected(std::string{"The file is not a MIDI file."});
@@ -1392,9 +1635,20 @@ std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
         if (header && !kept_header) {
             continue;
         }
+        // A syllable that is not UTF-8 is read in the code page the program gave, where it gave one.
+        std::string decoded;
         if (!valid_utf8(event.text)) {
-            return std::unexpected(std::string{"The words of the MIDI file are not UTF-8: they are probably in a "
-                                               "code page, which is not read. Save them as UTF-8."});
+            if (encoding.decoder == nullptr) {
+                return std::unexpected(std::string{"The words of the MIDI file are not UTF-8: they are probably in a "
+                                                   "code page, which is not read. Save them as UTF-8."});
+            }
+            auto legacy = decode_legacy(encoding, event.text);
+            if (!legacy) {
+                return std::unexpected(
+                    std::string{"The words of the MIDI file are not valid in the code page they were read as."});
+            }
+            decoded = std::move(*legacy);
+            text = decoded;
         }
         if (kept_header) {
             const std::string value{trim(text.substr(2))};
@@ -1490,12 +1744,13 @@ std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
 }
 
 std::expected<Lyrics, std::string> parse_timed_text(std::string_view text,
-                                                    std::optional<std::int64_t> duration_ms) {
+                                                    std::optional<std::int64_t> duration_ms,
+                                                    const TextEncoding& encoding) {
     // A MIDI file is bytes, not text: it is known by its header before anything decodes it.
     if (text.starts_with("MThd")) {
-        return parse_midi_karaoke(text, duration_ms);
+        return parse_midi_karaoke(text, duration_ms, encoding);
     }
-    const auto decoded = decode_text(text);
+    const auto decoded = decode_text(text, encoding);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }

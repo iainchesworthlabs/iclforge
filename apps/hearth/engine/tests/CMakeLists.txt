@@ -86,18 +86,21 @@ endif()
 # apps/hearth/CMakeLists.txt's own scope (it is never re-exported past that
 # one level), so it does not reach this file's scope as a plain variable read.
 if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
-    find_package(Qt6 6.8 QUIET COMPONENTS Core Gui Qml)
+    find_package(Qt6 6.8 QUIET COMPONENTS Core Gui Network Qml)
     if(Qt6_FOUND)
         add_executable(hearth_controller_tests
             ../../ui/tests/test_command_line.cpp
             ../../ui/tests/test_hearth_controller.cpp
             ../../ui/tests/test_karaoke_controller.cpp
             ../../ui/tests/test_microphone_controller.cpp
+            ../../ui/tests/test_single_instance.cpp
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/command_line.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/karaoke_controller.cpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/karaoke_controller.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/microphone_controller.cpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/microphone_controller.hpp"
+            "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/single_instance.cpp"
+            "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/single_instance.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/hearth_controller.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.cpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.hpp"
@@ -131,7 +134,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
             hearth_engine
             iclforge::containers
             iclforge::warnings iclforge::fmt iclforge::coverage
-            Qt6::Core Qt6::Gui Qt6::Qml
+            Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml
             Catch2::Catch2WithMain)
         # Windows only: this target links Qt6 as shared libraries
         # (Qt6Core(d).dll etc.) with nothing of its own to put them next
