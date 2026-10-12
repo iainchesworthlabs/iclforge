@@ -859,9 +859,10 @@ uses it.
 And **the Hearth sink firmware** ([planning/esp32-ota.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-ota.md#published-images),
 O8). No tag has been cut since this job landed (`v0.10.0-beta.1` has no `hearth-sink-*` assets), so
 this is what the workflow is configured to publish rather than a route a published release has
-been seen to take. `_build.yml`'s `package-esp32-firmware` job gathers the four board images `build-esp32s3`
+been seen to take. `_build.yml`'s `package-esp32-firmware` job gathers the five board images `build-esp32s3`
 and `build-esp32c3` build: `hearth-sink-esp32s3`, `hearth-sink-esp32c6` (4 MB table),
-`hearth-sink-esp32c6-16mb` and `hearth-sink-esp32p4-rev1`. Each is published as four files:
+`hearth-sink-esp32c6-16mb`, `hearth-sink-esp32p4-rev1` and `hearth-sink-esp32p4-rev3`. Each is
+published as four files:
 
 - `<image>-<version>.bin`, the app image, for an update over the network;
 - `-factory.bin`, the whole flash from `0x0`, for a new board (it overwrites NVS);
