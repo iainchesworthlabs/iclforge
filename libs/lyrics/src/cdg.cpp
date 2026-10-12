@@ -19,6 +19,7 @@ constexpr std::uint8_t kBorderPreset = 2;
 constexpr std::uint8_t kTileBlock = 6;
 constexpr std::uint8_t kScrollPreset = 20;
 constexpr std::uint8_t kScrollCopy = 24;
+constexpr std::uint8_t kTransparentColour = 28;
 constexpr std::uint8_t kLoadLow = 30;
 constexpr std::uint8_t kLoadHigh = 31;
 constexpr std::uint8_t kTileBlockXor = 38;
@@ -128,6 +129,9 @@ void CdgScreen::reset() {
     screen_.fill(0);
     table_.fill(0xFF000000U);
     border_ = 0;
+    fine_x_ = 0;
+    fine_y_ = 0;
+    transparent_.reset();
     applied_ = 0;
 }
 
@@ -165,6 +169,9 @@ void CdgScreen::apply(const CdgPacket& packet) {
         case kScrollCopy:
             scroll(packet, true);
             break;
+        case kTransparentColour:
+            transparent_ = static_cast<std::uint8_t>(data[0] & 0x0F);
+            break;
         case kLoadLow:
         case kLoadHigh: {
             const std::size_t base = packet.instruction == kLoadLow ? 0 : 8;
@@ -181,8 +188,7 @@ void CdgScreen::apply(const CdgPacket& packet) {
             break;
         }
         default:
-            // The transparent colour, and the instructions a disc may carry that a screen has no use
-            // for: nothing is composited, so they change nothing here.
+            // An instruction a disc may carry that a screen has no use for.
             break;
     }
 }
@@ -216,8 +222,12 @@ void CdgScreen::scroll(const CdgPacket& packet, bool copy) {
     const std::uint8_t fill = data[0] & 0x0F;
     const int horizontal = (data[1] >> 4) & 3;
     const int vertical = (data[2] >> 4) & 3;
-    // The command moves the picture by a whole tile: 1 is right or down, 2 is left or up, and the
-    // finer offsets in the low bits are a smooth scroll this does not draw.
+    // Every scroll command sets the display's fine offset, the low bits of the two direction bytes
+    // (also when it moves no tile, which is how a disc scrolls a pixel at a time); the bits a value
+    // past the largest offset spends are read as that largest.
+    fine_x_ = std::min(data[1] & 0x07, kCdgMaxFineScrollX);
+    fine_y_ = std::min(data[2] & 0x0F, kCdgMaxFineScrollY);
+    // The command moves the picture by a whole tile: 1 is right or down, 2 is left or up.
     const int dx = horizontal == 1 ? kTileWidth : (horizontal == 2 ? -kTileWidth : 0);
     const int dy = vertical == 1 ? kTileHeight : (vertical == 2 ? -kTileHeight : 0);
     if (dx == 0 && dy == 0) {
@@ -249,7 +259,11 @@ std::uint8_t CdgScreen::index_at(int x, int y) const {
 }
 
 std::uint32_t CdgScreen::colour(int index) const {
-    return table_[static_cast<std::size_t>(index & 0x0F)];
+    const std::size_t slot = static_cast<std::size_t>(index & 0x0F);
+    const std::uint32_t entry = table_[slot];
+    // Transparent keeps the table's red, green and blue and loses the alpha.
+    return transparent_.has_value() && static_cast<std::size_t>(*transparent_) == slot ? (entry & 0x00FFFFFFU)
+                                                                                         : entry;
 }
 
 std::vector<std::uint32_t> CdgScreen::pixels() const {
@@ -258,8 +272,12 @@ std::vector<std::uint32_t> CdgScreen::pixels() const {
         for (int x = 0; x < kCdgWidth; ++x) {
             const bool in_border = x < kBorderX || x >= kCdgWidth - kBorderX || y < kBorderY ||
                                    y >= kCdgHeight - kBorderY;
-            const std::uint8_t index = in_border ? border_ : screen_[static_cast<std::size_t>(y * kCdgWidth + x)];
-            out[static_cast<std::size_t>(y * kCdgWidth + x)] = table_[index & 0x0F];
+            // The border is a solid colour; the picture inside it is shown from the fine offset on,
+            // which stays inside the memory (at most 5 across and 11 down, in a border of 6 and 12).
+            const std::uint8_t index =
+                in_border ? border_
+                          : screen_[static_cast<std::size_t>((y + fine_y_) * kCdgWidth + x + fine_x_)];
+            out[static_cast<std::size_t>(y * kCdgWidth + x)] = colour(index);
         }
     }
     return out;

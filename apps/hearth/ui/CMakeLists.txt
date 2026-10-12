@@ -73,8 +73,6 @@ else()
 
     qt_add_executable(hearth
         src/main.cpp
-        src/cdg_picture.cpp
-        src/cdg_picture.hpp
         src/hearth_controller.cpp
         src/hearth_controller.hpp
         src/item_loader.cpp
@@ -97,11 +95,20 @@ else()
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.hpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
-        "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
+        "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp"
+        # The picture of a CD+G disc, shared with Crucible's lyric strip and the Forge GUI's
+        # player (apps/shared/cdg-picture): the disc as images by position, the source a
+        # controller gives them through, and the Qt Quick item that draws them.
+        "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frame_source.hpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frames.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frames.hpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_picture.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_picture.hpp")
     target_include_directories(hearth PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../engine/src"
+        "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src")
     target_link_libraries(hearth PRIVATE
         hearth_engine

@@ -44,8 +44,6 @@ qt_add_executable(hearth_qmltests
     tests/test_room.cpp
     tests/test_room.hpp
     src/test_outputs.hpp
-    src/cdg_picture.cpp
-    src/cdg_picture.hpp
     src/hearth_controller.cpp
     src/hearth_controller.hpp
     src/item_loader.cpp
@@ -62,7 +60,15 @@ qt_add_executable(hearth_qmltests
     "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/language_manager.cpp"
     "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/language_manager.hpp"
     "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
-    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
+    "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp"
+    # CdgPicture, which LyricView.qml draws a CD+G disc with, and what KaraokeController
+    # answers it through (the same reason as network_controller.cpp above: a QML_ELEMENT
+    # class is registered only by a target that compiles it).
+    "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frame_source.hpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frames.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frames.hpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_picture.cpp"
+    "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_picture.hpp")
 
 qt_add_qml_module(hearth_qmltests
     URI Hearth
@@ -84,6 +90,7 @@ add_dependencies(hearth_qmltests hearth)
 target_include_directories(hearth_qmltests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/apps/shared/preferences/src"
+    "${CMAKE_SOURCE_DIR}/apps/shared/cdg-picture/src"
     "${CMAKE_SOURCE_DIR}/apps/shared/media/src")
 target_compile_definitions(hearth_qmltests PRIVATE
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/qml")
