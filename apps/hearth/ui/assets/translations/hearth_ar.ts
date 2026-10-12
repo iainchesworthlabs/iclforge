@@ -5343,22 +5343,22 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::MicrophoneController</name>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="252"/>
+        <location filename="../../src/microphone_controller.cpp" line="255"/>
         <source>Nothing is playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="259"/>
+        <location filename="../../src/microphone_controller.cpp" line="262"/>
         <source>Reading the melody…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="333"/>
+        <location filename="../../src/microphone_controller.cpp" line="336"/>
         <source>The microphone went away. Plug it in again and turn it back on.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="337"/>
+        <location filename="../../src/microphone_controller.cpp" line="340"/>
         <source>The microphone stopped delivering audio. It may have been disconnected.</source>
         <translation type="unfinished"></translation>
     </message>
