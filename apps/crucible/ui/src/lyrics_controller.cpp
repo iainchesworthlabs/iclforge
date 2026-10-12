@@ -288,7 +288,13 @@ CrucibleLyrics::CrucibleLyrics(QObject* parent)
     }
 }
 
-CrucibleLyrics::~CrucibleLyrics() = default;
+CrucibleLyrics::~CrucibleLyrics() {
+    // The reading thread is joined while this object and its state are whole: a read that finished
+    // after them would be delivered to a lambda that holds `this`.
+    if (state_->monitor != nullptr) {
+        state_->monitor->setWanted(false);
+    }
+}
 
 qlonglong CrucibleLyrics::nowMs() const {
     const auto since = std::chrono::steady_clock::now().time_since_epoch();
