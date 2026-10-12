@@ -164,7 +164,9 @@ SessionOutput PlayerSession::receive(const transport::Frame& frame, std::int64_t
     if (opened.message.empty()) {
         return {};
     }
-    return on_message(opened.message, arrival);
+    SessionOutput out = on_message(opened.message, arrival);
+    out.large_document = opened.large_document;
+    return out;
 }
 
 SessionOutput PlayerSession::on_handshake_text(std::string_view text) {

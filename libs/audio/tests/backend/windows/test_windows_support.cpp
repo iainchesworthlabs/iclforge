@@ -1,5 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
+#include <cstdint>
+#include <cstdlib>
+
 #include <windows.h>
 // windows.h must precede the audio headers.
 #include <audioclient.h>
@@ -45,4 +49,27 @@ TEST_CASE("a driver merely declining the call is not the stream ending") {
     CHECK_FALSE(stream_gone(E_FAIL));
     CHECK_FALSE(stream_gone(AUDCLNT_E_BUFFER_TOO_LARGE));
     CHECK_FALSE(stream_gone(AUDCLNT_E_BUFFER_ERROR));
+}
+
+TEST_CASE("the performance counter and the steady clock share an epoch") {
+    // Capture stamps a packet with the performance counter's reading (GetBuffer's QPC position, in
+    // 100 ns) and says the time is on std::chrono::steady_clock's clock (capture.hpp,
+    // CaptureStamp): a consumer compares it with a playback position taken from that clock. The
+    // claim is that the two count from the same zero, which this holds the standard library to.
+    LARGE_INTEGER frequency{};
+    LARGE_INTEGER counter{};
+    REQUIRE(QueryPerformanceFrequency(&frequency));
+    const auto before = std::chrono::steady_clock::now().time_since_epoch();
+    REQUIRE(QueryPerformanceCounter(&counter));
+    const auto after = std::chrono::steady_clock::now().time_since_epoch();
+
+    const std::int64_t whole_seconds = counter.QuadPart / frequency.QuadPart;
+    const std::int64_t remainder = counter.QuadPart % frequency.QuadPart;
+    const std::int64_t counter_ns = whole_seconds * 1'000'000'000LL + remainder * 1'000'000'000LL / frequency.QuadPart;
+
+    const auto before_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(before).count();
+    const auto after_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(after).count();
+    // The counter was read between the two clock reads, to within a millisecond of slack.
+    CHECK(counter_ns >= before_ns - 1'000'000);
+    CHECK(counter_ns <= after_ns + 1'000'000);
 }

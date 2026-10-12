@@ -225,6 +225,35 @@ is explicit about the difference.
     as a display Windows extends onto at all, so there is no WMI monitor entry to read its SADs
     from even if this project wired one up.
 
+### When a packet was captured, and a requested period
+
+A microphone is only useful to an application that knows *when* each sample was captured, so that
+a take or a score can be placed against a playback position. `Capture` gives that, alongside the
+samples, and stays what it was for a caller that does not ask:
+
+- **`Capture::stamps()`** is a second lock-free ring, one `CaptureStamp` per packet: the index of
+  the packet's first frame in the stream the ring carries (silence fill included), and the time it
+  was captured, in nanoseconds on `std::chrono::steady_clock`'s clock. WASAPI's own packet position
+  (`GetBuffer`'s QPC position, in 100 ns) is read from the performance counter, which the MSVC
+  standard library's steady clock counts from the same zero; a test holds the two to that. A
+  packet the driver flags as having a bad time gets no stamp. For a loopback the stamp is when the
+  endpoint will play the packet, a little after it arrives.
+- **`CaptureTimeline`** (`capture_timeline.hpp`) turns the last 64 stamps into the time of any
+  frame, and a frame's index back from a time, by a least-squares line through them: a driver reads
+  its clock when it gets round to it, so the mean of a run of stamps is better than the nearest.
+  It also reports the rate the device actually runs at.
+- **`Capture::start(device, kind, CaptureOptions)`** can ask for a packet period in frames. Where
+  the engine has a shared-mode period of that size (`IAudioClient3`) the stream opens at the nearest
+  it offers; otherwise it opens as before. **`Capture::timing()`** says what was given: the period
+  and the endpoint's buffer.
+
+What this does *not* tell a caller is the delay between a sound and the microphone's stamp: the
+device and its driver add some. On the development workstation (a webcam's microphone and the
+motherboard's speakers, Windows 11 build 26200) a click handed to the render stream reached the
+application through the microphone about 130 ms later, with less than a millisecond of spread, and
+the engine's smallest shared-mode period (10 ms for both endpoints) bought nothing. A caller that
+needs the figure for its own equipment has to measure it.
+
 ### Per-process loopback and device notifications
 
 Two more WASAPI paths, added to the shared audio layer for [Crucible](../crucible/index.md)
