@@ -995,10 +995,13 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("");
         fmt::println("lyrics-to-lrc options (lyrics-to-lrc; any order, after the positional "
                      "arguments):");
-        fmt::println("  lyrics-encoding=<page>  the code page of an input that is not UTF-8 or "
-                     "UTF-16 (windows-1252, windows-1251, shift-jis, gbk, big5, euc-kr, ...);");
-        fmt::println("                    never guessed at: without it such a file is refused. "
-                     "A UTF-8 or UTF-16 file is read as it is");
+        fmt::println("  lyrics-encoding=<page>");
+        fmt::println("                    the code page of an input that is not UTF-8 or UTF-16 "
+                     "(windows-1252,");
+        fmt::println("                    windows-1251, shift-jis, gbk, big5, euc-kr, ...); never "
+                     "guessed at:");
+        fmt::println("                    without it such a file is refused. A UTF-8 or UTF-16 "
+                     "file is read as it is");
         fmt::println("  overwrite=1       replace the output file where there is one; the file "
                      "read is never written over");
     }
