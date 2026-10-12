@@ -28,6 +28,7 @@
 #include "freertos/message_buffer.h"
 #include "freertos/task.h"
 
+#include "ac4_stream.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
@@ -64,6 +65,9 @@ static_assert(kBlock == iclforge::ac3::kSamplesPerBlock, "the player writes the 
 constexpr std::size_t kMaxSlots = OutputLayout::kMaxSlots;
 // A burst is always 1,536 samples (planning/hearth-sendspin-extension.md).
 constexpr std::uint64_t kBurstFrames = 1536;
+// An AC-4 chunk is one frame, which lasts what its frame rate says: 2,048 samples at frame rate 13
+// and 48 kHz, until the first decoded frame says.
+constexpr std::uint64_t kAc4FrameFrames = 2048;
 // Ring bytes a chunk may not take, so a stream start, clear or end always
 // fits behind it.
 constexpr std::size_t kControlReserve = 512;
@@ -209,6 +213,15 @@ struct BurstPlayer::Impl {
     bool objects_always = false;
     // The decoder of an Opus stream, open from its start to its end, and the packet's samples.
     std::unique_ptr<OpusStream> opus;
+    // The decoder of an AC-4 stream of bursts: made when one starts, kept from one such stream to
+    // the next as the AC-3 ones are, and let go when another kind of stream starts or the settings
+    // it was made with change. A stream's chunks are one sync frame each.
+    std::unique_ptr<Ac4Stream> ac4;
+    // This stream could not open its decoder, or has had a frame refused: said once, and its
+    // chunks counted invalid.
+    bool ac4_failed = false;
+    // The samples the last decoded AC-4 frame lasted, for the late check.
+    std::uint64_t ac4_frame_samples = 0;
     std::array<std::int16_t, OpusStream::kMaxFrames * 2> opus_pcm{};
     std::optional<iclforge::ac3::FrameDecoder> ac3_decoder;
     // The decode lane (BurstPlayerConfig::decode_lane): started by the task, given back by it.
@@ -381,6 +394,11 @@ struct BurstPlayer::Impl {
     void drop_decoders() {
         ac3_decoder.reset();
         eac3_decoder.reset();
+        // The AC-4 decoder is made with the fold and the lane it has now: it goes, and the stream's
+        // next chunk makes another. The object stays, for the stream's own placement.
+        if (ac4) {
+            ac4->close();
+        }
     }
 
     // The sink opened for as many outputs as the routing and the identify
@@ -550,6 +568,9 @@ struct BurstPlayer::Impl {
         if (eac3_decoder) {
             eac3_decoder->reset();
         }
+        if (ac4) {
+            ac4->reset();
+        }
         programme.reset();
         bed_head = 0;
         bed_count = 0;
@@ -591,6 +612,23 @@ struct BurstPlayer::Impl {
         // An Opus stream's decoder is kept from one Opus stream to the next, as the AC-3 ones are,
         // and let go when another kind of stream starts; the AC-3 ones are let go when an Opus
         // stream does. Each is 27 KB or more, and a heap that WiFi has cut up has room for one.
+        // An AC-4 stream's decoder is the largest by far, 286 KB at 2.0: it goes with the AC-3
+        // ones when any other kind starts, and they go when it does. Its allocations go where
+        // CONFIG_ICLFORGE_AC4_INTERNAL_BELOW puts them for as long as the stream plays.
+        const bool ac4_stream = kind == Stream::kBursts && data_type == ac::DataType::kAc4;
+        ac4_failed = false;
+        ac4_frame_samples = 0;
+        if (!ac4_stream) {
+            ac4.reset();
+        } else {
+            ac3_decoder.reset();
+            eac3_decoder.reset();
+            opus.reset();
+            if (!ac4) {
+                ac4 = std::make_unique<Ac4Stream>();
+            }
+            ac4->begin_stream();
+        }
         const bool opus_stream = kind == Stream::kPcm && pcm_format.codec == m::Codec::kOpus;
         if (!opus_stream) {
             opus.reset();
@@ -657,6 +695,9 @@ struct BurstPlayer::Impl {
         playout->flush(esp_timer_get_time(), timed);
         report_stream_end();
         reset_decoding();
+        if (ac4) {
+            ac4->end_stream();
+        }
         stream = Stream::kIdle;
         have_decoder_report = false;
         active.store(false);
@@ -1027,6 +1068,88 @@ struct BurstPlayer::Impl {
                               .dialnorm = -static_cast<double>(au.dialnorm)};
     }
 
+    // One block of an AC-4 frame onto the layout and into the sink: the bed its channels are in, as
+    // deliver() sets one for an AC-3 block, and then the same render and emit.
+    static void ac4_block(void* self, const Ac4Stream::Block& block) {
+        static_cast<Impl*>(self)->ac4_deliver(block);
+    }
+
+    void ac4_deliver(const Ac4Stream::Block& block) {
+        if (!serving.fold && (!renderer_bed || !same_layout(*renderer_bed, block.bed))) {
+            renderer.set_bed(block.bed);
+            renderer_bed = block.bed;
+        }
+        const iclforge::ac3::PcmBlock pcm{.index = block.index,
+                                          .blocks = 0,
+                                          .channels = block.channels,
+                                          .objects = {},
+                                          .object_indices = {},
+                                          .object_metadata = nullptr};
+        const std::span<const std::span<float>> out(rendered.data(), layout.slots());
+        if (serving.fold) {
+            renderer.render_folded(pcm, 1.0F, out);
+        } else {
+            renderer.render(pcm, false, 1.0F, out);
+        }
+        emit(block.samples);
+    }
+
+    // One chunk of an AC-4 stream: its sync frame decoded. False when it was not one, which starts
+    // the decoder again.
+    [[nodiscard]] bool decode_ac4(std::span<const std::byte> sync_frame) {
+        if (ac4_failed || !ac4) {
+            invalid_chunks.fetch_add(1);
+            return true;
+        }
+        if (!ac4->is_open()) {
+            if (!ac4->open({.fold = serving.fold,
+                            .executor = lane.has_value() ? &*lane : nullptr,
+                            .max_channels = config.max_ac4_channels,
+                            .sample_rate_hz = config.sample_rate})) {
+                ac4_failed = true;
+                std::printf("burst player: cannot decode this AC-4 stream: %.*s\n",
+                            static_cast<int>(ac4->reason().size()), ac4->reason().data());
+                invalid_chunks.fetch_add(1);
+                return true;
+            }
+        }
+        switch (ac4->decode(sync_frame, &Impl::ac4_block, this)) {
+            case Ac4Stream::Result::kDecoded: {
+                ac4_frame_samples = ac4->frame_samples();
+                if (!have_decoder_report) {
+                    have_decoder_report = true;
+                    const Ac4Stream::Report& report = ac4->report();
+                    decoder_report = ac::DecoderReport{.data_type = data_type,
+                                                       .acmod = report.acmod,
+                                                       .lfe = report.lfe,
+                                                       .substreams = 1,
+                                                       .objects = 0,
+                                                       .objects_placed = false,
+                                                       .dialnorm = report.dialnorm_db};
+                }
+                return true;
+            }
+            case Ac4Stream::Result::kWaiting:
+                // Nothing came out for this chunk: the decoder is waiting for an I-frame, after a
+                // start or a reset, and its output will not begin at this chunk. The timeline is
+                // anchored again by the next chunk. Kept, decoded_frame would stay at the chunk
+                // the wait began at while the marks moved on, and every frame decoded after the
+                // I-frame would find no mark at or before it and be dropped for good.
+                decoded_frame_set = false;
+                mark_count = 0;
+                mark_head = 0;
+                return true;
+            case Ac4Stream::Result::kRefused:
+                ac4_failed = true;
+                std::printf("burst player: refusing this AC-4 stream: %.*s\n",
+                            static_cast<int>(ac4->reason().size()), ac4->reason().data());
+                return false;
+            case Ac4Stream::Result::kInvalid:
+                break;
+        }
+        return false;
+    }
+
     // A unit that does not decode: the decoders start again, and the next
     // burst is the start of a stream.
     void restart_after_error() {
@@ -1051,7 +1174,12 @@ struct BurstPlayer::Impl {
         // Too late to play any of it: dropped before it is decoded, and the
         // decoder starts again with the next.
         if (const std::optional<std::int64_t> next = playout->next_play_us(esp_timer_get_time())) {
-            const std::int64_t end = local_us + static_cast<std::int64_t>((kBurstFrames * 1'000'000) / config.sample_rate);
+            const std::uint64_t frames =
+                data_type == ac::DataType::kAc4
+                    ? (ac4_frame_samples != 0 ? ac4_frame_samples : kAc4FrameFrames)
+                    : kBurstFrames;
+            const std::int64_t end =
+                local_us + static_cast<std::int64_t>((frames * 1'000'000) / config.sample_rate);
             if (end < *next) {
                 ++late_chunks;
                 reset_decoding();
@@ -1065,8 +1193,14 @@ struct BurstPlayer::Impl {
         mark(frame, local_us);
         ++bursts_played;
         const std::int64_t started = esp_timer_get_time();
-        const bool whole = for_each_access_unit(std::as_bytes(payload),
-                                                [this](std::span<const std::byte> unit) { decode_unit(unit); });
+        // An AC-4 chunk is one sync frame, whole: it is not cut into units as AC-3's and E-AC-3's
+        // bursts are.
+        const bool whole = data_type == ac::DataType::kAc4
+                               ? decode_ac4(std::as_bytes(payload))
+                               : for_each_access_unit(std::as_bytes(payload),
+                                                      [this](std::span<const std::byte> unit) {
+                                                          decode_unit(unit);
+                                                      });
         if (!whole) {
             restart_after_error();
         }
@@ -1647,6 +1781,10 @@ BurstPlayerStatus BurstPlayer::status() const {
 }
 
 bool BurstPlayer::active() const { return impl_->active.load(); }
+
+bool BurstPlayer::decodes_ac4() {
+    return Ac4Stream::available();
+}
 
 bool BurstPlayer::decodes_opus() {
     return OpusStream::available();
