@@ -29,6 +29,35 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke: a pitch library**
+
+- **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one
+  against the other** (the microphone, scoring and recording programme, M1). A fundamental-frequency
+  tracker (the McLeod Pitch Method, written from the paper) that takes samples at any rate that is a
+  whole multiple of its analysis rate, low-passes and decimates them, and answers a pitch, a clarity and
+  a level every 10 ms; a reference as a contour on a fixed grid, from audio or from MIDI-style notes,
+  and the notes of a contour; and a scorer that counts, for a stretch of an item, how much of the
+  reference's voiced time the singer was within a tolerance of it (octaves folded, a key shift
+  optional), with how sharp or flat on average and an estimate of how early or late the singer is. It
+  also holds a deterministic synthetic singing voice with a known pitch, which is what its tests and
+  the later microphone tests are made of (no recording is bundled). Standard library only, internal,
+  and nothing links it yet.
+**Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
+
+- **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
+  field (`bsmod` 7 above 1/0 in Table E1.2 by reference to Table 5.7; a service-type value in
+  Annex G and EN 300 468) and defines no reproduction; Dolby's reference decoder reproduces it with
+  Annex C's coefficients, taking `clev` and `slev` from the Lo/Ro mixing group. AC-4 has no karaoke
+  value at all. `planning/karaoke-eac3-findings.md` gives the clauses and the commands, and the
+  corrections to what the repository said (`planning/karaoke-eac3.md`, E0).
+- **A support matrix, AC-3 beside E-AC-3.** Every karaoke capability by platform and feature, each
+  cell with its test or command and its owner, and two AC-3 gaps found by measuring: `forge
+  transcode` drops `bsmod`, and the LFE's level in the reproduction differs from Dolby's
+  (`planning/karaoke-support-matrix.md`).
+- **The AC-4 options.** Presentations, a dialogue substream with the listener's gain, and a vocal
+  object, side by side with what each does on a stock decoder, how it is authored from stems and
+  carried to a sink, measured with the repository's own decoder (`planning/karaoke-ac4-options.md`).
+
 **Hearth for Android: the plan**
 
 - **A plan, its findings and one screen design for Hearth's three surfaces.** `planning/hearth-android.md`
@@ -194,6 +223,13 @@ The sections below contain the complete change list and fixes.
   offset and a channel trim set on a part survive another part being added, replaced or removed;
   and a `.lrc` of the backing's name beside it (or one the author chooses) is put beside the saved
   stream under the stream's name, where Hearth finds it, never over a file already there.
+- **The Forge GUI's Hear step re-levels the capable player's parts.** Under **Capable**, a slider
+  for the melody and for each vocal sets its level against Table C.2.3 (0 dB is the table, -24 is
+  off, 12 dB the top: Hearth's span and `forge decode karaoke-melody=`'s), a part the stream lacks has
+  none, **Reset levels** puts them back, and the What plays table leaves out a part pulled to off.
+  The stream player takes the three levels (`karaokeMelodyDb`, `karaokeVocal1Db`,
+  `karaokeVocal2Db`, held to the library's span) and decodes the stream again when one moves
+  (planning/karaoke-phase2.md, W10).
 - **Hearth reproduces a karaoke stream.** `DecoderSettings` gains `karaoke` (aware by default,
   or capable, or off) and `karaoke_vocals`, which `decoder_setup()` hands to the output stage, and
   the stream decoder lays an AC-3 unit out from `output_mode()`: a karaoke stream played to a 5.1
