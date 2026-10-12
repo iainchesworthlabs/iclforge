@@ -1,0 +1,99 @@
+{
+  "format": 1,
+  "note": "The board suite's fixed play list (tools/hearth/board_suite.py, planning/esp32-platform-profiles.md, 'The board suite'). A stream is a file of the repository that the suite serves to the board and plays over POST /play; a profile's plays are the rows it is held to, in order. The figures a row is held to are recorded per profile in baselines/<profile>.json by `board_suite.py run --record`. A new feature is a new row here and a new figure there, in the same PR.",
+  "frame_us": 32000,
+  "tolerance": {
+    "relative": 0.05,
+    "absolute_permille": 20,
+    "stack_free_bytes": 512,
+    "headroom_ms": 2,
+    "note": "A decoder time per frame may be at most the baseline's plus the larger of 5% of it and 20 permille of a frame; the decode stack's free margin may be at most 512 bytes under the baseline's; the sink queue's least headroom at most 2 ms under. A proposal until the first recording runs take each row five times and the spread is written here."
+  },
+  "streams": {
+    "ac3-2.0": {
+      "file": "testdata/external-baseline/ac3-music-stereo-192/ffmpeg.ac3",
+      "codec": "AC-3",
+      "units": 938,
+      "what": "AC-3 2/0, 192 kbit/s, 30 s of music (FFmpeg)"
+    },
+    "eac3-2.0": {
+      "file": "testdata/external-baseline/eac3-music-stereo-96/ffmpeg.ec3",
+      "codec": "E-AC-3",
+      "units": 938,
+      "what": "E-AC-3 2/0, 96 kbit/s, 30 s of music (FFmpeg)"
+    },
+    "ac4-20-music": {
+      "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-192-3frames.ac4",
+      "codec": "AC-4",
+      "units": 3,
+      "pin": "ac4_20_music",
+      "what": "AC-4 2.0 from DEE, A-SPX, 192 kbit/s, three frames"
+    },
+    "ac4-20-acpl": {
+      "file": "testdata/ac4/constructed/2_0-acpl1-stereoproc.ac4",
+      "codec": "AC-4",
+      "pin": "ac4_20_acpl",
+      "what": "AC-4 2.0 constructed, A-CPL"
+    },
+    "ac4-51-music": {
+      "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-51-music-192-3frames.ac4",
+      "codec": "AC-4",
+      "units": 3,
+      "pin": "ac4_51_music",
+      "what": "AC-4 5.1 from DEE, 192 kbit/s, three frames"
+    },
+    "ac4-20-companding": {
+      "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-48-3frames.ac4",
+      "codec": "AC-4",
+      "units": 3,
+      "pin": "ac4_20_companding",
+      "what": "AC-4 2.0 from DEE, A-SPX with companding, 48 kbit/s, three frames"
+    }
+  },
+  "profiles": {
+    "s3-n16r8": {
+      "plays": [
+        {"id": "ac3-2.0", "stream": "ac3-2.0"},
+        {"id": "eac3-2.0", "stream": "eac3-2.0"}
+      ]
+    },
+    "s3-n16r8-ac4": {
+      "plays": [
+        {"id": "ac3-2.0", "stream": "ac3-2.0"},
+        {"id": "eac3-2.0", "stream": "eac3-2.0"},
+        {"id": "ac4-20-music", "stream": "ac4-20-music"},
+        {"id": "ac4-20-acpl", "stream": "ac4-20-acpl"},
+        {"id": "ac4-20-companding", "stream": "ac4-20-companding"}
+      ]
+    },
+    "c6-16mb": {
+      "note": "The C6 refuses an HTTP play on purpose (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES, #1395): its rows are that refusal, clean, with no reboot. Its audio path is Sendspin, which needs a server on the bench and is not in this list yet.",
+      "plays": [
+        {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"},
+        {"id": "eac3-2.0-refused", "stream": "eac3-2.0", "expect": "refused-memory"}
+      ]
+    },
+    "c6-4mb": {
+      "note": "No board on the bench: the rows are c6-16mb's, which differs in flash and partition table alone.",
+      "plays": [
+        {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"}
+      ]
+    },
+    "p4-rev1": {
+      "plays": [
+        {"id": "ac3-2.0", "stream": "ac3-2.0"},
+        {"id": "eac3-2.0", "stream": "eac3-2.0"}
+      ]
+    },
+    "p4-rev1-ac4": {
+      "plays": [
+        {"id": "ac3-2.0", "stream": "ac3-2.0"},
+        {"id": "eac3-2.0", "stream": "eac3-2.0"},
+        {"id": "ac4-20-music", "stream": "ac4-20-music"},
+        {"id": "ac4-20-acpl", "stream": "ac4-20-acpl"},
+        {"id": "ac4-51-music", "stream": "ac4-51-music"},
+        {"id": "ac4-20-companding", "stream": "ac4-20-companding"}
+      ]
+    }
+  }
+}

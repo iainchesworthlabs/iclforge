@@ -1,0 +1,838 @@
+#!/usr/bin/env python3
+"""The board suite: play a profile's fixed list on a booked board and hold it to a baseline.
+
+    python tools/hearth/board_suite.py plan   --profile s3-n16r8
+    python tools/hearth/board_suite.py run    --profile s3-n16r8 --host 192.168.1.45 \\
+        --lock D:/ac3bld/s3-board-45.lock --session 16d036 --purpose baseline [--record]
+    python tools/hearth/board_suite.py compare --run board-run.json \\
+        --baseline baselines/s3-n16r8.json
+    python tools/hearth/board_suite.py lock   take|release|show --file LOCK --session ID
+
+What it does (planning/esp32-platform-profiles.md, "The board suite"), and stops at the first
+refusal:
+
+1. **Booking.** `run` takes the lock file itself, atomically, and refuses with no `--lock` and
+   `--session`, or when the file exists: the rule is that a board nobody has booked is not one
+   to run on. It prints what a script cannot check (the other locks, the other sessions, a
+   running idf.py or esptool) as a checklist first, and releases the lock when it ends, whatever
+   happened, if it took it.
+2. **Identity.** GET /hardware must say the profile and the hash of its current definition
+   (`sink_profile.py identity`), and GET /status `stopped`. A board running another profile, an
+   older definition or an image built with neither is refused: its figures are not this
+   profile's.
+3. **Plays.** The repository's fixture streams are served from this machine and each row of the
+   profile's list (firmware/hearth-sink/suite.json) is played over POST /play, polled to its end,
+   and its lines read from GET /log.
+4. **Asserts**, per row: finished and not failed, every unit, no resynchronised byte, no sink
+   underrun, no failed allocation, no reboot, and for AC-4 the PCM hash the host pins
+   (testdata/ac4-probe-pcm-hashes.json). A row that expects the C6's refusal expects state
+   failed, why "memory", and no reboot.
+5. **Figures**, per row: the decoder's time per frame (`us_per_frame` less the sink's and the
+   renderer's, over the frame's 32 ms; an AC-4 play's own `decoder_permille`), the decode stack
+   left, the sink queue's least headroom. On an I2S sink `realtime_permille` is not one of them:
+   it includes the wait for the DAC and reads 981 to 992 for any stereo play.
+6. **Baseline.** `--record` writes baselines/<profile>.json from a clean run; `--compare` holds a
+   run to it with the suite's tolerance and prints an improvement as "re-baseline".
+
+Nothing the board says about its network is read or kept: /status carries the SSID and this
+takes the fields it wants by name.
+
+Standard library only, as the CI container's Python has nothing else.
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import datetime
+import http.client
+import http.server
+import json
+import os
+import re
+import socket
+import socketserver
+import statistics
+import sys
+import threading
+import time
+from dataclasses import dataclass, field
+from functools import partial
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import sink_profile
+
+REPO = Path(__file__).resolve().parents[2]
+PROJECT = REPO / "firmware" / "hearth-sink"
+SUITE = PROJECT / "suite.json"
+BASELINES = PROJECT / "baselines"
+PINS = REPO / "testdata" / "ac4-probe-pcm-hashes.json"
+
+FORMAT = 1
+
+# The fields of GET /status the suite reads, by name. The network object is never one.
+STATUS_FIELDS = (
+    "state",
+    "location",
+    "frames",
+    "finished",
+    "failed",
+    "why",
+    "error",
+    "us_per_frame",
+    "render_us_per_frame",
+    "sink_us_per_frame",
+    "worst_frame_us",
+    "ring_low",
+    "resync_bytes",
+)
+
+CHECKLIST = (
+    "the suite cannot see another session. Before it runs, by hand:",
+    "  - read all five lock files (D:/ac3bld: p4-board, p4-board2, s3-board-156, s3-board-45,",
+    "    c6-board; .lock)",
+    "  - ListAgents: is a peer building or testing near this board?",
+    "  - no idf.py, esptool, ota.py or capture of this board is running",
+    "  - the board's /status is stopped (the suite checks that one)",
+)
+
+
+class SuiteError(Exception):
+    """Why the suite will not run or cannot read what it was given; main() prints it."""
+
+
+# --- booking --------------------------------------------------------------------------
+
+
+def _stamp(moment: datetime.datetime) -> str:
+    return moment.strftime("%Y-%m-%dT%H:%MZ")
+
+
+def take_lock(path: Path, session: str, purpose: str, minutes: int) -> str:
+    """The booking line, written atomically: a lock that exists is not taken over."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    end = now + datetime.timedelta(minutes=minutes)
+    line = (
+        f"session={session} (board suite) | purpose={purpose} | start={_stamp(now)} | "
+        f"expected_end={_stamp(end)}"
+    )
+    try:
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError as error:
+        try:
+            held = path.read_text("utf-8", "replace").strip()
+        except OSError:
+            held = "(unreadable)"
+        raise SuiteError(f"{path} is booked: {held}") from error
+    except OSError as error:
+        raise SuiteError(f"{path} cannot be created: {error}") from error
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(line + "\n")
+    return line
+
+
+def hold_lock(path: Path, session: str, purpose: str, minutes: int) -> tuple[str, bool]:
+    """The booking for a run: the lock taken, or, where the file is already this session's (it
+    booked the board to do something first, such as put an image on it), that line, which the
+    run then leaves for its owner to release. Returns the line and whether the run took it."""
+    try:
+        return take_lock(path, session, purpose, minutes), True
+    except SuiteError:
+        try:
+            held = path.read_text("utf-8", "replace").strip()
+        except OSError:
+            held = ""
+        if f"session={session} " in held or f"session={session}|" in held:
+            return held, False
+        raise
+
+
+def release_lock(path: Path, session: str) -> str:
+    """Removes the lock only if it is this session's."""
+    try:
+        held = path.read_text("utf-8", "replace")
+    except FileNotFoundError:
+        return "no lock file"
+    except OSError as error:
+        raise SuiteError(f"{path} cannot be read: {error}") from error
+    if f"session={session} " not in held and f"session={session}|" not in held:
+        raise SuiteError(f"{path} is not this session's, and is left alone: {held.strip()}")
+    path.unlink()
+    return "released"
+
+
+# --- the board ------------------------------------------------------------------------
+
+
+class Board:
+    """A hearth_sink board's control surface, as far as the suite reads it."""
+
+    def __init__(self, host: str, port: int = 80, timeout: float = 10.0) -> None:
+        self.host = host
+        self.port = port
+        self.timeout = timeout
+
+    def _request(
+        self, method: str, path: str, body: bytes | None = None
+    ) -> tuple[int, dict[str, str], bytes]:
+        connection = http.client.HTTPConnection(self.host, self.port, timeout=self.timeout)
+        try:
+            connection.request(method, path, body=body)
+            response = connection.getresponse()
+            data = response.read()
+            return response.status, {k.lower(): v for k, v in response.getheaders()}, data
+        except (OSError, http.client.HTTPException) as error:
+            raise SuiteError(f"{self.host}: {method} {path}: {error}") from error
+        finally:
+            connection.close()
+
+    def json(self, path: str) -> dict[str, Any]:
+        status, _, data = self._request("GET", path)
+        if status != 200:
+            raise SuiteError(f"{self.host}: GET {path} answered {status}")
+        try:
+            return json.loads(data.decode("utf-8", "replace"))
+        except ValueError as error:
+            raise SuiteError(f"{self.host}: GET {path} is not JSON: {error}") from error
+
+    def hardware(self) -> dict[str, Any]:
+        return self.json("/hardware")
+
+    def status(self) -> dict[str, Any]:
+        """/status's fields the suite reads, by name; the network object is not among them."""
+        raw = self.json("/status")
+        return {key: raw.get(key) for key in STATUS_FIELDS}
+
+    def play(self, url: str) -> int:
+        return self._request("POST", "/play", url.encode("utf-8"))[0]
+
+    def stop(self) -> None:
+        with contextlib.suppress(SuiteError):
+            self._request("POST", "/stop")
+
+    def log(self, start: int | None) -> tuple[str, int | None]:
+        """The console lines after byte `start` (all of them for None), and the offset after."""
+        path = "/log" if start is None else f"/log?from={start}"
+        status, headers, data = self._request("GET", path)
+        if status != 200:
+            raise SuiteError(f"{self.host}: GET {path} answered {status}")
+        following = headers.get("x-log-next", "")
+        return data.decode("utf-8", "replace"), int(following) if following.isdigit() else None
+
+
+# --- reading a play -------------------------------------------------------------------
+
+_FIELD = re.compile(r"([A-Za-z_.\[\]0-9]+)=(-?[0-9A-Za-z_.:/-]+)")
+
+
+def fields(line: str) -> dict[str, str]:
+    return dict(_FIELD.findall(line))
+
+
+@dataclass
+class PlayLines:
+    """What a play's console lines say."""
+
+    verdict: str | None = None
+    units: int | None = None
+    resync_bytes: int | None = None
+    decode_stack_free: int | None = None
+    underruns: int | None = None
+    dry_ms: int | None = None
+    min_headroom_ms: int | None = None
+    failed_allocations: int = 0
+    ac4_decoder_permille: int | None = None
+    ac4_pcm_hash: str | None = None
+    heap_internal_free: int | None = None
+    heap_largest: int | None = None
+    refused: str | None = None
+
+
+def parse_play_lines(lines: list[str]) -> PlayLines:
+    """The facts of one play from its console lines, the last of each kind winning."""
+    found = PlayLines()
+    for raw in lines:
+        line = raw.strip()
+        if line.startswith("result="):
+            found.verdict = line.partition("=")[2].strip()
+        elif "could not allocate" in line:
+            found.failed_allocations += 1
+        elif line.startswith("sink.writes="):
+            values = fields(line)
+            found.underruns = _int(values.get("sink.underruns"))
+            found.dry_ms = _int(values.get("sink.dry_ms"))
+            found.min_headroom_ms = _int(values.get("sink.min_headroom_ms"))
+        elif line.startswith("stream.units="):
+            values = fields(line)
+            found.units = _int(values.get("stream.units"))
+            found.resync_bytes = _int(values.get("stream.resync_bytes"))
+            found.decode_stack_free = _int(values.get("stream.decode_stack_free"))
+        elif line.startswith("ac4.") and "pcm_hash=" in line:
+            values = fields(line)
+            found.ac4_decoder_permille = _int(values.get("decoder_permille"))
+            found.ac4_pcm_hash = values.get("pcm_hash")
+        elif line.startswith("heap: internal free"):
+            match = re.match(r"heap: internal free (\d+) \(largest block (\d+)\)", line)
+            if match:
+                found.heap_internal_free = int(match.group(1))
+                found.heap_largest = int(match.group(2))
+        elif line.startswith("player: a play here needs"):
+            found.refused = line
+    return found
+
+
+def _int(text: str | None) -> int | None:
+    try:
+        return int(text) if text is not None else None
+    except ValueError:
+        return None
+
+
+def decoder_permille(status: dict[str, Any], frame_us: int) -> int | None:
+    """The decoder's time for a frame over the frame's duration, in permille: `us_per_frame`
+    less what the sink's write and the renderer took, which on a paced sink includes the wait
+    for the DAC. None where the play had no frames."""
+    frames = status.get("frames") or 0
+    total = status.get("us_per_frame")
+    if not frames or total is None:
+        return None
+    others = (status.get("render_us_per_frame") or 0) + (status.get("sink_us_per_frame") or 0)
+    return max(0, round((total - others) * 1000 / frame_us))
+
+
+# --- the run --------------------------------------------------------------------------
+
+
+@dataclass
+class PlayResult:
+    id: str
+    stream: str
+    expect: str
+    state: str | None = None
+    why: str | None = None
+    frames: int | None = None
+    decoder_permille: int | None = None
+    lines: PlayLines = field(default_factory=PlayLines)
+    rebooted: bool = False
+    findings: list[str] = field(default_factory=list)
+
+    def figures(self) -> dict[str, Any]:
+        out: dict[str, Any] = {"state": self.state, "frames": self.frames}
+        if self.why:
+            out["why"] = self.why
+        for name, value in (
+            ("decoder_permille", self.decoder_permille),
+            ("units", self.lines.units),
+            ("decode_stack_free", self.lines.decode_stack_free),
+            ("underruns", self.lines.underruns),
+            ("dry_ms", self.lines.dry_ms),
+            ("min_headroom_ms", self.lines.min_headroom_ms),
+            ("resync_bytes", self.lines.resync_bytes),
+            ("pcm_hash", self.lines.ac4_pcm_hash),
+        ):
+            if value is not None:
+                out[name] = value
+        return out
+
+
+def load_suite(path: Path = SUITE) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError) as error:
+        raise SuiteError(f"{path} cannot be read: {error}") from error
+    if data.get("format") != FORMAT:
+        raise SuiteError(f"{path} is format {data.get('format')}, this reads {FORMAT}")
+    return data
+
+
+def plan(
+    suite: dict[str, Any], profile: str, only: list[str] | None = None
+) -> list[dict[str, Any]]:
+    rows = suite.get("profiles", {}).get(profile)
+    if rows is None:
+        known = ", ".join(sorted(suite.get("profiles", {})))
+        raise SuiteError(f"the suite has no list for profile '{profile}' (known: {known})")
+    out = []
+    for row in rows["plays"]:
+        if only and row["id"] not in only:
+            continue
+        stream = suite["streams"].get(row["stream"])
+        if stream is None:
+            raise SuiteError(
+                f"play {row['id']} names stream '{row['stream']}', which is not listed"
+            )
+        out.append({**row, "stream_spec": stream})
+    return out
+
+
+def lan_address_for(host: str) -> str:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.connect((host, 80))
+        return str(probe.getsockname()[0])
+
+
+class _Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *args: Any, **kwargs: Any) -> None:
+        return
+
+
+class FixtureServer(http.server.ThreadingHTTPServer):
+    def server_bind(self) -> None:
+        # HTTPServer's own looks the host's name up, which can take a second a server.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name = "localhost"
+        self.server_port = self.server_address[1]
+
+
+def serve_fixtures(directory: Path, address: str) -> FixtureServer:
+    server = FixtureServer((address, 0), partial(_Quiet, directory=str(directory)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def check_identity(board: Board, profile: str, profiles: Path | None = None) -> dict[str, Any]:
+    """The board's hardware report, if it is this profile at this definition."""
+    data = sink_profile.load(profiles) if profiles else sink_profile.load()
+    try:
+        wanted = sink_profile.profile_hash(data, profile)
+    except sink_profile.ProfileError as error:
+        raise SuiteError(str(error)) from error
+    hardware = board.hardware()
+    says = hardware.get("profile") or ""
+    if says != profile:
+        raise SuiteError(
+            f"the board says it is '{says or '(no profile)'}', not {profile}: build it with "
+            f"`sink_profile.py identity {profile} --cmake`; a scratch build is not a baseline"
+        )
+    if hardware.get("profile_hash") != wanted:
+        raise SuiteError(
+            f"the board carries {profile} at hash {hardware.get('profile_hash') or '(none)'} and "
+            f"the file's definition is {wanted}: it was built from another one"
+        )
+    return hardware
+
+
+def run_play(
+    board: Board,
+    row: dict[str, Any],
+    base_url: str,
+    counter: int,
+    mark: int | None,
+    suite: dict[str, Any],
+    pins: dict[str, str],
+    timeout: float,
+    sleep: float,
+) -> tuple[PlayResult, int | None]:
+    """One row, played; returns its result and the log offset to carry on from."""
+    spec = row["stream_spec"]
+    result = PlayResult(id=row["id"], stream=row["stream"], expect=row.get("expect", "pass"))
+    # Advance the mark past anything printed between plays.
+    _, mark = board.log(mark)
+    url = f"{base_url}/{spec['file']}?run={counter}"
+    code = board.play(url)
+    if code != 202:
+        result.state = "refused"
+        result.findings.append(f"POST /play answered {code}, expected 202")
+        return result, mark
+    # The location is the play's own (the run counter makes it unique), so a stale state of the
+    # play before is not read as this one's.
+    deadline = time.monotonic() + timeout
+    status: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        time.sleep(sleep)
+        status = board.status()
+        if str(status.get("location") or "").endswith(f"run={counter}") and status.get("state") in (
+            "finished",
+            "failed",
+        ):
+            break
+    else:
+        result.state = status.get("state")
+        result.findings.append(f"the play did not end in {timeout:.0f} s (state {result.state})")
+        return result, mark
+    result.state = status.get("state")
+    result.why = status.get("why") or None
+    result.frames = status.get("frames")
+    result.decoder_permille = decoder_permille(status, int(suite.get("frame_us", 32000)))
+
+    # The verdict line prints just after the state flips: read the log until it is there.
+    text = ""
+    verdict_deadline = time.monotonic() + 15
+    offset: int | None = mark
+    while time.monotonic() < verdict_deadline:
+        chunk, following = board.log(offset)
+        if following is not None and offset is not None and following < offset:
+            # The log is shorter than where it was: the board restarted, and its console is a
+            # new one. Read what it has said since from the start; a play that took the board
+            # down has no verdict line to wait for.
+            result.rebooted = True
+            chunk, following = board.log(None)
+            text = chunk
+            offset = following
+            break
+        text += chunk
+        offset = following if following is not None else offset
+        if "result=" in text or (result.expect == "refused-memory" and "refused" in text):
+            break
+        time.sleep(sleep)
+    result.lines = parse_play_lines(text.splitlines())
+    _judge(result, status, spec, pins)
+    return result, offset
+
+
+def _judge(
+    result: PlayResult, status: dict[str, Any], spec: dict[str, Any], pins: dict[str, str]
+) -> None:
+    lines = result.lines
+    if result.rebooted:
+        result.findings.append("the board rebooted during the play (its console restarted)")
+    if lines.failed_allocations:
+        result.findings.append(f"{lines.failed_allocations} failed allocation(s) in the play")
+    if result.expect == "refused-memory":
+        if result.state != "failed" or result.why != "memory":
+            result.findings.append(
+                f"expected a refusal for memory, got state {result.state} why {result.why!r}"
+            )
+        return
+    if result.state != "finished" or status.get("failed"):
+        result.findings.append(f"the play did not finish: state {result.state}, why {result.why!r}")
+        return
+    if lines.verdict != "pass":
+        result.findings.append(f"the verdict line says result={lines.verdict}")
+    if spec.get("units") is not None and lines.units != spec["units"]:
+        result.findings.append(f"{lines.units} units, expected {spec['units']}")
+    if lines.resync_bytes:
+        result.findings.append(f"{lines.resync_bytes} resynchronised bytes")
+    if lines.underruns:
+        result.findings.append(
+            f"{lines.underruns} sink underrun(s), {lines.dry_ms} ms dry, least headroom "
+            f"{lines.min_headroom_ms} ms"
+        )
+    pin = spec.get("pin")
+    if pin:
+        expected = pins.get(pin)
+        got = lines.ac4_pcm_hash
+        if expected is None:
+            result.findings.append(f"no pin named {pin} in {PINS.name}")
+        elif got is None or set(got) == {"0"}:
+            result.findings.append(
+                "no PCM hash on the AC-4 line: the image was built without "
+                "CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1 (the `measure` overlay)"
+            )
+        elif got.lower() != expected.lower():
+            result.findings.append(f"PCM hash {got} is not the host's {expected} ({pin})")
+        if lines.ac4_decoder_permille is not None:
+            result.decoder_permille = lines.ac4_decoder_permille
+
+
+def run_suite(
+    board: Board,
+    profile: str,
+    suite: dict[str, Any],
+    base_url: str,
+    pins: dict[str, str],
+    only: list[str] | None = None,
+    repeat: int = 1,
+    timeout: float = 120.0,
+    sleep: float = 0.4,
+) -> list[PlayResult]:
+    rows = plan(suite, profile, only)
+    mark: int | None = None
+    _, mark = board.log(None)
+    results: list[PlayResult] = []
+    counter = 0
+    for row in rows:
+        runs: list[PlayResult] = []
+        for _ in range(max(1, repeat)):
+            counter += 1
+            played, mark = run_play(
+                board, row, base_url, counter, mark, suite, pins, timeout, sleep
+            )
+            runs.append(played)
+            if played.findings and played.state in (None, "refused"):
+                break
+        results.append(_median(runs))
+    return results
+
+
+def _median(runs: list[PlayResult]) -> PlayResult:
+    """One result for a row played more than once: the worst findings and the median figures."""
+    if len(runs) == 1:
+        return runs[0]
+    chosen = runs[0]
+    times = [run.decoder_permille for run in runs if run.decoder_permille is not None]
+    if times:
+        chosen.decoder_permille = int(statistics.median(times))
+    stacks = [r.lines.decode_stack_free for r in runs if r.lines.decode_stack_free is not None]
+    if stacks:
+        chosen.lines.decode_stack_free = min(stacks)
+    heads = [r.lines.min_headroom_ms for r in runs if r.lines.min_headroom_ms is not None]
+    if heads:
+        chosen.lines.min_headroom_ms = min(heads)
+    for run in runs[1:]:
+        for finding in run.findings:
+            if finding not in chosen.findings:
+                chosen.findings.append(finding)
+        chosen.rebooted = chosen.rebooted or run.rebooted
+        if run.lines.underruns:
+            chosen.lines.underruns = max(chosen.lines.underruns or 0, run.lines.underruns)
+    return chosen
+
+
+# --- baseline -------------------------------------------------------------------------
+
+
+def run_record(
+    profile: str, hardware: dict[str, Any], results: list[PlayResult], boot: dict[str, str] | None
+) -> dict[str, Any]:
+    return {
+        "format": FORMAT,
+        "profile": profile,
+        "profile_hash": hardware.get("profile_hash"),
+        "version": hardware.get("version"),
+        "chip": hardware.get("chip"),
+        "recorded": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
+        "boot": boot or {},
+        "plays": {r.id: r.figures() for r in results},
+        "findings": {r.id: r.findings for r in results if r.findings},
+    }
+
+
+def compare(
+    run: dict[str, Any], baseline: dict[str, Any], tolerance: dict[str, Any]
+) -> tuple[list[str], list[str]]:
+    """What a run did against a baseline: regressions, and improvements to re-baseline."""
+    regressions: list[str] = []
+    improvements: list[str] = []
+    if run.get("profile") != baseline.get("profile"):
+        regressions.append(
+            f"the run is profile {run.get('profile')}, the baseline's is {baseline.get('profile')}"
+        )
+    relative = float(tolerance.get("relative", 0.05))
+    absolute = int(tolerance.get("absolute_permille", 20))
+    stack_slack = int(tolerance.get("stack_free_bytes", 512))
+    headroom_slack = int(tolerance.get("headroom_ms", 2))
+    for play, base in baseline.get("plays", {}).items():
+        now = run.get("plays", {}).get(play)
+        if now is None:
+            regressions.append(f"{play}: not in the run")
+            continue
+        if now.get("state") != base.get("state"):
+            regressions.append(f"{play}: state {now.get('state')}, baseline {base.get('state')}")
+            continue
+        base_time, now_time = base.get("decoder_permille"), now.get("decoder_permille")
+        if base_time is not None and now_time is not None:
+            margin = max(base_time * relative, absolute)
+            if now_time > base_time + margin:
+                regressions.append(
+                    f"{play}: the decoder takes {now_time} permille of a frame, the baseline's "
+                    f"{base_time} (allowed to {base_time + margin:.0f})"
+                )
+            elif now_time < base_time - margin:
+                improvements.append(
+                    f"{play}: {now_time} permille, the baseline's {base_time}: re-baseline"
+                )
+        if (
+            base.get("decode_stack_free") is not None
+            and now.get("decode_stack_free") is not None
+            and now["decode_stack_free"] < base["decode_stack_free"] - stack_slack
+        ):
+            regressions.append(
+                f"{play}: the decode stack has {now['decode_stack_free']} bytes free, the "
+                f"baseline's {base['decode_stack_free']}"
+            )
+        if (
+            base.get("min_headroom_ms") is not None
+            and now.get("min_headroom_ms") is not None
+            and now["min_headroom_ms"] < base["min_headroom_ms"] - headroom_slack
+        ):
+            regressions.append(
+                f"{play}: the sink queue's least headroom is {now['min_headroom_ms']} ms, the "
+                f"baseline's {base['min_headroom_ms']}"
+            )
+        if now.get("underruns"):
+            regressions.append(f"{play}: {now['underruns']} sink underrun(s)")
+        if now.get("units") != base.get("units"):
+            regressions.append(f"{play}: {now.get('units')} units, baseline {base.get('units')}")
+        if base.get("pcm_hash") and now.get("pcm_hash") != base.get("pcm_hash"):
+            regressions.append(
+                f"{play}: PCM hash {now.get('pcm_hash')}, baseline {base['pcm_hash']}"
+            )
+    return regressions, improvements
+
+
+# --- command line ---------------------------------------------------------------------
+
+
+def _print_results(results: list[PlayResult]) -> None:
+    for r in results:
+        figures = r.figures()
+        shown = ", ".join(f"{k}={v}" for k, v in figures.items())
+        verdict = "FAIL" if r.findings else "ok"
+        print(f"  {verdict:<4} {r.id}: {shown}")
+        for finding in r.findings:
+            print(f"         - {finding}")
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    suite = load_suite()
+    plan(suite, args.profile, args.only)  # a profile with no list is refused before a lock is taken
+    if not args.lock or not args.session:
+        raise SuiteError(
+            "refused: --lock and --session are required. A board is booked through its lock file "
+            "before anything runs on it (see tools/hearth/board_suite.py --help)"
+        )
+    for line in CHECKLIST:
+        print(line)
+    took, ours = hold_lock(
+        Path(args.lock), args.session, args.purpose or f"suite {args.profile}", args.minutes
+    )
+    print(f"booked: {took}" if ours else f"already booked by this session: {took}")
+    server = None
+    try:
+        board = Board(args.host, args.port, args.timeout)
+        hardware = check_identity(board, args.profile, args.profiles)
+        before = board.status()
+        if before.get("state") != "stopped":
+            raise SuiteError(f"the board's /status is {before.get('state')!r}, not 'stopped'")
+        print(
+            f"{args.host}: {hardware.get('chip')} {hardware.get('version')}, "
+            f"profile {args.profile} at {hardware.get('profile_hash')}"
+        )
+        address = args.serve_host or lan_address_for(args.host)
+        server = serve_fixtures(REPO, address)
+        base_url = f"http://{address}:{server.server_address[1]}"
+        pins = json.loads(PINS.read_text("utf-8")).get("hashes", {}) if PINS.is_file() else {}
+        results = run_suite(
+            board,
+            args.profile,
+            suite,
+            base_url,
+            pins,
+            args.only,
+            args.repeat,
+            args.play_timeout,
+        )
+        board.stop()
+        boot = None
+        record = run_record(args.profile, hardware, results, boot)
+        _print_results(results)
+        problems = [f for r in results for f in r.findings]
+        if args.out != "-":
+            Path(args.out).write_text(json.dumps(record, indent=2) + "\n", "utf-8")
+            print(f"wrote {args.out}")
+        regressions: list[str] = []
+        if args.compare:
+            baseline = json.loads(Path(args.compare).read_text("utf-8"))
+            regressions, improvements = compare(record, baseline, suite.get("tolerance", {}))
+            for line in regressions:
+                print(f"regression: {line}")
+            for line in improvements:
+                print(f"improved: {line}")
+        if args.record:
+            if problems or regressions:
+                print("not recorded: the run has findings")
+            else:
+                target = BASELINES / f"{args.profile}.json"
+                BASELINES.mkdir(exist_ok=True)
+                target.write_text(json.dumps(record, indent=2) + "\n", "utf-8")
+                print(f"recorded {target}")
+        return 1 if (problems or regressions) else 0
+    finally:
+        if server is not None:
+            server.shutdown()
+            server.server_close()
+        if ours:
+            print(f"lock: {release_lock(Path(args.lock), args.session)}")
+        else:
+            print("lock: left booked, as it was found")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    show = commands.add_parser("plan", help="a profile's play list")
+    show.add_argument("--profile", required=True)
+
+    run = commands.add_parser("run", help="play a profile's list on a booked board")
+    run.add_argument("--profile", required=True)
+    run.add_argument("--host", required=True, help="the board's address")
+    run.add_argument("--port", type=int, default=80)
+    run.add_argument("--lock", help="the board's lock file: taken, and released at the end")
+    run.add_argument("--session", help="your session id, as the lock line carries it")
+    run.add_argument("--purpose", default="")
+    run.add_argument("--minutes", type=int, default=30)
+    run.add_argument("--only", action="append", help="a play id; may be repeated")
+    run.add_argument("--repeat", type=int, default=1, help="plays of each row; the median is held")
+    run.add_argument("--timeout", type=float, default=10.0, help="one HTTP request, seconds")
+    run.add_argument("--play-timeout", type=float, default=120.0, help="one play, seconds")
+    run.add_argument("--serve-host", help="the address to serve the streams on")
+    run.add_argument("--out", default="board-run.json", help="where to write the run; - for none")
+    run.add_argument("--profiles", type=Path, help="a profiles file other than the repository's")
+    group = run.add_mutually_exclusive_group()
+    group.add_argument("--record", action="store_true", help="write baselines/<profile>.json")
+    group.add_argument("--compare", metavar="BASELINE", help="hold the run to this baseline")
+
+    cmp_ = commands.add_parser("compare", help="hold a recorded run to a baseline")
+    cmp_.add_argument("--run", type=Path, required=True)
+    cmp_.add_argument("--baseline", type=Path, required=True)
+
+    lock = commands.add_parser("lock", help="take, release or show a board's lock file")
+    lock.add_argument("action", choices=["take", "release", "show"])
+    lock.add_argument("--file", type=Path, required=True)
+    lock.add_argument("--session", default="")
+    lock.add_argument("--purpose", default="")
+    lock.add_argument("--minutes", type=int, default=60)
+
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "plan":
+            suite = load_suite()
+            for row in plan(suite, args.profile):
+                spec = row["stream_spec"]
+                print(
+                    f"{row['id']}\t{spec['codec']}\t{spec['file']}\t"
+                    f"{row.get('expect', 'pass')}\tunits={spec.get('units', '-')}"
+                    f"\tpin={spec.get('pin', '-')}"
+                )
+            return 0
+        if args.command == "run":
+            return cmd_run(args)
+        if args.command == "compare":
+            suite = load_suite()
+            regressions, improvements = compare(
+                json.loads(args.run.read_text("utf-8")),
+                json.loads(args.baseline.read_text("utf-8")),
+                suite.get("tolerance", {}),
+            )
+            for line in regressions:
+                print(f"regression: {line}")
+            for line in improvements:
+                print(f"improved: {line}")
+            if not regressions:
+                print("the run holds to the baseline")
+            return 1 if regressions else 0
+        if args.command == "lock":
+            if args.action == "show":
+                print(
+                    args.file.read_text("utf-8").strip() if args.file.is_file() else "no lock file"
+                )
+            elif not args.session:
+                raise SuiteError("--session is required")
+            elif args.action == "take":
+                print(take_lock(args.file, args.session, args.purpose, args.minutes))
+            else:
+                print(release_lock(args.file, args.session))
+            return 0
+    except (SuiteError, sink_profile.ProfileError) as error:
+        print(f"board_suite: {error}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

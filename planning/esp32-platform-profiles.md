@@ -355,44 +355,65 @@ and 24 KB stack given back for the length of a play.
 
 ### 3. The board suite
 
-`board_suite.py`, in `tools/hearth/` (standard library), replacing the scripts that
-live in `D:\ac3bld` and the session scratchpads:
+**Built (PR 6).** `board_suite.py`, in `tools/hearth/` (standard library), reads the play list
+from `firmware/hearth-sink/suite.json` and writes baselines under
+`firmware/hearth-sink/baselines/`. It replaces the scripts that lived in `D:\ac3bld` and the
+session scratchpads:
 
 ```
-board_suite.py run --profile s3-n16r8 --host 192.168.1.156 --lock D:/ac3bld/s3-board-156.lock \
-                   --session <id> [--record | --compare]
+board_suite.py run --profile s3-n16r8 --host 192.168.1.45 --lock D:/ac3bld/s3-board-45.lock \
+                   --session <id> [--repeat 3] [--record | --compare baselines/s3-n16r8.json]
+board_suite.py plan --profile s3-n16r8
+board_suite.py compare --run board-run.json --baseline baselines/s3-n16r8.json
+board_suite.py lock take|release|show --file <lock> --session <id>
 ```
 
 It does, in this order, and stops at the first refusal:
 
 1. **Booking.** Refuses with no `--lock` and `--session`. Takes the lock file atomically
    (create-new, one line `session=... | purpose=... | start=... | expected_end=...`) and refuses if
-   one exists. It does not read or print Wi-Fi values; they live in the build, never in the
-   suite's output or its recorded files. The rest of the booking rule (the other four locks,
-   `ListAgents`, running `idf.py`/`esptool`/`ota.py`) is the operator's, and the suite prints it
-   first as a checklist, because a script cannot see another session.
-2. **Identity.** `GET /hardware`: the profile id and locked-value hash are the profile's; the board
-   is `state: stopped`.
-3. **Plays.** Serves the fixture streams from the host (its own LAN address, no listener left
-   behind) and for each row of the play list: `POST /play`, poll `/status` to `finished`, read the
-   console lines of that play from `/log?from=`.
-4. **Asserts,** per play: `state` finished, not failed; `stream.units` equals the stream's frame
-   count; sink underruns 0; the decoder's time per frame against the baseline (below);
-   `stream.decode_stack_free` at least the baseline's margin; for AC-4, the `pcm_hash=` of the play's `ac4.<label>=` line
-   equal to the host's pin in
-   [`testdata/ac4-probe-pcm-hashes.json`](../testdata/ac4-probe-pcm-hashes.json). The AC-4 profiles
-   carry `ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` and play each AC-4 row twice, with `?hash=off` for the
-   speed figure, as the player's own comment describes.
-5. **Heap.** The boot `budget:` line and the free low-water over the list, against the profile.
-6. **Writes `board-run.json`** (what was measured, the image's version and profile hash, the
-   board, the date). `--record` writes `baselines/<profile>.json` from it; `--compare` fails on a
-   regression and prints an improvement as "re-baseline".
+   one exists, unless it is this session's own (a run on a board the session booked to put an
+   image on it uses that lock and leaves it for its owner). It releases only a lock it took. It
+   does not read or keep anything the board says about its network. The rest of the booking rule
+   (the other four locks, `ListAgents`, running `idf.py`/`esptool`/`ota.py`) is the operator's, and
+   the suite prints it first as a checklist, because a script cannot see another session.
+2. **Identity.** `GET /hardware`: the profile id and the hash of the file's current definition are
+   the board's (`sink_profile.py identity`); the board is `state: stopped`.
+3. **Plays.** Serves the fixture streams from this machine (its own LAN address, a server that is
+   shut down at the end) and for each row: `POST /play` of a location of its own, `/status` to
+   `finished` or `failed`, then `/log?from=` until the play's `result=` line, because the state
+   flips before the end-of-play lines print.
+4. **Asserts,** per row: finished and not failed; every unit and no resynchronised byte; sink
+   underruns 0; no failed allocation; no reboot (the log is shorter than where it was); and for
+   AC-4 the `pcm_hash=` of the `ac4.<label>=` line equal to the host's pin in
+   [`testdata/ac4-probe-pcm-hashes.json`](../testdata/ac4-probe-pcm-hashes.json). A row that
+   expects the C6's refusal expects state `failed`, why `memory`, and no reboot.
+5. **Figures,** per row: the decoder's time per frame, the decode stack left and the sink queue's
+   least headroom. `--repeat N` plays a row N times and holds the median time and the worst of the
+   rest.
+6. **Writes `board-run.json`** (the figures, the image's version and profile hash, the chip, the
+   date). `--record` writes `baselines/<profile>.json` from a clean run; `--compare` holds a run to
+   a baseline with the tolerance in `suite.json` and prints an improvement as "re-baseline".
 
-The fixed play list per profile, the first rows today's: AC-3 2.0, E-AC-3 2.0, E-AC-3 5.1 with
-JOC (`apps/demos/wasm/assets/demo.ec3`, 250 units, the one CI's HTTP step plays), and on the AC-4
-profiles the 2.0 SIMPLE and A-SPX gold streams. The streams are the repository's; the suite does
-not generate its own.
+Tests (`test_board_suite.py`, 46) run it against a stand-in board that answers with what the real
+boards printed on 2026-10-12, and hold the file to the tree (every stream is in the repository,
+every AC-4 row names a pin the host holds, every profile has a list).
 
+**Run on S3b (2026-10-12, the `s3-n16r8` image, 4175):** AC-3 2.0 and E-AC-3 2.0, 938 frames each,
+no underruns, the decode stack 18,256 and 18,064 bytes free, the queue's least headroom 5 ms, and
+the decoder at **123 and 88 permille of a frame** where `realtime_permille` read 981 for both.
+
+Not in PR 6, and said so: the boot `budget:` line is not read into the run (S3's `/log` may have
+rotated it out and the C6's is 2 KB: PR 7 reads it from the console where it has to); the 5.1 and
+wider rows (`demo.ec3` with objects) wait for the baselines; the AC-4 rows need an image built with
+`CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` (the `measure` overlay) and say so when the hash is not on
+the line; and a Sendspin play list for the C6 needs a server on the bench.
+
+The play list, in `suite.json`: AC-3 2.0 and E-AC-3 2.0 (30 s of music each) on every profile with
+an HTTP play, the C6's two rows as the refusal they are, and on the AC-4 profiles the pinned
+streams the host and the boards' PCM agree on (`ac4_20_music`, `ac4_20_acpl`,
+`ac4_20_companding`, and `ac4_51_music` on the P4). The streams are the repository's; the suite
+does not generate its own.
 **The speed figure is not `realtime_permille`.** On an I2S sink every stereo play on an S3 read
 981 to 992 permille in 2026-10-12's runs, whatever it decoded, because the figure includes the
 wait for the DAC (the player's own comment says so for a paced sink). The suite's figure is the
@@ -450,7 +471,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 3 | `_build.yml`, `package_firmware.py` and the docs read it; the guard on every profile build | no | **Built**: each board build takes `sink_profile.py defaults <id>` and is held by `verify` (with `idf.py size` for the static-RAM budget); `package_firmware.py package --profile` refuses a build that is not the profile; `check-docs` holds every fragment list the tree spells to a profile or to `other_stacks`, and the README's profile table is generated; `s3-n16r8-ac4` gets a CI build for the first time. Left: `check_firmware_package.py`'s `IMAGES` still carries its own copy, held to the file by a test, until #1400 lands its row. The repository variable `ESP32_PROFILE_GUARD=warn` turns a finding into an annotation |
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
 | 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
-| 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | |
+| 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
 | 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | |
 
