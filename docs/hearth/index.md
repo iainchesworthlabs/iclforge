@@ -138,6 +138,17 @@ are for lines and not words. It opens a window over the page, and the item plays
    muted: a guess. Play, and press `Space` as each word starts; a word that was pressed turns solid
    and keeps its time. A line's words are guessed again only where no press has set them.
 
+   **To put one word right**, choose it with a click, in either pass. It is outlined, the item is
+   cued 1.5 s before it, and the window says which word it is and when it starts. The next `Space`
+   in the words pass presses that word in place of the next guess, once, with the reaction time
+   taken off as for any press; **Stamp again** presses it at the position now, and **-10 ms** and
+   **+10 ms** move it by that, the word and not its line. Choosing the word again cues it again and
+   lets `Space` press it again; choosing its line lets the word go, and the buttons are the line's
+   again. This is how a file that came with the times of its words, from a forced aligner for one,
+   is corrected: the words of such a file are taken as given, so the words pass has none to press
+   until one is chosen. A word stays between its neighbours (stamped long after the next word, it
+   stops at the next word's time), so move the neighbour first when a word has to go past it.
+
 3. **A duet.** Choose a line and set its **Singer** (not marked, V1, V2 or both); the row shows the
    marker as it is written. The two **Name** fields are what the file calls the singers (`[v1:]`
    and `[v2:]`), kept with the file, unlike the names typed on the Karaoke page for a run. A name
