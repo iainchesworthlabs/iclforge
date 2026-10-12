@@ -695,6 +695,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
     int "E-AC-3 objects reconstructed and placed in real time (-1 = none stated, 0 = none)"
     default 0 if IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C3
     default 2 if IDF_TARGET_ESP32S3 && ICLFORGE_EXAMPLE_DECODE_LANE = 1
+    default 12 if IDF_TARGET_ESP32P4
     default -1
     range -1 15
     help
@@ -703,8 +704,13 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
         than this (planning/hearth-sendspin-extension.md): decoded on the board, a stream past it
         plays its bed alone. 0 is a statement, not an absence: the fixed-point decoder of an
         ESP32-C6 or ESP32-C3 plays the bed and reconstructs no objects. -1 states nothing, which a
-        server reads as the board placing whatever the format carries (the ESP32-P4: 12 objects
-        take 0.79 of real time, 15 extrapolate to about 0.9).
+        server reads as the board placing whatever the format carries; no build here uses it now.
+
+        The ESP32-P4's 12 is its figure over Sendspin (release image, lane on, null sink, 7.1.4,
+        x real time of a 32 ms frame, 2026-10-12): 2 objects 0.41, 4 0.49, 6 0.59, 8 0.68
+        (11 bursts late), 12 0.85 (worst burst 1.24), and 15 0.97 with 24 underruns, about 1.5 to
+        1.8 ms an object. 8 is the comfortable value and 12 is the margin; 9 to 11 and 13 to 14
+        were not run.
 
         The ESP32-S3's 2 is its release image's (sdkconfig.s3-fast) with the decode lane on, over
         Sendspin, which is the path a Hearth server plays it by. A 32 ms frame of channel-based
