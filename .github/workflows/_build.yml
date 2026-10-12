@@ -103,7 +103,7 @@ on:
         type: boolean
         default: true
       run_android:
-        description: "Build/test build-android."
+        description: "Build/test build-android and build-android-native."
         type: boolean
         default: true
       run_wasm:
@@ -1592,6 +1592,64 @@ jobs:
             packages/*.apk
             packages/*.apk.sha512
           if-no-files-found: error
+
+  # The native libraries Hearth for Android links (planning/hearth-android.md, phase 0c):
+  # libs/lyrics and libs/sendspin, with the vcpkg "hearth" feature's five packages, cross-built
+  # for arm64-v8a under the NDK. build-android above cannot hold them to this: its Gradle wrapper
+  # has no vcpkg and leaves ICLFORGE_BUILD_HEARTH off. A real CMake preset
+  # (config-android-arm64), so the command here is the one a person runs too. It compiles and
+  # links the two test binaries and does not run them: they are arm64, and Catch2's discovery is
+  # PRE_TEST for that reason. Running them is a device or emulator job, phase 1's harness.
+  #
+  # continue-on-error until it has gone green three times in a row on hosted runners, which is
+  # what build-android and macos-llvm each did before coming off it (this file's header): a new
+  # hosted leg proves itself before it can fail the required check. The first run builds the
+  # vcpkg ports (about 25 minutes on a desktop machine, cold); the cache setup-vcpkg keeps
+  # makes the later ones a few minutes.
+  build-android-native:
+    name: Android (sendspin and lyrics, arm64)
+    needs: [toolchain-versions]
+    if: inputs.run_android
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    # Newest main commit only (linux-appimage's concurrency comment).
+    concurrency:
+      group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'android-native-main' || format('android-native-run-{0}', github.run_id) }}
+      cancel-in-progress: false
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      # The NDK build-android pins, installed the same way and for the same reason.
+      - name: Install pinned Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.1.10909125"
+
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          vcpkg-commit: ${{ needs.toolchain-versions.outputs.vcpkg_commit }}
+          cache-key-suffix: android-arm64-hearth
+
+      # CMakePresets.json's android-arm64 fragment chains $ANDROID_NDK_HOME's toolchain file behind
+      # vcpkg's.
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
+          cmake --preset config-android-arm64
+
+      - name: Build
+        shell: bash
+        run: cmake --build --preset build-android-arm64 -- -k 0
 
   # The WASM browser decode demo (apps/demos/wasm, WASM browser demo): a real CMake
   # preset (config-wasm-emscripten) unlike build-android above, but still its
