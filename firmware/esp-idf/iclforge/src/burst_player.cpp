@@ -1130,6 +1130,14 @@ struct BurstPlayer::Impl {
                 return true;
             }
             case Ac4Stream::Result::kWaiting:
+                // Nothing came out for this chunk: the decoder is waiting for an I-frame, after a
+                // start or a reset, and its output will not begin at this chunk. The timeline is
+                // anchored again by the next chunk. Kept, decoded_frame would stay at the chunk
+                // the wait began at while the marks moved on, and every frame decoded after the
+                // I-frame would find no mark at or before it and be dropped for good.
+                decoded_frame_set = false;
+                mark_count = 0;
+                mark_head = 0;
                 return true;
             case Ac4Stream::Result::kRefused:
                 ac4_failed = true;

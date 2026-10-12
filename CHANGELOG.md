@@ -3456,6 +3456,16 @@ The sections below contain the complete change list and fixes.
   360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun. On an ESP32-P4, which
   states 12, the 14-object stream that took 0.97 with 24 underruns took 0.22, and the 11-object
   streams, within the figure, are reconstructed at 0.85 as before.
+- **A board can decode AC-4 from a Sendspin group** (`Ac4Stream`, `firmware/esp-idf/iclforge/src/
+  ac4_stream.hpp`; the burst player takes a stream of data type `ac4` a sync frame a chunk): an
+  image with `CONFIG_ICLFORGE_AC4` lists `ac4` where `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4` is 1
+  (the ESP32-P4's default), with `max_coded_channels` 6 and `max_objects` 0, and a server sends
+  anything past either as PCM decoded on its side. Measured on a P4 over Sendspin: 2.0 at 0.18 to
+  0.33 of real time and 5.1 at 0.51 to 0.73, each output's level the host decoder's to 0.01 dB. A
+  player's timeline is anchored again by the chunk after one the decoder waited an I-frame
+  through, which the first board run showed it had not been (every frame after a late first chunk
+  was dropped). `hearth-testserver` plays an `.ac4` file; `libs/device`'s `ac4_sync_frame.hpp` is
+  the raw frame of a sync frame without a list, tested on the host.
 
 **Library internals**
 
