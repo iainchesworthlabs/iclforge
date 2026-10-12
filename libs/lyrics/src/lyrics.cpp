@@ -1303,6 +1303,14 @@ std::string_view code_page_remedy() noexcept {
     return "Forge can convert it: forge lyrics-to-lrc <file> <out.lrc> lyrics-encoding=<page>.";
 }
 
+std::string with_code_page_remedy(std::string reason) {
+    if (is_code_page_refusal(reason)) {
+        reason += ' ';
+        reason += code_page_remedy();
+    }
+    return reason;
+}
+
 std::expected<Lyrics, std::string> parse_ass(std::string_view text,
                                              std::optional<std::int64_t> duration_ms,
                                              const TextEncoding& encoding) {

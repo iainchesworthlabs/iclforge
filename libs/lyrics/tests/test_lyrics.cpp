@@ -1843,3 +1843,18 @@ TEST_CASE("code_page_remedy names the command and the key that answer a code pag
     // A sentence of its own, to follow a refusal's.
     CHECK(remedy.ends_with('.'));
 }
+
+TEST_CASE("with_code_page_remedy follows a code page refusal and nothing else", "[lyrics][convert]") {
+    using iclforge::lyrics::with_code_page_remedy;
+    const auto refused = iclforge::lyrics::parse_lyrics("[00:01.00]Caf\xE9\n");
+    REQUIRE_FALSE(refused.has_value());
+    const std::string shown = with_code_page_remedy(refused.error());
+    CHECK(shown.starts_with(refused.error()));
+    CHECK(shown.size() > refused.error().size());
+    CHECK(shown.ends_with(std::string{iclforge::lyrics::code_page_remedy()}));
+
+    const auto empty = iclforge::lyrics::parse_lyrics("   \n");
+    REQUIRE_FALSE(empty.has_value());
+    CHECK(with_code_page_remedy(empty.error()) == empty.error());
+    CHECK(with_code_page_remedy("") == "");
+}

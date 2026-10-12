@@ -269,6 +269,11 @@ struct Placement {
 // own to choose, and say where the file can be made one every player reads.
 [[nodiscard]] std::string_view code_page_remedy() noexcept;
 
+// `reason` as a player shows it: where it is the refusal of text in a code page
+// (is_code_page_refusal), followed by code_page_remedy() as a sentence of its own; any other reason
+// unchanged.
+[[nodiscard]] std::string with_code_page_remedy(std::string reason);
+
 // Whether any line has a singer: the file is a duet and a view shows who sings what.
 [[nodiscard]] bool has_singers(const Lyrics& lyrics);
 
