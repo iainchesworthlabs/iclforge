@@ -1263,9 +1263,10 @@ fs::path write_eac3_karaoke_candidate(const fs::path& dir, const std::string& na
 TEST_CASE("decode karaoke reproduces an E-AC-3 karaoke stream, at the mixing group's Lo/Ro level",
           "[cli][decode][karaoke][eac3]") {
     const auto dir = scratch_dir();
-    // mixmeta with surmixlev=-6 sends lorosurmixlev -6 dB: the vocals at half.
+    // surmixlev=-6 is the group's lorosurmixlev: the vocals at half. bsmod=7 writes the group
+    // without `mixmeta` being asked for (planning/karaoke-eac3.md, D4).
     const auto stream =
-        write_eac3_karaoke_candidate(dir, "e32", "bsmod=7 mixmeta cmixlev=-3 surmixlev=-6");
+        write_eac3_karaoke_candidate(dir, "e32", "bsmod=7 cmixlev=-3 surmixlev=-6");
 
     std::string report;
     const auto coded = decode_to_wav(stream, dir / "e32_coded.wav", "");
@@ -1300,8 +1301,11 @@ TEST_CASE("decode karaoke reproduces an E-AC-3 karaoke stream, at the mixing gro
     CHECK(loudest > 0.05);
 }
 
-TEST_CASE("decode karaoke on E-AC-3 without a mixing group uses -3 dB, as Dolby's decoder did",
+TEST_CASE("eac3-encode bsmod=7 alone writes the mixing group at the encoder's defaults",
           "[cli][decode][karaoke][eac3]") {
+    // No `mixmeta`, no levels: the stream still carries lorosurmixlev (the encoder's -6 dB
+    // surround default, the same level an AC-3 karaoke stream is made at), so the reproduction
+    // does not fall to the decoder's own default of -3 dB (planning/karaoke-eac3.md, D4).
     const auto dir = scratch_dir();
     const auto stream = write_eac3_karaoke_candidate(dir, "e32d", "bsmod=7");
 
@@ -1311,9 +1315,9 @@ TEST_CASE("decode karaoke on E-AC-3 without a mixing group uses -3 dB, as Dolby'
     INFO(report);
     REQUIRE(coded.channels.size() == 5);
     REQUIRE(heard.channels.size() == 3);
-    CHECK(report.find("-3.0 dB") != std::string::npos);
+    CHECK(report.find("-6.0 dB") != std::string::npos);
 
-    constexpr double kSlev = 0.7071067811865476;
+    constexpr double kSlev = 0.5;
     const double scale = 1.0 / (1.0 + kSlev);
     double worst = 0.0;
     for (std::size_t i = 0; i < heard.frame_count(); ++i) {
@@ -1387,6 +1391,42 @@ TEST_CASE("transcode carries the service type between AC-3 and E-AC-3, and bsmod
     REQUIRE(run_cli("transcode " + quoted(eac3_stream) + " " + quoted(named) + " 384 bsmod=0",
                     dir / "tke_named.log") == 0);
     CHECK(bsmod_of(named, "named").find("0 (complete main)") != std::string::npos);
+}
+
+TEST_CASE("bsmod=7 on mono or 1+1 is written as asked, with a word about what it is",
+          "[cli][encode][karaoke][eac3]") {
+    // Mono's code 7 is Table 5.7's voice-over, and Annex A (Table A5.2) and Annex G (Table G.2)
+    // prohibit a karaoke service on 1+1 (planning/karaoke-eac3.md, D4). Both encoders accept it
+    // and said nothing.
+    const auto dir = scratch_dir();
+    const auto encode = [&](const std::string& command, const std::string& name,
+                            std::size_t channels, const std::string& tail) {
+        const auto source = write_wav(dir / (name + "_src.wav"), channels);
+        const auto stream = dir / (name + ".out");
+        fs::remove(stream);
+        const auto log = dir / (name + ".log");
+        REQUIRE(run_cli(command + " " + quoted(source) + " " + quoted(stream) + " " + tail, log) == 0);
+        return read_log(log);
+    };
+    const auto says = [](const std::string& log, const std::string& text) {
+        return log.find(text) != std::string::npos;
+    };
+
+    const auto eac3_mono = encode("eac3-encode", "km_e", 1, "128 none mono bsmod=7");
+    CHECK(says(eac3_mono, "voice-over service, not karaoke"));
+    const auto ac3_mono = encode("encode", "km_a", 1, "128 mono bsmod=7");
+    CHECK(says(ac3_mono, "voice-over service, not karaoke"));
+
+    const auto eac3_dual = encode("eac3-encode", "kd_e", 2, "192 none 1+1 bsmod=7");
+    CHECK(says(eac3_dual, "not defined for 1+1"));
+    const auto ac3_dual = encode("encode", "kd_a", 2, "192 1+1 bsmod=7");
+    CHECK(says(ac3_dual, "not defined for 1+1"));
+
+    // Every other layout and service type is left alone.
+    const auto surround = encode("eac3-encode", "ks_e", 5, "448 none L,C,R,Ls,Rs bsmod=7");
+    CHECK_FALSE(says(surround, "bsmod 7"));
+    const auto plain_mono = encode("eac3-encode", "kp_e", 1, "128 none mono bsmod=0");
+    CHECK_FALSE(says(plain_mono, "bsmod 7"));
 }
 
 TEST_CASE("decode karaoke labels a 2/1 stream's reproduction as the 3/0 it is, for AC-3 and E-AC-3",

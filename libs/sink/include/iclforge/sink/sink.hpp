@@ -282,6 +282,10 @@ class Sink {
     [[nodiscard]] Roles roles() const;
     // A controller@v1 command, sent on every connection where the role is active.
     void send_controller_command(const sendspin::controller::CommandMessage& command);
+    // The sink loses the lyrics it holds and says so on every connection, as a board does that
+    // restarted its player, or reconnected: a test of what a server does about a member that
+    // reports no lyrics (or another item's) for the item it is playing.
+    void forget_lyrics();
 
    private:
     friend class Connection;
