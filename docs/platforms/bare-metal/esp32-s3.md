@@ -1815,31 +1815,55 @@ image is unchanged (5.1 at 0.37, 7.1.4 at 0.72, 0 under), with its internal RAM 
 1.1 KB as `sdkconfig.s3-dcache` says: the decoder places an AC-4 play's allocations of 512 bytes and
 over in PSRAM, which is why the AC-4 plays have the most internal RAM.
 
-**A play's start.** The first chunks of a play are late: the board makes its decoder and decodes its
-first frame while the server's clock runs, so up to 14 of the first chunks are past their time
-when they are looked at. An AC-4 frame depends on the ones before it back to the last I-frame, so a
-chunk dropped for being late (as every late chunk was) cost the stream everything up to the next
-one: 0.74 to 0.90 s of silence in these streams, whose I-frames are 24 frames apart, for chunks that
-were 3 to 7 frames late. The player now decodes a late AC-4 chunk and discards what it decodes to,
-when the decoder would be caught up in a second (each chunk decoded takes 0.57 to 0.76 of a frame's
-time, so the lateness falls by the rest), and drops it as before when it would not. Measured on the
-same board and streams, three rounds, with the first-frame tables of the section above:
+**A play's start, and a stall.** The first chunks of a play are late: the board makes its decoder
+and decodes its first frame while the server's clock runs, so up to a dozen of the first chunks are
+past their time when they are looked at. An AC-4 frame depends on the ones before it back to the
+last I-frame, so a chunk dropped for being late (as every late chunk was) cost the stream everything
+up to the next one, and so does a chunk delayed by a stall in the network or the decode task. The
+player now decodes a late AC-4 chunk and discards what it decodes to when that loses less audio than
+dropping it and waiting would. Each chunk decoded takes a share `r` of the time its audio lasts (0.49
+for a 23.44 fps stream here, 0.75 for the converter's), so the lateness falls by the rest, and the
+audio lost is the lateness over `1 - r`; dropping loses the lateness and then, on average, half
+the I-frames' interval, taken as 0.5 s. Keeping is chosen when `late * r <= (1 - r) * 0.5 s`: 0.5 s
+late at `r` of 0.49, 0.17 s at 0.75. `r` starts at 0.6 for each stream and follows the frames after
+the first.
 
-| Stream | Silence at the start before | after | Late chunks | Kept | Output's RMS against the host |
-|---|---:|---:|---:|---:|---:|
-| `ac4-stereo-64` | 0.90 s | 5 ms | 0 | 0 | 0.00 dB (was 0.43 dB under) |
-| `ac4-20-music-192` | not measured | 16 ms | 2 | 2 | 0.02 dB |
-| `ac4-ims-film-96-24` | 0.74 s | 43 ms | 2 | 2 | not measured |
-| `ac4-ims-music-128-25` | 0.82 s | 5 to 64 ms | 0 to 14 | 0 to 8 | not measured |
+What the listener loses is `lost_frames` in the `sendspin.stream=` line: the stream's frames never
+handed to the sink (the playout's `silence_frames` does not say it, since it skips late frames and
+pads only a gap it had pushed nothing into). Measured on S3b over Sendspin, three plays of each
+stream with the image that drops and with the one that keeps, the first-frame tables of the
+section above in both:
 
-The chunks past what the decoder could catch up on in a second are still dropped (6 of 14 in the
-worst play, which then began 64 ms late). A play that started with a lateness over 0.24 s at the
-S3's ratio of 0.76 is such a one. No play had an invalid chunk. Plays that kept chunks had 1 to 4
-underruns, all in the first 125 chunks, where the plays before had none: the silence they had was
-the wait, which the playout pads and does not count, and a frame decoded late now meets a sink that
-has run dry once or twice at 256 frames (5 ms) each. Two rounds in three lost plays to another
-server taking the board (its status afterwards named `Hearth on Iains-Computer`), and those plays
-are not in the table.
+| Stream | Lost at the start, dropped (3 plays) | Lost at the start, kept (3 plays) |
+|---|---|---|
+| `ac4-stereo-64` | 0.98, 0.98, 0.90 s | 0.04, 0.00, 0.04 s |
+| `ac4-20-music-192` | 0.98, 0.98, 0 s | 0.09, 0.00, 0.04 s |
+| `ac4-ims-film-96-24` | 0.96, 0.96, 0.96 s | 0.42, 0.05, 0.63 s |
+| `ac4-ims-music-128-25` | 0.96, 0.96, 0.96 s | 0.16, 0.92, 0.36 s |
+
+A dropped chunk costs 0.96 s in every play, the 24 frames to the next I-frame of these streams. The
+kept ones lose their late chunks and little more at 23.44 fps, and 0.05 to 0.92 s at 24 and 25 fps,
+whose decode is slower (the 0.92 s play had 23 chunks late, which keeping loses about as much on as
+dropping would). Output of `ac4-stereo-64` is the host's RMS to 0.00 dB where it had been 0.43 dB
+under.
+
+A stall, simulated with `hearth-testserver --stall-after 5 --stall-ms N` on `ac4-20-music-192`
+(the group reads a buffered source about 1.85 s ahead, so the first 1.85 s of a stall is absorbed
+and what is longer makes chunks late):
+
+| Stall | Lost, dropped | Lost, kept | Chunks late, kept |
+|---|---|---|---|
+| 2.2 s | 1.62, 2.60 s | 1.02, 0.55 s | 24 and 13, all kept |
+| 2.6 s | 2.60 s | 1.83 s | 43, 29 kept |
+| 3.2 s | 1.62, 2.60 s | 2.09 s | 49, 11 kept |
+| 4.5 s | 4.60 s | not run with this rule (3.63 s with the one before it) | |
+
+A stall short enough for the decoder to catch up on costs about a second less than it did, and a
+long one costs what it did. Plays that kept chunks had 0 to 3 underruns, in the first 125 chunks of
+a start and about the stall in the others, where the plays that dropped had 0 or 1: the playout runs
+dry for a block (5 ms) when a frame decoded late reaches it. No play had an invalid chunk. Plays
+with another server taking the board (its status afterwards named `Hearth on Iains-Computer`) are
+not in the tables.
 
 ## What the port required from the library
 

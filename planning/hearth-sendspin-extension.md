@@ -424,10 +424,10 @@ does not close the connection.
   the start of a stream: it resets the decoder and conceals the gap as its `concealment` setting
   says. An AC-4 frame depends on the ones before it back to the last I-frame, which can be a second
   or more away, so a sink may instead decode a late AC-4 chunk and discard what it decodes to, when
-  its decoder is fast enough to be caught up with the stream within a second: the decoder keeps its
-  state and the audio lost is the chunk's lateness over the share of a frame that decoding leaves
-  free (an ESP32-S3's 0.57 leaves 0.43), where a dropped chunk costs everything up to the next
-  I-frame.
+  that loses less audio than dropping it would: the decoder keeps its state and the audio lost is
+  the chunk's lateness over the share of a frame that decoding leaves free (an ESP32-S3's 0.51 at
+  23.44 frames a second), where a dropped chunk costs its lateness and then the wait for the next
+  I-frame. A sink that does says so in `late_chunks` all the same: the chunk was not played.
 
 ### Settings
 
