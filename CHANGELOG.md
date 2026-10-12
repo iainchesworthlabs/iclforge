@@ -276,6 +276,15 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **The singer view moves about and shows the queue, and the Play page shows the lyrics.** The
+  full-screen view's position bar is pressed or dragged to move the item (the words and the clock
+  show the place held, and the item moves when it is let go, playing or paused), `Left` and
+  `Right` move it five seconds, **Queue** (or `Q`) opens the queue beside the words with the
+  playing item marked and a press playing another, and the top strip names the next item. The
+  Play page gets a **Lyrics** card for an item with lyrics or a CD+G picture: a column beside the
+  queue in a window 1,580 pixels wide or more, the first card of the monitor column in a narrower
+  one, and nothing for an item without. The shortcuts reference lists the singer view's keys
+  (planning/karaoke.md, "Found while building").
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the

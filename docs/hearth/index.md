@@ -122,8 +122,19 @@ a long path is where it is needed, because what Hearth follows is the output's o
 position, and a file's times are rarely right to the frame.
 
 **Full screen** (`F11`, or the button on the page; `Esc` leaves) is the singer view: dark, with
-larger type and more lines, and Previous, Play/Pause, Next and the vocals chooser kept at the
-bottom. `Space` pauses. Choosing a vocal there chooses the capable reproduction with it.
+larger type and more lines, and a position bar, Previous, Play/Pause, Next, **Queue** and the
+vocals chooser kept at the bottom. `Space` pauses. Choosing a vocal there chooses the capable
+reproduction with it. Press the position bar, or drag along it, to move the item: while the bar is
+held the words and the clock show the place held, and the item moves when it is let go. `Left`
+and `Right` move it five seconds either way, and stop at the ends of the item. **Queue** (or `Q`)
+opens the queue beside the words, with the item that is playing marked and a press playing that
+item; the strip at the top names the item that comes next.
+
+**On the Play page**, an item that has lyrics, or a CD+G picture, gets a **Lyrics** card with the
+same view and a **Full screen** button. It has a column of its own beside the queue when the
+window is 1,580 pixels wide or more, and is the first card of the monitor column in a narrower
+one, so that starting a song with lyrics does not move the rest of the page. An item with none
+gets no card.
 
 #### Timing the lyrics
 

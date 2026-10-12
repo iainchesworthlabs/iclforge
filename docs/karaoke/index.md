@@ -238,6 +238,15 @@ most are.
 The words follow the position of what is *heard*: the output device's own clock less its path's
 delay, so they stay with the sound on a Bluetooth speaker or a receiver with a long path.
 
+They are on the Karaoke page, full screen ([the singer view](#the-singer-view)), and on the Play
+page: an item with lyrics, or a CD+G picture, gets a **Lyrics** card there beside the queue (in
+a window 1,580 pixels wide or more) or at the top of the monitor column (in a narrower one). An
+item with none gets no card, so the Play page is as it was for every other stream.
+
+![Hearth's Play page for a karaoke stream: the queue, and a Lyrics card above what is playing](screenshots/hearth-play-lyrics.png)
+
+*The Play page at its default size, 1.8 s into the example.*
+
 ### A CD+G disc
 
 A **`.cdg` file with the same name** is the picture of a karaoke disc that was ripped on its own,
@@ -266,14 +275,22 @@ times are rarely right to the frame against a particular output.
 
 ### The singer view
 
-`F11`, or **Full screen** on the Karaoke page's lyrics, opens the words alone, large, on a dark
-screen. `Esc` leaves it, and `Space` pauses.
+`F11`, or **Full screen** on the Karaoke page's lyrics or the Play page's, opens the words alone,
+large, on a dark screen. `Esc` leaves it, and `Space` pauses.
 
-![The singer view: the line being sung large, with the lines around it and the controls at the bottom](screenshots/hearth-singer-view.png)
+![The singer view: the line being sung large, the queue beside it, and the position bar and controls at the bottom](screenshots/hearth-singer-view.png)
 
-Previous, Play/Pause, Next and the **Vocals** chooser stay at the bottom, so a singer can pause,
-skip, or change which vocals play without leaving. Choosing a vocal there chooses the capable
-reproduction with it.
+A position bar, Previous, Play/Pause, Next, **Queue** and the **Vocals** chooser stay at the
+bottom, so a singer can move about in the song, pause, skip, pick the next song or change which
+vocals play without leaving. Choosing a vocal there chooses the capable reproduction with it.
+
+**Moving about.** Press the position bar, or drag along it: the words and the clock show the place
+the bar is held at, and the song moves there when you let go, whether it was playing or paused.
+`Left` and `Right` move it five seconds either way, and stop at the ends.
+
+**The queue.** The strip at the top names the song that comes next. **Queue**, or `Q`, opens the
+queue beside the words: the song that is playing is marked, and pressing another plays it from
+its start. `Q` or the button closes it again.
 
 ## Make one in the Forge GUI
 
