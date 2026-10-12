@@ -660,6 +660,21 @@ forge decode sing-along.ac3 duet.wav karaoke=v1+v2    # V1 left, V2 right, melod
 forge decode sing-along.ac3 lead.wav channels=2 karaoke=v1   # stereo with V1 in the middle
 ```
 
+`karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
+flexibility": the listener moves the level of each part of the capable decoder's reproduction against
+Table C.2.3. 0 dB is the table as it stands (bit for bit), up to 12 dB louder, and `-24` or `off`, the
+bottom, mutes the part. They are the span, the units and the defaults of Hearth's sliders and of the
+wire's `karaoke_*_db` keys. A part raised far enough lowers the others, because every output's
+coefficients are scaled down together when their sum would pass 1 (§7.8.1's way). They are the
+capable decoder's alone, so a level with `karaoke` bare, `karaoke=off` or no `karaoke` at all is
+refused rather than quietly dropped, and a value outside the span is refused rather than clamped.
+
+```bash
+forge decode sing-along.ac3 sing.wav karaoke=none karaoke-melody=-6     # the guide melody 6 dB down
+forge decode sing-along.ac3 lead.wav karaoke=v1 karaoke-v1=-12          # V1 a quarter as loud
+forge decode sing-along.ac3 duet.wav karaoke=v1+v2 karaoke-v2=off       # V1 only, on the left
+```
+
 `monitor` reproduces a karaoke stream the same way, and plays it: `forge monitor sing-along.ac3
 karaoke=none` plays L, C and R (and the LFE) with the vocals out. The channels are laid out as the
 3/0 mode they are, not as the 3/2 layout the stream codes, and on an output narrower than the

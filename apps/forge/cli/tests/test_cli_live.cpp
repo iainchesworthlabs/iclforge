@@ -1144,7 +1144,8 @@ TEST_CASE("monitor and play take karaoke for an AC-3 karaoke stream, and play or
 
     SECTION("monitor") {
         const auto log = dir / "karaoke_plays_monitor.log";
-        const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 karaoke=v1", log);
+        const auto rc =
+            run_cli("monitor \"" + stream.string() + "\" -1 karaoke=v1 karaoke-melody=-6", log);
         const auto out = read_log(log);
         INFO(out);
         if (out.find("is unavailable on this platform") != std::string::npos) {
@@ -1153,13 +1154,27 @@ TEST_CASE("monitor and play take karaoke for an AC-3 karaoke stream, and play or
         CHECK(out.find("unknown option") == std::string::npos);
         if (rc == 0) {
             // A device took it: the report says which reproduction it was given - Annex C's 3/0
-            // on a device wide enough, the 2/0 form where monitor folds to the output's width.
+            // on a device wide enough, the 2/0 form where monitor folds to the output's width -
+            // and the level that was moved.
             const bool three_zero = out.find("(4 channels, ") != std::string::npos;
             CHECK(out.find("karaoke (Annex C.2.3.2, Table C.2.3)") != std::string::npos);
             CHECK((three_zero || out.find("2/0 reproduction") != std::string::npos));
+            CHECK(out.find("levels: melody -6.0 dB") != std::string::npos);
             CHECK(out.find("played 32 frames") != std::string::npos);
         }
         check_spoke_either_way(rc, out);
+    }
+    SECTION("monitor refuses a level the reproduction would not apply, before an output is touched") {
+        const auto log = dir / "karaoke_plays_level.log";
+        const auto rc = run_cli("monitor \"" + stream.string() + "\" -1 karaoke karaoke-v1=-3", log);
+        const auto out = read_log(log);
+        INFO(out);
+        if (out.find("is unavailable on this platform") != std::string::npos) {
+            return;
+        }
+        CHECK(rc == 1);
+        CHECK(out.find("move the parts of the karaoke-capable decoder") != std::string::npos);
+        CHECK(out.find("monitoring") == std::string::npos);
     }
     SECTION("play") {
         const auto log = dir / "karaoke_plays_play.log";

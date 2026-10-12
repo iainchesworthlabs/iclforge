@@ -1946,6 +1946,33 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                          token);
             return false;
         }
+        if (takes_karaoke &&
+            (key == "karaoke-melody" || key == "karaoke-v1" || key == "karaoke-v2")) {
+            // Annex C.2.3's "additional flexibility", the karaoke-CAPABLE decoder's: the
+            // level of each part against Table C.2.3, in dB. The span and the
+            // conversion are the library's (output.hpp), the ones Hearth's sliders,
+            // the wire's karaoke_*_db keys and a sink's decoder use: -24 to +12 dB,
+            // with the bottom of the span off. Refused outside it rather than held to
+            // it, as the other dB options here are: a typo should not play.
+            double db = 0.0;
+            if (value == "off") {
+                db = iclforge::ac3::kKaraokeMinLevelDb;
+            } else if (!parse_double(value, db) || !std::isfinite(db) ||
+                       db < iclforge::ac3::kKaraokeMinLevelDb ||
+                       db > iclforge::ac3::kKaraokeMaxLevelDb) {
+                fmt::println(stderr,
+                             "error: {} is a level in dB from {:g} (the same as off) to {:g}, "
+                             "against Table C.2.3 (got '{}')",
+                             key, iclforge::ac3::kKaraokeMinLevelDb,
+                             iclforge::ac3::kKaraokeMaxLevelDb, token);
+                return false;
+            }
+            const double gain = iclforge::ac3::karaoke_gain_from_db(db);
+            (key == "karaoke-melody"   ? out.output.karaoke_melody_gain
+             : key == "karaoke-v1"     ? out.output.karaoke_vocal1_gain
+                                       : out.output.karaoke_vocal2_gain) = gain;
+            continue;
+        }
         if (token == "mix-lfe") {
             out.output.mix_lfe = true;
             continue;
@@ -3205,6 +3232,17 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                      "gate-objects plays it as its bed - give one, not both");
         return false;
     }
+    // The levels are the capable decoder's: Table C.2.2, the aware decoder's, has none, and the
+    // library ignores them there. A level that moves nothing is refused, not quietly dropped -
+    // order-independent, since the token that names the reproduction may come after it.
+    if (takes_karaoke && out.output.karaoke != iclforge::ac3::KaraokeReproduction::kCapable &&
+        (out.output.karaoke_melody_gain != 1.0 || out.output.karaoke_vocal1_gain != 1.0 ||
+         out.output.karaoke_vocal2_gain != 1.0)) {
+        fmt::println(stderr,
+                     "error: karaoke-melody=, karaoke-v1= and karaoke-v2= move the parts of the "
+                     "karaoke-capable decoder: add karaoke=none, v1, v2 or v1+v2");
+        return false;
+    }
     return true;
 }
 
@@ -3569,6 +3607,32 @@ std::string_view vocals_name(iclforge::ac3::KaraokeVocals vocals) {
     return "no vocals";
 }
 
+// ", levels: melody -6.0 dB, V1 off": the parts the capable decoder was told to move off Table
+// C.2.3's own level, or nothing when none was. A gain that is not a finite number of 0 or more is a
+// mute in the library, and is called off here as the bottom of the span is.
+std::string karaoke_levels_words(const iclforge::ac3::OutputConfig& output) {
+    struct Part {
+        std::string_view name;
+        double gain;
+    };
+    const std::array<Part, 3> parts{{{"melody", output.karaoke_melody_gain},
+                                     {"V1", output.karaoke_vocal1_gain},
+                                     {"V2", output.karaoke_vocal2_gain}}};
+    std::string words;
+    for (const auto& part : parts) {
+        if (part.gain == 1.0) {
+            continue;
+        }
+        words += words.empty() ? ", levels: " : ", ";
+        if (std::isfinite(part.gain) && part.gain > 0.0) {
+            words += fmt::format("{} {:+.1f} dB", part.name, 20.0 * std::log10(part.gain));
+        } else {
+            words += fmt::format("{} off", part.name);
+        }
+    }
+    return words;
+}
+
 }  // namespace
 
 void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
@@ -3583,8 +3647,8 @@ void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
     if (reproduced && capable) {
         status_println(status,
                        "  karaoke (Annex C.2.3.2, Table C.2.3): melody M to the centre, "
-                       "listener's vocals: {}",
-                       vocals_name(output.karaoke_vocals));
+                       "listener's vocals: {}{}",
+                       vocals_name(output.karaoke_vocals), karaoke_levels_words(output));
     } else if (reproduced) {
         const auto levels = iclforge::ac3::mix_levels(first.acmod, first.cmixlev, first.surmixlev,
                                                       first.alternate_bsi);
@@ -3602,8 +3666,8 @@ void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
     } else if (folded && capable && first.acmod != iclforge::ac3::Acmod::k2_0) {
         status_println(status,
                        "  karaoke (Annex C.2.3.2, Table C.2.3): 2/0 reproduction, melody M at "
-                       "clev, listener's vocals: {}",
-                       vocals_name(output.karaoke_vocals));
+                       "clev, listener's vocals: {}{}",
+                       vocals_name(output.karaoke_vocals), karaoke_levels_words(output));
     } else if (folded) {
         status_println(status,
                        "note: karaoke at a stereo or mono target is Annex C's 2/0 "
