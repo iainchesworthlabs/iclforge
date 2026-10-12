@@ -64,6 +64,7 @@ class Sink {
     // What the other roles have received, over every connection.
     [[nodiscard]] Roles roles() const { return core_->roles(); }
     // A controller@v1 command, sent on every connection where the role is active.
+    void send_request(const sendspin::player::Request& request) { core_->send_request(request); }
     void send_controller_command(const sendspin::controller::CommandMessage& command) {
         core_->send_controller_command(command);
     }

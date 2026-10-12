@@ -756,6 +756,7 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
             support.max_objects.fill(options_.max_objects);
         }
         support.lyrics_max_bytes = options_.lyrics_max_bytes;
+        support.requests = options_.requests;
         config.iclforge_support = std::move(support);
         // What the sink's streams are rendered to, as its own page would say.
         if (!options_.layout.empty()) {
@@ -1037,6 +1038,12 @@ LyricFrame Sink::lyric_frame(std::int64_t delay_ms, const iclforge::lyrics::Stag
         name(metadata->album, frame.album);
     }
     return frame;
+}
+
+void Sink::send_request(const sendspin::player::Request& request) {
+    for_each_connection([&](Connection& connection) {
+        connection.driver().call([&] { return connection.session().send_iclforge_request(request); });
+    });
 }
 
 void Sink::forget_lyrics() {

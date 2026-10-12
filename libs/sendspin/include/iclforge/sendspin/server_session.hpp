@@ -99,6 +99,9 @@ class ServerListener {
     // controller@v1: a command the controller state last sent lists, a seek already checked
     // against its seek_max_ms.
     virtual void on_controller_command(const controller::CommandMessage& /*command*/) {}
+    // _iclforge_player@v1: a sink's request for the singer's karaoke choice, already cut to the keys
+    // its support object listed (player::accept_request): never empty (D8).
+    virtual void on_iclforge_request(const player::Request& /*request*/) {}
     // source@v1: the client opened its input stream after a start, or changed its format; one chunk
     // of it, captured from `timestamp_us` on the server clock; and the stream's end.
     virtual void on_source_stream_start(const messages::ClientStreamStart& /*start*/) {}

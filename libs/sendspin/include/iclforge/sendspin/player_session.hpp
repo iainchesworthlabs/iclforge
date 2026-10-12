@@ -231,6 +231,10 @@ class PlayerSession {
     [[nodiscard]] SessionOutput set_source_state(const source::State& state);
     // controller@v1's command, sent only while the role is active.
     [[nodiscard]] SessionOutput send_command(const controller::CommandMessage& command);
+    // _iclforge_player@v1's request for the singer's karaoke choice (D8): sent only while the role
+    // is active, and cut to the keys this sink's support object lists in `requests`. Nothing goes
+    // out when none is left, so a sink that lists none sends none.
+    [[nodiscard]] SessionOutput send_iclforge_request(const player::Request& request);
     // source@v1's input stream: opened only after the server's start while available, its chunks,
     // and its end.
     [[nodiscard]] SessionOutput start_source_stream(const messages::ClientStreamStart& start);

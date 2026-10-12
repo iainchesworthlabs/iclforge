@@ -29,6 +29,19 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**A sink can ask the server for the singer's karaoke choice**
+
+- **`client/command` carries an `_iclforge_player` request, and the support object's `requests`
+  lists what a sink may ask for.** The five karaoke keys (the reproduction, which vocals, and the
+  three levels) with the settings command's names and ranges: the protocol half of D8, for a touch
+  or remote control of the vocals on a board or a TV. A sink sends only the keys it listed, a server
+  acts only on those and only while the role is active, a request out of range is refused whole,
+  and the server decides: nothing is sent back, and the sink sees the result in its settings. The
+  host's event (`on_sink_request`, with the group the sink is in) is there; applying it to the
+  singer's settings, and a control on the Android or the panel screen, are the next changes.
+  Held by unit cases for the object, the support key and the cut, a session case (the sink's own cut
+  and a sink that lists none), the message, and the host's event on a real group.
+
 **Hearth for Android names an item that has no lyrics**
 
 - **The sink lists `metadata@v1` and the lyric screen's header shows what the server says is playing.**

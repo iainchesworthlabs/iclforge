@@ -170,6 +170,7 @@ struct ServerHost::State {
     void member_changed(const std::string& client_id);
     // A controller@v1 command from a client: volume and mute for its group, the rest for the engine.
     void controller_command(const std::string& client_id, const controller::CommandMessage& command);
+    void sink_request(const std::string& client_id, const player::Request& request);
 };
 
 // One connection to a client, whichever side dialled.
@@ -437,6 +438,12 @@ class HostConnection final : public ServerListener, public std::enable_shared_fr
         const std::string client_id = base64url::encode(session_->client_key());
         ServerHost::State* host = host_;
         host->post([host, client_id, command] { host->controller_command(client_id, command); });
+    }
+
+    void on_iclforge_request(const player::Request& request) override {
+        const std::string client_id = base64url::encode(session_->client_key());
+        ServerHost::State* host = host_;
+        host->post([host, client_id, request] { host->sink_request(client_id, request); });
     }
 
     void on_source_stream_start(const m::ClientStreamStart& start) override {
@@ -1696,6 +1703,21 @@ void ServerHost::State::controller_command(const std::string& client_id, const c
     if (command.command != controller::Command::kVolume && command.command != controller::Command::kMute) {
         events->on_controller_command({}, client_id, command);
     }
+}
+
+void ServerHost::State::sink_request(const std::string& client_id, const player::Request& request) {
+    // The group the sink is a member of, or none for a sink that is not in one: the callback says
+    // which, and what a request means for one that is in none is the host's to decide.
+    std::string group_id;
+    for (const std::shared_ptr<Group::State>& group : live_groups()) {
+        const std::scoped_lock lock(group->mutex);
+        if (group->member_of(client_id) != nullptr) {
+            group_id = group->id;
+            break;
+        }
+    }
+    // The callback runs without the group's lock.
+    events->on_sink_request(group_id, client_id, request);
 }
 
 const std::string& Group::id() const {

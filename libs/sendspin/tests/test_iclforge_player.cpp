@@ -917,3 +917,99 @@ TEST_CASE("iclforge_player: what a sink says of the lyrics it holds", "[sendspin
     CHECK_FALSE(with_state_lyrics(R"({"item":1,"line":-2})"));
     CHECK_FALSE(with_state_lyrics(R"({"item":1})"));
 }
+
+TEST_CASE("iclforge_player: a sink's request for the karaoke choice", "[sendspin][iclforge][request]") {
+    ac::Request request;
+    request.decoder.karaoke = ac::Karaoke::kCapable;
+    request.decoder.karaoke_vocals = ac::KaraokeVocals::kV2;
+    request.decoder.karaoke_melody_db = -6.0;
+    request.decoder.karaoke_vocal1_db = 0.0;
+    request.decoder.karaoke_vocal2_db = 12.0;
+    const std::string text = written(request, ac::write_request);
+    CHECK(text ==
+          R"({"command":"decoder","decoder":{"karaoke":"capable","karaoke_vocals":"v2","karaoke_melody_db":-6,)"
+          R"("karaoke_vocal1_db":0,"karaoke_vocal2_db":12}})");
+    const Parsed parsed(text);
+    const std::optional<ac::Request> read = ac::read_request(parsed.root());
+    REQUIRE(read.has_value());
+    CHECK(read->decoder.karaoke == ac::Karaoke::kCapable);
+    CHECK(read->decoder.karaoke_vocals == ac::KaraokeVocals::kV2);
+    CHECK(read->decoder.karaoke_melody_db == -6.0);
+    CHECK(read->decoder.karaoke_vocal1_db == 0.0);
+    CHECK(read->decoder.karaoke_vocal2_db == 12.0);
+
+    // Any one key is a request, and only the keys present are written.
+    ac::Request vocals;
+    vocals.decoder.karaoke_vocals = ac::KaraokeVocals::kNone;
+    CHECK(written(vocals, ac::write_request) == R"({"command":"decoder","decoder":{"karaoke_vocals":"none"}})");
+
+    const auto read_text = [](const std::string& source) { return ac::read_request(Parsed(source).root()); };
+    // A key that is not requestable is ignored as every unknown key is; alone it is no request.
+    const auto mixed = read_text(R"({"command":"decoder","decoder":{"karaoke_vocals":"v1","drc_cut":0.5,"x":1}})");
+    REQUIRE(mixed.has_value());
+    CHECK(mixed->decoder.karaoke_vocals == ac::KaraokeVocals::kV1);
+    CHECK_FALSE(mixed->decoder.drc_cut.has_value());
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":{"drc_cut":0.5}})"));
+    // Refused whole: the wrong command, no decoder object, nothing in it, a name or a level out of range.
+    CHECK_FALSE(read_text(R"({"command":"settings","decoder":{"karaoke_vocals":"v1"}})"));
+    CHECK_FALSE(read_text(R"({"decoder":{"karaoke_vocals":"v1"}})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder"})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":[]})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":{}})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":{"karaoke":"always"}})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":{"karaoke_vocals":"v3"}})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":{"karaoke_melody_db":-24.1}})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":{"karaoke_vocal2_db":12.1}})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":{"karaoke_vocal1_db":"loud"}})"));
+    // The ends are in range, and one wrong key spoils the others that are right.
+    CHECK(read_text(R"({"command":"decoder","decoder":{"karaoke_melody_db":-24.0,"karaoke_vocal1_db":12.0}})"));
+    CHECK_FALSE(read_text(R"({"command":"decoder","decoder":{"karaoke_vocals":"v1","karaoke_vocal1_db":99}})"));
+}
+
+TEST_CASE("iclforge_player: a server acts on the keys a sink listed as requestable", "[sendspin][iclforge][request]") {
+    ac::Request request;
+    request.decoder.karaoke = ac::Karaoke::kAware;
+    request.decoder.karaoke_vocals = ac::KaraokeVocals::kV1;
+    request.decoder.karaoke_vocal2_db = -3.0;
+
+    ac::Support support = board_support();
+    // A sink from before the key lists none, and nothing is acted on.
+    CHECK_FALSE(ac::accept_request(request, support).has_value());
+
+    support.requests = {"karaoke_vocals", "karaoke_vocal1_db"};
+    const std::optional<ac::Request> cut = ac::accept_request(request, support);
+    REQUIRE(cut.has_value());
+    CHECK(cut->decoder.karaoke_vocals == ac::KaraokeVocals::kV1);
+    CHECK_FALSE(cut->decoder.karaoke.has_value());
+    CHECK_FALSE(cut->decoder.karaoke_vocal2_db.has_value());
+
+    // None of its keys listed: nothing left.
+    support.requests = {"karaoke_vocal1_db"};
+    CHECK_FALSE(ac::accept_request(request, support).has_value());
+
+    // The support object: written only when it lists some, read with names that are not requestable
+    // skipped and a repeat collapsed, and refused for a value that is not a list of strings.
+    ac::Support listing = board_support();
+    CHECK(written(listing, ac::write_support).find("requests") == std::string::npos);
+    listing.requests = {"karaoke", "karaoke_vocals"};
+    const std::string text = written(listing, ac::write_support);
+    CHECK(text.find(R"("requests":["karaoke","karaoke_vocals"])") != std::string::npos);
+    const auto back = ac::read_support(Parsed(text).root());
+    REQUIRE(back.has_value());
+    CHECK(back->requests == listing.requests);
+    const auto silent = ac::read_support(Parsed(written(board_support(), ac::write_support)).root());
+    REQUIRE(silent.has_value());
+    CHECK(silent->requests.empty());
+
+    const auto with_requests = [&](const std::string& value) {
+        std::string source = written(board_support(), ac::write_support);
+        source.pop_back();
+        return ac::read_support(Parsed(source + R"(,"requests":)" + value + "}").root());
+    };
+    const auto skipped = with_requests(R"(["karaoke_vocals","drc_cut","karaoke_vocals","future"])");
+    REQUIRE(skipped.has_value());
+    CHECK(skipped->requests == std::vector<std::string>{"karaoke_vocals"});
+    CHECK_FALSE(with_requests("7"));
+    CHECK_FALSE(with_requests("[1]"));
+    CHECK_FALSE(with_requests("null"));
+}
