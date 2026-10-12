@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 
 #include "iclforge/lyrics/lyrics.hpp"
@@ -103,5 +104,17 @@ struct Stage {
 // skipped; text with no strong character reads left to right. A screen sets the direction of a line
 // from this, and runs a word's fill from its right edge.
 [[nodiscard]] bool text_is_right_to_left(std::string_view text);
+
+// A run of code points, `first` to `last` inclusive: what a font file carries, as a screen lists it.
+struct CodePointRange {
+    char32_t first = 0;
+    char32_t last = 0;
+};
+
+// Whether every code point of `text` (UTF-8) is one the fonts can draw: in `ranges` (sorted by
+// `first`, not overlapping) or a control character, which draws nothing. A byte sequence that is not
+// UTF-8 is not covered. A screen that finds a line is not covered shows a sentence in its place,
+// where the font would draw a missing-glyph box for each letter.
+[[nodiscard]] bool text_is_covered(std::string_view text, std::span<const CodePointRange> ranges);
 
 }  // namespace iclforge::lyrics

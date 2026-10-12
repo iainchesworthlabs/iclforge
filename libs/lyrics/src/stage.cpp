@@ -1,6 +1,7 @@
 #include "iclforge/lyrics/stage.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 namespace iclforge::lyrics {
 
@@ -173,6 +174,25 @@ namespace {
 }
 
 }  // namespace
+
+bool text_is_covered(std::string_view text, std::span<const CodePointRange> ranges) {
+    for (std::size_t at = 0; at < text.size();) {
+        std::size_t length = 1;
+        const char32_t c = next_code_point(text, at, length);
+        at += length;
+        if (c < 0x20 || c == 0x7F) {
+            continue;
+        }
+        // The first range that starts after c, and the one before it.
+        const auto after = std::upper_bound(
+            ranges.begin(), ranges.end(), c,
+            [](char32_t value, const CodePointRange& range) { return value < range.first; });
+        if (after == ranges.begin() || c > std::prev(after)->last) {
+            return false;
+        }
+    }
+    return true;
+}
 
 bool text_is_right_to_left(std::string_view text) {
     for (std::size_t at = 0; at < text.size();) {

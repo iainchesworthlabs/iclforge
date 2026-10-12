@@ -300,3 +300,40 @@ TEST_CASE("stage: a line's direction is its first strong character's", "[lyrics]
     CHECK_FALSE(text_is_right_to_left("abc\xD7"));
     CHECK_FALSE(text_is_right_to_left("\xD7"));
 }
+
+TEST_CASE("stage: text a font cannot draw is told from text it can", "[lyrics][stage][coverage]") {
+    using iclforge::lyrics::CodePointRange;
+    using iclforge::lyrics::text_is_covered;
+    // A font with Basic Latin, Latin-1 and Hebrew letters, as a screen lists what its files carry.
+    const std::vector<CodePointRange> font = {
+        {0x20, 0x7E}, {0xA0, 0xFF}, {0x5D0, 0x5EA}, {0x2019, 0x2019}};
+    // Hebrew "shalom", Russian "privet", "cafe" with its accent, a music note and "don't" with a
+    // typographic apostrophe, as UTF-8 bytes (nothing here depends on the compiler's source encoding).
+    const std::string shalom = "\xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D";
+    const std::string privet = "\xD0\x9F\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82";
+    const std::string cafe = "caf\xC3\xA9";
+    const std::string note = "\xE2\x99\xAA";
+    const std::string rsquo = "don\xE2\x80\x99t";
+
+    CHECK(text_is_covered("Should auld acquaintance be forgot,", font));
+    CHECK(text_is_covered(cafe, font));
+    CHECK(text_is_covered(shalom + " Hello", font));
+    CHECK(text_is_covered(rsquo, font));
+    CHECK(text_is_covered("", font));
+    // A newline and a tab draw nothing and are fine.
+    CHECK(text_is_covered("one\ntwo\tthree", font));
+    // One letter the font lacks is enough.
+    CHECK_FALSE(text_is_covered(privet, font));
+    CHECK_FALSE(text_is_covered("Hello " + privet, font));
+    CHECK_FALSE(text_is_covered(cafe + " " + note, font));
+    // A byte that is not UTF-8, and a sequence cut short, are not text.
+    CHECK_FALSE(text_is_covered("ab\xFF", font));
+    CHECK_FALSE(text_is_covered("ab\xD7", font));
+    // The replacement character, a C1 control and a letter between two ranges: none is listed.
+    CHECK_FALSE(text_is_covered("\xEF\xBF\xBD", font));
+    CHECK_FALSE(text_is_covered("\xC2\x80", font));
+    CHECK_FALSE(text_is_covered("\xD6\x91", font));
+    // No ranges: nothing but controls.
+    CHECK_FALSE(text_is_covered("a", {}));
+    CHECK(text_is_covered("", {}));
+}
