@@ -18,6 +18,7 @@
 #include "platform/process.hpp"
 
 #include "iclforge/lyrics/lyrics.hpp"
+#include "iclforge/lyrics/timing.hpp"
 
 // libs/lyrics/src/lyrics.cpp: the LRC reader, the lyrics file's place
 // beside an item, and the cursor the lyric view asks on every frame
@@ -1314,6 +1315,166 @@ TEST_CASE("lyrics: a UTF-16 file on disk is read, and its time is the item's", "
     REQUIRE(lyrics->lines.size() == 1);
     CHECK(lyrics->lines[0].text == kHebrewUtf8);
     CHECK(lyrics->lines[0].end_ms == 5000);
+}
+
+// ---- who sings an ASS line, and which of the lines at one time is read -----------------------------
+
+TEST_CASE("ass: two actors on the sung lines are the two singers, in the order they first appear",
+          "[lyrics][ass][duet]") {
+    // The second singer's line is written first in the file and is later in time: the first vocal
+    // is the one who sings first.
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:03.00,0:00:05.00,Default,Ben,0,0,0,,{\\k100}Hi {\\k100}there\n"
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,Anna,0,0,0,,{\\k100}Hel{\\k100}lo\n"
+        "Dialogue: 0,0:00:05.00,0:00:07.00,Default,Anna,0,0,0,,{\\k200}Bye\n"
+        "Dialogue: 0,0:00:08.00,0:00:09.00,Default,Anna,0,0,0,,Spoken by Anna, not sung\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->first_singer_name == "Anna");
+    CHECK(lyrics->second_singer_name == "Ben");
+    REQUIRE(lyrics->lines.size() == 4);
+    using iclforge::lyrics::Singer;
+    CHECK(lyrics->lines[0].text == "Hello");
+    CHECK(lyrics->lines[0].singer == Singer::kFirst);
+    CHECK(lyrics->lines[1].text == "Hi there");
+    CHECK(lyrics->lines[1].singer == Singer::kSecond);
+    CHECK(lyrics->lines[2].singer == Singer::kFirst);
+    // A line with no karaoke tags is not sung, whatever actor it names: nobody in particular.
+    CHECK(lyrics->lines[3].singer == Singer::kUnmarked);
+    CHECK(iclforge::lyrics::has_singers(*lyrics));
+
+    // The markers are what is written, and read back.
+    const std::string written = iclforge::lyrics::write_lrc(*lyrics);
+    CHECK(written.find("V1: ") != std::string::npos);
+    CHECK(written.find("V2: ") != std::string::npos);
+    CHECK(written.find("[v1:Anna]") != std::string::npos);
+}
+
+TEST_CASE("ass: two styles on the sung lines are the two singers when no actors are named",
+          "[lyrics][ass][duet]") {
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Male,,0,0,0,,{\\k100}Hel{\\k100}lo\n"
+        "Dialogue: 0,0:00:03.00,0:00:05.00,Female,,0,0,0,,{\\k100}Hi {\\k100}there\n"
+        "Dialogue: 0,0:00:05.00,0:00:07.00,Male,,0,0,0,,{\\k200}Bye\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 3);
+    using iclforge::lyrics::Singer;
+    CHECK(lyrics->lines[0].singer == Singer::kFirst);
+    CHECK(lyrics->lines[1].singer == Singer::kSecond);
+    CHECK(lyrics->lines[2].singer == Singer::kFirst);
+    // A style is the author's own label, and is not shown as a singer's name.
+    CHECK(lyrics->first_singer_name.empty());
+    CHECK(lyrics->second_singer_name.empty());
+}
+
+TEST_CASE("ass: actors decide before styles, and a sung line with no actor is for nobody in particular",
+          "[lyrics][ass][duet]") {
+    // Three styles, which alone would mark nobody; two actors, which are clear.
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Verse,Anna,0,0,0,,{\\k100}One{\\k100}a\n"
+        "Dialogue: 0,0:00:03.00,0:00:05.00,Verse2,Ben,0,0,0,,{\\k100}Two{\\k100}b\n"
+        "Dialogue: 0,0:00:05.00,0:00:07.00,Chorus,,0,0,0,,{\\k100}All{\\k100}in\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 3);
+    using iclforge::lyrics::Singer;
+    CHECK(lyrics->lines[0].singer == Singer::kFirst);
+    CHECK(lyrics->lines[1].singer == Singer::kSecond);
+    CHECK(lyrics->lines[2].singer == Singer::kUnmarked);
+}
+
+TEST_CASE("ass: one singer, or three, marks nobody, because it is not clear who is who",
+          "[lyrics][ass][duet]") {
+    using iclforge::lyrics::Singer;
+    const auto none_marked = [](const std::string& text) {
+        const auto lyrics = iclforge::lyrics::parse_ass(text);
+        REQUIRE(lyrics.has_value());
+        for (const auto& line : lyrics->lines) {
+            CHECK(line.singer == Singer::kUnmarked);
+        }
+        CHECK(lyrics->first_singer_name.empty());
+        CHECK_FALSE(iclforge::lyrics::has_singers(*lyrics));
+    };
+    // One style and one actor.
+    none_marked(kAssHeader +
+                "Dialogue: 0,0:00:01.00,0:00:03.00,Default,Anna,0,0,0,,{\\k100}A{\\k100}b\n"
+                "Dialogue: 0,0:00:03.00,0:00:05.00,Default,Anna,0,0,0,,{\\k100}C{\\k100}d\n");
+    // Three styles, no actors.
+    none_marked(kAssHeader +
+                "Dialogue: 0,0:00:01.00,0:00:03.00,Lead,,0,0,0,,{\\k100}A{\\k100}b\n"
+                "Dialogue: 0,0:00:03.00,0:00:05.00,Harmony,,0,0,0,,{\\k100}C{\\k100}d\n"
+                "Dialogue: 0,0:00:05.00,0:00:07.00,Both,,0,0,0,,{\\k100}E{\\k100}f\n");
+    // Three actors.
+    none_marked(kAssHeader +
+                "Dialogue: 0,0:00:01.00,0:00:03.00,Default,Anna,0,0,0,,{\\k100}A{\\k100}b\n"
+                "Dialogue: 0,0:00:03.00,0:00:05.00,Default,Ben,0,0,0,,{\\k100}C{\\k100}d\n"
+                "Dialogue: 0,0:00:05.00,0:00:07.00,Default,Cara,0,0,0,,{\\k100}E{\\k100}f\n");
+    // A second style that is not sung does not make a duet: a translation is not a singer.
+    none_marked(kAssHeader +
+                "Dialogue: 0,0:00:01.00,0:00:03.00,Romaji,,0,0,0,,{\\k100}A{\\k100}b\n"
+                "Dialogue: 0,0:00:07.00,0:00:09.00,Translation,,0,0,0,,Thank you\n");
+}
+
+TEST_CASE("ass: a translation at the sung line's time is not read, and one with a time of its own is",
+          "[lyrics][ass][styles]") {
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Romaji,,0,0,0,,{\\k100}Ari{\\k100}gatou\n"
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Translation,,0,0,0,,Thank you\n"
+        "Dialogue: 0,0:00:05.00,0:00:07.00,Translation,,0,0,0,,A line of its own\n"
+        "Dialogue: 0,0:00:09.00,0:00:12.00,Romaji,,0,0,0,,{\\k100}Sa{\\k100}yonara\n"
+        "Dialogue: 0,0:00:09.00,0:00:11.00,Translation,,0,0,0,,Goodbye\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 4);
+    CHECK(lyrics->lines[0].text == "Arigatou");
+    CHECK(lyrics->lines[0].word_timed());
+    CHECK(lyrics->lines[1].text == "A line of its own");
+    // At the same start but not the same end is not the same time: both are read.
+    CHECK(lyrics->lines[2].text == "Sayonara");
+    CHECK(lyrics->lines[3].text == "Goodbye");
+}
+
+TEST_CASE("ass: a line written on two layers is one line, and lines of one style at one time are all read",
+          "[lyrics][ass][styles]") {
+    // An outline under a fill: the same line twice, on layers 0 and 1.
+    const auto layered = iclforge::lyrics::parse_ass(kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\k100}Hel{\\k100}lo\n"
+        "Dialogue: 1,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\k100}Hel{\\k100}lo\n");
+    REQUIRE(layered.has_value());
+    CHECK(layered->lines.size() == 1);
+
+    // A top line and a bottom line: two lines of one style at one time, which are two lines.
+    const auto stacked = iclforge::lyrics::parse_ass(kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\an8}Top line\n"
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,Bottom line\n");
+    REQUIRE(stacked.has_value());
+    CHECK(stacked->lines.size() == 2);
+
+    // The same words in the same style at a different end are not a repeat.
+    const auto longer = iclforge::lyrics::parse_ass(kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,Same words\n"
+        "Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,Same words\n");
+    REQUIRE(longer.has_value());
+    CHECK(longer->lines.size() == 2);
+}
+
+TEST_CASE("ass: with no sung line among them, the lines at one time are read in the file's commonest style",
+          "[lyrics][ass][styles]") {
+    // English is the file's commonest style (3 events to Spanish's 2): where the two share a time,
+    // English is read. A time with Spanish alone is read in Spanish.
+    const std::string text = kAssHeader +
+        "Dialogue: 0,0:00:01.00,0:00:03.00,English,,0,0,0,,Hello there\n"
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Spanish,,0,0,0,,Hola\n"
+        "Dialogue: 0,0:00:04.00,0:00:06.00,English,,0,0,0,,Goodbye\n"
+        "Dialogue: 0,0:00:04.00,0:00:06.00,Spanish,,0,0,0,,Adios\n"
+        "Dialogue: 0,0:00:07.00,0:00:09.00,English,,0,0,0,,Again\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 3);
+    CHECK(lyrics->lines[0].text == "Hello there");
+    CHECK(lyrics->lines[1].text == "Goodbye");
+    CHECK(lyrics->lines[2].text == "Again");
 }
 
 // ---- a lyrics file beside a stream (place_lyrics_beside) --------------------------------------

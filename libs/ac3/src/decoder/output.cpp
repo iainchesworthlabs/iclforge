@@ -868,6 +868,13 @@ MixLevels mix_levels(Acmod acmod, std::optional<meta::CentreMixLevel> cmixlev,
 MixLevels mix_levels(const std::optional<meta::MixMetadata>& mix) {
     MixLevels out;
     if (!mix.has_value()) {
+        // An E-AC-3 stream with no mixmdate: Dolby's decoder folds it at -3 dB for the centre and
+        // -3 dB for the surrounds, measured (planning/karaoke-eac3-findings.md), where AC-3's
+        // -4.5 and -6 dB stand in for a bsi that has no level to read. Annex E has no bsi
+        // cmixlev or surmixlev to fall back on, so the AC-3 numbers were never a reading of the
+        // stream (planning/karaoke-eac3.md, D10).
+        out.loro_clev = meta::level::kMinus3dB;
+        out.loro_slev = meta::level::kMinus3dB;
         return out;
     }
     out.loro_clev = meta::coefficient(mix->lorocmixlev);

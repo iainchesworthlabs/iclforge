@@ -66,6 +66,7 @@
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "associated_mix.hpp"
+#include "code_pages.hpp"
 #include "container_input.hpp"
 #include "exit_codes.hpp"
 #include "platform/stdio_binary.hpp"
@@ -2897,6 +2898,27 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
                 return false;
             }
             out.lyrics_path = std::string{value};
+            continue;
+        }
+        if (key == "lyrics-encoding") {
+            if (command != "encode" && command != "eac3-encode" && command != "ac4-encode") {
+                fmt::println(stderr,
+                             "error: lyrics-encoding= goes with lyrics=, on encode, eac3-encode "
+                             "and ac4-encode");
+                return false;
+            }
+            const auto* page = iclforge::apps::find_code_page(value);
+            if (page == nullptr) {
+                fmt::println(stderr, "error: lyrics-encoding={} is not a code page forge knows; one of: {}",
+                             value, iclforge::apps::code_page_names());
+                return false;
+            }
+            if (!iclforge::apps::code_page_available(*page)) {
+                fmt::println(stderr, "error: lyrics-encoding={}: this system has no conversion for it",
+                             value);
+                return false;
+            }
+            out.lyrics_encoding = std::string{page->name};
             continue;
         }
         if (key == "src") {

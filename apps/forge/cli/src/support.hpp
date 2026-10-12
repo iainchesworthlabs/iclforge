@@ -328,6 +328,9 @@ struct Options {
     // lyrics= (encode, eac3-encode, ac4-encode): a lyrics file, in any format libs/lyrics reads, to
     // put beside the stream as its own UTF-8 `.lrc` (commands/lyrics.cpp). Empty for none.
     std::string lyrics_path;
+    // lyrics-encoding= (with lyrics=): the code page lyrics= is read in when it is neither UTF-8
+    // nor UTF-16, by its canonical name (apps/shared/text-encoding). Empty: such a file is refused.
+    std::string lyrics_encoding;
     // Each offset= occurrence: (sourceIndex, seconds) - leading silence ahead
     // of that source's own audio, in the same 0-based numbering src=
     // establishes (0 = the primary positional argument, 1..N = each src= in
