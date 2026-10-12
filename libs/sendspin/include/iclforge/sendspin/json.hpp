@@ -42,9 +42,12 @@
 //           with no heap, where it used to reserve 32 KB first; nlohmann builds
 //           all 2,000 levels - 4,032 allocations, 70.7 KB, 51-61 ms - and nothing
 //           but the message's size bounds that, with a failed allocation an
-//           abort() under -fno-exceptions. What the token cap (4,096 in the
-//           sessions) bounds is a valid 4 KB text of 2,000 one-digit values:
-//           32 KB of tokens in one block here, 65 KB in 19 for nlohmann
+//           abort() under -fno-exceptions. What the token cap bounds is a valid
+//           4 KB text of 2,000 one-digit values: 32 KB of tokens in one block here
+//           under a host's cap of 4,096, 65 KB in 19 for nlohmann. A board sets
+//           512 (PlayerConfig::max_json_tokens, 8 KB at most), which refuses that
+//           text at its 513th token with no block, and the largest message a
+//           server sends is 98
 //
 // So a swap would cost about 50 KB of flash and several times the CPU, to make the
 // worst case a message can reach unbounded rather than capped. The reader
