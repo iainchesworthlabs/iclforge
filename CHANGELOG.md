@@ -178,6 +178,13 @@ The sections below contain the complete change list and fixes.
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
   `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
+  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
+  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
+  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
+  is named on the row when it is chosen, and none is written. The row's strings are translated in
+  the six catalogues.
+
 - **The lyric library reads a code page when a program supplies the conversion.**
   `iclforge::lyrics::TextEncoding` carries a decoder callback (the library holds no table of any
   page, as it is linked into firmware), and every reader (`parse_lyrics`, `parse_subrip`,
@@ -185,6 +192,17 @@ The sections below contain the complete change list and fixes.
   one as its last argument. It is asked only for text that is not UTF-8 and has no UTF-16 mark, a
   MIDI file's title, artist and syllables one at a time and never its other `@` lines; a file that
   is UTF-8 or UTF-16 is read as it was whatever is given, and without a decoder a code page is still
+  refused by name. Forge supplies one with `lyrics-encoding=` (the next entry).
+- **`lyrics-encoding=<page>` on `forge encode`, `eac3-encode` and `ac4-encode` reads a lyrics file in a
+  code page.** With `lyrics=`, a file that is not UTF-8 or UTF-16 (Windows-1250 to 1258, Windows-874,
+  ISO 8859-1, -2 and -15, DOS 437 and 850, KOI8-R and -U, Shift-JIS, EUC-JP, GBK, GB18030, Big5,
+  EUC-KR, in the usual spellings and any case) is read in the page named and written beside the
+  stream as UTF-8 LRC, where it was refused. A page is still never guessed at: without the key the
+  refusal now says what to name, and bytes the page does not have refuse the file. The conversion is
+  the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
+  it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
+  GUI's picker will link as well.
+
   refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
   name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
