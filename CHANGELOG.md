@@ -3189,6 +3189,14 @@ The sections below contain the complete change list and fixes.
   for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
   sink, applies at the group's next play, and is kept for the run. The group editor says which a
   member is sent.
+- **The Sendspin player plays a stream's bed when it declares more objects than the board says it
+  places** (`BurstPlayerConfig::max_objects`, `iclforge/object_limit.hpp`,
+  `Eac3Decoder::set_skip_object_reconstruction()`): the decision is made from the first unit's
+  header (the complexity index less the LFE), before the object reconstruction allocates its 147 KB,
+  with the decoder the player already holds and no other made; a listener who chose objects
+  "always" is not overruled. On an ESP32-S3 (release image, lane on, null sink, 7.1.4, over
+  Sendspin) streams of 3 to 11 declared objects that took 1.07 to 2.27 of real time with 63 to
+  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun.
 
 **Library internals**
 
