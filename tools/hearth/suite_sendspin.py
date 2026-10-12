@@ -366,9 +366,21 @@ def judge(run: SendspinRun, spec: dict[str, Any]) -> list[str]:
     if stream.get("kind") != "bursts":
         findings.append(f"the stream was {stream.get('kind')!r}, not bursts")
     expected = spec.get("sendspin_units", spec.get("units"))
-    if expected is not None and stream.get("bursts") != expected:
-        findings.append(f"{stream.get('bursts')} bursts played, expected {expected}")
+    if expected is not None and accounted(stream) != expected:
+        late, dropped = stream.get("late", 0), stream.get("dropped", 0)
+        findings.append(
+            f"{stream.get('bursts')} bursts played, expected {expected}"
+            + (f" ({late} late, {dropped} dropped)" if late or dropped else "")
+        )
     return findings
+
+
+def accounted(stream: dict[str, Any]) -> int:
+    """The bursts of a stream the board accounts for: played, or arrived too late to play, or
+    dropped for want of room (the server's own test: it fails a run that does not account for
+    every burst it sent). A late burst is a glitch and is counted as one; a burst that is none
+    of these is a stream that lost data."""
+    return int(stream.get("bursts", 0)) + int(stream.get("late", 0)) + int(stream.get("dropped", 0))
 
 
 def glitches(run: SendspinRun) -> list[str]:
