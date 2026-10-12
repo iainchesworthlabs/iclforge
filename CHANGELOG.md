@@ -29,6 +29,30 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**E-AC-3 folds a stream with no `mixmdate` at -3 dB, as Dolby's decoder does**
+
+- **The default Lo/Ro levels of an E-AC-3 stream that sends no `mixmdate` are -3 dB for the centre
+  and -3 dB for the surrounds.** They were AC-3's -4.5 and -6 dB, which stand in for a bsi that
+  has no level to read; an E-AC-3 bsi has none to fall back on, and Dolby's decoder, measured,
+  folds such a stream at -3 and -3. A stereo or mono fold of such a stream (the CLI, Hearth, the
+  Forge GUI, the sinks and the WebAssembly decoder all read it through
+  `iclforge::ac3::mix_levels()`) is 1.5 dB louder in the centre and 3 dB louder in the
+  surrounds against its own front channels; a stream that carries `mixmdate`, and every AC-3
+  stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
+  needs a case of its own (`planning/karaoke-eac3.md`, D10).
+
+**Karaoke in E-AC-3: Hearth's Karaoke page knows it**
+
+- **The Karaoke page names an E-AC-3 karaoke stream and takes its choice.** Hearth's engine had
+  reproduced such a stream since the decoder did, but the page still said Karaoke is an AC-3
+  mode and disabled its controls. A programme is karaoke to the page when the decoder reproduces
+  it (`ac3::is_karaoke_programme`: the service type, one independent substream, no object
+  layer), so the page's words and the sound agree. A programme that is flagged karaoke and has a
+  dependent substream or objects says so ("Flagged karaoke, but ... it plays as coded"), a
+  plain E-AC-3 stream says it is not a karaoke one, and the signal-path line names the codec
+  ("E-AC-3 karaoke, aware."). Five strings are new or changed, translated in the six catalogues
+  (`planning/karaoke-eac3.md`, E4c).
+
 **Audio: when a packet was captured**
 
 - **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
@@ -39,6 +63,7 @@ The sections below contain the complete change list and fixes.
   packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
   `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
   consumer must treat as "no time", and a caller that does not use any of it sees no change.
+
 **Karaoke: a plan for a microphone, scoring and recording**
 
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
@@ -119,6 +144,19 @@ The sections below contain the complete change list and fixes.
   what the container says, so that a person can see whether a karaoke video's words are in a text
   track, a bitmap subtitle track or only in the picture.
 
+**Subtitle karaoke: who sings an ASS line, and which line at one time is read**
+
+- **An ASS script's duet is read.** Where exactly two different actors (the `Name` column) are named
+  on the sung lines, they are the two singers, in the order they first appear, with their names;
+  failing that, where exactly two styles are used on them, those are the singers (a style's name is
+  not shown as one). One, three or none marks nobody. The lines carry `V1:` and `V2:` through
+  `write_lrc` like any other duet, so Hearth's singer view and a sink read them.
+- **Lines that share a time are read once.** A line written on two layers is one line; of lines in
+  different styles at one start and end, a translation or a romanisation beside the sung line is
+  dropped, and with no sung line the file's commonest style is read. Lines in one style at one time
+  are all read. The reader no longer shows a doubled line or an interleaved translation for such a
+  script (planning/karaoke-formats-options.md, D14).
+
 **Forge writes the lyrics beside the stream it encodes**
 
 - **`lyrics=<file>` on `forge encode`, `eac3-encode` and `ac4-encode`.** The file may be an `.lrc`, a
@@ -129,6 +167,13 @@ The sections below contain the complete change list and fixes.
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
   `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
+  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
+  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
+  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
+  is named on the row when it is chosen, and none is written. The row's strings are translated in
+  the six catalogues.
+
 - **The lyric library reads a code page when a program supplies the conversion.**
   `iclforge::lyrics::TextEncoding` carries a decoder callback (the library holds no table of any
   page, as it is linked into firmware), and every reader (`parse_lyrics`, `parse_subrip`,
@@ -136,6 +181,23 @@ The sections below contain the complete change list and fixes.
   one as its last argument. It is asked only for text that is not UTF-8 and has no UTF-16 mark, a
   MIDI file's title, artist and syllables one at a time and never its other `@` lines; a file that
   is UTF-8 or UTF-16 is read as it was whatever is given, and without a decoder a code page is still
+  refused by name. Forge supplies one with `lyrics-encoding=` (the next entry).
+- **`lyrics-encoding=<page>` on `forge encode`, `eac3-encode` and `ac4-encode` reads a lyrics file in a
+  code page.** With `lyrics=`, a file that is not UTF-8 or UTF-16 (Windows-1250 to 1258, Windows-874,
+  ISO 8859-1, -2 and -15, DOS 437 and 850, KOI8-R and -U, Shift-JIS, EUC-JP, GBK, GB18030, Big5,
+  EUC-KR, in the usual spellings and any case) is read in the page named and written beside the
+  stream as UTF-8 LRC, where it was refused. A page is still never guessed at: without the key the
+  refusal now says what to name, and bytes the page does not have refuse the file. The conversion is
+  the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
+  it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
+  GUI's picker links as well.
+- **The Forge GUI's Lyrics row offers a code page for a file that is not UTF-8 or UTF-16.** A
+  **Code page** list appears under the problem line, with no page chosen and none guessed; the
+  page chosen reads the file, the first lines are shown as it reads them, and the stream is saved
+  with the words beside it as UTF-8 LRC (the same conversion as `lyrics-encoding=`). Choosing
+  another file forgets the page. The page names' language groups are translated in the six
+  catalogues.
+
   refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
   name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
@@ -712,9 +774,16 @@ The sections below contain the complete change list and fixes.
   back and starts. It waits, cued, on a first run (the "Before you play anything" dialog comes first) and
   with `--seek`, `--shot` or `--smoke-shot`; `--` ends the options, and `--open <file>` is the
   same file named as an option. The item to start is chosen on the engine thread
-  (`Engine::add_and_play()`), so the saved queue that is restored at start cannot move it. A
-  second double-click still starts a second Hearth beside the first
+  (`Engine::add_and_play()`), so the saved queue that is restored at start cannot move it
   ([Hearth's command line](docs/hearth/index.md#command-line)).
+- **A second launch hands its files to the running Hearth.** A second double-click on a stream
+  used to start a second Hearth with its own engine and output, and since a launch plays, two
+  played over each other. A launch that would play files now offers them (and its `--page`) to a
+  Hearth already running under the same account over a local socket that only that account can
+  open; the running one queues them, plays the first, comes forward and switches page, and the
+  second process ends before it has a window. A launch with no file, with `--seek`, or a capture
+  runs on its own, and a Hearth that does not answer is not waited for. Hearth now links Qt
+  Network for it (`QLocalServer`).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
@@ -3382,7 +3451,9 @@ The sections below contain the complete change list and fixes.
   with the decoder the player already holds and no other made; a listener who chose objects
   "always" is not overruled. On an ESP32-S3 (release image, lane on, null sink, 7.1.4, over
   Sendspin) streams of 3 to 11 declared objects that took 1.07 to 2.27 of real time with 63 to
-  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun.
+  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun. On an ESP32-P4, which
+  states 12, the 14-object stream that took 0.97 with 24 underruns took 0.22, and the 11-object
+  streams, within the figure, are reconstructed at 0.85 as before.
 
 **Library internals**
 
@@ -3621,6 +3692,26 @@ The sections below contain the complete change list and fixes.
   it hung on its first run), and could on any rejoin while the page was open. The trail has a
   mutex of its own, nothing is taken inside it, and a test makes a member leave and come back
   sixty times while a thread polls.
+
+**ESP32-P4: a restart that left the board without Wi-Fi**
+
+- **A restart or an update of an ESP32-P4 board sometimes brought it back with its link to the C6
+  dead, until a USB flash.** After an update over the network (2 of 10; 8 of 16 of a USB flash, a
+  wait and an update; none of 30 `POST /restart`s) the board read the C6's SDIO registers and got
+  no data (`sd_host_wait_for_event returned 0x107`, `Failed to read data - -1 838860`), and every
+  boot after it, esp_hosted's own restart of the host included, did the same, because
+  `esp_restart()` resets the CPU alone. A reset of the whole system clears it (`esptool --after
+  watchdog-reset`, nothing written, in 11 s), and so, from JTAG, does holding the C6's reset line
+  low for two seconds, which esp_hosted's 10 ms pulse at every boot does not. A restart of a board
+  whose Wi-Fi is behind esp_hosted now ends in the RTC watchdog's system reset, armed as
+  `esp_restart_noos` arms its own, from the last shutdown handler (`main/system_reset.cpp`; the S3
+  and C6 are untouched): 24 of 24 updates clean, and 8 of 8 boards that came back dead healed by
+  esp_hosted's own restart. A restart takes a second longer and the USB-Serial-JTAG port
+  re-enumerates. The image that is running when an update arrives does the restart, so a board
+  from before this needs one more update, or one USB flash. The P4 page's "Restarting the board"
+  has the log, the numbers, three requests for a system reset that leave the board dead
+  (`esp_rom_software_reset_system()`, a 20 ms watchdog stage, a stalled core) and how to recover a
+  dead board with the cable alone.
 
 **Sendspin: a sink's heap per message**
 
