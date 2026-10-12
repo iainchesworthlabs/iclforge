@@ -3505,6 +3505,13 @@ The sections below contain the complete change list and fixes.
   360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun. On an ESP32-P4, which
   states 12, the 14-object stream that took 0.97 with 24 underruns took 0.22, and the 11-object
   streams, within the figure, are reconstructed at 0.85 as before.
+- **The AC-4 decoder can leave object audio undecoded** (`DecoderConfig::skip_objects`): for a
+  player that places no objects and takes `decode_by_block()`'s channels alone, which until now
+  paid to reconstruct A-JOC's objects and threw them away. The channels of a presentation that has
+  them are the same bit for bit in full and core decoding; an intermediate spatial format is still
+  rendered; a presentation of objects alone is refused with a reason. Held by a 5.1 bed beside A-JOC
+  and direct-coded objects (the decoder's own test streams gain a `channels` option), and on the
+  host, in a Debug build, it halves a frame's time (54 to 29 ms with four objects).
 - **An AC-4 item declares its objects to a group** (`ItemFacts::objects`, `objects_alone`;
   `Session::open()`), so that a sink's stated AC-4 object limit (`max_objects`) is honoured. They
   were left at 0, so no AC-4 stream was ever held to a limit. The count is what the decoder makes
