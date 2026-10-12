@@ -1004,6 +1004,40 @@ TEST_CASE("midi karaoke: words in the common code pages are refused by name, not
     }
 }
 
+TEST_CASE("midi karaoke: only the title, the artist and the words have to be UTF-8, not the other @ lines",
+          "[lyrics][midi][encoding]") {
+    const auto bytes = [](std::initializer_list<int> values) {
+        std::string out;
+        for (const int value : values) {
+            out += midi_byte(value);
+        }
+        return out;
+    };
+    // A copyright line, a key line and a language line with a Latin-1 copyright sign and e acute in
+    // them: the reader never shows them, so they do not refuse a file whose words are plain.
+    const std::string words = midi_words_track(
+        midi_text(0, "@KMIDI KARAOKE FILE" + bytes({0xE9})) + midi_text(0, "@TCafe Song") +
+        midi_text(0, "@TTraditional") + midi_text(0, "@I" + bytes({0xA9}) + " 1985 Caf" + bytes({0xE9})) +
+        midi_text(0, "@LFRAN") + midi_text(100, "Sing") + midi_text(100, " along"));
+    const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({words}));
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->title == "Cafe Song");
+    CHECK(lyrics->artist == "Traditional");
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "Sing along");
+
+    // The title and the artist are kept, so they are checked: the file is refused, naming UTF-8.
+    for (const bool artist : {false, true}) {
+        const std::string first = artist ? std::string{"@TA Title"} : "@TCaf" + bytes({0xE9});
+        const std::string second = artist ? "@TCaf" + bytes({0xE9}) : std::string{"@TTraditional"};
+        const std::string refused = midi_words_track(midi_text(0, first) + midi_text(0, second) +
+                                                     midi_text(100, "Sing") + midi_text(100, " along"));
+        const auto result = iclforge::lyrics::parse_midi_karaoke(midi_file({refused}));
+        REQUIRE_FALSE(result.has_value());
+        CHECK(result.error().find("not UTF-8") != std::string::npos);
+    }
+}
+
 TEST_CASE("midi karaoke: a file is read as MIDI by its header, and a .kar is found beside an item",
           "[lyrics][midi]") {
     const std::string file = midi_file({midi_words_track(midi_text(200, "Sing") + midi_text(200, " along"))});
