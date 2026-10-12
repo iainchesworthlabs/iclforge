@@ -3616,6 +3616,18 @@ The sections below contain the complete change list and fixes.
   dropped: a Shield whose HDMI link dropped every 20 s played a quarter fewer bursts than were sent and
   reported none dropped.
 
+**Hearth applies a sink's request for the karaoke choice**
+
+- **A request from a member of the group Hearth plays to changes the singer's choice.** The vocals,
+  the reproduction and the levels a sink asked for (the protocol of the entry below) are applied as the
+  Karaoke page's own change is: kept across starts, and reaching every member that decodes for itself
+  through the settings it is sent, so the server's screens and the other members move together. A
+  request from a sink in another group, or in none, changes nothing; two sinks asking at once are
+  decided by the last. Nothing sends a request yet: the Android remote and the panel's touch control
+  are the next changes. Held by a case on a real group (the host's event reaches the application with
+  the group and the sink's name, cut to what the sink listed), and by cases for the map a request
+  makes and for the group it must come from.
+
 **A burst rebuilt from its parts, and a null burst**
 
 - **`iec61937::burst_from_parts`, `burst_period_bytes` and `null_burst`.** A sink that bitstreams a
@@ -3687,18 +3699,6 @@ The sections below contain the complete change list and fixes.
   A new project row (`hearth-android`, lane `android`), `check_android_jni.py` taught the second
   package, and a CI job, `build-android-hearth`, that builds the debug APK with vcpkg in front of the
   NDK's toolchain (`continue-on-error` until it has gone green on hosted runners).
-
-**Hearth applies a sink's request for the karaoke choice**
-
-- **A request from a member of the group Hearth plays to changes the singer's choice.** The vocals,
-  the reproduction and the levels a sink asked for (the protocol of the entry below) are applied as the
-  Karaoke page's own change is: kept across starts, and reaching every member that decodes for itself
-  through the settings it is sent, so the server's screens and the other members move together. A
-  request from a sink in another group, or in none, changes nothing; two sinks asking at once are
-  decided by the last. Nothing sends a request yet: the Android remote and the panel's touch control
-  are the next changes. Held by a case on a real group (the host's event reaches the application with
-  the group and the sink's name, cut to what the sink listed), and by cases for the map a request
-  makes and for the group it must come from.
 
 ### Changed
 
