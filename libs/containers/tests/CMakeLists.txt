@@ -3,6 +3,7 @@
 iclforge_add_test_binary(iclforge-containers-tests PROJECT containers SOURCES
     iec61937/test_iec61937.cpp
     iec61937/test_iec61937_ac4.cpp
+    iec61937/test_iec61937_parts.cpp
     iec61937/test_iec61937_unwrap.cpp
     matroska/test_matroska.cpp
     matroska/test_matroska_reader.cpp
