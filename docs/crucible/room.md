@@ -302,7 +302,7 @@ What the strip follows can also be sent over OSC to a lighting or show-control r
 Where the platform cannot read sessions, the strip says why and keeps Start and the nudge: a
 Linux build without Qt's D-Bus module, and **macOS**, whose only reader is a private framework that
 developers report macOS 15.4 and later withholds from programs Apple has not entitled (no Mac has
-run Crucible's reader; see [the findings](../../planning/karaoke-phase2-findings.md)). The sessions
+run Crucible's reader; see [the findings](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-phase2-findings.md)). The sessions
 are read on a thread of their own, only while an application with lyrics is waiting on one;
 `ICLFORGE_CRUCIBLE_MEDIA_SESSIONS=off` turns the reading off.
 
