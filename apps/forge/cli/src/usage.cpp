@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 109> kOptionTokens{{
+constexpr std::array<OptionToken, 110> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -138,6 +138,8 @@ constexpr std::array<OptionToken, 109> kOptionTokens{{
                                 "ac4-encode')"},
     {"conceal=","decode/monitor: repeat or mute, §7.10 error concealment for a bad frame"},
     {"src=", "an additional input source; repeat for more than one"},
+    {"lyrics=", "encode/eac3-encode/ac4-encode: a lyrics file (.lrc, .srt, .ass, .kar) to write beside "
+                "the stream as its own UTF-8 .lrc"},
     {"map=", "where each source channel goes"},
     {"offset=", "<sourceIndex>:<seconds> leading silence for that source"},
     {"capture2=", "live: a second capture device, clock-conformed to the first"},
@@ -921,6 +923,9 @@ void print_option_blocks(std::uint32_t mask) {
                      "channels (seconds >= 0), same 0-based numbering as src=");
         fmt::println("                    the programme is still as long as the longest one once "
                      "every offset is applied");
+        fmt::println("  lyrics=<path>     encode/eac3-encode/ac4-encode: a lyrics file (.lrc, .srt, "
+                     ".ass or .kar), read and written beside the stream as <stream>.lrc in UTF-8, "
+                     "where Hearth finds it; one already there is left alone");
     }
     if ((mask & topic::kTake) != 0) {
         fmt::println("");

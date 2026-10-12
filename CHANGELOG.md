@@ -29,6 +29,17 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke: a plan for a microphone, scoring and recording**
+
+- **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
+  and `planning/karaoke-microphone-findings.md`). Phase 1 left the microphone, scoring and recording
+  out; this is the plan for them: who sings with what, the latency budget (a voice mixed into a
+  Sendspin group comes out of a sink at least 400 ms late, so the voice is mixed where the
+  microphone is), a pitch score and the references that exist for one, a recording of the dry voice, the
+  decisions with a recommendation each (approved by the owner as recommended), and a build plan by
+  platform. A voice through one Windows 11 workstation's own shared-mode path was measured at about
+  130 ms, so a monitor is offered with its measured latency and not promised.
+
 **The Android audio backend names no Java package**
 
 - **A second Android app can link `iclforge::audio`'s passthrough backend.** The backend exported
@@ -178,6 +189,23 @@ The sections below contain the complete change list and fixes.
   what the container says, so that a person can see whether a karaoke video's words are in a text
   track, a bitmap subtitle track or only in the picture.
 
+**Forge writes the lyrics beside the stream it encodes**
+
+- **`lyrics=<file>` on `forge encode`, `eac3-encode` and `ac4-encode`.** The file may be an `.lrc`, a
+  SubRip `.srt`, an Advanced SubStation Alpha `.ass` or a MIDI karaoke `.kar`; what is written beside the
+  stream is `<stream>.lrc`, the one format Hearth finds by name and sends to every sink: UTF-8, with a
+  duet's `V1:`/`V2:` markers and names, word times where the file has them, and a time with no text
+  where a cue ends before the next begins. The file is read before the encode (a code page is
+  named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
+  `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
+  `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
+  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
+  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
+  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
+  is named on the row when it is chosen, and none is written. The row's strings are translated in
+  the six catalogues.
+
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
 - **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
@@ -202,6 +230,40 @@ The sections below contain the complete change list and fixes.
   same lossless rewrite `strip_objects` does, so the bed is bit-identical and the result plays in
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
+
+**Karaoke in E-AC-3: the boards reproduce it themselves**
+
+- **A Hearth sink board lists the codecs it reproduces karaoke for.** Its support object now
+  states `karaoke_codecs`, every codec it decodes (AC-3 and E-AC-3), so Hearth sends an E-AC-3
+  karaoke stream to it as it is, with the choice of reproduction, and not as PCM decoded on the
+  host. Checked on a real ESP32-S3 over Wi-Fi: the board's output levels follow the same
+  programme decoded on the host to within 0.25 dB, for as coded, aware, and capable with a
+  vocal, with none, and with the melody and a vocal moved (the live case, `network sinks live:
+  an E-AC-3 karaoke stream is reproduced by the board that decodes it`, beside the AC-3 one it
+  now shares its body with). The P4 and the C6 carry the same line and were not run
+  (`planning/karaoke-eac3.md`, E4b, D6).
+
+**Karaoke in E-AC-3: authoring writes the levels, and the WebAssembly decoder reproduces it**
+
+- **An E-AC-3 stream flagged karaoke carries its Lo/Ro mixing group.** `eac3-encode` with `bsmod=7`
+  above 1/0 (and `plan::eac3_config()` for the Forge GUI and the library) writes `mixmdate` whether
+  or not `mixmeta` is given: Annex E has no `cmixlev` or `surmixlev` in `bsi`, the group is where
+  a decoder reads the levels of Annex C's reproduction, and a stream without one is reproduced at
+  the decoder's own default (-3 dB in Dolby's) and not at the level the author set. Its
+  `lorocmixlev` and `lorosurmixlev` come from `cmixlev=` and `surmixlev=` (-4.5 and -6 dB by
+  default, the level an AC-3 karaoke stream is made at); an explicit `lorosurmixlev` still wins.
+  A 2/0 stream has no such level and gets none (`planning/karaoke-eac3.md`, E5, D4).
+- **`encode` and `eac3-encode` say what `bsmod=7` is on mono and on 1+1.** Table 5.7 gives mono's
+  code 7 the meaning of a voice-over, and Annex A (Table A5.2) and Annex G (Table G.2) prohibit a
+  karaoke service on 1+1; both encoders accepted it silently. The stream is still written as
+  asked, with a warning (for an extra programme, naming which).
+- **The WebAssembly decoder reproduces an E-AC-3 karaoke stream.** `PushDecoder` read karaoke from
+  an AC-3 syncframe only; an E-AC-3 syncframe that is one independent substream with no object
+  layer and `bsmod` 7 above 1/0 is karaoke too, and `karaoke`/`karaokeVocals` apply to its side
+  fold as they do to AC-3's. The JavaScript package's documentation says so.
+- **`verify_karaoke_oracle.py`'s E-AC-3 cases** say what they are now that `bsmod=7` alone writes
+  the group, and one at a -3 dB surround level takes the place of the no-`mixmdate` stream the
+  command line can no longer write (the decoder's default for one is held by the library's tests).
 
 **Karaoke in E-AC-3: Hearth reproduces it, and a sink says which codecs it reproduces it for**
 
@@ -578,6 +640,12 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **The Network page says whether a board holds lyrics and which line it is on.** The sink report
+  has a Lyrics row: "not offered" for a board that lists no lyric commands, "none held", "held,
+  before the first line", or "line 3 of 12" with the line's text. The board reports the item and
+  the line's index; Hearth keeps the lines of the document it sent the group and reads the index
+  against them. Run against real boards, a line change follows the one before at the file's
+  spacing to the polling's resolution (S3a and P4a, a line every 3 s).
 - **The singer view moves about and shows the queue, and the Play page shows the lyrics.** The
   full-screen view's position bar is pressed or dragged to move the item (the words and the clock
   show the place held, and the item moves when it is let go, playing or paused), `Left` and
@@ -618,6 +686,19 @@ The sections below contain the complete change list and fixes.
   project) when E-AC-3's mixing metadata, or AC-3's Annex D, was off and the stream had neither, so
   the line and the project were a different stream than the window encoded; they are now written
   with their group, and a project that names either asks for it, as `forge` reads it.
+- **The C API reproduces a karaoke stream and reads lyrics.** `iclforge_decoder_create_with_karaoke()`
+  takes an `iclforge_karaoke_config_t` - the reproduction (`ICLFORGE_KARAOKE_OFF`, `_AWARE`,
+  `_CAPABLE`), the listener's vocals and the three part levels in dB against Table C.2.3, the span,
+  units and defaults Hearth's sliders and `forge decode karaoke-melody=` use - and a decoded frame
+  says `bsmod`, `is_karaoke`, `output_acmod`, `output_lfe` and `karaoke_reproduced`, so that a caller
+  lays out the three or four channels of a reproduction and not the five or six it coded. The AC-3
+  decoder had no output configuration at all before. `iclforge_lyrics_parse()` reads the bytes of an
+  LRC (UTF-8 or UTF-16), SubRip, Advanced SubStation Alpha or MIDI karaoke file into lines of timed
+  words with their singers, and `iclforge_lyrics_position()` is the stateless cursor Hearth uses.
+  31 functions are added, and a status, `ICLFORGE_ERROR_LYRICS_UNREADABLE`, with the reason in
+  `iclforge_lyrics_error_message()`. The reader is `libs/lyrics`, compiled into the library; a
+  build whose compiler has no `<filesystem>` answers the lyrics functions with
+  `ICLFORGE_ERROR_UNSUPPORTED` (planning/karaoke-phase2.md, W5).
 - **The browser decode demo reproduces karaoke streams.** `PushDecoder` and the npm package's
   `FoldOptions` take `karaoke` (as coded, aware, capable) and `karaokeVocals` (none, V1, V2, both),
   and every push says whether the unit is Annex C karaoke type. The demo page shows a control for
@@ -3092,6 +3173,26 @@ The sections below contain the complete change list and fixes.
   support catalogue's AC-4 encode row and the GUI's pages say so, and the translation catalogues
   take the new strings.
 
+**The ESP-IDF component's link targets are checked in the static job**
+
+- **`tools/checks/check_esp_component_targets.py` fails when the component links an `iclforge::`
+  target that its own options never define.** `firmware/esp-idf/iclforge/CMakeLists.txt` turns its
+  Kconfig symbols into the root build's options and links libraries by name, and whether a library
+  exists under those options is decided by `if()` guards in the root and in each library's
+  directory. The script runs the component's file, the root's and the libraries' through a small
+  interpreter of the CMake language once for each combination of the symbols the component reads,
+  with no ESP-IDF, and holds every `target_link_libraries()` to a definition. A finding names the
+  file that defines the target and the guard (with the values it read) or the `return()` that kept
+  it from running. The rest of the build is held to the same rule: in every combination that
+  configures, each `iclforge::` name that any executed `target_link_libraries()` names, and each
+  one an `iclforge_add_library()` links for its library, must be defined by the end of the run,
+  except inside a conditional generator expression (`$<TARGET_EXISTS:...>`,
+  `$<INSTALL_INTERFACE:...>`), which a build may leave out. A combination the build itself refuses
+  with `message(FATAL_ERROR)` is not a finding. Its tests put the root's guard for `libs/lyrics`
+  back as it was before #1344, when the sink firmware stopped configuring because the sink's player
+  linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
+  ESP-IDF image, so nothing before the merge saw that break.
+
 ### Changed
 
 **Shared code**
@@ -3477,6 +3578,41 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**Lyrics on a board**
+
+- **A board's lyric document cost ten times its text of the internal heap, and the default let it
+  be sixteen kilobytes.** A parsed document is a line and a word each in many small blocks, which
+  the allocator keeps in internal RAM whatever the total, and that is what Wi-Fi's receive buffers
+  and the decoder come out of. Measured on boards with a stream playing, word-timed lines took
+  about ten times their text at the peak: an S3 playing 5.1 was left 27 KB at its least with a
+  64-byte document, 7.8 KB with 2,000 bytes and 0.4 KB with 4,000; a P4 was left 66 KB with
+  16,000 bytes and once dropped the play; a C6's Wi-Fi receive buffers failed to allocate at 2,000.
+  A board with PSRAM now reads and holds the document there (`PsramScope`, with a replacement
+  `operator new` that takes PSRAM first for the one task that has it open): on the P4 a 16,000-byte
+  document costs 49 KB at the peak, not 157 KB, and on the S3 2,000 bytes cost 7.4 KB and 1.0 KB
+  once held. A board takes a document only while three times its size (twelve times of internal
+  RAM, where PSRAM has no room) and 8 KB of internal heap are free, and holds none, and says why,
+  otherwise; an S3 playing 5.1 E-AC-3 has a few hundred bytes to spare and takes none. The
+  defaults are what each part spares: none without PSRAM, 2,048 bytes on an S3, 16,384 on a P4.
+- **A document was sent to a board three times at the start of an item.** The first anchor follows
+  the document at once, the board's report of the item takes a round trip, and a member that does
+  not report the item is sent the document again. A document just sent is now given two seconds to
+  be reported, and an item a board was told has none (a document too big for it) is not sent
+  again. Recovery itself, a board that restarted mid-item being sent the document with the next
+  anchor, had no test: it has a unit test with a board that loses its document and a live case
+  that restarts a real one (S3: back holding the item 7 s after the restart).
+
+**Hearth: a member that comes back to a playing group**
+
+- **A member rejoining a group that was playing could stop the engine for good.** The group logs
+  from inside its own lock when a member starts, and the Network page's poll reads the group's
+  facts from inside `NetworkSinks`' lock; the host's trail was guarded by that lock, so the two
+  were taken in opposite orders and the engine, the poll and the host's own thread waited on each
+  other. It showed when a board was restarted in the middle of an item (the live case that does
+  it hung on its first run), and could on any rejoin while the page was open. The trail has a
+  mutex of its own, nothing is taken inside it, and a test makes a member leave and come back
+  sixty times while a thread polls.
 
 **Sendspin: a sink's heap per message**
 
