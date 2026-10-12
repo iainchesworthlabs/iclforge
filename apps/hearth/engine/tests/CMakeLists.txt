@@ -94,7 +94,12 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.cpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.hpp"
             "${CMAKE_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
-            "${CMAKE_SOURCE_DIR}/apps/shared/media/src/container_input.hpp")
+            "${CMAKE_SOURCE_DIR}/apps/shared/media/src/container_input.hpp"
+            # KaraokeController is a CdgFrameSource and holds a CdgFrames (apps/shared/cdg-picture);
+            # CdgPicture, the Qt Quick item, is not here.
+            "${CMAKE_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frame_source.hpp"
+            "${CMAKE_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frames.cpp"
+            "${CMAKE_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frames.hpp")
         # hearth_controller.cpp itself is NOT listed as a source: it is
         # #include'd directly by test_hearth_controller.cpp (that file's own
         # header explains why - internal-linkage functions with no header to
@@ -108,6 +113,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
         set_target_properties(hearth_controller_tests PROPERTIES AUTOMOC ON)
         target_include_directories(hearth_controller_tests PRIVATE
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src"
+            "${CMAKE_SOURCE_DIR}/apps/shared/cdg-picture/src"
             "${CMAKE_SOURCE_DIR}/apps/shared/media/src")
         # A DEE AC-4 stream, for media_ac4_to_map()'s case.
         target_compile_definitions(hearth_controller_tests PRIVATE

@@ -252,8 +252,10 @@ the stream is shown in its place, since it is what a word-by-word fill and the d
 
 What is drawn is what the disc's own player draws: the screen preset and the border preset, the
 tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form
-brings back what left), and the 12-bit colour table of 16 colours. The smooth scrolling offsets
-within a tile and the transparent colour are read and not drawn. A packet that is not CD+G is skipped
+brings back what left), the smooth scrolling offsets within a tile (the picture is shown up to 5
+pixels left and 11 up of where its memory has it, which is how a disc scrolls a line a pixel at a
+time), the 12-bit colour table of 16 colours, and the transparent colour (drawn as the backdrop, which
+is black: there is no video here for it to show). A packet that is not CD+G is skipped
 and keeps its place in time, and a file that is not a whole number of 24-byte packets, or has no
 CD+G packet in it, is refused with the reason (playback is not affected). The packets are not checked
 for parity: a rip has already been through the drive's error correction.
