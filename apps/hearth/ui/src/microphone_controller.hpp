@@ -30,6 +30,7 @@
 // handed in by whoever shows it (the card), as KaraokeController's is.
 namespace iclforge::hearth {
 class MicrophoneInput;
+struct TakeInfo;
 }
 
 namespace iclforge::hearth::ui {
@@ -70,6 +71,16 @@ class MicrophoneController : public QObject {
     // (M)").
     Q_PROPERTY(QString referenceStatus READ referenceStatus NOTIFY referenceChanged)
     Q_PROPERTY(QString referenceText READ referenceText NOTIFY referenceChanged)
+
+    // A take (M6): the dry voice kept as a FLAC with a description beside it. Its own switch, not
+    // the microphone's (RC1): recording and "Microphone on" are two indicators. The folder is the
+    // person's choice, kept; it is never made until a take is started.
+    Q_PROPERTY(bool recording READ recording NOTIFY recordingChanged)
+    Q_PROPERTY(double takeSeconds READ takeSeconds NOTIFY recordingChanged)
+    Q_PROPERTY(QString takeError READ takeError NOTIFY recordingChanged)
+    // The last take: name, path, folder, seconds; empty before one.
+    Q_PROPERTY(QVariantMap lastTake READ lastTake NOTIFY recordingChanged)
+    Q_PROPERTY(QString takesFolder READ takesFolder NOTIFY takesFolderChanged)
 
     // The live view: voiced, hz, referenceHz, centsFromReference (absent where there is no note or
     // the singer is not voiced), itemMs.
@@ -115,6 +126,11 @@ class MicrophoneController : public QObject {
     [[nodiscard]] QString referenceText() const { return reference_text_; }
     [[nodiscard]] QVariantMap live() const { return live_; }
     [[nodiscard]] QVariantMap score() const { return score_; }
+    [[nodiscard]] bool recording() const { return recording_; }
+    [[nodiscard]] double takeSeconds() const { return take_seconds_; }
+    [[nodiscard]] QString takeError() const { return take_error_; }
+    [[nodiscard]] QVariantMap lastTake() const { return last_take_; }
+    [[nodiscard]] QString takesFolder() const { return takes_folder_; }
 
     // Lists the inputs again.
     Q_INVOKABLE void refreshDevices();
@@ -126,6 +142,18 @@ class MicrophoneController : public QObject {
     Q_INVOKABLE void stop();
     // Starts the score again from nothing (a new take of the same item).
     Q_INVOKABLE void restartScore();
+
+    // Starts a take: the microphone must be on. False, with takeError, when the file could not be
+    // made. The name is the item's and the time.
+    Q_INVOKABLE bool startRecording();
+    // Ends it and keeps it; lastTake says where.
+    Q_INVOKABLE void stopRecording();
+    // Removes the last take and its description.
+    Q_INVOKABLE bool deleteLastTake();
+    // Opens the folder in the file manager.
+    Q_INVOKABLE void showTakes();
+    // Where takes go: a folder URL from a dialog, or a path. Kept.
+    Q_INVOKABLE void setTakesFolder(const QString& urlOrPath);
 
     // The item playing, and which part to take the reference from ("m", "v1", "v2" or "" for the
     // first present). An empty path closes the microphone: nothing is playing to sing along to.
@@ -154,6 +182,8 @@ class MicrophoneController : public QObject {
     void referenceChanged();
     void liveChanged();
     void scoreChanged();
+    void recordingChanged();
+    void takesFolderChanged();
 
    private:
     struct State;
@@ -161,6 +191,7 @@ class MicrophoneController : public QObject {
 
     void publish(bool force);
     void fail(const QString& text);
+    void remember_take(const iclforge::hearth::TakeInfo& info);
 
     std::unique_ptr<State> state_data_;
     QTimer timer_;
@@ -180,6 +211,11 @@ class MicrophoneController : public QObject {
     QString reference_text_;
     QVariantMap live_;
     QVariantMap score_;
+    bool recording_ = false;
+    double take_seconds_ = 0.0;
+    QString take_error_;
+    QVariantMap last_take_;
+    QString takes_folder_;
     QString item_path_;
     QString prefer_;
     int ticks_ = 0;

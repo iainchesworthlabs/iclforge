@@ -33,6 +33,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_settings_model.cpp
     test_sink_form.cpp
     test_stream_decoder.cpp
+    test_take_recorder.cpp
     test_transport.cpp)
 target_link_libraries(iclforge-hearth-tests PRIVATE hearth_engine)
 # test_karaoke_example.cpp reads the karaoke example's words (examples/karaoke/auld-lang-syne/) where the
