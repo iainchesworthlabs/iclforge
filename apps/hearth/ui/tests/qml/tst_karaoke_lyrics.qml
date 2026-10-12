@@ -312,7 +312,9 @@ TestCase {
         HearthController.playItem(0);
         const view = named(win, "lyricsView");
         tryCompare(view, "status", "none", 10000);
-        const message = named(win, "lyricMessage");
+        // The Karaoke page's own view: the Play page carries two more (PlayLyricsCard.qml), hidden
+        // for an item with no lyrics, and the first message found in the window would be theirs.
+        const message = named(view, "lyricMessage");
         tryVerify(function() { return message.visible && message.text.indexOf("bare.lrc") >= 0; }, 5000);
     }
 

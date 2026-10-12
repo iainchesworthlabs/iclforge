@@ -24,6 +24,17 @@ Item {
     // minimum (Main.qml's minimumWidth/minimumHeight).
     readonly property bool narrow: root.width < 1100
 
+    // Asked for by the lyrics card's button; Main.qml opens the singer view.
+    signal lyricsFullScreenRequested()
+
+    // Whether the lyrics card has a column of its own beside the queue, or is the first card of
+    // the monitor column. Only when the queue (340), the lyrics (360), the sidebar (300) and a
+    // monitor column at least as wide as it is at the narrow breakpoint all fit; a width
+    // that does not present them folded into the monitor, the way Objects and Signal path are.
+    // A fixed width rather than "is there a lyrics file", so that starting a song does not move
+    // the rest of the page.
+    readonly property bool lyricsBeside: root.width >= 1580
+
     // The meter's own axis (-60,-48,-36,-24,-12,-6,0 dB): six EQUAL-WIDTH
     // segments over unequal dB spans, giving more resolution near 0 dB -
     // where clipping risk actually lives - the same idea a broadcast PPM's
@@ -392,6 +403,18 @@ Item {
             }
         }
 
+        // --- lyrics, beside the queue --------------------------------------
+        // Its own column when there is room; the first card of the monitor column when
+        // there is not (root.lyricsBeside). Present only for an item that has lyrics.
+        PlayLyricsCard {
+            objectName: "playLyricsBeside"
+            placed: root.lyricsBeside
+            Layout.fillWidth: false
+            Layout.preferredWidth: 360
+            Layout.alignment: Qt.AlignTop
+            onFullScreenRequested: root.lyricsFullScreenRequested()
+        }
+
         // --- now playing, levels, loudness, this frame -------------------
         ScrollView {
             id: monitorScroll
@@ -404,6 +427,12 @@ Item {
             ColumnLayout {
                 width: monitorScroll.availableWidth
                 spacing: Theme.gap * 2
+
+                PlayLyricsCard {
+                    objectName: "playLyricsFolded"
+                    placed: !root.lyricsBeside
+                    onFullScreenRequested: root.lyricsFullScreenRequested()
+                }
 
                 Card {
                     ordinal: "02"

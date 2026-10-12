@@ -496,6 +496,18 @@ void print_container(const iclforge::apps::ContainerFacts& facts) {
                  facts.codec_id, facts.samples,
                  facts.kind == ContainerKind::kMp4 ? "samples" : "frames", facts.sample_rate,
                  timescale, facts.channels, box);
+    // What else the file holds and this reads none of: a picture, a subtitle track.
+    if (!facts.other_tracks.empty()) {
+        std::string others;
+        for (const iclforge::apps::OtherTrack& other : facts.other_tracks) {
+            if (!others.empty()) {
+                others += ", ";
+            }
+            others += fmt::format("{} track {} '{}' ({})", other.kind, other.id, other.codec_id,
+                                  other.language);
+        }
+        fmt::println("{:<16}{}", "other tracks", others);
+    }
 }
 
 void print_ac4_table(std::string_view path, const Ac4Summary& summary,

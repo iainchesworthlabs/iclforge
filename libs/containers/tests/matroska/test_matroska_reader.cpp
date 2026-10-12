@@ -505,6 +505,103 @@ TEST_CASE("Matroska track selection picks the audio AC-3 track", "[matroska][rea
     }
 }
 
+TEST_CASE("Matroska lists the tracks it does not read, by type, codec and language",
+          "[matroska][reader][skipped]") {
+    // What a karaoke video rip holds beside its Dolby audio: the picture, a second audio track, a
+    // text subtitle track, a bitmap subtitle track and a track of a type this reader has no
+    // name for.
+    Bytes tracks;
+    put_bytes(tracks, track_entry(TrackSpec{.number = 1, .type = 1, .codec_id = "V_MPEG4/ISO/AVC"}));
+    put_bytes(tracks, track_entry(TrackSpec{.number = 2, .type = 2, .codec_id = "A_AAC"}));
+    put_bytes(tracks, track_entry(TrackSpec{.number = 3, .type = 2, .codec_id = "A_EAC3"}));
+    put_bytes(tracks, track_entry(TrackSpec{.number = 4, .type = 17, .codec_id = "S_TEXT/UTF8",
+                                            .language = "fre"}));
+    put_bytes(tracks, track_entry(TrackSpec{.number = 5, .type = 17, .codec_id = "S_VOBSUB",
+                                            .language = "jpn"}));
+    put_bytes(tracks, track_entry(TrackSpec{.number = 6, .type = 33, .codec_id = "D_WEBVTT/METADATA"}));
+
+    Bytes cluster;
+    put_uint_element(cluster, kClusterTimestamp, 0);
+    put_element(cluster, kSimpleBlock, block_payload(3, 0, 0x80, frame_of(40, 0x33)));
+    Bytes file = ebml_header();
+    Bytes segment;
+    put_element(segment, kTracks, tracks);
+    put_element(segment, kCluster, cluster);
+    put_element(file, kSegment, segment);
+
+    using iclforge::containers::matroska::TrackKind;
+
+    SECTION("the selected track is read and is not listed; every other track is, in file order") {
+        const auto out = iclforge::containers::matroska::demux(file);
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 3);
+        REQUIRE(out->skipped.size() == 5);
+        const auto& skipped = out->skipped;
+        CHECK(skipped[0].track_number == 1);
+        CHECK(skipped[0].kind == TrackKind::kVideo);
+        CHECK(skipped[0].codec_id == "V_MPEG4/ISO/AVC");
+        CHECK(skipped[1].track_number == 2);
+        CHECK(skipped[1].kind == TrackKind::kAudio);
+        CHECK(skipped[1].codec_id == "A_AAC");
+        CHECK(skipped[2].track_number == 4);
+        CHECK(skipped[2].kind == TrackKind::kText);
+        CHECK(skipped[2].codec_id == "S_TEXT/UTF8");
+        CHECK(skipped[2].language == "fre");
+        CHECK(skipped[3].track_number == 5);
+        CHECK(skipped[3].kind == TrackKind::kText);
+        CHECK(skipped[3].codec_id == "S_VOBSUB");
+        CHECK(skipped[4].track_number == 6);
+        CHECK(skipped[4].kind == TrackKind::kOther);
+    }
+
+    SECTION("an explicit track number is read and not listed, and the one auto-selection would take is") {
+        const auto out = iclforge::containers::matroska::demux(
+            file, iclforge::containers::matroska::ReadOptions{.track_number = 2});
+        REQUIRE(out.has_value());
+        CHECK(out->track.track_number == 2);
+        REQUIRE(out->skipped.size() == 5);
+        bool has_two = false;
+        bool has_three = false;
+        for (const auto& track : out->skipped) {
+            has_two = has_two || track.track_number == 2;
+            has_three = has_three || track.track_number == 3;
+        }
+        CHECK_FALSE(has_two);
+        CHECK(has_three);
+    }
+
+    SECTION("the streaming Reader reads the same file without an error") {
+        const auto frames = read_in_chunks(file, 7);
+        CHECK(frames.size() == 1);
+    }
+
+    CHECK(iclforge::containers::matroska::describe(TrackKind::kText) == "text");
+}
+
+TEST_CASE("Matroska lists no more than 64 skipped tracks, however many Tracks declares",
+          "[matroska][reader][skipped]") {
+    Bytes tracks;
+    for (std::uint64_t number = 1; number <= 70; ++number) {
+        put_bytes(tracks, track_entry(TrackSpec{.number = number, .type = 1, .codec_id = "V_VP9"}));
+    }
+    put_bytes(tracks, track_entry(TrackSpec{.number = 71, .type = 2, .codec_id = "A_AC3"}));
+    Bytes cluster;
+    put_uint_element(cluster, kClusterTimestamp, 0);
+    put_element(cluster, kSimpleBlock, block_payload(71, 0, 0x80, frame_of(40, 0x33)));
+    Bytes file = ebml_header();
+    Bytes segment;
+    put_element(segment, kTracks, tracks);
+    put_element(segment, kCluster, cluster);
+    put_element(file, kSegment, segment);
+
+    const auto out = iclforge::containers::matroska::demux(file);
+    REQUIRE(out.has_value());
+    CHECK(out->track.track_number == 71);
+    REQUIRE(out->skipped.size() == 64);
+    CHECK(out->skipped.front().track_number == 1);
+    CHECK(out->skipped.back().track_number == 64);
+}
+
 TEST_CASE("Matroska reads a 32-bit SamplingFrequency and a defaulted track", "[matroska][reader]") {
     SECTION("a float32 sample rate") {
         Bytes tracks;

@@ -1,6 +1,7 @@
 #include "lyrics_controller.hpp"
 
 #include <QFile>
+#include <QImage>
 #include <QSet>
 #include <QUrl>
 
@@ -16,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include "cdg_frames.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 
 namespace {
@@ -29,6 +31,9 @@ using iclforge::lyrics::WordState;
 // No lyric file is anywhere near this; the library refuses a file past it too, and this refuses
 // before reading it.
 constexpr qint64 kMaxFileBytes = 4LL * 1024 * 1024;
+// A CD's subcode is at most 80 minutes of 24-byte packets, 300 a second: under 35 MiB. The library
+// refuses a file past this too, and this refuses before reading it.
+constexpr qint64 kMaxDiscBytes = 64LL * 1024 * 1024;
 
 [[nodiscard]] QString from_utf8(const std::string& text) {
     return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
@@ -73,6 +78,8 @@ constexpr qint64 kMaxFileBytes = 4LL * 1024 * 1024;
 // What one application has: the file, and the clock that follows it.
 struct Entry {
     Lyrics lyrics;
+    // A CD+G disc, when the file was one (status "picture").
+    iclforge::apps::CdgFrames disc;
     QString status = QStringLiteral("none");
     QString file_name;
     QString error_text;
@@ -106,6 +113,20 @@ struct Entry {
     return entry;
 }
 
+// An application's CD+G disc from the bytes of a `.cdg` file: an entry in the "picture" state, or in
+// the "error" one with the reader's reason.
+[[nodiscard]] Entry make_disc_entry(const QString& name, std::string_view bytes) {
+    Entry entry;
+    entry.file_name = name;
+    if (auto loaded = entry.disc.load_bytes(bytes)) {
+        entry.status = QStringLiteral("picture");
+    } else {
+        entry.status = QStringLiteral("error");
+        entry.error_text = from_utf8(loaded.error());
+    }
+    return entry;
+}
+
 [[nodiscard]] Entry failed_entry(const QString& name, const QString& why) {
     Entry entry;
     entry.file_name = name;
@@ -125,7 +146,11 @@ struct CrucibleLyrics::State {
     }
 };
 
-CrucibleLyrics::CrucibleLyrics(QObject* parent) : QObject(parent), state_(std::make_unique<State>()) {}
+CrucibleLyrics::CrucibleLyrics(QObject* parent)
+    : iclforge::apps::CdgFrameSource(parent), state_(std::make_unique<State>()) {
+    // A new file, a clear or a nudge is a different picture at the same position.
+    connect(this, &CrucibleLyrics::changed, this, &CrucibleLyrics::pictureChanged);
+}
 
 CrucibleLyrics::~CrucibleLyrics() = default;
 
@@ -150,11 +175,19 @@ bool CrucibleLyrics::importFile(int app, const QString& fileUrl, qlonglong durat
     const qsizetype slash = std::max(path.lastIndexOf(QLatin1Char('/')), path.lastIndexOf(QLatin1Char('\\')));
     const QString name = path.mid(slash + 1);
     QFile file(path);
+    // A CD+G disc is told by its extension, in any case: its bytes are packets and say nothing
+    // else, and Hearth finds a disc by the same extension (find_cdg_file).
+    const bool disc = path.endsWith(QStringLiteral(".cdg"), Qt::CaseInsensitive);
     Entry entry;
     if (!file.open(QIODevice::ReadOnly)) {
-        entry = failed_entry(name, QStringLiteral("The lyrics file could not be opened."));
-    } else if (file.size() > kMaxFileBytes) {
-        entry = failed_entry(name, QStringLiteral("The lyrics file is too large to be lyrics."));
+        entry = failed_entry(name, disc ? QStringLiteral("The CD+G file could not be opened.")
+                                        : QStringLiteral("The lyrics file could not be opened."));
+    } else if (file.size() > (disc ? kMaxDiscBytes : kMaxFileBytes)) {
+        entry = failed_entry(name, disc ? QStringLiteral("The CD+G file is too large to be a disc.")
+                                        : QStringLiteral("The lyrics file is too large to be lyrics."));
+    } else if (disc) {
+        const QByteArray bytes = file.readAll();
+        entry = make_disc_entry(name, std::string_view{bytes.constData(), static_cast<std::size_t>(bytes.size())});
     } else {
         // The bytes go to the reader as they are: it decides UTF-8, UTF-16 or neither, and says why.
         const QByteArray bytes = file.readAll();
@@ -216,8 +249,10 @@ void CrucibleLyrics::start(int app) {
 
 void CrucibleLyrics::startAt(int app, qlonglong now_ms) {
     const auto it = state_->entries.find(app);
-    // A plain file has no times to follow and an error has no lyrics: only a timed file starts.
-    if (it == state_->entries.end() || it->second.status != QStringLiteral("timed")) {
+    // A plain file has no times to follow and an error has no lyrics: only a timed file or a disc
+    // starts.
+    if (it == state_->entries.end()
+        || (it->second.status != QStringLiteral("timed") && it->second.status != QStringLiteral("picture"))) {
         return;
     }
     it->second.running = true;
@@ -267,6 +302,16 @@ qlonglong CrucibleLyrics::positionMs(int app, qlonglong now_ms) const {
         return -1;
     }
     return std::max<qlonglong>(0, now_ms - entry->started_ms);
+}
+
+QImage CrucibleLyrics::pictureFrame(int key, qlonglong positionMs) {
+    const auto it = state_->entries.find(key);
+    if (it == state_->entries.end() || it->second.status != QStringLiteral("picture")) {
+        return {};
+    }
+    Entry& entry = it->second;
+    // The nudge shows the words later by moving the song's position back, and the picture the same.
+    return entry.disc.frame(std::max<qlonglong>(0, positionMs) - entry.nudge_ms);
 }
 
 QVariantMap CrucibleLyrics::cursor(int app, qlonglong now_ms) const {
