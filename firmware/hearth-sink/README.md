@@ -92,6 +92,7 @@ it, and the other stacks this page spells are held to it too. The list, generate
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none |
 | `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a, P4b |
 | `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | P4a, P4b |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none |
 | `s3-n16r8` | `hw`, `psram`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
 | `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | S3a, S3b |
 

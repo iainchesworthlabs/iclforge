@@ -9,21 +9,27 @@ Run: python3 -m unittest discover -s tools/hearth -p 'test_*.py'
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import http.server
 import io
 import json
+import os
 import sys
 import tempfile
 import threading
 import unittest
+import urllib.request
 from pathlib import Path
 from typing import ClassVar
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import bench
 import board_suite as bs
 import sink_profile
+from test_bench import temp_bench
 
 SECRET = "TheHomeNetwork-5GHz"
 
@@ -64,6 +70,7 @@ class StandIn:
         self.location = ""
         self.frames = 0
         self.status_extra: dict = {}
+        self.layout = "2.0"
         self.restarts = 0
         self.log = bytearray(
             b"boot line\n"
@@ -72,6 +79,7 @@ class StandIn:
             b"headroom=23552 floor=0 verdict=ok\n"
         )
         self.boot_log = bytes(self.log)
+        self.boot_logs: list[bytes] | None = None  # one per restart, in turn
         self.plays: list[str] = []
         stand_in = self
 
@@ -98,14 +106,21 @@ class StandIn:
                         "frames": stand_in.frames,
                         "finished": stand_in.state == "finished",
                         "failed": stand_in.state == "failed",
+                        "layout": stand_in.layout,
                         "network": {"kind": "wifi", "ssid": SECRET, "address": "192.168.1.9"},
                         **stand_in.status_extra,
                     }
                     self._send(200, json.dumps(body).encode())
                 elif path == "/log":
                     start = int(query.partition("=")[2]) if query.startswith("from=") else 0
-                    data = bytes(stand_in.log[start:]) if start <= len(stand_in.log) else b""
-                    self._send(200, data, {"X-Log-Next": str(len(stand_in.log))})
+                    # a reply is at most 4 KB, as the board's is (kLogReplyBytes)
+                    data = (
+                        bytes(stand_in.log[start : start + 4096])
+                        if start <= len(stand_in.log)
+                        else b""
+                    )
+                    nxt = start + len(data) if start <= len(stand_in.log) else len(stand_in.log)
+                    self._send(200, data, {"X-Log-Next": str(nxt)})
                 else:
                     self._send(404, b"")
 
@@ -118,7 +133,9 @@ class StandIn:
                 elif self.path == "/restart":
                     stand_in.restarts += 1
                     stand_in.state = "stopped"
-                    stand_in.log = bytearray(stand_in.boot_log)
+                    cycle = stand_in.boot_logs
+                    boot = cycle[(stand_in.restarts - 1) % len(cycle)] if cycle else None
+                    stand_in.log = bytearray(boot or stand_in.boot_log)
                     self._send(200, b"restarting\n")
                 else:
                     stand_in.state = "stopped"
@@ -180,6 +197,14 @@ class StandIn:
         self.server.server_close()
 
 
+def budget_log(free: int, largest: int, verdict: str = "ok", floor: int = 0) -> bytes:
+    return (
+        f"boot line\nbudget: when=boot net=1 internal_free={free} largest={largest} ask_ring=0 "
+        "ask_decode_stack=0 ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 "
+        f"headroom={largest - 8192} floor={floor} verdict={verdict}\n"
+    ).encode()
+
+
 def standard(**overrides) -> dict[str, Behaviour]:
     return {
         "ffmpeg.ac3": Behaviour(**overrides),
@@ -239,6 +264,33 @@ class Suite(unittest.TestCase):
             # the compare's boot ratchet reads.
             for key in ("internal_free", "largest"):
                 self.assertIsInstance(record["boot"].get(key), int, f"{path.name}: boot {key}")
+
+    def test_a_pin_layout_belongs_to_a_stream_that_has_a_pin(self) -> None:
+        for name, spec in self.suite["streams"].items():
+            if "pin_layout" in spec:
+                self.assertIn("pin", spec, name)
+                self.assertEqual(spec["codec"], "AC-4", name)
+
+    def test_a_profile_s_own_tolerance_names_only_figures_the_suite_holds(self) -> None:
+        allowed = {
+            "relative",
+            "absolute_permille",
+            "stack_free_bytes",
+            "headroom_ms",
+            "largest_block_bytes",
+            "internal_free_bytes",
+            "note",
+        }
+        for profile, spec in self.suite["profiles"].items():
+            self.assertLessEqual(set(spec.get("tolerance", {})), allowed, profile)
+
+    def test_the_c6_has_room_for_its_measured_boot_jitter_and_the_s3_keeps_its_own(self) -> None:
+        c6 = bs.tolerance_for(self.suite, "c6-16mb")
+        s3 = bs.tolerance_for(self.suite, "s3-n16r8")
+        # 96,256 to 88,064 was seen: 8,192 bytes
+        self.assertGreaterEqual(c6["largest_block_bytes"], 8192)
+        self.assertEqual(s3["largest_block_bytes"], 1024)
+        self.assertEqual(c6["absolute_permille"], s3["absolute_permille"])
 
     def test_plan_for_an_unknown_profile_is_refused(self) -> None:
         with self.assertRaises(bs.SuiteError):
@@ -501,6 +553,175 @@ class Boot(unittest.TestCase):
         self.assertEqual(record["plays"]["ac3-2.0"]["decoder_permille_samples"], [223, 223, 223])
 
 
+class FoldedPin(unittest.TestCase):
+    """A pin is the host's hash of a stream in its own layout: a fold is not it."""
+
+    ROW: ClassVar[dict] = {
+        "id": "ac4-51-music",
+        "stream": "ac4-51-music",
+        "stream_spec": {
+            "codec": "AC-4",
+            "units": 3,
+            "pin": "ac4_51_music",
+            "pin_layout": "5.1",
+        },
+    }
+    PINS: ClassVar[dict[str, str]] = {"ac4_51_music": "6d36d7d2e8a070e9"}
+
+    def judge(self, layout: str, pcm_hash: str) -> bs.PlayResult:
+        result = bs.PlayResult(id="ac4-51-music", stream="ac4-51-music", expect="pass")
+        result.state = "finished"
+        result.lines = bs.parse_play_lines(
+            [
+                "sink.writes=24 sink.underruns=0 sink.dry_ms=0 sink.min_headroom_ms=5 "
+                "sink.dma_ms=64",
+                "stream.units=3 stream.held=0 stream.resync_bytes=0 stream.sink=i2s_wide "
+                "stream.decode_stack_free=17020 stream.audio_ms=128 stream.wall_ms=17",
+                f"ac4.lap=1 frames=3 decoder_permille=604 worst_frame_us=33624 pcm_hash={pcm_hash}",
+                "result=pass",
+            ]
+        )
+        bs._judge(
+            result, {"state": "finished", "layout": layout}, self.ROW["stream_spec"], self.PINS
+        )
+        return result
+
+    def test_the_stream_folded_to_2_0_is_not_held_to_the_5_1_pin(self) -> None:
+        result = self.judge("2.0", "7162259f3e596916")
+        self.assertEqual(result.findings, [])
+        self.assertTrue(result.folded)
+        self.assertEqual(result.figures()["layout"], "2.0")
+        self.assertEqual(result.figures()["pcm_hash"], "7162259f3e596916")
+
+    def test_the_stream_played_in_its_own_layout_is_held_to_the_pin(self) -> None:
+        self.assertEqual(self.judge("5.1", "6d36d7d2e8a070e9").findings, [])
+        wrong = self.judge("5.1", "7162259f3e596916")
+        self.assertTrue(any("is not the host's" in f for f in wrong.findings))
+        self.assertFalse(wrong.folded)
+
+    def test_a_fold_with_no_hash_at_all_is_still_a_finding(self) -> None:
+        result = self.judge("2.0", "0000000000000000")
+        self.assertTrue(any("no PCM hash" in f for f in result.findings))
+
+    def test_a_row_with_no_pin_layout_is_held_to_its_pin_whatever_the_layout(self) -> None:
+        spec = {"codec": "AC-4", "pin": "ac4_51_music"}
+        result = bs.PlayResult(id="x", stream="x", expect="pass")
+        result.state = "finished"
+        result.lines = bs.parse_play_lines(
+            ["ac4.lap=1 frames=3 decoder_permille=1 pcm_hash=7162259f3e596916", "result=pass"]
+        )
+        bs._judge(result, {"state": "finished", "layout": "2.0"}, spec, self.PINS)
+        self.assertTrue(any("is not the host's" in f for f in result.findings))
+
+    def test_the_folded_row_s_own_hash_is_what_the_baseline_holds_it_to(self) -> None:
+        base = {
+            "profile": "p4-rev1-ac4",
+            "plays": {
+                "ac4-51-music": {
+                    "state": "finished",
+                    "units": 3,
+                    "pcm_hash": "7162259f3e596916",
+                    "layout": "2.0",
+                }
+            },
+        }
+        same = {
+            "profile": "p4-rev1-ac4",
+            "plays": {
+                "ac4-51-music": {
+                    "state": "finished",
+                    "units": 3,
+                    "pcm_hash": "7162259f3e596916",
+                    "layout": "2.0",
+                }
+            },
+        }
+        moved = {
+            "profile": "p4-rev1-ac4",
+            "plays": {
+                "ac4-51-music": {
+                    "state": "finished",
+                    "units": 3,
+                    "pcm_hash": "0123456789abcdef",
+                    "layout": "2.0",
+                }
+            },
+        }
+        self.assertEqual(bs.compare(same, base, {})[0], [])
+        regressions, _ = bs.compare(moved, base, {})
+        self.assertTrue(any("PCM hash" in line for line in regressions))
+
+
+class LogPaging(unittest.TestCase):
+    """GET /log answers 4 KB at a time; a read follows X-Log-Next to the end."""
+
+    def test_a_whole_log_read_follows_the_pages_and_ends_at_the_real_end(self) -> None:
+        noisy = b"".join(b"hosted: line %05d of the boot\n" % n for n in range(400))  # ~12.8 KB
+        stand_in = StandIn("p4-rev1", standard())
+        try:
+            stand_in.log = bytearray(noisy + budget_log(292211, 221184))
+            board = bs.Board("127.0.0.1", stand_in.port)
+            text, following = board.log(None)
+            boot = bs.boot_budget(board)
+        finally:
+            stand_in.close()
+        self.assertEqual(len(text.encode()), len(noisy) + len(budget_log(292211, 221184)))
+        self.assertEqual(following, len(noisy) + len(budget_log(292211, 221184)))
+        self.assertEqual((boot["internal_free"], boot["largest"]), (292211, 221184))
+
+    def test_a_read_from_a_mark_follows_the_pages_too(self) -> None:
+        stand_in = StandIn("p4-rev1", standard())
+        try:
+            stand_in.log = bytearray(b"x" * 10000)
+            board = bs.Board("127.0.0.1", stand_in.port)
+            text, following = board.log(1000)
+        finally:
+            stand_in.close()
+        self.assertEqual((len(text), following), (9000, 10000))
+
+    def test_a_log_that_is_shorter_than_the_mark_is_returned_for_the_caller_to_read_as_a_restart(
+        self,
+    ) -> None:
+        stand_in = StandIn("p4-rev1", standard())
+        try:
+            stand_in.log = bytearray(b"ESP-ROM:esp32p4\n")
+            board = bs.Board("127.0.0.1", stand_in.port)
+            text, following = board.log(20000)
+        finally:
+            stand_in.close()
+        self.assertEqual((text, following), ("", 16))
+
+    def test_a_run_whose_log_is_longer_than_a_page_is_marked_at_its_end(self) -> None:
+        # The first read of a whole log used to mark the end of its first 4 KB, and the play
+        # then read the rest of the old log, with its old result= line, as its own.
+        stand_in = StandIn("s3-n16r8", standard())
+        try:
+            stand_in.log = bytearray(
+                b"".join(
+                    b"old play: sink.writes=1 sink.underruns=9 sink.dry_ms=9 "
+                    b"sink.min_headroom_ms=0 sink.dma_ms=1\n"
+                    b"result=fail\n"
+                    for _ in range(200)
+                )
+            )
+            board = bs.Board("127.0.0.1", stand_in.port, 5.0)
+            results = bs.run_suite(
+                board,
+                "s3-n16r8",
+                bs.load_suite(),
+                "http://127.0.0.1:1",
+                {},
+                repeat=1,
+                sleep=0.01,
+                timeout=5.0,
+            )
+        finally:
+            stand_in.close()
+        for result in results:
+            self.assertEqual(result.findings, [], result.id)
+            self.assertEqual(result.lines.underruns, 0, result.id)
+
+
 class Identity(unittest.TestCase):
     def setUp(self) -> None:
         self.opened: list[StandIn] = []
@@ -615,6 +836,267 @@ class Compare(unittest.TestCase):
         run = {"profile": "c6-16mb", "plays": {}}
         regressions, _ = bs.compare(run, self.figures(), self.TOLERANCE)
         self.assertEqual(len(regressions), 2)
+
+
+class BenchBoards(unittest.TestCase):
+    """--board against the bench's table: the lock and the address are the board's own."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        path = temp_bench(Path(self.tmp.name))
+        patch = mock.patch.dict(os.environ, {bench.ENVIRONMENT: str(path)})
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    @staticmethod
+    def args(**more: object) -> argparse.Namespace:
+        base = {
+            "board": "",
+            "host": None,
+            "lock": None,
+            "restart": False,
+            "accept_restart_fault": False,
+            "reset_by": "http",
+        }
+        return argparse.Namespace(**{**base, **more})
+
+    def test_a_board_of_the_bench_gives_the_address_and_the_lock(self) -> None:
+        args = self.args(board="S3b")
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "192.168.1.45")
+        self.assertEqual(Path(args.lock).name, "s3-board-45.lock")
+        self.assertEqual(Path(args.lock).parent, Path(self.tmp.name) / "locks")
+
+    def test_an_address_that_is_not_the_board_s_is_refused(self) -> None:
+        with self.assertRaises(bs.SuiteError) as raised:
+            bs.resolve_board(self.args(board="S3b", host="192.168.1.156"))
+        self.assertIn("192.168.1.45", str(raised.exception))
+
+    def test_another_board_s_lock_is_refused(self) -> None:
+        with self.assertRaises(bs.SuiteError) as raised:
+            bs.resolve_board(self.args(board="S3b", lock="D:/ac3bld/s3-board-156.lock"))
+        self.assertIn("s3-board-45.lock", str(raised.exception))
+
+    def test_the_board_s_own_address_and_lock_given_by_hand_are_accepted(self) -> None:
+        args = self.args(board="C6", host="192.168.1.117", lock="D:/ac3bld/c6-board.lock")
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "192.168.1.117")
+        self.assertEqual(args.lock, "D:/ac3bld/c6-board.lock")
+
+    def test_a_p4_is_not_restarted_unless_the_run_accepts_the_fault(self) -> None:
+        for name in ("P4a", "P4b"):
+            with self.assertRaises(bs.SuiteError) as raised:
+                bs.resolve_board(self.args(board=name, restart=True))
+            self.assertIn("C6 link", str(raised.exception))
+        accepted = self.args(board="P4a", restart=True, accept_restart_fault=True)
+        bs.resolve_board(accepted)
+        self.assertEqual(accepted.host, "192.168.1.99")
+
+    def test_a_p4_may_be_reset_by_esptool_where_its_http_restart_is_refused(self) -> None:
+        args = self.args(board="P4a", restart=True, reset_by="esptool")
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "192.168.1.99")
+
+    def test_an_s3_is_restarted_without_a_word(self) -> None:
+        args = self.args(board="S3a", restart=True)
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "192.168.1.156")
+
+    def test_a_label_that_is_not_on_the_bench_is_only_a_label(self) -> None:
+        args = self.args(board="the stand-in", host="127.0.0.1", lock="x.lock")
+        bs.resolve_board(args)
+        self.assertEqual((args.host, args.lock), ("127.0.0.1", "x.lock"))
+
+    def test_no_board_leaves_the_arguments_as_they_were(self) -> None:
+        args = self.args(host="127.0.0.1")
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "127.0.0.1")
+        self.assertIsNone(args.lock)
+
+
+class ResetBy(unittest.TestCase):
+    """--reset-by esptool: a P4's boots, taken by a watchdog reset and not by POST /restart."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        path = temp_bench(self.root)
+        data = json.loads(path.read_text("utf-8"))
+        data["boards"]["P4a"]["host"] = "127.0.0.1"  # the stand-in
+        path.write_text(json.dumps(data), "utf-8")
+        patch = mock.patch.dict(os.environ, {bench.ENVIRONMENT: str(path)})
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.stand_in = StandIn("p4-rev1", standard())
+        self.addCleanup(self.stand_in.close)
+        self.saved = bs.BASELINES
+        bs.BASELINES = self.root / "baselines"
+        self.addCleanup(setattr, bs, "BASELINES", self.saved)
+        self.lock = self.root / "locks" / "p4-board.lock"
+        self.out = self.root / "run.json"
+        self.resets: list[str] = []
+
+    def reset_through_the_stand_in(self, table, board, run, probe=None, wait=90.0):
+        """What esptool's reset does to the board, as the stand-in's restart."""
+        self.resets.append(board.name)
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{self.stand_in.port}/restart", method="POST", data=b""
+        )
+        urllib.request.urlopen(request, timeout=5).read()
+        return {"version": "v0.10.0-beta.1-4175-g79d2e7618-"}
+
+    def run_cli(self, *extra: str) -> tuple[int, str, str]:
+        argv = [
+            "run",
+            "--profile",
+            "p4-rev1",
+            "--board",
+            "P4a",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(self.stand_in.port),
+            "--lock",
+            str(self.lock),
+            "--session",
+            "16d036",
+            "--serve-host",
+            "127.0.0.1",
+            "--out",
+            str(self.out),
+            "--play-timeout",
+            "10",
+            *extra,
+        ]
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = bs.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_the_boots_are_taken_by_the_reset_and_the_worst_is_held(self) -> None:
+        self.stand_in.boot_logs = [budget_log(112500, 96256), budget_log(108988, 94208)]
+        with mock.patch.object(bs.bench_flash, "reset_board", self.reset_through_the_stand_in):
+            code, out, err = self.run_cli("--restart", "--reset-by", "esptool", "--boots", "2")
+        self.assertEqual((code, err), (0, ""), out)
+        self.assertEqual(self.resets, ["P4a", "P4a"])
+        record = json.loads(self.out.read_text("utf-8"))
+        self.assertEqual(
+            (record["boot"]["internal_free"], record["boot"]["largest"]), (108988, 94208)
+        )
+
+    def test_the_http_restart_of_a_p4_is_still_refused_before_anything_is_sent(self) -> None:
+        with mock.patch.object(bs.bench_flash, "reset_board", self.reset_through_the_stand_in):
+            code, _, err = self.run_cli("--restart")
+        self.assertEqual(code, 2)
+        self.assertIn("--reset-by esptool", err)
+        self.assertEqual((self.resets, self.stand_in.restarts), ([], 0))
+        self.assertFalse(self.lock.exists())
+
+    def test_esptool_is_a_way_to_restart_and_so_needs_restart(self) -> None:
+        code, _, err = self.run_cli("--reset-by", "esptool")
+        self.assertEqual(code, 2)
+        self.assertIn("needs --restart", err)
+
+    def test_it_needs_the_board_to_be_one_of_the_bench(self) -> None:
+        args = [
+            "run",
+            "--profile",
+            "p4-rev1",
+            "--board",
+            "a stand-in",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(self.stand_in.port),
+            "--lock",
+            str(self.lock),
+            "--session",
+            "16d036",
+            "--restart",
+            "--reset-by",
+            "esptool",
+        ]
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = bs.main(args)
+        self.assertEqual(code, 2)
+        self.assertIn("board of bench.json", err.getvalue())
+
+    def test_a_board_that_does_not_answer_after_the_reset_is_an_error_and_the_lock_goes(
+        self,
+    ) -> None:
+        with mock.patch.object(bs.bench_flash, "reset_board", lambda *a, **k: None):
+            code, _, err = self.run_cli("--restart", "--reset-by", "esptool")
+        self.assertEqual(code, 2)
+        self.assertIn("did not answer after the reset", err)
+        self.assertFalse(self.lock.exists())
+
+
+class WorstBoot(unittest.TestCase):
+    def test_it_is_the_boot_with_the_smallest_largest_block(self) -> None:
+        samples = [
+            {"largest": 96256, "internal_free": 112000},
+            {"largest": 88064, "internal_free": 112600},
+            {"largest": 94208, "internal_free": 108988},
+        ]
+        self.assertEqual(bs.worst_boot(samples)["largest"], 88064)
+
+    def test_a_tie_goes_to_the_least_free_ram(self) -> None:
+        samples = [
+            {"largest": 31744, "internal_free": 102539},
+            {"largest": 31744, "internal_free": 85923},
+            {"largest": 31744, "internal_free": 86231},
+        ]
+        self.assertEqual(bs.worst_boot(samples)["internal_free"], 85923)
+
+    def test_a_boot_with_no_line_is_not_a_boot(self) -> None:
+        self.assertEqual(bs.worst_boot([{}, {"largest": 1, "internal_free": 2}, {}])["largest"], 1)
+        self.assertEqual(bs.worst_boot([{}, {}]), {})
+        self.assertEqual(bs.worst_boot([]), {})
+
+
+class Tolerance(unittest.TestCase):
+    SUITE: ClassVar[dict] = {
+        "tolerance": {"relative": 0.05, "largest_block_bytes": 1024, "note": "the suite's"},
+        "profiles": {
+            "wide": {"tolerance": {"largest_block_bytes": 12288, "note": "why"}},
+            "plain": {},
+        },
+    }
+
+    def test_a_profile_s_own_values_go_over_the_suite_s_and_its_note_is_not_one(self) -> None:
+        wide = bs.tolerance_for(self.SUITE, "wide")
+        self.assertEqual(wide["largest_block_bytes"], 12288)
+        self.assertEqual(wide["relative"], 0.05)
+        self.assertEqual(wide["note"], "the suite's")
+
+    def test_a_profile_with_none_or_no_row_has_the_suite_s(self) -> None:
+        for profile in ("plain", "absent", None):
+            self.assertEqual(bs.tolerance_for(self.SUITE, profile)["largest_block_bytes"], 1024)
+
+    def test_a_c6_boot_one_step_below_the_common_mode_is_not_a_regression_on_the_c6(self) -> None:
+        baseline = {
+            "profile": "c6-16mb",
+            "boot": {"largest": 96256, "internal_free": 112500, "verdict": "below-floor"},
+            "plays": {},
+        }
+        run = {
+            "profile": "c6-16mb",
+            "boot": {"largest": 88064, "internal_free": 112500, "verdict": "below-floor"},
+            "plays": {},
+        }
+        suite = bs.load_suite()
+        regressions, _ = bs.compare(run, baseline, bs.tolerance_for(suite, "c6-16mb"))
+        self.assertEqual(regressions, [])
+        # the S3's 1,024 bytes would call the same boot a regression
+        regressions, _ = bs.compare(run, baseline, bs.tolerance_for(suite, "s3-n16r8"))
+        self.assertTrue(any("largest internal block" in line for line in regressions))
+        # and a loss the C6's allowance does not cover still is one
+        run["boot"]["largest"] = 65536
+        regressions, _ = bs.compare(run, baseline, bs.tolerance_for(suite, "c6-16mb"))
+        self.assertTrue(any("largest internal block" in line for line in regressions))
 
 
 class CommandLine(unittest.TestCase):
@@ -772,6 +1254,66 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(self.stand_in.restarts, 1)
         baseline = json.loads((bs.BASELINES / "s3-n16r8.json").read_text("utf-8"))
         self.assertEqual(baseline["boot"]["largest"], 31744)
+
+    def test_boots_restarts_that_many_times_and_the_record_holds_the_worst(self) -> None:
+        self.stand_in.boot_logs = [
+            budget_log(86231, 31744),
+            budget_log(102539, 31744),
+            budget_log(85923, 31744),
+        ]
+        code, out, _ = self.run_cli(
+            *self.run_args(
+                "--lock", str(self.lock), "--session", "16d036", "--restart", "--boots", "3"
+            )
+        )
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stand_in.restarts, 3)
+        self.assertIn("restarting (3 of 3)", out)
+        record = json.loads(self.out.read_text("utf-8"))
+        self.assertEqual(record["boot"]["internal_free"], 85923)
+        self.assertEqual(
+            record["boot_samples"],
+            {"internal_free": [86231, 102539, 85923], "largest": [31744, 31744, 31744]},
+        )
+
+    def test_the_worst_boot_is_the_one_a_baseline_records(self) -> None:
+        self.stand_in.boot_logs = [budget_log(112500, 96256), budget_log(108988, 94208)]
+        code, out, _ = self.run_cli(
+            *self.run_args(
+                "--lock",
+                str(self.lock),
+                "--session",
+                "16d036",
+                "--restart",
+                "--boots",
+                "2",
+                "--record",
+            )
+        )
+        self.assertEqual(code, 0, out)
+        baseline = json.loads((bs.BASELINES / "s3-n16r8.json").read_text("utf-8"))
+        self.assertEqual(
+            (baseline["boot"]["internal_free"], baseline["boot"]["largest"]), (108988, 94208)
+        )
+
+    def test_one_boot_has_no_samples_to_keep(self) -> None:
+        code, out, _ = self.run_cli(
+            *self.run_args("--lock", str(self.lock), "--session", "16d036", "--restart")
+        )
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("boot_samples", json.loads(self.out.read_text("utf-8")))
+
+    def test_boots_without_restart_or_below_one_is_refused_before_the_board_is_touched(
+        self,
+    ) -> None:
+        for extra in (("--boots", "3"), ("--restart", "--boots", "0")):
+            code, _, err = self.run_cli(
+                *self.run_args("--lock", str(self.lock), "--session", "16d036", *extra)
+            )
+            self.assertEqual(code, 2, extra)
+            self.assertIn("--boots", err)
+        self.assertEqual((self.stand_in.restarts, self.stand_in.plays), (0, []))
+        self.assertFalse(self.lock.exists())
 
     def test_a_line_read_half_printed_is_not_a_figure(self) -> None:
         found = bs.parse_play_lines(

@@ -2,8 +2,8 @@
 """The board suite: play a profile's fixed list on a booked board and hold it to a baseline.
 
     python tools/hearth/board_suite.py plan   --profile s3-n16r8
-    python tools/hearth/board_suite.py run    --profile s3-n16r8 --host 192.168.1.45 \\
-        --lock D:/ac3bld/s3-board-45.lock --session 16d036 --purpose baseline [--record]
+    python tools/hearth/board_suite.py run    --profile s3-n16r8 --board S3b \\
+        --session 16d036 --purpose baseline [--restart] [--record]
     python tools/hearth/board_suite.py compare --run board-run.json \\
         --baseline baselines/s3-n16r8.json
     python tools/hearth/board_suite.py lock   take|release|show --file LOCK --session ID
@@ -11,11 +11,12 @@
 What it does (planning/esp32-platform-profiles.md, "The board suite"), and stops at the first
 refusal:
 
-1. **Booking.** `run` takes the lock file itself, atomically, and refuses with no `--lock` and
+1. **Booking.** `run` takes the lock file itself, atomically, and refuses with no lock and
    `--session`, or when the file exists: the rule is that a board nobody has booked is not one
-   to run on. It prints what a script cannot check (the other locks, the other sessions, a
-   running idf.py or esptool) as a checklist first, and releases the lock when it ends, whatever
-   happened, if it took it.
+   to run on (planning/esp32-board-bench.md). `--board` names a board of bench.json, which gives
+   the address and the lock and refuses a pair that is not its own. It prints what a script
+   cannot check (the other sessions, a running idf.py or esptool) as a checklist first, and
+   releases the lock when it ends, whatever happened, if it took it.
 2. **Identity.** GET /hardware must say the profile and the hash of its current definition
    (`sink_profile.py identity`), and GET /status `stopped`. A board running another profile, an
    older definition or an image built with neither is refused: its figures are not this
@@ -32,7 +33,9 @@ refusal:
    left, the sink queue's least headroom. On an I2S sink `realtime_permille` is not one of them:
    it includes the wait for the DAC and reads 981 to 992 for any stereo play.
 6. **Baseline.** `--record` writes baselines/<profile>.json from a clean run; `--compare` holds a
-   run to it with the suite's tolerance and prints an improvement as "re-baseline".
+   run to it with the suite's tolerance, the profile's own over it, and prints an improvement
+   as "re-baseline". A board's boot figures vary from boot to boot: `--restart --boots N`
+   restarts N times and holds the worst.
 
 Nothing the board says about its network is read or kept: /status carries the SSID and this
 takes the fields it wants by name.
@@ -48,7 +51,6 @@ import datetime
 import http.client
 import http.server
 import json
-import os
 import re
 import socket
 import socketserver
@@ -63,6 +65,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import bench
+import bench_flash
 import sink_profile
 
 REPO = Path(__file__).resolve().parents[2]
@@ -72,6 +76,11 @@ BASELINES = PROJECT / "baselines"
 PINS = REPO / "testdata" / "ac4-probe-pcm-hashes.json"
 
 FORMAT = 1
+
+# The most a board's GET /log answers with in one reply (firmware/esp-idf/iclforge/src/
+# control.cpp, kLogReplyBytes), and how many replies one read follows (a 256 KB ring).
+LOG_REPLY_BYTES = 4096
+MAX_LOG_PAGES = 64
 
 # The fields of GET /status the suite reads, by name. The network object is never one.
 STATUS_FIELDS = (
@@ -88,80 +97,68 @@ STATUS_FIELDS = (
     "worst_frame_us",
     "ring_low",
     "resync_bytes",
+    "layout",
 )
 
 CHECKLIST = (
     "the suite cannot see another session. Before it runs, by hand:",
-    "  - read all five lock files (D:/ac3bld: p4-board, p4-board2, s3-board-156, s3-board-45,",
-    "    c6-board; .lock)",
+    "  - read all five lock files (python tools/hearth/bench.py status)",
     "  - ListAgents: is a peer building or testing near this board?",
     "  - no idf.py, esptool, ota.py or capture of this board is running",
     "  - the board's /status is stopped (the suite checks that one)",
 )
 
-
-class SuiteError(Exception):
-    """Why the suite will not run or cannot read what it was given; main() prints it."""
+# The booking is the bench's (bench.py): the suite and the flash tool take the same lines.
+SuiteError = bench.BenchError
 
 
 # --- booking --------------------------------------------------------------------------
 
 
-def _stamp(moment: datetime.datetime) -> str:
-    return moment.strftime("%Y-%m-%dT%H:%MZ")
-
-
 def take_lock(path: Path, session: str, purpose: str, minutes: int) -> str:
     """The booking line, written atomically: a lock that exists is not taken over."""
-    now = datetime.datetime.now(datetime.timezone.utc)
-    end = now + datetime.timedelta(minutes=minutes)
-    line = (
-        f"session={session} (board suite) | purpose={purpose} | start={_stamp(now)} | "
-        f"expected_end={_stamp(end)}"
-    )
-    try:
-        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError as error:
-        try:
-            held = path.read_text("utf-8", "replace").strip()
-        except OSError:
-            held = "(unreadable)"
-        raise SuiteError(f"{path} is booked: {held}") from error
-    except OSError as error:
-        raise SuiteError(f"{path} cannot be created: {error}") from error
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write(line + "\n")
-    return line
+    return bench.take_lock(path, session, purpose, minutes, "board suite")
 
 
 def hold_lock(path: Path, session: str, purpose: str, minutes: int) -> tuple[str, bool]:
     """The booking for a run: the lock taken, or, where the file is already this session's (it
     booked the board to do something first, such as put an image on it), that line, which the
     run then leaves for its owner to release. Returns the line and whether the run took it."""
-    try:
-        return take_lock(path, session, purpose, minutes), True
-    except SuiteError:
-        try:
-            held = path.read_text("utf-8", "replace").strip()
-        except OSError:
-            held = ""
-        if f"session={session} " in held or f"session={session}|" in held:
-            return held, False
-        raise
+    return bench.hold_lock(path, session, purpose, minutes, "board suite")
 
 
-def release_lock(path: Path, session: str) -> str:
-    """Removes the lock only if it is this session's."""
+release_lock = bench.release_lock
+
+
+def resolve_board(args: argparse.Namespace) -> None:
+    """Fills --host and --lock from the bench's row for --board, and refuses a pair that
+    disagrees with it: a lock that is not the board's is the mistake the rule exists for. A
+    --board that is not on the bench is only a label for the record."""
+    if not args.board:
+        return
     try:
-        held = path.read_text("utf-8", "replace")
-    except FileNotFoundError:
-        return "no lock file"
-    except OSError as error:
-        raise SuiteError(f"{path} cannot be read: {error}") from error
-    if f"session={session} " not in held and f"session={session}|" not in held:
-        raise SuiteError(f"{path} is not this session's, and is left alone: {held.strip()}")
-    path.unlink()
-    return "released"
+        row = bench.load().boards.get(args.board)
+    except bench.BenchError:
+        row = None
+    if row is None:
+        return
+    if args.host and args.host != row.host:
+        raise SuiteError(f"--board {row.name} is at {row.host}, not {args.host}")
+    if args.lock and Path(args.lock).name != row.lock.name:
+        raise SuiteError(f"--board {row.name} is guarded by {row.lock.name}, not {args.lock}")
+    if (
+        args.restart
+        and row.restart_kills_c6_link
+        and args.reset_by != "esptool"
+        and not args.accept_restart_fault
+    ):
+        raise SuiteError(
+            f"{row.name}: a restart can leave a P4 with no Wi-Fi (its C6 link), and --restart "
+            "restarts it by POST /restart; restart it with --reset-by esptool (a watchdog reset), "
+            "or pass --accept-restart-fault (planning/esp32-board-bench.md has the recovery)"
+        )
+    args.host = args.host or row.host
+    args.lock = args.lock or str(row.lock)
 
 
 # --- the board ------------------------------------------------------------------------
@@ -213,6 +210,10 @@ class Board:
         """POST /restart, then wait for the board to answer again and to be stopped."""
         self._request("POST", "/restart")
         time.sleep(sleep)
+        self.wait_stopped(wait, sleep)
+
+    def wait_stopped(self, wait: float = 120.0, sleep: float = 2.0) -> None:
+        """Wait for the board to answer and to be stopped."""
         deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
             try:
@@ -228,13 +229,28 @@ class Board:
             self._request("POST", "/stop")
 
     def log(self, start: int | None) -> tuple[str, int | None]:
-        """The console lines after byte `start` (all of them for None), and the offset after."""
-        path = "/log" if start is None else f"/log?from={start}"
-        status, headers, data = self._request("GET", path)
-        if status != 200:
-            raise SuiteError(f"{self.host}: GET {path} answered {status}")
-        following = headers.get("x-log-next", "")
-        return data.decode("utf-8", "replace"), int(following) if following.isdigit() else None
+        """The console lines after byte `start` (all the ring holds for None) to the end of the
+        log, and the offset after. One reply is at most LOG_REPLY_BYTES (control.cpp's
+        kLogReplyBytes): a client follows X-Log-Next for the rest, and a whole-log read that did
+        not left its mark in the middle of a 16 KB ring and the P4's boot line, past the first
+        4 KB of a noisy boot, unread."""
+        data = b""
+        cursor = start
+        following_number: int | None = None
+        for _ in range(MAX_LOG_PAGES):
+            path = "/log" if cursor is None else f"/log?from={cursor}"
+            status, headers, page = self._request("GET", path)
+            if status != 200:
+                raise SuiteError(f"{self.host}: GET {path} answered {status}")
+            following = headers.get("x-log-next", "")
+            following_number = int(following) if following.isdigit() else None
+            data += page
+            if following_number is None or len(page) < LOG_REPLY_BYTES:
+                break
+            if cursor is not None and following_number <= cursor:
+                break  # the log is shorter than where it was: the caller reads that as a restart
+            cursor = following_number
+        return data.decode("utf-8", "replace"), following_number
 
 
 # --- reading a play -------------------------------------------------------------------
@@ -333,11 +349,16 @@ class PlayResult:
     samples: list[int] = field(default_factory=list)
     rebooted: bool = False
     findings: list[str] = field(default_factory=list)
+    folded: bool = False
+    layout: str | None = None
 
     def figures(self) -> dict[str, Any]:
         out: dict[str, Any] = {"state": self.state, "frames": self.frames}
         if self.why:
             out["why"] = self.why
+        if self.folded:
+            # the hash is of what the decoder folded the stream to, held to the baseline's own
+            out["layout"] = self.layout
         if len(self.samples) > 1:
             out["decoder_permille_samples"] = list(self.samples)
         for name, value in (
@@ -435,7 +456,7 @@ def check_identity(board: Board, profile: str, profiles: Path | None = None) -> 
 def boot_budget(board: Board) -> dict[str, Any]:
     """The last `budget:` line of the board's console, as its fields, or {} where the log no
     longer holds one (a board that has played has rotated its boot lines out of a small log: the
-    C6's holds 2 KB, and its suite reads its serial console for this instead)."""
+    C6's holds 2 KB, which a restart a moment before still has it in)."""
     text, _ = board.log(None)
     found: dict[str, str] = {}
     for line in text.splitlines():
@@ -448,6 +469,59 @@ def boot_budget(board: Board) -> dict[str, Any]:
     if "floor" in found:
         boot["floor"] = _number(found["floor"])
     return boot
+
+
+def boot_budget_wait(board: Board, seconds: float = 12.0, sleep: float = 0.5) -> dict[str, Any]:
+    """boot_budget after a restart, which can answer before the line has been printed."""
+    deadline = time.monotonic() + seconds
+    while True:
+        boot = boot_budget(board)
+        if boot or time.monotonic() >= deadline:
+            return boot
+        time.sleep(sleep)
+
+
+def restart_board(args: argparse.Namespace, board: Board) -> None:
+    """One restart of the board, by the method the run asked for: POST /restart, or a system
+    reset by esptool's watchdog reset, which does not start the fault a P4's restart can."""
+    if args.reset_by != "esptool":
+        board.restart()
+        return
+    table = bench.load()
+    row = table.boards[args.board]
+    hardware = bench_flash.reset_board(table, row, bench_flash.make_runner(table))
+    if hardware is None:
+        raise SuiteError(f"{row.name} did not answer after the reset")
+    board.wait_stopped()
+
+
+def worst_boot(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    """The boot that left the least: the smallest largest block, then the least free RAM, of the
+    samples that have a budget line. A board's boot figures are not one number: the S3's free RAM
+    reads 16 KB higher when the idle task has freed the player's start stack first, and the C6's
+    largest block was 96,256 bytes on fourteen of seventeen boots and 94,208, 92,160 and 88,064
+    on the others. A baseline of the worst of N boots is the floor the board is known to start
+    from, and a run that starts higher than it is not a regression."""
+    usable = [sample for sample in samples if sample]
+    if not usable:
+        return {}
+    return min(
+        usable,
+        key=lambda sample: (
+            sample.get("largest", sys.maxsize),
+            sample.get("internal_free", sys.maxsize),
+        ),
+    )
+
+
+def tolerance_for(suite: dict[str, Any], profile: str | None) -> dict[str, Any]:
+    """The suite's tolerance, with the profile's own on top of it: a profile whose boot figures
+    jitter by more than the S3's does (the C6's largest block, by 8 KB) says so in its row, with
+    the spread it was measured from."""
+    merged = dict(suite.get("tolerance", {}))
+    own = (suite.get("profiles", {}).get(profile or "") or {}).get("tolerance", {})
+    merged.update({key: value for key, value in own.items() if key != "note"})
+    return merged
 
 
 def _number(text: str) -> Any:
@@ -557,6 +631,13 @@ def _judge(
     if pin:
         expected = pins.get(pin)
         got = lines.ac4_pcm_hash
+        # The pin is the host's hash of the stream in its own layout. A play on another layout
+        # (a 5.1 stream folded to the 2.0 an I2S sink with two outputs is given, which a sink
+        # that cannot open six cannot be asked otherwise) is not that PCM: no host oracle, and
+        # the hash is the row's own, held to the baseline's.
+        played = str(status.get("layout") or "")
+        pin_layout = spec.get("pin_layout")
+        folded = bool(pin_layout and played and played != pin_layout)
         if expected is None:
             result.findings.append(f"no pin named {pin} in {PINS.name}")
         elif got is None or set(got) == {"0"}:
@@ -564,6 +645,9 @@ def _judge(
                 "no PCM hash on the AC-4 line: the image was built without "
                 "CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1 (the `measure` overlay)"
             )
+        elif folded:
+            result.folded = True
+            result.layout = played
         elif got.lower() != expected.lower():
             result.findings.append(f"PCM hash {got} is not the host's {expected} ({pin})")
         if lines.ac4_decoder_permille is not None:
@@ -634,8 +718,9 @@ def run_record(
     results: list[PlayResult],
     boot: dict[str, Any] | None,
     board: str = "",
+    boots: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    return {
+    record = {
         "format": FORMAT,
         "profile": profile,
         "profile_hash": hardware.get("profile_hash"),
@@ -647,6 +732,14 @@ def run_record(
         "plays": {r.id: r.figures() for r in results},
         "findings": {r.id: r.findings for r in results if r.findings},
     }
+    samples = [b for b in (boots or []) if b]
+    if len(samples) > 1:
+        # `boot` is the worst of these; they are kept so that the spread can be read
+        record["boot_samples"] = {
+            "internal_free": [b.get("internal_free") for b in samples],
+            "largest": [b.get("largest") for b in samples],
+        }
+    return record
 
 
 def compare(
@@ -752,6 +845,18 @@ def _print_results(results: list[PlayResult]) -> None:
 def cmd_run(args: argparse.Namespace) -> int:
     suite = load_suite()
     plan(suite, args.profile, args.only)  # a profile with no list is refused before a lock is taken
+    resolve_board(args)
+    if args.reset_by == "esptool":
+        if not args.restart:
+            raise SuiteError("--reset-by esptool is the way --restart restarts: it needs --restart")
+        if args.board not in bench.load().boards:
+            raise SuiteError("--reset-by esptool needs --board to be a board of bench.json")
+    if args.boots < 1:
+        raise SuiteError("--boots is at least 1")
+    if args.boots > 1 and not args.restart:
+        raise SuiteError("--boots restarts the board that many times: it needs --restart")
+    if not args.host:
+        raise SuiteError("--host, or a --board that is on the bench, is required")
     if not args.lock or not args.session:
         raise SuiteError(
             "refused: --lock and --session are required. A board is booked through its lock file "
@@ -766,9 +871,16 @@ def cmd_run(args: argparse.Namespace) -> int:
     server = None
     try:
         board = Board(args.host, args.port, args.timeout)
+        boots: list[dict[str, Any]] = []
         if args.restart:
-            print(f"{args.host}: restarting, so that its boot line is the log's first")
-            board.restart()
+            for number in range(1, args.boots + 1):
+                print(
+                    f"{args.host}: restarting ({number} of {args.boots}), so that its boot line "
+                    "is the log's first"
+                )
+                restart_board(args, board)
+                if number < args.boots:
+                    boots.append(boot_budget_wait(board))
         hardware = check_identity(board, args.profile, args.profiles)
         before = board.status()
         if before.get("state") != "stopped":
@@ -777,7 +889,10 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"{args.host}: {hardware.get('chip')} {hardware.get('version')}, "
             f"profile {args.profile} at {hardware.get('profile_hash')}"
         )
-        boot = boot_budget(board)
+        boots.append(boot_budget_wait(board) if args.restart else boot_budget(board))
+        boot = worst_boot(boots)
+        if len(boots) > 1:
+            print(f"boot: the worst of {len(boots)}: {boot}")
         address = args.serve_host or lan_address_for(args.host)
         server = serve_fixtures(REPO, address)
         base_url = f"http://{address}:{server.server_address[1]}"
@@ -793,7 +908,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             args.play_timeout,
         )
         board.stop()
-        record = run_record(args.profile, hardware, results, boot, args.board)
+        record = run_record(args.profile, hardware, results, boot, args.board, boots)
         _print_results(results)
         problems = [f for r in results for f in r.findings]
         if args.out != "-":
@@ -802,7 +917,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         regressions: list[str] = []
         if args.compare:
             baseline = json.loads(Path(args.compare).read_text("utf-8"))
-            regressions, improvements = compare(record, baseline, suite.get("tolerance", {}))
+            regressions, improvements = compare(
+                record, baseline, tolerance_for(suite, args.profile)
+            )
             for line in regressions:
                 print(f"regression: {line}")
             for line in improvements:
@@ -837,17 +954,41 @@ def main(argv: list[str] | None = None) -> int:
 
     run = commands.add_parser("run", help="play a profile's list on a booked board")
     run.add_argument("--profile", required=True)
-    run.add_argument("--host", required=True, help="the board's address")
+    run.add_argument("--host", help="the board's address (the bench's, with --board)")
     run.add_argument("--port", type=int, default=80)
     run.add_argument("--lock", help="the board's lock file: taken, and released at the end")
     run.add_argument("--session", help="your session id, as the lock line carries it")
     run.add_argument("--purpose", default="")
-    run.add_argument("--board", default="", help="a label for the board, kept in the record")
+    run.add_argument(
+        "--board",
+        default="",
+        help="a board of tools/hearth/bench.json, which gives --host and --lock and refuses a "
+        "pair that is not its own; any other text is a label kept in the record",
+    )
     run.add_argument(
         "--restart",
         action="store_true",
         help="POST /restart first, so that the boot line is in the log "
-        "(not for a P4: its restart kills the C6 link)",
+        "(refused for a P4 of the bench: its restart can kill the C6 link)",
+    )
+    run.add_argument(
+        "--reset-by",
+        choices=("http", "esptool"),
+        default="http",
+        help="how --restart restarts: POST /restart, or esptool's watchdog reset through the "
+        "board's serial port (what a P4 needs, whose restart can leave its C6 link dead)",
+    )
+    run.add_argument(
+        "--boots",
+        type=int,
+        default=1,
+        help="with --restart, restart this many times and hold the worst boot line "
+        "(a board's boot figures vary from boot to boot)",
+    )
+    run.add_argument(
+        "--accept-restart-fault",
+        action="store_true",
+        help="restart a P4 anyway, ready to put it back by hand",
     )
     run.add_argument("--minutes", type=int, default=30)
     run.add_argument("--only", action="append", help="a play id; may be repeated")
@@ -888,10 +1029,11 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_run(args)
         if args.command == "compare":
             suite = load_suite()
+            recorded = json.loads(args.run.read_text("utf-8"))
             regressions, improvements = compare(
-                json.loads(args.run.read_text("utf-8")),
+                recorded,
                 json.loads(args.baseline.read_text("utf-8")),
-                suite.get("tolerance", {}),
+                tolerance_for(suite, recorded.get("profile")),
             )
             for line in regressions:
                 print(f"regression: {line}")

@@ -1,0 +1,55 @@
+{
+  "format": 1,
+  "profile": "c6-16mb",
+  "profile_hash": "c256f286a410",
+  "version": "v0.10.0-beta.1-4175-g79d2e7618-",
+  "chip": "ESP32-C6",
+  "board": "C6",
+  "recorded": "2026-10-12T06:48Z",
+  "boot": {
+    "when": "boot",
+    "net": 1,
+    "internal_free": 108988,
+    "largest": 94208,
+    "ask_total": 73728,
+    "ask_biggest": 32768,
+    "headroom": 61440,
+    "verdict": "below-floor",
+    "floor": 134008
+  },
+  "plays": {
+    "ac3-2.0-refused": {
+      "state": "failed",
+      "frames": 0,
+      "why": "memory"
+    },
+    "eac3-2.0-refused": {
+      "state": "failed",
+      "frames": 0,
+      "why": "memory"
+    }
+  },
+  "findings": {},
+  "boot_samples": {
+    "internal_free": [
+      112684,
+      112536,
+      112560,
+      112540,
+      112300,
+      108988,
+      112652,
+      112544
+    ],
+    "largest": [
+      96256,
+      96256,
+      96256,
+      96256,
+      94208,
+      94208,
+      96256,
+      96256
+    ]
+  }
+}
