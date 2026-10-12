@@ -165,12 +165,57 @@ not something it ran.
 | `bench_flash.py verify BOARD --build-dir D [--profile P]` | what the board says against the build | no |
 | `bench_flash.py ota BOARD --build-dir D --session ID` | `ota.py push`, with the board's address and lock | yes |
 | `bench_flash.py reset BOARD --session ID` | a system reset by esptool's watchdog reset after the MAC check, then waits for the board | resets it |
-| `board_suite.py run --board B ...` | the play list, held to the baseline; `--restart --reset-by esptool --boots N` boots a P4 by watchdog reset | plays |
+| `board_suite.py run --board B ...` | the play list, held to the baseline; `--restart --reset-by esptool --boots N` boots a P4 by watchdog reset; a row with `via sendspin` is played by `hearth-testserver` ([below](#sendspin-rows)) | plays |
 
 `flash` reads the MAC of the chip on the port first and writes **nothing** unless its last three
 octets are the table's (`mac_tail`): a port that moved to another board when a cable was changed
 is the case it is for. `--erase` also wipes the board's pairing records and stored network, and
 says so.
+
+## Sendspin rows
+
+A row of `firmware/hearth-sink/suite.json` with `"via": "sendspin"` is played by the repository's
+`hearth-testserver`, not by `POST /play`: the C6 refuses an HTTP play on purpose (#1395), so
+Sendspin is its audio path, and a baseline that does not play it holds nothing of what the part
+is for. The harness is `tools/hearth/suite_sendspin.py`; the board's own `sendspin.stream=` line,
+printed when the stream ends, is read the way a `/play`'s `result=` line is.
+
+**The server** is built from the tree under test into the bench's directory, once per change to
+`libs/sendspin` or `apps/hearth/testserver` (about twenty minutes), and `board_suite.py run`
+finds it by `--testserver`, then `ICLFORGE_TESTSERVER`, then `<locks>/suite-testserver/bin/`. A
+run that has a Sendspin row and no server stops before it books the board:
+
+```powershell
+$env:VCPKG_ROOT = 'D:/vcpkg'
+cmake --preset config-windows-msvc -B D:/ac3bld/suite-testserver -DICLFORGE_BUILD_GUI=OFF `
+    -DICLFORGE_BUILD_TESTS=OFF -DICLFORGE_BUILD_CLI=OFF -DICLFORGE_BUILD_EXAMPLES=OFF
+cmake --build D:/ac3bld/suite-testserver --target hearth-testserver
+```
+
+**What the harness does to the board**, which a row's author should know before adding one:
+
+- **One identity.** The server's key and pairing records are in a state directory
+  (`<locks>/suite-sendspin-state`, or `--sendspin-state`). A fresh directory is a new server to the
+  board, which is a new pairing record each run: eight of them once pushed every other server off
+  a C6. Keep the directory.
+- **The pairing code is relayed from `GET /status`** (`sendspin.pairing_code`) into the file the
+  server reads after it asks, for the first 25 seconds only, and a code the board kept from a
+  pairing that failed before the run is not used.
+- **`--code-log` is given only to a board that does not hold the suite's record.** The server asks
+  a board to pair at the dial whenever it has one, and a board that holds the record then shows a
+  code nobody enters: the second row of a run waited 99 seconds and failed that way. The
+  harness reads `GET /pairing` and decides; a stored record the board refuses is forgotten and
+  the row played again by a code, with a note.
+- **The suite's record is forgotten at the end**, by its `server_id` (`POST /pairing`, `forget
+  <id>`), never a bare `forget`, which drops the owner's Hearth. A record that was there before
+  the run and is not the suite's name is left. `--keep-pairing` keeps it.
+- **The board is not polled while it plays.** The C6's E-AC-3 play has 2.6 to 3.2 KB of internal
+  heap at its least, and its HTTP server answers from that heap: with the server polling `/status`
+  every second and a relay every 0.4 s, the same play rebooted the board once in four. The server is
+  started without `--status`, the totals come from the log afterwards, and the decode stack from
+  one `GET /status` after the stream.
+- **Music Assistant is displaced** while a stream plays: it holds a board by unpaired access (PSK
+  `sentinel`), and the server pairs at the dial and wins. It has to dial the board again.
 
 ## What was in `D:\ac3bld\esp-reflash`, and where it went
 

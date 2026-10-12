@@ -29,6 +29,18 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth tells a group's members what is playing**
+
+- **The engine sets `metadata@v1` for a group.** A member that lists the role gets the item's title
+  when it starts and its position as the lyrics' anchors give it (a pause is speed 0, a seek moves
+  it, with the item's length), and nothing once the output closes. The title is the lyrics file's
+  `[ti:]` when the item has one, and otherwise the name the queue shows; the artist and the album come
+  from the lyrics file only, since nothing in the tree reads a tag from an AC-3, E-AC-3, AC-4 or MP4
+  file, and are left out when it has none. A sink that does not list the role is sent nothing.
+  Music Assistant's players and Hearth for Android's screen can use it; Hearth itself did not send it
+  before. Held by a case on a real group with a member that lists the role and one that does not, and
+  by an engine case that plays an item through to its end.
+
 **Hearth: a microphone and a pitch score on the Karaoke page**
 
 - **A singer can turn a microphone on and see how close their pitch is to the tune** (the

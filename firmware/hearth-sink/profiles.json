@@ -386,7 +386,7 @@
       "budget": {
         "app_bytes_max": 1880000,
         "bootloader_bytes_max": 32768,
-        "internal_static_bytes_max": 108000
+        "internal_static_bytes_max": 151000
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -507,7 +507,7 @@
       "budget": {
         "app_bytes_max": 1835008,
         "bootloader_bytes_max": 32768,
-        "internal_static_bytes_max": 108000
+        "internal_static_bytes_max": 151000
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
