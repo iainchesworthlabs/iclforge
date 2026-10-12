@@ -115,6 +115,10 @@ not something it ran.
   (the build's `otadata` alone, then a watchdog reset) boots the first slot as valid with
   nothing on trial, and is how P4a was put back on the 3556 it was found on, in both sessions,
   with no fault (a restore by rollback is a restart by the image that is running).
+  **It boots the first slot**: it is the way back only while the image to restore is in
+  `ota_0`. Another session's push to P4a on 2026-10-12 moved 3556 to `ota_1`, and an
+  `--otadata-only` there would have booted their image; read `ota.py status` first. An S3's
+  restart is safe, so a rollback or an OTA of the build is how an S3 goes back.
 - **esptool exits 1 after a watchdog reset that worked**: the USB-Serial/JTAG port of a P4
   re-enumerates, pySerial complains, and the write had been verified and the board reset.
   `flash` reads that as a verified write (`Hash of data verified`, `Hard resetting`, and no

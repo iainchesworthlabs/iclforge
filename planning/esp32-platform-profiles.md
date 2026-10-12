@@ -527,6 +527,38 @@ and free RAM at boot has a second mode, 286,331 against 289,3xx to 289,9xx, on t
 decoder time a regression), 4,096 bytes of free RAM and 8,192 of largest block. The saved compare
 run holds to it, and a run 20% slower on `ac4-20-acpl` and 8 KB lower on RAM still fails.
 
+**Recorded (PR 12, `s3-n16r8-ac4`):** S3a (`.156`, the proposed recording board), the image
+`v0.10.0-beta.1-4460-g12c4fdaaf` built with the `measure` overlay, profile hash
+`6124ef3f591f`, five plays a row after eight restarts. AC-3 2.0 at 120 permille and E-AC-3 2.0 at
+84 (with the AC-4 build's 64 KB data cache, a few percent under the release shape's 123 and 87);
+`ac4-20-music` at 510 permille of the audio, `ac4-20-acpl` at 645 and `ac4-20-companding` at 608,
+so all three decode inside real time on an S3, and their PCM hashes are **the host's pins, equal**
+(`f860e51f602ae753`, `e8b8cfa716dd0e1c`, `5b93c61c57566b0c`), as the P4's are. The boot line is
+the worst of eight: `internal_free=52075 largest=31744 headroom=23552 verdict=ok`, which spread
+28 bytes, and is 33 KB under the release shape's 85,755 (the 64 KB data cache takes 32 KB of heap).
+The S3 is steady where the C6's and the P4's boots are not, so the profile has no tolerance of its
+own.
+
+**Cross-checked on S3b**, the second board: the same image against S3a's baseline, worst of three
+boots and three plays a row, holds with no finding: AC-3 120 and E-AC-3 82 permille, the three
+AC-4 rows at 510, 646 and 598 with the same three hashes, boot free RAM 51,927 against 52,075. The
+two S3 boards agree to within the noise of the rows.
+
+**A locked default moved under the profile (PR 12).** The first S3 build after `main` was merged in
+failed the guard on two locked keys, for both S3 profiles and for nothing else: the Sendspin
+lyric budget (`ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES`, 16,384 to 2,048 on the S3, because a
+lyric document costs about ten times its text of internal RAM at the peak) and the objects a
+board states (`ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS`, 2 to 0). Both are other sessions' commits to
+the Kconfig, which is what the guard is for. The profiles follow them in one commit at the bottom
+of the stack, so the profile hashes change (`s3-n16r8` `c4b8d369cf36` to `0fb46709d4bb`,
+`s3-n16r8-ac4` `9d72f4f00ba8` to `6124ef3f591f`) and **a baseline recorded under the old hash is
+re-recorded**: `s3-n16r8`'s was, on S3b, the worst of eight boots now (AC-3 123 and E-AC-3 87
+permille against 124 and 88; boot free RAM 85,755 against 86,223). Nothing material moved: the new
+image held to the old baseline before it was replaced. The C6 and P4 profiles were not touched:
+their locked values still equal the Kconfig's defaults (and the P4 builds of PR 10 and 11 held).
+`compare` does not look at a baseline's hash, so a stale one is a number that is still right and a
+hash that is not; the PR that changes a locked default carries the re-record.
+
 ## Changing a profile
 
 A change to a profile, a fragment it names, or a locked key's Kconfig default is one PR that:
@@ -568,7 +600,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
 | 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
-| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash); `s3-n16r8-ac4` needs its board and the same image. `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
+| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash) and **`s3-n16r8-ac4` built** (S3a, cross-checked on S3b; `s3-n16r8` re-recorded under its new hash). `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
 PR 3 follows 2. PR 2 adds `p4-rev3` once #1400 is on main, since its fragments are not.
@@ -582,7 +614,8 @@ Still open:
 
 1. **The recording board for each profile.** Proposed: S3a for both S3 profiles with S3b as the
    cross-check, C6 `.117` for `c6-16mb`, P4a `.99` for both P4 profiles (P4b needs a USB flash
-   after any OTA).
+   after any OTA). Done so: S3a for `s3-n16r8-ac4` with the S3b cross-check, S3b for
+   `s3-n16r8` (its S3a cross-check is not run), the C6 and P4a for theirs.
 2. **The tolerance:** now measured, not proposed: the larger of 5% and 5 permille over the
    median, for the decoder's time per frame; 0 underruns; the stack's margin within 512 bytes of
    the baseline's (see the ratchet above). Say if looser or tighter.
