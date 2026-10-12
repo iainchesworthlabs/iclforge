@@ -5241,17 +5241,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1343"/>
+        <location filename="../../src/hearth_controller.cpp" line="1354"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2402"/>
+        <location filename="../../src/hearth_controller.cpp" line="2415"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2405"/>
+        <location filename="../../src/hearth_controller.cpp" line="2418"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>

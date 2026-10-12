@@ -1216,6 +1216,17 @@ bool write_kept_karaoke(QSettings& store, const iclforge::hearth::DecoderSetting
     return item;
 }
 
+// One queue item per path, in order: what addFiles() and openAndPlay() both hand the engine.
+[[nodiscard]] std::vector<iclforge::hearth::QueueItem> queue_items_from_paths(
+    const QStringList& paths) {
+    std::vector<iclforge::hearth::QueueItem> items;
+    items.reserve(static_cast<std::size_t>(paths.size()));
+    for (const QString& path : paths) {
+        items.push_back(queue_item_from_path(path));
+    }
+    return items;
+}
+
 [[nodiscard]] QVariantMap queue_row(const iclforge::hearth::QueueItem& item, bool current) {
     QVariantMap row;
     row[QStringLiteral("path")] = QString::fromStdString(item.path);
@@ -1534,12 +1545,14 @@ void HearthController::addFiles(const QStringList& paths) {
     if (!engine_ || paths.isEmpty()) {
         return;
     }
-    std::vector<iclforge::hearth::QueueItem> items;
-    items.reserve(static_cast<std::size_t>(paths.size()));
-    for (const QString& path : paths) {
-        items.push_back(queue_item_from_path(path));
+    engine_->add(queue_items_from_paths(paths));
+}
+
+void HearthController::openAndPlay(const QStringList& paths) {
+    if (!engine_ || paths.isEmpty()) {
+        return;
     }
-    engine_->add(std::move(items));
+    engine_->add_and_play(queue_items_from_paths(paths));
 }
 
 void HearthController::addFolder(const QString& path) {

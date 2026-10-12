@@ -22,6 +22,12 @@ struct SessionOutput {
     std::vector<transport::Frame> frames;
     // Close the connection once the frames are sent.
     bool close = false;
+    // A PlayerSession sets it: the frame it answers carried a JSON document above
+    // kRetainedMessageBytes (lyrics, a long metadata block). The session keeps no reference into
+    // that frame, and has the channel release its own buffers for it: a transport that holds one
+    // buffer per connection for incoming frames should release that one now, rather than keep
+    // what a one-off grew.
+    bool large_document = false;
 
     void text(std::string_view message) {
         transport::Frame frame{.kind = transport::FrameKind::kText, .bytes = {}};
@@ -38,6 +44,7 @@ struct SessionOutput {
             frames.push_back(std::move(frame));
         }
         close = close || other.close;
+        large_document = large_document || other.large_document;
     }
 };
 
