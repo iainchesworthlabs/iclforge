@@ -49,6 +49,22 @@ The sections below contain the complete change list and fixes.
   linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
   ESP-IDF image, so nothing before the merge saw that break.
 
+**Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
+
+- **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
+  field (`bsmod` 7 above 1/0 in Table E1.2 by reference to Table 5.7; a service-type value in
+  Annex G and EN 300 468) and defines no reproduction; Dolby's reference decoder reproduces it with
+  Annex C's coefficients, taking `clev` and `slev` from the Lo/Ro mixing group. AC-4 has no karaoke
+  value at all. `planning/karaoke-eac3-findings.md` gives the clauses and the commands, and the
+  corrections to what the repository said (`planning/karaoke-eac3.md`, E0).
+- **A support matrix, AC-3 beside E-AC-3.** Every karaoke capability by platform and feature, each
+  cell with its test or command and its owner, and two AC-3 gaps found by measuring: `forge
+  transcode` drops `bsmod`, and the LFE's level in the reproduction differs from Dolby's
+  (`planning/karaoke-support-matrix.md`).
+- **The AC-4 options.** Presentations, a dialogue substream with the listener's gain, and a vocal
+  object, side by side with what each does on a stock decoder, how it is authored from stems and
+  carried to a sink, measured with the repository's own decoder (`planning/karaoke-ac4-options.md`).
+
 **Hearth for Android: the plan**
 
 - **A plan, its findings and one screen design for Hearth's three surfaces.** `planning/hearth-android.md`
@@ -86,6 +102,27 @@ The sections below contain the complete change list and fixes.
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
 
+**Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
+
+- **`iclforge/base/karaoke.hpp`.** `KaraokeReproduction` (off, aware, capable), `KaraokeVocals`
+  (none, V1, V2, both), the part levels' -24 to +12 dB span and `karaoke_gain_from_db` move from
+  `iclforge/ac3/decoder/output.hpp` into `iclforge::base`, header-only, so that the E-AC-3
+  decoder, the wire's converters and a later AC-4 mapping name the same types. `iclforge::ac3`
+  re-exports every name, so no caller changes and no symbol is exported or removed
+  (`planning/karaoke-eac3.md`, E1, D5).
+- **`Eac3Decoder` reproduces Annex C's karaoke when `OutputConfig::karaoke` asks.** A programme
+  that is one independent substream with `bsmod` 7 above 1/0, no dependent substream and no object
+  layer comes back as L, C, R and the LFE (aware), or with the listener's vocals and levels
+  (capable), through the same output stage as AC-3, in the access-unit, block and flush paths.
+  A/52 gives E-AC-3 the signalling and no reproduction; Dolby's decoder reproduces Annex C's, and
+  the tests hold the same ratios (V1 into L and V2 into R at the Lo/Ro surround level, the melody
+  at the centre at L's gain), the levels coming from `mixmdate`'s `lorocmixlev` and
+  `lorosurmixlev` and being -3 dB when it is absent. A programme with a dependent substream is
+  decoded as coded. `DecodedAccessUnit::layout` still names the coded bed and `channels` holds the
+  reproduction; `ac3::output_mode()` says what it is. The CLI, Hearth, the GUI, the WebAssembly
+  glue and the firmware read it in the pull requests that follow
+  (`planning/karaoke-eac3.md`, E2, D1 to D3).
+
 **E-AC-3: an associated service mixed into the main**
 
 - **`iclforge::ac3::AssociatedServiceMixer` and `forge decode associated=`.** A description or a
@@ -115,6 +152,14 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke guide has a recipe for timing a song's words with a forced aligner.** [Timing a
+  song with a forced aligner](docs/karaoke/forced-alignment.md) takes a song and its plain lyrics
+  through WhisperX (with Demucs where the vocal has to be separated), both run outside the
+  repository, to an enhanced `.lrc` that Hearth reads and its timing window corrects. It records
+  the versions run, the first-run downloads, the output of one run on a freely licensed
+  recording, and what the aligner got wrong; nothing in the tree depends on either tool. The
+  findings gain E19, the three ways the Forge GUI could offer word timing and what each means for
+  the lyric file it writes (planning/karaoke-phase2-findings.md, decision D13 in the plan).
 - **A sink that decodes a karaoke stream itself applies the part levels.** The Sendspin
   extension's decoder settings take three more keys, `karaoke_melody_db`, `karaoke_vocal1_db` and
   `karaoke_vocal2_db` (-24.0, which is off, to 12.0 dB against Table C.2.3), which a sink lists
@@ -216,6 +261,13 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The timing window corrects one word.** In **Time the lyrics...** a click on a word chooses it
+  (it is outlined, and the item is cued 1.5 s before it) and the window says which word it is and
+  when it starts. In the words pass the next `Space` presses that word, once, in place of the next
+  guess; **Stamp again** presses it at the position now; **-10 ms** and **+10 ms** move it, and
+  not its line. A file that came with the times of its words (from a forced aligner, say) opens
+  with every word taken as given, and only its lines could be stamped again or nudged, so one wrong
+  word could not be put right. A word stays between its neighbours; choosing its line lets it go.
 - **The timing window sets who sings a line.** In **Time the lyrics...** a chosen line takes a
   **Singer** (not marked, V1, V2 or both) and each row shows its marker; two **Name** fields set
   what the file calls the singers (`[v1:]` and `[v2:]`, kept with the file, unlike the names typed on
