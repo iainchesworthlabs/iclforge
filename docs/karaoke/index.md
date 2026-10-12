@@ -468,9 +468,10 @@ samples and the same lines as `forge decode` and Hearth do.
   and [Timing a song with a forced aligner](forced-alignment.md) runs one and reads its result in.
 - **Reading a lyrics file in a code page, in Hearth and Crucible.** UTF-8 and UTF-16 are read there;
   Latin-1, Windows-1255 and the other encodings are named and not guessed at. Forge reads one when it
-  is told the page (`lyrics-encoding=`) and writes the words beside the stream as UTF-8, which every
-  player reads, so a file in a code page is brought in once, at the encode. A MIDI karaoke file has
-  no way to say its encoding; Forge's `lyrics-encoding=` is how to name it.
+  is told the page (`lyrics-encoding=`, or the Code page list on the Karaoke flow's Lyrics row, which
+  shows how the page chosen reads the first lines) and writes the words beside the stream as UTF-8,
+  which every player reads, so a file in a code page is brought in once, at the encode. A MIDI
+  karaoke file has no way to say its encoding; naming the page is how to read it.
 - **Text from a CD+G disc.** Its words are pixels, so Hearth shows the picture and cannot follow the
   words.
 - **A screen on a sink that has not been run.** A board that decodes for itself is sent the lyrics

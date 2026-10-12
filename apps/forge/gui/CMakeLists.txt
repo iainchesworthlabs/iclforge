@@ -357,6 +357,10 @@ target_link_libraries(forge-gui
         # stream as the stream's own UTF-8 .lrc (the same place_lyrics_beside `forge encode lyrics=`
         # uses).
         iclforge::lyrics
+        # The Lyrics row's code-page picker: the operating system's conversion of a file that is
+        # not UTF-8 or UTF-16, as `forge encode lyrics-encoding=` reads it
+        # (apps/shared/text-encoding).
+        iclforge::app_text_encoding
         iclforge::warnings
         iclforge::fmt
         # The project file's reader and writer (apps/shared/project), which `forge` compiles in
