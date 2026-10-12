@@ -29,6 +29,25 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth: a singer can keep a take of their voice**
+
+- **"Record a take" keeps the singer's voice from the microphone, and only when pressed** (the
+  microphone, scoring and recording programme, M6). The Microphone card gains **Record a take** and
+  **Stop recording**, a **Recording** indicator with the elapsed time (a second sign beside
+  **Microphone on**: having the microphone on is not recording), the folder takes go to with
+  **Choose…**, and **Show in folder** and **Delete this take** for the last one. A take stops when the
+  microphone goes off, the page is left, the item ends, the device goes away or the disk fails, and
+  says why. Turning the microphone on never starts one.
+- **A take is the voice alone, lossless, with a description beside it.** One mono 24-bit FLAC at the
+  microphone's rate through the existing encoder, and a `.take.json` that says which item it was,
+  where in the item the first sample was sung (the heard position when the sound reached the
+  microphone, less the microphone's declared delay, plus the singer's timing), and that alignment, so
+  any editor can place it. The backing is never mixed in. Takes go to the documents folder under
+  "Hearth takes" unless the person chose another, never beside the song file, and the folder is not
+  made until the first take, and a take begun in the same second as another is numbered, not
+  written over it. `TakeRecorder` in the engine is Qt-free and is tested with no device.
+  Hearth's user guide has a section on it.
+
 **Hearth: a microphone and a pitch score on the Karaoke page**
 
 - **A singer can turn a microphone on and see how close their pitch is to the tune** (the
@@ -39,9 +58,9 @@ The sections below contain the complete change list and fixes.
   two sliders for the microphone's delay and the singer's own timing. **It is off until it is turned
   on**: a kept choice of input opens nothing, and it closes when the page is left, when the item
   ends or changes, and when the device goes away or stops delivering (which it names). **Nothing is
-  recorded and nothing leaves the machine.** The score is shown only when the person has said they
-  wear headphones, because through open speakers the microphone hears the backing and the score
-  reads as nearly perfect for no singing.
+  recorded unless the singer asks for a take, and nothing leaves the machine.** The score is shown
+  only when the person has said they wear headphones, because through open speakers the microphone
+  hears the backing and the score reads as nearly perfect for no singing.
 - **`MicrophoneSession` and `MicrophoneInput` in the engine** (Qt-free, so every CI leg tests
   them with a scripted input): the input seam over `iclforge::audio::Capture` and `CaptureTimeline`,
   the meter, a stall and a gone device, and a `Performance` against the reference once one has

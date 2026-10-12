@@ -8,8 +8,12 @@
 #include <string>
 #include <vector>
 
+#include <filesystem>
+
+#include "iclforge/lyrics/playhead.hpp"
 #include "microphone_input.hpp"
 #include "performance.hpp"
+#include "take_recorder.hpp"
 
 // A singer's microphone, from the person turning it on to what it heard (planning/karaoke-
 // microphone.md, M4): the input, a level meter, the loss of the device, and a Performance against
@@ -43,6 +47,12 @@ struct MicrophoneSnapshot {
     std::optional<std::int32_t> lag_ms{};
     std::optional<double> key_offset_cents{};
     std::uint64_t unplaced_frames = 0;
+
+    // A take being recorded (RC1: its own state, not the microphone's): how long it is so far.
+    bool taking = false;
+    double take_seconds = 0.0;
+    // Why the take stopped by itself (the disk filled), empty otherwise.
+    std::string take_error;
 
     // The alignment in force: what was declared and what the person moved.
     std::int64_t input_delay_ms = 0;
@@ -91,6 +101,25 @@ class MicrophoneSession {
     void set_offset_ms(std::int64_t ms);
     void set_score_options(const pitch::ScoreOptions& options);
 
+    // A take: the dry voice, mono, kept as a file until end_take() (planning/karaoke-microphone.md,
+    // M6). Only while the microphone is open; closing the microphone ends it, and keeps what was
+    // written. `partial` carries what the caller knows (the item, the reference, the headphones
+    // answer); the alignment and where the take starts in the item are filled in here.
+    [[nodiscard]] std::expected<void, std::string> begin_take(const std::filesystem::path& file,
+                                                              const TakeMetadata& partial);
+    [[nodiscard]] bool taking() const { return recorder_.recording(); }
+    // Ends the take and writes its description. The error is a sentence.
+    [[nodiscard]] std::expected<TakeInfo, std::string> end_take();
+    // Ends it and removes the file.
+    void discard_take();
+    // A take the session ended itself (the disk failed): what was written is a take, handed over
+    // once.
+    [[nodiscard]] std::optional<TakeInfo> take_ended_by_itself() {
+        std::optional<TakeInfo> out = std::move(ended_take_);
+        ended_take_.reset();
+        return out;
+    }
+
     // Reads what the microphone has captured, measures and feeds it. Called from a timer a few
     // times a second at least; `now_ns` is the steady clock.
     MicrophoneHealth pump(std::int64_t now_ns);
@@ -100,6 +129,8 @@ class MicrophoneSession {
    private:
     void rebuild_performance();
     [[nodiscard]] PerformanceOptions performance_options() const;
+    // Writes the block just read to the take, and ends the take if the disk fails.
+    void record_block(std::size_t channels, std::size_t frames);
 
     std::unique_ptr<MicrophoneInput> input_;
     bool open_ = false;
@@ -123,6 +154,14 @@ class MicrophoneSession {
     std::int64_t clipped_at_ns_ = 0;
     bool ever_clipped_ = false;
     std::int64_t last_audio_ns_ = 0;
+
+    lyrics::Playhead playhead_{};
+    TakeRecorder recorder_{};
+    TakeMetadata take_{};
+    bool take_started_ = false;
+    std::optional<TakeInfo> ended_take_{};
+    std::string take_error_;
+    std::vector<float> take_mono_;
     std::int64_t silent_since_ns_ = 0;
     bool silent_ = false;
     double silent_seconds_ = 0.0;

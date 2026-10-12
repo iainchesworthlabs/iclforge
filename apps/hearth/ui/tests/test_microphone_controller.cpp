@@ -9,9 +9,11 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QSettings>
 #include <QString>
 #include <QTemporaryDir>
+#include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -259,6 +261,148 @@ TEST_CASE("microphone controller: the reference is read from the karaoke stream,
     // Nothing playing.
     rig->controller->load("", "");
     CHECK(rig->controller->referenceStatus() == "none");
+}
+
+TEST_CASE("microphone controller: a take needs the microphone, is its own switch, and is kept",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    QTemporaryDir takes;
+    REQUIRE(takes.isValid());
+    auto rig = make_rig();
+    rig->controller->setTakesFolder(takes.path());
+    CHECK(QDir::fromNativeSeparators(rig->controller->takesFolder()) ==
+          QDir::fromNativeSeparators(takes.path()));
+
+    // Not with the microphone off.
+    CHECK(!rig->controller->startRecording());
+    CHECK(rig->controller->takeError().contains("Turn the microphone on"));
+    CHECK(!rig->controller->recording());
+
+    REQUIRE(rig->controller->start());
+    CHECK(!rig->controller->recording());  // on is not recording
+    REQUIRE(rig->controller->startRecording());
+    CHECK(rig->controller->recording());
+    CHECK(rig->controller->on());
+
+    // A second of what the microphone delivered.
+    rig->now += 1'000'000'000LL;
+    rig->input->set_now_ns(rig->now);
+    rig->controller->tick();
+
+    rig->controller->stopRecording();
+    CHECK(!rig->controller->recording());
+    CHECK(rig->controller->on());  // the microphone stays on
+    const QVariantMap take = rig->controller->lastTake();
+    REQUIRE(take.contains("path"));
+    CHECK(QFileInfo::exists(take.value("path").toString()));
+    CHECK(take.value("name").toString().endsWith(".flac"));
+    CHECK(take.value("seconds").toDouble() > 0.5);
+    QString sidecar = take.value("path").toString();
+    sidecar.chop(5);
+    CHECK(QFileInfo::exists(sidecar + ".take.json"));
+
+    // Deleting it removes both.
+    CHECK(rig->controller->deleteLastTake());
+    CHECK(!QFileInfo::exists(take.value("path").toString()));
+    CHECK(!QFileInfo::exists(sidecar + ".take.json"));
+    CHECK(rig->controller->lastTake().isEmpty());
+}
+
+TEST_CASE("microphone controller: turning the microphone off ends a take and keeps it",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    QTemporaryDir takes;
+    REQUIRE(takes.isValid());
+    auto rig = make_rig();
+    rig->controller->setTakesFolder(takes.path());
+    REQUIRE(rig->controller->start());
+    REQUIRE(rig->controller->startRecording());
+    rig->now += 500'000'000;
+    rig->input->set_now_ns(rig->now);
+    rig->controller->tick();
+    rig->controller->stop();
+    CHECK(!rig->controller->recording());
+    CHECK(rig->controller->state() == "off");
+    const QVariantMap take = rig->controller->lastTake();
+    REQUIRE(take.contains("path"));
+    CHECK(QFileInfo::exists(take.value("path").toString()));
+}
+
+TEST_CASE("microphone controller: a device that goes away during a take ends it and keeps it",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    QTemporaryDir takes;
+    REQUIRE(takes.isValid());
+    auto rig = make_rig();
+    rig->controller->setTakesFolder(takes.path());
+    REQUIRE(rig->controller->start());
+    REQUIRE(rig->controller->startRecording());
+    rig->now += 500'000'000;
+    rig->input->set_now_ns(rig->now);
+    rig->controller->tick();
+    rig->input->unplug();
+    rig->now += 100'000'000;
+    rig->controller->tick();
+    CHECK(rig->controller->state() == "error");
+    CHECK(!rig->controller->recording());
+    const QVariantMap take = rig->controller->lastTake();
+    REQUIRE(take.contains("path"));
+    CHECK(QFileInfo::exists(take.value("path").toString()));
+}
+
+TEST_CASE("microphone controller: a take is not written over, nor deleted while another runs",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    QTemporaryDir takes;
+    REQUIRE(takes.isValid());
+    auto rig = make_rig();
+    rig->controller->setTakesFolder(takes.path());
+    REQUIRE(rig->controller->start());
+    REQUIRE(rig->controller->startRecording());
+    rig->now += 500'000'000;
+    rig->input->set_now_ns(rig->now);
+    rig->controller->tick();
+    rig->controller->stopRecording();
+    const QString first = rig->controller->lastTake().value("path").toString();
+    REQUIRE(QFileInfo::exists(first));
+    const qint64 first_size = QFileInfo(first).size();
+
+    // A second take at once, which is the same second: its own file, and the first is not touched.
+    REQUIRE(rig->controller->startRecording());
+    CHECK(!rig->controller->deleteLastTake());  // not while one is being made
+    CHECK(QFileInfo::exists(first));
+    rig->controller->stopRecording();
+    const QString second = rig->controller->lastTake().value("path").toString();
+    CHECK(second != first);
+    CHECK(QFileInfo::exists(second));
+    CHECK(QFileInfo::exists(first));
+    CHECK(QFileInfo(first).size() == first_size);
+}
+
+TEST_CASE("microphone controller: the takes folder is kept, and is not made until a take starts",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    QTemporaryDir parent;
+    REQUIRE(parent.isValid());
+    const QString chosen = QDir(parent.path()).filePath("My takes");
+    {
+        auto rig = make_rig();
+        rig->controller->setTakesFolder(QUrl::fromLocalFile(chosen).toString());
+        CHECK(!QFileInfo::exists(chosen));
+    }
+    auto again = make_rig();
+    CHECK(QDir::fromNativeSeparators(again->controller->takesFolder()) ==
+          QDir::fromNativeSeparators(chosen));
+    CHECK(!QFileInfo::exists(chosen));
+    REQUIRE(again->controller->start());
+    REQUIRE(again->controller->startRecording());
+    CHECK(QFileInfo::exists(chosen));
+    again->controller->stopRecording();
 }
 
 TEST_CASE("microphone controller: the item ending closes the microphone", "[hearth][microphone]") {

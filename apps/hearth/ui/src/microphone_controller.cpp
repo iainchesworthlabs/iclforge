@@ -1,9 +1,16 @@
 #include "microphone_controller.hpp"
 
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QDesktopServices>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QMetaObject>
 #include <QPointer>
 #include <QSettings>
+#include <QStandardPaths>
+#include <QUrl>
 #include <QVariant>
 
 // Qt's headers define `slots` as a macro, and iclforge::render::OutputLayout has a method of that
@@ -25,6 +32,7 @@
 #include "microphone_input.hpp"
 #include "microphone_session.hpp"
 #include "reference_melody.hpp"
+#include "take_recorder.hpp"
 
 namespace iclforge::hearth::ui {
 
@@ -94,6 +102,14 @@ MicrophoneController::MicrophoneController(std::unique_ptr<iclforge::hearth::Mic
     QSettings settings = kept();
     device_id_ = settings.value(QStringLiteral("microphone/deviceId")).toString();
     headphones_ = settings.value(QStringLiteral("microphone/headphones"), false).toBool();
+    takes_folder_ = settings.value(QStringLiteral("microphone/takesFolder")).toString();
+    if (takes_folder_.isEmpty()) {
+        // Offered, not made: the person's own documents, under a folder of Hearth's.
+        const QString documents =
+            QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+        takes_folder_ = QDir(documents.isEmpty() ? QDir::homePath() : documents)
+                            .filePath(QStringLiteral("Hearth takes"));
+    }
     input_delay_ms_ = std::clamp(
         settings.value(QStringLiteral("microphone/inputDelayMs"), 0).toInt(), 0, kMaxAlignmentMs);
     offset_ms_ = std::clamp(settings.value(QStringLiteral("microphone/offsetMs"), 0).toInt(),
@@ -190,6 +206,10 @@ bool MicrophoneController::start() {
 }
 
 void MicrophoneController::stop() {
+    // A take running when the microphone is turned off is a take: kept, and reported.
+    if (recording_) {
+        stopRecording();
+    }
     timer_.stop();
     state_data_->session.stop();
     const bool changed = state_ != QLatin1String("off") || !error_text_.isEmpty();
@@ -201,12 +221,119 @@ void MicrophoneController::stop() {
     publish(true);
 }
 
+bool MicrophoneController::startRecording() {
+    if (recording_) {
+        return true;
+    }
+    take_error_.clear();
+    if (!on()) {
+        take_error_ = tr("Turn the microphone on first.");
+        emit recordingChanged();
+        return false;
+    }
+    const QString title = QFileInfo(item_path_).completeBaseName();
+    const QString stamp =
+        QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HHmmss"));
+    const std::string stem =
+        iclforge::hearth::take_file_stem(title.toStdString(), stamp.toStdString());
+    // A name is to the second, so a take begun at once after another would write over it: a number
+    // is added to the name when the file, or its description, is there already.
+    const QString base = QDir(takes_folder_).filePath(QString::fromStdString(stem));
+    const auto taken = [](const QString& name) {
+        return QFileInfo::exists(name + QStringLiteral(".flac")) ||
+               QFileInfo::exists(name + QStringLiteral(".take.json"));
+    };
+    QString chosen = base;
+    for (int n = 2; taken(chosen); ++n) {
+        chosen = base + QStringLiteral(" (%1)").arg(n);
+    }
+    const QString file = chosen + QStringLiteral(".flac");
+
+    iclforge::hearth::TakeMetadata metadata;
+    metadata.item_path = item_path_.toStdString();
+    metadata.item_title = title.toStdString();
+    metadata.reference =
+        reference_status_ == QLatin1String("ready") ? reference_text_.toStdString() : std::string{};
+    const auto begun =
+        state_data_->session.begin_take(std::filesystem::path(file.toStdU16String()), metadata);
+    if (!begun) {
+        take_error_ = QString::fromStdString(begun.error());
+        emit recordingChanged();
+        return false;
+    }
+    recording_ = true;
+    take_seconds_ = 0.0;
+    emit recordingChanged();
+    return true;
+}
+
+void MicrophoneController::stopRecording() {
+    if (!recording_) {
+        return;
+    }
+    recording_ = false;
+    const auto done = state_data_->session.end_take();
+    if (done) {
+        remember_take(*done);
+    } else {
+        take_error_ = QString::fromStdString(done.error());
+    }
+    take_seconds_ = 0.0;
+    emit recordingChanged();
+}
+
+void MicrophoneController::remember_take(const iclforge::hearth::TakeInfo& info) {
+    QVariantMap take;
+    const QString path = QString::fromStdU16String(info.audio.u16string());
+    take.insert(QStringLiteral("path"), path);
+    take.insert(QStringLiteral("name"), QFileInfo(path).fileName());
+    take.insert(QStringLiteral("folder"), QFileInfo(path).absolutePath());
+    take.insert(QStringLiteral("seconds"), info.seconds);
+    last_take_ = take;
+}
+
+bool MicrophoneController::deleteLastTake() {
+    const QString path = last_take_.value(QStringLiteral("path")).toString();
+    if (path.isEmpty() || recording_) {
+        return false;
+    }
+    bool ok = QFile::remove(path);
+    QString sidecar = path;
+    sidecar.chop(5);  // ".flac"
+    sidecar += QStringLiteral(".take.json");
+    ok = QFile::remove(sidecar) && ok;
+    last_take_.clear();
+    emit recordingChanged();
+    return ok;
+}
+
+void MicrophoneController::showTakes() {
+    const QString folder = last_take_.contains(QStringLiteral("folder"))
+                               ? last_take_.value(QStringLiteral("folder")).toString()
+                               : takes_folder_;
+    QDesktopServices::openUrl(QUrl::fromLocalFile(folder));
+}
+
+void MicrophoneController::setTakesFolder(const QString& urlOrPath) {
+    const QUrl url(urlOrPath);
+    const QString path = url.isLocalFile() ? url.toLocalFile() : urlOrPath;
+    if (path.isEmpty() || path == takes_folder_) {
+        return;
+    }
+    takes_folder_ = QDir::toNativeSeparators(path);
+    kept().setValue(QStringLiteral("microphone/takesFolder"), takes_folder_);
+    emit takesFolderChanged();
+}
+
 void MicrophoneController::restartScore() {
     state_data_->session.clear_singer();
     publish(true);
 }
 
 void MicrophoneController::fail(const QString& text) {
+    if (recording_) {
+        stopRecording();
+    }
     timer_.stop();
     state_data_->session.stop();
     state_ = QStringLiteral("error");
@@ -360,6 +487,22 @@ void MicrophoneController::publish(bool force) {
     silent_seconds_ = s.silent_seconds;
     if (meter_changed) {
         emit meterChanged();
+    }
+
+    if (recording_) {
+        if (!s.taking) {
+            // The session ended it by itself: the disk filled. Say so, and keep what is there.
+            recording_ = false;
+            take_error_ = QString::fromStdString(s.take_error);
+            if (const auto kept = state_data_->session.take_ended_by_itself()) {
+                remember_take(*kept);
+            }
+            take_seconds_ = 0.0;
+            emit recordingChanged();
+        } else if (std::fabs(s.take_seconds - take_seconds_) >= 0.1) {
+            take_seconds_ = s.take_seconds;
+            emit recordingChanged();
+        }
     }
 
     QVariantMap live;
