@@ -50,6 +50,15 @@ CONFIG_ICLFORGE_EXAMPLE_I2S_DMA_FRAMES=256
 CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
 CONFIG_ICLFORGE_EXAMPLE_HOLD_FIRST_UNIT=1
 #
+# The decode task's 32 KB stack of the HTTP and partition player (POST /play) in PSRAM, asked
+# for here and not left to the option's default, so that a change of the default cannot quietly
+# put it back. With Wi-Fi up and the Sendspin player started, no internal block on this part is
+# over 31,744 bytes, and an image of this shape with the stack internal answered every POST /play
+# with `could not allocate 32768 bytes` and `could not start the decode task` (2026-10-12, main
+# 3d6b2aa0a, both boards). The Sendspin player's own decode task has an option of its own,
+# ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM, which is on by default for this part.
+CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM=1
+#
 # With sdkconfig.ac4 as well, an AC-4 play keeps only allocations under 512 bytes in
 # internal RAM and its decoder's state goes to PSRAM: the component's
 # CONFIG_ICLFORGE_AC4_INTERNAL_BELOW, 512 on this part (planning/ac4.md, D14c). The AC-3

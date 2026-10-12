@@ -31,7 +31,9 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <cmath>
 #include <cstring>
+#include <optional>
 #include <set>
 #include <span>
 #include <stdexcept>
@@ -48,11 +50,13 @@
 #include "iclforge/ac3/meta/qc.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/latency.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
 #include "iclforge/ac3/oba/atmos.hpp"
@@ -393,6 +397,44 @@ py::list blksw_to_list(const std::vector<std::array<bool, iclforge::ac3::kBlocks
     return out;
 }
 
+// The AC-3 frame decoder as Python holds it: the library's, with the output configuration it was
+// made with kept beside it, so that a decoded frame can say what the output stage left its
+// channels as (iclforge::ac3::output_mode() is a function of that and the frame; FrameDecoder
+// keeps its configuration behind its pimpl).
+struct PyFrameDecoder : iclforge::ac3::FrameDecoder {
+    PyFrameDecoder() = default;
+    explicit PyFrameDecoder(const iclforge::ac3::DecoderConfig& config)
+        : iclforge::ac3::FrameDecoder(config), output(config.output) {}
+    iclforge::ac3::OutputConfig output{};
+};
+
+// A decoded frame and what became of its channels: the layout they are in (the coded one unless
+// Annex C's karaoke reproduction replaced it) and whether it did.
+struct PyDecodedFrame : iclforge::ac3::DecodedFrame {
+    PyDecodedFrame() = default;
+    PyDecodedFrame(iclforge::ac3::DecodedFrame&& frame, const iclforge::ac3::OutputConfig& config)
+        : iclforge::ac3::DecodedFrame(std::move(frame)) {
+        karaoke = iclforge::ac3::meta::is_karaoke(
+            static_cast<iclforge::ac3::meta::BitstreamMode>(bsmod), acmod);
+        output = iclforge::ac3::output_mode(config, acmod, lfe, karaoke);
+        reproduced = karaoke && config.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
+                     (output.acmod != acmod || output.lfe != lfe);
+    }
+    iclforge::ac3::OutputMode output{iclforge::ac3::Acmod::k2_0, false};
+    bool karaoke = false;
+    bool reproduced = false;
+};
+
+// A karaoke part's linear gain as the dB the setter took it from (iclforge::ac3::karaoke_gain_from_db):
+// 0 is off, which is the bottom of the span. Held to the span, so what a setter was given outside
+// it reads back as the end it was held to.
+double karaoke_db_of(double gain) {
+    if (!std::isfinite(gain) || gain <= 0.0) {
+        return iclforge::ac3::kKaraokeMinLevelDb;
+    }
+    return iclforge::ac3::karaoke_level_db(20.0 * std::log10(gain));
+}
+
 // AC-3's own channel labels (Table 5.8) - independent of the E-AC-3 Table E2.5 chanmap machinery
 // used for DecodedSubstream/DecodedAccessUnit below, same split
 // apps/demos/wasm/decoder_bindings.cpp draws between its own ac3_channel_labels() and
@@ -522,6 +564,25 @@ PYBIND11_MODULE(_iclforge, m) {
         .value("k3_1", iclforge::ac3::Acmod::k3_1, "L, C, R, S")
         .value("k2_2", iclforge::ac3::Acmod::k2_2, "L, R, Ls, Rs")
         .value("k3_2", iclforge::ac3::Acmod::k3_2, "L, C, R, Ls, Rs");
+
+    // Annex C (ETSI TS 102 366, informative): how a karaoke stream is reproduced.
+    py::enum_<iclforge::ac3::KaraokeReproduction>(
+        m, "KaraokeReproduction",
+        "How an AC-3 karaoke stream (bsmod 7 above 1/0: L, R, a guide melody and one or two "
+        "vocals) is reproduced - DecoderConfig(karaoke=...)")
+        .value("kOff", iclforge::ac3::KaraokeReproduction::kOff, "The channels as coded (default)")
+        .value("kAware", iclforge::ac3::KaraokeReproduction::kAware,
+               "C.2.3.1, Table C.2.2: L, C, R with the vocals at the stream's own level")
+        .value("kCapable", iclforge::ac3::KaraokeReproduction::kCapable,
+               "C.2.3.2, Table C.2.3: the listener's vocals and each part's level");
+    py::enum_<iclforge::ac3::KaraokeVocals>(
+        m, "KaraokeVocals", "Which vocals are heard under KaraokeReproduction.kCapable")
+        .value("kNone", iclforge::ac3::KaraokeVocals::kNone)
+        .value("kV1", iclforge::ac3::KaraokeVocals::kV1)
+        .value("kV2", iclforge::ac3::KaraokeVocals::kV2)
+        .value("kBoth", iclforge::ac3::KaraokeVocals::kBoth);
+    m.attr("KARAOKE_MIN_LEVEL_DB") = iclforge::ac3::kKaraokeMinLevelDb;
+    m.attr("KARAOKE_MAX_LEVEL_DB") = iclforge::ac3::kKaraokeMaxLevelDb;
 
     py::enum_<iclforge::ac3::SampleRate>(m, "SampleRate")
         .value("k48000", iclforge::ac3::SampleRate::k48000)
@@ -1112,11 +1173,37 @@ PYBIND11_MODULE(_iclforge, m) {
             // not reject them as unknown.
             py::object trace_obj = kwargs.attr("pop")("trace", py::none());
             py::object eac3_trace_obj = kwargs.attr("pop")("eac3_trace", py::none());
+            // The karaoke choice lives in the config's output stage, which KwargBinder's
+            // direct-member fields cannot reach: popped by hand, as the traces are. The levels
+            // are dB against Table C.2.3 (iclforge::ac3::karaoke_gain_from_db).
+            py::object karaoke_obj = kwargs.attr("pop")("karaoke", py::none());
+            py::object vocals_obj = kwargs.attr("pop")("karaoke_vocals", py::none());
+            py::object melody_obj = kwargs.attr("pop")("karaoke_melody_db", py::none());
+            py::object vocal1_obj = kwargs.attr("pop")("karaoke_vocal1_db", py::none());
+            py::object vocal2_obj = kwargs.attr("pop")("karaoke_vocal2_db", py::none());
             iclforge::ac3::DecoderConfig config =
                 KwargBinder<iclforge::ac3::DecoderConfig>(std::move(kwargs))
                     .field("drc_scale", &iclforge::ac3::DecoderConfig::drc_scale)
                     .field("heavy_compression", &iclforge::ac3::DecoderConfig::heavy_compression)
                     .finish();
+            if (!karaoke_obj.is_none()) {
+                config.output.karaoke = karaoke_obj.cast<iclforge::ac3::KaraokeReproduction>();
+            }
+            if (!vocals_obj.is_none()) {
+                config.output.karaoke_vocals = vocals_obj.cast<iclforge::ac3::KaraokeVocals>();
+            }
+            if (!melody_obj.is_none()) {
+                config.output.karaoke_melody_gain =
+                    iclforge::ac3::karaoke_gain_from_db(melody_obj.cast<double>());
+            }
+            if (!vocal1_obj.is_none()) {
+                config.output.karaoke_vocal1_gain =
+                    iclforge::ac3::karaoke_gain_from_db(vocal1_obj.cast<double>());
+            }
+            if (!vocal2_obj.is_none()) {
+                config.output.karaoke_vocal2_gain =
+                    iclforge::ac3::karaoke_gain_from_db(vocal2_obj.cast<double>());
+            }
             if (!trace_obj.is_none()) {
                 config.trace = trace_obj.cast<iclforge::ac3::verify::FrameTrace*>();
             }
@@ -1127,26 +1214,88 @@ PYBIND11_MODULE(_iclforge, m) {
             return config;
         }))
         .def_readwrite("drc_scale", &iclforge::ac3::DecoderConfig::drc_scale)
-        .def_readwrite("heavy_compression", &iclforge::ac3::DecoderConfig::heavy_compression);
+        .def_readwrite("heavy_compression", &iclforge::ac3::DecoderConfig::heavy_compression)
+        .def_property(
+            "karaoke",
+            [](const iclforge::ac3::DecoderConfig& c) { return c.output.karaoke; },
+            [](iclforge::ac3::DecoderConfig& c, iclforge::ac3::KaraokeReproduction value) {
+                c.output.karaoke = value;
+            },
+            "Annex C's karaoke reproduction (KaraokeReproduction): kOff plays the coded "
+            "channels, kAware the karaoke-aware decoder's L, C, R and kCapable the capable "
+            "decoder's, with karaoke_vocals and the levels. Ignored for a frame that is not "
+            "karaoke, and by Eac3Decoder.")
+        .def_property(
+            "karaoke_vocals",
+            [](const iclforge::ac3::DecoderConfig& c) { return c.output.karaoke_vocals; },
+            [](iclforge::ac3::DecoderConfig& c, iclforge::ac3::KaraokeVocals value) {
+                c.output.karaoke_vocals = value;
+            },
+            "Which vocals the listener hears under kCapable (KaraokeVocals).")
+        .def_property(
+            "karaoke_melody_db",
+            [](const iclforge::ac3::DecoderConfig& c) {
+                return karaoke_db_of(c.output.karaoke_melody_gain);
+            },
+            [](iclforge::ac3::DecoderConfig& c, double db) {
+                c.output.karaoke_melody_gain = iclforge::ac3::karaoke_gain_from_db(db);
+            },
+            "The guide melody's level against Table C.2.3, in dB, under kCapable: 0 is the "
+            "table bit for bit, KARAOKE_MIN_LEVEL_DB (-24) is off and KARAOKE_MAX_LEVEL_DB "
+            "(12) the top. A value outside the span is held to it; one that is not a number "
+            "is 0 dB.")
+        .def_property(
+            "karaoke_vocal1_db",
+            [](const iclforge::ac3::DecoderConfig& c) {
+                return karaoke_db_of(c.output.karaoke_vocal1_gain);
+            },
+            [](iclforge::ac3::DecoderConfig& c, double db) {
+                c.output.karaoke_vocal1_gain = iclforge::ac3::karaoke_gain_from_db(db);
+            },
+            "V1's level, as karaoke_melody_db.")
+        .def_property(
+            "karaoke_vocal2_db",
+            [](const iclforge::ac3::DecoderConfig& c) {
+                return karaoke_db_of(c.output.karaoke_vocal2_gain);
+            },
+            [](iclforge::ac3::DecoderConfig& c, double db) {
+                c.output.karaoke_vocal2_gain = iclforge::ac3::karaoke_gain_from_db(db);
+            },
+            "V2's level, as karaoke_melody_db.");
 
-    py::class_<iclforge::ac3::DecodedFrame>(m, "DecodedFrame")
+    py::class_<PyDecodedFrame>(m, "DecodedFrame")
         .def_readonly("sample_rate", &iclforge::ac3::DecodedFrame::sample_rate)
         .def_readonly("bitrate_kbps", &iclforge::ac3::DecodedFrame::bitrate_kbps)
-        .def_readonly("acmod", &iclforge::ac3::DecodedFrame::acmod)
+        .def_readonly("acmod", &iclforge::ac3::DecodedFrame::acmod,
+                      "What the frame codes. `output_acmod` is what `channels` are.")
         .def_readonly("lfe", &iclforge::ac3::DecodedFrame::lfe)
+        .def_readonly("bsmod", &iclforge::ac3::DecodedFrame::bsmod,
+                      "The frame's bsmod (A/52 Table 5.7): 7 with an acmod above 1/0 is karaoke")
         .def_readonly("dialnorm", &iclforge::ac3::DecodedFrame::dialnorm)
         .def_readonly("compr", &iclforge::ac3::DecodedFrame::compr)
         .def_readonly("dialnorm2", &iclforge::ac3::DecodedFrame::dialnorm2)
         .def_readonly("compr2", &iclforge::ac3::DecodedFrame::compr2)
-        .def_property_readonly("dynrng", [](const iclforge::ac3::DecodedFrame& f) { return to_vec(f.dynrng); })
-        .def_property_readonly("dynrng2", [](const iclforge::ac3::DecodedFrame& f) { return to_vec(f.dynrng2); })
-        .def_property_readonly("blksw", [](const iclforge::ac3::DecodedFrame& f) { return blksw_to_list(f.blksw); })
+        .def_readonly("is_karaoke", &PyDecodedFrame::karaoke,
+                      "Whether the frame is Annex C's karaoke main service (bsmod 7 above 1/0), "
+                      "however the decoder was configured")
+        .def_property_readonly(
+            "output_acmod", [](const PyDecodedFrame& f) { return f.output.acmod; },
+            "The layout `channels` are in: `acmod` for everything the decoder left alone, k3_0 "
+            "(L, C, R, then the LFE) for a karaoke frame it reproduced")
+        .def_property_readonly("output_lfe", [](const PyDecodedFrame& f) { return f.output.lfe; })
+        .def_readonly("karaoke_reproduced", &PyDecodedFrame::reproduced,
+                      "Whether the decoder replaced the coded layout with a karaoke reproduction "
+                      "for this frame")
+        .def_property_readonly("dynrng", [](const PyDecodedFrame& f) { return to_vec(f.dynrng); })
+        .def_property_readonly("dynrng2", [](const PyDecodedFrame& f) { return to_vec(f.dynrng2); })
+        .def_property_readonly("blksw", [](const PyDecodedFrame& f) { return blksw_to_list(f.blksw); })
         .def_property_readonly("channels",
                                 [](py::object self) {
-                                    return channel_views(self.cast<const iclforge::ac3::DecodedFrame&>().channels, self);
+                                    return channel_views(self.cast<const PyDecodedFrame&>().channels, self);
                                 })
-        .def_property_readonly("channel_labels", [](const iclforge::ac3::DecodedFrame& f) {
-            return ac3_channel_labels(f.acmod, f.lfe);
+        .def_property_readonly("channel_labels", [](const PyDecodedFrame& f) {
+            // The channels are what the output stage left, not what the frame coded.
+            return ac3_channel_labels(f.output.acmod, f.output.lfe);
         });
 
     py::class_<iclforge::ac3::DecodedSubstream>(m, "DecodedSubstream")
@@ -1223,14 +1372,14 @@ PYBIND11_MODULE(_iclforge, m) {
             return labels;
         });
 
-    py::class_<iclforge::ac3::FrameDecoder>(m, "FrameDecoder")
+    py::class_<PyFrameDecoder>(m, "FrameDecoder")
         .def(py::init<>())
         .def(py::init<const iclforge::ac3::DecoderConfig&>(), py::arg("config"))
         .def(
             "decode_frame",
-            [](iclforge::ac3::FrameDecoder& self, const py::buffer& frame) {
+            [](PyFrameDecoder& self, const py::buffer& frame) {
                 const auto bytes = to_bytes(frame);
-                iclforge::ac3::DecodedFrame result;
+                std::optional<iclforge::ac3::DecodedFrame> result;
                 {
                     py::gil_scoped_release release;
                     auto decoded = self.decode_frame(bytes);
@@ -1239,17 +1388,17 @@ PYBIND11_MODULE(_iclforge, m) {
                     }
                     result = std::move(*decoded);
                 }
-                return result;
+                return PyDecodedFrame{std::move(*result), self.output};
             },
             py::arg("frame"), "Decode exactly one AC-3 syncframe")
         .def(
             "decode_frame_into",
-            [](iclforge::ac3::FrameDecoder& self, const py::buffer& frame, const py::object& out) {
+            [](PyFrameDecoder& self, const py::buffer& frame, const py::object& out) {
                 const auto bytes = to_bytes(frame);
                 auto views =
                     extract_out_views(out, kMaxAc3Channels,
                                       static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame));
-                iclforge::ac3::DecodedFrame result;
+                std::optional<iclforge::ac3::DecodedFrame> result;
                 {
                     py::gil_scoped_release release;
                     auto decoded = self.decode_frame_into(bytes, views.spans);
@@ -1258,7 +1407,7 @@ PYBIND11_MODULE(_iclforge, m) {
                     }
                     result = std::move(*decoded);
                 }
-                return result;
+                return PyDecodedFrame{std::move(*result), self.output};
             },
             py::arg("frame"), py::arg("out"),
             "As decode_frame, but PCM lands in `out` (a (n, SAMPLES_PER_FRAME) array, or a "
@@ -1268,9 +1417,7 @@ PYBIND11_MODULE(_iclforge, m) {
             "returns.")
         .def_property_readonly(
             "latency_samples",
-            [](const iclforge::ac3::FrameDecoder&) {
-                return iclforge::ac3::FrameDecoder::latency_samples();
-            },
+            [](const PyFrameDecoder&) { return iclforge::ac3::FrameDecoder::latency_samples(); },
             "The delay this decoder adds on top of the encoder's budget: always 0 for AC-3.");
 
     py::class_<iclforge::ac3::Eac3Decoder>(m, "Eac3Decoder")
@@ -1789,4 +1936,6 @@ PYBIND11_MODULE(_iclforge, m) {
     iclforge::python::register_containers(m);
 
     iclforge::python::register_ac4(m);
+
+    iclforge::python::register_lyrics(m);
 }

@@ -56,7 +56,7 @@
     <message>
         <location filename="../qml/AboutDialog.qml" line="140"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Fermer</translation>
     </message>
 </context>
 <context>
@@ -229,7 +229,7 @@
         <location filename="../qml/DecoderAc4.qml" line="301"/>
         <location filename="../qml/DecoderAc4.qml" line="346"/>
         <source>%1 dB</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/DecoderAc4.qml" line="272"/>
@@ -740,7 +740,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="408"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">aucune</translation>
     </message>
     <message>
         <location filename="../qml/DecoderEac3.qml" line="410"/>
@@ -750,7 +750,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="412"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/DecoderEac3.qml" line="421"/>
@@ -798,7 +798,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="489"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Les deux</translation>
     </message>
     <message>
         <location filename="../qml/DecoderEac3.qml" line="504"/>
@@ -889,7 +889,7 @@
     <message>
         <location filename="../qml/DecoderPage.qml" line="41"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Décodeur</translation>
     </message>
     <message>
         <location filename="../qml/DecoderPage.qml" line="44"/>
@@ -914,22 +914,22 @@
     <message>
         <location filename="../qml/DecoderPage.qml" line="63"/>
         <source>Karaoke: as coded</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké&#xa0;: tel que codé</translation>
     </message>
     <message>
         <location filename="../qml/DecoderPage.qml" line="64"/>
         <source>Karaoke: capable</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké&#xa0;: capable</translation>
     </message>
     <message>
         <location filename="../qml/DecoderPage.qml" line="64"/>
         <source>Karaoke: aware</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké&#xa0;: aware</translation>
     </message>
     <message>
         <location filename="../qml/DecoderPage.qml" line="71"/>
         <source>Karaoke page</source>
-        <translation type="unfinished"></translation>
+        <translation>Page Karaoké</translation>
     </message>
 </context>
 <context>
@@ -996,89 +996,89 @@
     <message>
         <location filename="../qml/KaraokePage.qml" line="83"/>
         <source>The lines are marked for %1 and for %2.</source>
-        <translation type="unfinished"></translation>
+        <translation>Les lignes sont marquées pour %1 et pour %2.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="86"/>
         <source>Both vocals play, so %1 and %2 are both in the mix.</source>
-        <translation type="unfinished"></translation>
+        <translation>Les deux voix sont jouées&#xa0;: %1 et %2 sont donc toutes deux dans le mixage.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="89"/>
         <source>No vocal plays: you sing the lines of %1 and of %2.</source>
-        <translation type="unfinished"></translation>
+        <translation>Aucune voix n&apos;est jouée&#xa0;: vous chantez les lignes de %1 et de %2.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="92"/>
         <location filename="../qml/KaraokePage.qml" line="93"/>
         <source>The vocal of %1 plays: you sing the lines of %2.</source>
-        <translation type="unfinished"></translation>
+        <translation>La voix de %1 est jouée&#xa0;: vous chantez les lignes de %2.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="140"/>
         <source>off</source>
-        <translation type="unfinished"></translation>
+        <translation>désactivé</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="142"/>
         <source>%1 dB</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="253"/>
         <source>the LFE, as coded</source>
-        <translation type="unfinished"></translation>
+        <translation>le LFE, tel que codé</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="257"/>
         <source>silent</source>
-        <translation type="unfinished"></translation>
+        <translation>silencieux</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="290"/>
         <source>Karaoke</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="296"/>
         <source>Nothing is playing</source>
-        <translation type="unfinished"></translation>
+        <translation>Rien n&apos;est en cours de lecture</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="307"/>
         <source>Add a karaoke stream to the queue and play it. What you choose here applies to it.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ajoutez un flux de karaoké à la file d&apos;attente et lancez-le. Ce que vous choisissez ici s&apos;y applique.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="311"/>
         <source>Karaoke, %1 coded: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké, %1 codé&#xa0;: %2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="316"/>
         <source>An AC-3 stream, but not a karaoke one: its service is %1.</source>
-        <translation type="unfinished"></translation>
+        <translation>Un flux AC-3, mais pas un flux de karaoké&#xa0;: son service est %1.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="318"/>
         <source>Karaoke is an AC-3 mode (Annex C of ETSI TS 102 366). This is not an AC-3 stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>Le karaoké est un mode de l&apos;AC-3 (annexe C de l&apos;ETSI TS 102 366). Ce n&apos;est pas un flux AC-3.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="329"/>
         <source>Reproduction</source>
-        <translation type="unfinished"></translation>
+        <translation>Reproduction</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="330"/>
         <source>Annex C, ETSI TS 102 366</source>
-        <translation type="unfinished"></translation>
+        <translation>Annexe C, ETSI TS 102 366</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="336"/>
         <location filename="../qml/KaraokePage.qml" line="340"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation>Décodeur</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="344"/>
@@ -1088,301 +1088,301 @@
     <message>
         <location filename="../qml/KaraokePage.qml" line="345"/>
         <source>Aware</source>
-        <translation type="unfinished"></translation>
+        <translation>Aware</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="346"/>
         <source>Capable</source>
-        <translation type="unfinished"></translation>
+        <translation>Capable</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="354"/>
         <source>The channels as the stream codes them: the vocals come from the surround speakers.</source>
-        <translation type="unfinished"></translation>
+        <translation>Les canaux tels que le flux les code&#xa0;: les voix sortent des haut-parleurs surround.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="357"/>
         <source>L, C and R, with the vocals at the level the programme set (Table C.2.2).</source>
-        <translation type="unfinished"></translation>
+        <translation>L, C et R, avec les voix au niveau fixé par le programme (tableau C.2.2).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="359"/>
         <source>L, C and R, with the vocals you choose (Table C.2.3).</source>
-        <translation type="unfinished"></translation>
+        <translation>L, C et R, avec les voix que vous choisissez (tableau C.2.3).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="368"/>
         <location filename="../qml/KaraokePage.qml" line="372"/>
         <source>Vocals</source>
-        <translation type="unfinished"></translation>
+        <translation>Voix</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="376"/>
         <source>None</source>
-        <translation type="unfinished"></translation>
+        <translation>Aucun</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="377"/>
         <source>V1</source>
-        <translation type="unfinished"></translation>
+        <translation>V1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="378"/>
         <source>V2</source>
-        <translation type="unfinished"></translation>
+        <translation>V2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="379"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation>Les deux</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="389"/>
         <source>Melody</source>
-        <translation type="unfinished"></translation>
+        <translation>Mélodie</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="410"/>
         <source>%1 level, dB</source>
-        <translation type="unfinished"></translation>
+        <translation>Niveau %1, dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="437"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable decoder only.</source>
-        <translation type="unfinished"></translation>
+        <translation>Le niveau de chaque partie par rapport au tableau C.2.3&#xa0;: 0 dB correspond au tableau, et le bas du curseur est désactivé. Relever une partie suffisamment abaisse les autres, de sorte qu&apos;aucun haut-parleur ne soit poussé au-delà de la pleine échelle. Décodeur capable uniquement.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="447"/>
         <source>Reset levels</source>
-        <translation type="unfinished"></translation>
+        <translation>Réinitialiser les niveaux</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="461"/>
         <source>These controls do not apply to the stream that is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ces commandes ne s&apos;appliquent pas au flux en cours de lecture.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="474"/>
         <source>This is going out as a bitstream, so the receiver decodes it and the choice above is not applied. Unless the receiver is karaoke-capable, V1 and V2 play from its surround speakers.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ceci sort sous forme de bitstream&#xa0;: le récepteur le décode et le choix ci-dessus n&apos;est pas appliqué. À moins que le récepteur ne soit capable de karaoké, V1 et V2 sortent de ses haut-parleurs surround.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="483"/>
         <source>Choose output…</source>
-        <translation type="unfinished"></translation>
+        <translation>Choisir la sortie…</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="492"/>
         <source>This is going to a network group. A sink that takes the karaoke settings decodes the stream itself and reproduces it as chosen here; one that does not is sent PCM with the reproduction applied, so the group plays one reproduction. The Network page says which each sink was sent.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ceci est envoyé à un groupe réseau. Un lecteur qui accepte les réglages karaoké décode lui-même le flux et le reproduit comme choisi ici&#xa0;; celui qui ne les accepte pas reçoit du PCM avec la reproduction déjà appliquée, de sorte que le groupe joue une seule reproduction. La page Réseau indique ce qui a été envoyé à chacun.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="509"/>
         <source>The stereo fold is Lt/Rt. Annex C defines no Lt/Rt reproduction, so the stream plays as its Lt/Rt fold and the choice above has no effect. The Lo/Ro fold reproduces karaoke.</source>
-        <translation type="unfinished"></translation>
+        <translation>Le repli stéréo est Lt/Rt. L&apos;annexe C ne définit aucune reproduction Lt/Rt&#xa0;: le flux est donc joué dans son repli Lt/Rt et le choix ci-dessus n&apos;a aucun effet. Le repli Lo/Ro reproduit le karaoké.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="518"/>
         <source>Use Lo/Ro</source>
-        <translation type="unfinished"></translation>
+        <translation>Utiliser Lo/Ro</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="527"/>
         <source>Lyrics</source>
-        <translation type="unfinished">Paroles</translation>
+        <translation>Paroles</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="529"/>
         <source>%1 · line %2 of %3</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 · ligne %2 sur %3</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="551"/>
         <source>, word-timed</source>
-        <translation type="unfinished"></translation>
+        <translation>, minuté par mot</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="552"/>
         <source>, line-timed</source>
-        <translation type="unfinished"></translation>
+        <translation>, minuté par ligne</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="562"/>
         <source>Time the lyrics…</source>
-        <translation type="unfinished"></translation>
+        <translation>Synchroniser les paroles…</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="567"/>
         <source>Full screen · F11</source>
-        <translation type="unfinished">Plein écran · F11</translation>
+        <translation>Plein écran · F11</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="583"/>
         <location filename="../qml/KaraokePage.qml" line="591"/>
         <source>Show</source>
-        <translation type="unfinished"></translation>
+        <translation>Afficher</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="594"/>
         <source>Words</source>
-        <translation type="unfinished"></translation>
+        <translation>Paroles</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="595"/>
         <source>Picture</source>
-        <translation type="unfinished"></translation>
+        <translation>Image</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="617"/>
         <source>This is the picture of the CD+G disc beside the lyrics. Its words are part of the picture; choose Words to follow the lyrics file.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ceci est l&apos;image du disque CD+G qui accompagne les paroles. Ses paroles font partie de l&apos;image&#xa0;; choisissez «&#xa0;Paroles&#xa0;» pour suivre le fichier de paroles.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="621"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ces paroles n&apos;ont pas de temps&#xa0;: elles sont donc affichées en entier et ne sont pas suivies.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="614"/>
         <source>This is the picture of a CD+G disc. Its words are part of the picture, so there is no text to follow.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ceci est l&apos;image d&apos;un disque CD+G. Ses paroles font partie de l&apos;image&#xa0;: il n&apos;y a donc pas de texte à suivre.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="623"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
-        <translation type="unfinished"></translation>
+        <translation>Ce fichier minute les lignes, pas les mots&#xa0;: une ligne entière est mise en valeur pendant qu&apos;elle est chantée.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="643"/>
         <source>First singer</source>
-        <translation type="unfinished"></translation>
+        <translation>Première voix</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="652"/>
         <source>Name of the first singer (V1)</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de la première voix (V1)</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="659"/>
         <source>Second singer</source>
-        <translation type="unfinished"></translation>
+        <translation>Deuxième voix</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="668"/>
         <source>Name of the second singer (V2)</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de la deuxième voix (V2)</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="702"/>
         <source>The stream</source>
-        <translation type="unfinished"></translation>
+        <translation>Le flux</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="707"/>
         <source>Backing left</source>
-        <translation type="unfinished"></translation>
+        <translation>Accompagnement gauche</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="708"/>
         <source>Backing right</source>
-        <translation type="unfinished"></translation>
+        <translation>Accompagnement droit</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="709"/>
         <source>Melody guide</source>
-        <translation type="unfinished"></translation>
+        <translation>Mélodie guide</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="390"/>
         <location filename="../qml/KaraokePage.qml" line="710"/>
         <source>Vocal 1</source>
-        <translation type="unfinished"></translation>
+        <translation>Voix 1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="391"/>
         <location filename="../qml/KaraokePage.qml" line="711"/>
         <source>Vocal 2</source>
-        <translation type="unfinished"></translation>
+        <translation>Voix 2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="728"/>
         <source>not in this stream</source>
-        <translation type="unfinished"></translation>
+        <translation>absent de ce flux</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="729"/>
         <source>heard</source>
-        <translation type="unfinished"></translation>
+        <translation>audible</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="729"/>
         <source>muted</source>
-        <translation type="unfinished"></translation>
+        <translation>coupé</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="739"/>
         <source>What plays</source>
-        <translation type="unfinished"></translation>
+        <translation>Ce qui est joué</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="777"/>
         <source>Nothing karaoke is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation>Aucun karaoké n&apos;est en cours de lecture.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="785"/>
         <source>Signal path</source>
-        <translation type="unfinished"></translation>
+        <translation>Trajet du signal</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="793"/>
         <source>Decoded as the stream says.</source>
-        <translation type="unfinished"></translation>
+        <translation>Décodé comme le flux l&apos;indique.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="796"/>
         <source>as coded</source>
-        <translation type="unfinished"></translation>
+        <translation>tel que codé</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="797"/>
         <source>aware</source>
-        <translation type="unfinished"></translation>
+        <translation>aware</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="798"/>
         <source>capable, vocals: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>capable, voix&#xa0;: %1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="799"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation>aucune</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="800"/>
         <source>both</source>
-        <translation type="unfinished"></translation>
+        <translation>les deux</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="803"/>
         <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké AC-3, %1&#xa0;: non reproduit (voir l&apos;avis).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="804"/>
         <source>AC-3 karaoke, %1.</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké AC-3, %1.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="816"/>
         <source>Nothing is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation>Rien n&apos;est en cours de lecture.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="818"/>
         <source>%1 · %2 ch at %3 Hz</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 · %2 canaux à %3 Hz</translation>
     </message>
 </context>
 <context>
@@ -1400,7 +1400,7 @@
     <message>
         <location filename="../qml/LicencesDialog.qml" line="61"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Fermer</translation>
     </message>
 </context>
 <context>
@@ -1413,7 +1413,7 @@
     <message>
         <location filename="../qml/LyricScreen.qml" line="204"/>
         <source>Esc leaves full screen</source>
-        <translation type="unfinished"></translation>
+        <translation>Échap quitte le plein écran</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="259"/>
@@ -1434,62 +1434,62 @@
     <message>
         <location filename="../qml/LyricScreen.qml" line="457"/>
         <source>Previous</source>
-        <translation type="unfinished"></translation>
+        <translation>Précédent</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="464"/>
         <source>Pause</source>
-        <translation type="unfinished"></translation>
+        <translation>Pause</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="464"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation>Lire</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="470"/>
         <source>Next</source>
-        <translation type="unfinished"></translation>
+        <translation>Suivant</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="488"/>
         <source>Show</source>
-        <translation type="unfinished"></translation>
+        <translation>Afficher</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="501"/>
         <source>Words</source>
-        <translation type="unfinished"></translation>
+        <translation>Paroles</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="502"/>
         <source>Picture</source>
-        <translation type="unfinished"></translation>
+        <translation>Image</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="516"/>
         <source>Vocals</source>
-        <translation type="unfinished"></translation>
+        <translation>Voix</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="529"/>
         <source>None</source>
-        <translation type="unfinished"></translation>
+        <translation>Aucun</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="530"/>
         <source>V1</source>
-        <translation type="unfinished"></translation>
+        <translation>V1</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="531"/>
         <source>V2</source>
-        <translation type="unfinished"></translation>
+        <translation>V2</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="532"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation>Les deux</translation>
     </message>
 </context>
 <context>
@@ -1497,233 +1497,233 @@
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="155"/>
         <source>Next line: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Ligne suivante&#xa0;: %1</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="156"/>
         <source>Every line has a time. Go on to the words, or save.</source>
-        <translation type="unfinished"></translation>
+        <translation>Chaque ligne a un temps. Passez aux mots, ou enregistrez.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="163"/>
         <source>Next word: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Mot suivant&#xa0;: %1</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="166"/>
         <source>Stamp the lines first.</source>
-        <translation type="unfinished"></translation>
+        <translation>Horodatez d&apos;abord les lignes.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="169"/>
         <source>Play to the first line, then press Space as each word starts.</source>
-        <translation type="unfinished"></translation>
+        <translation>Lisez jusqu&apos;à la première ligne, puis appuyez sur Espace au début de chaque mot.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="170"/>
         <source>Every word in this line is pressed. Play on to the next line.</source>
-        <translation type="unfinished"></translation>
+        <translation>Chaque mot de cette ligne est marqué. Continuez jusqu&apos;à la ligne suivante.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="236"/>
         <source>Saved as %1. A file that was there is kept once, as %1.bak.</source>
-        <translation type="unfinished"></translation>
+        <translation>Enregistré sous %1. Un fichier déjà présent est conservé une fois, sous %1.bak.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="254"/>
         <source>Choose the words to time</source>
-        <translation type="unfinished"></translation>
+        <translation>Choisissez les mots à synchroniser</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="255"/>
         <source>Lyrics and text (*.lrc *.txt)</source>
-        <translation type="unfinished"></translation>
+        <translation>Paroles et texte (*.lrc *.txt)</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="255"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>Tous les fichiers (*)</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="262"/>
         <location filename="../qml/LyricTimingDialog.qml" line="274"/>
         <source>Time the lyrics</source>
-        <translation type="unfinished"></translation>
+        <translation>Synchroniser les paroles</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="292"/>
         <source>There are no words to time for this item.</source>
-        <translation type="unfinished"></translation>
+        <translation>Il n&apos;y a pas de mots à synchroniser pour cet élément.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="299"/>
         <source>Choose a text file with one line of the words to a line (an .lrc file with no times will do), saved as UTF-8 or UTF-16.</source>
-        <translation type="unfinished"></translation>
+        <translation>Choisissez un fichier texte avec une ligne de paroles par ligne (un fichier .lrc sans temps convient), enregistré en UTF-8 ou UTF-16.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="307"/>
         <source>Choose a text file…</source>
-        <translation type="unfinished"></translation>
+        <translation>Choisir un fichier texte…</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="330"/>
         <source>What Space stamps</source>
-        <translation type="unfinished"></translation>
+        <translation>Ce que marque la barre d&apos;espace</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="332"/>
         <source>1 · Lines</source>
-        <translation type="unfinished"></translation>
+        <translation>1 · Lignes</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="333"/>
         <source>2 · Words</source>
-        <translation type="unfinished"></translation>
+        <translation>2 · Mots</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="346"/>
         <source>Every stamped line has its words spread over it by their letters, as a guess: slanted and muted. Play, and press Space as each word starts; a pressed word turns solid.</source>
-        <translation type="unfinished"></translation>
+        <translation>Les mots de chaque ligne horodatée sont répartis sur elle d&apos;après leurs lettres, à titre d&apos;estimation&#xa0;: en italique et atténués. Lancez la lecture et appuyez sur Espace au début de chaque mot&#xa0;; un mot marqué devient plein.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="344"/>
         <source>Play the item and press Space as each line starts. A line can be stamped again, or nudged, afterwards.</source>
-        <translation type="unfinished"></translation>
+        <translation>Lancez la lecture de l&apos;élément et appuyez sur Espace au début de chaque ligne. Une ligne peut ensuite être horodatée de nouveau ou décalée.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="162"/>
         <source>Space presses the chosen word again: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Espace horodate de nouveau le mot choisi&#xa0;: %1</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="358"/>
         <source>To put one word right, choose it: the item is cued just before it. Press Space as it starts, or stamp it again, or nudge it 10 ms at a time.</source>
-        <translation type="unfinished"></translation>
+        <translation>Pour corriger un seul mot, choisissez-le&#xa0;: l&apos;élément est placé juste avant lui. Appuyez sur Espace au moment où il commence, ou horodatez-le de nouveau, ou décalez-le de 10 ms en 10 ms.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="372"/>
         <source>Pause</source>
-        <translation type="unfinished"></translation>
+        <translation>Pause</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="372"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation>Lire</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="377"/>
         <source>Back 5 s</source>
-        <translation type="unfinished"></translation>
+        <translation>Reculer de 5 s</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="382"/>
         <source>Forward 5 s</source>
-        <translation type="unfinished"></translation>
+        <translation>Avancer de 5 s</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="397"/>
         <source>Start of line · Space</source>
-        <translation type="unfinished"></translation>
+        <translation>Début de ligne · Espace</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="398"/>
         <source>Start of word · Space</source>
-        <translation type="unfinished"></translation>
+        <translation>Début de mot · Espace</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="572"/>
         <source>Chosen word: %1, in line %2, starts at %3.</source>
-        <translation type="unfinished"></translation>
+        <translation>Mot choisi&#xa0;: %1, à la ligne %2, commence à %3.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="589"/>
         <source>%1 of %2 lines have a time</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 lignes sur %2 ont un temps</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="598"/>
         <source>Stamp again</source>
-        <translation type="unfinished"></translation>
+        <translation>Horodater de nouveau</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="604"/>
         <source>−10 ms</source>
-        <translation type="unfinished"></translation>
+        <translation>−10 ms</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="610"/>
         <source>+10 ms</source>
-        <translation type="unfinished"></translation>
+        <translation>+10 ms</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="620"/>
         <source>Singer</source>
-        <translation type="unfinished"></translation>
+        <translation>Chanteur</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="627"/>
         <source>Who sings the selected line</source>
-        <translation type="unfinished"></translation>
+        <translation>Qui chante la ligne sélectionnée</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="629"/>
         <source>Not marked</source>
-        <translation type="unfinished"></translation>
+        <translation>Non marquée</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="632"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation>Les deux</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="642"/>
         <source>Name of V1</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de V1</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="644"/>
         <source>Name of the first singer, saved in the file</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de la première voix, enregistré dans le fichier</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="651"/>
         <source>Name of V2</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de V2</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="653"/>
         <source>Name of the second singer, saved in the file</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom de la deuxième voix, enregistré dans le fichier</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="663"/>
         <source>Reaction time</source>
-        <translation type="unfinished"></translation>
+        <translation>Temps de réaction</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="675"/>
         <source>Reaction time in milliseconds</source>
-        <translation type="unfinished"></translation>
+        <translation>Temps de réaction en millisecondes</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="678"/>
         <source>ms taken off each press</source>
-        <translation type="unfinished"></translation>
+        <translation>ms retirées de chaque appui</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="687"/>
         <source>Save</source>
-        <translation type="unfinished"></translation>
+        <translation>Enregistrer</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="692"/>
         <source>Discard and close</source>
-        <translation type="unfinished"></translation>
+        <translation>Abandonner et fermer</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="692"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>Fermer</translation>
     </message>
 </context>
 <context>
@@ -1731,47 +1731,47 @@
     <message>
         <location filename="../qml/LyricView.qml" line="73"/>
         <source>%1 + %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 + %2</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="99"/>
         <source>guide</source>
-        <translation type="unfinished"></translation>
+        <translation>guide</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="100"/>
         <source>you</source>
-        <translation type="unfinished"></translation>
+        <translation>vous</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="101"/>
         <source>shared</source>
-        <translation type="unfinished"></translation>
+        <translation>partagée</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="112"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="428"/>
         <source>CD+G picture</source>
-        <translation type="unfinished"></translation>
+        <translation>Image CD+G</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="444"/>
         <source>%1 Playback is not affected.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 La lecture n&apos;est pas affectée.</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="448"/>
         <source>Nothing is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation>Rien n&apos;est en cours de lecture.</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="450"/>
         <source>No lyrics. Hearth looks for %1 next to the stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>Pas de paroles. Hearth cherche %1 à côté du flux.</translation>
     </message>
 </context>
 <context>
@@ -1800,7 +1800,7 @@
     <message>
         <location filename="../qml/Main.qml" line="271"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Lire</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="272"/>
@@ -1815,7 +1815,7 @@
     <message>
         <location filename="../qml/Main.qml" line="274"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Décodeur</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="275"/>
@@ -1830,7 +1830,7 @@
     <message>
         <location filename="../qml/Main.qml" line="277"/>
         <source>Karaoke</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="289"/>
@@ -2038,7 +2038,7 @@
     <message>
         <location filename="../qml/Media.qml" line="165"/>
         <source>off</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">désactivé</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="172"/>
@@ -2051,7 +2051,7 @@
         <location filename="../qml/Media.qml" line="344"/>
         <location filename="../qml/Media.qml" line="983"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">aucune</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="182"/>
@@ -2062,7 +2062,7 @@
         <location filename="../qml/Media.qml" line="184"/>
         <location filename="../qml/Media.qml" line="570"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="203"/>
@@ -2077,7 +2077,7 @@
     <message>
         <location filename="../qml/Media.qml" line="205"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Tous les fichiers (*)</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="226"/>
@@ -3068,7 +3068,7 @@
     <message>
         <location filename="../qml/NetworkSinkDecoder.qml" line="291"/>
         <source>None</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Aucun</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkDecoder.qml" line="292"/>
@@ -3190,7 +3190,7 @@
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="232"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Tous les fichiers (*)</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="271"/>
@@ -3240,7 +3240,7 @@
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="316"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Fermer</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="316"/>
@@ -3465,7 +3465,7 @@
     <message>
         <location filename="../qml/NetworkSinkSettings.qml" line="60"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Décodeur</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSettings.qml" line="61"/>
@@ -3798,7 +3798,7 @@
     <message>
         <location filename="../qml/OutputPicker.qml" line="417"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/OutputPicker.qml" line="439"/>
@@ -4147,7 +4147,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlayPage.qml" line="693"/>
         <source>%1 dB</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="697"/>
@@ -4187,7 +4187,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlayPage.qml" line="770"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Tous les fichiers (*)</translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="770"/>
@@ -4205,7 +4205,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlaySignalPathCard.qml" line="14"/>
         <source>Signal path</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Trajet du signal</translation>
     </message>
     <message>
         <location filename="../qml/PlaySignalPathCard.qml" line="42"/>
@@ -4369,7 +4369,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../../src/network_controller.cpp" line="362"/>
         <location filename="../../src/network_controller.cpp" line="375"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">aucune</translation>
     </message>
     <message>
         <location filename="../../src/network_controller.cpp" line="363"/>
@@ -4435,7 +4435,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="38"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Tous les fichiers (*)</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="67"/>
@@ -4450,7 +4450,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="97"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Fermer</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="135"/>
@@ -4500,7 +4500,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="186"/>
         <source>Lyric delay</source>
-        <translation type="unfinished"></translation>
+        <translation>Décalage des paroles</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="210"/>
@@ -4515,7 +4515,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="231"/>
         <source>Shows the lyrics later (+) or sooner (-) than the music, on top of the timing in the lyrics file. Nudge it when the words are off against this output.</source>
-        <translation type="unfinished"></translation>
+        <translation>Affiche les paroles plus tard (+) ou plus tôt (-) que la musique, en plus du minutage du fichier de paroles. Ajustez-le lorsque les mots sont décalés par rapport à cette sortie.</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="243"/>
@@ -4656,46 +4656,46 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="582"/>
-        <source>System follows the language the desktop is set to. Applies at once. Hearth&apos;s catalogues carry every string but none are translated yet, so the words stay in English while the layout direction and the typeface follow the language chosen.</source>
-        <translation type="unfinished"></translation>
+        <source>System follows the language the desktop is set to. Applies at once. The Karaoke page, the lyrics and the singer view are translated; the other pages are not yet, so their words stay in English while the layout direction and the typeface follow the language chosen. The translations are machine-made and have not been read by a speaker.</source>
+        <translation>Système suit la langue configurée sur le bureau. S&apos;applique immédiatement. La page Karaoké, les paroles et la vue chanteur sont traduites&#xa0;; les autres pages ne le sont pas encore, leurs mots restent donc en anglais tandis que le sens de la mise en page et la police suivent la langue choisie. Les traductions sont faites par machine et n&apos;ont pas été relues par un locuteur.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="595"/>
+        <location filename="../qml/Settings.qml" line="596"/>
         <source>Diagnostics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="600"/>
+        <location filename="../qml/Settings.qml" line="601"/>
         <source>A text file of what Hearth has done: outputs opened, streams played, sinks found and paired, and every error. Pairing keys, codes and file paths are left out.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="612"/>
+        <location filename="../qml/Settings.qml" line="613"/>
         <source>Save diagnostics…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="613"/>
+        <location filename="../qml/Settings.qml" line="614"/>
         <source>Writes a plain-text support file where you choose. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="621"/>
+        <location filename="../qml/Settings.qml" line="622"/>
         <source>View live…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="622"/>
+        <location filename="../qml/Settings.qml" line="623"/>
         <source>Opens the same report in a window that keeps itself up to date. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="627"/>
+        <location filename="../qml/Settings.qml" line="628"/>
         <source>Copy diagnostics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="628"/>
+        <location filename="../qml/Settings.qml" line="629"/>
         <source>Copies the same report to the clipboard. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4716,7 +4716,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="75"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Lire</translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="77"/>
@@ -4731,7 +4731,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="81"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Décodeur</translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="83"/>
@@ -4746,7 +4746,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="87"/>
         <source>Karaoke</source>
-        <translation type="unfinished"></translation>
+        <translation>Karaoké</translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="90"/>
@@ -4771,7 +4771,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="104"/>
         <source>Lyrics in full screen; Esc leaves it</source>
-        <translation type="unfinished"></translation>
+        <translation>Paroles en plein écran&#xa0;; Échap les quitte</translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="108"/>
@@ -4801,7 +4801,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="129"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Fermer</translation>
     </message>
 </context>
 <context>
@@ -5179,17 +5179,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/TransportBar.qml" line="44"/>
         <source>Previous</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Précédent</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="52"/>
         <source>Pause</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Pause</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="52"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Lire</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="59"/>
@@ -5199,7 +5199,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/TransportBar.qml" line="67"/>
         <source>Next</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Suivant</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="113"/>
@@ -5225,7 +5225,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/TransportBar.qml" line="240"/>
         <source>%1 dB</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 dB</translation>
     </message>
 </context>
 <context>
