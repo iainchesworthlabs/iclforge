@@ -419,6 +419,26 @@ TEST_CASE("passthrough: a link that goes away under a stream is opened again whe
     }
 }
 
+TEST_CASE("passthrough: bursts that cannot be written because the link is gone are counted as dropped",
+          "[sink][passthrough]") {
+    Run run;
+    REQUIRE(run.out.start({.data_type = ac::DataType::kAc3, .sample_rate = 48000}));
+    run.play(10, 600'000, 500'000, 1'000'000);
+    REQUIRE(run.out.counts().dropped == 0);
+
+    // The route goes and stays gone while 20 more bursts are written to the output: none can be
+    // played, and each is counted, so that what was played, late and dropped adds up to what was sent.
+    run.link.lose();
+    run.link.refuse = true;
+    const std::int64_t first_due = run.clock.now + 100'000;
+    run.play(20, first_due, 100'000, first_due + 20 * kPeriodUs + 200'000, 100);
+    const sink::OutputCounts counts = run.out.counts();
+    CHECK(counts.dropped >= 20);
+    // Bursts of the first ten still waiting for their slot when the link went are in that too.
+    CHECK(counts.dropped <= 30);
+    CHECK(counts.units + counts.dropped == 30);
+}
+
 TEST_CASE("passthrough: a clear flushes the link and starts it again from null bursts", "[sink][passthrough]") {
     Run run;
     REQUIRE(run.out.start({.data_type = ac::DataType::kAc3, .sample_rate = 48000}));
