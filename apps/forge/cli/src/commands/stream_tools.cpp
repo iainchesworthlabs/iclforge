@@ -1347,6 +1347,16 @@ int run_transcode(std::string_view in_path, std::string_view out_path, std::uint
     if (*target_codec == plan::Codec::kEac3 && source_meta->mix.has_value()) {
         p.meta.mixmeta = true;
     }
+    // The service type is part of what the programme is, and it travels: a karaoke stream, a voice
+    // over or an associated service transcoded to the other codec stays what it was (it used to
+    // come out "complete main", with the vocals still in the surrounds and no flag). bsmod= names
+    // a different one, and an absent or zero bsmod sends nothing. E-AC-3 writes it inside the
+    // informational group, which infomdat opens, exactly as bsmod= itself does; AC-4 has no bsmod.
+    if (!meta.bsmod.has_value() && !to_ac4 && source_meta->bsmod.has_value() &&
+        *source_meta->bsmod != 0) {
+        p.meta.info.bsmod = static_cast<iclforge::ac3::meta::BitstreamMode>(*source_meta->bsmod);
+        p.meta.infomdat = true;
+    }
     // A compr word the operator did not override is carried across verbatim
     // (TranscodeEncoder::encode stamps it back), which needs compre set in
     // the output - hence a HeavyConfig here even though its own detector's

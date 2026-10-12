@@ -97,7 +97,7 @@ constexpr std::int64_t kLastLineMs = 5000;
 
 }  // namespace
 
-std::string write_lrc(const Lyrics& lyrics) {
+std::string write_lrc(const Lyrics& lyrics, const LrcWriteOptions& options) {
     std::string out;
     const auto tag = [&out](const char* name, const std::string& value) {
         if (!value.empty()) {
@@ -121,7 +121,8 @@ std::string write_lrc(const Lyrics& lyrics) {
                       static_cast<long long>(seconds % 60));
         tag("length", text);
     }
-    for (const LyricLine& line : lyrics.lines) {
+    for (std::size_t index = 0; index < lyrics.lines.size(); ++index) {
+        const LyricLine& line = lyrics.lines[index];
         // A duet's singer comes first on the line, before any text or word tag.
         const std::string_view marker = singer_marker(line.singer);
         if (lyrics.timed) {
@@ -150,6 +151,19 @@ std::string write_lrc(const Lyrics& lyrics) {
             out += line.text;
         }
         out += '\n';
+        // Where the line ends before the next begins, in the hundredths that are written, a time
+        // with no text says so. A line that is itself only a time is not given another.
+        if (options.mark_gaps && lyrics.timed && index + 1 < lyrics.lines.size() &&
+            (!line.text.empty() || line.word_timed())) {
+            const auto centis = [](std::int64_t ms) { return (std::max<std::int64_t>(ms, 0) + 5) / 10; };
+            const LyricLine& next = lyrics.lines[index + 1];
+            if (centis(line.end_ms) > centis(line.start_ms) &&
+                centis(line.end_ms) < centis(next.start_ms)) {
+                out += '[';
+                out += stamp(line.end_ms);
+                out += "]\n";
+            }
+        }
     }
     return out;
 }
