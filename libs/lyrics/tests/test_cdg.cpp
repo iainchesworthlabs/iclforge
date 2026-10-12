@@ -68,12 +68,21 @@ std::string tile(int colour0, int colour1, int row, int column, const std::array
     return packet(xor_tile ? 38 : 6, d);
 }
 
-std::string scroll(bool copy, int fill, int horizontal, int vertical) {
+// A scroll: the command (0 none, 1 right or down, 2 left or up) in bits 5-4 of the two direction
+// bytes and the fine offset in their low bits.
+std::string scroll(bool copy, int fill, int horizontal, int vertical, int fine_x = 0, int fine_y = 0) {
     Data d{};
     d[0] = static_cast<std::uint8_t>(fill);
-    d[1] = static_cast<std::uint8_t>(horizontal << 4);
-    d[2] = static_cast<std::uint8_t>(vertical << 4);
+    d[1] = static_cast<std::uint8_t>((horizontal << 4) | fine_x);
+    d[2] = static_cast<std::uint8_t>((vertical << 4) | fine_y);
     return packet(copy ? 24 : 20, d);
+}
+
+// Define transparent colour, `high` being bits of the data byte above the colour's four.
+std::string transparent(int colour, int high = 0) {
+    Data d{};
+    d[0] = static_cast<std::uint8_t>(high | colour);
+    return packet(28, d);
 }
 
 CdgFile parsed(const std::string& bytes) {
@@ -241,6 +250,145 @@ TEST_CASE("cdg: a scroll moves the picture by a tile, and a copy brings back wha
     top.seek(1000);
     CHECK(top.index_at(0, 204) == 7);
     CHECK(top.index_at(0, 0) == 0);
+}
+
+TEST_CASE("cdg: a scroll's fine offset shows the picture shifted left and up, and moves nothing in memory",
+          "[lyrics][cdg]") {
+    constexpr std::uint32_t kWhite = 0xFFFFFFFFU;
+    constexpr std::uint32_t kBlack = 0xFF000000U;
+    constexpr std::uint32_t kRed = 0xFFFF0000U;
+    Data low{};
+    colour_bytes(low, 1, 15, 0, 0);  // colour 1 is red, 7 is white, 0 stays black
+    colour_bytes(low, 7, 15, 15, 15);
+    // The border is colour 1; a tile of stripes at row 2, column 2 is at x 12 to 17 and y 24 to 35.
+    const std::string drawn = packet(30, low) + preset(0) + border(1) + tile(0, 7, 2, 2, kStripes);
+
+    const CdgFile resting = parsed(drawn);
+    CdgScreen at_rest(resting);
+    at_rest.seek(1000);
+    CHECK(at_rest.fine_scroll_x() == 0);
+    CHECK(at_rest.fine_scroll_y() == 0);
+    const auto still = at_rest.pixels();
+    CHECK(still[24 * 300 + 12] == kWhite);
+    CHECK(still[24 * 300 + 13] == kBlack);
+
+    // An offset of 3 across and 5 down with no tile moved: the display is the memory seen from
+    // (3, 5), so the memory's (12, 24) is at (9, 19), and each line of the stripes with it.
+    const CdgFile offset = parsed(drawn + scroll(false, 0, 0, 0, 3, 5));
+    CdgScreen shifted(offset);
+    shifted.seek(1000);
+    CHECK(shifted.fine_scroll_x() == 3);
+    CHECK(shifted.fine_scroll_y() == 5);
+    const auto moved = shifted.pixels();
+    for (int line = 0; line < 12; ++line) {
+        for (int pixel = 0; pixel < 6; ++pixel) {
+            INFO("line " << line << " pixel " << pixel);
+            CHECK(moved[static_cast<std::size_t>((19 + line) * 300 + 9 + pixel)] ==
+                  (pixel == line % 6 ? kWhite : kBlack));
+        }
+    }
+    // Where the picture was is now another part of it, and the memory itself has not moved.
+    CHECK(moved[24 * 300 + 12] == kBlack);
+    CHECK(shifted.index_at(12, 24) == 7);
+    CHECK(shifted.index_at(13, 24) == 0);
+    // The border is a ring that does not move with the picture inside it.
+    CHECK(moved[0] == kRed);
+    CHECK(moved[100 * 300 + 5] == kRed);
+    CHECK(moved[215 * 300 + 299] == kRed);
+    CHECK(moved[100 * 300 + 294] == kRed);
+    CHECK(moved[100 * 300 + 6] == kBlack);
+
+    // The next scroll command sets the offset again: back to 0 with a tile moved right, the picture
+    // is the memory moved a whole tile and not shifted by the offset it had.
+    const CdgFile stepped = parsed(drawn + scroll(false, 0, 0, 0, 4, 9) + scroll(false, 0, 1, 0, 0, 0));
+    CdgScreen after(stepped);
+    after.seek(1000);
+    CHECK(after.fine_scroll_x() == 0);
+    CHECK(after.fine_scroll_y() == 0);
+    const auto tiled = after.pixels();
+    CHECK(tiled[24 * 300 + 18] == kWhite);
+    CHECK(tiled[24 * 300 + 12] == kBlack);
+
+    // A seek back replays the packets, so the offset goes back with the picture.
+    shifted.seek(0);
+    CHECK(shifted.fine_scroll_x() == 0);
+    CHECK(shifted.fine_scroll_y() == 0);
+}
+
+TEST_CASE("cdg: a fine offset past 5 across or 11 down is read as the largest, inside the memory",
+          "[lyrics][cdg]") {
+    constexpr std::uint32_t kWhite = 0xFFFFFFFFU;
+    constexpr std::uint32_t kBlack = 0xFF000000U;
+    Data low{};
+    colour_bytes(low, 7, 15, 15, 15);
+    // The last tile, row 17 and column 49, at x 294 to 299 and y 204 to 215: its pixel at line 10
+    // is the fifth, the memory's (298, 214), the last the display can reach.
+    const std::string drawn = packet(30, low) + preset(0) + tile(0, 7, 17, 49, kStripes);
+    // Offsets of 7 across and 15 down in the data bits (the format has room for them).
+    const CdgFile file = parsed(drawn + scroll(false, 0, 0, 0, 7, 15));
+    CdgScreen screen(file);
+    screen.seek(1000);
+    CHECK(screen.fine_scroll_x() == 5);
+    CHECK(screen.fine_scroll_y() == 11);
+    const auto pixels = screen.pixels();
+    // The display's last picture pixel is the memory's (298, 214), and the one before it is (297, 214).
+    CHECK(pixels[203 * 300 + 293] == kWhite);
+    CHECK(pixels[203 * 300 + 292] == kBlack);
+    CHECK(pixels[202 * 300 + 293] == kBlack);
+    // Bit 3 of the horizontal byte is not part of its offset (the vertical one uses all four).
+    const CdgFile spare = parsed(drawn + scroll(false, 0, 0, 0, 0x08 | 2, 0));
+    CdgScreen narrow(spare);
+    narrow.seek(1000);
+    CHECK(narrow.fine_scroll_x() == 2);
+}
+
+TEST_CASE("cdg: the transparent colour is left out of the picture wherever it is drawn", "[lyrics][cdg]") {
+    Data low{};
+    colour_bytes(low, 1, 15, 0, 0);  // red
+    colour_bytes(low, 2, 0, 15, 0);  // green
+    const std::string colours = packet(30, low);
+    // Green all over, a border of red, one tile of red on green.
+    const std::string drawn = colours + preset(2) + border(1) + tile(2, 1, 2, 2, kStripes);
+
+    const CdgFile file = parsed(drawn + transparent(2));
+    CdgScreen screen(file);
+    CHECK_FALSE(screen.transparent().has_value());
+    screen.seek(1000);
+    REQUIRE(screen.transparent().has_value());
+    CHECK(*screen.transparent() == 2);
+    // The colour has no alpha and keeps what it was: nothing is over the picture's other colours.
+    CHECK(screen.colour(2) == 0x0000FF00U);
+    CHECK(screen.colour(1) == 0xFFFF0000U);
+    const auto pixels = screen.pixels();
+    CHECK(pixels[100 * 300 + 150] == 0x0000FF00U);
+    CHECK(pixels[24 * 300 + 12] == 0xFFFF0000U);
+    CHECK(pixels[0] == 0xFFFF0000U);
+
+    // A seek back before the instruction has no transparent colour, and the picture is whole again.
+    screen.seek(0);
+    CHECK_FALSE(screen.transparent().has_value());
+    screen.seek(1000);
+    CHECK(screen.transparent().has_value());
+
+    // The index is in the low four bits of the data byte, and the border is as transparent as the
+    // picture when it is that colour: a new definition moves the transparency to red.
+    const CdgFile redefined = parsed(drawn + transparent(2) + transparent(1, 0x30));
+    CdgScreen red(redefined);
+    red.seek(1000);
+    REQUIRE(red.transparent().has_value());
+    CHECK(*red.transparent() == 1);
+    const auto after = red.pixels();
+    CHECK(after[100 * 300 + 150] == 0xFF00FF00U);
+    CHECK(after[24 * 300 + 12] == 0x00FF0000U);
+    CHECK(after[0] == 0x00FF0000U);
+
+    // Loading colours afterwards changes the colour and not which one is transparent.
+    Data blue{};
+    colour_bytes(blue, 2, 0, 0, 15);
+    const CdgFile reloaded = parsed(drawn + transparent(2) + packet(30, blue));
+    CdgScreen later(reloaded);
+    later.seek(1000);
+    CHECK(later.pixels()[100 * 300 + 150] == 0x000000FFU);
 }
 
 TEST_CASE("cdg: the picture follows the position, forward and back, 300 packets a second", "[lyrics][cdg]") {

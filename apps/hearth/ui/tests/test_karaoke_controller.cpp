@@ -99,6 +99,40 @@ QByteArray cdg_disc(int first = 1, int second = 2) {
     return bytes;
 }
 
+// A disc with a red tile (6 by 12 pixels, at x 12 to 17 and y 24 to 35) on green; at one second
+// (packet 300) a scroll that moves no tile and sets the fine offset to 3 across and 5 down; at two
+// seconds (packet 600) green is made the transparent colour.
+QByteArray cdg_offset_disc() {
+    CdgData colours{};
+    colours[2] = 0x3C;
+    colours[3] = 0x00;
+    colours[4] = 0x03;
+    colours[5] = 0x30;
+    QByteArray bytes = cdg_packet(30, colours);
+    bytes += cdg_packet(1, first_byte(2));
+    CdgData tile{};
+    tile[0] = 2;  // clear pixels: green
+    tile[1] = 1;  // set pixels: red
+    tile[2] = 2;  // row
+    tile[3] = 2;  // column
+    for (std::size_t line = 0; line < 12; ++line) {
+        tile[4 + line] = 0x3F;
+    }
+    bytes += cdg_packet(6, tile);
+    for (int i = 3; i < 300; ++i) {
+        bytes += cdg_packet(0);
+    }
+    CdgData offset{};
+    offset[1] = 3;
+    offset[2] = 5;
+    bytes += cdg_packet(20, offset);
+    for (int i = 301; i < 600; ++i) {
+        bytes += cdg_packet(0);
+    }
+    bytes += cdg_packet(28, first_byte(2));
+    return bytes;
+}
+
 }  // namespace
 
 TEST_CASE("KaraokeController: a word-timed file loads as lines and words",
@@ -715,6 +749,41 @@ TEST_CASE("KaraokeController: a CD+G file with no lyrics file is a picture that 
     controller.load(room.path("other.ac3"), 10000);
     CHECK(controller.status().toStdString() == "none");
     CHECK(controller.pictureFrame(500).isNull());
+}
+
+TEST_CASE("KaraokeController: the picture is shifted by a scroll's fine offset and drops the transparent colour",
+          "[hearth][hearth-controller][karaoke][lyrics][cdg]") {
+    Room room;
+    room.write("smooth.cdg", cdg_offset_disc());
+    KaraokeController controller;
+    controller.load(room.path("smooth.ac3"), 10000);
+    REQUIRE(controller.status().toStdString() == "picture");
+
+    // Before the scroll: the tile is where its memory has it, x 12 to 17 and y 24 to 35.
+    const QImage before = controller.pictureFrame(500);
+    REQUIRE_FALSE(before.isNull());
+    CHECK(before.pixel(12, 24) == 0xFFFF0000U);
+    CHECK(before.pixel(17, 35) == 0xFFFF0000U);
+    CHECK(before.pixel(9, 19) == 0xFF00FF00U);
+
+    // The scroll at one second sets the offset: the same tile is seen 3 pixels left and 5 up.
+    const QImage shifted = controller.pictureFrame(1100);
+    CHECK(shifted.pixel(9, 19) == 0xFFFF0000U);
+    CHECK(shifted.pixel(14, 30) == 0xFFFF0000U);
+    CHECK(shifted.pixel(8, 19) == 0xFF00FF00U);
+    CHECK(shifted.pixel(9, 18) == 0xFF00FF00U);
+    CHECK(shifted.pixel(15, 30) == 0xFF00FF00U);
+    CHECK(shifted.pixel(14, 31) == 0xFF00FF00U);
+    // The border does not move with it.
+    CHECK(shifted.pixel(0, 0) == 0xFF000000U);
+
+    // Two seconds in, green is the transparent colour: the picture's green has no alpha, and the
+    // red tile is as opaque as it was.
+    const QImage clear = controller.pictureFrame(2100);
+    CHECK(qAlpha(clear.pixel(100, 100)) == 0);
+    CHECK(clear.pixel(9, 19) == 0xFFFF0000U);
+    // Going back takes the transparency back out: the frame at 1100 ms is the opaque green again.
+    CHECK(controller.pictureFrame(1100).pixel(100, 100) == 0xFF00FF00U);
 }
 
 TEST_CASE("KaraokeController: a lyrics file beside the item is shown in place of a picture",

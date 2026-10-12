@@ -156,6 +156,11 @@ does). Times are kept to a hundredth of a second, which is what the format has.
 An item with no words says so, and takes a text file with a line of the words to a line, saved as
 UTF-8 or UTF-16 (an `.lrc` with no times will do), and times that.
 
+A file that already has word times opens with them as given, solid and not drawn as guesses, so the
+window is where they are checked against the sound and corrected. That is how the output of a forced
+aligner is used: [Timing a song with a forced aligner](../karaoke/forced-alignment.md) makes such a
+file with outside software and brings it here.
+
 ### AC-4
 
 The desktop player plays channel-based, immersive and object AC-4 (A-JOC and direct-coded)

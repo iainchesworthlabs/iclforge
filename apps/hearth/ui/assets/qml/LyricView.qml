@@ -417,7 +417,7 @@ Item {
         objectName: "lyricPicture"
         anchors.fill: parent
         visible: root.status === "picture"
-        controller: KaraokeController
+        source: KaraokeController
         positionMs: root.positionMs
         Accessible.role: Accessible.Graphic
         Accessible.name: qsTr("CD+G picture")

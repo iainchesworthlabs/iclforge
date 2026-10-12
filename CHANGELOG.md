@@ -29,6 +29,18 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth for Android: the plan**
+
+- **A plan, its findings and one screen design for Hearth's three surfaces.** `planning/hearth-android.md`
+  sets out a Sendspin sink app for Android TV that passes the coded stream through to the receiver as
+  the Shield demo does and shows the karaoke lyrics: the requirements, the component boundaries, the
+  project rules, fourteen decisions with a recommendation and a cost each, a phased plan with sizes,
+  the spikes that need a Shield and a receiver, and the questions for the owner.
+  `planning/hearth-android-findings.md` keeps what was read from the code apart from what is
+  not measured, and `planning/hearth-sink-screen.md` is the one design (model, screens, layout in
+  units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
+  are held to. Nothing is built.
+
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
 - **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
@@ -168,6 +180,14 @@ The sections below contain the complete change list and fixes.
   also stops with "the channel layout changes mid-stream" where a stream's layout changes after
   the output was opened, in place of reading past the narrower frame (planning/karaoke-phase2.md,
   W5 and W10).
+- **The karaoke guide has a recipe for timing a song's words with a forced aligner.** [Timing a
+  song with a forced aligner](docs/karaoke/forced-alignment.md) takes a song and its plain lyrics
+  through WhisperX (with Demucs where the vocal has to be separated), both run outside the
+  repository, to an enhanced `.lrc` that Hearth reads and its timing window corrects. It records
+  the versions run, the first-run downloads, the output of one run on a freely licensed
+  recording, and what the aligner got wrong; nothing in the tree depends on either tool. The
+  findings gain E19, the three ways the Forge GUI could offer word timing and what each means for
+  the lyric file it writes (planning/karaoke-phase2-findings.md, decision D13 in the plan).
 - **A sink that decodes a karaoke stream itself applies the part levels.** The Sendspin
   extension's decoder settings take three more keys, `karaoke_melody_db`, `karaoke_vocal1_db` and
   `karaoke_vocal2_db` (-24.0, which is off, to 12.0 dB against Table C.2.3), which a sink lists
@@ -308,6 +328,12 @@ The sections below contain the complete change list and fixes.
   code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
   `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
   (planning/karaoke-phase2.md, W13e).
+- **A MIDI karaoke file counted in SMPTE frames is read.** The reader refused a file whose time
+  division is SMPTE (a frame rate and the ticks in a frame, where the other files count ticks in a
+  quarter note). It now reads the four rates the format defines, 24, 25, 29.97 and 30 frames a
+  second: a tick is a fixed length of time, rounded to the nearest millisecond, and the file's tempo
+  events, which name a quarter note, move nothing. Any other rate is refused with the reason, and a
+  frame of no ticks is a damaged file (planning/karaoke-phase2.md, W13e).
 - **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
   `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
   (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
@@ -344,6 +370,15 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
+  offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
+  dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
+  now shown shifted by the offset the last scroll command set (the border stays a ring, and a value
+  past the largest is read as the largest, so the shift never leaves the memory). Instruction 28,
+  *define transparent colour*, was skipped; the colour it names now has an alpha of 0 in
+  `CdgScreen::pixels()` and `colour()`, so a picture's backdrop shows where the disc meant video to.
+  Both are state of the replay, so a seek back lands where a seek from the start does
+  (`iclforge::lyrics`, `cdg.hpp`; planning/karaoke-phase2.md, W13f).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the
@@ -2846,6 +2881,17 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Shared code**
+
+- **The picture of a CD+G disc is shared code, `apps/shared/cdg-picture`.** Hearth's picture item
+  and the frame cache that was in its `KaraokeController` moved to a project of their own so that
+  Crucible and the Forge GUI can draw a disc as well: `CdgFrames` (a disc as images by position,
+  Qt Gui only), `CdgFrameSource` (what a window asks for a frame, `pictureFrame(key, positionMs)`,
+  and is told changed by `pictureChanged(key)`) and `CdgPicture` (the Qt Quick item, which takes a
+  `source` where it took a `controller`). A program may not use another program, and Crucible's
+  row did not list Hearth, so the item could not be reached where it was. Nothing is drawn or
+  timed differently (planning/karaoke-phase2.md, W13f).
+
 **JSON**
 
 - **An object scene file is read with nlohmann/json, not a hand-written tokenizer.** `iclforge::objects`
@@ -4037,8 +4083,11 @@ The sections below contain the complete change list and fixes.
   that bit never put a pull request in the queue: nine sat green and unmerged, some for six
   days. (Queueing one with that token is no better: GitHub starts no `merge_group` run for the
   entry, which would wait out the 180-minute check timeout.) The workflow now sets the bit with
-  a person's token, the Dependabot secret `MERGE_QUEUE_TOKEN`, and warns when it is not set;
-  `.github/branch-protection.md` says how to create it.
+  a person's token, the Dependabot secret `MERGE_QUEUE_TOKEN`, and fails the job, enabling
+  nothing, when it is not set or has expired: the first version fell back to `GITHUB_TOKEN`
+  with a warning, and a bit set that way is inert and is not replaced by a later run, so five
+  pull requests stayed stuck after the secret was added. `.github/branch-protection.md` says
+  how to create the token.
 - **Every Linux and macOS package shipped without the `ac3cli` man page or any of the
   four shell completions.** They were guarded by `if(CMAKE_CROSSCOMPILING)` on the
   mistaken assumption this meant only the arm64 cross legs — it's set whenever a

@@ -427,6 +427,10 @@ TEST_CASE(
         configured(sink, "5.1");
         settings.decoder.objects = sp::ObjectsPolicy::kAlways;
         sink.intended_settings = settings;
+        // PCM that carries the sink's 5.1: without a 6-channel format the objects are not worth a
+        // fold to 2.0, and the stream is played as its bed.
+        CHECK(choose_sink_form(joc, sink).form == SinkForm::kCoded);
+        sink.pcm_formats.push_back({.channels = 6, .sample_rate = k48k, .bit_depth = 16});
         CHECK(choose_sink_form(joc, sink).form == SinkForm::kPcm);
     }
     SECTION("a stream with no objects is not held to the limit") {
@@ -447,6 +451,24 @@ TEST_CASE(
         configured(no_pcm, "7.1.4");
         no_pcm.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 0;
         CHECK(choose_sink_form(joc, no_pcm).form == SinkForm::kCoded);
+    }
+    SECTION("PCM too narrow for the sink's layout is not worth its objects: the bed, not stereo") {
+        // Every board lists stereo PCM only. A 7.1.4 sink sent 2.0 PCM so that a few objects are
+        // placed would lose its speakers, which is worse than playing the bed in 7.1.4.
+        SinkFacts narrow = hearth_sink({sp::DataType::kEac3}, {2});
+        configured(narrow, "7.1.4");
+        narrow.iclforge_support->max_objects[static_cast<std::size_t>(sp::DataType::kEac3)] = 4;
+        const auto choice = choose_sink_form(joc, narrow);
+        CHECK(choice.form == SinkForm::kCoded);
+        CHECK(mentions(choice.reason, "plays the bed without them"));
+        // Nor is Opus, which is stereo.
+        narrow.codecs = {"pcm", "opus"};
+        narrow.opus_fallback = true;
+        const auto opus = choose_sink_form(joc, narrow, iclforge::hearth::form_policy(narrow));
+        CHECK(opus.form == SinkForm::kCoded);
+        // A sink set to 2.0 has no heights, so its objects were never in question.
+        configured(narrow, "2.0");
+        CHECK(choose_sink_form(joc, narrow).form == SinkForm::kCoded);
     }
 }
 
