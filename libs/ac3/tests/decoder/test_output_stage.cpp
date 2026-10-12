@@ -10,6 +10,7 @@
 #include <numbers>
 #include <optional>
 #include <span>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -21,6 +22,7 @@
 #include "iclforge/ac3/io/metadata_edit.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
+#include "iclforge/base/karaoke.hpp"
 
 // The §7.8 output stage (ac3/decoder/output.hpp): dialnorm normalisation, the
 // three folds, LFE mixing, and §7.7's line and RF operating modes.
@@ -1848,6 +1850,19 @@ std::vector<double> response(const ac3::OutputConfig& config, ac3::Acmod acmod, 
 }
 
 }  // namespace
+
+TEST_CASE("karaoke choice: the names iclforge::ac3 takes are the base library's, not copies",
+          "[decoder][output][karaoke]") {
+    // E1 (planning/karaoke-eac3.md): one definition in iclforge/base/karaoke.hpp, which an AC-4
+    // mapping and the wire's converters read too; the AC-3 names are re-exports of it.
+    static_assert(std::is_same_v<ac3::KaraokeReproduction, iclforge::base::KaraokeReproduction>);
+    static_assert(std::is_same_v<ac3::KaraokeVocals, iclforge::base::KaraokeVocals>);
+    static_assert(ac3::kKaraokeMinLevelDb == iclforge::base::kKaraokeMinLevelDb);
+    static_assert(ac3::kKaraokeMaxLevelDb == iclforge::base::kKaraokeMaxLevelDb);
+    CHECK(ac3::karaoke_gain_from_db(-6.0) == iclforge::base::karaoke_gain_from_db(-6.0));
+    CHECK(ac3::OutputConfig{}.karaoke == iclforge::base::KaraokeReproduction::kOff);
+    CHECK(ac3::OutputConfig{}.karaoke_vocals == iclforge::base::KaraokeVocals::kBoth);
+}
 
 TEST_CASE("karaoke levels: the span and the dB conversion every control and the wire share",
           "[decoder][output][karaoke][releveling]") {
