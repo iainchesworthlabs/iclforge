@@ -46,6 +46,11 @@ The sections below contain the complete change list and fixes.
   `ENCODING_IEC61937` track on the Shield reports its position in steps of about 20 ms, needs 8
   bursts queued to start and 4 to hold, and drifted -0.3 ppm against `CLOCK_MONOTONIC` over 10
   minutes with no underruns; the Shield's HDMI audio route disappears when its display sleeps.
+- **A receiver loses its Dolby lock in half a second of PCM silence and keeps it through null
+  bursts.** Read over the Onkyo's network port while the Shield streamed: silence of 1, 3 or 6 s
+  dropped the lock after about 0.5 s and the receiver took about 0.8 s to return once the bursts
+  resumed; null bursts for 1, 3 or 6 s never dropped it; a cold lock took 1.0 to 1.4 s. The plan's
+  decisions D1 to D14 are accepted as recommended.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 

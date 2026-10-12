@@ -384,8 +384,44 @@ is at least 128 ms and its `required_lead_time_ms` at least 256 ms plus the time
 report (about 300 ms is safe); a sink needs a **smoothed** position, not single samples; and the
 Shield's own link drift is a few ppm at most, so the burst slip that D10 worried about is, on this
 device, rare (even the ±36 ppm bound is a burst every ~15 minutes; the fit says far less). What it
-leaves open: the receiver's relock after silence and after null bursts, and the absolute latency to
-the receiver's output.
+leaves open: the absolute latency to the receiver's output (the relock is [below](#the-receivers-relock-s1-read-over-the-onkyos-network-port)).
+
+### The receiver's relock (S1, read over the Onkyo's network port)
+
+The receiver was **only queried** (eISCP `IFAQSTN` about eight times a second, plus power, input,
+volume and listening-mode reads before and after); no setting command was sent, and its state at the
+end was what it was at the start (powered on, input 05, volume 0, Direct). Its input 05 is *named
+"Shield"* in the receiver's own selector list: it was on the Shield's input throughout, which an
+earlier note of mine misread as "PC". Each run streamed the karaoke AC-3 for 10 s, then a gap, then
+12 s more; times are from the Shield's own event lines to the receiver's reported audio format, each
+with the poll's resolution of about 0.12 s.
+
+| Gap | Lock after the stream starts | Left Dolby after the gap began | Dolby again after the bursts resumed |
+|---|---|---|---|
+| PCM silence, 1 s | 1.05 s | 0.60 s (`N/A`) | 0.88 s |
+| PCM silence, 3 s | 1.39 s | 0.48 s (`N/A`) | 0.75 s |
+| PCM silence, 6 s | 1.26 s | 0.49 s (`N/A`) | 0.89 s |
+| Null bursts, 1 s | 1.26 s | **never** | already there (0.05 s) |
+| Null bursts, 3 s | 1.30 s | **never** | already there (0.16 s) |
+| Null bursts, 6 s | 1.25 s | **never** | already there (0.08 s) |
+
+The format the receiver reports is `HDMI 6, Dolby Audio - DD, 48 kHz, 5.0 ch` while it is locked
+(the karaoke stream is 3/2) and `HDMI 6, PCM, 48 kHz, 2.0 ch` while the Shield idles; between the
+two it says `N/A`. What this settles:
+
+- **Zeros lose the lock; null bursts keep it.** A receiver left PCM silence within about half a
+  second and took about 0.8 s to come back once bursts resumed, whatever the length of the gap from
+  1 to 6 s. With null bursts in the gap it never left Dolby for 6 s. A sink that has to wait to
+  start a stream on time, or to bridge a late chunk, must write null bursts and never zeros
+  ([the plan's "keep the link alive"](hearth-android.md#how-the-audio-is-carried)).
+- **A cold start costs about 1.0 to 1.4 s** from idle PCM to Dolby Digital on the receiver's
+  display. That is the receiver mode change a karaoke song makes under D5(a), and the figure the
+  owner accepted: about a second at the song's start and the same at its end.
+- **A stream that holds the link continuously needs no relock between items**, so keeping a bitstream
+  on the link across songs (null bursts between them) avoids the second at every boundary; that is a
+  design choice for phase 1, and a reason to keep the track open between items.
+- Not measured: whether the sound after a null-burst gap is clean (the receiver's own indicator was
+  the oracle, at volume 0), and the same for E-AC-3.
 
 ### The NDK build (S2)
 
@@ -403,7 +439,6 @@ the receiver's output.
 
 | Item | Why |
 |---|---|
-| The receiver's relock after PCM silence and after null bursts | The Onkyo was on input 05 (PC, analog) at volume 0, so its state did not follow the Shield's stream. Reading its lock over eISCP needs the Shield's HDMI input selected, a setting change on the receiver that was not made unasked. The Shield's own APIs cannot see it |
-| Atmos/JOC lock | The receiver reconstructs objects only from a signed stream, and **no signing key is on this machine** (no worktree asset, no environment variable, no key file; the only copy is the write-only CI secret `ATMOS_SIGNING_KEY`). A sink passes bits through unchanged, so a JOC stream signed on the host would not need the key on the Android side; a locally built demo does |
+| Atmos/JOC lock | The receiver reconstructs objects only from a signed stream. The owner supplied a test key on 2026-10-12 and it is in the demo's gitignored asset path, but no signed JOC stream has been played to the receiver yet. A sink passes bits through unchanged, so a stream signed on the host needs no key on the Android side; a locally built demo does |
 | HOME, standby and reboot (S3), beyond the display-sleep finding | Not run |
 | AC-4 over `ENCODING_IEC61937` | No AC-4 receiver; the route lists no AC-4 profile |
