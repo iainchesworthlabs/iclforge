@@ -502,6 +502,11 @@ network over Improv Wi-Fi, and type `pair forget` or `pair reset`.
 **A board's limits are its own.** The player holds three connections at once. It closes a
 connection that sends a message larger than its largest chunk
 (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES`, 25,600 bytes by default) before storing it.
+A JSON message of more than 512 values (`PlayerConfig::max_json_tokens`, set to
+`kSinkMaxJsonTokens`), five times the 98 of the largest a server sends, is dropped before any
+storage is taken for it: a valid 4 KB text of two thousand one-digit values, which would need one
+32 KB block that a C6 with Wi-Fi up cannot give and whose failure aborts, costs the board its
+count and nothing else.
 A chunk that does not fit the ring between the network and the decoder is dropped and counted.
 A chunk of the wrong type, or a unit that fails to decode, is counted as invalid, and the decoder
 starts again at the next burst. The decoder meets the posture above.
