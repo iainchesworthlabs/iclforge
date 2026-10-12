@@ -1815,6 +1815,32 @@ image is unchanged (5.1 at 0.37, 7.1.4 at 0.72, 0 under), with its internal RAM 
 1.1 KB as `sdkconfig.s3-dcache` says: the decoder places an AC-4 play's allocations of 512 bytes and
 over in PSRAM, which is why the AC-4 plays have the most internal RAM.
 
+**A play's start.** The first chunks of a play are late: the board makes its decoder and decodes its
+first frame while the server's clock runs, so up to 14 of the first chunks are past their time
+when they are looked at. An AC-4 frame depends on the ones before it back to the last I-frame, so a
+chunk dropped for being late (as every late chunk was) cost the stream everything up to the next
+one: 0.74 to 0.90 s of silence in these streams, whose I-frames are 24 frames apart, for chunks that
+were 3 to 7 frames late. The player now decodes a late AC-4 chunk and discards what it decodes to,
+when the decoder would be caught up in a second (each chunk decoded takes 0.57 to 0.76 of a frame's
+time, so the lateness falls by the rest), and drops it as before when it would not. Measured on the
+same board and streams, three rounds, with the first-frame tables of the section above:
+
+| Stream | Silence at the start before | after | Late chunks | Kept | Output's RMS against the host |
+|---|---:|---:|---:|---:|---:|
+| `ac4-stereo-64` | 0.90 s | 5 ms | 0 | 0 | 0.00 dB (was 0.43 dB under) |
+| `ac4-20-music-192` | not measured | 16 ms | 2 | 2 | 0.02 dB |
+| `ac4-ims-film-96-24` | 0.74 s | 43 ms | 2 | 2 | not measured |
+| `ac4-ims-music-128-25` | 0.82 s | 5 to 64 ms | 0 to 14 | 0 to 8 | not measured |
+
+The chunks past what the decoder could catch up on in a second are still dropped (6 of 14 in the
+worst play, which then began 64 ms late). A play that started with a lateness over 0.24 s at the
+S3's ratio of 0.76 is such a one. No play had an invalid chunk. Plays that kept chunks had 1 to 4
+underruns, all in the first 125 chunks, where the plays before had none: the silence they had was
+the wait, which the playout pads and does not count, and a frame decoded late now meets a sink that
+has run dry once or twice at 256 frames (5 ms) each. Two rounds in three lost plays to another
+server taking the board (its status afterwards named `Hearth on Iains-Computer`), and those plays
+are not in the table.
+
 ## What the port required from the library
 
 **A `thread_local` that made the library unlinkable on any RTOS.** `eac3_tools.cpp`'s

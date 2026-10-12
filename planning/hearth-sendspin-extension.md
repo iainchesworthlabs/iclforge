@@ -419,9 +419,15 @@ does not close the connection.
   durations, so the timeline does not drift.
 - Synchronisation corrections are applied to decoded PCM, never to bursts
   ([R9](#playerv1)).
-- A late chunk is dropped before it is decoded, and counted in `late_chunks`. Because a decoder
-  carries state from frame to frame, the sink then treats the next chunk as the start of a stream:
-  it resets the decoder and conceals the gap as its `concealment` setting says.
+- A late chunk is not played, and is counted in `late_chunks`. It is dropped before it is decoded,
+  and because a decoder carries state from frame to frame, the sink then treats the next chunk as
+  the start of a stream: it resets the decoder and conceals the gap as its `concealment` setting
+  says. An AC-4 frame depends on the ones before it back to the last I-frame, which can be a second
+  or more away, so a sink may instead decode a late AC-4 chunk and discard what it decodes to, when
+  its decoder is fast enough to be caught up with the stream within a second: the decoder keeps its
+  state and the audio lost is the chunk's lateness over the share of a frame that decoding leaves
+  free (an ESP32-S3's 0.57 leaves 0.43), where a dropped chunk costs everything up to the next
+  I-frame.
 
 ### Settings
 
