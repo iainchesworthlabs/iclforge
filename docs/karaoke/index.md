@@ -213,10 +213,14 @@ its words: the music in it is not played or read. What is taken:
 - every **syllable** is a word of the line with its own start, from its tick through the file's
   **tempo map** (a tempo change on any track moves every later tick), so the fill moves by syllable. A
   syllable that begins with a space is the start of the next word: the space is joined to the one
-  before it. A line ends where the next begins.
+  before it. A line ends where the next begins;
+- a file whose time is counted in **SMPTE frames** (a frame rate and the ticks in a frame, where the
+  other files count ticks in a quarter note) has a tick of a fixed length, and its tempo events mean
+  nothing: 24, 25, 29.97 and 30 frames a second are the four rates the format defines, and all
+  four are read.
 
-A file whose time is in SMPTE frames, that has no words, or that is cut short says so. A MIDI file
-carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
+A file with no words, that is cut short, or that counts SMPTE frames at some other rate says so. A
+MIDI file carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
 are not guessed at, so a Western karaoke file with accented letters saved in Latin-1 (and Hebrew in
 Windows-1255) is refused with the reason, as an LRC file in a code page is. Plain ASCII is UTF-8, and
 most are.
@@ -248,8 +252,10 @@ the stream is shown in its place, since it is what a word-by-word fill and the d
 
 What is drawn is what the disc's own player draws: the screen preset and the border preset, the
 tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form
-brings back what left), and the 12-bit colour table of 16 colours. The smooth scrolling offsets
-within a tile and the transparent colour are read and not drawn. A packet that is not CD+G is skipped
+brings back what left), the smooth scrolling offsets within a tile (the picture is shown up to 5
+pixels left and 11 up of where its memory has it, which is how a disc scrolls a line a pixel at a
+time), the 12-bit colour table of 16 colours, and the transparent colour (drawn as the backdrop, which
+is black: there is no video here for it to show). A packet that is not CD+G is skipped
 and keeps its place in time, and a file that is not a whole number of 24-byte packets, or has no
 CD+G packet in it, is refused with the reason (playback is not affected). The packets are not checked
 for parity: a rip has already been through the drive's error correction.
@@ -337,9 +343,10 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
 - **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
   (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
   player do not offer them.
-- **Finding the times of a file's words.** Hearth's timing window ([Timing the
-  lyrics](../hearth/index.md#timing-the-lyrics)) takes them from your presses, and an estimate by
-  the letters of a word is only where a press starts from; nothing here aligns words to the sound.
+- **Aligning words to the sound.** Hearth's timing window ([Timing the
+  lyrics](../hearth/index.md#timing-the-lyrics)) takes word times from your presses, and an estimate
+  by the letters of a word is only where a press starts from. A forced aligner is outside software,
+  and [Timing a song with a forced aligner](forced-alignment.md) runs one and reads its result in.
 - **Reading a lyrics file in a code page.** UTF-8 and UTF-16 are read; Latin-1, Windows-1255 and the
   other 8-bit encodings are named and not guessed at. A MIDI karaoke file has no way to say its
   encoding, so its words must be UTF-8.

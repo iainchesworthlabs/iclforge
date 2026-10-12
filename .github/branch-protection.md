@@ -242,10 +242,14 @@ hold up the entries behind it. The workflow therefore reads the secret
 - Store it under **Settings → Secrets and variables → Dependabot** as
   `MERGE_QUEUE_TOKEN`. A Dependabot-triggered run reads that store, not the
   Actions one.
-- Without it the job warns (`MERGE_QUEUE_TOKEN is not set`) and falls back to
-  `GITHUB_TOKEN`, so the PR stays unmerged. When the token expires the same
-  warning appears or `gh pr merge` fails: a run of Dependabot PRs that stop
-  merging means rotating it.
+- Without it the job fails (`MERGE_QUEUE_TOKEN is not set`) and enables nothing,
+  so the PR shows a red **Enable auto-merge** check instead of sitting green and
+  unmerged. `GITHUB_TOKEN` is never used as a fallback: the bit it sets is inert,
+  and `gh pr merge --auto` does not replace a bit that is already set, so a PR
+  that took the fallback stays stuck after the secret is added. When the token
+  expires `gh pr merge` fails the same way: a run of red **Enable auto-merge**
+  checks on Dependabot PRs means rotating it, and then re-running the failed
+  jobs.
 
 A conflict is Dependabot's to rebase (`rebase-strategy` in
 `.github/dependabot.yml`), and the push runs the gate and this workflow again.

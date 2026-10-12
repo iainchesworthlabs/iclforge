@@ -519,8 +519,8 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.dir = Path(self._tmp.name)
 
-    def write(self, stem, rows, commit="c0ffee"):
-        stamped = [{"commit": commit, "commit_date": "2026-09-30T00:00:00Z", **r} for r in rows]
+    def write(self, stem, rows, commit="c0ffee", date="2026-09-30T00:00:00Z"):
+        stamped = [{"commit": commit, "commit_date": date, **r} for r in rows]
         (self.dir / f"{stem}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in stamped))
 
     def fixture(self):
@@ -550,13 +550,16 @@ class SiteScriptsRenderTest(unittest.TestCase):
             {"codec": "ac4", "leg": "ac4-20-music-192", "mos_lqo": 4.71, "bitrate_kbps": 192},
             {"codec": "ac4", "leg": "ac4-514-music-768", "mos_lqo": 4.68, "bitrate_kbps": 768}])
 
-    def render(self, *flags):
+    def render_json(self, *flags):
         # UTF-8 explicitly: the harness prints a multiplication sign and en dashes, and a
         # Windows locale would read them as cp1252.
         done = subprocess.run(["node", str(self.HARNESS), str(self.dir), "--json", *flags],
                               capture_output=True, encoding="utf-8", check=False, timeout=60)
         self.assertEqual(done.returncode, 0, done.stderr)
-        return {card["title"]: card for card in json.loads(done.stdout)["cards"]}
+        return json.loads(done.stdout)
+
+    def render(self, *flags):
+        return {card["title"]: card for card in self.render_json(*flags)["cards"]}
 
     def badge_messages(self):
         buf = io.StringIO()
@@ -707,6 +710,52 @@ class SiteScriptsRenderTest(unittest.TestCase):
                 accuracy = {line["codec"]: line["what"]
                             for line in cards["Decode accuracy"]["lines"]}
                 self.assertRegex(accuracy["AC-4"], r"of 1 Dolby streams")
+
+    def test_a_line_from_an_older_commit_says_which_commit_and_day(self):
+        """The series are written by different jobs: AC-4's decode scores had no row for ten days
+        while the footer said the page was updated on every merge, and nothing on the card said
+        its AC-4 figure was that old."""
+        self.fixture()
+        self.write("ac4-quality-main", [
+            {"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72},
+            {"leg": "ac4-ims-music-64-2997", "min_snr_db": 16.67, "mos_lqo": 4.39}],
+            commit="dd67c646a0b1c2d3", date="2026-09-20T06:26:42Z")
+        self.write("external-comparison-main", [
+            {"codec": "eac3", "leg": "eac3-51-256", "variant": "spx", "mos_lqo": 2.38}],
+            commit="5c21b117ffffffff", date="2026-09-25T21:25:24Z")
+        self.write("ac4-encode-quality-main", [
+            {"codec": "ac4", "leg": "ac4-20-music-192", "mos_lqo": 4.71, "bitrate_kbps": 192}],
+            commit="24f0bf1f0aaaaaaa", date="2026-09-22T10:00:00Z")
+        note = "Last recorded on dd67c646, 2026-09-20."
+        surfaces = (((), "Listening quality"), (("--page",), "Predicted listening quality"))
+        for flags, listening in surfaces:
+            with self.subTest(surface="page" if flags else "strip"):
+                cards = self.render(*flags)
+                accuracy = {line["codec"]: line["what"]
+                            for line in cards["Decode accuracy"]["lines"]}
+                self.assertIn(note, accuracy["AC-4"])
+                # AC-3 and E-AC-3 are the gold-reference gate's rows, from the newest commit.
+                self.assertNotIn("Last recorded", accuracy["AC-3"])
+                self.assertNotIn("Last recorded", accuracy["E-AC-3"])
+                for title in ("Speed", "Allocation per frame", "Live growth"):
+                    for line in cards[title]["lines"]:
+                        self.assertNotIn("Last recorded", line["what"], title)
+                lines = {line["codec"]: line["what"] for line in cards[listening]["lines"]}
+                self.assertIn("Last recorded on 5c21b117, 2026-09-25.", lines["E-AC-3"])
+                # AC-4's listening line is the encoder's own series, dated by its own commit
+                # and not by the tool comparison's.
+                self.assertIn("Last recorded on 24f0bf1f, 2026-09-22.", lines["AC-4"])
+                # A codec with no figure has nothing to date.
+                self.assertEqual(lines["AC-3"], "No measurement recorded.")
+
+    def test_the_page_footer_names_the_newest_commit_of_any_series(self):
+        self.fixture()
+        self.write("ac4-quality-main",
+                   [{"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72}],
+                   commit="dd67c646a0b1c2d3", date="2026-10-20T06:26:42Z")
+        asof = self.render_json("--page")["asof"]
+        self.assertIn("dd67c646", asof)
+        self.assertNotIn("Updated on every merge", asof)
 
     def test_a_codec_with_no_rows_says_so_on_its_own_line(self):
         self.fixture()

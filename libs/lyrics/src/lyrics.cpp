@@ -604,6 +604,36 @@ struct MidiSyllable {
     std::string text;
 };
 
+// A SMPTE time division: the ticks in one second, as a fraction (the frame rate times the ticks in
+// a frame, over the 1001 that the drop-frame rate divides by), so that no rounding is done until a
+// time is asked for.
+struct SmpteTicks {
+    std::uint64_t per_second_numerator = 1;
+    std::uint64_t per_second_denominator = 1;
+};
+
+// The division word's high byte is the frame rate as a negative number (two's complement) and its
+// low byte the ticks in a frame. Four rates are defined: 24, 25, 30, and "29", which is the
+// 29.97 frames a second of NTSC (30000/1001). Anything else, and a frame of no ticks, is nothing.
+[[nodiscard]] std::optional<SmpteTicks> smpte_ticks_of(std::uint32_t division) {
+    const std::uint64_t ticks_per_frame = division & 0xFFU;
+    if (ticks_per_frame == 0) {
+        return std::nullopt;
+    }
+    const std::uint32_t frames_negated = (0x100U - ((division >> 8U) & 0xFFU)) & 0xFFU;
+    switch (frames_negated) {
+        case 24:
+        case 25:
+        case 30:
+            return SmpteTicks{.per_second_numerator = frames_negated * ticks_per_frame,
+                              .per_second_denominator = 1};
+        case 29:
+            return SmpteTicks{.per_second_numerator = 30000U * ticks_per_frame, .per_second_denominator = 1001};
+        default:
+            return std::nullopt;
+    }
+}
+
 [[nodiscard]] bool equals_nocase(std::string_view a, std::string_view b) {
     return lowercase(a) == lowercase(b);
 }
@@ -1205,10 +1235,23 @@ std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
     if (!reader.ok || header_length < 6) {
         return std::unexpected(damaged);
     }
-    if ((division & 0x8000U) != 0) {
-        return std::unexpected(std::string{"The MIDI file counts time in SMPTE frames, which is not read."});
-    }
-    if (division == 0) {
+    // The time division is either ticks per quarter note (the tempo events then say how long a
+    // quarter is) or, with the top bit set, a frame rate and the ticks in a frame, which is a
+    // fixed length of time with no tempo in it.
+    const bool smpte = (division & 0x8000U) != 0;
+    SmpteTicks smpte_ticks;
+    if (smpte) {
+        const std::optional<SmpteTicks> read = smpte_ticks_of(division);
+        if (!read) {
+            // (A frame rate that is not one of the four, or a frame of no ticks.)
+            return std::unexpected(
+                (division & 0xFFU) == 0
+                    ? damaged
+                    : std::string{"The MIDI file counts time in SMPTE frames at a rate this reader does not "
+                                  "know (24, 25, 29.97 and 30 frames a second are read)."});
+        }
+        smpte_ticks = *read;
+    } else if (division == 0) {
         return std::unexpected(damaged);
     }
     reader.at = 8 + header_length;
@@ -1310,8 +1353,17 @@ std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
     std::stable_sort(tempos.begin(), tempos.end(),
                      [](const MidiTempo& a, const MidiTempo& b) { return a.tick < b.tick; });
 
-    // Milliseconds from a tick: the time of each stretch at its own tempo.
+    // Milliseconds from a tick: in SMPTE time a tick is a fixed length (and a tempo event, which
+    // names a quarter note, means nothing); otherwise the time of each stretch at its own tempo.
     const auto to_ms = [&](std::uint64_t tick) -> std::int64_t {
+        if (smpte) {
+            // Whole seconds apart from the remainder, so that no tick count overflows.
+            const std::uint64_t per_second = smpte_ticks.per_second_numerator;
+            const std::uint64_t scale = 1000U * smpte_ticks.per_second_denominator;
+            const std::uint64_t whole = tick / per_second;
+            const std::uint64_t rest = tick % per_second;
+            return static_cast<std::int64_t>(whole * scale + (rest * scale + per_second / 2) / per_second);
+        }
         std::uint64_t micros = 0;
         std::uint64_t previous = 0;
         std::uint64_t tempo = 500000;

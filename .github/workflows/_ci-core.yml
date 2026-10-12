@@ -1067,11 +1067,17 @@ jobs:
       # runner.temp names the host's path, which a step inside the container
       # writes somewhere upload-artifact never looks.
       - name: AC-4 decode against DEE's sources (level, SNR floors, lag)
+        id: ac4-decode-score
         run: |
           python3 tools/checks/score_ac4_decode.py --cli build/config-linux-llvm/bin/forge \
             --json-out ac4-quality/ac4-decode-quality.json
 
+      # After a scorer that FAILED too: score_ac4_decode.py writes --json-out before it
+      # exits non-zero on a floor, so a breach is a measurement like any other, and the
+      # trend is where a dip is seen. Not after a scorer that never ran (an earlier step
+      # failed): there is no file, and a second red step would only repeat the first.
       - name: Upload AC-4 decode quality results
+        if: ${{ !cancelled() && steps.ac4-decode-score.outcome != 'skipped' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ac4-quality-decode-linux-llvm
@@ -1106,11 +1112,15 @@ jobs:
       # appends to ac4-encode-quality-<branch>.jsonl: the series behind the
       # AC-4 line of the Listening quality card.
       - name: AC-4 encode, decoded against its sources (SNR, LSD and ViSQOL floors)
+        id: ac4-encode-score
         run: |
           python3 tools/checks/score_ac4_encode.py --cli build/config-linux-llvm/bin/forge \
             --json-out ac4-quality/ac4-encode-quality.json
 
+      # After a scorer that FAILED too, for the reason the decode upload above gives:
+      # score_ac4_encode.py writes --json-out before it exits non-zero.
       - name: Upload AC-4 encode quality results
+        if: ${{ !cancelled() && steps.ac4-encode-score.outcome != 'skipped' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ac4-quality-encode-linux-llvm
@@ -1376,11 +1386,28 @@ jobs:
   # tools/ci/append_external_comparison_history.py is stdlib-only, and
   # testdata/external-baseline/manifest.json (the FFmpeg/DEE numbers to
   # diff against) is a committed file the checkout below already has.
+  #
+  # It runs after a FFmpeg Validate that FAILED, not only one that passed. The
+  # job is one long list of gates and the scoring steps sit among them, so a
+  # measurement does not depend on every gate passing: on 2026-10-11
+  # the nightly scored all 24 AC-4 encode legs and 10 decode streams,
+  # uploaded them, and then failed a coverage check three steps later, which
+  # skipped this job and threw the points away. That was the first night anything
+  # could write the AC-4 encode series, which has no row yet. What a failed run
+  # still has is only what its uploads hold, so every download
+  # below that a failed run may lack is tolerated there (continue-on-error is
+  # off on a run that passed, where a missing artifact is a real fault) and
+  # every append that needs one runs only when it arrived.
   persist-external-comparison-trend:
     name: Publish external-encoder landscape trend
     needs: ffmpeg-validate
     # A push to main, or the nightly run, which is where FFmpeg Validate runs now.
-    if: (github.event_name == 'push' || github.event_name == 'schedule') && github.ref == 'refs/heads/main'
+    # Passed or failed, not skipped (tier t2) and not cancelled (it gave way to a
+    # newer run, and a cancelled one has no artifact worth a commit).
+    if: >-
+      !cancelled() &&
+      (needs.ffmpeg-validate.result == 'success' || needs.ffmpeg-validate.result == 'failure') &&
+      (github.event_name == 'push' || github.event_name == 'schedule') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1396,7 +1423,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # The landscape trend is computed by one of the LAST steps of FFmpeg
+      # Validate, so a run that failed earlier has none: tolerated there, and
+      # the append below then does not run. A run that passed has it, and a
+      # missing one fails here as it always did.
       - name: Download landscape trend
+        continue-on-error: ${{ needs.ffmpeg-validate.result != 'success' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: external-encoder-landscape-trend
@@ -1406,8 +1438,9 @@ jobs:
       # spectrograms into history" below), but downloaded unconditionally -
       # harmless on a non-main run, and keeps this step identical regardless
       # of branch rather than adding an `if` two different ways to the same
-      # artifact.
+      # artifact. Tolerated on a failed run for the reason above.
       - name: Download quality spectrograms
+        continue-on-error: ${{ needs.ffmpeg-validate.result != 'success' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: quality-spectrograms
@@ -1463,8 +1496,11 @@ jobs:
             git commit -q --allow-empty -m "Initialize quality-history branch"
           fi
 
+      # On a run that passed it always runs, and a missing trend.json fails it
+      # as before. On a run that failed it runs only when the trend arrived.
       - name: Append external-comparison history
         id: append
+        if: needs.ffmpeg-validate.result == 'success' || hashFiles('results/trend.json') != ''
         shell: bash
         env:
           BRANCH: ${{ github.ref_name }}
@@ -1537,7 +1573,9 @@ jobs:
       # per-release image history, only "latest", which is what
       # docs/landscape.md's img tags read.
       - name: Copy quality spectrograms into history
-        if: github.ref == 'refs/heads/main'
+        if: >-
+          github.ref == 'refs/heads/main' &&
+          (needs.ffmpeg-validate.result == 'success' || hashFiles('results/spectrograms/*.png') != '')
         shell: bash
         run: |
           set -euo pipefail
@@ -1650,6 +1688,9 @@ jobs:
     name: Publish object-reconstruction quality trend
     needs: ffmpeg-validate
     # A push to main, or the nightly run, which is where FFmpeg Validate runs now.
+    # Only after one that PASSED, unlike persist-external-comparison-trend above:
+    # its scores come from the last step of that job, so a run that failed has none
+    # to publish and there is nothing a looser condition would save.
     if: (github.event_name == 'push' || github.event_name == 'schedule') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

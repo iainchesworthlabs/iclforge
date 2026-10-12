@@ -7,7 +7,9 @@ append-only histories.
 Each card has one line per codec (AC-3, E-AC-3, and AC-4). A figure is the worst case among that
 codec's own workloads, except on the listening-quality card, which gives the range, and the
 workload it comes from is named beside it. The figures of two codecs come from different workloads
-and do not compare with each other. The speed and allocation series cover all three codecs and the
+and do not compare with each other. Each series is written by its own job, so a line recorded on
+an older commit than the one named under the cards says which commit and day it was recorded on.
+The speed and allocation series cover all three codecs and the
 Atmos object layer. AC-4's decode quality is a series of its own on
 [Quality trend](quality-trend.md#ac-4-decode-quality) with no per-channel floors yet, so its figure
 has no colour. The listening-quality card scores the encoders of all three codecs: AC-3 and E-AC-3
@@ -487,6 +489,29 @@ ceiling) fails the build rather than merely being recorded.
     const rate = parts.length > 1 && /^\d+$/.test(parts[parts.length - 1]) ? `${parts.pop()} kbps` : null;
     return [parts.map((p) => (has(LEG_LAYOUTS, p) ? LEG_LAYOUTS[p] : p)).join(" "), rate].filter(Boolean).join(", ");
   }
+
+  // Each series is a file of its own, written by its own job, so two cards, or two lines of one,
+  // can be from different commits: speed, memory and the gold-reference gate follow each merge,
+  // while the AC-4 decode scores, the encoders' listening scores and the tool comparison follow
+  // the nightly scoring run. `series` is newestCommitRows() of one history file and `latest` is
+  // the newest of all of them. A line from an older commit than that says which commit and day
+  // it was recorded on, so an old figure does not read as the latest one. Nothing for a series
+  // that is the newest, or one that has no commit to name.
+  function recordedNote(series, latest) {
+    if (!series || !latest || !series.commit || series.commit === latest.commit) return "";
+    const day = Number.isNaN(Date.parse(series.date)) ? "" : new Date(series.date).toISOString().slice(0, 10);
+    return ` <em>Last recorded on <code>${esc(String(series.commit).slice(0, 8))}</code>${day ? ", " + day : ""}.</em>`;
+  }
+
+  // The series whose newest commit is the most recent, by the date that commit was made.
+  function newestSeries(all) {
+    let best = null;
+    for (const s of all) {
+      if (!s || !s.commit || Number.isNaN(Date.parse(s.date))) continue;
+      if (!best || Date.parse(s.date) > Date.parse(best.date)) best = s;
+    }
+    return best;
+  }
   // <<< measurement summary
 
   function rawUrl(file) {
@@ -555,7 +580,7 @@ ceiling) fails the build rather than merely being recorded.
   const noLine = (codec, what) => line(codec, "&mdash;", "", what || NO_MEASUREMENT);
   const code = (s) => `<code>${esc(s)}</code>`;
 
-  function speedCard(rows) {
+  function speedCard(rows, noteFor = () => "") {
     const picked = slowestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyCard("Speed");
     const timed = rows.filter((r) => isNumber(r.ms_per_frame) && r.ms_per_frame > 0);
@@ -563,7 +588,7 @@ ceiling) fails the build rather than merely being recorded.
       const e = picked[codec];
       return e ? line(codec, formatMultiple(e.times) + "&times;", "",
         `${esc(e.words)} (${code(e.config)}) on ${code(e.leg)}: ${e.ms.toFixed(3)} ms/frame ` +
-        `against a ${round2(e.budget)} ms frame.`) : noLine(codec);
+        `against a ${round2(e.budget)} ms frame.${noteFor(codec)}`) : noLine(codec);
     });
     // 1x is the line that means something - below it the codec cannot keep up
     // with playback. Anything above is headroom, and how much headroom is
@@ -576,7 +601,7 @@ ceiling) fails the build rather than merely being recorded.
       ok ? OK : WATCH);
   }
 
-  function qualityCard(rows, ac4Rows) {
+  function qualityCard(rows, ac4Rows, noteFor = () => "") {
     // Least headroom over the gate, again worst-case: one leg sitting on its
     // floor matters more than four sitting well above it.
     const gated = tightestPerCodec(rows);
@@ -592,14 +617,14 @@ ceiling) fails the build rather than merely being recorded.
         return line(codec, oneDecimal(g.value), "dB",
           `${esc(g.words)}${channel}, on ${code(g.leg)} (check ${code(g.check)}): ` +
           `${g.headroom.toFixed(1)} dB above its own ${oneDecimal(g.floor)} dB floor, scored against ${g.against}. ` +
-          "Every channel is gated separately.", g.headroom < 0);
+          "Every channel is gated separately." + noteFor(codec), g.headroom < 0);
       }
       if (codec === "AC-4" && ac4 && ac4.snr !== null) {
         const mos = ac4.mos !== null
           ? ` MOS-LQO ${twoDecimals(ac4.mos)}&ndash;${twoDecimals(ac4.mosBest)}, lowest ${code(ac4.mosLeg)}.` : "";
         return line(codec, oneDecimal(ac4.snr), "dB",
           `Lowest minimum SNR of ${ac4.streams} Dolby streams, ${code(ac4.snrLeg)}, scored against the ` +
-          `sources they were encoded from. No per-channel floor is recorded yet.${mos}`);
+          `sources they were encoded from. No per-channel floor is recorded yet.${mos}${noteFor(codec)}`);
       }
       return noLine(codec);
     });
@@ -610,7 +635,7 @@ ceiling) fails the build rather than merely being recorded.
       lines, "The colour is the smallest margin over a channel's own floor. Nothing here measures perceived audio quality.", badge);
   }
 
-  function listeningCard(rows) {
+  function listeningCard(rows, noteFor = () => "") {
     const picked = listeningPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyCard("Predicted listening quality");
     const lines = CODECS.map((codec) => {
@@ -620,7 +645,7 @@ ceiling) fails the build rather than merely being recorded.
         : `${twoDecimals(p.low.mos_lqo)}&ndash;${twoDecimals(p.high.mos_lqo)}`;
       return line(codec, range, "MOS-LQO",
         `${p.count} encoder measurements on ${p.legs.size} legs. Lowest is ${code(p.low.leg)} ` +
-        `(${esc(legWords(p.low.leg))}${p.low.variant ? `, tool set ${code(p.low.variant)}` : ""}).`);
+        `(${esc(legWords(p.low.leg))}${p.low.variant ? `, tool set ${code(p.low.variant)}` : ""}).${noteFor(codec)}`);
     });
     // NO badge, deliberately - not an unknown one. A low-bitrate leg is
     // SUPPOSED to score lower, so any absolute floor here would flag the
@@ -632,13 +657,13 @@ ceiling) fails the build rather than merely being recorded.
       "its programme legs at default options: the synthetic test signals are gated in CI and not counted here.", null);
   }
 
-  function allocationCard(rows) {
+  function allocationCard(rows, noteFor = () => "") {
     const picked = heaviestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyCard("Allocation per frame");
     const lines = CODECS.map((codec) => {
       const e = picked[codec];
       return e ? line(codec, round0(e.value / 1024), "KB",
-        `${esc(e.words)} (${code(e.config)})${isNumber(e.allocs) ? `: ${round0(e.allocs)} allocations a frame` : ""}.`) : noLine(codec);
+        `${esc(e.words)} (${code(e.config)})${isNumber(e.allocs) ? `: ${round0(e.allocs)} allocations a frame` : ""}.${noteFor(codec)}`) : noLine(codec);
     });
     // NO badge: nothing gates allocator traffic, so there is no line to borrow.
     return card("Allocation per frame", "Bytes requested from the heap per frame: the heaviest workload of each codec.", lines,
@@ -646,7 +671,7 @@ ceiling) fails the build rather than merely being recorded.
       "and is held by none. What stays in memory is live growth.", null);
   }
 
-  function growthCard(rows) {
+  function growthCard(rows, noteFor = () => "") {
     const picked = mostRetainingPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyCard("Live growth");
     const windows = [...new Set(Object.values(picked).filter((e) => isNumber(e.frames)).map((e) => e.frames - 1))];
@@ -655,7 +680,7 @@ ceiling) fails the build rather than merely being recorded.
       const e = picked[codec];
       const over = e && e.value >= MEMORY_RETENTION_WARN_BYTES;
       return e ? line(codec, oneDecimal(e.value / 1024), "KiB",
-        `${esc(e.words)} (${code(e.config)})${over ? ", over the 4 KiB line" : ""}.`, over) : noLine(codec);
+        `${esc(e.words)} (${code(e.config)})${over ? ", over the 4 KiB line" : ""}.${noteFor(codec)}`, over) : noLine(codec);
     });
     // steady_live_growth is the bytes still held live after the steady-state frames. NOT
     // "> 0 means a leak": append_memory_history.py warns at 4 KiB and hard-fails at 1 MiB, so
@@ -705,25 +730,31 @@ ceiling) fails the build rather than merely being recorded.
     const n = newestCommitRows(ac4Encode);
     const m = newestCommitRows(memory);
 
+    // The newest commit of any series. A line from an older one says so (recordedNote): the
+    // series are written by different jobs on different cadences, and any one of them can be
+    // absent or behind on a given commit.
+    const latest = newestSeries([p, q, a, e, n, m]);
+    const since = (series) => () => recordedNote(series, latest);
+
     target.innerHTML = [
-      guarded("Speed", () => speedCard(p.rows)),
-      guarded("Decode accuracy", () => qualityCard(q.rows, a.rows)),
+      guarded("Speed", () => speedCard(p.rows, since(p))),
+      // Two series: the gold-reference gate (AC-3, E-AC-3) and AC-4's decode scores, each its
+      // own newest commit.
+      guarded("Decode accuracy", () => qualityCard(q.rows, a.rows,
+        (codec) => recordedNote(codec === "AC-4" ? a : q, latest))),
       // Two series, each its own newest commit: the AC-3 and E-AC-3 tool comparison, and the
       // AC-4 encoder's own. A row says its codec, so the card files each under its own line.
-      guarded("Predicted listening quality", () => listeningCard(e.rows.concat(n.rows))),
-      guarded("Allocation per frame", () => allocationCard(m.rows)),
-      guarded("Live growth", () => growthCard(m.rows)),
+      guarded("Predicted listening quality", () => listeningCard(e.rows.concat(n.rows),
+        (codec) => recordedNote(codec === "AC-4" ? n : e, latest))),
+      guarded("Allocation per frame", () => allocationCard(m.rows, since(m))),
+      guarded("Live growth", () => growthCard(m.rows, since(m))),
     ].join("");
 
-    // Whichever series has a date - they are all written by the same run, but
-    // any one of them can be absent on a given commit.
-    const stamp = [p, q, e, m].map((x) => x.date).filter(Boolean).sort().pop();
-    const sha = [p, q, e, m].map((x) => x.commit).filter(Boolean)[0];
-    if (stamp && sha) {
+    if (latest) {
       document.getElementById("pq-asof").innerHTML =
         `Latest measurement on <code>main</code>: ` +
-        `<a href="https://github.com/${REPO}/commit/${sha}">${sha.slice(0, 8)}</a>, ` +
-        `${new Date(stamp).toLocaleString()}. Updated on every merge.`;
+        `<a href="https://github.com/${REPO}/commit/${esc(latest.commit)}">${esc(String(latest.commit).slice(0, 8))}</a>, ` +
+        `${new Date(latest.date).toLocaleString()}. A line recorded on an older commit says which.`;
     }
   }
 
