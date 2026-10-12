@@ -1,10 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -173,12 +175,21 @@ TEST_CASE("find_cdg_beside: the name.cdg beside an item, in any case", "[app-cdg
         out << disc();
     }
 
+    // The spelling it reports can be the one it asked for rather than the one on disk (a
+    // case-insensitive file system finds `SHOUT.cdg` for `SHOUT.CDG`), so only the name is held.
+    const auto lowered = [](const std::optional<fs::path>& found) {
+        std::string name = found->filename().string();
+        for (char& c : name) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        return name;
+    };
     const auto lower = iclforge::apps::find_cdg_beside((folder / "disc.mp3").string());
     REQUIRE(lower.has_value());
-    CHECK(lower->filename().string() == "disc.cdg");
+    CHECK(lowered(lower) == "disc.cdg");
     const auto upper = iclforge::apps::find_cdg_beside((folder / "SHOUT.ac3").string());
     REQUIRE(upper.has_value());
-    CHECK(upper->filename().string() == "SHOUT.CDG");
+    CHECK(lowered(upper) == "shout.cdg");
     // Nothing beside an item with no disc, and nothing for an empty path.
     CHECK_FALSE(iclforge::apps::find_cdg_beside((folder / "other.mp3").string()).has_value());
     CHECK_FALSE(iclforge::apps::find_cdg_beside("").has_value());
