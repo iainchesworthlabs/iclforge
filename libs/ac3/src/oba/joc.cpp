@@ -20,6 +20,7 @@
 #include "iclforge/ac3/core/mdct.hpp"
 #include "iclforge/dsp/qmf.hpp"
 #include "iclforge/ac3/detail/decode_scalar.hpp"
+#include "iclforge/ac3/detail/profile.hpp"
 #include "iclforge/base/detail/profiling.hpp"
 #include "iclforge/ac3/oba/joc_tables.hpp"
 #include "iclforge/objects/joc_domain.hpp"
@@ -392,12 +393,24 @@ void forward_512(std::span<const recon_scalar_t, 512> windowed,
         mdct512_forward(windowed, coeffs);
         return;
     }
-    std::array<double, 512> wide{};
-    std::array<double, 256> narrow{};
-    std::ranges::copy(windowed, wide.begin());
-    mdct512_forward(wide, narrow, /*fast=*/false);
-    for (std::size_t i = 0; i < narrow.size(); ++i) {
-        coeffs[i] = static_cast<recon_scalar_t>(narrow[i]);
+    if constexpr (internal::kReferenceTransformAvailable) {
+        std::array<double, 512> wide{};
+        std::array<double, 256> narrow{};
+        std::ranges::copy(windowed, wide.begin());
+        mdct512_forward(wide, narrow, /*fast=*/false);
+        for (std::size_t i = 0; i < narrow.size(); ++i) {
+            coeffs[i] = static_cast<recon_scalar_t>(narrow[i]);
+        }
+    } else {
+        // A profile with no direct form (profile.hpp) cannot be asked for it: the transform
+        // the double entry point would have run here is the stub's, which asserts and fills
+        // zeros, and that is what this does without naming the double transform. Naming it
+        // kept 8,928 bytes of its tables (mdct.cpp's fast_mdct_tables<512, double> and
+        // twiddles<double>) in the minimum-footprint image's .bss, for a branch that
+        // cannot run there and a stream (Atmos object reconstruction in the MDCT domain)
+        // that a part which plays the bed never takes.
+        assert(false && "direct-form MDCT is absent from this build (ICLFORGE_MINIMAL_DECODER)");
+        std::ranges::fill(coeffs, recon_scalar_t{0});
     }
 }
 
@@ -407,12 +420,19 @@ void inverse_512(std::span<const recon_scalar_t, 256> coeffs,
         imdct512_windowed(coeffs, x);
         return;
     }
-    std::array<double, 256> wide{};
-    std::array<double, 512> out{};
-    std::ranges::copy(coeffs, wide.begin());
-    imdct512_windowed(wide, out, /*fast=*/false);
-    for (std::size_t i = 0; i < out.size(); ++i) {
-        x[i] = static_cast<recon_scalar_t>(out[i]);
+    if constexpr (internal::kReferenceTransformAvailable) {
+        std::array<double, 256> wide{};
+        std::array<double, 512> out{};
+        std::ranges::copy(coeffs, wide.begin());
+        imdct512_windowed(wide, out, /*fast=*/false);
+        for (std::size_t i = 0; i < out.size(); ++i) {
+            x[i] = static_cast<recon_scalar_t>(out[i]);
+        }
+    } else {
+        // As forward_512's: a decode refuses fast_imdct == false in this profile
+        // (DecodeError::kNoReferenceTransform) long before it gets here.
+        assert(false && "direct-form IMDCT is absent from this build (ICLFORGE_MINIMAL_DECODER)");
+        std::ranges::fill(x, recon_scalar_t{0});
     }
 }
 

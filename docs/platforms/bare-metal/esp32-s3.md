@@ -19,7 +19,7 @@ the float32 path worth having and real-time decode worth measuring.
 | Atmos bed | Correct, decoded bed-only via `DecoderConfig::skip_object_reconstruction`. 11 allocations per frame |
 | Atmos objects | **Correct, reconstructed on target.** 22 allocations per frame — see [Objects](#objects). **And placed**: the `eac3_atmos_render` row pans a height-object stream onto 7.1.4 through the block form, every level the host's — see [Placed on loudspeakers](#placed-on-loudspeakers) |
 | Encode | AC-3 and E-AC-3, six rows: 5.1 and 2/0 through each encoder, 2/0 with coupling, spectral extension and AHT, and 2/0 §E3.5 enhanced coupling - six frames of synthesised programme each, byte count and FNV-1a hash checked against `firmware/baremetal/encode_fixture.hpp`, peak heap per row. One substream at a time; see [Encoding](#encoding) for what does not fit |
-| AC-4 decode | **Correct on the board and under QEMU, with its state in PSRAM.** The six fixtures of the AC-4 probe (2.0, 5.1 and 5.1.4, with A-CPL and companding) equal the pins the Cortex-M3 leg and the host are held to in CI, and on a board with Wi-Fi up all twenty plays of the P4's table (2.0, 5.1, 5.1.4 and the four frame rates) give the P4's PCM hashes. **Real time only for 2.0 in SIMPLE mode** (0.87 of a frame) as D14c measured it; 2.0 in A-SPX mode took 1.03 to 1.09, 5.1 2.1 to 3.2 and 5.1.4 4.4 to 5.6. Since D14g (2026-10-11) the decoder's second core, and QIO flash, 64-byte data-cache lines, the code in PSRAM and a 64 KB data cache (`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`), take 2.0 to 0.40 (SIMPLE) and 0.50 (A-SPX), the converter at every frame rate to 0.67 to 0.87, E-AC-3 7.1.4 to 0.75 and 5.1 in SIMPLE mode to 0.99, with the PCM unchanged (D14g; D14h's single precision A-CPL interpolation moved the PCM of streams with A-CPL and took 5.1 in A-CPL mode 3 to 1.44); in an image built without those two files, with the second core, 2.0 SIMPLE takes 0.80 and A-SPX 0.99 ([Playback speed](#playback-speed)). The decode task's stack is in PSRAM: with Wi-Fi up no internal block is over 31,744 bytes and a 5.1 A-CPL play uses 32,560. See [AC-4](#ac-4) (phase D14c of [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)). No ESP32 sink takes AC-4 in a Sendspin group |
+| AC-4 decode | **Correct on the board and under QEMU, with its state in PSRAM.** The six fixtures of the AC-4 probe (2.0, 5.1 and 5.1.4, with A-CPL and companding) equal the pins the Cortex-M3 leg and the host are held to in CI, and on a board with Wi-Fi up all twenty plays of the P4's table (2.0, 5.1, 5.1.4 and the four frame rates) give the P4's PCM hashes. **Real time only for 2.0 in SIMPLE mode** (0.87 of a frame) as D14c measured it; 2.0 in A-SPX mode took 1.03 to 1.09, 5.1 2.1 to 3.2 and 5.1.4 4.4 to 5.6. Since D14g (2026-10-11) the decoder's second core, and QIO flash, 64-byte data-cache lines, the code in PSRAM and a 64 KB data cache (`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`), take 2.0 to 0.40 (SIMPLE) and 0.50 (A-SPX), the converter at every frame rate to 0.67 to 0.87, E-AC-3 7.1.4 to 0.75 and 5.1 in SIMPLE mode to 0.99, with the PCM unchanged (D14g; D14h's single precision A-CPL interpolation moved the PCM of streams with A-CPL and took 5.1 in A-CPL mode 3 to 1.44); in an image built without those two files, with the second core, 2.0 SIMPLE takes 0.80 and A-SPX 0.99 ([Playback speed](#playback-speed)). The decode task's stack is in PSRAM: with Wi-Fi up no internal block is over 31,744 bytes and a 5.1 A-CPL play uses 32,560. See [AC-4](#ac-4) (phase D14c of [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s)). With both files, the Sendspin sink lists `ac4` at 2 channels and 25 frames a second ([AC-4 from a server](#ac-4-from-a-server)) |
 | Standalone probe fits internal SRAM | Yes, without PSRAM. 195,025-byte peak heap (`eac3_atmos_render`; 194,655 with Atmos objects reconstructed, 173,794 for the 7.1.4 fixture folded to stereo, 167,386 as coded) against 304,680 free under QEMU on 2026-09-29. The board reported 316,196 free on 2026-09-11, when the peak was 237,206 — see [Memory](#memory) |
 | Retained after teardown | 12 bytes, one `__cxa_thread_atexit` record, the spectrum scratch's pointer; 23,552 bytes while §E3.5 is in use |
 | Audio output | Two examples drive real peripherals — see [Examples](#examples) |
@@ -266,9 +266,11 @@ Wi-Fi ([the Hearth plan](https://github.com/iainchesworthlabs/iclforge/blob/main
 - Sendspin's time filter;
 - `player@v1`, for Music Assistant's stereo PCM;
 - Hearth's `_iclforge_player@v1`, whose AC-3 and E-AC-3 bursts the component decodes and renders
-  onto the board's layout. The player advertises `ac3` and `eac3` as its data types and not `ac4`:
-  no ESP32 sink takes AC-4 in a Sendspin group yet (phase I6 of
-  [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#i6-the-esp32-sinks)).
+  onto the board's layout. The player advertises `ac3` and `eac3` as its data types, and `ac4` too
+  in an image built with the AC-4 decoder and the 64 KB data cache, at 2 channels and 25 frames a
+  second ([AC-4 from a server](#ac-4-from-a-server)); the release image has no decoder and does not.
+  Phase I6 of
+  [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#i6-the-esp32-sinks).
 
 [An ESP32-S3 sink](../../hearth/sink-esp32-s3.md) sets a board up.
 
@@ -1771,6 +1773,97 @@ On a board with Wi-Fi, `hearth_sink` with `sdkconfig.ac4` plays an AC-4 stream f
 `stream.*` lines the tables above come from, which `GET /log` returns. A play's location can carry
 `decoding=core`, `hash=off` and `below=<bytes>` (that play's internal-RAM allocation limit, in place
 of `CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`). The stack in PSRAM is the default for this image.
+
+### AC-4 from a server
+
+An AC-4 stream a Sendspin group sends the board as it is, one sync frame a chunk under the data type
+`ac4`, is decoded by the player with the decoder above and written by the playout AC-3 and E-AC-3
+use. An image with `CONFIG_ICLFORGE_AC4` and the 64 KB data cache (`sdkconfig.ac4`,
+`sdkconfig.s3-fast`, `sdkconfig.s3-dcache`: the `s3-n16r8-ac4` profile) lists `ac4`
+(`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4`) and states two limits, 2 channels and 25 frames a second
+(`..._AC4_MAX_CODED_CHANNELS`, `..._AC4_MAX_FRAME_RATE`), and no objects: a server decodes what is
+past either and sends PCM. The release image has no decoder and lists none. A frame past either
+limit that reaches the decoder, from a server that did not read the figures, is refused with a
+console line.
+
+Measured 2026-10-12 on an ESP32-S3-DevKitC-1 N16R8 (S3b) over Sendspin from
+`hearth-testserver`, the image above with the null sink and the second lane on, 20 s a play,
+x real time of the stream's own frame (the board's decode and render per chunk, the sink's time
+left out):
+
+| Stream | Frame rate | x real time | Worst burst | Late | Under | Internal RAM free, least |
+|---|---:|---:|---:|---:|---:|---:|
+| `ac4-stereo-64` (A-SPX) | 23.44 | 0.57 to 0.58 | 0.85 to 0.91 | 6 to 27 | 0 | 87 KB |
+| `ac4-20-music-192` (SIMPLE) | 23.44 | 0.48 | 0.88 | 4 | 0 | 89 KB |
+| `ac4-20-speech-128` | 23.44 | 0.59 | 0.88 | 8 | 0 | 87 KB |
+| `ac4-ims-film-96-24` | 24 | 0.74 | 1.2 | 7 | 0 | 83 KB |
+| `ac4-ims-music-128-25` | 25 | 0.76 | 1.3 | 4 | 0 | 83 KB |
+| `ac4-ims-music-64-2997` | 29.97 | 0.97 (0.99 with the first frame in it) | 1.7 (the first frame) | 3 | 0 and 39 | 85 KB |
+| `ac4-51-music-128` | 23.44 | refused: more than 2 channels | | | | |
+
+The first frame of a stream whose frames are 1,920, 1,536, 960, 768 or 384 samples (24, 29.97 and
+30 fps and the high frame rates, frame rate indices 0, 1, 3, 4, 5, 6, 8, 9, 11 and 12) took 0.41 to
+0.49 s, so a play opened with 12 or 13 chunks dropped as late. It was not the converter (6.7 to
+11 ms): the inverse transform's tables for those lengths were built when the frame arrived, in
+software double, and the built-in tables stopped at the lengths of a 2,048-sample frame
+(`ac4_reconstruct`'s own time in the first frame 468 and 384 ms against 20 and 21). Every length of
+Table 186 is built in now (89 KB more), and the first frame of 24 and 29.97 takes 47 and 54 ms.
+A frame at 24, 25 or 29.97 costs 30 to 33 ms whatever the rate, which is why the limit is a rate
+and not a codec tool: 25 a second leaves 0.76 and 29.97 leaves 0.97, with no room for the Wi-Fi
+traffic, and the play that took 39 underruns went on to a second that took none. E-AC-3 on the same
+image is unchanged (5.1 at 0.37, 7.1.4 at 0.72, 0 under), with its internal RAM at its least 0.2 and
+1.1 KB as `sdkconfig.s3-dcache` says: the decoder places an AC-4 play's allocations of 512 bytes and
+over in PSRAM, which is why the AC-4 plays have the most internal RAM.
+
+**A play's start, and a stall.** The first chunks of a play are late: the board makes its decoder
+and decodes its first frame while the server's clock runs, so up to a dozen of the first chunks are
+past their time when they are looked at. An AC-4 frame depends on the ones before it back to the
+last I-frame, so a chunk dropped for being late (as every late chunk was) cost the stream everything
+up to the next one, and so does a chunk delayed by a stall in the network or the decode task. The
+player now decodes a late AC-4 chunk and discards what it decodes to when that loses less audio than
+dropping it and waiting would. Each chunk decoded takes a share `r` of the time its audio lasts (0.49
+for a 23.44 fps stream here, 0.75 for the converter's), so the lateness falls by the rest, and the
+audio lost is the lateness over `1 - r`; dropping loses the lateness and then, on average, half
+the I-frames' interval, taken as 0.5 s. Keeping is chosen when `late * r <= (1 - r) * 0.5 s`: 0.5 s
+late at `r` of 0.49, 0.17 s at 0.75. `r` starts at 0.6 for each stream and follows the frames after
+the first.
+
+What the listener loses is `lost_frames` in the `sendspin.stream=` line: the stream's frames never
+handed to the sink (the playout's `silence_frames` does not say it, since it skips late frames and
+pads only a gap it had pushed nothing into). Measured on S3b over Sendspin, three plays of each
+stream with the image that drops and with the one that keeps, the first-frame tables of the
+section above in both:
+
+| Stream | Lost at the start, dropped (3 plays) | Lost at the start, kept (3 plays) |
+|---|---|---|
+| `ac4-stereo-64` | 0.98, 0.98, 0.90 s | 0.04, 0.00, 0.04 s |
+| `ac4-20-music-192` | 0.98, 0.98, 0 s | 0.09, 0.00, 0.04 s |
+| `ac4-ims-film-96-24` | 0.96, 0.96, 0.96 s | 0.42, 0.05, 0.63 s |
+| `ac4-ims-music-128-25` | 0.96, 0.96, 0.96 s | 0.16, 0.92, 0.36 s |
+
+A dropped chunk costs 0.96 s in every play, the 24 frames to the next I-frame of these streams. The
+kept ones lose their late chunks and little more at 23.44 fps, and 0.05 to 0.92 s at 24 and 25 fps,
+whose decode is slower (the 0.92 s play had 23 chunks late, which keeping loses about as much on as
+dropping would). Output of `ac4-stereo-64` is the host's RMS to 0.00 dB where it had been 0.43 dB
+under.
+
+A stall, simulated with `hearth-testserver --stall-after 5 --stall-ms N` on `ac4-20-music-192`
+(the group reads a buffered source about 1.85 s ahead, so the first 1.85 s of a stall is absorbed
+and what is longer makes chunks late):
+
+| Stall | Lost, dropped | Lost, kept | Chunks late, kept |
+|---|---|---|---|
+| 2.2 s | 1.62, 2.60 s | 1.02, 0.55 s | 24 and 13, all kept |
+| 2.6 s | 2.60 s | 1.83 s | 43, 29 kept |
+| 3.2 s | 1.62, 2.60 s | 2.09 s | 49, 11 kept |
+| 4.5 s | 4.60 s | not run with this rule (3.63 s with the one before it) | |
+
+A stall short enough for the decoder to catch up on costs about a second less than it did, and a
+long one costs what it did. Plays that kept chunks had 0 to 3 underruns, in the first 125 chunks of
+a start and about the stall in the others, where the plays that dropped had 0 or 1: the playout runs
+dry for a block (5 ms) when a frame decoded late reaches it. No play had an invalid chunk. Plays
+with another server taking the board (its status afterwards named `Hearth on Iains-Computer`) are
+not in the tables.
 
 ## What the port required from the library
 

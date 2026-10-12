@@ -1,19 +1,19 @@
 {
   "format": 1,
   "profile": "p4-rev1-ac4",
-  "profile_hash": "6cd3fe4b015f",
-  "version": "v0.10.0-beta.1-4413-g43d19b5c1",
+  "profile_hash": "85e6b4f66269",
+  "version": "v0.10.0-beta.1-4517-g84efde0e7",
   "chip": "ESP32-P4",
   "board": "P4a",
-  "recorded": "2026-10-12T09:27Z",
+  "recorded": "2026-10-12T15:09Z",
   "boot": {
     "when": "boot",
     "net": 1,
-    "internal_free": 289271,
-    "largest": 217088,
+    "internal_free": 281191,
+    "largest": 208896,
     "ask_total": 49152,
     "ask_biggest": 40960,
-    "headroom": 176128,
+    "headroom": 167936,
     "verdict": "ok",
     "floor": 0
   },
@@ -23,7 +23,7 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        61,
+        62,
         61,
         61,
         61,
@@ -42,13 +42,13 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        41,
-        41,
-        41,
-        41,
-        41
+        40,
+        40,
+        40,
+        40,
+        40
       ],
-      "decoder_permille": 41,
+      "decoder_permille": 40,
       "units": 938,
       "decode_stack_free": 26212,
       "underruns": 0,
@@ -61,11 +61,11 @@
       "frames": 3,
       "why": "end of stream",
       "decoder_permille_samples": [
-        239,
-        220,
         241,
-        251,
-        253
+        243,
+        225,
+        241,
+        242
       ],
       "decoder_permille": 241,
       "units": 3,
@@ -81,13 +81,13 @@
       "frames": 4,
       "why": "end of stream",
       "decoder_permille_samples": [
-        281,
-        281,
-        280,
-        285,
-        294
+        287,
+        268,
+        289,
+        283,
+        283
       ],
-      "decoder_permille": 281,
+      "decoder_permille": 283,
       "units": 4,
       "decode_stack_free": 16920,
       "underruns": 0,
@@ -102,13 +102,13 @@
       "why": "end of stream",
       "layout": "2.0",
       "decoder_permille_samples": [
-        621,
-        617,
-        599,
-        626,
-        593
+        618,
+        604,
+        590,
+        595,
+        605
       ],
-      "decoder_permille": 617,
+      "decoder_permille": 604,
       "units": 3,
       "decode_stack_free": 16840,
       "underruns": 0,
@@ -122,13 +122,13 @@
       "frames": 3,
       "why": "end of stream",
       "decoder_permille_samples": [
-        276,
-        298,
-        282,
-        303,
-        268
+        278,
+        270,
+        300,
+        274,
+        299
       ],
-      "decoder_permille": 282,
+      "decoder_permille": 278,
       "units": 3,
       "decode_stack_free": 16920,
       "underruns": 0,
@@ -136,29 +136,81 @@
       "min_headroom_ms": 5,
       "resync_bytes": 0,
       "pcm_hash": "5b93c61c57566b0c"
+    },
+    "ac3-2.0-sendspin": {
+      "state": "finished",
+      "frames": 938,
+      "decoder_permille_samples": [
+        85,
+        85,
+        85,
+        85,
+        85
+      ],
+      "decoder_permille": 85,
+      "units": 938,
+      "decode_stack_free": 26352,
+      "via": "sendspin",
+      "plays": 5,
+      "glitched_plays": 1,
+      "burst_us": 2721,
+      "late": 7,
+      "dropped": 0,
+      "invalid": 0,
+      "resyncs": 0,
+      "worst_error_us": -343,
+      "play_heap_free": 246487,
+      "ring_high": 47560,
+      "stream_underruns": 0
+    },
+    "eac3-2.0-sendspin": {
+      "state": "finished",
+      "frames": 938,
+      "decoder_permille_samples": [
+        68,
+        67,
+        67,
+        67,
+        67
+      ],
+      "decoder_permille": 67,
+      "units": 938,
+      "decode_stack_free": 26272,
+      "via": "sendspin",
+      "plays": 5,
+      "glitched_plays": 0,
+      "burst_us": 2153,
+      "late": 0,
+      "dropped": 0,
+      "invalid": 0,
+      "resyncs": 0,
+      "worst_error_us": -363,
+      "play_heap_free": 192879,
+      "ring_high": 25288,
+      "stream_underruns": 0
     }
   },
   "findings": {},
   "boot_samples": {
     "internal_free": [
-      289271,
-      289891,
-      289891,
-      289875,
-      289863,
-      289863,
-      289827,
-      289883
+      281563,
+      281555,
+      298179,
+      281555,
+      281191,
+      281555,
+      281555,
+      281563
     ],
     "largest": [
-      217088,
-      217088,
-      217088,
-      221184,
-      217088,
-      217088,
-      217088,
-      221184
+      212992,
+      212992,
+      212992,
+      212992,
+      208896,
+      212992,
+      212992,
+      212992
     ]
   }
 }

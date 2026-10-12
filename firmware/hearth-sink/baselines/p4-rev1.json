@@ -1,15 +1,15 @@
 {
   "format": 1,
   "profile": "p4-rev1",
-  "profile_hash": "1da8144216fb",
-  "version": "v0.10.0-beta.1-4367-g957c80e16",
+  "profile_hash": "af3ac10bdf67",
+  "version": "v0.10.0-beta.1-4565-gc3878ebaa",
   "chip": "ESP32-P4",
   "board": "P4a",
-  "recorded": "2026-10-12T08:12Z",
+  "recorded": "2026-10-12T14:54Z",
   "boot": {
     "when": "boot",
     "net": 1,
-    "internal_free": 291875,
+    "internal_free": 291783,
     "largest": 217088,
     "ask_total": 40960,
     "ask_biggest": 32768,
@@ -23,7 +23,7 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        62,
+        61,
         61,
         61,
         61,
@@ -31,7 +31,7 @@
       ],
       "decoder_permille": 61,
       "units": 938,
-      "decode_stack_free": 18480,
+      "decode_stack_free": 18484,
       "underruns": 0,
       "dry_ms": 0,
       "min_headroom_ms": 5,
@@ -42,42 +42,94 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        40,
         41,
-        40,
         41,
-        40
+        41,
+        41,
+        41
       ],
-      "decoder_permille": 40,
+      "decoder_permille": 41,
       "units": 938,
-      "decode_stack_free": 18400,
+      "decode_stack_free": 18404,
       "underruns": 0,
       "dry_ms": 0,
       "min_headroom_ms": 5,
       "resync_bytes": 0
+    },
+    "ac3-2.0-sendspin": {
+      "state": "finished",
+      "frames": 938,
+      "decoder_permille_samples": [
+        85,
+        85,
+        85,
+        85,
+        85
+      ],
+      "decoder_permille": 85,
+      "units": 938,
+      "decode_stack_free": 18160,
+      "via": "sendspin",
+      "plays": 5,
+      "glitched_plays": 0,
+      "burst_us": 2715,
+      "late": 0,
+      "dropped": 0,
+      "invalid": 0,
+      "resyncs": 0,
+      "worst_error_us": -393,
+      "play_heap_free": 253939,
+      "ring_high": 47560,
+      "stream_underruns": 0
+    },
+    "eac3-2.0-sendspin": {
+      "state": "finished",
+      "frames": 938,
+      "decoder_permille_samples": [
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "decoder_permille": 67,
+      "units": 938,
+      "decode_stack_free": 18080,
+      "via": "sendspin",
+      "plays": 5,
+      "glitched_plays": 0,
+      "burst_us": 2145,
+      "late": 0,
+      "dropped": 0,
+      "invalid": 0,
+      "resyncs": 0,
+      "worst_error_us": -335,
+      "play_heap_free": 203315,
+      "ring_high": 25288,
+      "stream_underruns": 0
     }
   },
   "findings": {},
   "boot_samples": {
     "internal_free": [
-      291931,
-      291911,
-      291939,
-      291931,
-      291923,
-      291915,
-      291875,
-      291931
+      291795,
+      291783,
+      291803,
+      291803,
+      291795,
+      291795,
+      291795,
+      291795
     ],
     "largest": [
       221184,
-      221184,
-      221184,
-      221184,
-      221184,
-      221184,
       217088,
-      217088
+      221184,
+      221184,
+      221184,
+      221184,
+      221184,
+      221184
     ]
   }
 }

@@ -307,6 +307,7 @@ is what a chunk carries, what the sink reports, and the settings the server can 
 | `buffer_capacity` | integer | Maximum bytes of burst chunks held and not yet played, counting each chunk's whole plaintext message |
 | `max_chunk_bytes?` | integer | 1 to 1,048,576: the most bytes one chunk to the sink may be, counted as `buffer_capacity` counts a chunk (the whole plaintext message, header included, the encryption's tag not). It bounds a burst chunk and a `player@v1` PCM chunk alike, so a server that plays this sink PCM sizes its units to it; absent when the sink does not say, and a server then sends what its codec allows |
 | `max_coded_channels?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 64: the most channels, full-bandwidth and LFE, the sink decodes of a stream of that type. A syncframe wider than it is refused, so a server sends such a stream another way. A type the object does not name has no stated limit, which is not a limit of none; absent when the sink states none for any type. A name a reader does not know is skipped |
+| `max_frame_rate?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 1,000: the most frames a second, an access unit and so a burst chunk each, the sink decodes of a stream of that type in real time. A stream whose frame rate is higher is refused by the sink, so a server sends it another way, as it does one past `max_coded_channels`. A frame rate is compared as it is, to within half a percent, so `25` takes 23.976, 24 and 25 and `30` takes 29.97 and 30. A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
 | `max_objects?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 0 to 255: the most objects the sink reconstructs and places of a stream of that type in real time. `0` is a statement and not an absence: the sink decodes the stream's bed and does not reconstruct its objects. A stream with more objects than the limit is decoded as its bed by the sink, never reconstructed past it, so a server that wants the objects placed sends it PCM it renders itself. A sink counts what a stream declares from its first unit, before it decodes: the OBA complexity index of the addbsi less the LFE, which is also the figure a server falls back to; a listener who chose objects `always` is not overruled A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
 | `lyrics?` | object | `max_bytes`: 1 to 60,000, the most bytes of lyric document (an LRC text in UTF-8) the sink holds for the item playing. Absent when the sink holds none. A sink that states it lists `lyrics` and `lyrics_position` in `supported_commands` ([Lyrics](#lyrics)) |
 | `karaoke_codecs?` | string[] | Data type names (`"ac3"`, `"eac3"`, `"ac4"`): the codecs the sink reproduces karaoke for when it is told to, which is the `karaoke` decoder setting. Absent, or empty, for a sink that states none, and a server then reads it as `["ac3"]`: the codec every sink's karaoke path was written for. A sink that reproduces an E-AC-3 stream's lists `"eac3"`. A karaoke stream of a type the sink does not list is played as coded by its own decoder, so a server that wants the reproduction sends it PCM it has decoded itself. A name a reader does not know is skipped |
@@ -419,9 +420,15 @@ does not close the connection.
   durations, so the timeline does not drift.
 - Synchronisation corrections are applied to decoded PCM, never to bursts
   ([R9](#playerv1)).
-- A late chunk is dropped before it is decoded, and counted in `late_chunks`. Because a decoder
-  carries state from frame to frame, the sink then treats the next chunk as the start of a stream:
-  it resets the decoder and conceals the gap as its `concealment` setting says.
+- A late chunk is not played, and is counted in `late_chunks`. It is dropped before it is decoded,
+  and because a decoder carries state from frame to frame, the sink then treats the next chunk as
+  the start of a stream: it resets the decoder and conceals the gap as its `concealment` setting
+  says. An AC-4 frame depends on the ones before it back to the last I-frame, which can be a second
+  or more away, so a sink may instead decode a late AC-4 chunk and discard what it decodes to, when
+  that loses less audio than dropping it would: the decoder keeps its state and the audio lost is
+  the chunk's lateness over the share of a frame that decoding leaves free (an ESP32-S3's 0.51 at
+  23.44 frames a second), where a dropped chunk costs its lateness and then the wait for the next
+  I-frame. A sink that does says so in `late_chunks` all the same: the chunk was not played.
 
 ### Settings
 
@@ -465,6 +472,41 @@ plays, every output carries `ac3::render::IdentifyTone::fill`'s result instead o
 audio: the tone on `output` (its low band when the output carries the LFE) and silence elsewhere.
 A running stream keeps its timeline and its chunks are decoded and discarded, so the stream
 continues in sync when the tone stops. `level_db` is inside `IdentifyTone`'s −60 to −12 dB.
+
+### Requests
+
+`client/command`, object `_iclforge_player`, from a sink to its server:
+`{"command": "decoder", "decoder": {...}}`. It lets a sink's own control (a touch screen's vocals
+button, a TV remote) ask for the **singer's karaoke choice**, which is the server's to hold. It is
+the one thing a sink may send to a server in this role besides its state.
+
+| Key in `decoder` | Values |
+|---|---|
+| `karaoke` | `"off"`, `"aware"`, `"capable"` |
+| `karaoke_vocals` | `"none"`, `"v1"`, `"v2"`, `"both"` |
+| `karaoke_melody_db`, `karaoke_vocal1_db`, `karaoke_vocal2_db` | -24.0 to 12.0 (dB) |
+
+The names and ranges are the settings command's ([Settings](#settings)), so a request is the
+decoder object of a settings command with only these keys. Rules:
+
+- **The sink says what it may ask for.** The support object's `requests` lists the keys, a subset of
+  the five above; absent or empty, the sink asks for none. A server acts only on a key the sink
+  listed, only while the role is active, and a sink sends only what it listed.
+- **A request is advice.** The server applies it as it would the singer's own change on its Karaoke
+  page, so every member and every screen of the server moves together (a group hears one
+  reproduction). There is no reply: a sink that decodes for itself and lists the decoder keys sees
+  the result as the settings command it is sent next, and every sink hears it in the audio. A
+  server that does not act on requests ignores them, and a sink must not assume otherwise.
+- **A passed-through stream is not changed by it.** A sink that hands the coded bits to a receiver
+  plays every vocal whatever is chosen ([the sink screen's SS7](hearth-sink-screen.md)); its request
+  changes what the group's decoding members play and what the server's own screens show.
+- **Refused whole.** A key that is present with a value out of range or a name the reader does not
+  know refuses the request, as a settings object is refused whole. A key that is not one of the five
+  is ignored, as every unknown key is ([E14](#encryption)); a request with none of the five has
+  nothing to ask for and is dropped.
+- **An added optional key and a new object**, so no version change ([Versions](#versions)): a server
+  from before it does not read `_iclforge_player` in `client/command` and a sink from before it does
+  not list `requests`.
 
 ### Lyrics
 

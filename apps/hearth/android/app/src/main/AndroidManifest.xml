@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The sink listens for Hearth's WebSocket and answers it: sockets are kernel-enforced through
+         the inet group, so without this the listener fails at runtime, not at build time. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The idle screen says what address the box has: the active network's link properties. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- NsdManager advertises _sendspin._tcp through the platform's mDNS responder, which needs the
+         Wi-Fi state, and it receives multicast only with the multicast lock the service will hold
+         while a server is connected (a later phase). -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+    <!-- The sink is a foreground service of the media-playback type from the first launch until
+         the person leaves it (planning/hearth-android.md, D9). The second permission is the one
+         API 34 asks for the type; the notification is the service's, and where the system hides it
+         the service still runs. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Android TV first (D11): leanback is declared, but not required, so that the same APK
+         installs on a phone or a tablet, which a later phase gives a local-decode route. A
+         touchscreen is optional on a TV. -->
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:icon="@drawable/ic_launcher"
+        android:banner="@drawable/banner"
+        android:theme="@style/Theme.Hearth"
+        android:usesCleartextTraffic="false">
+        <!-- usesCleartextTraffic governs the app's own OUTBOUND client connections through the
+             platform's networking stack, which the sink makes none of: it listens, over a socket the
+             native library opens, and speaks Noise over WebSocket itself. -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|density">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <!-- LEANBACK_LAUNCHER puts the app on the TV home screen's row, and LAUNCHER on a
+                     phone's launcher. -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".SinkService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+    </application>
+
+</manifest>

@@ -161,6 +161,22 @@ class HostEvents final : public iclforge::sendspin::ServerHostEvents {
         return commands_;
     }
 
+    // _iclforge_player@v1's requests for the singer's karaoke choice (D8), in order.
+    struct Request {
+        std::string group_id;
+        std::string client_id;
+        iclforge::sendspin::player::Request request;
+    };
+    void on_sink_request(const std::string& group_id, const std::string& client_id,
+                         const iclforge::sendspin::player::Request& request) override {
+        const std::lock_guard lock(mutex_);
+        requests_.push_back({.group_id = group_id, .client_id = client_id, .request = request});
+    }
+    std::vector<Request> requests() {
+        const std::lock_guard lock(mutex_);
+        return requests_;
+    }
+
     // client/goodbye's own reason, once on_client_goodbye() has heard one for this client_id.
     std::optional<iclforge::sendspin::messages::GoodbyeReason> goodbye(
         const std::string& client_id) {
@@ -179,6 +195,7 @@ class HostEvents final : public iclforge::sendspin::ServerHostEvents {
     std::condition_variable changed_;
     std::map<std::string, iclforge::sendspin::ClientView> clients_;
     std::vector<Command> commands_;
+    std::vector<Request> requests_;
     std::map<std::string, iclforge::sendspin::messages::GoodbyeReason> goodbyes_;
 };
 
@@ -722,6 +739,9 @@ TEST_CASE("group: test sinks' other roles get the group's metadata, colours, tra
         options.unpaired_access = true;
         options.codecs = {m::Codec::kPcm};
         options.other_roles = std::move(listed);
+        // What a sink with a vocals control may ask the server for (D8): the vocals, not the
+        // reproduction.
+        options.requests = {"karaoke_vocals"};
         options.artwork_channels.channels = {
             {.source = ss::artwork::Source::kAlbum, .format = ss::artwork::Format::kJpeg, .width = 300, .height = 300}};
         options.visualizer_request = {.types = {ss::visualizer::Type::kLoudness, ss::visualizer::Type::kBeat},
@@ -847,6 +867,20 @@ TEST_CASE("group: test sinks' other roles get the group's metadata, colours, tra
     CHECK(commands.front().group_id == group->id());
     CHECK(commands.front().client_id == lounge_id);
     CHECK(commands.front().command.command == controller::Command::kNext);
+
+    // A request for the singer's karaoke choice reaches the host's events with the group the sink is
+    // in, cut to the keys the sink listed; keys it did not list are not passed on (D8).
+    iclforge::sendspin::player::Request ask;
+    ask.decoder.karaoke_vocals = iclforge::sendspin::player::KaraokeVocals::kV1;
+    ask.decoder.karaoke = iclforge::sendspin::player::Karaoke::kCapable;
+    kitchen->send_request(ask);
+    REQUIRE(eventually([&] { return !events.requests().empty(); }, 10s));
+    const std::vector<HostEvents::Request> requests = events.requests();
+    REQUIRE(requests.size() == 1);
+    CHECK(requests.front().group_id == group->id());
+    CHECK(requests.front().client_id == kitchen_id);
+    CHECK(requests.front().request.decoder.karaoke_vocals == iclforge::sendspin::player::KaraokeVocals::kV1);
+    CHECK_FALSE(requests.front().request.decoder.karaoke.has_value());
 
     // Artwork at the channel's source, format and size, in more than one part; then cleared.
     std::vector<std::uint8_t> image(100000);

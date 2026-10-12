@@ -29,6 +29,7 @@ add_library(hearth_engine STATIC
     src/settings_model.cpp
     src/sink_form.cpp
     src/stream_decoder.cpp
+    src/take_recorder.cpp
     src/transport.cpp
     src/unit_reports.cpp)
 target_include_directories(hearth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")

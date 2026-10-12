@@ -18,6 +18,7 @@
 #include <variant>
 #include <vector>
 
+#include "iclforge/lyrics/follower.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/arbiter.hpp"
@@ -36,6 +37,7 @@
 #include "iclforge/sendspin/stream_roles.hpp"
 #include "iclforge/sendspin/transport.hpp"
 #include "iclforge/sendspin/websocket.hpp"
+#include "iclforge/sink/lyric_frame.hpp"
 #include "iclforge/sink/store.hpp"
 
 namespace iclforge::sink {
@@ -171,6 +173,11 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                                        : Arbiter::rank_of(activate.activities) == Arbiter::Rank::kPairing ? "pairing"
                                                                                                            : "nothing";
         log(std::string(verdict.admit ? "activated for " : "refused, another server holds the sink: ") + activities);
+        if (verdict.admit) {
+            activity_ = Arbiter::rank_of(activate.activities) == Arbiter::Rank::kPlayback ? Sink::Status::Activity::kPlayback
+                        : Arbiter::rank_of(activate.activities) == Arbiter::Rank::kPairing ? Sink::Status::Activity::kPairing
+                                                                                            : Sink::Status::Activity::kNothing;
+        }
         return verdict.admit;
     }
 
@@ -178,16 +185,20 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
 
     void on_stream_start(const m::PlayerStream& stream) override {
         const bool writing = output_->start(stream);
+        streaming_ = true;
         log("stream " + format_text(stream.format) +
             (writing ? (output_->file().empty() ? std::string{} : " to " + output_->file().string())
                      : std::string(" (not written)")));
     }
     void on_stream_clear() override {
         output_->clear();
+        follower_.clear_position();
         log("stream cleared");
     }
     void on_stream_end() override {
         output_->end();
+        streaming_ = false;
+        follower_.clear_position();
         log("stream ended after " + std::to_string(output_->counts().units) + " chunks");
     }
     void on_audio(std::span<const std::uint8_t> frame, std::int64_t local_time) override {
@@ -229,7 +240,10 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         log("unpaired by server " + short_key(server_key));
     }
 
-    void on_pairing_code(const flow::Code& code) override { log("PAIRING CODE " + code_text(code)); }
+    void on_pairing_code(const flow::Code& code) override {
+        pairing_code_ = code_text(code);
+        log("PAIRING CODE " + *pairing_code_);
+    }
 
     void on_pairing_held_back() override {
         log("pairing waits for the operator: type 'window' to open the static code's window, or 'reset' at the "
@@ -237,32 +251,46 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     }
 
     void on_paired(const Key32& server_key, const Key32& long_term_psk) override {
+        pairing_code_.reset();
         const bool stored = sink_->store_->add_record(server_key, long_term_psk);
         log("paired with server " + short_key(server_key) + (stored ? "" : " (the record could not be saved)"));
     }
 
     void on_pairing_ended(std::optional<pm::AbortReason> reason) override {
+        pairing_code_.reset();
         log("pairing " + std::string(abort_text(reason)));
     }
 
     void on_burst_stream_start(const ac::StreamStart& stream) override {
         const bool writing = bursts_->start(stream);
+        streaming_ = true;
+        // Only a stream the output took leaves the sink by the way the output says.
+        burst_taken_ = writing;
         reported_decoder_.reset();
         const std::string_view codec = stream.data_type == ac::DataType::kAc3    ? "AC-3 "
                                        : stream.data_type == ac::DataType::kEac3 ? "E-AC-3 "
                                                                                  : "AC-4 ";
-        log("burst stream " + std::string(codec) + std::to_string(stream.sample_rate) + " Hz to " +
-            sink_->options_.layout +
+        // "to 7.1.4" when the program renders to a layout, and nothing when it does not (it hands the
+        // bytes on, as the Android app does).
+        const std::string layout = sink_->options_.layout.empty() ? std::string{} : " to " + sink_->options_.layout;
+        log("burst stream " + std::string(codec) + std::to_string(stream.sample_rate) + " Hz" + layout +
             (writing ? (bursts_->file().empty() ? std::string{} : " in " + bursts_->file().string())
                      : std::string(" (not written)")));
         post_iclforge_state();
     }
+    // A flush moves the sound: the document stays for the item and the position waits for the new
+    // stream's first anchor. The end of a stream is nothing playing, and the document stays too: the
+    // same item started again takes its anchors, and another item's document replaces it.
     void on_burst_stream_clear() override {
         bursts_->clear();
+        follower_.clear_position();
         log("burst stream cleared");
     }
     void on_burst_stream_end() override {
         bursts_->end();
+        streaming_ = false;
+        burst_taken_ = false;
+        follower_.clear_position();
         log("burst stream ended after " + std::to_string(bursts_->counts().units) + " bursts");
         post_iclforge_state();
     }
@@ -334,13 +362,9 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                 // The document is parsed as a board would: held when it has lyrics, the item
                 // reported with the line -1 until an anchor says where the sound is (this sink has
                 // no clock of its own to follow it by: it reports the line of the anchor's position).
-                lyrics_.reset();
-                if (!command.lyrics.text.empty()) {
-                    if (auto parsed = iclforge::lyrics::parse_lyrics(command.lyrics.text)) {
-                        lyrics_ = std::move(*parsed);
-                    }
-                }
-                const bool held = lyrics_.has_value();
+                // The follower keeps the item even when the document is not held, so the anchors
+                // that follow are the item's and are not mistaken for another's.
+                const bool held = follower_.set_document(command.lyrics.item, command.lyrics.text);
                 if (held) {
                     iclforge_state_.lyrics = ac::LyricsReport{.item = command.lyrics.item, .line = -1};
                 } else {
@@ -359,12 +383,14 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                               static_cast<long long>(anchor.item), static_cast<long long>(anchor.position_ms),
                               anchor.speed);
                 log(text);
-                // The line the position is in, for an anchor of the item held.
-                if (lyrics_ && iclforge_state_.lyrics && iclforge_state_.lyrics->item == anchor.item) {
+                // The line the position is in, for an anchor of the item held, and the anchor for the
+                // screen's playhead, which follows the sound by the server's clock.
+                if (follower_.has_lyrics() && iclforge_state_.lyrics && iclforge_state_.lyrics->item == anchor.item) {
                     const iclforge::lyrics::LyricPosition at =
-                        iclforge::lyrics::lyric_position(*lyrics_, anchor.position_ms);
+                        iclforge::lyrics::lyric_position(*follower_.lyrics(), anchor.position_ms);
                     iclforge_state_.lyrics->line = at.line ? static_cast<std::int32_t>(*at.line) : -1;
                 }
+                follower_.anchor(anchor.item, anchor.position_ms, anchor.at_us, anchor.speed);
                 const std::lock_guard lock(sink_->roles_mutex_);
                 sink_->roles_.lyric_commands.push_back(command);
                 break;
@@ -385,6 +411,9 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             ++roles.states;
             if (state.metadata) {
                 roles.metadata = *state.metadata;
+                // This connection's, for the title a screen shows when it holds no document (D7).
+                // Called with the session's lock held, as inspect() takes it to read.
+                metadata_ = *state.metadata;
                 text += roles.metadata ? " metadata \"" + roles.metadata->title.value_or("") + "\""
                                        : std::string(" metadata cleared");
             }
@@ -450,13 +479,59 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         sink_->roles_.visualizer.reset();
     }
 
+    // This connection as a screen says it, read under the session's lock.
+    [[nodiscard]] Sink::Status::Peer peer_status() {
+        return driver().inspect([&] {
+            Sink::Status::Peer peer;
+            peer.id = id_;
+            peer.address = peer_;
+            peer.server_name = session_->server_name();
+            peer.activity = activity_;
+            peer.streaming = streaming_;
+            peer.output = output_now();
+            return peer;
+        });
+    }
+    [[nodiscard]] std::optional<std::string> pairing_code() {
+        return driver().inspect([&] { return pairing_code_; });
+    }
+
+    // What this connection's server last said is playing (metadata@v1), none once it cleared it.
+    [[nodiscard]] std::optional<sendspin::metadata::State> metadata() {
+        return driver().inspect([&] { return metadata_; });
+    }
+
+    // Whether this connection holds a lyric document, held or not (the item is known).
+    [[nodiscard]] bool has_lyric_item() {
+        return driver().inspect([&] { return follower_.item().has_value(); });
+    }
+    [[nodiscard]] bool streaming() {
+        return driver().inspect([&] { return streaming_; });
+    }
+
+    // What a screen draws of this connection's lyrics now: the playhead on the server's clock, which
+    // the session's time filter gives for the sink's own. Without a converged clock there is no
+    // position, and the stage is "waiting" with the first lines to show.
+    [[nodiscard]] LyricFrame lyric_frame(std::int64_t delay_ms, const iclforge::lyrics::StageOptions& options) {
+        return driver().inspect([&] {
+            std::optional<std::int64_t> position;
+            if (session_->clock_converged()) {
+                position = follower_.position_ms(session_->clock().to_server(sink_->clock_.now_us()));
+            }
+            const iclforge::lyrics::Stage stage =
+                iclforge::lyrics::make_stage(follower_.lyrics(), position, delay_ms, options);
+            return make_lyric_frame(follower_.item(), follower_.lyrics(), stage, streaming_);
+        });
+    }
+
     // Holds no lyrics from here, and reports it (Sink::forget_lyrics()).
     void forget_lyrics() {
         driver().call([&] {
-            lyrics_.reset();
+            follower_.reset();
             iclforge_state_.lyrics.reset();
             ac::State state = iclforge_state_;
             state.decoder = bursts_->decoder();
+            state.output = output_now();
             state.counters.bursts_played = bursts_->counts().units;
             return session_->set_iclforge_state(state);
         });
@@ -466,6 +541,12 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
    private:
     void log(std::string_view text) { sink_->log("[" + std::to_string(id_) + "] " + std::string(text)); }
 
+    // How the burst stream leaves the sink, while one the output took is open. Under the session's
+    // lock, as burst_taken_ is.
+    [[nodiscard]] std::optional<ac::Output> output_now() const {
+        return burst_taken_ ? bursts_->output() : std::nullopt;
+    }
+
     // Reports the extension role's state from the sink's thread, outside the callback that
     // changed it, with what the burst output has found.
     void post_iclforge_state() {
@@ -474,8 +555,13 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             if (const std::shared_ptr<Connection> connection = self.lock()) {
                 connection->driver().call([&] {
                     ac::State state = connection->iclforge_state_;
+                    const OutputCounts counts = connection->bursts_->counts();
                     state.decoder = connection->bursts_->decoder();
-                    state.counters.bursts_played = connection->bursts_->counts().units;
+                    state.output = connection->output_now();
+                    state.counters.bursts_played = counts.units;
+                    state.counters.underruns = counts.underruns;
+                    state.counters.late_chunks = counts.late;
+                    state.counters.dropped_chunks = counts.dropped;
                     return connection->session_->set_iclforge_state(state);
                 });
             }
@@ -487,8 +573,18 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     std::string peer_;
     m::PlayerState state_;
     ac::State iclforge_state_;
-    // The document the sink holds, parsed, for the line an anchor's position is in.
-    std::optional<iclforge::lyrics::Lyrics> lyrics_;
+    // The document the sink holds, parsed, and the playhead the server's anchors move: the line an
+    // anchor's position is in, and what a screen draws at a time on the server's clock.
+    iclforge::lyrics::Follower follower_;
+    // A stream is open: what the screen's "no lyrics" and its idle screen are told apart by.
+    bool streaming_ = false;
+    // metadata@v1's latest state from this connection's server, for Sink::lyric_frame().
+    std::optional<sendspin::metadata::State> metadata_;
+    // The burst output took the stream that is open (BurstStreamOutput::start returned true).
+    bool burst_taken_ = false;
+    // What this connection was admitted for, and the code its server asked to pair by.
+    Sink::Status::Activity activity_ = Sink::Status::Activity::kNothing;
+    std::optional<std::string> pairing_code_;
     std::unique_ptr<StreamOutput> output_;
     std::unique_ptr<BurstStreamOutput> bursts_;
     // The decoder report last sent.
@@ -622,15 +718,16 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
     config.player_state = {.volume = 100,
                            .muted = false,
                            .output_delay_ms = 0,
-                           .required_lead_time_ms = 500,
-                           .min_buffer_ms = 200,
+                           .required_lead_time_ms = options_.required_lead_time_ms,
+                           .min_buffer_ms = options_.min_buffer_ms,
                            .supported_commands = std::vector<m::PlayerCommand>{m::PlayerCommand::kVolume,
                                                                                m::PlayerCommand::kMute},
                            .format = std::nullopt};
-    if (options_.extension_role) {
+    const std::vector<ac::DataType> data_types = options_.data_types_now ? options_.data_types_now() : options_.data_types;
+    if (options_.extension_role && !data_types.empty()) {
         config.supported_roles = {std::string(ac::kRole), "player@v1"};
         ac::Support support;
-        support.data_types = {ac::DataType::kAc3, ac::DataType::kEac3, ac::DataType::kAc4};
+        support.data_types = data_types;
         support.sample_rates = {48000};
         support.outputs.count = options_.output_count;
         support.outputs.bit_depth = 32;
@@ -658,14 +755,20 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         if (options_.max_objects) {
             support.max_objects.fill(options_.max_objects);
         }
+        if (options_.max_frame_rate != 0) {
+            support.max_frame_rate.fill(options_.max_frame_rate);
+        }
         support.lyrics_max_bytes = options_.lyrics_max_bytes;
+        support.requests = options_.requests;
         config.iclforge_support = std::move(support);
         // What the sink's streams are rendered to, as its own page would say.
-        config.iclforge_state.layout = options_.layout;
+        if (!options_.layout.empty()) {
+            config.iclforge_state.layout = options_.layout;
+        }
         config.iclforge_state.volume = 100;
         config.iclforge_state.muted = false;
-        config.iclforge_state.required_lead_time_ms = 500;
-        config.iclforge_state.min_buffer_ms = 200;
+        config.iclforge_state.required_lead_time_ms = options_.required_lead_time_ms;
+        config.iclforge_state.min_buffer_ms = options_.min_buffer_ms;
         config.iclforge_state.supported_commands = {ac::Command::kVolume, ac::Command::kMute};
         if (options_.accept_settings || options_.karaoke) {
             config.iclforge_state.supported_commands.push_back(ac::Command::kSettings);
@@ -863,9 +966,86 @@ Sink::Roles Sink::roles() const {
     return roles_;
 }
 
+void Sink::set_external_source(bool external) {
+    for_each_connection([&](Connection& connection) {
+        connection.driver().call([&] { return connection.session().set_external_source(external); });
+    });
+}
+
 void Sink::send_controller_command(const sendspin::controller::CommandMessage& command) {
     for_each_connection([&](Connection& connection) {
         connection.driver().call([&] { return connection.session().send_command(command); });
+    });
+}
+
+Sink::Status Sink::status() const {
+    std::vector<std::shared_ptr<Connection>> all;
+    {
+        const std::lock_guard lock(connections_mutex_);
+        for (const auto& [id, connection] : connections_) {
+            all.push_back(connection);
+        }
+    }
+    Status out;
+    for (const std::shared_ptr<Connection>& connection : all) {
+        out.connections.push_back(connection->peer_status());
+        if (!out.pairing_code) {
+            out.pairing_code = connection->pairing_code();
+        }
+    }
+    {
+        // The records are added from a session's callback, under the sessions' shared lock.
+        const std::lock_guard lock(*session_lock_);
+        out.paired_servers = store_->records();
+    }
+    return out;
+}
+
+LyricFrame Sink::lyric_frame(std::int64_t delay_ms, const iclforge::lyrics::StageOptions& options) const {
+    std::vector<std::shared_ptr<Connection>> all;
+    {
+        const std::lock_guard lock(connections_mutex_);
+        for (const auto& [id, connection] : connections_) {
+            all.push_back(connection);
+        }
+    }
+    // The document of the first connection that has one: a sink plays for one server at a time, and
+    // the arbiter keeps the others from replacing what is playing.
+    LyricFrame frame;
+    bool found = false;
+    bool streaming = false;
+    std::optional<sendspin::metadata::State> metadata;
+    for (const std::shared_ptr<Connection>& connection : all) {
+        if (!found && connection->has_lyric_item()) {
+            frame = connection->lyric_frame(delay_ms, options);
+            found = true;
+            // What the server that sent the document says is playing, if it says.
+            metadata = connection->metadata();
+        } else if (!found && !metadata) {
+            // No document held yet: a server that says what is playing still names the item.
+            metadata = connection->metadata();
+        }
+        streaming = streaming || connection->streaming();
+    }
+    frame.streaming = streaming;
+    // What the server says is playing (metadata@v1) names the item first, and the document's own
+    // tags are the fallback (D7): an item with no lyrics still has a title to show.
+    if (metadata) {
+        const auto name = [](const std::optional<std::string>& said, std::string& into) {
+            if (said && !said->empty()) {
+                into = *said;
+            }
+        };
+        name(metadata->title, frame.title);
+        name(metadata->artist, frame.artist);
+        name(metadata->album, frame.album);
+    }
+    return frame;
+}
+
+void Sink::send_request(const sendspin::player::Request& request) {
+    for_each_connection([&](Connection& connection) {
+        connection.driver().call([&] { return connection.session().send_iclforge_request(request); });
     });
 }
 

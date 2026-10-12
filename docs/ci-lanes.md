@@ -50,7 +50,7 @@ legs](ci-agentic.md#the-legs)).
 
 | Lane | Job(s) gated by `<lane>` |
 |---|---|
-| `android` | `build-android` |
+| `android` | `build-android`, `build-android-native` (libs/lyrics and libs/sendspin for arm64 under the NDK; compiles and links) and `build-android-hearth` (Hearth for Android's debug APK, through Gradle with vcpkg in front of the NDK, and its instrumented tests on an x86_64 emulator); both of the last two `continue-on-error` until they have proved themselves |
 | `wasm` | `build-wasm`, `device-ui` |
 | `esp` | `build-esp32s3` (also builds the S3 sink image), `hearth-esp32s3` (Hearth Sendspin sink under QEMU), `build-esp32c3` (also builds the ESP32-C6 probe, and the C6 and P4 sink images), `package-esp32-firmware` (the four published sink images and their manifest), `build-footprint`, `ci.yml`'s `esp-component` job-call (`.github/workflows/esp-component.yml`: `pack`, `esphome`) |
 | `rust` | `build-rust` |

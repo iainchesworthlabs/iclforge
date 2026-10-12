@@ -660,6 +660,27 @@ TEST_CASE("messages: server/state and client/command", "[sendspin][messages][rol
     REQUIRE(command_read.has_value());
     CHECK(command_read->controller == command.controller);
     CHECK_FALSE(m::read_client_command(Parsed(R"({"type":"client/command","payload":{"controller":{"command":"louder"}}})").payload()));
+
+    // _iclforge_player@v1's request rides in the same message under the role's own key (D8), beside
+    // a controller command or alone, and a malformed one is a malformed message.
+    m::ClientCommand ask;
+    ask.iclforge = iclforge::sendspin::player::Request{};
+    ask.iclforge->decoder.karaoke_vocals = iclforge::sendspin::player::KaraokeVocals::kV1;
+    const std::string ask_text = m::write_client_command(ask);
+    CHECK(ask_text ==
+          R"({"type":"client/command","payload":{"_iclforge_player":{"command":"decoder","decoder":{"karaoke_vocals":"v1"}}}})");
+    const auto ask_read = m::read_client_command(Parsed(ask_text).payload());
+    REQUIRE(ask_read.has_value());
+    CHECK_FALSE(ask_read->controller.has_value());
+    REQUIRE(ask_read->iclforge.has_value());
+    CHECK(ask_read->iclforge->decoder.karaoke_vocals == iclforge::sendspin::player::KaraokeVocals::kV1);
+    ask.controller = command.controller;
+    const auto both = m::read_client_command(Parsed(m::write_client_command(ask)).payload());
+    REQUIRE(both.has_value());
+    CHECK(both->controller == command.controller);
+    CHECK(both->iclforge.has_value());
+    CHECK_FALSE(m::read_client_command(
+        Parsed(R"({"type":"client/command","payload":{"_iclforge_player":{"command":"decoder","decoder":{}}}})").payload()));
 }
 
 TEST_CASE("messages: the source@v1 artwork@v1 and visualizer@v1 objects in the core messages", "[sendspin][messages][roles]") {

@@ -2647,6 +2647,15 @@ the history's move, the tracks' release), `syntax/asf.{hpp,cpp}`, `decoder.cpp` 
 enhancement, DRC, the downmix and mixing. The probe's peak attribution (`firmware/baremetal/ac4_probe.cpp`, `stage_timers.cpp`)
 and its ceilings, and `run_baremetal_probe.sh --ac4 --stage-timers`.
 
+**Extended to every frame length, 2026-10-12 (the converter warm-up).** D14f built the tables in for the lengths of a
+2,048-sample frame, which is the frame at frame rate indices 2 and 13 and, halved, at 7 and 10. The streams at 0, 1, 3, 4, 5,
+6, 8, 9, 11 and 12 have frames of 1,920, 1,536, 960, 768 and 384 samples, and built their transforms' tables when the first
+frame arrived. An ESP32-S3 over Sendspin spent 0.49 s there for 24 fps and 0.41 s for 29.97 (P4: 0.23 s for 29.97), with the
+stage timers putting it in `ac4_reconstruct`'s own time (468 and 384 ms against 20) and not in the converter (7 and 11 ms): the
+KBD windows and the FFT's roots and twiddles in software double. The generator now writes the fifteen lengths of Table 186 at
+44.1 and 48 kHz (ten new, 89 KB at `float`); the test holds each to the runtime code's bits at `float` and fixed. The first
+frame takes 47 and 54 ms on the S3, with `ac4_reconstruct`'s own time 21 and 27 ms.
+
 **Exit, as measured.** (a) The PCM did not move: the probe's six hashes at `float` and fixed on the x86-64 host, the Cortex-M3
 under QEMU and (fixed) RV32IMC equal their pins after every step, and the `double` and `float` decodes of every tracked AC-4
 stream as coded, folded to 2.0 and in core decoding (252, and 3 both refuse) and 12 encodes are byte-identical to `main`.

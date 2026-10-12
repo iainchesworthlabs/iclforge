@@ -7,7 +7,7 @@ Live capture, IEC 61937 passthrough delivery, shared-mode monitor playback and t
 A library, internal to the repository.
 
 - **Uses:** `base`, `render`, `containers`, `objects`
-- **Used by:** `crucible`, `demo-android`, `forge`, `hearth`
+- **Used by:** `crucible`, `demo-android`, `forge`, `hearth`, `hearth-android`
 - **CI lanes:** core
 - **CMake target:** `iclforge::audio`
 

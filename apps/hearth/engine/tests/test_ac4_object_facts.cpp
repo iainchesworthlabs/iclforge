@@ -1,3 +1,4 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -114,7 +115,42 @@ std::vector<std::byte> channel_stream() {
     return wrapped(*frames, *rest);
 }
 
+// Stereo at `frame_rate_index` (Part 1 Table 83 at 48 kHz).
+std::vector<std::byte> stereo_at(int frame_rate_index) {
+    iclforge::ac4::EncoderConfig config;
+    config.channels = 2;
+    config.bitrate_kbps = 128;
+    config.frame_rate_index = frame_rate_index;
+    auto encoder = iclforge::ac4::Encoder::create(config);
+    INFO(iclforge::ac4::Encoder::refusal_reason(config));
+    REQUIRE(encoder.has_value());
+    const std::vector<std::vector<float>> planes = tones(2);
+    const std::vector<std::span<const float>> views(planes.begin(), planes.end());
+    const auto frames = encoder->encode(views);
+    REQUIRE(frames.has_value());
+    const auto rest = encoder->flush();
+    REQUIRE(rest.has_value());
+    return wrapped(*frames, *rest);
+}
+
 }  // namespace
+
+TEST_CASE("ac4 frame rate: an item says the frames a second its stream is coded at",
+          "[hearth][ac4][frame_rate]") {
+    struct Case {
+        int index;
+        double frames_per_second;
+    };
+    // The 2 048-sample frame, then the rates that go through the converter, 1000/1001 ones
+    // among them, whose frames alternate between two lengths.
+    for (const Case& c : {Case{13, 48000.0 / 2048.0}, Case{2, 25.0}, Case{1, 24.0},
+                          Case{0, 24000.0 / 1001.0}, Case{3, 30000.0 / 1001.0}}) {
+        CAPTURE(c.index);
+        auto session = Session::open("item", loader_of(stereo_at(c.index)));
+        REQUIRE(session.has_value());
+        CHECK(session->facts().frame_rate == Catch::Approx(c.frames_per_second).epsilon(0.002));
+    }
+}
 
 TEST_CASE("ac4 object facts: direct-coded objects are counted, and are objects alone",
           "[hearth][ac4][objects]") {

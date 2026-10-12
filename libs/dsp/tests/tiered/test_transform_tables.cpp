@@ -1,6 +1,6 @@
 // The inverse transform's built-in tables (libs/dsp/src/tiered/transform_tables.hpp,
 // planning/ac4.md, the decoder's memory): at the float and fixed-point tiers a transform reads its
-// roots, twiddles and window from flash for the lengths of a 2048-sample frame, and every value
+// roots, twiddles and window from flash for every length Table 186 lists, and every value
 // there must be the bits the decoder computes when it builds its own, on the compiler and C
 // library at hand, or the decoder's output would move. At double nothing is built in.
 
@@ -65,7 +65,11 @@ std::size_t first_difference(std::span<const R> built_in, const std::vector<R>& 
     return computed.size();
 }
 
-constexpr std::size_t kLengths[] = {2048, 1024, 512, 256, 128};
+// Table 186 at 44.1 and 48 kHz: each of the decoder's frame lengths (2048, 1920, 1536, 1024, 960,
+// 768, 512 and 384, and those over the high frame rate mode's 2 and 4) halved while the table has
+// the length.
+constexpr std::size_t kLengths[] = {2048, 1920, 1536, 1024, 960, 768, 512, 480,
+                                    384,  256,  240,  192,  128, 120, 96};
 
 }  // namespace
 
@@ -96,7 +100,9 @@ TEST_CASE("The built-in transform tables are the bits the decoder computes",
 }
 
 TEST_CASE("A length with no built-in table has none", "[ac4][core][dsp][transform_tables]") {
-    for (const std::size_t n : {std::size_t{1920}, std::size_t{1536}, std::size_t{96}, std::size_t{4096}}) {
+    // Table 186 does not list these, so a transform of them has no window to take either.
+    for (const std::size_t n : {std::size_t{4096}, std::size_t{1000}, std::size_t{64},
+                                std::size_t{60}, std::size_t{48}, std::size_t{0}}) {
         CAPTURE(n);
         CHECK(dsp::transform_table<Real>(n) == nullptr);
     }

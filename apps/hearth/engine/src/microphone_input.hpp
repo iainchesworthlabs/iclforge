@@ -66,15 +66,24 @@ class MicrophoneInput {
 // device, no thread.
 class ScriptedMicrophoneInput final : public MicrophoneInput {
    public:
+    // `samples` is mono, or interleaved when `channels` is more than one.
     ScriptedMicrophoneInput(std::vector<float> samples, std::uint32_t sample_rate,
-                            std::int64_t first_time_ns, std::vector<InputDevice> devices = {})
+                            std::int64_t first_time_ns, std::vector<InputDevice> devices = {},
+                            std::uint16_t channels = 1)
         : samples_(std::move(samples)),
           rate_(sample_rate),
           first_time_ns_(first_time_ns),
-          devices_(std::move(devices)) {}
+          devices_(std::move(devices)),
+          channels_(std::max<std::uint16_t>(channels, 1)) {}
 
     // The time up to which samples have been captured.
     void set_now_ns(std::int64_t now_ns) { now_ns_ = now_ns; }
+    // A new script: other samples, the first captured at `first_time_ns`, played from the start.
+    void script(std::vector<float> samples, std::int64_t first_time_ns) {
+        samples_ = std::move(samples);
+        first_time_ns_ = first_time_ns;
+        read_ = 0;
+    }
     // Makes the device go away, as a pulled USB cable does.
     void unplug() { plugged_ = false; }
     // Makes the next start() refuse with `reason`.
@@ -100,7 +109,7 @@ class ScriptedMicrophoneInput final : public MicrophoneInput {
     void stop() override { running_ = false; }
     [[nodiscard]] bool running() const override { return running_ && plugged_; }
     [[nodiscard]] std::uint32_t sample_rate() const override { return rate_; }
-    [[nodiscard]] std::uint16_t channels() const override { return 1; }
+    [[nodiscard]] std::uint16_t channels() const override { return channels_; }
     [[nodiscard]] std::uint32_t period_frames() const override { return rate_ / 100; }
 
     bool read(InputBlock& out) override {
@@ -108,16 +117,17 @@ class ScriptedMicrophoneInput final : public MicrophoneInput {
             return false;
         }
         const double seconds = static_cast<double>(now_ns_ - first_time_ns_) / 1e9;
+        // In frames: one sample of every channel.
         const std::size_t available =
             seconds <= 0.0
                 ? 0
-                : std::min(samples_.size(),
+                : std::min(samples_.size() / channels_,
                            static_cast<std::size_t>(seconds * static_cast<double>(rate_)));
         if (available <= read_) {
             return false;
         }
-        out.samples.assign(samples_.begin() + static_cast<std::ptrdiff_t>(read_),
-                           samples_.begin() + static_cast<std::ptrdiff_t>(available));
+        out.samples.assign(samples_.begin() + static_cast<std::ptrdiff_t>(read_ * channels_),
+                           samples_.begin() + static_cast<std::ptrdiff_t>(available * channels_));
         out.first_time_ns =
             first_time_ns_ + static_cast<std::int64_t>(static_cast<double>(read_) * 1e9 /
                                                        static_cast<double>(rate_));
@@ -131,6 +141,7 @@ class ScriptedMicrophoneInput final : public MicrophoneInput {
     std::uint32_t rate_;
     std::int64_t first_time_ns_;
     std::vector<InputDevice> devices_;
+    std::uint16_t channels_ = 1;
     std::int64_t now_ns_ = 0;
     std::size_t read_ = 0;
     bool running_ = false;

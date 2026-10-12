@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bench
 import board_suite as bs
 import sink_profile
+import suite_sendspin as ss
 from test_bench import temp_bench
 
 SECRET = "TheHomeNetwork-5GHz"
@@ -241,9 +242,32 @@ class Suite(unittest.TestCase):
                 self.assertIn(spec["pin"], pins, name)
 
     def test_a_profile_without_psram_http_plays_only_expects_a_refusal(self) -> None:
+        # Its HTTP rows: a row played over Sendspin is the board's product path, and plays.
         for profile in ("c6-16mb", "c6-4mb"):
             for row in self.suite["profiles"][profile]["plays"]:
+                if row.get("via") == "sendspin":
+                    self.assertIsNone(row.get("expect"), f"{profile}/{row['id']}")
+                    continue
                 self.assertEqual(row.get("expect"), "refused-memory", f"{profile}/{row['id']}")
+
+    def test_a_row_is_played_over_http_or_over_sendspin_and_nothing_else(self) -> None:
+        for profile, spec in self.suite["profiles"].items():
+            for row in spec["plays"]:
+                self.assertIn(
+                    row.get("via", "play"), ("play", "sendspin"), f"{profile}/{row['id']}"
+                )
+
+    def test_a_sendspin_row_s_stream_states_how_many_bursts_it_is(self) -> None:
+        # The bursts the board played are held to it, as a /play's units are.
+        for profile, spec in self.suite["profiles"].items():
+            for row in spec["plays"]:
+                if row.get("via") == "sendspin":
+                    stream = self.suite["streams"][row["stream"]]
+                    self.assertIsInstance(
+                        stream.get("sendspin_units", stream.get("units")),
+                        int,
+                        f"{profile}/{row['id']}",
+                    )
 
     def test_a_committed_baseline_is_for_a_profile_and_holds_exactly_its_rows(self) -> None:
         for path in sorted(bs.BASELINES.glob("*.json")):
@@ -259,7 +283,13 @@ class Suite(unittest.TestCase):
             for row_id, figures in record["plays"].items():
                 if rows[row_id].get("expect") is None:
                     self.assertEqual(figures["state"], "finished", f"{path.name}/{row_id}")
-                    self.assertEqual(figures["underruns"], 0, f"{path.name}/{row_id}")
+                    if figures.get("via") == "sendspin":
+                        # over Sendspin a play may glitch; the baseline says how many did
+                        self.assertLessEqual(
+                            figures["glitched_plays"], figures["plays"], f"{path.name}/{row_id}"
+                        )
+                    else:
+                        self.assertEqual(figures["underruns"], 0, f"{path.name}/{row_id}")
             # --record refuses a run whose log holds no boot line, so a baseline has the figures
             # the compare's boot ratchet reads.
             for key in ("internal_free", "largest"):
@@ -279,6 +309,9 @@ class Suite(unittest.TestCase):
             "headroom_ms",
             "largest_block_bytes",
             "internal_free_bytes",
+            "play_heap_free_bytes",
+            "play_heap_free_note",
+            "glitched_plays",
             "note",
         }
         for profile, spec in self.suite["profiles"].items():
@@ -407,6 +440,13 @@ class Run(unittest.TestCase):
 
     def run_rows(self, stand_in: StandIn, profile: str, **kwargs):
         board = bs.Board("127.0.0.1", stand_in.port, 5.0)
+        if "only" not in kwargs:
+            # the /play rows: a Sendspin row is played by the test server (test_suite_sendspin.py)
+            kwargs["only"] = [
+                row["id"]
+                for row in bs.plan(self.suite, profile)
+                if row.get("via", "play") == "play"
+            ]
         return bs.run_suite(
             board,
             profile,
@@ -457,13 +497,16 @@ class Run(unittest.TestCase):
         self.assertTrue(any("result=fail" in f for f in results[0].findings))
 
     def test_the_c6s_refusal_is_the_row_and_a_play_that_runs_is_the_finding(self) -> None:
+        # The /play rows: the C6's Sendspin rows are played by the test server, not here.
+        rows = ["ac3-2.0-refused", "eac3-2.0-refused"]
         refusing = {name: Behaviour(refuse=True) for name in ("ffmpeg.ac3", "ffmpeg.ec3")}
-        results = self.run_rows(self.board("c6-16mb", refusing), "c6-16mb")
+        results = self.run_rows(self.board("c6-16mb", refusing), "c6-16mb", only=rows)
+        self.assertEqual([r.id for r in results], rows)
         for r in results:
             self.assertEqual(r.findings, [], r.id)
             self.assertEqual((r.state, r.why), ("failed", "memory"))
         playing = self.board("c6-16mb", standard())
-        results = self.run_rows(playing, "c6-16mb")
+        results = self.run_rows(playing, "c6-16mb", only=rows)
         self.assertTrue(any("expected a refusal for memory" in f for f in results[0].findings))
 
     def test_an_ac4_play_needs_the_hosts_pcm_hash(self) -> None:
@@ -551,6 +594,73 @@ class Boot(unittest.TestCase):
         self.assertEqual(record["board"], "S3b")
         self.assertEqual(record["boot"]["largest"], 31744)
         self.assertEqual(record["plays"]["ac3-2.0"]["decoder_permille_samples"], [223, 223, 223])
+
+
+class BaselineNote(unittest.TestCase):
+    """A baseline recorded under another hash than the run's image carries says so."""
+
+    def test_the_same_hash_has_no_note(self) -> None:
+        run = {"profile_hash": "0fb46709d4bb"}
+        self.assertIsNone(bs.baseline_note(run, {"profile_hash": "0fb46709d4bb"}))
+
+    def test_another_hash_says_both_and_that_the_figures_are_as_recorded(self) -> None:
+        note = bs.baseline_note({"profile_hash": "6e5a68ebbb57"}, {"profile_hash": "0fb46709d4bb"})
+        assert note is not None
+        self.assertIn("0fb46709d4bb", note)
+        self.assertIn("6e5a68ebbb57", note)
+        self.assertIn("compared as they were recorded", note)
+        self.assertTrue(note.startswith("note:"))
+
+    def test_a_hash_that_is_not_known_on_either_side_is_not_a_difference(self) -> None:
+        self.assertIsNone(bs.baseline_note({"profile_hash": "x"}, {}))
+        self.assertIsNone(bs.baseline_note({}, {"profile_hash": "x"}))
+        self.assertIsNone(bs.baseline_note({"profile_hash": ""}, {"profile_hash": "x"}))
+
+    def test_the_compare_command_prints_it_and_the_exit_code_is_the_figures(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = {
+                "profile": "s3-n16r8",
+                "profile_hash": "c4b8d369cf36",
+                "boot": {},
+                "plays": {"ac3-2.0": {"state": "finished", "decoder_permille": 123, "units": 938}},
+            }
+            run = {
+                "profile": "s3-n16r8",
+                "profile_hash": "0fb46709d4bb",
+                "boot": {},
+                "plays": {"ac3-2.0": {"state": "finished", "decoder_permille": 124, "units": 938}},
+            }
+            (Path(tmp) / "base.json").write_text(json.dumps(base), "utf-8")
+            (Path(tmp) / "run.json").write_text(json.dumps(run), "utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = bs.main(
+                    [
+                        "compare",
+                        "--run",
+                        str(Path(tmp) / "run.json"),
+                        "--baseline",
+                        str(Path(tmp) / "base.json"),
+                    ]
+                )
+        self.assertEqual(code, 0)
+        self.assertIn("recorded under profile hash c4b8d369cf36", out.getvalue())
+        self.assertIn("the run holds to the baseline", out.getvalue())
+
+    def test_the_note_does_not_hide_a_regression(self) -> None:
+        base = {
+            "profile_hash": "c4b8d369cf36",
+            "profile": "s3-n16r8",
+            "plays": {"ac3-2.0": {"state": "finished", "decoder_permille": 100, "units": 938}},
+        }
+        run = {
+            "profile_hash": "0fb46709d4bb",
+            "profile": "s3-n16r8",
+            "plays": {"ac3-2.0": {"state": "finished", "decoder_permille": 200, "units": 938}},
+        }
+        regressions, _ = bs.compare(run, base, {})
+        self.assertTrue(regressions)
+        self.assertIsNotNone(bs.baseline_note(run, base))
 
 
 class FoldedPin(unittest.TestCase):
@@ -714,6 +824,7 @@ class LogPaging(unittest.TestCase):
                 repeat=1,
                 sleep=0.01,
                 timeout=5.0,
+                only=["ac3-2.0", "eac3-2.0"],
             )
         finally:
             stand_in.close()
@@ -968,6 +1079,11 @@ class ResetBy(unittest.TestCase):
             str(self.out),
             "--play-timeout",
             "10",
+            # the /play rows: the Sendspin rows need the test server, which these do not have
+            "--only",
+            "ac3-2.0",
+            "--only",
+            "eac3-2.0",
             *extra,
         ]
         out, err = io.StringIO(), io.StringIO()
@@ -1135,6 +1251,11 @@ class CommandLine(unittest.TestCase):
             str(self.out),
             "--play-timeout",
             "10",
+            # the /play rows: the Sendspin rows need the test server, which these do not have
+            "--only",
+            "ac3-2.0",
+            "--only",
+            "eac3-2.0",
             *extra,
         ]
 
@@ -1312,6 +1433,88 @@ class CommandLine(unittest.TestCase):
             )
             self.assertEqual(code, 2, extra)
             self.assertIn("--boots", err)
+        self.assertEqual((self.stand_in.restarts, self.stand_in.plays), (0, []))
+        self.assertFalse(self.lock.exists())
+
+    def c6_stand_in(self) -> None:
+        self.stand_in.hardware["profile"] = "c6-16mb"
+        self.stand_in.hardware["profile_hash"] = sink_profile.profile_hash(
+            sink_profile.load(), "c6-16mb"
+        )
+
+    def test_a_sendspin_row_is_played_by_the_test_server_and_the_pairing_is_tidied(self) -> None:
+        self.c6_stand_in()
+        closed: list[str] = []
+
+        class Tidy:
+            def __init__(self, board, keep=False) -> None:
+                self.keep = keep
+
+            def close(self) -> str:
+                closed.append("closed")
+                return "pairing: forgot the suite's record"
+
+        stream = (
+            "sendspin.stream=bursts bursts=938 late=0 dropped=0 invalid=0 underruns=0 resyncs=0 "
+            "worst_error_us=-362 burst_us=21111 sink_us=10674 ring_high=35260 heap_free=52560"
+        )
+        canned = ss.SendspinRun(
+            exit_code=0,
+            stream=ss.parse_stream_end(stream),
+            after={"decode_stack_free": 10904},
+            report={"players": [{"counters": {}}]},
+            server_id="SUITEID",
+        )
+        with (
+            mock.patch.object(ss, "find_testserver", return_value=Path("hearth-testserver")),
+            mock.patch.object(ss, "Pairing", Tidy),
+            mock.patch.object(ss, "play_row", return_value=canned) as played,
+        ):
+            code, out, err = self.run_cli(
+                *self.run_args(
+                    "--lock", str(self.lock), "--session", "16d036",
+                    "--profile", "c6-16mb", "--only", "ac3-2.0-sendspin",
+                )
+            )  # fmt: skip
+        self.assertEqual((code, err), (0, ""), out)
+        self.assertEqual(played.call_count, 1)
+        self.assertTrue(str(played.call_args.args[3]).endswith("ffmpeg.ac3"))
+        self.assertEqual(closed, ["closed"])
+        self.assertIn("pairing: forgot", out)
+        figures = json.loads(self.out.read_text("utf-8"))["plays"]["ac3-2.0-sendspin"]
+        self.assertEqual(figures["via"], "sendspin")
+        self.assertEqual(figures["decoder_permille"], 660)
+        self.assertEqual(figures["play_heap_free"], 52560)
+        self.assertFalse(self.lock.exists())
+
+    def test_no_test_server_is_refused_before_the_board_is_booked_or_touched(self) -> None:
+        self.c6_stand_in()
+        with mock.patch.object(
+            ss,
+            "find_testserver",
+            side_effect=ss.SendspinError("no hearth-testserver: --testserver"),
+        ):
+            code, _, err = self.run_cli(
+                *self.run_args(
+                    "--lock", str(self.lock), "--session", "16d036",
+                    "--profile", "c6-16mb", "--only", "ac3-2.0-sendspin", "--restart",
+                )
+            )  # fmt: skip
+        self.assertEqual(code, 2)
+        self.assertIn("--testserver", err)
+        self.assertFalse(self.lock.exists())
+        self.assertEqual((self.stand_in.restarts, self.stand_in.plays), (0, []))
+
+    def test_a_board_that_is_another_image_is_refused_before_it_is_restarted(self) -> None:
+        # Eight restarts of a board the suite then refuses are eight restarts for nothing.
+        self.stand_in.hardware["profile"] = ""
+        code, _, err = self.run_cli(
+            *self.run_args(
+                "--lock", str(self.lock), "--session", "16d036", "--restart", "--boots", "8"
+            )
+        )
+        self.assertEqual(code, 2)
+        self.assertIn("no profile", err)
         self.assertEqual((self.stand_in.restarts, self.stand_in.plays), (0, []))
         self.assertFalse(self.lock.exists())
 

@@ -30,6 +30,7 @@
 // handed in by whoever shows it (the card), as KaraokeController's is.
 namespace iclforge::hearth {
 class MicrophoneInput;
+struct TakeInfo;
 }
 
 namespace iclforge::hearth::ui {
@@ -71,6 +72,16 @@ class MicrophoneController : public QObject {
     Q_PROPERTY(QString referenceStatus READ referenceStatus NOTIFY referenceChanged)
     Q_PROPERTY(QString referenceText READ referenceText NOTIFY referenceChanged)
 
+    // A take (M6): the dry voice kept as a FLAC with a description beside it. Its own switch, not
+    // the microphone's (RC1): recording and "Microphone on" are two indicators. The folder is the
+    // person's choice, kept; it is never made until a take is started.
+    Q_PROPERTY(bool recording READ recording NOTIFY recordingChanged)
+    Q_PROPERTY(double takeSeconds READ takeSeconds NOTIFY recordingChanged)
+    Q_PROPERTY(QString takeError READ takeError NOTIFY recordingChanged)
+    // The last take: name, path, folder, seconds; empty before one.
+    Q_PROPERTY(QVariantMap lastTake READ lastTake NOTIFY recordingChanged)
+    Q_PROPERTY(QString takesFolder READ takesFolder NOTIFY takesFolderChanged)
+
     // The live view: voiced, hz, referenceHz, centsFromReference (absent where there is no note or
     // the singer is not voiced), itemMs.
     Q_PROPERTY(QVariantMap live READ live NOTIFY liveChanged)
@@ -78,6 +89,14 @@ class MicrophoneController : public QObject {
     // reference's voiced time the singer was voiced for), meanCents, lagMs and keyOffsetCents
     // (absent until there is enough), counted, hit, unplaced, timingEstimated.
     Q_PROPERTY(QVariantMap score READ score NOTIFY scoreChanged)
+    // A number that changes whenever the score does, which a line's mark binds to: lineResult()
+    // is a function of the performance so far, and a binding follows only what it reads.
+    Q_PROPERTY(int scoreRevision READ scoreRevision NOTIFY scoreChanged)
+    // What the last performance came to, kept when the microphone is turned off, the item ends or
+    // the device goes (M5): the same fields as `score`, plus `reference` (what it was scored
+    // against) and `toleranceCents`. Empty until one has been scored, and when the person had not
+    // said they wore headphones, since that score is never shown. Cleared by the next start().
+    Q_PROPERTY(QVariantMap summary READ summary NOTIFY summaryChanged)
 
    public:
     // The machine's own input.
@@ -115,6 +134,13 @@ class MicrophoneController : public QObject {
     [[nodiscard]] QString referenceText() const { return reference_text_; }
     [[nodiscard]] QVariantMap live() const { return live_; }
     [[nodiscard]] QVariantMap score() const { return score_; }
+    [[nodiscard]] int scoreRevision() const { return score_revision_; }
+    [[nodiscard]] QVariantMap summary() const { return summary_; }
+    [[nodiscard]] bool recording() const { return recording_; }
+    [[nodiscard]] double takeSeconds() const { return take_seconds_; }
+    [[nodiscard]] QString takeError() const { return take_error_; }
+    [[nodiscard]] QVariantMap lastTake() const { return last_take_; }
+    [[nodiscard]] QString takesFolder() const { return takes_folder_; }
 
     // Lists the inputs again.
     Q_INVOKABLE void refreshDevices();
@@ -126,6 +152,18 @@ class MicrophoneController : public QObject {
     Q_INVOKABLE void stop();
     // Starts the score again from nothing (a new take of the same item).
     Q_INVOKABLE void restartScore();
+
+    // Starts a take: the microphone must be on. False, with takeError, when the file could not be
+    // made. The name is the item's and the time.
+    Q_INVOKABLE bool startRecording();
+    // Ends it and keeps it; lastTake says where.
+    Q_INVOKABLE void stopRecording();
+    // Removes the last take and its description.
+    Q_INVOKABLE bool deleteLastTake();
+    // Opens the folder in the file manager.
+    Q_INVOKABLE void showTakes();
+    // Where takes go: a folder URL from a dialog, or a path. Kept.
+    Q_INVOKABLE void setTakesFolder(const QString& urlOrPath);
 
     // The item playing, and which part to take the reference from ("m", "v1", "v2" or "" for the
     // first present). An empty path closes the microphone: nothing is playing to sing along to.
@@ -139,6 +177,26 @@ class MicrophoneController : public QObject {
 
     // The engine's heard position, as of now. Called whenever it is polled.
     Q_INVOKABLE void anchor(qlonglong positionMs, bool playing);
+
+    // What a view of the last few seconds is drawn from (M5), for [fromMs, toMs] of the item:
+    //   hasReference  false when there is nothing to score against;
+    //   notes         the reference's notes in the window, flat: start, end, MIDI note number;
+    //   trace         the singer's placed frames in the window, flat: item time, MIDI note number
+    //                 (-1 where not voiced) and 1 when within the tolerance of the reference, else
+    //                 0. A voice an octave from the tune is drawn on the tune's octave, as it is
+    //                 scored, so the line is where the notes are.
+    // The window is asked for by the view, so nothing is built while no ribbon is shown.
+    Q_INVOKABLE QVariantMap ribbon(qlonglong fromMs, qlonglong toMs) const;
+
+    // A line's result once it has been sung, for [startMs, endMs) of the item (the line's own
+    // times with the lyrics' delay added): scored (false when the reference has no note in it, or
+    // there is no reference: a line like that has no mark, not a zero), withheld (the headphones
+    // answer is missing), notSung (the singer was voiced for under a fifth of its notes' time:
+    // shown as such and not as a bad score), percent, level (1 to 3: under 45, under 75, 75 and
+    // over: presentation, not measurement) and counted.
+    Q_INVOKABLE QVariantMap lineResult(qlonglong startMs, qlonglong endMs) const;
+    // The level (1 to 3) a line of `percent` is marked with: the same three bands for every line.
+    [[nodiscard]] static int levelFor(int percent);
 
     // What the 20 ms timer does: read the microphone, measure and score it, and tell the page.
     // Public so that a test with its own clock can drive it.
@@ -154,6 +212,9 @@ class MicrophoneController : public QObject {
     void referenceChanged();
     void liveChanged();
     void scoreChanged();
+    void recordingChanged();
+    void takesFolderChanged();
+    void summaryChanged();
 
    private:
     struct State;
@@ -161,6 +222,9 @@ class MicrophoneController : public QObject {
 
     void publish(bool force);
     void fail(const QString& text);
+    void remember_take(const iclforge::hearth::TakeInfo& info);
+    // Keeps what the performance came to, before the session forgets it.
+    void capture_summary();
 
     std::unique_ptr<State> state_data_;
     QTimer timer_;
@@ -180,6 +244,13 @@ class MicrophoneController : public QObject {
     QString reference_text_;
     QVariantMap live_;
     QVariantMap score_;
+    int score_revision_ = 0;
+    QVariantMap summary_;
+    bool recording_ = false;
+    double take_seconds_ = 0.0;
+    QString take_error_;
+    QVariantMap last_take_;
+    QString takes_folder_;
     QString item_path_;
     QString prefer_;
     int ticks_ = 0;

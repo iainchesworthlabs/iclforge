@@ -721,6 +721,12 @@ struct TransientHold {
     // synthesis buffer §3.7.2 takes out of them. Grown once, then reused.
     std::vector<float> window;
     std::vector<float> synthesis;
+    // §3.7.2's two cross-fades: 3,072 bytes at float or Q7.24, made here with the rest of
+    // the hold, at the first frame of a stream that signals a correction, and let go with
+    // it. They were statics of transient_prenoise.cpp, in .bss for every image that links
+    // the decoder and for the streams that never use the tool as much as for the ones that
+    // do (the ESP32-C6's internal RAM is what its player and its network share).
+    internal::TransientPrenoiseWindows windows;
 };
 
 int frame_samples(const DecodedSubstream& frame) {
@@ -766,7 +772,7 @@ void apply_correction(TransientHold& hold, const TransientHold::Correction& corr
         std::copy_n(channel.begin() + in_channel, count, hold.window.begin() + in_window);
     });
     internal::apply_transient_prenoise(hold.window, correction.transient - base,
-                                       correction.translen, hold.synthesis);
+                                       correction.translen, hold.synthesis, hold.windows);
     each_share([&hold](std::vector<float>& channel, int in_channel, int in_window, int count) {
         std::copy_n(hold.window.begin() + in_window, count, channel.begin() + in_channel);
     });

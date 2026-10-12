@@ -28,6 +28,8 @@
 #include "iclforge/sendspin/state_roles.hpp"
 #include "iclforge/sendspin/stream_roles.hpp"
 #include "iclforge/sendspin/websocket.hpp"
+#include "iclforge/lyrics/stage.hpp"
+#include "iclforge/sink/lyric_frame.hpp"
 #include "iclforge/sink/store.hpp"
 
 // iclforge::sink: libs/sendspin's player half as a sink that a program runs (planning/hearth-
@@ -71,6 +73,15 @@ struct Options {
     // The channel counts PCM and FLAC are offered at, each of the formats above (Opus stays at
     // two): a player that renders to a layout wider than stereo lists that width.
     std::vector<std::int32_t> pcm_channels{2};
+    // The coded formats the extension role lists: what a server may send as bursts. A program lists
+    // the ones its output takes; the test sink's decoders take all three.
+    std::vector<sendspin::player::DataType> data_types{
+        sendspin::player::DataType::kAc3, sendspin::player::DataType::kEac3, sendspin::player::DataType::kAc4};
+    // When set, asked for each connection instead of `data_types`: what the output takes now. A
+    // route comes and goes with a TV (an Android box loses its HDMI output when the display sleeps),
+    // so what a program could take when the sink started is not what it can when a server dials.
+    // An empty answer leaves the extension role unlisted for that connection.
+    std::function<std::vector<sendspin::player::DataType>()> data_types_now;
     // Offer _iclforge_player@v1 before player@v1, as a Hearth sink does.
     bool extension_role = true;
     // Lists the Settings command in the extension role's state and applies
@@ -99,10 +110,16 @@ struct Options {
     // `lyrics_position` commands (W7d, planning/karaoke-phase2.md); 0 lists neither, as a board
     // from before them, or one with no heap to spare. What it receives is kept (Sink::roles()).
     std::uint32_t lyrics_max_bytes = 0;
+    // The decoder keys the sink may ask a server to change (the extension role's support `requests`:
+    // any of sendspin::player::kRequestableKeys), for a sink whose screen or remote chooses the
+    // singer's karaoke choice (D8, planning/hearth-android.md). Empty lists none, and request()
+    // then sends nothing.
+    std::vector<std::string> requests;
     // What the extension role's streams are rendered to, as its support and state objects say it:
-    // the layout in the layout grammar (state.layout), the number of outputs (support.outputs.count)
-    // and the crossover's range in Hz (support.management.crossover_hz). The sink does not render:
-    // the program's output does, and says here what it renders to.
+    // the layout in the layout grammar (state.layout; none is stated when it is empty, as for a program
+    // that bitstreams and renders nothing), the number of outputs (support.outputs.count) and the
+    // crossover's range in Hz (support.management.crossover_hz). The sink does not render: the
+    // program's output does, and says here what it renders to.
     std::string layout;
     std::int32_t output_count = 2;
     std::array<double, 2> crossover_hz{0.0, 0.0};
@@ -123,6 +140,12 @@ struct Options {
     // buffer_capacity): what a server may have sent that has not played yet. A board's is a
     // few tens of KB.
     std::uint64_t buffer_capacity = 32ULL * 1024 * 1024;
+    // What the sink asks of a server in time (both roles' state): how far ahead of its play time a
+    // chunk must be sent to be played on time, and the least the sink wants buffered. A device that
+    // takes time to start (an AudioTrack, which needs the whole of its buffer queued before it moves)
+    // asks for more than a sink that writes a file.
+    std::int32_t required_lead_time_ms = 500;
+    std::int32_t min_buffer_ms = 200;
     // The most bytes one chunk to the sink may be, which the extension role's support object
     // states; 0 states none, as a sink from before the key does.
     std::uint32_t max_chunk_bytes = 0;
@@ -132,6 +155,9 @@ struct Options {
     // The most objects the extension role's support object states it places, for every data type
     // it lists; unset states none. 0 is a statement: bed only.
     std::optional<std::uint8_t> max_objects;
+    // The most frames a second the extension role's support object states it decodes, for every
+    // data type it lists; 0 states none.
+    std::uint16_t max_frame_rate = 0;
 };
 
 // What a sink reports, one line at a time, from any of its threads.
@@ -154,6 +180,12 @@ struct OutputCounts {
     std::uint32_t streams = 0;
     std::uint64_t units = 0;
     std::uint64_t frames = 0;
+    // What went wrong at the output, which the extension role's state reports as its counters: gaps
+    // the device played where there was no audio, units that came after their time, and units that
+    // were dropped (late ones, or ones that could not be taken).
+    std::uint64_t underruns = 0;
+    std::uint64_t late = 0;
+    std::uint64_t dropped = 0;
 };
 
 // Where one connection's player@v1 stream goes: PCM, FLAC or Opus, which an output decodes or
@@ -208,6 +240,11 @@ class BurstStreamOutput {
     [[nodiscard]] virtual const std::filesystem::path& file() const = 0;
     // What the output found in the current stream, once it has: the role's `decoder` state.
     [[nodiscard]] virtual const std::optional<sendspin::player::DecoderReport>& decoder() const = 0;
+    // How a stream this output took leaves the sink, which the role's `output` state says (D6,
+    // planning/hearth-android.md): handed to a receiver as it was coded (kPassthrough), or decoded
+    // here and played as samples (kPcm). Unset for an output that does not say, which a server reads
+    // as not known; the sink reports it only while a stream the output took is open.
+    [[nodiscard]] virtual std::optional<sendspin::player::Output> output() const { return std::nullopt; }
 };
 
 // What a sink asks of its program for each connection: the two outputs, made when the connection
@@ -250,6 +287,11 @@ class Sink {
     void reset_rounds();
     void cancel_pairing();
 
+    // Another source holds the device (audio focus was lost to a call, a navigation voice, another
+    // app): tells every server so, as the specification's `external_source`, and again when it is
+    // given back. The output is the program's to pause.
+    void set_external_source(bool external);
+
     // Totals over every connection, for tests.
     struct Totals {
         std::uint32_t connections = 0;
@@ -262,6 +304,30 @@ class Sink {
         std::uint64_t burst_frames = 0;
     };
     [[nodiscard]] Totals totals() const;
+
+    // What a screen says of the sink (planning/hearth-sink-screen.md, the model): who is connected and
+    // what each is doing here, the code a server asked to pair by that has not yet been typed there,
+    // and how many servers this sink holds a pairing record for.
+    struct Status {
+        enum class Activity : std::uint8_t { kNothing, kPairing, kPlayback };
+        struct Peer {
+            std::uint64_t id = 0;
+            // The peer's address, as the transport saw it.
+            std::string address;
+            // What the server called itself; empty until it has said.
+            std::string server_name;
+            Activity activity = Activity::kNothing;
+            // A stream is open on this connection.
+            bool streaming = false;
+            // How that stream leaves the sink, as the role's state says it to the server: unset
+            // with no stream, with one the output did not take, and for an output that does not say.
+            std::optional<sendspin::player::Output> output;
+        };
+        std::vector<Peer> connections;
+        std::optional<std::string> pairing_code;
+        std::size_t paired_servers = 0;
+    };
+    [[nodiscard]] Status status() const;
 
     // What the other roles have received, over every connection: the server/state messages and the
     // latest state of each state role, none once cleared; the last image on each artwork channel,
@@ -281,10 +347,22 @@ class Sink {
     [[nodiscard]] Roles roles() const;
     // A controller@v1 command, sent on every connection where the role is active.
     void send_controller_command(const sendspin::controller::CommandMessage& command);
+    // Asks the server of every connection where the role is active to change the singer's karaoke
+    // choice, as the sink's screen or remote chose it. Cut to Options::requests, and advice: the
+    // server decides, and what it did comes back as the settings the sink is sent.
+    void send_request(const sendspin::player::Request& request);
     // The sink loses the lyrics it holds and says so on every connection, as a board does that
     // restarted its player, or reconnected: a test of what a server does about a member that
     // reports no lyrics (or another item's) for the item it is playing.
     void forget_lyrics();
+
+    // What a screen draws of the lyrics now (lyric_frame.hpp): the document the sink holds for the
+    // item playing, followed on the sink's own clock by the server's anchors, less `delay_ms`, the
+    // singer's nudge (positive shows the lyrics later). A sink that holds none answers
+    // StageMode::kNoLyrics, with `streaming` saying whether a stream is open. Safe to call from a
+    // thread of the program's own, as the totals are.
+    [[nodiscard]] LyricFrame lyric_frame(std::int64_t delay_ms = 0,
+                                         const lyrics::StageOptions& options = {}) const;
 
    private:
     friend class Connection;

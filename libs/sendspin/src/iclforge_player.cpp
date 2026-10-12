@@ -111,6 +111,8 @@ constexpr std::int32_t kMaxCodedChannels = 64;
 // The most objects a sink may state it places: a JOC programme carries sixteen, an AC-4
 // presentation more, and the count is a byte.
 constexpr std::int32_t kMaxObjects = 255;
+// AC-4's fastest frame rate is 120 fps; a limit above 1000 is not a limit.
+constexpr std::int32_t kMaxFrameRate = 1000;
 // The longest layout text a state may carry. A layout is a name or a speaker list, a few hundred
 // characters at the most.
 constexpr std::size_t kMaxLayoutText = 512;
@@ -280,6 +282,17 @@ void write_support(json::Writer& w, const Support& support) {
         }
         w.end_object();
     }
+    const bool any_rate_limit =
+        std::ranges::any_of(support.max_frame_rate, [](std::uint16_t limit) { return limit != 0; });
+    if (any_rate_limit) {
+        w.key("max_frame_rate").begin_object();
+        for (const Named<DataType>& entry : kDataTypes) {
+            if (const std::uint16_t limit = support.max_frame_rate_of(entry.value); limit != 0) {
+                w.member(entry.name, static_cast<std::int32_t>(limit));
+            }
+        }
+        w.end_object();
+    }
     if (support.lyrics_max_bytes != 0) {
         w.key("lyrics").begin_object().key("max_bytes").unsigned_integer(support.lyrics_max_bytes).end_object();
     }
@@ -299,6 +312,13 @@ void write_support(json::Writer& w, const Support& support) {
         w.key("karaoke_codecs").begin_array();
         for (const DataType type : support.karaoke_codecs) {
             w.string(data_type_name(type));
+        }
+        w.end_array();
+    }
+    if (!support.requests.empty()) {
+        w.key("requests").begin_array();
+        for (const std::string& key : support.requests) {
+            w.string(key);
         }
         w.end_array();
     }
@@ -431,6 +451,25 @@ std::optional<Support> read_support(json::Value value) {
                 static_cast<std::uint8_t>(*objects);
         }
     }
+    // The frames a second a sink keeps up with, the same shape as the channel count: a type the
+    // object does not name states none, and a rate that is not a rate refuses the object.
+    if (const json::Value limits = value["max_frame_rate"]; limits.exists()) {
+        if (!limits.is_object()) {
+            return std::nullopt;
+        }
+        for (const Named<DataType>& entry : kDataTypes) {
+            const json::Value limit = limits[entry.name];
+            if (!limit.exists()) {
+                continue;
+            }
+            const std::optional<std::int32_t> rate = read_int32(limit, 1, kMaxFrameRate);
+            if (!rate) {
+                return std::nullopt;
+            }
+            support.max_frame_rate[static_cast<std::size_t>(entry.value)] =
+                static_cast<std::uint16_t>(*rate);
+        }
+    }
     // The lyric document a sink holds: an object with the size, absent for a sink that takes none.
     if (const json::Value lyrics = value["lyrics"]; lyrics.exists()) {
         if (!lyrics.is_object()) {
@@ -456,6 +495,23 @@ std::optional<Support> read_support(json::Value value) {
             }
             if (const std::optional<DataType> type = value_of(kDataTypes, element)) {
                 support.karaoke_codecs.push_back(*type);
+            }
+        }
+    }
+    // The keys the sink may ask a server to change: a name that is not requestable is skipped, as
+    // an unknown data type is, and an element that is not a string refuses the array.
+    if (const json::Value requests = value["requests"]; requests.exists()) {
+        if (!requests.is_array()) {
+            return std::nullopt;
+        }
+        for (const json::Value element : requests.elements()) {
+            const std::optional<std::string> key = element.as_string();
+            if (!element.is_string() || !key) {
+                return std::nullopt;
+            }
+            if (std::ranges::find(kRequestableKeys, std::string_view{*key}) != kRequestableKeys.end() &&
+                std::ranges::find(support.requests, *key) == support.requests.end()) {
+                support.requests.push_back(*key);
             }
         }
     }
@@ -1001,6 +1057,96 @@ std::expected<CommandMessage, CommandFailure> read_command(json::Value value) {
         }
     }
     return command;
+}
+
+void write_request(json::Writer& w, const Request& request) {
+    const DecoderSettings& decoder = request.decoder;
+    w.begin_object().member("command", "decoder").key("decoder").begin_object();
+    if (decoder.karaoke) {
+        w.member("karaoke", name_of(kKaraokes, *decoder.karaoke));
+    }
+    if (decoder.karaoke_vocals) {
+        w.member("karaoke_vocals", name_of(kKaraokeVocals, *decoder.karaoke_vocals));
+    }
+    if (decoder.karaoke_melody_db) {
+        w.key("karaoke_melody_db").number(*decoder.karaoke_melody_db, 1);
+    }
+    if (decoder.karaoke_vocal1_db) {
+        w.key("karaoke_vocal1_db").number(*decoder.karaoke_vocal1_db, 1);
+    }
+    if (decoder.karaoke_vocal2_db) {
+        w.key("karaoke_vocal2_db").number(*decoder.karaoke_vocal2_db, 1);
+    }
+    w.end_object().end_object();
+}
+
+std::optional<Request> read_request(json::Value value) {
+    if (!value.is_object() || !value["command"].equals("decoder")) {
+        return std::nullopt;
+    }
+    const json::Value decoder = value["decoder"];
+    if (!decoder.is_object()) {
+        return std::nullopt;
+    }
+    Request request;
+    DecoderSettings& out = request.decoder;
+    bool any = false;
+    // A key that is present and wrong refuses the whole request, as a settings object is refused
+    // whole: half of what a sink asked for is not what it asked for.
+    if (const json::Value field = decoder["karaoke"]; field.exists()) {
+        out.karaoke = value_of(kKaraokes, field);
+        if (!out.karaoke) {
+            return std::nullopt;
+        }
+        any = true;
+    }
+    if (const json::Value field = decoder["karaoke_vocals"]; field.exists()) {
+        out.karaoke_vocals = value_of(kKaraokeVocals, field);
+        if (!out.karaoke_vocals) {
+            return std::nullopt;
+        }
+        any = true;
+    }
+    const auto level = [&](std::string_view key, std::optional<double>& target) {
+        const json::Value field = decoder[key];
+        if (!field.exists()) {
+            return true;
+        }
+        target = read_number(field);
+        any = true;
+        return target && *target >= kKaraokeLevelMinDb && *target <= kKaraokeLevelMaxDb;
+    };
+    if (!level("karaoke_melody_db", out.karaoke_melody_db) || !level("karaoke_vocal1_db", out.karaoke_vocal1_db) ||
+        !level("karaoke_vocal2_db", out.karaoke_vocal2_db)) {
+        return std::nullopt;
+    }
+    if (!any) {
+        return std::nullopt;
+    }
+    return request;
+}
+
+std::optional<Request> accept_request(const Request& request, const Support& support) {
+    const auto lists = [&](std::string_view key) {
+        return std::ranges::find(support.requests, key) != support.requests.end();
+    };
+    Request out;
+    bool any = false;
+    const auto keep = [&](std::string_view key, const auto& from, auto& into) {
+        if (from && lists(key)) {
+            into = from;
+            any = true;
+        }
+    };
+    keep("karaoke", request.decoder.karaoke, out.decoder.karaoke);
+    keep("karaoke_vocals", request.decoder.karaoke_vocals, out.decoder.karaoke_vocals);
+    keep("karaoke_melody_db", request.decoder.karaoke_melody_db, out.decoder.karaoke_melody_db);
+    keep("karaoke_vocal1_db", request.decoder.karaoke_vocal1_db, out.decoder.karaoke_vocal1_db);
+    keep("karaoke_vocal2_db", request.decoder.karaoke_vocal2_db, out.decoder.karaoke_vocal2_db);
+    if (!any) {
+        return std::nullopt;
+    }
+    return out;
 }
 
 std::optional<std::string> check_settings(const Settings& settings, const Support& support) {

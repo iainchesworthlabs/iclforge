@@ -150,7 +150,7 @@ can. Unpaired access stays off.
 | Change | Where | Size | Needed by |
 |---|---|---|---|
 | `metadata@v1` fed from the engine (title, artist, album, progress) | `apps/hearth/engine` | M | A sink with no lyric document having a title ([D7](#decisions)); also the panel |
-| An `output` key in the role's state: `passthrough` or `pcm` | `libs/sendspin`, the host's Network page | S | The screen's route chip ([D6](#decisions)); also the panel |
+| An `output` key in the role's state: `passthrough` or `pcm` | `libs/sendspin` (built), `libs/sink` and the app (built), the host's Network page (open) | S | The screen's route chip ([D6](#decisions)); also the panel |
 | The Network page says a pass-through member is within a burst | `apps/hearth/ui` | S | [D10](#decisions) |
 | A request from a sink to the server (vocals, reproduction) | `libs/sendspin`, the host | M | The TV remote choosing V1 or V2 ([D8](#decisions)); the panel's Q6 |
 | `Stage` on `main` | `libs/lyrics` | S | The P4X session's W12a; the Android lyric view |
