@@ -33,6 +33,14 @@
 // nothing in the queue the first becomes the item that is loaded and cued, not
 // playing: with a capture the grab waits for the item's media information to
 // be read first, so a page that shows a song (Karaoke, Play, Media) shows it.
+// A file named on its own - `hearth song.ac3`, or what the shell runs for a
+// double-clicked .ac3 (`hearth.exe "%1"`, cmake/Packaging.cmake) - is
+// `--open <file>` written without the option, and a launch plays it: the file
+// goes behind the queue the window brings back, becomes the item playing and
+// starts (Engine::add_and_play()). It only waits, cued as above, on a first
+// run (the "Before you play anything" dialog says where the sound goes and
+// comes first), with a capture, and with `--seek`. `--` ends the options, so
+// `hearth -- --page` opens a file called `--page`.
 // `--seek <ms>` starts that item at a position and holds it paused there (a
 // stopped item has no position to show, and a seek on it is kept for its next
 // start), so a lyric view shows a word part way through; that is a moment of
@@ -254,17 +262,22 @@ int main(int argc, char** argv) {
         QMetaObject::invokeMethod(engine.rootObjects().first(), "openOutputPicker");
     }
 
-    // --open: the files join the queue behind whatever is in it, and with an
-    // empty queue (a capture's scratch store always is) the first becomes the
-    // current item, loaded and cued, which is what a page that shows a song
-    // reads. Absolute paths: the queue keeps them, and the lyrics file is
-    // found beside the item.
+    // --open and a file on its own: the files join the queue behind whatever is
+    // in it, and with an empty queue (a capture's scratch store always is) the
+    // first becomes the current item, loaded and cued, which is what a page
+    // that shows a song reads. A launch plays the first instead
+    // (CommandLine::plays_at_launch(), which a capture and --seek are not),
+    // unless this is the first run: the dialog that says where the sound goes
+    // is open over the window, and the file waits cued behind it. Absolute
+    // paths: the queue keeps them, and the lyrics file is found beside the
+    // item.
     iclforge::hearth::ui::HearthController* const controller =
         command_line.open_files.isEmpty()
             ? nullptr
             : engine.singletonInstance<iclforge::hearth::ui::HearthController*>(
                   "Hearth", "HearthController");
     QString first_path;
+    bool plays = false;
     if (controller != nullptr) {
         QStringList paths;
         paths.reserve(command_line.open_files.size());
@@ -272,10 +285,17 @@ int main(int argc, char** argv) {
             paths.push_back(QDir::cleanPath(QFileInfo(file).absoluteFilePath()));
         }
         first_path = paths.first();
-        controller->addFiles(paths);
+        plays = command_line.plays_at_launch() && controller->firstRunSeen();
+        if (plays) {
+            controller->openAndPlay(paths);
+        } else {
+            controller->addFiles(paths);
+        }
     }
 
-    if (controller == nullptr) {
+    // Nothing more to wait for: no file, or a file that is already playing
+    // (which is never a capture, so there is no picture to take either).
+    if (controller == nullptr || plays) {
         if (!shot_path.isEmpty()) {
             // Let the page switch and the layout settle before the grab.
             QTimer::singleShot(500, &app, [&engine, shot_path] {

@@ -7,6 +7,8 @@ docs/library/python-api.md in the iclforge repository for the full surface and w
 
 from ._iclforge import (
     BLOCKS_PER_FRAME,
+    KARAOKE_MAX_LEVEL_DB,
+    KARAOKE_MIN_LEVEL_DB,
     MAX_AC3_CHANNELS,
     SAMPLES_PER_FRAME,
     TRANSFORM_DELAY_SAMPLES,
@@ -36,6 +38,8 @@ from ._iclforge import (
     FrameError,
     FrameHeader,
     HeavyConfig,
+    KaraokeReproduction,
+    KaraokeVocals,
     LatencyBudget,
     ObjectPlacement,
     Position,
@@ -59,6 +63,7 @@ from ._iclforge import (
     describe,
     eac3,
     fullbw_channel_count,
+    lyrics,
     meta,
     profile_for,
     profile_name,
@@ -85,6 +90,8 @@ except PackageNotFoundError:  # pragma: no cover - an editable/unbuilt checkout
 
 __all__ = [
     "BLOCKS_PER_FRAME",
+    "KARAOKE_MAX_LEVEL_DB",
+    "KARAOKE_MIN_LEVEL_DB",
     "MAX_AC3_CHANNELS",
     "SAMPLES_PER_FRAME",
     "TRANSFORM_DELAY_SAMPLES",
@@ -114,6 +121,8 @@ __all__ = [
     "FrameError",
     "FrameHeader",
     "HeavyConfig",
+    "KaraokeReproduction",
+    "KaraokeVocals",
     "LatencyBudget",
     "ObjectPlacement",
     "Position",
@@ -138,6 +147,7 @@ __all__ = [
     "describe",
     "eac3",
     "fullbw_channel_count",
+    "lyrics",
     "meta",
     "profile_for",
     "profile_name",
