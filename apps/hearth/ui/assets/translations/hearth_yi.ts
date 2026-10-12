@@ -56,7 +56,7 @@
     <message>
         <location filename="../qml/AboutDialog.qml" line="140"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">פֿאַרמאַכן</translation>
     </message>
 </context>
 <context>
@@ -229,7 +229,7 @@
         <location filename="../qml/DecoderAc4.qml" line="301"/>
         <location filename="../qml/DecoderAc4.qml" line="346"/>
         <source>%1 dB</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/DecoderAc4.qml" line="272"/>
@@ -740,7 +740,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="408"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">קיינע</translation>
     </message>
     <message>
         <location filename="../qml/DecoderEac3.qml" line="410"/>
@@ -750,7 +750,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="412"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/DecoderEac3.qml" line="421"/>
@@ -798,7 +798,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="489"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">ביידע</translation>
     </message>
     <message>
         <location filename="../qml/DecoderEac3.qml" line="504"/>
@@ -889,7 +889,7 @@
     <message>
         <location filename="../qml/DecoderPage.qml" line="41"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">דעקאָדער</translation>
     </message>
     <message>
         <location filename="../qml/DecoderPage.qml" line="44"/>
@@ -914,22 +914,22 @@
     <message>
         <location filename="../qml/DecoderPage.qml" line="63"/>
         <source>Karaoke: as coded</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע: ווי קאָדירט</translation>
     </message>
     <message>
         <location filename="../qml/DecoderPage.qml" line="64"/>
         <source>Karaoke: capable</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע: פֿעיִק</translation>
     </message>
     <message>
         <location filename="../qml/DecoderPage.qml" line="64"/>
         <source>Karaoke: aware</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע: באַוווּסט</translation>
     </message>
     <message>
         <location filename="../qml/DecoderPage.qml" line="71"/>
         <source>Karaoke page</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע־בלאַט</translation>
     </message>
 </context>
 <context>
@@ -996,89 +996,89 @@
     <message>
         <location filename="../qml/KaraokePage.qml" line="83"/>
         <source>The lines are marked for %1 and for %2.</source>
-        <translation type="unfinished"></translation>
+        <translation>די שורות זענען אָנגעצייכנט פֿאַר %1 און פֿאַר %2.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="86"/>
         <source>Both vocals play, so %1 and %2 are both in the mix.</source>
-        <translation type="unfinished"></translation>
+        <translation>ביידע געזאַנגען שפּילן, אַזוי אַז %1 און %2 זענען ביידע אין דעם מיקס.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="89"/>
         <source>No vocal plays: you sing the lines of %1 and of %2.</source>
-        <translation type="unfinished"></translation>
+        <translation>קיין געזאַנג שפּילט ניט: איר זינגט די שורות פֿון %1 און פֿון %2.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="92"/>
         <location filename="../qml/KaraokePage.qml" line="93"/>
         <source>The vocal of %1 plays: you sing the lines of %2.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער געזאַנג פֿון %1 שפּילט: איר זינגט די שורות פֿון %2.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="140"/>
         <source>off</source>
-        <translation type="unfinished"></translation>
+        <translation>אויס</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="142"/>
         <source>%1 dB</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="253"/>
         <source>the LFE, as coded</source>
-        <translation type="unfinished"></translation>
+        <translation>דער LFE, ווי קאָדירט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="257"/>
         <source>silent</source>
-        <translation type="unfinished"></translation>
+        <translation>שטיל</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="290"/>
         <source>Karaoke</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="296"/>
         <source>Nothing is playing</source>
-        <translation type="unfinished"></translation>
+        <translation>גאָרנישט שפּילט ניט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="307"/>
         <source>Add a karaoke stream to the queue and play it. What you choose here applies to it.</source>
-        <translation type="unfinished"></translation>
+        <translation>לייגט צו אַ קאַראַאָקע־סטרים צום ריי און שפּילט אים. וואָס איר קלײַבט דאָ גילט פֿאַר אים.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="311"/>
         <source>Karaoke, %1 coded: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע, %1 קאָדירט: %2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="316"/>
         <source>An AC-3 stream, but not a karaoke one: its service is %1.</source>
-        <translation type="unfinished"></translation>
+        <translation>אַן AC-3־סטרים, אָבער ניט קיין קאַראַאָקע־סטרים: זײַן סערוויס איז %1.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="318"/>
         <source>Karaoke is an AC-3 mode (Annex C of ETSI TS 102 366). This is not an AC-3 stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע איז אַ מאָדוס פֿון AC-3 (אַנעקס C פֿון ETSI TS 102 366). דאָס איז ניט קיין AC-3־סטרים.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="329"/>
         <source>Reproduction</source>
-        <translation type="unfinished"></translation>
+        <translation>רעפּראָדוקציע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="330"/>
         <source>Annex C, ETSI TS 102 366</source>
-        <translation type="unfinished"></translation>
+        <translation>אַנעקס C, ETSI TS 102 366</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="336"/>
         <location filename="../qml/KaraokePage.qml" line="340"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation>דעקאָדער</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="344"/>
@@ -1088,280 +1088,280 @@
     <message>
         <location filename="../qml/KaraokePage.qml" line="345"/>
         <source>Aware</source>
-        <translation type="unfinished"></translation>
+        <translation>באַוווּסט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="346"/>
         <source>Capable</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿעיִק</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="354"/>
         <source>The channels as the stream codes them: the vocals come from the surround speakers.</source>
-        <translation type="unfinished"></translation>
+        <translation>די קאַנאַלן ווי דער סטרים קאָדירט זיי: דער געזאַנג קומט פֿון די סראַונד־הילכערס.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="357"/>
         <source>L, C and R, with the vocals at the level the programme set (Table C.2.2).</source>
-        <translation type="unfinished"></translation>
+        <translation>L, C און R, מיט דעם געזאַנג אויפֿן ניוואָ וואָס די פּראָגראַם האָט באַשטימט (טאַבעלע C.2.2).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="359"/>
         <source>L, C and R, with the vocals you choose (Table C.2.3).</source>
-        <translation type="unfinished"></translation>
+        <translation>L, C און R, מיט דעם געזאַנג וואָס איר קלײַבט (טאַבעלע C.2.3).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="368"/>
         <location filename="../qml/KaraokePage.qml" line="372"/>
         <source>Vocals</source>
-        <translation type="unfinished"></translation>
+        <translation>געזאַנג</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="376"/>
         <source>None</source>
-        <translation type="unfinished"></translation>
+        <translation>קיינע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="377"/>
         <source>V1</source>
-        <translation type="unfinished"></translation>
+        <translation>V1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="378"/>
         <source>V2</source>
-        <translation type="unfinished"></translation>
+        <translation>V2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="379"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation>ביידע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="389"/>
         <source>Melody</source>
-        <translation type="unfinished"></translation>
+        <translation>מעלאָדיע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="410"/>
         <source>%1 level, dB</source>
-        <translation type="unfinished"></translation>
+        <translation>ניוואָ פֿון %1, dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="437"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable decoder only.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער ניוואָ פֿון יעדן טייל לגבי טאַבעלע C.2.3: 0 dB איז די טאַבעלע, און דער אונטערשטער עק פֿון דער קאָנטראָל איז אויס. אויב מען הייבט אײנעם גענוג הויך, ווערן די אַנדערע אַראָפּגעלאָזט, כּדי קיין הילכער זאָל ניט ווערן געטריבן איבער דער פֿולער סקאַלע. נאָר בײַם פֿעיִקן דעקאָדער.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="447"/>
         <source>Reset levels</source>
-        <translation type="unfinished"></translation>
+        <translation>צוריקשטעלן די ניוואָען</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="461"/>
         <source>These controls do not apply to the stream that is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation>די קאָנטראָלן גילטן ניט פֿאַר דעם סטרים וואָס שפּילט איצט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="474"/>
         <source>This is going out as a bitstream, so the receiver decodes it and the choice above is not applied. Unless the receiver is karaoke-capable, V1 and V2 play from its surround speakers.</source>
-        <translation type="unfinished"></translation>
+        <translation>דאָס גייט אַרויס ווי אַ ביטסטרים, דעריבער דעקאָדירט דער רעסיווער עס און די אויסוואַל אויבן ווערט ניט אָנגעווענדט. סײַדן דער רעסיווער איז פֿעיִק צו קאַראַאָקע, קומען V1 און V2 פֿון זײַנע סראַונד־הילכערס.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="483"/>
         <source>Choose output…</source>
-        <translation type="unfinished"></translation>
+        <translation>קלײַבט אַרויסגאַנג…</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="492"/>
         <source>This is going to a network group. A sink that takes the karaoke settings decodes the stream itself and reproduces it as chosen here; one that does not is sent PCM with the reproduction applied, so the group plays one reproduction. The Network page says which each sink was sent.</source>
-        <translation type="unfinished"></translation>
+        <translation>דאָס גייט צו אַ נעץ־גרופּע. אַ שפּילער וואָס נעמט אָן די קאַראַאָקע־אײַנשטעלונגען דעקאָדירט דעם סטרים אַליין און רעפּראָדוצירט אים ווי אויסגעקליבן דאָ; אײנער וואָס נעמט זיי ניט אָן באַקומט PCM מיט דער רעפּראָדוקציע שוין אָנגעווענדט, אַזוי אַז די גרופּע שפּילט איין רעפּראָדוקציע. די נעץ־בלאַט ווײַזט וואָס איז געשיקט געוואָרן צו יעדן.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="509"/>
         <source>The stereo fold is Lt/Rt. Annex C defines no Lt/Rt reproduction, so the stream plays as its Lt/Rt fold and the choice above has no effect. The Lo/Ro fold reproduces karaoke.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער סטערעא־פֿאָלד איז Lt/Rt. אַנעקס C דעפֿינירט קיין Lt/Rt־רעפּראָדוקציע ניט, אַזוי אַז דער סטרים שפּילט ווי זײַן Lt/Rt־פֿאָלד און די אויסוואַל אויבן האָט קיין השפּעה ניט. דער Lo/Ro־פֿאָלד רעפּראָדוצירט קאַראַאָקע.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="518"/>
         <source>Use Lo/Ro</source>
-        <translation type="unfinished"></translation>
+        <translation>ניצט Lo/Ro</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="527"/>
         <source>Lyrics</source>
-        <translation type="unfinished"></translation>
+        <translation>ווערטער</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="529"/>
         <source>%1 · line %2 of %3</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 · שורה %2 פֿון %3</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="549"/>
         <source>, word-timed</source>
-        <translation type="unfinished"></translation>
+        <translation>, מיט צײַט פֿאַר יעדן וואָרט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="550"/>
         <source>, line-timed</source>
-        <translation type="unfinished"></translation>
+        <translation>, מיט צײַט פֿאַר יעדע שורה</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="560"/>
         <source>Time the lyrics…</source>
-        <translation type="unfinished"></translation>
+        <translation>סינכראָניזירן די ווערטער…</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="565"/>
         <source>Full screen · F11</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿולער עקראַן · F11</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="586"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
-        <translation type="unfinished"></translation>
+        <translation>די ווערטער האָבן קיין צײַטן ניט, דעריבער ווערן זיי געוויזן גאַנץ און ניט נאָכגעפֿאָלגט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="588"/>
         <source>This is the picture of a CD+G disc. Its words are part of the picture, so there is no text to follow.</source>
-        <translation type="unfinished"></translation>
+        <translation>דאָס איז דאָס בילד פֿון אַ CD+G־דיסק. די ווערטער זענען אַ טייל פֿונעם בילד, דעריבער איז דאָ קיין טעקסט צו נאָכפֿאָלגן.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="591"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
-        <translation type="unfinished"></translation>
+        <translation>די טעקע גיט צײַטן פֿאַר שורות, ניט פֿאַר ווערטער: אַ גאַנצע שורה ווערט הערויסגעהויבן בשעת מען זינגט זי.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="611"/>
         <source>First singer</source>
-        <translation type="unfinished"></translation>
+        <translation>ערשטער זינגער</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="620"/>
         <source>Name of the first singer (V1)</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָמען פֿון דעם ערשטן זינגער (V1)</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="627"/>
         <source>Second singer</source>
-        <translation type="unfinished"></translation>
+        <translation>צווייטער זינגער</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="636"/>
         <source>Name of the second singer (V2)</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָמען פֿון דעם צווייטן זינגער (V2)</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="670"/>
         <source>The stream</source>
-        <translation type="unfinished"></translation>
+        <translation>דער סטרים</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="675"/>
         <source>Backing left</source>
-        <translation type="unfinished"></translation>
+        <translation>באַגלײטונג לינקס</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="676"/>
         <source>Backing right</source>
-        <translation type="unfinished"></translation>
+        <translation>באַגלײטונג רעכטס</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="677"/>
         <source>Melody guide</source>
-        <translation type="unfinished"></translation>
+        <translation>גיד־מעלאָדיע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="390"/>
         <location filename="../qml/KaraokePage.qml" line="678"/>
         <source>Vocal 1</source>
-        <translation type="unfinished"></translation>
+        <translation>געזאַנג 1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="391"/>
         <location filename="../qml/KaraokePage.qml" line="679"/>
         <source>Vocal 2</source>
-        <translation type="unfinished"></translation>
+        <translation>געזאַנג 2</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="696"/>
         <source>not in this stream</source>
-        <translation type="unfinished"></translation>
+        <translation>ניטאָ אין דעם סטרים</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="697"/>
         <source>heard</source>
-        <translation type="unfinished"></translation>
+        <translation>הערבאַר</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="697"/>
         <source>muted</source>
-        <translation type="unfinished"></translation>
+        <translation>אָפּגעשטילט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="707"/>
         <source>What plays</source>
-        <translation type="unfinished"></translation>
+        <translation>וואָס שפּילט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="745"/>
         <source>Nothing karaoke is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation>קיין קאַראַאָקע שפּילט ניט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="753"/>
         <source>Signal path</source>
-        <translation type="unfinished"></translation>
+        <translation>סיגנאַל־וועג</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="761"/>
         <source>Decoded as the stream says.</source>
-        <translation type="unfinished"></translation>
+        <translation>דעקאָדירט ווי דער סטרים זאָגט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="764"/>
         <source>as coded</source>
-        <translation type="unfinished"></translation>
+        <translation>ווי קאָדירט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="765"/>
         <source>aware</source>
-        <translation type="unfinished"></translation>
+        <translation>באַוווּסט</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="766"/>
         <source>capable, vocals: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿעיִק, געזאַנג: %1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="767"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation>קיינע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="768"/>
         <source>both</source>
-        <translation type="unfinished"></translation>
+        <translation>ביידע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="771"/>
         <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
-        <translation type="unfinished"></translation>
+        <translation>AC-3־קאַראַאָקע, %1: ניט רעפּראָדוצירט (זעט די באַמערקונג).</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="772"/>
         <source>AC-3 karaoke, %1.</source>
-        <translation type="unfinished"></translation>
+        <translation>AC-3־קאַראַאָקע, %1.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="784"/>
         <source>Nothing is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation>גאָרנישט שפּילט ניט.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="786"/>
         <source>%1 · %2 ch at %3 Hz</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 · %2 קאַנאַלן ביי %3 הערץ</translation>
     </message>
 </context>
 <context>
@@ -1379,7 +1379,7 @@
     <message>
         <location filename="../qml/LicencesDialog.qml" line="61"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">פֿאַרמאַכן</translation>
     </message>
 </context>
 <context>
@@ -1387,52 +1387,52 @@
     <message>
         <location filename="../qml/LyricScreen.qml" line="137"/>
         <source>Esc leaves full screen</source>
-        <translation type="unfinished"></translation>
+        <translation>Esc פֿאַרלאָזט דעם פֿולן עקראַן</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="180"/>
         <source>Previous</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿריִערדיק</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="187"/>
         <source>Pause</source>
-        <translation type="unfinished"></translation>
+        <translation>פּויזירן</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="187"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּילן</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="193"/>
         <source>Next</source>
-        <translation type="unfinished"></translation>
+        <translation>קומענדיק</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="217"/>
         <source>Vocals</source>
-        <translation type="unfinished"></translation>
+        <translation>געזאַנג</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="230"/>
         <source>None</source>
-        <translation type="unfinished"></translation>
+        <translation>קיינע</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="231"/>
         <source>V1</source>
-        <translation type="unfinished"></translation>
+        <translation>V1</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="232"/>
         <source>V2</source>
-        <translation type="unfinished"></translation>
+        <translation>V2</translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="233"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation>ביידע</translation>
     </message>
 </context>
 <context>
@@ -1440,218 +1440,218 @@
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="125"/>
         <source>Next line: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>קומענדיקע שורה: %1</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="126"/>
         <source>Every line has a time. Go on to the words, or save.</source>
-        <translation type="unfinished"></translation>
+        <translation>יעדע שורה האָט אַ צײַט. גייט ווײַטער צו די ווערטער, אָדער שפּײַכערט.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="130"/>
         <source>Next word: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>קומענדיקער וואָרט: %1</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="133"/>
         <source>Stamp the lines first.</source>
-        <translation type="unfinished"></translation>
+        <translation>שטעלט פֿריִער די צײַטן פֿון די שורות.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="136"/>
         <source>Play to the first line, then press Space as each word starts.</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּילט ביז דער ערשטער שורה, און דריקט דערנאָך שפּײַס ווען יעדער וואָרט הייבט זיך אָן.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="137"/>
         <source>Every word in this line is pressed. Play on to the next line.</source>
-        <translation type="unfinished"></translation>
+        <translation>יעדער וואָרט אין דער שורה איז געדריקט. שפּילט ווײַטער ביז דער קומענדיקער שורה.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="168"/>
         <source>Saved as %1. A file that was there is kept once, as %1.bak.</source>
-        <translation type="unfinished"></translation>
+        <translation>געשפּײַכערט ווי %1. אַ טעקע וואָס איז געווען דאָרט ווערט אײַנמאָל געהאַלטן, ווי %1.bak.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="184"/>
         <source>Choose the words to time</source>
-        <translation type="unfinished"></translation>
+        <translation>קלײַבט די ווערטער צו סינכראָניזירן</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="185"/>
         <source>Lyrics and text (*.lrc *.txt)</source>
-        <translation type="unfinished"></translation>
+        <translation>ווערטער און טעקסט (*.lrc *.txt)</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="185"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>אַלע טעקעס (*)</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="192"/>
         <location filename="../qml/LyricTimingDialog.qml" line="204"/>
         <source>Time the lyrics</source>
-        <translation type="unfinished"></translation>
+        <translation>סינכראָניזירן די ווערטער</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="222"/>
         <source>There are no words to time for this item.</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿאַר דעם אײַטעם זענען דאָ קיין ווערטער צו סינכראָניזירן ניט.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="229"/>
         <source>Choose a text file with one line of the words to a line (an .lrc file with no times will do), saved as UTF-8 or UTF-16.</source>
-        <translation type="unfinished"></translation>
+        <translation>קלײַבט אַ טעקסט־טעקע מיט איין שורה ווערטער אויף יעדער שורה (אַ .lrc־טעקע אָן צײַטן גייט), געשפּײַכערט ווי UTF-8 אָדער UTF-16.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="237"/>
         <source>Choose a text file…</source>
-        <translation type="unfinished"></translation>
+        <translation>קלײַבט אַ טעקסט־טעקע…</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="260"/>
         <source>What Space stamps</source>
-        <translation type="unfinished"></translation>
+        <translation>וואָס שפּײַס שטעלט</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="262"/>
         <source>1 · Lines</source>
-        <translation type="unfinished"></translation>
+        <translation>1 · שורות</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="263"/>
         <source>2 · Words</source>
-        <translation type="unfinished"></translation>
+        <translation>2 · ווערטער</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="276"/>
         <source>Every stamped line has its words spread over it by their letters, as a guess: slanted and muted. Play, and press Space as each word starts; a pressed word turns solid.</source>
-        <translation type="unfinished"></translation>
+        <translation>די ווערטער פֿון יעדער שורה מיט אַ צײַט ווערן פֿאַרשפּרייט איבער איר לויט זייערע אותיות, ווי אַן אָפּשאַצונג: שרעג און פֿאַרדעמפּט. שפּילט און דריקט שפּײַס ווען יעדער וואָרט הייבט זיך אָן; אַ געדריקטער וואָרט ווערט פֿעסט.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="274"/>
         <source>Play the item and press Space as each line starts. A line can be stamped again, or nudged, afterwards.</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּילט דעם אײַטעם און דריקט שפּײַס ווען יעדע שורה הייבט זיך אָן. אַ שורה קען שפּעטער ווערן ווידער געשטעלט, אָדער אַ ביסל פֿאַרשפּאָרט.</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="291"/>
         <source>Pause</source>
-        <translation type="unfinished"></translation>
+        <translation>פּויזירן</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="291"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּילן</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="296"/>
         <source>Back 5 s</source>
-        <translation type="unfinished"></translation>
+        <translation>5 ס צוריק</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="301"/>
         <source>Forward 5 s</source>
-        <translation type="unfinished"></translation>
+        <translation>5 ס פֿאָרויס</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="316"/>
         <source>Start of line · Space</source>
-        <translation type="unfinished"></translation>
+        <translation>אָנהייב פֿון שורה · שפּײַס</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="317"/>
         <source>Start of word · Space</source>
-        <translation type="unfinished"></translation>
+        <translation>אָנהייב פֿון וואָרט · שפּײַס</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="460"/>
         <source>%1 of %2 lines have a time</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 פֿון %2 שורות האָבן אַ צײַט</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="468"/>
         <source>Stamp again</source>
-        <translation type="unfinished"></translation>
+        <translation>שטעלט ווידער</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="474"/>
         <source>−10 ms</source>
-        <translation type="unfinished"></translation>
+        <translation>−10 ms</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="480"/>
         <source>+10 ms</source>
-        <translation type="unfinished"></translation>
+        <translation>+10 ms</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="490"/>
         <source>Singer</source>
-        <translation type="unfinished"></translation>
+        <translation>זינגער</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="497"/>
         <source>Who sings the selected line</source>
-        <translation type="unfinished"></translation>
+        <translation>ווער זינגט די אויסגעקליבענע שורה</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="499"/>
         <source>Not marked</source>
-        <translation type="unfinished"></translation>
+        <translation>ניט אָנגעצייכנט</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="502"/>
         <source>Both</source>
-        <translation type="unfinished"></translation>
+        <translation>ביידע</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="512"/>
         <source>Name of V1</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָמען פֿון V1</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="514"/>
         <source>Name of the first singer, saved in the file</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָמען פֿון דעם ערשטן זינגער, געשפּײַכערט אין דער טעקע</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="521"/>
         <source>Name of V2</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָמען פֿון V2</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="523"/>
         <source>Name of the second singer, saved in the file</source>
-        <translation type="unfinished"></translation>
+        <translation>נאָמען פֿון דעם צווייטן זינגער, געשפּײַכערט אין דער טעקע</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="533"/>
         <source>Reaction time</source>
-        <translation type="unfinished"></translation>
+        <translation>רעאַקציע־צײַט</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="545"/>
         <source>Reaction time in milliseconds</source>
-        <translation type="unfinished"></translation>
+        <translation>רעאַקציע־צײַט אין מיליסעקונדעס</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="548"/>
         <source>ms taken off each press</source>
-        <translation type="unfinished"></translation>
+        <translation>מילישניות וואָס ווערן אַראָפּגענומען פֿון יעדן דריק</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="557"/>
         <source>Save</source>
-        <translation type="unfinished"></translation>
+        <translation>שפּײַכערן</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="562"/>
         <source>Discard and close</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿאַרווארפֿן און פֿאַרמאַכן</translation>
     </message>
     <message>
         <location filename="../qml/LyricTimingDialog.qml" line="562"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿאַרמאַכן</translation>
     </message>
 </context>
 <context>
@@ -1659,47 +1659,47 @@
     <message>
         <location filename="../qml/LyricView.qml" line="68"/>
         <source>%1 + %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 + %2</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="94"/>
         <source>guide</source>
-        <translation type="unfinished"></translation>
+        <translation>גיד</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="95"/>
         <source>you</source>
-        <translation type="unfinished"></translation>
+        <translation>איר</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="96"/>
         <source>shared</source>
-        <translation type="unfinished"></translation>
+        <translation>געמיינזאַם</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="107"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="423"/>
         <source>CD+G picture</source>
-        <translation type="unfinished"></translation>
+        <translation>CD+G־בילד</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="439"/>
         <source>%1 Playback is not affected.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 דאָס שפּילן ווערט ניט באַאיינפֿלוסט.</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="443"/>
         <source>Nothing is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation>גאָרנישט שפּילט ניט.</translation>
     </message>
     <message>
         <location filename="../qml/LyricView.qml" line="445"/>
         <source>No lyrics. Hearth looks for %1 next to the stream.</source>
-        <translation type="unfinished"></translation>
+        <translation>קיין ווערטער ניטאָ. Hearth זוכט %1 לעבן דעם סטרים.</translation>
     </message>
 </context>
 <context>
@@ -1728,7 +1728,7 @@
     <message>
         <location filename="../qml/Main.qml" line="271"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">שפּילן</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="272"/>
@@ -1743,7 +1743,7 @@
     <message>
         <location filename="../qml/Main.qml" line="274"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">דעקאָדער</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="275"/>
@@ -1758,7 +1758,7 @@
     <message>
         <location filename="../qml/Main.qml" line="277"/>
         <source>Karaoke</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="289"/>
@@ -1966,7 +1966,7 @@
     <message>
         <location filename="../qml/Media.qml" line="165"/>
         <source>off</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">אויס</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="172"/>
@@ -1979,7 +1979,7 @@
         <location filename="../qml/Media.qml" line="344"/>
         <location filename="../qml/Media.qml" line="983"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">קיינע</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="182"/>
@@ -1990,7 +1990,7 @@
         <location filename="../qml/Media.qml" line="184"/>
         <location filename="../qml/Media.qml" line="570"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="203"/>
@@ -2005,7 +2005,7 @@
     <message>
         <location filename="../qml/Media.qml" line="205"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">אַלע טעקעס (*)</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="226"/>
@@ -2996,7 +2996,7 @@
     <message>
         <location filename="../qml/NetworkSinkDecoder.qml" line="291"/>
         <source>None</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">קיינע</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkDecoder.qml" line="292"/>
@@ -3118,7 +3118,7 @@
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="232"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">אַלע טעקעס (*)</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="271"/>
@@ -3168,7 +3168,7 @@
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="316"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">פֿאַרמאַכן</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="316"/>
@@ -3388,7 +3388,7 @@
     <message>
         <location filename="../qml/NetworkSinkSettings.qml" line="60"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">דעקאָדער</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSettings.qml" line="61"/>
@@ -3721,7 +3721,7 @@
     <message>
         <location filename="../qml/OutputPicker.qml" line="417"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/OutputPicker.qml" line="439"/>
@@ -4057,7 +4057,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlayPage.qml" line="664"/>
         <source>%1 dB</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="668"/>
@@ -4097,7 +4097,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlayPage.qml" line="741"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">אַלע טעקעס (*)</translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="741"/>
@@ -4115,7 +4115,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlaySignalPathCard.qml" line="14"/>
         <source>Signal path</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">סיגנאַל־וועג</translation>
     </message>
     <message>
         <location filename="../qml/PlaySignalPathCard.qml" line="42"/>
@@ -4279,7 +4279,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../../src/network_controller.cpp" line="361"/>
         <location filename="../../src/network_controller.cpp" line="374"/>
         <source>none</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">קיינע</translation>
     </message>
     <message>
         <location filename="../../src/network_controller.cpp" line="362"/>
@@ -4345,7 +4345,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="38"/>
         <source>All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">אַלע טעקעס (*)</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="67"/>
@@ -4360,7 +4360,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="97"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">פֿאַרמאַכן</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="135"/>
@@ -4410,7 +4410,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="186"/>
         <source>Lyric delay</source>
-        <translation type="unfinished"></translation>
+        <translation>פֿאַרשפּעטונג פֿון די ווערטער</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="210"/>
@@ -4425,7 +4425,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="231"/>
         <source>Shows the lyrics later (+) or sooner (-) than the music, on top of the timing in the lyrics file. Nudge it when the words are off against this output.</source>
-        <translation type="unfinished"></translation>
+        <translation>ווײַזט די ווערטער שפּעטער (+) אָדער פֿריִער (-) ווי די מוזיק, אין צוגאָב צו דער צײַט אין דער ווערטער־טעקע. פֿאַרשטעלט עס ווען די ווערטער פּאַסן ניט צו דעם אַרויסגאַנג.</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="243"/>
@@ -4566,46 +4566,46 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="582"/>
-        <source>System follows the language the desktop is set to. Applies at once. Hearth&apos;s catalogues carry every string but none are translated yet, so the words stay in English while the layout direction and the typeface follow the language chosen.</source>
-        <translation type="unfinished"></translation>
+        <source>System follows the language the desktop is set to. Applies at once. The Karaoke page, the lyrics and the singer view are translated; the other pages are not yet, so their words stay in English while the layout direction and the typeface follow the language chosen. The translations are machine-made and have not been read by a speaker.</source>
+        <translation>סיסטעם גייט נאָך דער שפּראַך אויף וועלכער דער דעסקטאָפּ איז אײַנגעשטעלט. ווירקט תיכּף. דער קאַראַאָקע־בלאַט, די ווערטער און די זינגער־אָנזיכט זענען איבערגעזעצט; די אַנדערע בלעטער נאָך ניט, דעריבער בלײַבן זייערע ווערטער אויף ענגליש בעת די ריכטונג פֿון דער אויסלייג און די שריפֿט גייען נאָך דער אויסגעקליבענער שפּראַך. די איבערזעצונגען זײַנען מאַשין־געמאַכט און קיין רעדער האָט זיי נישט איבערגעלייענט.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="595"/>
+        <location filename="../qml/Settings.qml" line="596"/>
         <source>Diagnostics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="600"/>
+        <location filename="../qml/Settings.qml" line="601"/>
         <source>A text file of what Hearth has done: outputs opened, streams played, sinks found and paired, and every error. Pairing keys, codes and file paths are left out.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="612"/>
+        <location filename="../qml/Settings.qml" line="613"/>
         <source>Save diagnostics…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="613"/>
+        <location filename="../qml/Settings.qml" line="614"/>
         <source>Writes a plain-text support file where you choose. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="621"/>
+        <location filename="../qml/Settings.qml" line="622"/>
         <source>View live…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="622"/>
+        <location filename="../qml/Settings.qml" line="623"/>
         <source>Opens the same report in a window that keeps itself up to date. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="627"/>
+        <location filename="../qml/Settings.qml" line="628"/>
         <source>Copy diagnostics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="628"/>
+        <location filename="../qml/Settings.qml" line="629"/>
         <source>Copies the same report to the clipboard. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4626,7 +4626,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="75"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">שפּילן</translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="77"/>
@@ -4641,7 +4641,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="81"/>
         <source>Decoder</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">דעקאָדער</translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="83"/>
@@ -4656,7 +4656,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="87"/>
         <source>Karaoke</source>
-        <translation type="unfinished"></translation>
+        <translation>קאַראַאָקע</translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="90"/>
@@ -4681,7 +4681,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="104"/>
         <source>Lyrics in full screen; Esc leaves it</source>
-        <translation type="unfinished"></translation>
+        <translation>ווערטער אין פֿולן עקראַן; Esc פֿאַרלאָזט עס</translation>
     </message>
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="110"/>
@@ -4691,7 +4691,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/ShortcutsDialog.qml" line="114"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">פֿאַרמאַכן</translation>
     </message>
 </context>
 <context>
@@ -5069,17 +5069,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/TransportBar.qml" line="44"/>
         <source>Previous</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">פֿריִערדיק</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="52"/>
         <source>Pause</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">פּויזירן</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="52"/>
         <source>Play</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">שפּילן</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="59"/>
@@ -5089,7 +5089,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/TransportBar.qml" line="67"/>
         <source>Next</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">קומענדיק</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="113"/>
@@ -5115,7 +5115,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/TransportBar.qml" line="240"/>
         <source>%1 dB</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 dB</translation>
     </message>
 </context>
 <context>
