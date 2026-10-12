@@ -390,7 +390,10 @@ samples and the same lines as `forge decode` and Hearth do.
 - **A screen on a sink.** A board that decodes for itself is sent the lyrics and where the sound is
   in them, follows them on its own clock and reports the line; the panel that would draw them waits
   for a board with a display.
-- **Karaoke in E-AC-3 or AC-4**, and **a microphone, scoring or recording**.
+- **Karaoke in E-AC-3 or AC-4.**
+- **A microphone, scoring or recording.** A [draft plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
+  sets out the requirements and the design questions and is awaiting approval; nothing of it is
+  built.
 
 ## How it is checked
 
