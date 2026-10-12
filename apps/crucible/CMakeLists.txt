@@ -327,6 +327,20 @@ else()
         message(STATUS "Qt SVG not found: SVG-only application icons show the monogram")
     endif()
 
+    # Qt D-Bus reads the media players on Linux (MPRIS: ui/src/platform/linux/media_sessions.cpp).
+    # Optional the way Svg is: a kit without it gets the reader that says so
+    # (no_media_sessions.cpp), and the lyric strip keeps Start and the nudge. Exactly one of the
+    # two is compiled, the same rule as a platform directory.
+    set(ICLFORGE_CRUCIBLE_DBUS_LIB)
+    if(LINUX)
+        find_package(Qt6 6.8 QUIET COMPONENTS DBus)
+        if(Qt6DBus_FOUND)
+            set(ICLFORGE_CRUCIBLE_DBUS_LIB Qt6::DBus)
+        else()
+            message(STATUS "Qt D-Bus not found: Crucible cannot read other players' media sessions")
+        endif()
+    endif()
+
     # Generated INTO the source tree (ignored by git, see ui/assets/qml/shared/.gitignore)
     # rather than the build tree: the QML ahead-of-time compiler names its
     # cache files after the path relative to the source directory, and a
@@ -380,14 +394,27 @@ else()
         ui/src/main.cpp
         ui/src/crucible_controller.cpp
         ui/src/crucible_controller.hpp
+        ui/src/lyric_osc.cpp
+        ui/src/lyric_osc.hpp
         ui/src/lyrics_controller.cpp
         ui/src/lyrics_controller.hpp
+        ui/src/media_monitor.cpp
+        ui/src/media_monitor.hpp
+        ui/src/media_session.cpp
+        ui/src/media_session.hpp
         ../shared/theme/src/system_theme.cpp
         ../shared/theme/src/system_theme.hpp
         ../shared/preferences/src/language_manager.cpp
         ../shared/preferences/src/language_manager.hpp
         ../shared/preferences/src/settings_migration.cpp
         ../shared/preferences/src/settings_migration.hpp
+        # The picture of a CD+G disc the lyric strip draws, shared with Hearth and the Forge GUI
+        # (apps/shared/cdg-picture): a QML_ELEMENT is registered only by a target that compiles it.
+        ../shared/cdg-picture/src/cdg_frame_source.hpp
+        ../shared/cdg-picture/src/cdg_frames.cpp
+        ../shared/cdg-picture/src/cdg_frames.hpp
+        ../shared/cdg-picture/src/cdg_picture.cpp
+        ../shared/cdg-picture/src/cdg_picture.hpp
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/app_icon_provider.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/tray_support.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/app_entry.hpp"
@@ -409,13 +436,24 @@ else()
     # stop being made again.
     if(WIN32)
         target_sources(crucible PRIVATE ui/src/platform/windows/app_icon_provider.cpp
+                                           ui/src/platform/windows/media_sessions.cpp
                                            ui/src/platform/windows/tray_support.cpp)
+        # The transport controls are WinRT (C++/WinRT, header-only in the SDK); the umbrella import
+        # library is what resolves its activation.
+        target_link_libraries(crucible PRIVATE WindowsApp)
     elseif(LINUX)
         target_sources(crucible PRIVATE ui/src/platform/linux/app_icon_provider.cpp
                                            ui/src/platform/linux/tray_support.cpp)
         target_sources(crucible PRIVATE ui/src/desktop_entries.cpp ui/src/desktop_entries.hpp)
+        if(ICLFORGE_CRUCIBLE_DBUS_LIB)
+            target_sources(crucible PRIVATE ui/src/platform/linux/media_sessions.cpp)
+            target_link_libraries(crucible PRIVATE ${ICLFORGE_CRUCIBLE_DBUS_LIB})
+        else()
+            target_sources(crucible PRIVATE ui/src/platform/linux/no_media_sessions.cpp)
+        endif()
     elseif(APPLE)
         target_sources(crucible PRIVATE ui/src/platform/macos/app_icon_provider.mm
+                                           ui/src/platform/macos/media_sessions.mm
                                            ui/src/platform/macos/tray_support.cpp)
         set_target_properties(crucible PROPERTIES
             OBJCXX_STANDARD 23
@@ -438,6 +476,7 @@ else()
     # theme for system_theme.hpp and the shared preferences for language_manager.hpp and
     # settings_migration.hpp.
     target_include_directories(crucible PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shared/cdg-picture/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/theme/src")
     # The driver folder in the source tree is the default place the
@@ -450,6 +489,7 @@ else()
     # be compiled under it (apps/forge/gui carries a workaround for exactly that).
     target_link_libraries(crucible PRIVATE
         iclforge::crucible_engine
+        iclforge::audio
         iclforge::lyrics
         iclforge::coverage
         Qt6::Core Qt6::Gui Qt6::Qml Qt6::Widgets Qt6::Quick Qt6::QuickControls2 ${ICLFORGE_CRUCIBLE_QUICK3D_LIB})

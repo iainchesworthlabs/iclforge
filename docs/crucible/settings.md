@@ -1,9 +1,9 @@
 # Settings
 
 `Ctrl+3`, the page switch in the header, or **Settings…** in the tray menu where there is one.
-The page is seven numbered blocks, in the order that matters on a new machine: the two things that
+The page is eight numbered blocks, in the order that matters on a new machine: the two things that
 make the whole thing work, then how it sounds, then how it looks and behaves, then the file you
-attach to a bug report. It lays out as two columns when the window is wide enough and one when it
+attach to a bug report, then the lyric events a rig can read. It lays out as two columns when the window is wide enough and one when it
 is not, and every block wraps inside its column.
 
 Nothing here has an Apply button. Each control writes its setting as you change it, and the
@@ -191,3 +191,32 @@ file, or the value of any environment variable.
 
 The full contents, the two limits and how the withholding is held are in
 [Saving a diagnostics file](troubleshooting.md#saving-a-diagnostics-file).
+
+## 08 Lyric events out
+
+What the [lyric strip](room.md#06-lyrics) follows, said over OSC for a lighting console, a
+show-control desk or a visual rig that reads it. **Off until you turn it on**, and only the strip's
+events are sent: nothing of the audio, and nothing is received.
+
+- **Send the lyric strip's events over OSC** is the switch. While it is off no socket is opened.
+- **Send to** is an IPv4 address (`127.0.0.1`, or `localhost`, for this machine; a rig on the
+  network by its address). A host name is not looked up, and the page says so when one is typed.
+- **Port** is the UDP port, 1 to 65535; it starts at 9000.
+- **Lines**, **Words** and **Position, ten times a second** choose what is said. Lines and words
+  are on, the position off.
+
+Every message begins with the application's name, so a rig can tell which application of the room
+a line is from. Times are milliseconds from the start of the song; text is UTF-8, cut at 480 bytes.
+
+| Address | Arguments | Sent when |
+|---|---|---|
+| `/crucible/lyrics/state` | `s` app, `s` state | following starts (`following`), stops (`stopped`), or its lyrics are cleared (`cleared`) |
+| `/crucible/lyrics/line` | `s` app, `i` line, `s` text, `i` start, `i` end | the line being sung changes; line `-1` and no text when the song is between lines |
+| `/crucible/lyrics/word` | `s` app, `i` line, `i` word, `s` text, `i` start, `i` end | the word being sung changes (a word-timed line only) |
+| `/crucible/lyrics/position` | `s` app, `i` position | ten times a second while the song is followed, when **Position** is on |
+
+The messages are single OSC 1.0 messages in single UDP datagrams (no bundles, no time tags), sent
+from a socket of the operating system's choosing. UDP has no delivery: a rig that is not listening
+loses them, and the page cannot tell. The strip's own position is what is read, so whichever
+[origin](room.md#06-lyrics) it has, a media session or Start, the events
+follow it.

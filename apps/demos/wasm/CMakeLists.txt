@@ -18,8 +18,12 @@
 # and fetch() need http(s), not file://) is the entire "run the demo" story.
 # ---------------------------------------------------------------------------
 
-add_executable(iclforge_wasm_decode decoder_bindings.cpp)
-target_link_libraries(iclforge_wasm_decode PRIVATE iclforge::ac3 iclforge::warnings)
+# lyrics_bindings.cpp is the timed-lyrics reader (libs/lyrics, the one Hearth and Crucible use) as
+# an Embind function and class, so that the page shows the words of a karaoke stream with the C++
+# reader and not a second one in JavaScript. It is in this module and not a module of its own
+# because the page already loads this one.
+add_executable(iclforge_wasm_decode decoder_bindings.cpp lyrics_bindings.cpp)
+target_link_libraries(iclforge_wasm_decode PRIVATE iclforge::ac3 iclforge::lyrics iclforge::warnings)
 
 # --bind: Embind, the JS<->C++ binding generator decoder_bindings.cpp's
 # EMSCRIPTEN_BINDINGS macro uses. MODULARIZE+EXPORT_NAME: the loader becomes a
