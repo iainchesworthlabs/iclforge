@@ -78,6 +78,12 @@ class ScriptedMicrophoneInput final : public MicrophoneInput {
 
     // The time up to which samples have been captured.
     void set_now_ns(std::int64_t now_ns) { now_ns_ = now_ns; }
+    // A new script: other samples, the first captured at `first_time_ns`, played from the start.
+    void script(std::vector<float> samples, std::int64_t first_time_ns) {
+        samples_ = std::move(samples);
+        first_time_ns_ = first_time_ns;
+        read_ = 0;
+    }
     // Makes the device go away, as a pulled USB cable does.
     void unplug() { plugged_ = false; }
     // Makes the next start() refuse with `reason`.

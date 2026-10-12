@@ -119,6 +119,15 @@ Item {
         return root.singerOf(index) === "v2" ? root.currentColor : root.sungColor;
     }
 
+    // A line's place on the item's timeline, which is what the tune and the singer are placed on
+    // (planning/karaoke-microphone.md, M5): its own times are the lyrics', and the singer's nudge
+    // shows the words later, so the same nudge puts the line later in the item.
+    function itemWindowOf(index) {
+        const line = root.lines[index];
+        return { startMs: line.startMs + KaraokeController.delayMs,
+                 endMs: line.endMs + KaraokeController.delayMs };
+    }
+
     // Where the position is in the lines, with the delay taken off
     // (KaraokeController.cursor()). Set by updateCursor(), which runs when the
     // position, the file or the delay changes: cursor() is a function of all
@@ -251,6 +260,23 @@ Item {
                         opacity: 0.55
                         font.pixelSize: root.unit
                         wrapMode: Text.WordWrap
+                    }
+                    // How the line was sung, once it has been (planning/karaoke-microphone.md,
+                    // M5): three pips and a percentage, or "not sung", and nothing for a line the
+                    // tune has no notes in or with the microphone off. The line's own times are
+                    // the lyrics', so the nudge is added to put it on the item's timeline. The
+                    // revision is read in a real condition: a bare read in a binding is dropped.
+                    LineMark {
+                        objectName: "lyricPastMark"
+                        x: root.indentOf(pastRow.modelData)
+                        size: Math.round(root.unit * 0.7)
+                        color: root.sungColor
+                        restColor: root.restColor
+                        result: MicrophoneController.on && MicrophoneController.scoreRevision >= 0
+                                ? MicrophoneController.lineResult(
+                                      root.itemWindowOf(pastRow.modelData).startMs,
+                                      root.itemWindowOf(pastRow.modelData).endMs)
+                                : null
                     }
                 }
             }
