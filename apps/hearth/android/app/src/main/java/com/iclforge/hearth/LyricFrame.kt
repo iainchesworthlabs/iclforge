@@ -48,6 +48,11 @@ data class LyricFrame(
     val countIn: Int,
     val lineNumber: Int,
     val lineCount: Int,
+    /**
+     * [positionMs] and [lengthMs] are the server's progress (`metadata@v1`) for an item the sink holds no
+     * timed words for: the header's time, where a document's playhead is not there to give it.
+     */
+    val progress: Boolean = false,
 ) {
     /** libs/lyrics' `StageMode`. */
     enum class Mode { NONE, PLAIN, WAITING, GAP, LINE }
@@ -111,6 +116,7 @@ data class LyricFrame(
             countIn = json.optInt("count_in", 0),
             lineNumber = json.optInt("line_number", 0),
             lineCount = json.optInt("line_count", 0),
+            progress = json.optBoolean("progress", false),
         )
 
         private fun row(json: JSONObject) =

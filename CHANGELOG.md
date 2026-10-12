@@ -250,6 +250,21 @@ The sections below contain the complete change list and fixes.
   were given.
   This is a move: no message, log line or file the test sink writes is different.
 
+**Hearth for Android: two leftovers of the metadata and the request path**
+
+- **"Both" asks the server for the aware reproduction.** The controls sheet's vocals row sent the
+  capable reproduction for every choice; the owner's call of 2026-10-13 is that "Both" asks for
+  `aware`, which plays both voices as the song's mix does, and V1, V2 and None ask for `capable` with
+  that choice, the only reproduction that has them. The rule is one function, `sink::vocals_request`,
+  and a host case holds the four choices.
+- **An item with no lyrics shows the server's clock in the lyric screen's header.** The header drew a
+  time only for a document's line. `Sink::lyric_frame()` now takes the position and length from the
+  server's `metadata@v1` progress, at the sink's own time on the server's clock (a pause keeps it), for
+  an item with no document or a plain one, and the length for a timed document that names none; the
+  frame says `progress` when the position is the server's. The header's right side shows the time and
+  the hairline under it fills by it. A host case holds the position, the pause and the document's own
+  length winning; `LyricViewRenderTest` holds the pixels.
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
