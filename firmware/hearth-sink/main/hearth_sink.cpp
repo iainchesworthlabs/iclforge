@@ -390,6 +390,30 @@ bool begin_play(Session& session, const std::function<void()>& on_source_open = 
                 static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),
                 static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
 
+    // The build's floor for a play (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES), before the
+    // sink, the ring or either task takes anything: under it, the ring and the stack come
+    // out of what is left and the decoder then fails an allocation and aborts, which reboots
+    // the board and takes its Sendspin session with it. The Sendspin player has not been
+    // handed anything yet, so it plays on.
+#if CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES > 0
+    {
+        constexpr std::size_t kFloor = CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES;
+        const std::size_t room = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        if (room < kFloor) {
+            std::printf("player: a play here needs %lu bytes of internal RAM free and %lu are: "
+                        "refused (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES)\n",
+                        static_cast<unsigned long>(kFloor), static_cast<unsigned long>(room));
+            xSemaphoreTake(g_player_mutex, portMAX_DELAY);
+            g_last_stats.failed = true;
+            g_last_stats.failure = "memory";
+            g_last_stats.error = static_cast<int>(room);
+            xSemaphoreGive(g_player_mutex);
+            g_state.store("failed");
+            return false;
+        }
+    }
+#endif
+
     // Read directly into config.layout rather than a separate local: a
     // second stack-resident OutputLayout here is exactly what once
     // boot-looped this example on a main-task stack overflow before

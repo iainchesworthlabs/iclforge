@@ -577,6 +577,28 @@ config ICLFORGE_EXAMPLE_HOLD_FIRST_UNIT
         a copy of the unit while it is held: 1 KB a channel for each of its six
         blocks, in PSRAM when the part has it.
 
+# A PLAY'S MEMORY FLOOR. What a play asks of internal RAM is not known until it
+# has asked: the ring, the decode task's stack, the I2S queue and the decoder's
+# state are taken one after another, and a part that runs out partway through
+# is met as an abort() inside the decoder, which reboots the board. This is the
+# check made before any of that, with the figure the build was sized for.
+config ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES
+    int "Internal RAM a play needs free once its source is open, bytes (0 = no check)"
+    default 0
+    range 0 1000000
+    help
+        A play started by POST /play, or the one configured at boot, is
+        refused when less than this much internal RAM is free once its source
+        is open: the play fails with the reason "memory" and the figure that
+        was free as its error, GET /status says so, the console says how much
+        was needed, and the board plays on. It is the sum of what the play
+        takes before its decoder starts (the ring, the decode task's stack,
+        the fetch task's, the I2S queue) and the least internal RAM any
+        stream's decoder has asked for. A floor and not a fit: a wider stream
+        asks for more, and a part under the floor cannot play any. 0 makes no
+        check, which is right where the ring and the stacks are in PSRAM.
+        Sendspin plays do not pass through it.
+
 # THE CONTROL SURFACE - iclforge::Control, firmware/esp-idf/iclforge/include/iclforge/
 # control.hpp: GET /status, POST /play with a location, POST /stop, POST /volume.
 # Only worth having where there is a network, so 0 (off) by default; the HTTP
