@@ -233,6 +233,12 @@ The sections below contain the complete change list and fixes.
   code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
   `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
   (planning/karaoke-phase2.md, W13e).
+- **A MIDI karaoke file counted in SMPTE frames is read.** The reader refused a file whose time
+  division is SMPTE (a frame rate and the ticks in a frame, where the other files count ticks in a
+  quarter note). It now reads the four rates the format defines, 24, 25, 29.97 and 30 frames a
+  second: a tick is a fixed length of time, rounded to the nearest millisecond, and the file's tempo
+  events, which name a quarter note, move nothing. Any other rate is refused with the reason, and a
+  frame of no ticks is a damaged file (planning/karaoke-phase2.md, W13e).
 - **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
   `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
   (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
@@ -3159,6 +3165,17 @@ The sections below contain the complete change list and fixes.
   no heap, against 32 KB reserved first. A text of 2,000 one-digit values still needs 32 KB of
   tokens, which only the token cap bounds. A re-handshake is entered after the message's tokens
   are released, so its X25519 does not sit on top of them.
+- **A sink's session takes at most 8 KB of tokens for a message, where a host's takes 64 KB.**
+  `PlayerConfig::max_json_tokens` (4,096 by default, so a host reads what it did) bounds the one
+  block a session takes for a message of more than 64 values, and Hearth's sink sets
+  `kSinkMaxJsonTokens`, 512. The largest message a server legitimately sends is 98 tokens
+  (`server/state` with metadata, controller and color, as Music Assistant sends it;
+  `stream/start` with every role is 88 and a settings command for sixteen outputs and every
+  decoder key 89); only `languages` has no bound, and a hundred of them make `server/activate`
+  126. A lyric document is one string, one token, whatever its bytes. No message comes within
+  twice the cap, and a valid 4 KB text of 2,000 one-digit values, which needed one 32 KB block,
+  is refused at its 513th token with no block taken. A message over the cap is dropped as a
+  malformed one is.
 
 **Object signing**
 
