@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -43,6 +44,10 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(build())
+        // A TV box that lets its display sleep loses its HDMI audio route with it, and a bitstream with
+        // it (planning/hearth-android-findings.md, F12). While this screen is the one shown, the
+        // display stays on; what keeps it on once the person leaves is the next phase's (spike S3).
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         SinkService.start(this)
     }
 

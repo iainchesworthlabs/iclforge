@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "android/passthrough_bridge.hpp"
 #include "native_sink.hpp"
 
 namespace {
@@ -75,6 +76,32 @@ iclforge::hearth_android::NativeSink& sink() {
 }  // namespace
 
 extern "C" {
+
+// The JavaVM, for the audio backend's threads that attach themselves. Defined here once, by the
+// app, and not by the backend: a shared object has one JNI_OnLoad, and a second app links the backend
+// too (libs/audio/src/backend/android/passthrough_bridge.hpp).
+JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
+    iclforge::audio::android::set_java_vm(vm);
+    return JNI_VERSION_1_6;
+}
+
+// Hands the process's PassthroughBridge to the audio backend. Called once before a stream starts, and
+// safe to call again.
+JNIEXPORT void JNICALL Java_com_iclforge_hearth_NativeSink_registerPassthroughBridge(JNIEnv* env, jobject /*self*/,
+                                                                                     jobject bridge) {
+    iclforge::audio::android::register_passthrough_bridge(env, bridge);
+}
+
+// Another source holds the device (audio focus lost), or has given it back.
+JNIEXPORT void JNICALL Java_com_iclforge_hearth_NativeSink_setExternalSource(JNIEnv* /*env*/, jobject /*self*/,
+                                                                             jboolean external) {
+    sink().set_external_source(external != JNI_FALSE);
+}
+
+// Whether a stream is open on the device: when the app holds audio focus.
+JNIEXPORT jboolean JNICALL Java_com_iclforge_hearth_NativeSink_streaming(JNIEnv* /*env*/, jobject /*self*/) {
+    return sink().streaming() ? JNI_TRUE : JNI_FALSE;
+}
 
 JNIEXPORT jstring JNICALL Java_com_iclforge_hearth_NativeSink_nativeVersionString(JNIEnv* env, jobject /*self*/) {
     return env->NewStringUTF("hearth-android 0.1.0-alpha.1 (iclforge::sink)");

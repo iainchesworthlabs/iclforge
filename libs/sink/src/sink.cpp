@@ -451,8 +451,12 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             if (const std::shared_ptr<Connection> connection = self.lock()) {
                 connection->driver().call([&] {
                     ac::State state = connection->iclforge_state_;
+                    const OutputCounts counts = connection->bursts_->counts();
                     state.decoder = connection->bursts_->decoder();
-                    state.counters.bursts_played = connection->bursts_->counts().units;
+                    state.counters.bursts_played = counts.units;
+                    state.counters.underruns = counts.underruns;
+                    state.counters.late_chunks = counts.late;
+                    state.counters.dropped_chunks = counts.dropped;
                     return connection->session_->set_iclforge_state(state);
                 });
             }
@@ -597,15 +601,16 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
     config.player_state = {.volume = 100,
                            .muted = false,
                            .output_delay_ms = 0,
-                           .required_lead_time_ms = 500,
-                           .min_buffer_ms = 200,
+                           .required_lead_time_ms = options_.required_lead_time_ms,
+                           .min_buffer_ms = options_.min_buffer_ms,
                            .supported_commands = std::vector<m::PlayerCommand>{m::PlayerCommand::kVolume,
                                                                                m::PlayerCommand::kMute},
                            .format = std::nullopt};
-    if (options_.extension_role) {
+    const std::vector<ac::DataType> data_types = options_.data_types_now ? options_.data_types_now() : options_.data_types;
+    if (options_.extension_role && !data_types.empty()) {
         config.supported_roles = {std::string(ac::kRole), "player@v1"};
         ac::Support support;
-        support.data_types = {ac::DataType::kAc3, ac::DataType::kEac3, ac::DataType::kAc4};
+        support.data_types = data_types;
         support.sample_rates = {48000};
         support.outputs.count = options_.output_count;
         support.outputs.bit_depth = 32;
@@ -641,8 +646,8 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         }
         config.iclforge_state.volume = 100;
         config.iclforge_state.muted = false;
-        config.iclforge_state.required_lead_time_ms = 500;
-        config.iclforge_state.min_buffer_ms = 200;
+        config.iclforge_state.required_lead_time_ms = options_.required_lead_time_ms;
+        config.iclforge_state.min_buffer_ms = options_.min_buffer_ms;
         config.iclforge_state.supported_commands = {ac::Command::kVolume, ac::Command::kMute};
         if (options_.accept_settings || options_.karaoke) {
             config.iclforge_state.supported_commands.push_back(ac::Command::kSettings);
@@ -838,6 +843,12 @@ Sink::Totals Sink::totals() const {
 Sink::Roles Sink::roles() const {
     const std::lock_guard lock(roles_mutex_);
     return roles_;
+}
+
+void Sink::set_external_source(bool external) {
+    for_each_connection([&](Connection& connection) {
+        connection.driver().call([&] { return connection.session().set_external_source(external); });
+    });
 }
 
 void Sink::send_controller_command(const sendspin::controller::CommandMessage& command) {

@@ -121,6 +121,39 @@ The sections below contain the complete change list and fixes.
   were given.
   This is a move: no message, log line or file the test sink writes is different.
 
+**Hearth for Android: the pass-through output**
+
+- **The coded stream goes to the receiver as it is** (`planning/hearth-android.md`, phase 1c).
+  `iclforge::sink::PassthroughOutput` (`libs/sink`, the `sink_passthrough` target) takes each Sendspin
+  burst chunk, rebuilds the IEC 61937 burst it came from (`iec61937::burst_from_parts`), and writes it
+  to a link in the slot it is due in, with null bursts between, never silence, so that a receiver keeps
+  its lock. A burst more than half its length late is dropped and counted; the link is kept 6 bursts
+  ahead (the Shield held with 4 and not with 3) and is primed with 8 before it is expected to move;
+  after a stream ends it is held open with null bursts for 3 s, so that the next stream, which is
+  usually a song later, does not wait for a relock. The link is a seam: the app's is the process's
+  `AudioTrack` through `iclforge::audio`'s passthrough backend, and the host tests drive the output
+  against a model of the Shield's device (8 bursts to start, 20 ms position steps) with a clock of
+  their own.
+- **The app uses it.** The extension role lists AC-3 and E-AC-3 as the route takes them when a server
+  dials (asked each time: a TV box loses its HDMI route when the display sleeps), reports the decoder
+  from the first syncframe's header, and carries the output's counters (bursts, underruns, late,
+  dropped) in its role state. The service takes audio focus when a stream starts and gives it back
+  when it ends; losing it pauses the link and tells the server the device is held elsewhere
+  (`external_source`). `libs/audio`'s Android backend reads `AudioTrack.getUnderrunCount()` through an
+  optional bridge method, which a write that was accepted cannot show.
+- **What the device needs of a sink.** The state asks a server for 0.8 s of lead (`required_lead_time_ms`,
+  now an option): the first burst can be placed once the track is open, eight bursts are queued and its
+  position has begun to report, about 0.5 s on a Shield, and 0.5 s lost the first two. A burst is
+  dropped only when it is three quarters of its length late, so that the estimate of the clock moving
+  a few milliseconds does not flip one between played and dropped. The display stays on while the
+  screen is shown (a TV box that lets it sleep loses the HDMI route, and the track dies with it), and a
+  link that has gone is opened again within a second of the route's return.
+- **Library changes** (`libs/sink`): the role's data types are the program's (`Options::data_types`,
+  or `data_types_now` asked per connection, and an empty answer leaves the extension role unlisted),
+  `OutputCounts` carries underruns, late and dropped chunks into the role state, and
+  `Sink::set_external_source()`. `main`'s change to the test sink (it holds the lyrics and reports an
+  anchor's line, and `forget_lyrics()`) is made in the library, where that code is.
+
 **Hearth for Android: the app's skeleton**
 
 - **`apps/hearth/android`: a Gradle project and an app that is a Sendspin sink and plays nothing yet**

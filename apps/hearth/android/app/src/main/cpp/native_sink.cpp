@@ -17,6 +17,9 @@
 #include <utility>
 #include <vector>
 
+#include "audio_link.hpp"
+#include "iclforge/sendspin/session_driver.hpp"
+#include "iclforge/sink/passthrough.hpp"
 #include "iclforge/sink/sink.hpp"
 
 namespace iclforge::hearth_android {
@@ -74,45 +77,103 @@ class DiscardingStream final : public sink::StreamOutput {
     std::filesystem::path no_file_;
 };
 
-class DiscardingBursts final : public sink::BurstStreamOutput {
-   public:
-    bool start(const sendspin::player::StreamStart& /*stream*/) override {
-        ++counts_.streams;
-        return true;
-    }
-    void clear() override {}
-    void end() override {}
-    void write(const sendspin::BurstChunk& /*chunk*/, std::int64_t /*local_time*/) override { ++counts_.units; }
-    void set_karaoke(sendspin::player::Karaoke /*reproduction*/, sendspin::player::KaraokeVocals /*vocals*/,
-                     const std::array<double, 3>& /*levels_db*/) override {}
-    [[nodiscard]] sink::OutputCounts counts() const override { return counts_; }
-    [[nodiscard]] const std::filesystem::path& file() const override { return no_file_; }
-    [[nodiscard]] const std::optional<sendspin::player::DecoderReport>& decoder() const override { return decoder_; }
+// The extension role's output: the stream as it is, to the receiver, through the process's one
+// AudioTrack. It keeps its link in a base, so that the link is made before the output that refers to it
+// and outlives it, and tells the app's outputs when it is made and gone, for audio focus.
+class AppOutputs;
 
-   private:
-    sink::OutputCounts counts_;
-    std::filesystem::path no_file_;
-    std::optional<sendspin::player::DecoderReport> decoder_;
+struct LinkHolder {
+    explicit LinkHolder(std::unique_ptr<sink::BurstLink> held) : link(std::move(held)) {}
+    std::unique_ptr<sink::BurstLink> link;
 };
 
-class DiscardingOutputs final : public sink::Outputs {
+class AppBurstOutput final : private LinkHolder, public sink::PassthroughOutput {
    public:
+    AppBurstOutput(AppOutputs& owner, std::unique_ptr<sink::BurstLink> link);
+    ~AppBurstOutput() override;
+
+   private:
+    AppOutputs* owner_;
+};
+
+class AppOutputs final : public sink::Outputs {
+   public:
+    explicit AppOutputs(SharedAudio& audio) : audio_(&audio) {}
+
     [[nodiscard]] std::unique_ptr<sink::StreamOutput> stream(std::uint64_t /*connection*/) override {
         return std::make_unique<DiscardingStream>();
     }
     [[nodiscard]] std::unique_ptr<sink::BurstStreamOutput> bursts(std::uint64_t /*connection*/) override {
-        return std::make_unique<DiscardingBursts>();
+        auto output = std::make_unique<AppBurstOutput>(*this, audio_->make_link());
+        output->run();
+        return output;
     }
+
+    // Another source holds the device (audio focus), or has given it back.
+    void set_paused(bool paused) {
+        const std::lock_guard lock(mutex_);
+        paused_ = paused;
+        for (AppBurstOutput* output : live_) {
+            output->set_paused(paused);
+        }
+    }
+
+    // Whether any connection has a stream open on the link: what audio focus is taken for.
+    [[nodiscard]] bool streaming() const {
+        const std::lock_guard lock(mutex_);
+        return std::ranges::any_of(live_, [](const AppBurstOutput* output) { return output->streaming(); });
+    }
+
+    void add(AppBurstOutput* output) {
+        const std::lock_guard lock(mutex_);
+        live_.push_back(output);
+        if (paused_) {
+            output->set_paused(true);
+        }
+    }
+    void remove(AppBurstOutput* output) {
+        const std::lock_guard lock(mutex_);
+        std::erase(live_, output);
+    }
+
+   private:
+    SharedAudio* audio_;
+    mutable std::mutex mutex_;
+    std::vector<AppBurstOutput*> live_;
+    bool paused_ = false;
 };
+
+[[nodiscard]] std::int64_t steady_now_us() {
+    static const sendspin::SteadyClock clock;
+    return clock.now_us();
+}
+
+[[nodiscard]] sink::PassthroughOptions app_options() {
+    sink::PassthroughOptions options;
+    options.note = [](std::string_view text) {
+        __android_log_print(ANDROID_LOG_INFO, "HearthPassthrough", "%.*s", static_cast<int>(text.size()), text.data());
+    };
+    return options;
+}
+
+AppBurstOutput::AppBurstOutput(AppOutputs& owner, std::unique_ptr<sink::BurstLink> link)
+    : LinkHolder(std::move(link)), PassthroughOutput(*this->link, steady_now_us, app_options()), owner_(&owner) {
+    owner_->add(this);
+}
+
+AppBurstOutput::~AppBurstOutput() {
+    owner_->remove(this);
+}
 
 }  // namespace
 
 class NativeSink::Impl {
    public:
     mutable std::mutex mutex;
-    // The log and the outputs outlive the sink, which refers to both.
+    // The log, the device and the outputs outlive the sink, which refers to the first and the last.
     LogBuffer log;
-    DiscardingOutputs outputs;
+    SharedAudio audio;
+    AppOutputs outputs{audio};
     std::unique_ptr<sink::Sink> sink;
 };
 
@@ -134,11 +195,19 @@ std::string NativeSink::start(const std::string& state_directory, const std::str
     options.advertise = false;
     options.code_method = sink::CodeMethod::kDynamic;
     options.unpaired_access = false;
-    // player@v1 in PCM, and the extension role's three data types: what the output takes is the
-    // next phase's. Phase 1b's sink is a skeleton that takes either and drops it.
+    // The coded stream goes to the receiver as it is, in the formats the route takes when a server
+    // dials. player@v1's PCM is listed and dropped: the phase that decodes (planning/
+    // hearth-android.md, phase 4) and the one that plays it (5) are not this one's.
     options.codecs = {sendspin::messages::Codec::kPcm};
     options.extension_role = true;
+    SharedAudio* audio = &impl_->audio;
+    options.data_types_now = [audio] { return audio->routes(); };
     options.buffer_capacity = 8ULL * 1024 * 1024;
+    // The first burst can be placed once the track has been opened, eight bursts queued (it does not
+    // move before that) and its position has begun to report: about 0.5 s on a Shield. A server that
+    // starts a stream with the lead the test sink asks for (0.5 s) has its first bursts due before
+    // that, and they are dropped; 0.8 s leaves the margin that the first run showed was needed.
+    options.required_lead_time_ms = 800;
 
     std::expected<std::unique_ptr<sink::Sink>, std::string> started =
         sink::Sink::start(std::move(options), impl_->outputs, impl_->log);
@@ -148,6 +217,18 @@ std::string NativeSink::start(const std::string& state_directory, const std::str
     const std::lock_guard lock(impl_->mutex);
     impl_->sink = std::move(*started);
     return {};
+}
+
+void NativeSink::set_external_source(bool external) {
+    const std::lock_guard lock(impl_->mutex);
+    if (impl_->sink) {
+        impl_->sink->set_external_source(external);
+    }
+    impl_->outputs.set_paused(external);
+}
+
+bool NativeSink::streaming() const {
+    return impl_->outputs.streaming();
 }
 
 void NativeSink::stop() {

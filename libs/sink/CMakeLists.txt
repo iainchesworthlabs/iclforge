@@ -23,3 +23,13 @@ target_link_libraries(iclforge_sink PUBLIC iclforge::sendspin iclforge::lyrics)
 # which measure them, and --coverage is compile-time, not inherited from whatever later links this
 # archive.
 target_link_libraries(iclforge_sink PRIVATE iclforge::warnings iclforge::coverage)
+
+# The pass-through output (include/iclforge/sink/passthrough.hpp): a burst output that rebuilds each
+# Sendspin burst chunk into the IEC 61937 burst it came from and keeps a link alive with null
+# bursts. A target of its own, so that a program that decodes its streams (hearth-testsink) or
+# writes them down does not link what only a bitstreaming one needs: the burst rebuild
+# (iclforge::containers) and the frame header reader (iclforge::ac3).
+add_library(iclforge_sink_passthrough STATIC src/passthrough_output.cpp)
+add_library(iclforge::sink_passthrough ALIAS iclforge_sink_passthrough)
+target_link_libraries(iclforge_sink_passthrough PUBLIC iclforge::sink iclforge::containers iclforge::ac3)
+target_link_libraries(iclforge_sink_passthrough PRIVATE iclforge::warnings iclforge::coverage)

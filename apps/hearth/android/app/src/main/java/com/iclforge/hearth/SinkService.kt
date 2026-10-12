@@ -8,8 +8,13 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import java.io.File
@@ -20,13 +25,45 @@ import java.io.File
  * which the notification's Quit action and the screen's button do. The Activity is only a view of
  * what this holds, so leaving the screen (HOME) does not end the sink.
  *
- * Not here yet, and each the next phase's: the pass-through output, audio focus, the MediaSession
- * the remote's play and pause keys come through, and the Wi-Fi lock that streaming holds.
+ * It also holds what the stream needs of the platform: the [PassthroughBridge] the audio backend
+ * writes through, and audio focus, taken when a stream starts and given back when it ends. A bitstream
+ * cannot be made quieter, so losing focus, to a call or another app, pauses it and tells the
+ * server the device is held elsewhere (`external_source`); getting it back resumes.
+ *
+ * Not here yet, and each a later phase's: the MediaSession the remote's play and pause keys come
+ * through, and the Wi-Fi lock that streaming holds.
  */
 class SinkService : Service() {
     private var advertiser: SinkAdvertiser? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var bridge: PassthroughBridge? = null
+    private var focus: AudioFocusRequest? = null
+
+    private val focusChanged = AudioManager.OnAudioFocusChangeListener { change ->
+        // A bitstream has no "quieter": ducking is losing it for as long as it lasts.
+        val held = change != AudioManager.AUDIOFOCUS_GAIN
+        Log.i(TAG, "audio focus change $change: ${if (held) "held elsewhere" else "ours"}")
+        NativeSink.setExternalSource(held)
+    }
+
+    private val watch = object : Runnable {
+        override fun run() {
+            followStream()
+            handler.postDelayed(this, WATCH_MS)
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        if (NativeSink.available) {
+            // Before any server dials: the route is asked for when one does.
+            val created = PassthroughBridge()
+            bridge = created
+            NativeSink.registerPassthroughBridge(created)
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_QUIT) {
@@ -36,14 +73,60 @@ class SinkService : Service() {
         }
         enterForeground()
         startSink()
+        handler.removeCallbacks(watch)
+        handler.post(watch)
         // A restart by the system after the process was killed comes with no intent; the sink is
         // started again, which is what "available until the person leaves it" means.
         return START_STICKY
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(watch)
+        releaseFocus()
         stopSink()
         super.onDestroy()
+    }
+
+    /** Takes audio focus when a stream starts on the device and gives it back when it ends. */
+    private fun followStream() {
+        if (!NativeSink.available) {
+            return
+        }
+        val streaming = NativeSink.streaming()
+        if (streaming && focus == null) {
+            takeFocus()
+        } else if (!streaming && focus != null) {
+            releaseFocus()
+        }
+    }
+
+    private fun takeFocus() {
+        val manager = getSystemService(AudioManager::class.java)
+        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener(focusChanged, handler)
+            .build()
+        val result = manager.requestAudioFocus(request)
+        Log.i(TAG, "audio focus requested: ${if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) "granted" else "refused ($result)"}")
+        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            focus = request
+        }
+    }
+
+    private fun releaseFocus() {
+        val held = focus ?: return
+        focus = null
+        getSystemService(AudioManager::class.java).abandonAudioFocusRequest(held)
+        Log.i(TAG, "audio focus abandoned")
+        // The stream is over (or the service is going): the device is nobody's but ours.
+        if (NativeSink.available) {
+            NativeSink.setExternalSource(false)
+        }
     }
 
     private fun enterForeground() {
@@ -125,6 +208,7 @@ class SinkService : Service() {
         private const val TAG = "HearthSink"
         private const val CHANNEL = "sink"
         private const val NOTIFICATION_ID = 1
+        private const val WATCH_MS = 500L
         const val ACTION_QUIT = "com.iclforge.hearth.QUIT"
 
         /** Sendspin's client port (libs/sendspin's websocket::kClientPort), tried first. */

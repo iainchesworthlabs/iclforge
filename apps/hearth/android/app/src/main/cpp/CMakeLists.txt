@@ -71,15 +71,24 @@ set(ICLFORGE_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_CAPI OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_HEARTH ON CACHE BOOL "" FORCE)
+# One shared object: the libraries it links are static and end up inside it, so that the APK carries
+# libiclforge_hearth_jni.so and libc++_shared.so and not a shared library per library of the root.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_HEARTH_APPS OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("${ICLFORGE_REPO_ROOT}" iclforge_build)
 
 # --- this app's own shared object -----------------------------------------------------------------
 add_library(iclforge_hearth_jni SHARED
+    audio_link.cpp
     jni_entry.cpp
     native_sink.cpp)
 target_compile_features(iclforge_hearth_jni PRIVATE cxx_std_23)
+# The audio backend's registration (android/passthrough_bridge.hpp) is the one header of
+# iclforge::audio's src/backend tree this app includes, which the project table exposes for it.
+target_include_directories(iclforge_hearth_jni PRIVATE
+    "${ICLFORGE_REPO_ROOT}/libs/audio/src/backend")
 # log: android/log.h, which native_sink.cpp writes the sink's log through.
 target_link_libraries(iclforge_hearth_jni PRIVATE
-    iclforge::sink iclforge::sendspin iclforge::lyrics iclforge::warnings log)
+    iclforge::sink iclforge::sink_passthrough iclforge::audio iclforge::sendspin iclforge::lyrics
+    iclforge::warnings log)

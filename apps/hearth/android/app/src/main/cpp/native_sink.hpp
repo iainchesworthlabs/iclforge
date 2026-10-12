@@ -41,6 +41,11 @@ class NativeSink {
     void stop();
 
     [[nodiscard]] bool running() const;
+    // Another source holds the device (audio focus was taken), or has given it back: servers are
+    // told, and what is playing waits.
+    void set_external_source(bool external);
+    // Whether a stream is open on the device, which is when the app holds audio focus.
+    [[nodiscard]] bool streaming() const;
     [[nodiscard]] std::uint16_t port() const;
     [[nodiscard]] std::string client_id() const;
     [[nodiscard]] SinkTotals totals() const;

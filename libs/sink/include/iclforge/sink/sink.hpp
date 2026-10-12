@@ -71,6 +71,15 @@ struct Options {
     // The channel counts PCM and FLAC are offered at, each of the formats above (Opus stays at
     // two): a player that renders to a layout wider than stereo lists that width.
     std::vector<std::int32_t> pcm_channels{2};
+    // The coded formats the extension role lists: what a server may send as bursts. A program lists
+    // the ones its output takes; the test sink's decoders take all three.
+    std::vector<sendspin::player::DataType> data_types{
+        sendspin::player::DataType::kAc3, sendspin::player::DataType::kEac3, sendspin::player::DataType::kAc4};
+    // When set, asked for each connection instead of `data_types`: what the output takes now. A
+    // route comes and goes with a TV (an Android box loses its HDMI output when the display sleeps),
+    // so what a program could take when the sink started is not what it can when a server dials.
+    // An empty answer leaves the extension role unlisted for that connection.
+    std::function<std::vector<sendspin::player::DataType>()> data_types_now;
     // Offer _iclforge_player@v1 before player@v1, as a Hearth sink does.
     bool extension_role = true;
     // Lists the Settings command in the extension role's state and applies
@@ -124,6 +133,12 @@ struct Options {
     // buffer_capacity): what a server may have sent that has not played yet. A board's is a
     // few tens of KB.
     std::uint64_t buffer_capacity = 32ULL * 1024 * 1024;
+    // What the sink asks of a server in time (both roles' state): how far ahead of its play time a
+    // chunk must be sent to be played on time, and the least the sink wants buffered. A device that
+    // takes time to start (an AudioTrack, which needs the whole of its buffer queued before it moves)
+    // asks for more than a sink that writes a file.
+    std::int32_t required_lead_time_ms = 500;
+    std::int32_t min_buffer_ms = 200;
     // The most bytes one chunk to the sink may be, which the extension role's support object
     // states; 0 states none, as a sink from before the key does.
     std::uint32_t max_chunk_bytes = 0;
@@ -155,6 +170,12 @@ struct OutputCounts {
     std::uint32_t streams = 0;
     std::uint64_t units = 0;
     std::uint64_t frames = 0;
+    // What went wrong at the output, which the extension role's state reports as its counters: gaps
+    // the device played where there was no audio, units that came after their time, and units that
+    // were dropped (late ones, or ones that could not be taken).
+    std::uint64_t underruns = 0;
+    std::uint64_t late = 0;
+    std::uint64_t dropped = 0;
 };
 
 // Where one connection's player@v1 stream goes: PCM, FLAC or Opus, which an output decodes or
@@ -250,6 +271,11 @@ class Sink {
     void open_window();
     void reset_rounds();
     void cancel_pairing();
+
+    // Another source holds the device (audio focus was lost to a call, a navigation voice, another
+    // app): tells every server so, as the specification's `external_source`, and again when it is
+    // given back. The output is the program's to pause.
+    void set_external_source(bool external);
 
     // Totals over every connection, for tests.
     struct Totals {

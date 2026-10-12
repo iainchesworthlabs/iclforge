@@ -40,6 +40,18 @@ object NativeSink {
 
     external fun stop()
 
+    /**
+     * Hands the process's [PassthroughBridge] to the audio backend. Before a stream starts; safe to
+     * call again.
+     */
+    external fun registerPassthroughBridge(bridge: Any)
+
+    /** Another source holds the device (audio focus was lost), or has given it back. */
+    external fun setExternalSource(external: Boolean)
+
+    /** Whether a stream is open on the device. */
+    external fun streaming(): Boolean
+
     external fun running(): Boolean
 
     /** The port the sink listens on, 0 when it is not running. */
