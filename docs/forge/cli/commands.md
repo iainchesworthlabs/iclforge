@@ -356,6 +356,28 @@ forge ac4-encode me_51.wav out.mp4 448 substream1-content=music-and-effects \
     substream3=german.wav substream3-content=dialogue substream3-language=de \
     presentation1=1,2 presentation1-config=0 presentation2=1,3 presentation2-config=0
 ```
+### Lyrics beside the stream: `lyrics=`
+
+`lyrics=<file>` on `encode`, `eac3-encode` and `ac4-encode` puts a lyrics file beside the stream as
+its own, so that what Forge makes is a stream and its words. The file may be an `.lrc`, a SubRip
+`.srt`, an Advanced SubStation Alpha `.ass` or a MIDI karaoke `.kar`, in UTF-8 or UTF-16. What is
+written is `<stream>.lrc` (the stream's name with the extension replaced), the one format
+[Hearth](../../hearth/index.md) finds by name and sends to every sink: UTF-8, with a duet's `V1:`
+and `V2:` markers and the singers' names, word times where the file has them (an ASS script's
+karaoke syllables, a MIDI file's), and a time with no text where a cue ends before the next one
+begins, so that the gap is not shown as the line going on. Styling and positions are not carried.
+
+The file is read before the encode, so a file that is not lyrics is refused first, with exit code
+2, and a code page such as Latin-1 or Shift-JIS is named and not guessed at. A `.lrc` of that name
+already beside the stream is left as it was, and the run says so. `-` as the output has no name to
+put a file beside and is refused (exit code 1).
+
+```bash
+forge encode backing.wav sing-along.ac3 384 L,C,R,Cs src=melody.wav src=lead.wav \
+    map=0.0:L,0.1:R,1.0:C,2.0:Cs bsmod=voiceover lyrics=words.srt
+# writes sing-along.ac3 and sing-along.lrc
+```
+
 ### ADM ingest — professional master files (opt-in)
 
 **Only *runnable* in a build with `-DICLFORGE_BUILD_ADM=ON`** — but always *listed*, the same

@@ -70,6 +70,29 @@ The sections below contain the complete change list and fixes.
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
 
+**Containers: what a file holds besides its audio**
+
+- **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
+  file with Dolby audio often carries a picture, a second audio track or a subtitle track, and the
+  readers gave up one audio track and said nothing of the rest. `mp4::Demuxed::skipped` and
+  `matroska::Demuxed::skipped` now hold each other track's id, kind (`audio`, `video`, `text` or
+  `other`, from the MP4 handler or the Matroska track type), codec (the first sample entry, or the
+  CodecID) and language, in file order and up to 64. `forge probe` prints them on an `other tracks`
+  line and writes them as `container.other_tracks` in its JSON. None of their content is read; it is
+  what the container says, so that a person can see whether a karaoke video's words are in a text
+  track, a bitmap subtitle track or only in the picture.
+
+**Forge writes the lyrics beside the stream it encodes**
+
+- **`lyrics=<file>` on `forge encode`, `eac3-encode` and `ac4-encode`.** The file may be an `.lrc`, a
+  SubRip `.srt`, an Advanced SubStation Alpha `.ass` or a MIDI karaoke `.kar`; what is written beside the
+  stream is `<stream>.lrc`, the one format Hearth finds by name and sends to every sink: UTF-8, with a
+  duet's `V1:`/`V2:` markers and names, word times where the file has them, and a time with no text
+  where a cue ends before the next begins. The file is read before the encode (a code page is
+  named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
+  `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
+  `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
 - **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
