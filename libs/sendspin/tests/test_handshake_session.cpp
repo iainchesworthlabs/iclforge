@@ -438,3 +438,97 @@ TEST_CASE("channel: fragments in both dialects, and what it refuses", "[sendspin
     CHECK(channel.client.open(small[0]).error == Channel::OpenError::kDecrypt);
 }
 
+
+// A board that took an 8,000-byte lyrics document kept 12.7 KB of internal heap for the rest of
+// the connection: the capacity the document grew in each receive buffer. A document's buffers are
+// released with the next message; a stream's large chunks keep theirs, so a chunk costs no
+// allocation, and small messages never reallocate.
+TEST_CASE("channel: a large document's receive buffers are released, a stream's are kept",
+          "[sendspin][handshake_session][channel][heap]") {
+    namespace message_id = iclforge::sendspin::message_id;
+    using iclforge::sendspin::kRetainedMessageBytes;
+    const Dialect dialect = GENERATE(Dialect::kSpecification, Dialect::kAiosendspin911);
+    const KeyPair server_identity = generated();
+    const KeyPair client_identity = generated();
+    const ServerKeys server_keys;
+    const ClientKeys client_keys;
+    hs::Initiator server(server_identity, server_keys);
+    hs::Responder client(client_identity, Suite::kChaChaPolySha256, client_keys);
+    REQUIRE(run(server, client));
+    Established channel = channels(server, client, dialect);
+
+    const auto message_of = [](std::uint8_t id, std::size_t bytes) {
+        std::vector<std::uint8_t> message(bytes, 0x5A);
+        message[0] = id;
+        return message;
+    };
+    // The server seals `message`; the client opens each frame. The last frame's result.
+    const auto deliver = [&](const std::vector<std::uint8_t>& message) {
+        std::vector<std::vector<std::uint8_t>> sealed;
+        REQUIRE(channel.server.seal(message, sealed));
+        Channel::Opened opened;
+        for (const std::vector<std::uint8_t>& ciphertext : sealed) {
+            opened = channel.client.open(ciphertext);
+            REQUIRE(opened.error == Channel::OpenError::kNone);
+        }
+        CHECK(opened.message.size() == message.size());
+        return opened;
+    };
+
+    SECTION("a 20 KB document, then a small message") {
+        Channel::Opened opened = deliver(message_of(message_id::kJson, 20000));
+        CHECK(opened.large_document);
+        // The span it came in is valid until the next open(), so the buffer is held until then.
+        CHECK(channel.client.held_bytes() >= 20000);
+        opened = deliver(message_of(message_id::kJson, 100));
+        CHECK_FALSE(opened.large_document);
+        CHECK(channel.client.held_bytes() <= kRetainedMessageBytes);
+    }
+    SECTION("a fragmented document releases both buffers") {
+        Channel::Opened opened = deliver(message_of(message_id::kJson, 150000));
+        CHECK(opened.large_document);
+        CHECK(channel.client.held_bytes() >= 150000);
+        opened = deliver(message_of(message_id::kJson, 100));
+        CHECK(channel.client.held_bytes() <= kRetainedMessageBytes);
+    }
+    SECTION("a document, then a chunk of the stream") {
+        deliver(message_of(message_id::kJson, 8000));
+        // The chunk is received into a new, chunk-sized buffer; the document's is gone.
+        const Channel::Opened opened = deliver(message_of(message_id::kPlayerAudio, 3000));
+        CHECK_FALSE(opened.large_document);
+        CHECK(channel.client.held_bytes() < 8000);
+    }
+    SECTION("the bound is one byte of document") {
+        Channel::Opened opened = deliver(message_of(message_id::kJson, kRetainedMessageBytes));
+        CHECK_FALSE(opened.large_document);
+        opened = deliver(message_of(message_id::kJson, kRetainedMessageBytes + 1));
+        CHECK(opened.large_document);
+    }
+    SECTION("small messages are received into one allocation") {
+        Channel::Opened opened = deliver(message_of(message_id::kJson, 3000));
+        const std::uint8_t* const where = opened.message.data();
+        const std::size_t held = channel.client.held_bytes();
+        REQUIRE(held >= 3000);
+        for (const std::size_t bytes : {100U, 2900U, 3000U, 50U, 3000U}) {
+            opened = deliver(message_of(message_id::kJson, bytes));
+            CHECK_FALSE(opened.large_document);
+            CHECK(opened.message.data() == where);
+            CHECK(channel.client.held_bytes() == held);
+        }
+    }
+    SECTION("a stream's large chunks, and the control messages between them, keep one allocation") {
+        const std::vector<std::uint8_t> chunk = message_of(message_id::kPlayerAudio, 20000);
+        Channel::Opened opened = deliver(chunk);
+        CHECK_FALSE(opened.large_document);
+        const std::uint8_t* const where = opened.message.data();
+        const std::size_t held = channel.client.held_bytes();
+        REQUIRE(held >= chunk.size());
+        for (int i = 0; i < 3; ++i) {
+            opened = deliver(message_of(message_id::kJson, 100));
+            CHECK(channel.client.held_bytes() == held);
+            opened = deliver(chunk);
+            CHECK(opened.message.data() == where);
+            CHECK(channel.client.held_bytes() == held);
+        }
+    }
+}

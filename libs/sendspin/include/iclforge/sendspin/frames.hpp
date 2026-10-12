@@ -59,6 +59,17 @@ inline constexpr std::size_t kMaxFramePlaintext = kMaxNoiseMessage - kAeadTagByt
 // One unfragmented message's payload after its ID.
 inline constexpr std::size_t kMaxFramePayload = kMaxFramePlaintext - 1;
 
+// A receive buffer keeps the capacity of the largest message it has held, which is what a stream
+// wants: the next audio chunk is the same size, and a board pays no allocation per chunk. A JSON
+// document longer than this (lyrics, a long metadata block) is not that: it comes once an item, and
+// on a board with Wi-Fi up the buffer it grew stays taken from internal heap for the rest of the
+// connection (a measured 8,000-byte lyrics document: 12.7 KB). Such a document's buffers are
+// released when the next message arrives, so the span it was delivered in is valid until then.
+inline constexpr std::size_t kRetainedMessageBytes = 4096;
+
+// Whether `message` (ID first) is a JSON document above kRetainedMessageBytes.
+[[nodiscard]] bool is_large_document(std::span<const std::uint8_t> message);
+
 // How many frames a message of `message_bytes` bytes (ID included) takes in
 // `dialect`'s form: 1 when it fits in one frame, which is then the message itself.
 [[nodiscard]] std::size_t frame_count(std::size_t message_bytes, Dialect dialect);
@@ -103,13 +114,19 @@ class Reassembler {
     Result push(std::span<const std::uint8_t> frame);
 
     [[nodiscard]] bool in_flight() const { return state_ != State::kIdle; }
+    // Drops a message in flight, and releases the buffer if it grew past kRetainedMessageBytes.
     void reset();
+    // The bytes the reassembler holds between messages: the capacity of its buffer, which only a
+    // fragmented message uses (an unfragmented one is delivered as the frame itself).
+    [[nodiscard]] std::size_t held_bytes() const { return buffer_.capacity(); }
 
    private:
     enum class State : std::uint8_t { kIdle, kSpecification, kAiosendspin911 };
 
     Result fail(FrameError error);
     Result append(std::span<const std::uint8_t> data, bool last);
+    // Empties buffer_ after a delivered message: released if that was a large document.
+    void recycle();
 
     std::vector<std::uint8_t> buffer_;
     std::size_t max_;

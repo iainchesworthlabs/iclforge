@@ -70,6 +70,9 @@ pass was AC-3 and single-substream E-AC-3:
 - `iclforge::ac3::eac3` — `Eac3Encoder`/`Eac3FrameConfig`, `Eac3Decoder`/`DecodedSubstream`.
 - `iclforge::ac4` — `Encoder`/`EncoderConfig`, `Decoder`/`DecodedFrame`, objects included (see
   Coverage below).
+- `iclforge::ac3::Decoder::with_karaoke` and `iclforge::lyrics` — Annex C's karaoke reproduction
+  (`KaraokeConfig`) and timed lyrics, over the C API's `iclforge_decoder_create_with_karaoke` and
+  `iclforge_lyrics_*`; `tests/karaoke.rs` holds them against the committed karaoke examples.
 
 Every config type follows the C header's own `_config_init` growth convention: construct with
 `Default::default()` (which calls the raw `iclforge_*_config_init()` FFI function first) and
