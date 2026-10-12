@@ -929,12 +929,18 @@ struct BurstPlayer::Impl {
             // The bed is the layout the decoder's channels are in, which for an AC-3 syncframe is
             // the coded one except under Annex C's reproduction: a karaoke stream comes out as L,
             // C, R and the LFE, three or four channels for the four to six coded, and laid out
-            // from the coded acmod its vocals would sit where the surrounds were. (A fold has no
-            // bed: the renderer takes its channels as they come.)
+            // from the coded acmod its vocals would sit where the surrounds were. An E-AC-3
+            // programme of one independent substream is reproduced the same way
+            // (iclforge::ac3::is_karaoke_programme), so a unit that is one syncframe asks the
+            // same question. (A fold has no bed: the renderer takes its channels as they come.)
             iclforge::ac3::eac3::chanmap::Layout unit_bed = *bed;
-            if (header->kind == iclforge::ac3::io::StreamKind::kAc3 && header->bytes == unit.size()) {
-                const bool karaoke = iclforge::ac3::meta::is_karaoke(
-                    static_cast<iclforge::ac3::meta::BitstreamMode>(header->bsmod), header->acmod);
+            if (header->bytes == unit.size()) {
+                const auto bsmod = static_cast<iclforge::ac3::meta::BitstreamMode>(header->bsmod);
+                const bool karaoke =
+                    header->kind == iclforge::ac3::io::StreamKind::kAc3
+                        ? iclforge::ac3::meta::is_karaoke(bsmod, header->acmod)
+                        : iclforge::ac3::is_karaoke_programme(
+                              bsmod, header->acmod, 1, header->oba_complexity_index.has_value());
                 const iclforge::ac3::OutputMode mode =
                     iclforge::ac3::output_mode(decoder_config.output, header->acmod, header->lfe, karaoke);
                 if (mode.acmod != header->acmod) {

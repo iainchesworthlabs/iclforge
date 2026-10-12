@@ -95,6 +95,70 @@ The sections below contain the complete change list and fixes.
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
 
+**Karaoke in E-AC-3: Hearth reproduces it, and a sink says which codecs it reproduces it for**
+
+- **Hearth plays an E-AC-3 karaoke stream reproduced.** Its engine took the coded bed for the
+  layout of every E-AC-3 unit, so once the decoder gave a karaoke programme as L, C, R and the
+  LFE (Hearth's setting is aware by default) the renderer would have been handed four channels
+  for a five-channel bed. A programme that is one independent substream is laid out from
+  `ac3::output_mode()` as an AC-3 syncframe is, in the stream player, the test sink and the
+  firmware's burst player; the unit report says it is karaoke and whether it was reproduced;
+  and a unit that transient pre-noise processing held back to the end of the stream is laid
+  out the same way as the rest. A programme with a dependent substream is played as coded.
+- **A sink states the codecs it reproduces karaoke for.** The support object gains
+  `karaoke_codecs`, an optional array of data type names; a sink that lists none, which is every
+  board and sink from before the key, reproduces AC-3's alone. Hearth sends an E-AC-3 karaoke
+  stream as it is only to a sink that lists `eac3` there (and takes the `karaoke` setting, and the
+  rest of what an AC-3 one needs), and decodes it for any other with the reproduction applied, so
+  a group still plays one reproduction. No board lists it yet, so every board is sent PCM for
+  such a stream (`planning/karaoke-eac3.md`, E4a, D6; `planning/hearth-sendspin-extension.md`).
+
+**Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
+
+- **`iclforge/base/karaoke.hpp`.** `KaraokeReproduction` (off, aware, capable), `KaraokeVocals`
+  (none, V1, V2, both), the part levels' -24 to +12 dB span and `karaoke_gain_from_db` move from
+  `iclforge/ac3/decoder/output.hpp` into `iclforge::base`, header-only, so that the E-AC-3
+  decoder, the wire's converters and a later AC-4 mapping name the same types. `iclforge::ac3`
+  re-exports every name, so no caller changes and no symbol is exported or removed
+  (`planning/karaoke-eac3.md`, E1, D5).
+- **`Eac3Decoder` reproduces Annex C's karaoke when `OutputConfig::karaoke` asks.** A programme
+  that is one independent substream with `bsmod` 7 above 1/0, no dependent substream and no object
+  layer comes back as L, C, R and the LFE (aware), or with the listener's vocals and levels
+  (capable), through the same output stage as AC-3, in the access-unit, block and flush paths.
+  A/52 gives E-AC-3 the signalling and no reproduction; Dolby's decoder reproduces Annex C's, and
+  the tests hold the same ratios (V1 into L and V2 into R at the Lo/Ro surround level, the melody
+  at the centre at L's gain), the levels coming from `mixmdate`'s `lorocmixlev` and
+  `lorosurmixlev` and being -3 dB when it is absent. A programme with a dependent substream is
+  decoded as coded. `DecodedAccessUnit::layout` still names the coded bed and `channels` holds the
+  reproduction; `ac3::output_mode()` says what it is. The CLI, Hearth, the GUI, the WebAssembly
+  glue and the firmware read it in the pull requests that follow
+  (`planning/karaoke-eac3.md`, E2, D1 to D3).
+- **`forge decode` and `forge monitor` reproduce an E-AC-3 karaoke stream.** `karaoke` and
+  `karaoke=none|v1|v2|v1+v2` (and the levels) take effect on an E-AC-3 programme that is one
+  independent substream, writing L, C, R and the LFE with the mask FL FR FC LFE, and saying which
+  reproduction and which level the report used; they warned "karaoke is AC-3's, and ignored"
+  before. A programme with a dependent substream is decoded as coded and the report says why.
+  `spdif` and `play` say what they say for AC-3 (a receiver reproduces it), and `spatial` says it
+  places objects and has no karaoke bed. The held-back last unit of a reproduced stream is written
+  at the same channel count as the rest.
+- **`forge transcode` carries the service type.** A karaoke, voice-over or associated-service stream
+  transcoded between AC-3 and E-AC-3 used to come out `bsmod` 0, "complete main", with the vocals
+  still in the surrounds and no flag; it keeps its `bsmod` (E-AC-3 writes it in the informational
+  group), and `bsmod=` still names another one (`planning/karaoke-eac3.md`, E3).
+- **The karaoke reproduction's LFE keeps its level against L, C and R.** The output stage scaled
+  the three sums down by the largest's (§7.8.1's way) and passed the LFE at unity, so the LFE came
+  out 3.5 dB above where the mix put it for a -6 dB surround level (4.6 dB at -3 dB); it now takes
+  the same factor. Dolby's decoder, which scales nothing, leaves it level with the three, and the
+  oracle script below agrees with it on all five streams (`planning/karaoke-eac3.md`, E9, D8).
+- **`forge decode` no longer labels a 2/1 karaoke stream's reproduction as the coded layout.** A
+  2/1 stream (L R V1) reproduces as L, C, R: three channels where three were coded, so a comparison
+  of channel counts called it "already what Annex C gives" and wrote the vocal under the coded
+  mask, in the file's right channel. The mode is compared now, for AC-3 and E-AC-3.
+- **`tools/checks/verify_karaoke_oracle.py`** writes tone-per-channel AC-3 and E-AC-3 karaoke
+  streams, decodes them with `forge decode karaoke` and with the Dolby Reference Player's decoder,
+  and compares each output channel's tones as ratios to L's. Local only (the player is licensed and
+  never runs in CI); it says so and exits 0 without it.
+
 **E-AC-3: an associated service mixed into the main**
 
 - **`iclforge::ac3::AssociatedServiceMixer` and `forge decode associated=`.** A description or a
