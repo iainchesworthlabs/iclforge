@@ -307,7 +307,7 @@ read from the code.
 | The host's rule | `apps/hearth/engine/src/sink_form.cpp` (`choose_sink_form`) | `StreamNeeds` says the stream is karaoke and a reproduction is asked for: a sink that lists the karaoke keys is sent the stream as coded, one that does not is sent PCM decoded here (the fallback), so a group of both plays one reproduction | S |
 | The host sends the choice | Hearth's per-sink settings (`network_sinks`, `settings_model`) | The singer's choice joins what each sink is sent; a change is a new settings revision, applied at the next burst boundary, as the others are | S to M |
 | The words | W13a's library, then the board | The document and a progress anchor reach the board, which runs the cursor on its own playout clock (option A above); needs `lyrics` reachable from the firmware, which W13a settles | M to L |
-| The panel | the board's own UI | Draws the lines and the fill, in right-to-left for Hebrew and Yiddish, with the fonts those need | L (parked until the board) |
+| The panel | the board's own UI | Draws the lines and the fill, in right-to-left for Hebrew and Yiddish, with the fonts those need | L (built 2026-10-12, [karaoke-p4x-panel.md](karaoke-p4x-panel.md)) |
 
 ### Whether the board can
 

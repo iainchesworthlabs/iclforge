@@ -15,7 +15,7 @@
     | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1 merged (#1290); W2 merged (#1293); W3 designed in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes) |
     | 2 | Research W4 and W5 (lyrics for a network group; Android and a browser page) | Read from the code; written up in [the findings](karaoke-phase2-findings.md) |
     | 3 | Builds in [the approved order](#order), one pull request each | W13a, W6's library and writer, W7's wire and host, and W8 are merged; W6's controller and dialog, W7's firmware, W9, W10, W11 and W13b are in review ([the table below](#work-items)) |
-    | 4 | W12, the ESP32-P4 with a panel | **Parked** until the board arrives; only its questions are kept |
+    | 4 | W12, the ESP32-P4 with a panel | Planned and built on 2026-10-12 in [karaoke-p4x-panel.md](karaoke-p4x-panel.md): the screen is drawn and measured on a board with no panel; the v3.x kit has not arrived |
 
 ## What this phase is
 
@@ -52,7 +52,8 @@ text/lyric meta data and events". That is W13.
    (Crucible's import, then SubRip and ASS, MIDI karaoke and CD+G); W11 (duets) only if asked.
    W13a is first because the writer, the sink firmware and Crucible all need the module where
    they can reach it ([W13](#w13-timed-text-import)).
-4. **Parked (W12).** The ESP32-P4 with a panel.
+4. **W12.** The ESP32-P4 with a panel: parked until the board was two weeks away, then planned
+   and built in [its own page](karaoke-p4x-panel.md) (2026-10-12).
 
 ## Work items
 
@@ -67,12 +68,12 @@ tests, **L** is two to four stacked PRs. "Needs" is what the item cannot start w
 | W4 | **Findings: lyrics for a network group.** Which position the lyric clock follows for a group, how a sink with a screen would get the line and the word, and how the choice reaches a sink that decodes for itself | S | Nothing | Read from `NetworkGroupSink`, `choose_sink_form` and the Sendspin roles: [the findings](karaoke-phase2-findings.md#w4-lyrics-for-a-network-group) |
 | W5 | **Findings: Android and a browser page.** What the C API, the bindings and WebAssembly lack, and the smallest first slice | S | Nothing | Read from `libs/capi`, `bindings/*`, `apps/demos/*`: [the findings](karaoke-phase2-findings.md#w5-android-and-a-browser-page) |
 | W6 | **Word timing, built** (shape per W3, D2) | L | W13a | **Built.** The library and the writer are merged (#1300) and so is Hearth's controller (#1303); the timing dialog and its singer choice land with the rest of the phase |
-| W7 | **The sink decodes locally where it can** (D3): the role's settings carry the karaoke choice, the board applies it and runs the lyrics itself; the host sends PCM only to a sink that cannot | M to L | W13a for the lyrics; D3 | **Built.** The wire keys (#1305), the host's rule (#1308) and the firmware (#1310) are merged; the firmware was verified on a real S3 against the host's decode, within 0.25 dB for each reproduction. The lyrics to the board (W7d) are the document and an anchor on the role, followed on the board's own clock; the panel to draw them is parked ([below](#w12-parked-the-esp32-p4-with-a-panel)) |
+| W7 | **The sink decodes locally where it can** (D3): the role's settings carry the karaoke choice, the board applies it and runs the lyrics itself; the host sends PCM only to a sink that cannot | M to L | W13a for the lyrics; D3 | **Built.** The wire keys (#1305), the host's rule (#1308) and the firmware (#1310) are merged; the firmware was verified on a real S3 against the host's decode, within 0.25 dB for each reproduction. The lyrics to the board (W7d) are the document and an anchor on the role, followed on the board's own clock; the panel to draw them is parked ([below](#w12-the-esp32-p4-with-a-panel)) |
 | W8 | **Karaoke in the browser decode demo** (the smallest slice W5 finds) | S to M | D4 | **Merged, PR #1311**: the WebAssembly build was run in Node against `forge decode`, all eight cases sample for sample |
 | W9 | **An LFE part in authoring** (phase 1's decision 6) | M | Nothing; the encoder and the output stage already carry an LFE | **Merged, PR #1312** |
 | W10 | **Annex C's re-levelling of M, V1 and V2** | M to L | A library change, reviewed with the AC-3 decoder's owner session | **Built.** The library's gains (#1313) are merged; Hearth's levels and sliders and the levels to a sink that decodes for itself (verified on a real S3) land with the rest of the phase |
 | W11 | **Duets** beyond the V1 and V2 choice that exists | M | The owner asking for it | **Asked for by the owner on 2026-10-12; built.** The marker in `libs/lyrics` (W11a, #1326), Hearth's view (W11b) and the timing dialog's singer and names (W11c) ([below](#w11-duets)) |
-| W12 | **The ESP32-P4 with a panel** | L | The board | **Parked**; [questions only](#w12-parked-the-esp32-p4-with-a-panel) |
+| W12 | **The ESP32-P4 with a panel** | L | The board | **Built, not run on the kit**: [the plan](karaoke-p4x-panel.md); the five questions are [answered below](#w12-the-esp32-p4-with-a-panel) |
 | W13 | **Timed-text import.** The lyric module in a library, Crucible importing LRC; SubRip, Advanced SubStation Alpha, MIDI karaoke and CD+G as stretch | L (six PRs; the first is S to M) | D9 to D12; the owner's answer on what Crucible does with the text | Scoped in [the findings](karaoke-phase2-findings.md#w13-timed-text-beyond-lrc-and-crucible). W13a is merged (#1299); W13b, Crucible's lyric strip with start-and-nudge as the position (D9), W13c SubRip, W13d ASS, W13e MIDI karaoke and W13f CD+G (a picture, no text, D11) are built and land with the rest of the phase, with Crucible's import taking all of the text formats; the media-session sources are not started |
 
 ## First items
@@ -280,20 +281,23 @@ to draw right-to-left text with a word fill that runs right to left within a wor
 check in the Hearth lyric view and the board's panel (a font with the glyphs, and a layout that
 shapes a right-to-left line), not a parser matter.
 
-### W12: parked, the ESP32-P4 with a panel
+### W12: the ESP32-P4 with a panel
 
-Only the questions are kept; no firmware is started. The board's panel is assumed to be on the P4's
-MIPI DSI interface, with I2S audio as the sinks have today (phase 1's [Later](karaoke.md#later-not-v1)).
+Taken off the shelf on 2026-10-12, when the owner's kit (a P4 of chip revision v3.2 or newer at
+400 MHz with a 7-inch 1024 by 600 capacitive panel on MIPI DSI) was on its way. The plan, the design
+and the work are [karaoke-p4x-panel.md](karaoke-p4x-panel.md); the questions this section kept
+before are answered there:
 
-1. **Where the reproduction happens: decided (D3).** The sink decodes coded AC-3 and applies
-   the singer's choice itself, with the server's PCM as the fallback for a sink that cannot. What
-   is left is the output: the P4 sink outputs stereo today (TDM waits for the v3.x board), so
-   the 2/0 reproduction fits it and the 3/0 one does not until that board is in.
-2. **How the words reach it.** The `_ac3forge_player@v1` role already carries the coded stream; it
-   has no field for lyrics, and `metadata@v1`, the upstream role that carries the title and a
-   progress anchor, has none either. The findings list the shapes.
-3. **Which clock the board's cursor runs on.** Its own playout clock, which knows its own output
-   delay, against the host's, which does not.
-4. **What the screen shows when nothing is playing**, and what a person at the TV controls from
-   the board itself (the choice of vocals, the delay).
-5. **The panel's size and its fonts**: a CJK line needs a font the board has flash for.
+1. **Where the reproduction happens: decided (D3).** The sink decodes coded AC-3 and applies the
+   singer's choice itself, with the server's PCM as the fallback for a sink that cannot. The output
+   was the open part: a chip of revision v3.x opens TDM (the 160 MHz I2S clock), so the 3/0
+   reproduction fits it where the v1.x board's stereo did not.
+2. **How the words reach it: built (W7d).** `lyrics` and `lyrics_position` on
+   `_iclforge_player@v1`.
+3. **Which clock the board's cursor runs on: the board's own**, through the Sendspin host's time
+   filter, which is what `iclforge::lyrics::Follower` answers on.
+4. **What the screen shows when nothing is playing, and what a person at the TV controls from the
+   board:** the board's name, address, network and pairing code; touch sets the lyric delay and the
+   text size, and which vocals sound stays the server's until the role can carry a request back.
+5. **The panel's size and its fonts:** 1024 by 600, Archivo and a static Noto Sans Hebrew in the
+   image; a CJK face does not fit the 4 MB slots and is not in it.

@@ -270,6 +270,23 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **The ESP32-P4 sink draws the lyrics on a panel, with the colour moving as the song does, and
+  there is an image for a P4 of chip revision v3.x.** `hearth_sink` takes a screen
+  (`main/panel/`, chosen like the sink and the source): LVGL 9 drawing the lines before and after
+  the one being sung, the words of it with the fill moving by time, a duet's two singers by name
+  and side, an instrumental break as four dots, right-to-left text, and an idle screen with the
+  board's name, address and pairing code, with Archivo and Noto Sans Hebrew in the image; touch
+  sets the board's own lyric delay and text size. It runs on a MIPI DSI panel with a GT911 (the
+  7-inch panel of Espressif's ESP32-P4-Function-EV-Board, the pins from its board support header)
+  or into a frame buffer in PSRAM with no panel, which `GET :8081/panel.bmp` reads back, so the
+  screen is drawn and its cost measured on a board that has none; `firmware/hearth-sink/preview`
+  draws the same code on a computer. What a screen shows is `iclforge::lyrics::Stage` and
+  `Follower::stage()` in the library, tested on the host. The new image,
+  `hearth-sink-esp32p4-rev3`, is built over `sdkconfig.p4` by `sdkconfig.p4-rev3` (chip revisions
+  v3.1 to v3.99, 400 MHz, and the 160 MHz PLL as the I2S clock so that TDM opens at 16 by 32 bits);
+  the two P4 images refuse each other's chips, and `ota.py` picks one by the revision the board
+  reports. The panel and the v3.x chip have not run on a board: CI builds both
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md), planning/karaoke-p4x-panel.md, W12).
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the

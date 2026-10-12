@@ -1,6 +1,6 @@
 # Sink firmware: install, update, go back
 
-Every tagged release publishes `hearth_sink` built for four boards, so a board can be set up and
+Every tagged release publishes `hearth_sink` built for five boards, so a board can be set up and
 kept up to date without ESP-IDF. CI packages the images whenever its `esp` lane runs, which is
 after a merge to main that changes the ESP32 trees or a tree its component ships, and nightly
 ([the lane table](../ci-lanes.md#lane-table)); the release workflow attaches them to the GitHub
@@ -31,9 +31,11 @@ has the design and the reasons for it.
 | `hearth-sink-esp32c6` | Any ESP32-C6 module; it uses a 4 MB partition table |
 | `hearth-sink-esp32c6-16mb` | An ESP32-C6 with 16 MB of flash |
 | `hearth-sink-esp32p4-rev1` | An ESP32-P4 of silicon revision v1.x, such as the DFRobot FireBeetle 2 |
+| `hearth-sink-esp32p4-rev3` | An ESP32-P4 of silicon revision v3.x with a 7-inch panel, such as the ESP32-P4-Function-EV-Board ([An ESP32-P4 sink](sink-esp32-p4.md)) |
 
-A P4 of revision v3.x needs another build, which releases do not publish yet. The P4 reaches
-Wi-Fi through its onboard ESP32-C6, whose own firmware these images do not change.
+The two P4 images refuse each other's chips: one for v1.x silicon will not start on v3.x and the
+other way round, which is why a release carries both. The P4 reaches Wi-Fi through its onboard
+ESP32-C6, whose own firmware these images do not change.
 
 **Telling boards apart.** Over USB, `esptool chip-id` names the chip and its revision, and
 `esptool flash-id` gives the flash size. A board already on the network reports both:
@@ -50,7 +52,7 @@ Each image is published as four files, with `<version>` the release's tag:
 | `<image>-<version>-parts.zip` | The same pieces as separate files with a `flash_args`, for a board already in use. Its settings are kept |
 | `<image>-<version>-elf.zip` | The ELF, for reading a crash's backtrace or core dump |
 
-`hearth-sink-manifest.json` describes all four images for the tools.
+`hearth-sink-manifest.json` describes all five images for the tools.
 
 ## Checking a download
 
