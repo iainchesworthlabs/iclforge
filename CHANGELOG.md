@@ -5414,6 +5414,18 @@ The sections below contain the complete change list and fixes.
   14 KB free. The floor is 160,796 in both C6 profiles: what a play takes (134,008) and the
   26,788 bytes the network was left at its least beside an E-AC-3 stream. The C6 still refuses
   an HTTP play with `why: memory` and plays over Sendspin.
+- **An E-AC-3 decoder held the spectra of seven streams for every block of every frame, a stereo
+  stream's two or three included.** `Eac3Decoder` keeps six blocks of spectra between its two
+  passes, and each block's was sized for the most a frame can code (five full-bandwidth channels,
+  the LFE, and the coupling channel in the last slot), a kilobyte a stream at Q7.24 and float and
+  two at double. A 2.0 stream with coupling held 79,069 bytes in the heap, 43,242 of them six
+  7,207-byte blocks, against 27,166 for the same stream as AC-3; with a frame's own streams it
+  holds 54,083 (24,576 less, 30,720 less without coupling), measured by a counting
+  `operator new` over 60 units of `testdata/external-baseline/eac3-music-stereo-96`. The
+  coupling channel keeps its stream number in the syntax and sits in the slot after the channels'
+  in the store (`BlockSpectra`). A 5.1 stream with coupling holds what it held. Nothing a decode
+  writes changes: the ac3 test binary's results are the same on the fixed tier (182 failing
+  assertions of 3,721,493, the same ones as before) and all 1,011 cases pass on the double tier.
 
 ## [0.10.0-beta.1] - 2026-09-01
 

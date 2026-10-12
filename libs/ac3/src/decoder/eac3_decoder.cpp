@@ -881,6 +881,37 @@ DecodedSubstream join_frames(std::vector<DecodedSubstream>& parts) {
     return out;
 }
 
+// One block's spectra, a stream each: the coded channels in their own order (the LFE after the
+// full-bandwidth ones) and, in a frame some block of which couples, the shared coupling channel,
+// which the syntax names by kCplStream and this keeps in the slot right after the channels. A
+// frame's streams were seven slots whatever it coded (kCplStream is the last of them), a kilobyte
+// each, six blocks a frame; a stereo stream now holds two or three. Stream numbers are the
+// syntax's, so every use reads as it did: `coeffs[stream]`.
+template <typename Scalar>
+class BlockSpectra {
+   public:
+    using Spectrum = std::array<Scalar, 256>;
+
+    // `channels` coded channels (fbw + lfe), and the coupling channel's spectrum after them when
+    // `coupling`. Entries that stay keep what they held, as a vector's resize does, and those
+    // that arrive are zero.
+    void resize(std::size_t channels, bool coupling) {
+        channels_ = channels;
+        store_.resize(channels + (coupling ? 1U : 0U));
+    }
+    [[nodiscard]] Spectrum& operator[](std::size_t stream) { return store_[slot(stream)]; }
+    [[nodiscard]] const Spectrum& operator[](std::size_t stream) const {
+        return store_[slot(stream)];
+    }
+
+   private:
+    [[nodiscard]] std::size_t slot(std::size_t stream) const {
+        return stream == static_cast<std::size_t>(kCplStream) ? channels_ : stream;
+    }
+    std::vector<Spectrum> store_;
+    std::size_t channels_ = 0;
+};
+
 }  // namespace
 
 // Every private data member, following the same pimpl pattern as
@@ -1110,8 +1141,9 @@ struct Eac3Decoder::Impl {
     struct BlockTail {
         // per stream; decoupled where standard. The single largest heap item
         // in an E-AC-3 decode: seven streams x 2,048 bytes x one entry per
-        // block is 100,352 bytes, which is why it follows decode_scalar_t.
-        std::vector<std::array<internal::decode_scalar_t, 256>> coeffs;
+        // block is 100,352 bytes, which is why it follows decode_scalar_t, and
+        // why BlockSpectra holds only the streams a frame codes.
+        BlockSpectra<internal::decode_scalar_t> coeffs;
         // Each stream's block exponent (block_norm.hpp): the power of two the
         // coefficients above are scaled up by; all zero in the floating tiers.
         std::array<int, kMaxSubstreamStreams> norm{};
@@ -1427,7 +1459,7 @@ void ecpl_reconstruct_block(const Tail& tail, const std::array<Scalar, 256>& pre
                             eac3::EcplNoise& ecpl_noise, std::array<Scalar, 256>& zr,
                             std::array<Scalar, 256>& zi, std::vector<Scalar>& amp_scratch,
                             std::vector<Scalar>& angle_scratch, bool fast,
-                            std::vector<std::array<Scalar, 256>>& coeffs,
+                            BlockSpectra<Scalar>& coeffs,
                             bool spectrum_ready = false) {
     const auto ubins = static_cast<std::size_t>(tail.cplendmant - tail.cplstrtmant);
     if constexpr (std::is_same_v<Scalar, iclforge::internal::Fixed32>) {
@@ -2230,8 +2262,19 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
     // mantissas in block 0, and decode_aht_stream writes them straight into the
     // six tails: those writes are the bins [begin, endmant) of the stream, which
     // the clearing of any block leaves alone.
+    //
+    // And only the spectra the frame has: one a coded channel and, when some block couples, the
+    // coupling channel's, which BlockSpectra keeps right after the channels' (kMaxSubstreamStreams
+    // of them is what a 5.1 stream with coupling needs, and what this asked for on every frame
+    // of every stream). A stereo stream has two, or three with coupling. They are 1,024 bytes
+    // each at Q7.24 and float (2,048 at double), six blocks a frame: 24,576 of the 79,069 bytes
+    // a 2.0 stream's decoder held with coupling, 30,720 without, on an ESP32-C6 whose internal
+    // heap is what Wi-Fi's receive buffers come out of. resize() keeps capacity, so a stream that changes shape
+    // allocates for the widest frame it has seen and then no more.
+    const bool frame_couples =
+        std::any_of(frm->cplinu.begin(), frm->cplinu.begin() + nblks, [](bool on) { return on; });
     for (auto& tail : tails) {
-        tail.coeffs.resize(static_cast<std::size_t>(kMaxSubstreamStreams));
+        tail.coeffs.resize(static_cast<std::size_t>(nchans), frame_couples);
     }
 
     // Captured alongside out.object_metadata below, from whichever block's
@@ -3722,7 +3765,8 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
             if (coupled_block) {
                 clear_from(kCplStream, 0, cplstrtmant);
                 clear_from(kCplStream, cplendmant, end);
-            } else if (!frm->ahtinu[static_cast<std::size_t>(kCplStream)]) {
+            } else if (frame_couples && !frm->ahtinu[static_cast<std::size_t>(kCplStream)]) {
+                // (A frame with no coupling in any block has no such spectrum to clear.)
                 clear_from(kCplStream, 0, end);
             }
         }
