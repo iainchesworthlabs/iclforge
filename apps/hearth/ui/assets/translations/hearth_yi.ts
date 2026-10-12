@@ -2736,7 +2736,7 @@
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="277"/>
         <source>%1 · %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 · %2</translation>
     </message>
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="291"/>
@@ -5420,17 +5420,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1332"/>
+        <location filename="../../src/hearth_controller.cpp" line="1343"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2391"/>
+        <location filename="../../src/hearth_controller.cpp" line="2404"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2394"/>
+        <location filename="../../src/hearth_controller.cpp" line="2407"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5440,7 +5440,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../../src/microphone_controller.cpp" line="255"/>
         <source>Nothing is playing.</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">גאָרנישט שפּילט ניט.</translation>
     </message>
     <message>
         <location filename="../../src/microphone_controller.cpp" line="262"/>
