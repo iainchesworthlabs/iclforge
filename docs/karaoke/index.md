@@ -430,10 +430,48 @@ the item ending does the same.
 - **The last take** is offered with **Show in folder** and **Delete this take**, which removes the
   file and its description.
 
-Turning a take into a karaoke stream with your voice as a vocal part is what the Forge GUI's
-Karaoke flow already does with any mono file: decode the stream's parts with `forge decode`, give
-the take as **Vocal 1** or **Vocal 2** with its offset, and encode. A mix that contains the backing is
-a recording of somebody else's work as well as your voice: keep it for yourself.
+### Make a karaoke stream with your voice in it
+
+A take is a vocal part, and the Forge's [Karaoke flow](../forge/gui/karaoke.md) takes any mono file
+as **Vocal 1** or **Vocal 2**. A take is a recording of one person at one time, so four things need
+handling first:
+
+- **It is FLAC, and the Forge reads WAV.** Convert it with any tool that reads FLAC; the lines below
+  use ffmpeg.
+- **It is at the microphone's rate**, often 44.1 kHz. The Forge GUI resamples a part to the
+  backing's rate and says so; `forge encode` refuses a source at another rate, so convert it.
+- **It starts partway into the song.** `item_start_ms` in the `.take.json` is where, in
+  milliseconds (12340 is 12.34 s), with the microphone's delay and any timing you moved already
+  taken off. `null` means the take could not be placed, and you place it by ear.
+- **It is shorter than the song.** The Forge holds a part's last sample past the part's end, which
+  is not silence: end the take on silence and as long as the backing. The command below does.
+
+In the Forge GUI, give the backing and the melody guide as their parts, the take converted to WAV
+as **Vocal 1**, set its **Start offset** to `item_start_ms` divided by 1000, and save.
+
+From the command line, from a stream you sang to (a 3/2 stream with a melody guide and two vocals:
+`forge probe` says the layout) and a take:
+
+```text
+forge decode song.ac3 parts.wav
+ffmpeg -i "Song - 2026-10-12 211500.flac" -af "adelay=12340,apad=whole_dur=213.5" -ar 48000 -c:a pcm_s24le take.wav
+forge encode parts.wav mine.ac3 320 L,C,R,Cs src=take.wav map=0.0:L,0.1:R,0.2:C,0.3:none,0.4:none,1.0:Cs bsmod=voiceover
+```
+
+`adelay` is in milliseconds (the take's `item_start_ms`) and `apad=whole_dur` is the song's length
+in seconds (`forge probe` shows it as the duration); together they make the take as long as the
+backing, silent before and after it. `-ar` is the backing's rate. In `forge encode`, `parts.wav`
+is source 0: its channels 0, 1 and 2 are L, R and the melody guide, and channels 3 and 4, the
+stream's own vocals, go to `none`. The take is source 1 and takes the surround, which one vocal
+makes a 3/1 stream with (`L,C,R,Cs`, 320 kbit/s). A stream with one vocal has no channel 4, so leave
+`0.4:none` out.
+
+This decodes the stream and encodes it again, which is a second generation of AC-3 for the backing.
+If you still have the files it was made from, give those to the Karaoke flow instead.
+A one-click "save my performance as a karaoke stream" in Hearth is not built: the plan holds it
+until this has been tried ([D12](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)).
+A take made through open speakers has the backing in it as well as your voice, and is a recording of
+somebody else's work: keep it for yourself.
 
 ### What it does not do
 

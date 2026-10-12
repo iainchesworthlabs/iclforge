@@ -441,6 +441,15 @@ The sections below contain the complete change list and fixes.
   made until the first take, and a take begun in the same second as another is numbered, not
   written over it. `TakeRecorder` in the engine is Qt-free and is tested with no device.
   Hearth's user guide has a section on it.
+- **The user guide says how to turn a take into a karaoke stream with the singer's voice in it**
+  (the plan's D12, the recipe first). The Forge's Karaoke flow takes the take as Vocal 1 with its
+  start offset, or `forge decode`, `ffmpeg` and `forge encode` do the same from a stream; the page
+  says what a take needs first (FLAC to WAV, the microphone's rate to the backing's, where it
+  starts, and made as long as the backing) and the commands were run on the repository's example
+  stream: the voice starts where `item_start_ms` says and is silent after it. A found difference:
+  `forge encode` and the Forge GUI hold a shorter part's last sample past its end, which is not
+  silence, and the Forge GUI's warning and the page for it said it was padded with silence; the
+  page now says what is done.
 
 **Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
 
