@@ -19,8 +19,13 @@
 # a fine-grained personal access token for this repository only (Contents and
 # Pull requests: read and write), stored under Settings > Secrets and variables
 # > DEPENDABOT - a Dependabot-triggered run reads that store, not the Actions
-# one. Without it the job falls back to GITHUB_TOKEN and warns, which leaves
-# the PR unmerged, as before.
+# one. Without it (never created, or expired) the job FAILS and sets no bit at
+# all, and the Actions token is never a fallback: a bit set with it is inert,
+# and `gh pr merge --auto` does not replace a bit that is already set, so a PR
+# that took the fallback stayed stuck even after the token was rotated (#1321 to
+# #1325, 2026-10-11/12, cleared by hand). A red check on the Dependabot PR says
+# what is wrong; once the secret is stored, re-run the job and the bit is set
+# by the person.
 #
 # osv-scanner.yml, zizmor.yml and scorecard.yml are all visible-only
 # (upload to Security > Code scanning, never gate a PR - see each workflow's
@@ -58,16 +63,15 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           # A person's token, so that GitHub queues the PR as that person: see the
-          # header. Both are passed in and the choice is made below, so that a
-          # missing secret is a warning instead of an empty GH_TOKEN.
+          # header. It is the only token this step is given, and it is checked
+          # below so that a missing secret fails here, with a message, instead of
+          # as an empty GH_TOKEN.
           MERGE_QUEUE_TOKEN: ${{ secrets.MERGE_QUEUE_TOKEN }}
-          ACTIONS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -n "$MERGE_QUEUE_TOKEN" ]; then
-            export GH_TOKEN="$MERGE_QUEUE_TOKEN"
-          else
-            echo "::warning title=MERGE_QUEUE_TOKEN is not set::Auto-merge is enabled with the Actions token, which the merge queue does not act on, so this pull request will not merge by itself. Add MERGE_QUEUE_TOKEN as a Dependabot secret; the header of this workflow says how."
-            export GH_TOKEN="$ACTIONS_TOKEN"
+          if [ -z "$MERGE_QUEUE_TOKEN" ]; then
+            echo "::error title=MERGE_QUEUE_TOKEN is not set::Auto-merge was NOT enabled on this pull request. The Actions token is not used as a fallback: the merge queue does not act on a bit it sets, and a bit set that way is not replaced by a later run. Add or rotate MERGE_QUEUE_TOKEN as a Dependabot secret (the header of this workflow says how), then re-run this job."
+            exit 1
           fi
+          export GH_TOKEN="$MERGE_QUEUE_TOKEN"
           gh pr merge --auto --squash "$PR_URL"
