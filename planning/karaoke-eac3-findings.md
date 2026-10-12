@@ -174,6 +174,26 @@ programme; none is E-AC-3's.
    not the -6 dB the AC-3 karaoke default carries. The AC-3 encoder's `cmixlev` and `surmixlev` have
    no E-AC-3 counterpart unless `mixmeta` writes `lorocmixlev` and `lorosurmixlev`.
 
+## What the build found: the default levels of an E-AC-3 fold without `mixmdate`
+
+Measured on 2026-10-12 while building E2, on the repository's streams without any karaoke flag
+(`k_cm.ec3`, a 3/2 stream with `bsmod` 0 and no `mixmdate`, and `k_cm.ac3`, the same audio as AC-3
+with `cmixlev` -4.5 and `surmixlev` -6), decoded to Lo/Ro stereo with the Reference Player
+(`dmx-mode` 2, `drc-mode=line`) and with `forge decode ... downmix=loro`; tone levels in dB against L:
+
+| Stream | Decoder | M (centre) in L and R | V1 in L (a surround) |
+|---|---|---|---|
+| AC-3, `cmixlev` -4.5, `surmixlev` -6 | Dolby | -4.5 | -6.0 |
+| AC-3, the same | `forge` | -4.5 | -6.0 |
+| **E-AC-3, no `mixmdate`** | **Dolby** | **-3.0** | **-3.0** |
+| **E-AC-3, no `mixmdate`** | **`forge`** | **-4.5** | **-6.0** |
+
+An E-AC-3 `bsi` has no `cmixlev` and `surmixlev`, A/52 says only that downmixing "should be
+performed as defined in the original specification" where the Lo/Ro group is not sent
+(Annex D 3.1.2), and Dolby's decoder takes -3 dB for both. `MixLevels`' starting values are AC-3's
+-4.5 and -6, which `mix_levels()` returns unchanged for an E-AC-3 stream with no `mixmdate`. The
+karaoke programme takes -3 and -3 (D2, built in E2); every other E-AC-3 fold is decision D10.
+
 ## One corner Dolby's decoder does oddly
 
 A 7.1 karaoke stream (independent 5.1, `bsmod` 7, plus a dependent substream for the rear pair),
