@@ -1,0 +1,21 @@
+# The conformance fixtures of planning/hearth-sink-screen.md as the sink's core frames them, at fixed
+# positions (golden.txt holds the frame of each: `iclforge-sink-tests` and the Android app's own
+# instrumented test both compare their frames with it, so a renderer's test and the library agree).
+#
+#   name | document | lyric delay in ms | positions in ms, comma-separated
+#
+# A document is a path under the repository root (examples/karaoke/...) or a file beside this one. To
+# change a case or a frame, edit this file and regenerate golden.txt with
+#   ICLFORGE_UPDATE_LYRIC_FRAMES=1 iclforge-sink-tests "lyric frames*"
+# and read the diff: a frame that moved is a decision, not a refresh.
+
+auld-lang-syne         | examples/karaoke/auld-lang-syne/auld-lang-syne.lrc           | 0   | 0,500,1000,2050,2450,3600,4200,6000,6900,8100,12300,15000,16600
+auld-lang-syne-delayed | examples/karaoke/auld-lang-syne/auld-lang-syne.lrc           | 500 | 4200,4800
+leave-her-johnny       | examples/karaoke/leave-her-johnny/leave-her-johnny.lrc       | 0   | 0,3000,5400,6700,9000,9700
+auld-lang-syne-lines   | examples/karaoke/auld-lang-syne/auld-lang-syne-lines-only.lrc | 0   | 0,4500,8000,12000,16600
+auld-lang-syne-plain   | plain.txt                                                    | 0   | 0
+lengths                | lengths.lrc                                                  | 0   | 1000,9000,17000,25000,33000
+gaps                   | gaps.lrc                                                     | 0   | 1000,4000,7000,11000,12500,13500
+hebrew-yiddish         | hebrew-yiddish.lrc                                           | 0   | 1000,5000,9000,13000
+hebrew-yiddish-utf16   | hebrew-yiddish-utf16.lrc                                     | 0   | 1000,5000
+arabic-japanese        | arabic-japanese.lrc                                          | 0   | 1000,5000,9000,13000

@@ -1,18 +1,11 @@
 package com.iclforge.hearth
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Rect
-import android.os.SystemClock
-import android.view.View
-import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
-import java.io.FileOutputStream
 
 /**
  * The lyric view against planning/hearth-sink-screen.md, S2 to S8, on the device's own text engine:
@@ -24,134 +17,7 @@ import java.io.FileOutputStream
  *
  * Nothing here needs an HDMI route or a screen: it runs on an emulator and on a TV box that is asleep.
  */
-class LyricViewRenderTest {
-    private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context = instrumentation.context
-    private val target = instrumentation.targetContext
-
-    private val width = 1920
-    private val height = 1080
-
-    // --- fixtures and rendering --------------------------------------------------------------
-
-    private fun document(path: String): ByteArray = context.assets.open("karaoke/$path").use { it.readBytes() }
-
-    private fun frameOf(document: ByteArray, positionMs: Long, delayMs: Int = 0, streaming: Boolean = true): LyricFrame {
-        assertTrue("iclforge_hearth_jni did not load", NativeSink.available)
-        return LyricFrame.parse(Harness.lyricFrameJson(document, positionMs, delayMs, streaming))
-    }
-
-    private fun frameOf(text: String, positionMs: Long): LyricFrame = frameOf(text.toByteArray(Charsets.UTF_8), positionMs)
-
-    private fun render(
-        name: String,
-        frame: LyricFrame,
-        delayMs: Int = 0,
-        step: Int = 1,
-        graceElapsed: Boolean = true,
-    ): Bitmap {
-        lateinit var bitmap: Bitmap
-        instrumentation.runOnMainSync {
-            val view = LyricView(target)
-            view.delayMs = delayMs
-            view.textStep = step
-            val now = SystemClock.uptimeMillis()
-            view.show(frame, if (graceElapsed) now - 2 * Tokens.NO_LYRICS_GRACE_MS else now)
-            view.measure(
-                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
-            )
-            view.layout(0, 0, width, height)
-            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-        }
-        val directory = File(target.getExternalFilesDir(null), "lyric-renders")
-        directory.mkdirs()
-        FileOutputStream(File(directory, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        return bitmap
-    }
-
-    // --- probes ------------------------------------------------------------------------------
-
-    private fun close(a: Int, b: Int, tolerance: Int = 24): Boolean {
-        fun channel(value: Int, shift: Int) = (value shr shift) and 0xFF
-        return listOf(16, 8, 0).all { kotlin.math.abs(channel(a, it) - channel(b, it)) <= tolerance }
-    }
-
-    /** The pixels of [region] that are [color], within a tolerance (the text is anti-aliased). */
-    private fun count(bitmap: Bitmap, region: Rect, color: Int, tolerance: Int = 24): Int {
-        var found = 0
-        val row = IntArray(region.width())
-        for (y in region.top until region.bottom) {
-            bitmap.getPixels(row, 0, region.width(), region.left, y, region.width(), 1)
-            for (pixel in row) {
-                if (close(pixel, color, tolerance)) {
-                    found++
-                }
-            }
-        }
-        return found
-    }
-
-    /**
-     * The longest horizontal run of [color] in [region]: a dot is a run of tens of pixels in a row, and
-     * the anti-aliased edge of a letter is never more than a few.
-     */
-    private fun longestRun(bitmap: Bitmap, region: Rect, color: Int, tolerance: Int = 3): Int {
-        var longest = 0
-        val row = IntArray(region.width())
-        for (y in region.top until region.bottom) {
-            bitmap.getPixels(row, 0, region.width(), region.left, y, region.width(), 1)
-            var run = 0
-            for (pixel in row) {
-                run = if (close(pixel, color, tolerance)) run + 1 else 0
-                longest = maxOf(longest, run)
-            }
-        }
-        return longest
-    }
-
-    /** The box of everything in [region] that is not the background: where text was drawn. */
-    private fun inked(bitmap: Bitmap, region: Rect): Rect? {
-        var left = Int.MAX_VALUE
-        var top = Int.MAX_VALUE
-        var right = Int.MIN_VALUE
-        var bottom = Int.MIN_VALUE
-        val row = IntArray(region.width())
-        for (y in region.top until region.bottom) {
-            bitmap.getPixels(row, 0, region.width(), region.left, y, region.width(), 1)
-            for (x in row.indices) {
-                if (!close(row[x], Tokens.BG, 12)) {
-                    left = minOf(left, region.left + x)
-                    right = maxOf(right, region.left + x)
-                    top = minOf(top, y)
-                    bottom = maxOf(bottom, y)
-                }
-            }
-        }
-        return if (right < left) null else Rect(left, top, right + 1, bottom + 1)
-    }
-
-    /** The stage, between the header and the footer, inside the overscan margin. */
-    private val stage: Rect
-        get() {
-            val u = height / 600f
-            val safeX = (width * Tokens.OVERSCAN).toInt()
-            val safeY = (height * Tokens.OVERSCAN).toInt()
-            return Rect(
-                safeX, safeY + (Tokens.HEADER_U * u).toInt(),
-                width - safeX, height - safeY - (Tokens.FOOTER_U * u).toInt(),
-            )
-        }
-
-    /** The middle third of the stage, where the line being sung is, with a context line either side. */
-    private val centre: Rect
-        get() = Rect(stage.left, stage.top + stage.height() / 3, stage.right, stage.bottom - stage.height() / 3)
-
-    /** The band the line being sung is centred in, and no other row. */
-    private val band: Rect
-        get() = Rect(stage.left, stage.top + stage.height() * 2 / 5, stage.right, stage.top + stage.height() * 3 / 5)
-
+class LyricViewRenderTest : RenderTestBase() {
     // --- S2: word-timed ----------------------------------------------------------------------
 
     @Test

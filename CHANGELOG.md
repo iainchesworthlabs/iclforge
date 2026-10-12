@@ -72,6 +72,18 @@ The sections below contain the complete change list and fixes.
   stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
   needs a case of its own (`planning/karaoke-eac3.md`, D10).
 
+**Hearth for Android: the lyric screen against the spec's fixtures**
+
+- **The conformance fixtures at fixed positions** (`planning/hearth-android.md`, phase 2's exit, AR3):
+  `libs/sink/tests/lyric-frames` lists the documents (the karaoke examples, lines of 18, 36, 44, 54 and
+  55 characters, a gap of 3.9 s and of 4.0 s, Hebrew and Yiddish in UTF-8 and UTF-16, Arabic, Japanese,
+  Cyrillic, Greek, a plain file) with their positions, and `golden.txt` holds the frame the library gives
+  for each (48). The host's tests and the Android app's instrumented test, on the device's own build of
+  the library, are held to it. On a Shield the view draws tiers T1 to T4 on the box's faces (Arabic shaped,
+  Hebrew and Yiddish right to left, Japanese by the system's face), the length rule's five sizes are
+  asserted on what the view chose, and the idle screen dims and walks a small ring after two quiet minutes
+  (an OLED TV's burn-in), held by seven new instrumented cases.
+
 **Hearth for Android: the lyric screen**
 
 - **The app draws the lyrics** (`apps/hearth/android`, phase 2b of `planning/hearth-android.md`; S2 to

@@ -159,6 +159,11 @@ val harnessFixtures = tasks.register<Copy>("stageHarnessFixtures") {
         include("**/*.lrc")
         into("karaoke")
     }
+    // The conformance fixtures and the frames the library is held to for them (libs/sink/tests).
+    from(rootDir.resolve("../../../libs/sink/tests/lyric-frames")) {
+        include("*.lrc", "*.txt")
+        into("lyric-frames")
+    }
     into(layout.buildDirectory.dir("harness-assets"))
 }
 // The family's faces, from the shared theme (apps/shared/theme/assets/fonts), so that there is one copy

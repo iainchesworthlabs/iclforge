@@ -61,11 +61,11 @@ JNIEXPORT jbyteArray JNICALL Java_com_iclforge_hearth_Harness_lyricFrameJson(JNI
     const jsize size = env->GetArrayLength(document);
     std::string text(static_cast<std::size_t>(size), '\0');
     env->GetByteArrayRegion(document, 0, size, reinterpret_cast<jbyte*>(text.data()));
-    constexpr iclforge::lyrics::StageOptions kStage{.lines_before = 1, .lines_after = 3};
     std::string json;
     if (auto parsed = iclforge::lyrics::parse_lyrics(text)) {
         const iclforge::lyrics::Stage stage = iclforge::lyrics::make_stage(
-            &*parsed, static_cast<std::int64_t>(position_ms), static_cast<std::int64_t>(delay_ms), kStage);
+            &*parsed, static_cast<std::int64_t>(position_ms), static_cast<std::int64_t>(delay_ms),
+            iclforge::sink::kScreenStageOptions);
         json = iclforge::sink::lyric_frame_json(
             iclforge::sink::make_lyric_frame(std::int64_t{1}, &*parsed, stage, streaming != JNI_FALSE));
     } else {

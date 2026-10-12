@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -14,6 +15,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import kotlin.math.max
 
 /**
  * The app's one screen. It is the plain screen of phase 1b (what the sink is called, whether it is
@@ -66,8 +68,41 @@ class MainActivity : Activity() {
             if (showing && !lyrics.hasFocus()) {
                 lyrics.requestFocus()
             }
+            guard(showing, if (showing) frame else listOf(status.text.toString(), code.text.toString(), hint.text.toString()))
             handler.postDelayed(this, 1000L / Tokens.framesPerSecond(frame))
         }
+    }
+
+    // --- the display is kept on, so what holds still on it is moved and dimmed (IdleGuard) ------
+
+    private var quietSince = SystemClock.uptimeMillis()
+    private var lastShown: Any? = null
+
+    /**
+     * Notes whether what is on the screen has changed, and once it has held still for the quiet period
+     * dims it and moves it a few u a minute. A key or a touch is a change.
+     */
+    private fun guard(lyricsShown: Boolean, shown: Any) {
+        val now = SystemClock.uptimeMillis()
+        if (shown != lastShown) {
+            lastShown = shown
+            quietSince = now
+        }
+        val quiet = now - quietSince
+        val (target, other) = if (lyricsShown) lyrics to plain else plain to lyrics
+        val u = max(1, target.height) / 600f
+        val (x, y) = IdleGuard.offsetU(quiet)
+        target.alpha = IdleGuard.alpha(quiet)
+        target.translationX = x * u
+        target.translationY = y * u
+        other.alpha = 1f
+        other.translationX = 0f
+        other.translationY = 0f
+    }
+
+    override fun onUserInteraction() {
+        quietSince = SystemClock.uptimeMillis()
+        super.onUserInteraction()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

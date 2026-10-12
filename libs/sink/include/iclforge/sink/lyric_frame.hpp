@@ -83,6 +83,11 @@ struct LyricFrame {
     std::size_t line_count = 0;
 };
 
+// The rows a screen is given: one line before the current one and three after it (the panel draws two
+// after on its small scale, a TV draws all three; planning/hearth-sink-screen.md, Layout). One place,
+// so that the app, its instrumented tests and the checked-in frames ask for the same.
+inline constexpr lyrics::StageOptions kScreenStageOptions{.lines_before = 1, .lines_after = 3};
+
 // The frame for `lyrics` (null: none held, of item `item` if the sink knows which) at `stage`, which
 // make_stage() answered for the same document. `streaming` is whether a stream is playing.
 [[nodiscard]] LyricFrame make_lyric_frame(std::optional<std::int64_t> item, const lyrics::Lyrics* lyrics,

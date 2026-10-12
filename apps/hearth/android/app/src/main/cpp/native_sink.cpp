@@ -284,14 +284,11 @@ std::vector<std::string> NativeSink::drain_log() {
 }
 
 std::string NativeSink::lyric_frame_json(std::int32_t delay_ms) const {
-    // One line before the current one and three after: the screen draws the first two on a phone-sized
-    // surface and all three on a TV (planning/hearth-sink-screen.md, Layout).
-    constexpr iclforge::lyrics::StageOptions kStage{.lines_before = 1, .lines_after = 3};
     const std::lock_guard lock(impl_->mutex);
     if (!impl_->sink) {
         return sink::lyric_frame_json(sink::LyricFrame{});
     }
-    return sink::lyric_frame_json(impl_->sink->lyric_frame(delay_ms, kStage));
+    return sink::lyric_frame_json(impl_->sink->lyric_frame(delay_ms, sink::kScreenStageOptions));
 }
 
 }  // namespace iclforge::hearth_android

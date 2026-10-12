@@ -5,9 +5,10 @@ plays what Hearth sends it. The plan is [`planning/hearth-android.md`](../../../
 and the one screen design it, the desktop Hearth and the ESP32-P4X panel share is
 [`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md).
 
-**State: phase 2b** (the pass-through path held end to end on the host and on a device, one run on a
+**State: phase 2c** (the pass-through path held end to end on the host and on a device, one run on a
 Shield and a receiver recorded below, the sink core following a karaoke item's lyrics on its own
-clock, and [the lyric screen](#the-lyric-screen-phase-2) that draws them). The service, the advertisement, the listener, the pairing records, a plain
+clock, and [the lyric screen](#the-lyric-screen-phase-2) that draws them, held to the spec's fixtures
+at fixed positions). The service, the advertisement, the listener, the pairing records, a plain
 pairing screen and the pass-through output are here: an AC-3 or E-AC-3 stream a Hearth sends is
 rebuilt into the IEC 61937 bursts it came from and written to the receiver, between null bursts, in the
 slot each is due in. What it does not do yet: show the lyrics (phase 2), the common design and the
@@ -99,6 +100,30 @@ adb shell am instrument -w -e class com.iclforge.hearth.LyricViewRenderTest \
     com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner
 adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders
 ```
+
+**Conformance (2c).** The spec's fixtures are held at fixed positions by one checked-in file:
+`libs/sink/tests/lyric-frames/cases.txt` lists each document (the karaoke examples, a file timed as lines,
+a plain one, lines of 18, 36, 44, 54 and 55 characters, a gap of 3.9 s and one of 4.0 s, Hebrew and
+Yiddish in UTF-8 and UTF-16, Arabic, Japanese, Cyrillic and Greek) with its positions and delay, and
+`golden.txt` holds the 48 frames the library gives for them. `iclforge-sink-tests` and
+`LyricConformanceTest` (on the device, with this build of the library) compare their frames with it, so a
+renderer's test and the library agree; `ICLFORGE_UPDATE_LYRIC_FRAMES=1` rewrites it, and a frame that
+moved is a decision to read in the diff. On the Shield's own faces the same test draws the scripts of
+tiers T1 to T4: Greek and Cyrillic by the system's face, Hebrew and Yiddish (the digraph letters and
+points) right to left in Noto Sans Hebrew, Arabic shaped (joined letters are narrower than the same
+letters kept apart by a zero-width non-joiner) in Noto Sans Arabic, and Japanese by the system's face; a
+line no face has is the sentence. The length rule's five steps are asserted on the size the view chose
+(72, 64, 56, 48 and 40 u), and the text-size step moves each one.
+
+![Arabic, Japanese, Cyrillic and Greek lines: each in its own script, the Arabic right-aligned and shaped](../../../docs/hearth/screenshots/android-lyric-scripts.png)
+
+**The idle guard.** A sink holds the display on, and an OLED TV is the reason the spec asks for what
+holds still to be moved: once nothing on the screen (the pairing screen or the lyric view, a paused song
+included) has changed for two minutes, it dims to 40% and moves 6 u a minute round a small ring; a key or
+a touch brings it back (`IdleGuard`, held by `LyricConformanceTest`). **Reduced motion** has nothing to
+switch off: the only thing that moves is the fill, which the spec keeps, and the count-in's dots go out in
+steps and do not fade. **Not done:** the no-lyrics screen's title (S7 names the item when it has a title,
+which a sink with no document gets only from `metadata@v1`, D7, phase 3).
 
 To see it live, `hearth-testserver --lyrics examples/karaoke/auld-lang-syne/auld-lang-syne.lrc
 --play examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --player ws://<the Shield>:8928/sendspin ...`

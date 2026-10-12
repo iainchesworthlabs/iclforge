@@ -53,6 +53,13 @@ class LyricView(context: Context) : View(context) {
     /** Called when the singer moves the delay from the keys, with the new value. */
     var onDelayChanged: ((Int) -> Unit)? = null
 
+    /**
+     * The size in u the line being sung was last drawn at: what the length rule (SS1) chose for it,
+     * which the tests hold to the rule's steps without measuring glyphs.
+     */
+    var currentSizeU: Float = 0f
+        private set
+
     init {
         setBackgroundColor(Tokens.BG)
         isFocusable = true
@@ -503,6 +510,7 @@ class LyricView(context: Context) : View(context) {
         val indent = if (frame.duet && row.singer == 2 && !row.rtl && drawn) width * Tokens.DUET_INDENT else 0f
         // A line the faces cannot draw is replaced by a sentence, which is Latin and runs left to right.
         val sizeU = Tokens.currentSizeU(text.codePointCount(0, text.length), textStep)
+        currentSizeU = sizeU
         // SemiBold, as the panel draws the line being sung; two rows at most (SS1).
         val layout = layoutOf(text, sizeU, u, max(1, contentW - indent.toInt()), 600, maxLines = 2)
         val block = Block(layout, tagOf(row, u, contentW, past = false), indent)
