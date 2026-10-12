@@ -220,4 +220,30 @@ class LyricViewRenderTest : RenderTestBase() {
         val footer = Rect(stage.left, stage.bottom, stage.right, height)
         assertNotNull("no chip in the footer", inked(bitmap, footer))
     }
+
+    @Test
+    fun theRouteIsAChipInTheFooterWhileAStreamIsOpen() {
+        val frame = frameOf(document("auld-lang-syne/auld-lang-syne.lrc"), 1000)
+        val footer = Rect(stage.left, stage.bottom, stage.right, height)
+        val none = render("route-none", frame)
+        val passed = render("route-passthrough", frame, route = "passthrough")
+        val decoded = render("route-pcm", frame, route = "pcm")
+        val bare = inked(none, footer)
+        val withPassthrough = inked(passed, footer)
+        val withPcm = inked(decoded, footer)
+        assertNotNull("no chip in the footer with a route", withPassthrough)
+        assertNotNull(withPcm)
+        // The chip is in front of "Line N of M", so what was the footer's text is wider by its width.
+        val extra = withPassthrough!!.width() - (bare?.width() ?: 0)
+        assertTrue("the route chip added only $extra px", extra > 100)
+        assertTrue(
+            "passthrough and pcm drew the same chip",
+            withPassthrough.width() != withPcm!!.width(),
+        )
+        // The chip is the muted colour, as the other footer chips are.
+        assertTrue(count(passed, footer, Tokens.MUTED) > count(none, footer, Tokens.MUTED))
+        // A route the screen does not know draws nothing.
+        val unknown = render("route-unknown", frame, route = "tape")
+        assertEquals(bare, inked(unknown, footer))
+    }
 }

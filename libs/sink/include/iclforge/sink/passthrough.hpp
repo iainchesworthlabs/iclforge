@@ -145,6 +145,10 @@ class PassthroughOutput : public BurstStreamOutput {
     [[nodiscard]] const std::optional<sendspin::player::DecoderReport>& decoder() const override {
         return decoder_;
     }
+    // The bits reach the receiver as they were coded: what the role's `output` state says.
+    [[nodiscard]] std::optional<sendspin::player::Output> output() const override {
+        return sendspin::player::Output::kPassthrough;
+    }
 
     // Another source holds the device: nothing is written to the link while it does, and what comes
     // due is dropped; given back, the stream carries on from what is due.

@@ -43,6 +43,18 @@ class LyricView(context: Context) : View(context) {
             invalidate()
         }
 
+    /**
+     * How the stream leaves the sink, the role's `output` state ("passthrough" or "pcm"): drawn as a
+     * chip in the footer while a stream is open, and nothing when it is null (D6).
+     */
+    var route: String? = null
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
+
     /** The text size step: 0 small, 1 medium, 2 large (SS8). */
     var textStep: Int = 1
         set(value) {
@@ -474,6 +486,11 @@ class LyricView(context: Context) : View(context) {
     private fun drawFooter(canvas: Canvas, u: Float, left: Float, right: Float, top: Float, bottom: Float) {
         val widthPx = (right - left).toInt()
         val chips = ArrayList<Pair<String, Int>>()
+        // The route comes first: what the signal path is, then where in the song (the spec's order).
+        when (route) {
+            "passthrough" -> chips += context.getString(R.string.route_passthrough) to Tokens.MUTED
+            "pcm" -> chips += context.getString(R.string.route_pcm) to Tokens.MUTED
+        }
         if (frame.mode == LyricFrame.Mode.LINE && frame.timed && frame.lineNumber > 0) {
             chips += context.getString(R.string.line_of, frame.lineNumber, frame.lineCount) to Tokens.MUTED
         } else if (frame.mode == LyricFrame.Mode.PLAIN) {

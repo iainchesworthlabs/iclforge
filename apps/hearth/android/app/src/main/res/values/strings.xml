@@ -20,6 +20,9 @@
     <string name="line_of">Line %1$d of %2$d</string>
     <string name="not_timed">Not timed</string>
     <string name="delay_ms">Delay %1$s ms</string>
+    <!-- The footer's route chip (D6): how the stream leaves this sink. -->
+    <string name="route_passthrough">Passing through</string>
+    <string name="route_pcm">Decoded here</string>
     <!-- The starting, idle and attention screens (S0, S1, S10). -->
     <string name="starting_network">Waiting for the network</string>
     <string name="starting_network_hint">Check that the box is connected to your network.</string>

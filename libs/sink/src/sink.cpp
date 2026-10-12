@@ -264,6 +264,8 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     void on_burst_stream_start(const ac::StreamStart& stream) override {
         const bool writing = bursts_->start(stream);
         streaming_ = true;
+        // Only a stream the output took leaves the sink by the way the output says.
+        burst_taken_ = writing;
         reported_decoder_.reset();
         const std::string_view codec = stream.data_type == ac::DataType::kAc3    ? "AC-3 "
                                        : stream.data_type == ac::DataType::kEac3 ? "E-AC-3 "
@@ -287,6 +289,7 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     void on_burst_stream_end() override {
         bursts_->end();
         streaming_ = false;
+        burst_taken_ = false;
         follower_.clear_position();
         log("burst stream ended after " + std::to_string(bursts_->counts().units) + " bursts");
         post_iclforge_state();
@@ -482,6 +485,7 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             peer.server_name = session_->server_name();
             peer.activity = activity_;
             peer.streaming = streaming_;
+            peer.output = output_now();
             return peer;
         });
     }
@@ -519,6 +523,7 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             iclforge_state_.lyrics.reset();
             ac::State state = iclforge_state_;
             state.decoder = bursts_->decoder();
+            state.output = output_now();
             state.counters.bursts_played = bursts_->counts().units;
             return session_->set_iclforge_state(state);
         });
@@ -527,6 +532,12 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
 
    private:
     void log(std::string_view text) { sink_->log("[" + std::to_string(id_) + "] " + std::string(text)); }
+
+    // How the burst stream leaves the sink, while one the output took is open. Under the session's
+    // lock, as burst_taken_ is.
+    [[nodiscard]] std::optional<ac::Output> output_now() const {
+        return burst_taken_ ? bursts_->output() : std::nullopt;
+    }
 
     // Reports the extension role's state from the sink's thread, outside the callback that
     // changed it, with what the burst output has found.
@@ -538,6 +549,7 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                     ac::State state = connection->iclforge_state_;
                     const OutputCounts counts = connection->bursts_->counts();
                     state.decoder = connection->bursts_->decoder();
+                    state.output = connection->output_now();
                     state.counters.bursts_played = counts.units;
                     state.counters.underruns = counts.underruns;
                     state.counters.late_chunks = counts.late;
@@ -558,6 +570,8 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     iclforge::lyrics::Follower follower_;
     // A stream is open: what the screen's "no lyrics" and its idle screen are told apart by.
     bool streaming_ = false;
+    // The burst output took the stream that is open (BurstStreamOutput::start returned true).
+    bool burst_taken_ = false;
     // What this connection was admitted for, and the code its server asked to pair by.
     Sink::Status::Activity activity_ = Sink::Status::Activity::kNothing;
     std::optional<std::string> pairing_code_;

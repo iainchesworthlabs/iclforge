@@ -29,6 +29,17 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth for Android says its route**
+
+- **The sink core reports `output` and the app draws it.** A `BurstStreamOutput` may say how a
+  stream it took leaves the sink (`output()`, unset by default); `libs/sink` puts it in the
+  extension role's state while that stream is open and in `Sink::Status::Peer::output`, the
+  pass-through output says `passthrough` and the test sink's decoding output says `pcm`. The
+  Android app's status JSON carries it and the lyric screen's footer has a "Passing through" or
+  "Decoded here" chip. A stream the output did not take, and an output that does not say, report
+  nothing. A loopback case holds all four (a server reads the state; the status says the same),
+  and the Shield's render test holds the chip.
+
 **The extension role's state says how the stream leaves the sink**
 
 - **`output` in `_iclforge_player`'s `client/state`: `"passthrough"` (the coded bits go on to a

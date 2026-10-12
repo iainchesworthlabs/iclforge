@@ -85,12 +85,18 @@ class StatusScreenTest : RenderTestBase() {
         assertEquals(0, status.pairedServers)
 
         val shown = SinkStatus.parse(
-            """{"connections":[{"id":3,"address":"192.168.1.87:60507","server_name":"Hearth é","activity":"playback","streaming":true}],"pairing_code":"622-933","paired_servers":2}""".toByteArray(),
+            """{"connections":[{"id":3,"address":"192.168.1.87:60507","server_name":"Hearth é","activity":"playback","streaming":true,"output":"passthrough"}],"pairing_code":"622-933","paired_servers":2}""".toByteArray(),
         )
         assertEquals("Hearth é", shown.playingFor?.serverName)
         assertEquals("622-933", shown.pairingCode)
         assertEquals(2, shown.pairedServers)
         assertTrue(shown.connections.single().streaming)
+        // How the stream leaves the sink, which is null when no stream is open or the sink does not say.
+        assertEquals("passthrough", shown.playingFor?.output)
+        val quiet = SinkStatus.parse(
+            """{"connections":[{"id":3,"address":"a","server_name":"b","activity":"playback","streaming":false,"output":null}],"pairing_code":null,"paired_servers":0}""".toByteArray(),
+        )
+        assertNull(quiet.playingFor?.output)
     }
 
     // --- the pictures -----------------------------------------------------------------------

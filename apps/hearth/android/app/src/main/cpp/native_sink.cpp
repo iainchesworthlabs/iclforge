@@ -300,9 +300,14 @@ std::string NativeSink::status_json() const {
         const char* activity = peer.activity == sink::Sink::Status::Activity::kPlayback  ? "playback"
                                : peer.activity == sink::Sink::Status::Activity::kPairing ? "pairing"
                                                                                          : "nothing";
+        // How the stream leaves the sink: "passthrough" or "pcm" while one the output took is open
+        // (the role's `output` state, D6), null otherwise.
+        const std::string output = peer.output
+                                       ? "\"" + std::string(sendspin::player::output_name(*peer.output)) + "\""
+                                       : std::string("null");
         out += "{\"id\":" + std::to_string(peer.id) + ",\"address\":" + sink::json_quote(peer.address) +
                ",\"server_name\":" + sink::json_quote(peer.server_name) + ",\"activity\":\"" + activity +
-               "\",\"streaming\":" + (peer.streaming ? "true" : "false") + "}";
+               "\",\"streaming\":" + (peer.streaming ? "true" : "false") + ",\"output\":" + output + "}";
     }
     out += "],\"pairing_code\":";
     out += status.pairing_code ? sink::json_quote(*status.pairing_code) : "null";

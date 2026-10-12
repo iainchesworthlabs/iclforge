@@ -70,8 +70,10 @@ and its element is not drawn; no platform invents one.
 `route` and `format` are the two the panel does not draw because its role state does not carry
 them. For the Android sink the route is **new information**: a sink that can both pass through and
 decode (the plan's phase 4) must say which. The role's state object accepts an added optional
-key without a version change, so an `output` key (`passthrough`, `pcm`) is the proposal
-([D6](hearth-android.md#decisions)); the panel could draw `format` the same day.
+key without a version change, so an `output` key (`passthrough`, `pcm`) was added
+([D6](hearth-android.md#decisions); `libs/sendspin`'s `State::output`, written by `libs/sink` for an
+output that says it, and drawn as the Android footer's route chip). The panel's firmware does not
+write it yet and the host's Network page does not read it; `format` is not in the state at all.
 
 ## The screens
 
@@ -262,7 +264,7 @@ they are checked in beside the fixture so a renderer's test and the library's ag
 | 2 | The count-in on the desktop and the TV | Owner (a change to the signed-off desktop design) |
 | 3 | SS5's sentence and the title rule: **agreed with the P4X session 2026-10-12**; the sentence is pinned in SS5 above | Settled |
 | 4 | The viewing distance the panel is designed for: **narrowed, as stated above, 2026-10-12** | Settled |
-| 5 | `format` and `route` in the role's state, for the panel's footer. The P4X session will draw them when they exist on `main` | The plan's D6 |
+| 5 | `route`: **the role's state has the `output` key** (D6, built); the panel's firmware can write `pcm` and draw it when it wants. `format` is still not in the state, for the panel's footer | The plan's D6; the P4X session for the firmware |
 | 6 | A request path from a sink to the server for the vocals and the reproduction | The plan's D8; a protocol PR, shared with the panel's Q6 |
 | 7 | Where tokens live: one file generating QML, Kotlin and a C header, or this page only | **Settled** (the plan's D13): `docs/hearth/design/sink-screen-tokens.json`. The Android app's `Tokens.kt` is generated from it, and `tools/checks/sink_screen_tokens.py` holds the desktop's Signal dark palette and the panel's screen to the same values without writing to either; moving either to a generated file is its owner's |
 | 8 | Where `title` and `artist` come from for an item with no lyric document | The plan's D7 |

@@ -113,6 +113,9 @@ struct Recording {
         std::array<double, 3> levels{};
     };
     std::vector<Karaoke> karaoke;
+    // What the burst output answers to start(), and what it says its streams do (D6).
+    bool burst_takes = true;
+    std::optional<ac::Output> burst_output;
     // What the output says it has counted, as the program's would.
     std::uint32_t streams = 0;
     std::uint32_t burst_streams = 0;
@@ -161,7 +164,7 @@ class FakeBursts final : public iclforge::sink::BurstStreamOutput {
         const std::lock_guard lock(recording_->mutex);
         recording_->burst_started.push_back(stream);
         ++recording_->burst_streams;
-        return true;
+        return recording_->burst_takes;
     }
     void clear() override {}
     void end() override {
@@ -185,6 +188,10 @@ class FakeBursts final : public iclforge::sink::BurstStreamOutput {
     }
     [[nodiscard]] const fs::path& file() const override { return file_; }
     [[nodiscard]] const std::optional<ac::DecoderReport>& decoder() const override { return decoder_; }
+    [[nodiscard]] std::optional<ac::Output> output() const override {
+        const std::lock_guard lock(recording_->mutex);
+        return recording_->burst_output;
+    }
 
    private:
     Recording* recording_;
@@ -223,7 +230,15 @@ class Keys final : public hs::ServerKeyring {
 class Events final : public iclforge::sendspin::ServerListener {
    public:
     void on_hello(const m::ClientHello& /*hello*/) override { update([&] { ++hellos; }); }
-    void on_state(const m::ClientState& state) override { update([&] { available = state.available; }); }
+    void on_state(const m::ClientState& state) override {
+        update([&] {
+            available = state.available;
+            if (state.iclforge) {
+                ++iclforge_states;
+                iclforge_output = state.iclforge->output;
+            }
+        });
+    }
     void on_goodbye(m::GoodbyeReason /*reason*/) override {}
     void on_leave() override {}
     void on_pairing_held_back(const std::optional<std::string>& /*message*/) override {}
@@ -240,10 +255,22 @@ class Events final : public iclforge::sendspin::ServerListener {
         return changed_.wait_for(lock, timeout, std::forward<Predicate>(predicate));
     }
 
+    // The extension role's client/state messages so far, and the `output` of the last.
+    struct Extension {
+        int states = 0;
+        std::optional<ac::Output> output;
+    };
+    [[nodiscard]] Extension extension() {
+        const std::lock_guard lock(mutex_);
+        return {.states = iclforge_states, .output = iclforge_output};
+    }
+
     int hellos = 0;
     bool available = false;
     bool code_wanted = false;
     bool paired = false;
+    int iclforge_states = 0;
+    std::optional<ac::Output> iclforge_output;
 
    private:
     template <class Update>
@@ -464,6 +491,83 @@ TEST_CASE("sink: a burst stream and its karaoke settings reach the burst output"
     CHECK(recording.karaoke[0].levels == std::array<double, 3>{-6.0, 0.0, 0.0});
     CHECK(recording.burst_ended == 1);
     CHECK(recording.started.empty());
+}
+
+namespace {
+
+// What the sink said of how a burst stream leaves it: in the extension role's state the server read
+// and in its own status, once the stream had started, and in the state once it had ended.
+struct OutputSeen {
+    std::optional<ac::Output> state_during;
+    std::optional<ac::Output> status_during;
+    std::optional<ac::Output> state_after;
+    bool status_streaming = false;
+};
+
+OutputSeen watch_output(std::string_view leaf, std::optional<ac::Output> says, bool takes) {
+    const fs::path dir = scratch(leaf);
+    Recording recording;
+    recording.burst_output = says;
+    recording.burst_takes = takes;
+    FakeOutputs outputs(recording);
+    Lines log;
+    auto sink = iclforge::sink::Sink::start(options_in(dir), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole)}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+
+    // Every set_iclforge_state sends a client/state, so each change below is one more message.
+    OutputSeen seen;
+    int states = server.events.extension().states;
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    REQUIRE(server.events.wait([&] { return server.events.iclforge_states > states; }));
+    const Events::Extension during = server.events.extension();
+    seen.state_during = during.output;
+    states = during.states;
+    const iclforge::sink::Sink::Status status = (*sink)->status();
+    REQUIRE(status.connections.size() == 1);
+    seen.status_during = status.connections[0].output;
+    seen.status_streaming = status.connections[0].streaming;
+
+    REQUIRE(server.call([&] { return server.server.end_burst_stream(); }));
+    REQUIRE(server.events.wait([&] { return server.events.iclforge_states > states; }));
+    seen.state_after = server.events.extension().output;
+    return seen;
+}
+
+}  // namespace
+
+TEST_CASE("sink: the role's state says how a stream the output took leaves the sink", "[sink][websocket]") {
+    // An output that hands the bits on says so while the stream is open, to the server and in the
+    // sink's own status, and the key goes with the stream.
+    const OutputSeen passed = watch_output("output_passthrough", ac::Output::kPassthrough, true);
+    CHECK(passed.state_during == ac::Output::kPassthrough);
+    CHECK(passed.status_during == ac::Output::kPassthrough);
+    CHECK(passed.status_streaming);
+    CHECK_FALSE(passed.state_after.has_value());
+
+    // One that decodes says pcm.
+    const OutputSeen decoded = watch_output("output_pcm", ac::Output::kPcm, true);
+    CHECK(decoded.state_during == ac::Output::kPcm);
+    CHECK(decoded.status_during == ac::Output::kPcm);
+    CHECK_FALSE(decoded.state_after.has_value());
+
+    // A stream the output did not take leaves the sink by no way it can name: nothing is said, though
+    // the stream is open and the output would pass a stream it took.
+    const OutputSeen refused = watch_output("output_refused", ac::Output::kPassthrough, false);
+    CHECK_FALSE(refused.state_during.has_value());
+    CHECK_FALSE(refused.status_during.has_value());
+    CHECK(refused.status_streaming);
+
+    // An output that does not say, as one from before the key, is not known.
+    const OutputSeen silent = watch_output("output_silent", std::nullopt, true);
+    CHECK_FALSE(silent.state_during.has_value());
+    CHECK_FALSE(silent.status_during.has_value());
 }
 
 TEST_CASE("sink: a lyric document and its anchors become a frame on the sink's own clock", "[sink][websocket]") {

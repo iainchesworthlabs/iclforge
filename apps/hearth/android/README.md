@@ -120,6 +120,21 @@ the delay by 50 ms and up and down scroll a file with no times.
 
 ![The controls sheet: the delay's minus and plus, the three text sizes with the large one filled and the focus ring on it, the line being sung above](../../../docs/hearth/screenshots/android-lyric-sheet.png)
 
+**The route chip (D6).** While a stream is open the footer's first chip says how it leaves this sink:
+"Passing through" when the output hands the coded bits to the receiver (what this app's output always
+does), "Decoded here" for an output that decodes. It is the extension role's `output` state, which the
+sink core sends to the server in `client/state` and puts in its own status (`Sink::Status::Peer::output`,
+`NativeSink.statusJson()`'s `"output"`), and it is absent, and so is the chip, with no stream open, with
+one the output did not take (the receiver's route was gone at the start), and for a sink that does not
+say. The format half of the spec's chip ("Dolby Digital 5.1 · passing through") is not drawn: it needs
+the stream's format as well as its route. The sink core's half is held by a loopback case in
+`iclforge-sink-tests` (a server reads the key in `client/state`, the status says the same, and a stream
+the output did not take says nothing); the chip is held by `LyricViewRenderTest`. The app's own JNI
+JSON is read by `StatusScreenTest` from a canned object: a real server's run to a Shield has not been
+made.
+
+![The footer's route chip: "Passing through" before the line's place in the song](../../../docs/hearth/screenshots/android-lyric-route.png)
+
 **How it is checked.** `LyricViewRenderTest` (`src/androidTest`) takes the karaoke examples' documents
 (`examples/karaoke`, staged by Gradle) through the library's own frame (`Harness.lyricFrameJson`: the
 pure half of `Sink::lyric_frame()`), the parse and the view, draws it to a 1920 by 1080 bitmap with no
@@ -169,9 +184,9 @@ player the same run is made to a reference sink in the test server's own process
 core had the sound in (`reference sink: 55 lyric frame(s) on a line, the last at 14279 ms: "And auld
 lang syne!"` for that file): the chain from a server's document and anchors, through the time filter, to
 the sink's clock, run on the host. It has not been run to a Shield here. **Not shown here:** the pictures on a
-television (they are the view's own render at 1080p, not a photograph of a set), the lyric screen's
-controls sheet and the text-size setting (phase 3), the format and route chips (they need the role's
-`output` key, D6), and a duet's "you" and "guide" words (they need the reproduction the singer chose).
+television (they are the view's own render at 1080p, not a photograph of a set), the format chip (it
+needs the stream's format as well as the route), and a duet's "you" and "guide" words (they need the
+reproduction the singer chose).
 
 ## A run on a Shield and a receiver (phase 1e)
 

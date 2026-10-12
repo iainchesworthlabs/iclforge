@@ -174,6 +174,8 @@ class MainActivity : Activity() {
             choice = choice, name = name, where = where, status = status, formats = formats,
             error = startError, note = note,
         )
+        // The footer's route chip: how the server's stream leaves this sink, while it plays one.
+        lyrics.route = status.playingFor?.output
     }
 
     private companion object {

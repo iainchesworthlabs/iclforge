@@ -18,6 +18,12 @@ data class SinkStatus(
         /** "nothing", "pairing" or "playback": what the server was admitted for. */
         val activity: String,
         val streaming: Boolean,
+        /**
+         * How the stream leaves the sink while one is open: "passthrough" (the coded bits go on to the
+         * receiver) or "pcm" (decoded here), the extension role's `output` state (D6); null when no
+         * stream the output took is open, and for a sink that does not say.
+         */
+        val output: String? = null,
     )
 
     /** The server this sink is playing for, if one is. */
@@ -45,6 +51,7 @@ data class SinkStatus(
                                 serverName = peer.optString("server_name"),
                                 activity = peer.optString("activity", "nothing"),
                                 streaming = peer.optBoolean("streaming", false),
+                                output = if (peer.isNull("output")) null else peer.optString("output"),
                             )
                         }
                     },

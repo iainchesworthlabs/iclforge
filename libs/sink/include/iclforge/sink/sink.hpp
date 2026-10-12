@@ -232,6 +232,11 @@ class BurstStreamOutput {
     [[nodiscard]] virtual const std::filesystem::path& file() const = 0;
     // What the output found in the current stream, once it has: the role's `decoder` state.
     [[nodiscard]] virtual const std::optional<sendspin::player::DecoderReport>& decoder() const = 0;
+    // How a stream this output took leaves the sink, which the role's `output` state says (D6,
+    // planning/hearth-android.md): handed to a receiver as it was coded (kPassthrough), or decoded
+    // here and played as samples (kPcm). Unset for an output that does not say, which a server reads
+    // as not known; the sink reports it only while a stream the output took is open.
+    [[nodiscard]] virtual std::optional<sendspin::player::Output> output() const { return std::nullopt; }
 };
 
 // What a sink asks of its program for each connection: the two outputs, made when the connection
@@ -306,6 +311,9 @@ class Sink {
             Activity activity = Activity::kNothing;
             // A stream is open on this connection.
             bool streaming = false;
+            // How that stream leaves the sink, as the role's state says it to the server: unset
+            // with no stream, with one the output did not take, and for an output that does not say.
+            std::optional<sendspin::player::Output> output;
         };
         std::vector<Peer> connections;
         std::optional<std::string> pairing_code;
