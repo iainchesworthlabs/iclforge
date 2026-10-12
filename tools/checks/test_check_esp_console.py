@@ -89,6 +89,7 @@ STARVED_MESSAGE = (
     "and still reach result=pass"
 )
 
+
 # A progress line of the same play, which --min-heap-free reads heap_free= from.
 def progress(heap_free: int) -> str:
     return (
@@ -182,8 +183,8 @@ class Examine(unittest.TestCase):
         thin = [*BOOT, progress(9772), progress(41648), *TAIL]
         problems, listing = check_esp_console.examine(thin, 18000)
         self.assertEqual(
-            problems, ["free heap fell to 9772 bytes while playing, under the 18000 this shape "
-                       "is held to"]
+            problems,
+            ["free heap fell to 9772 bytes while playing, under the 18000 this shape is held to"],
         )
         self.assertEqual([thin[i] for i in listing], ["result=pass", progress(9772)])
 
@@ -196,6 +197,58 @@ class Examine(unittest.TestCase):
         problems, _ = check_esp_console.examine(CLEAN, 18000)
         self.assertEqual(len(problems), 1)
         self.assertIn("no heap_free= line", problems[0])
+
+
+def budget(headroom: int, verdict: str = "ok", when: str = "boot") -> str:
+    """hearth_sink's boot budget line, as report_budget prints it."""
+    return (
+        f"budget: when={when} net=1 internal_free=90931 largest=31744 ask_ring=0 "
+        f"ask_decode_stack=0 ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 "
+        f"headroom={headroom} floor=0 verdict={verdict}"
+    )
+
+
+class BudgetLine(unittest.TestCase):
+    """--min-budget-headroom: the last budget: line is verdict=ok and has the margin."""
+
+    def test_a_line_with_the_margin_is_clean(self) -> None:
+        problems, _ = check_esp_console.examine([*BOOT[:6], budget(23552), *BOOT[6:]], None, 4096)
+        self.assertEqual(problems, [])
+
+    def test_a_line_under_the_margin_is_found_and_listed(self) -> None:
+        lines = [*BOOT[:6], budget(1024), *BOOT[6:]]
+        problems, shown = check_esp_console.examine(lines, None, 4096)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("leaves 1024 bytes of headroom, under the 4096", problems[0])
+        self.assertIn(6, shown)
+
+    def test_a_verdict_that_is_not_ok_is_found_whatever_the_margin(self) -> None:
+        lines = [*BOOT[:6], budget(-1024, "short-block"), *BOOT[6:]]
+        problems, _ = check_esp_console.examine(lines, None, 0)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("verdict=short-block (headroom -1024)", problems[0])
+
+    def test_the_last_line_is_the_one_held(self) -> None:
+        lines = [*BOOT[:6], budget(-1, "short-block"), budget(23552, when="network-up"), *BOOT[6:]]
+        problems, _ = check_esp_console.examine(lines, None, 4096)
+        self.assertEqual(problems, [])
+
+    def test_a_profile_that_refuses_a_play_on_purpose_is_held_to_its_own_verdict(self) -> None:
+        lines = [*BOOT[:6], budget(65536, "below-floor"), *BOOT[6:]]
+        problems, _ = check_esp_console.examine(lines, None, 4096, "below-floor")
+        self.assertEqual(problems, [])
+        problems, _ = check_esp_console.examine(lines, None, 4096)
+        self.assertIn("verdict=below-floor", problems[0])
+        self.assertIn("held to verdict=ok", problems[0])
+
+    def test_a_capture_with_no_line_cannot_be_held_to_one(self) -> None:
+        problems, _ = check_esp_console.examine(CLEAN, None, 4096)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("no budget: line", problems[0])
+
+    def test_without_the_option_a_short_line_is_not_judged(self) -> None:
+        lines = [*BOOT[:6], budget(-1, "short-block"), *BOOT[6:]]
+        self.assertEqual(check_esp_console.examine(lines), ([], []))
 
 
 class ReadCapture(unittest.TestCase):
