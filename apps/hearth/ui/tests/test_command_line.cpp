@@ -36,14 +36,14 @@ TEST_CASE("an ordinary launch asks for nothing", "[hearth][command-line]") {
     CHECK(cli.warnings.isEmpty());
 }
 
-TEST_CASE("--shot grabs the window and is not the unattended capture", "[hearth][command-line]") {
+TEST_CASE("the --shot option grabs the window and is not the unattended capture", "[hearth][command-line]") {
     const CommandLine cli = parse({"--shot", "play.png", "--page", "settings"});
     CHECK(cli.shot_path == QStringLiteral("play.png"));
     CHECK_FALSE(cli.smoke);
     CHECK(cli.page == QStringLiteral("settings"));
 }
 
-TEST_CASE("--smoke-shot is the same capture with network discovery off", "[hearth][command-line]") {
+TEST_CASE("the --smoke-shot option is the same capture with network discovery off", "[hearth][command-line]") {
     const CommandLine cli = parse({"--smoke-shot", "karaoke.png", "--page", "karaoke"});
     CHECK(cli.shot_path == QStringLiteral("karaoke.png"));
     CHECK(cli.smoke);
@@ -57,7 +57,7 @@ TEST_CASE("naming both captures keeps the safe one", "[hearth][command-line]") {
     CHECK(parse({"--smoke-shot", "b.png", "--shot", "a.png"}).smoke);
 }
 
-TEST_CASE("--open queues each file it is given, in order", "[hearth][command-line]") {
+TEST_CASE("the --open option queues each file it is given, in order", "[hearth][command-line]") {
     const CommandLine cli = parse({"--open", "song.ac3", "--open", "next song.ac3"});
     REQUIRE(cli.open_files.size() == 2);
     CHECK(cli.open_files[0] == QStringLiteral("song.ac3"));
@@ -75,7 +75,7 @@ TEST_CASE("a value is never read as an option", "[hearth][command-line]") {
     CHECK(cli.shot_path == QStringLiteral("x.png"));
 }
 
-TEST_CASE("--seek is a position in milliseconds for the item that was opened", "[hearth][command-line]") {
+TEST_CASE("the --seek option is a position in milliseconds for the item that was opened", "[hearth][command-line]") {
     const CommandLine cli = parse({"--open", "song.ac3", "--seek", "12500"});
     REQUIRE(cli.seek_ms.has_value());
     CHECK(*cli.seek_ms == 12500);
@@ -95,7 +95,7 @@ TEST_CASE("a position that is not one is said so and not used", "[hearth][comman
     }
 }
 
-TEST_CASE("--seek with nothing opened says so", "[hearth][command-line]") {
+TEST_CASE("the --seek option with nothing opened says so", "[hearth][command-line]") {
     const CommandLine cli = parse({"--seek", "3000"});
     CHECK_FALSE(cli.seek_ms.has_value());
     REQUIRE(cli.warnings.size() == 1);
