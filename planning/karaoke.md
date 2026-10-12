@@ -37,12 +37,15 @@ features in two existing programs, not a new program.
   (`KaraokeVocals::kNone`, `kV1`, `kV2`, `kBoth`), `MixLevels::karaoke`, `meta::is_karaoke()` and
   the four-argument `output_channel_count()`, in `libs/ac3/src/decoder/output.cpp` and
   `libs/ac3/include/iclforge/ac3/decoder/output.hpp`. `FrameDecoder` sets the flag from the
-  frame's own `bsmod`; E-AC-3 and AC-4 never do.
+  frame's own `bsmod`. When this was written E-AC-3 and AC-4 never did; since 2026-10-12
+  `Eac3Decoder` does, for a programme of one independent substream with no object layer
+  ([karaoke-eac3.md](karaoke-eac3.md)), and AC-4 still does not.
 - **CLI:** `forge decode in.ac3 out.wav karaoke` (aware) and `karaoke=none|v1|v2|v1+v2`
   (capable), `channels=2|1` for the 2/0 reproduction; `forge encode ... bsmod=7` with a 3/0 to
   3/2 layout writes a karaoke stream (L, C, R, Ls, Rs = L M R V1 V2).
-- **Verification:** no outside decoder reproduces karaoke, so the library is checked against the
-  annex's own tables (`libs/ac3/tests/decoder/test_output_stage.cpp`,
+- **Verification:** no outside decoder was known to reproduce karaoke when this was written (Dolby's
+  does, for AC-3 and E-AC-3: [the findings](karaoke-eac3-findings.md)), so the library is checked
+  against the annex's own tables (`libs/ac3/tests/decoder/test_output_stage.cpp`,
   `apps/forge/cli/tests/test_cli_encode_paths.cpp` `[karaoke]`).
 
 ### What does not exist
@@ -290,8 +293,8 @@ used by the verification table below.
 
 Stem files as a playback source, microphone input, scoring and recording; an LFE part in
 authoring; Annex C's optional re-levelling of V1, V2 and M; a lyrics editor or a tool that times
-words against a stream; estimated word times for a line that has none; karaoke in E-AC-3 or AC-4
-(the specifications give them no mode and the decoder never sets the flag); video playback of a
+words against a stream; estimated word times for a line that has none; karaoke in AC-4 (its
+specification gives it no mode; E-AC-3 is [its own plan](karaoke-eac3.md)); video playback of a
 karaoke MP4's picture; Android, a browser page and an ESP32 sink (see [Later](#later-not-v1)).
 
 ### Quality targets
@@ -310,8 +313,11 @@ karaoke MP4's picture; Android, a browser page and an ESP32 sink (see [Later](#l
 
 ### Verification
 
-There is no outside oracle: no other decoder reproduces karaoke, so a misreading of an Annex C
-table would be invisible to any comparison with another program. What stands in for it:
+There was no outside oracle when this was written: no decoder known then reproduced karaoke, so a
+misreading of an Annex C table would have been invisible to any comparison with another program.
+Dolby's Reference Player's decoder does reproduce it, for AC-3 and for E-AC-3
+([the findings](karaoke-eac3-findings.md)), and `tools/checks/verify_karaoke_oracle.py` compares
+against it, locally. What stands in for it in CI:
 
 | Checked | How | Requirements |
 |---|---|---|

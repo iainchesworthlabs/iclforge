@@ -472,6 +472,81 @@ TEST_CASE(
     }
 }
 
+// An AC-4 presentation of objects alone decodes to no channels, so a decoder that places fewer
+// objects than it has plays no bed: the objects limit holds whatever the sink's layout or objects
+// setting, and where PCM is not possible the sink is sent nothing, not a stream it would play
+// silence of.
+TEST_CASE("sink form: a stream of objects alone has no bed for a sink that places fewer to play",
+          "[hearth][sink_form][objects]") {
+    const StreamNeeds objects{.stream = BitstreamFormat::kAc4,
+                              .sample_rate = k48k,
+                              .coded_channels = 0,
+                              .objects = 12,
+                              .objects_alone = true};
+    constexpr auto kAc4Type = static_cast<std::size_t>(sp::DataType::kAc4);
+    SinkFacts sink = hearth_sink({sp::DataType::kAc4}, {2, 6});
+    configured(sink, "5.1");
+
+    SECTION("a sink that states no limit, or one the stream is within, is sent it as it is") {
+        CHECK(choose_sink_form(objects, sink).form == SinkForm::kCoded);
+        sink.iclforge_support->max_objects[kAc4Type] = 12;
+        CHECK(choose_sink_form(objects, sink).form == SinkForm::kCoded);
+    }
+    SECTION("past the limit it is PCM decoded here even on a layout with no heights") {
+        sink.iclforge_support->max_objects[kAc4Type] = 4;
+        const auto choice = choose_sink_form(objects, sink);
+        REQUIRE(choice.form == SinkForm::kPcm);
+        REQUIRE(choice.layout.has_value());
+        CHECK(choice.layout->slots() == 6);
+        CHECK(mentions(choice.reason, "up to 4 objects"));
+        CHECK(mentions(choice.reason, "has 12"));
+    }
+    SECTION(
+        "the listener's objects setting does not leave them out: there is no bed without them") {
+        sink.iclforge_support->max_objects[kAc4Type] = 0;
+        sp::Settings settings;
+        settings.decoder.objects = sp::ObjectsPolicy::kNever;
+        sink.intended_settings = settings;
+        const auto choice = choose_sink_form(objects, sink);
+        CHECK(choice.form == SinkForm::kPcm);
+        CHECK(mentions(choice.reason, "does not place objects"));
+    }
+    SECTION("a width the sink does not list is folded to one it does, not left with nothing") {
+        SinkFacts stereo_only = hearth_sink({sp::DataType::kAc4}, {2});
+        configured(stereo_only, "7.1.4");
+        stereo_only.iclforge_support->max_objects[kAc4Type] = 4;
+        const auto choice = choose_sink_form(objects, stereo_only);
+        REQUIRE(choice.form == SinkForm::kPcm);
+        REQUIRE(choice.layout.has_value());
+        CHECK(choice.layout->slots() == 2);
+    }
+    SECTION("where PCM is not possible the sink is sent nothing, and the reason says why") {
+        sink.iclforge_support->max_objects[kAc4Type] = 4;
+        const auto off = choose_sink_form(objects, sink, {.pcm_fallback = false});
+        CHECK(off.form == SinkForm::kNone);
+        CHECK(mentions(off.reason, "switched off"));
+        SinkFacts no_pcm = hearth_sink({sp::DataType::kAc4}, {});
+        configured(no_pcm, "5.1");
+        no_pcm.iclforge_support->max_objects[kAc4Type] = 4;
+        const auto none = choose_sink_form(objects, no_pcm);
+        CHECK(none.form == SinkForm::kNone);
+        CHECK(mentions(none.reason, "lists no PCM"));
+    }
+    SECTION("the same objects over a bed are played as the bed, as an E-AC-3 stream's are") {
+        StreamNeeds with_bed = objects;
+        with_bed.objects_alone = false;
+        with_bed.coded_channels = 6;
+        sink.iclforge_support->max_objects[kAc4Type] = 4;
+        // 5.1 has no heights, so the objects were never in question.
+        CHECK(choose_sink_form(with_bed, sink).form == SinkForm::kCoded);
+        // Where PCM is not possible it still plays, as its bed.
+        configured(sink, "7.1.4");
+        const auto bed = choose_sink_form(with_bed, sink, {.pcm_fallback = false});
+        CHECK(bed.form == SinkForm::kCoded);
+        CHECK(mentions(bed.reason, "plays the bed without them"));
+    }
+}
+
 // A sink the person has set to Opus, on a link too poor for PCM: sent decoded audio as Opus, at 2.0,
 // where it lists Opus and the stream is at 48 kHz; PCM as before where it is not set, does not list
 // it, or the stream is at another rate.
