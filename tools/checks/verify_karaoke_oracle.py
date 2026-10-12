@@ -54,12 +54,16 @@ class Case:
 CASES = (
     Case("ac3 3/2 + LFE, surmixlev -6", "ac3", ("L", "R", "C", "LFE", "Ls", "Rs"), "51",
          "bsmod=7 surmixlev=-6 cmixlev=-3", 7),
-    Case("e-ac-3 3/2 + LFE, no mixmdate", "eac3", ("L", "R", "C", "LFE", "Ls", "Rs"), "51",
+    # bsmod=7 alone writes the mixing group at the encoder's defaults (centre -4.5, surround -6):
+    # an E-AC-3 stream flagged karaoke always carries the levels its reproduction uses.
+    Case("e-ac-3 3/2 + LFE, bsmod=7 alone", "eac3", ("L", "R", "C", "LFE", "Ls", "Rs"), "51",
          "bsmod=7", 7),
-    Case("e-ac-3 3/2 + LFE, lorosurmixlev -6", "eac3", ("L", "R", "C", "LFE", "Ls", "Rs"), "51",
-         "bsmod=7 mixmeta cmixlev=-6 surmixlev=-6", 7),
-    Case("e-ac-3 3/1, no mixmdate", "eac3", ("L", "R", "C", "Cs"), "L,C,R,Cs", "bsmod=7", 6),
-    Case("e-ac-3 2/1, no mixmdate", "eac3", ("L", "R", "Cs"), "L,R,Cs", "bsmod=7", 6),
+    Case("e-ac-3 3/2 + LFE, lorosurmixlev -3", "eac3", ("L", "R", "C", "LFE", "Ls", "Rs"), "51",
+         "bsmod=7 cmixlev=-3 surmixlev=-3", 7),
+    Case("e-ac-3 3/2 + LFE, lorocmixlev -6, lorosurmixlev -6", "eac3",
+         ("L", "R", "C", "LFE", "Ls", "Rs"), "51", "bsmod=7 cmixlev=-6 surmixlev=-6", 7),
+    Case("e-ac-3 3/1, bsmod=7 alone", "eac3", ("L", "R", "C", "Cs"), "L,C,R,Cs", "bsmod=7", 6),
+    Case("e-ac-3 2/1, bsmod=7 alone", "eac3", ("L", "R", "Cs"), "L,R,Cs", "bsmod=7", 6),
 )
 
 
