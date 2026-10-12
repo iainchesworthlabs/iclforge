@@ -199,8 +199,11 @@ struct OutputConfig {
     // by default, which folds with exactly what the stream says.
     MixLevelOverride mix_override{};
     // Annex C's karaoke reproduction, off by default - see
-    // KaraokeReproduction. Only the AC-3 decoder (FrameDecoder) knows a frame
-    // is karaoke, so for E-AC-3 this is never applied.
+    // KaraokeReproduction. FrameDecoder knows a frame is karaoke from its own
+    // bsmod and acmod; Eac3Decoder from a programme's, for one independent
+    // substream with no dependent substream and no object layer (the
+    // specification defines no E-AC-3 reproduction: planning/karaoke-eac3.md,
+    // D1 to D3).
     KaraokeReproduction karaoke = KaraokeReproduction::kOff;
     // The listener's choice of vocals under kCapable; read for no other mode.
     KaraokeVocals karaoke_vocals = KaraokeVocals::kBoth;

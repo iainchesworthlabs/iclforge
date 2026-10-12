@@ -728,7 +728,10 @@ struct DecodedAccessUnit {
     // Parallel to `layout`, except for dual mono - unless DecoderConfig::
     // output asked for a fold, in which case this holds the folded output and
     // `layout` still describes what was rendered before it. See
-    // iclforge::ac3::output_channel_count().
+    // iclforge::ac3::output_channel_count(). So does Annex C's karaoke
+    // reproduction (OutputConfig::karaoke, for a programme that is one
+    // independent substream flagged bsmod 7): L, C, R and then the LFE, in the
+    // first slots, which iclforge::ac3::output_mode() names.
     std::vector<std::vector<float>> channels;
     // §7.10, same convention as DecodedFrame::concealed: std::nullopt on any
     // access unit that assembled normally. ConcealmentAction::kBedOnly is the

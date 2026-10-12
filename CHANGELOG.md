@@ -54,7 +54,7 @@ The sections below contain the complete change list and fixes.
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
 
-**Karaoke in E-AC-3: the choice, with no codec in it**
+**Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
 
 - **`iclforge/base/karaoke.hpp`.** `KaraokeReproduction` (off, aware, capable), `KaraokeVocals`
   (none, V1, V2, both), the part levels' -24 to +12 dB span and `karaoke_gain_from_db` move from
@@ -62,6 +62,18 @@ The sections below contain the complete change list and fixes.
   decoder, the wire's converters and a later AC-4 mapping name the same types. `iclforge::ac3`
   re-exports every name, so no caller changes and no symbol is exported or removed
   (`planning/karaoke-eac3.md`, E1, D5).
+- **`Eac3Decoder` reproduces Annex C's karaoke when `OutputConfig::karaoke` asks.** A programme
+  that is one independent substream with `bsmod` 7 above 1/0, no dependent substream and no object
+  layer comes back as L, C, R and the LFE (aware), or with the listener's vocals and levels
+  (capable), through the same output stage as AC-3, in the access-unit, block and flush paths.
+  A/52 gives E-AC-3 the signalling and no reproduction; Dolby's decoder reproduces Annex C's, and
+  the tests hold the same ratios (V1 into L and V2 into R at the Lo/Ro surround level, the melody
+  at the centre at L's gain), the levels coming from `mixmdate`'s `lorocmixlev` and
+  `lorosurmixlev` and being -3 dB when it is absent. A programme with a dependent substream is
+  decoded as coded. `DecodedAccessUnit::layout` still names the coded bed and `channels` holds the
+  reproduction; `ac3::output_mode()` says what it is. The CLI, Hearth, the GUI, the WebAssembly
+  glue and the firmware read it in the pull requests that follow
+  (`planning/karaoke-eac3.md`, E2, D1 to D3).
 
 **E-AC-3: an associated service mixed into the main**
 
