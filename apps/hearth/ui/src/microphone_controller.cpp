@@ -42,6 +42,12 @@ constexpr int kTickMs = 20;
 // What the page is told every this many ticks: 100 ms, which is as often as a meter is worth
 // repainting and keeps the bindings quiet.
 constexpr int kPublishEvery = 5;
+// A line's mark has three levels: under 45 %, under 75 %, and 75 % or more. Where they fall is
+// presentation, not measurement; the percentage is shown beside the mark.
+constexpr int kLevelMid = 45;
+constexpr int kLevelHigh = 75;
+// A line the singer was voiced for less than this share of its notes' time is "not sung".
+constexpr double kNotSungCoverage = 0.2;
 
 [[nodiscard]] std::int64_t steady_now_ns() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -57,6 +63,30 @@ constexpr int kPublishEvery = 5;
 
 [[nodiscard]] double level_from_db(double db) {
     return std::clamp((db + 60.0) / 60.0, 0.0, 1.0);
+}
+
+// What the page is told of the score so far.
+[[nodiscard]] QVariantMap score_map(const iclforge::hearth::MicrophoneSnapshot& s) {
+    QVariantMap score;
+    score.insert(QStringLiteral("withheld"), s.score_withheld);
+    score.insert(QStringLiteral("percent"),
+                 s.total.counted > 0 && s.total.sung > 0
+                     ? static_cast<int>(std::lround(s.total.fraction() * 100.0))
+                     : -1);
+    score.insert(QStringLiteral("coveragePercent"),
+                 static_cast<int>(std::lround(s.total.coverage() * 100.0)));
+    score.insert(QStringLiteral("meanCents"), s.total.mean_cents);
+    score.insert(QStringLiteral("counted"), static_cast<int>(s.total.counted));
+    score.insert(QStringLiteral("hit"), static_cast<int>(s.total.hit));
+    score.insert(QStringLiteral("unplaced"), static_cast<qulonglong>(s.unplaced_frames));
+    score.insert(QStringLiteral("timingEstimated"), s.timing_estimated);
+    if (s.lag_ms) {
+        score.insert(QStringLiteral("lagMs"), static_cast<int>(*s.lag_ms));
+    }
+    if (s.key_offset_cents) {
+        score.insert(QStringLiteral("keyOffsetCents"), *s.key_offset_cents);
+    }
+    return score;
 }
 
 [[nodiscard]] std::optional<ReferencePart> part_from_text(const QString& text) {
@@ -80,6 +110,38 @@ struct MicrophoneController::State {
         : session(std::move(input)), clock(std::move(clock_fn)) {}
 
     iclforge::hearth::MicrophoneSession session;
+    // The reference's notes, in time order, for the ribbon: made when the reference arrives. The
+    // range is of the whole tune with room, so that the picture does not move as notes come in.
+    std::vector<iclforge::pitch::Note> notes;
+    double low_midi = 55.0;
+    double high_midi = 79.0;
+
+    void set_notes(std::vector<iclforge::pitch::Note> found) {
+        notes = std::move(found);
+        low_midi = 55.0;
+        high_midi = 79.0;
+        if (notes.empty()) {
+            return;
+        }
+        double low = notes.front().midi;
+        double high = notes.front().midi;
+        for (const iclforge::pitch::Note& n : notes) {
+            low = std::min(low, n.midi);
+            high = std::max(high, n.midi);
+        }
+        // Two semitones of room each side, and at least an octave and a half so that one note
+        // does not fill the picture.
+        low -= 2.0;
+        high += 2.0;
+        const double span = high - low;
+        if (span < 18.0) {
+            const double grow = (18.0 - span) / 2.0;
+            low -= grow;
+            high += grow;
+        }
+        low_midi = low;
+        high_midi = high;
+    }
     std::function<std::int64_t()> clock;
     // The reference job in flight: stopped by raising its flag, and joined by the destructor.
     std::shared_ptr<std::atomic<bool>> cancel;
@@ -199,16 +261,42 @@ bool MicrophoneController::start() {
     state_ = QStringLiteral("on");
     error_text_.clear();
     ticks_ = 0;
+    // A new performance: the last one's summary is of that one.
+    if (!summary_.isEmpty()) {
+        summary_.clear();
+        emit summaryChanged();
+    }
     timer_.start();
     emit stateChanged();
     publish(true);
     return true;
 }
 
+void MicrophoneController::capture_summary() {
+    // What the performance came to, before the session forgets it. Not when the score is withheld
+    // (the person never said they wore headphones, so it is never shown), and not when nothing was
+    // scored.
+    const iclforge::hearth::MicrophoneSnapshot s = state_data_->session.snapshot();
+    if (s.score_withheld || s.total.counted == 0 || s.total.sung == 0) {
+        return;
+    }
+    QVariantMap summary = score_map(s);
+    summary.insert(QStringLiteral("reference"), reference_text_);
+    summary.insert(QStringLiteral("toleranceCents"),
+                   state_data_->session.score_options().tolerance_cents);
+    if (summary != summary_) {
+        summary_ = summary;
+        emit summaryChanged();
+    }
+}
+
 void MicrophoneController::stop() {
     // A take running when the microphone is turned off is a take: kept, and reported.
     if (recording_) {
         stopRecording();
+    }
+    if (on()) {
+        capture_summary();
     }
     timer_.stop();
     state_data_->session.stop();
@@ -334,6 +422,9 @@ void MicrophoneController::fail(const QString& text) {
     if (recording_) {
         stopRecording();
     }
+    if (on()) {
+        capture_summary();
+    }
     timer_.stop();
     state_data_->session.stop();
     state_ = QStringLiteral("error");
@@ -367,16 +458,27 @@ void MicrophoneController::load(const QString& itemPath, const QString& prefer) 
     // The score is of an item: another one starts it again, and a microphone left on with nothing
     // to sing along to is closed.
     if (item_changed) {
-        state_data_->session.clear_singer();
-        if (itemPath.isEmpty() && on()) {
-            stop();
+        if (on()) {
+            // The microphone left on with nothing to sing along to is closed. Either way what the
+            // performance came to is kept: the item ending is when a summary is wanted.
+            if (itemPath.isEmpty()) {
+                stop();
+            } else {
+                capture_summary();
+            }
+        } else if (!itemPath.isEmpty() && !summary_.isEmpty()) {
+            // A summary is of an item: another one, with the microphone off, has none.
+            summary_.clear();
+            emit summaryChanged();
         }
+        state_data_->session.clear_singer();
     }
 
     if (state_data_->cancel) {
         state_data_->cancel->store(true);
     }
     state_data_->session.set_reference(std::nullopt);
+    state_data_->set_notes({});
     if (itemPath.isEmpty()) {
         reference_status_ = QStringLiteral("none");
         reference_text_ = tr("Nothing is playing.");
@@ -443,10 +545,13 @@ void MicrophoneController::load(const QString& itemPath, const QString& prefer) 
                 if (outcome->ok) {
                     controller->reference_status_ = QStringLiteral("ready");
                     controller->reference_text_ = outcome->text;
+                    controller->state_data_->set_notes(
+                        iclforge::pitch::segment_notes(*outcome->contour));
                     controller->state_data_->session.set_reference(std::move(outcome->contour));
                 } else {
                     controller->reference_status_ = QStringLiteral("none");
                     controller->reference_text_ = outcome->text;
+                    controller->state_data_->set_notes({});
                     controller->state_data_->session.set_reference(std::nullopt);
                 }
                 emit controller->referenceChanged();
@@ -524,29 +629,110 @@ void MicrophoneController::publish(bool force) {
         emit liveChanged();
     }
 
-    QVariantMap score;
-    score.insert(QStringLiteral("withheld"), s.score_withheld);
-    score.insert(QStringLiteral("percent"),
-                 s.total.counted > 0 && s.total.sung > 0
-                     ? static_cast<int>(std::lround(s.total.fraction() * 100.0))
-                     : -1);
-    score.insert(QStringLiteral("coveragePercent"),
-                 static_cast<int>(std::lround(s.total.coverage() * 100.0)));
-    score.insert(QStringLiteral("meanCents"), s.total.mean_cents);
-    score.insert(QStringLiteral("counted"), static_cast<int>(s.total.counted));
-    score.insert(QStringLiteral("hit"), static_cast<int>(s.total.hit));
-    score.insert(QStringLiteral("unplaced"), static_cast<qulonglong>(s.unplaced_frames));
-    score.insert(QStringLiteral("timingEstimated"), s.timing_estimated);
-    if (s.lag_ms) {
-        score.insert(QStringLiteral("lagMs"), static_cast<int>(*s.lag_ms));
-    }
-    if (s.key_offset_cents) {
-        score.insert(QStringLiteral("keyOffsetCents"), *s.key_offset_cents);
-    }
+    const QVariantMap score = score_map(s);
     if (score != score_) {
         score_ = score;
+        ++score_revision_;
         emit scoreChanged();
     }
+}
+
+QVariantMap MicrophoneController::ribbon(qlonglong fromMs, qlonglong toMs) const {
+    QVariantMap out;
+    const auto& reference = state_data_->session.reference();
+    out.insert(QStringLiteral("hasReference"), reference.has_value());
+    out.insert(QStringLiteral("lowMidi"), state_data_->low_midi);
+    out.insert(QStringLiteral("highMidi"), state_data_->high_midi);
+
+    QVariantList notes;
+    for (const iclforge::pitch::Note& note : state_data_->notes) {
+        if (note.end_ms <= fromMs) {
+            continue;
+        }
+        if (note.start_ms >= toMs) {
+            break;  // in time order
+        }
+        notes.push_back(static_cast<double>(note.start_ms));
+        notes.push_back(static_cast<double>(note.end_ms));
+        notes.push_back(note.midi);
+    }
+    out.insert(QStringLiteral("notes"), notes);
+
+    QVariantList trace;
+    const auto* points = state_data_->session.trace();
+    if (points != nullptr && reference.has_value() && reference->hop_ms > 0) {
+        const iclforge::pitch::ScoreOptions& options = state_data_->session.score_options();
+        const auto hop = static_cast<std::int64_t>(reference->hop_ms);
+        for (const iclforge::hearth::TracePoint& p : *points) {
+            if (p.item_ms < fromMs || p.item_ms > toMs) {
+                continue;
+            }
+            double midi = -1.0;
+            double hit = 0.0;
+            if (p.hz > 0.0F) {
+                midi = 69.0 + 12.0 * std::log2(static_cast<double>(p.hz) / 440.0);
+                const auto index = static_cast<std::size_t>(
+                    std::max<std::int64_t>(0, (p.item_ms + hop / 2) / hop));
+                const bool has_note = index < reference->hz.size() && reference->hz[index] > 0.0F;
+                if (!has_note && options.fold_octaves) {
+                    // Where the tune has no note there is nothing to be on or off: the voice is
+                    // drawn on the octave nearest the middle of the picture, so that it stays in
+                    // it.
+                    const double centre = (state_data_->low_midi + state_data_->high_midi) / 2.0;
+                    midi += 12.0 * std::round((centre - midi) / 12.0);
+                }
+                if (has_note) {
+                    const double target =
+                        69.0 + 12.0 * std::log2(static_cast<double>(reference->hz[index]) / 440.0);
+                    // As it is scored: octaves do not matter, so the line is drawn on the tune's.
+                    if (options.fold_octaves) {
+                        midi += 12.0 * std::round((target - midi) / 12.0);
+                    }
+                    const double cents = (midi - target) * 100.0 - options.key_shift_cents;
+                    hit = std::fabs(cents) <= options.tolerance_cents ? 1.0 : 0.0;
+                }
+            }
+            trace.push_back(static_cast<double>(p.item_ms));
+            trace.push_back(midi);
+            trace.push_back(hit);
+        }
+    }
+    out.insert(QStringLiteral("trace"), trace);
+    return out;
+}
+
+int MicrophoneController::levelFor(int percent) {
+    return percent >= kLevelHigh ? 3 : (percent >= kLevelMid ? 2 : 1);
+}
+
+QVariantMap MicrophoneController::lineResult(qlonglong startMs, qlonglong endMs) const {
+    QVariantMap out;
+    out.insert(QStringLiteral("scored"), false);
+    out.insert(QStringLiteral("withheld"), !headphones_);
+    out.insert(QStringLiteral("notSung"), false);
+    out.insert(QStringLiteral("percent"), -1);
+    out.insert(QStringLiteral("level"), 0);
+    out.insert(QStringLiteral("counted"), 0);
+    // The same rule as the total: never a number without the headphones answer.
+    if (!headphones_ || !on() || endMs <= startMs) {
+        return out;
+    }
+    const iclforge::pitch::Tally tally = state_data_->session.tally(startMs, endMs);
+    out.insert(QStringLiteral("counted"), static_cast<int>(tally.counted));
+    if (!tally.scored()) {
+        return out;  // no note of the reference in this line: no mark, which is not a zero
+    }
+    out.insert(QStringLiteral("scored"), true);
+    // Under a fifth of the notes' time voiced is a line the singer did not sing, which is not the
+    // same as a line sung badly and is not shown as a score.
+    if (tally.coverage() < kNotSungCoverage) {
+        out.insert(QStringLiteral("notSung"), true);
+        return out;
+    }
+    const int percent = static_cast<int>(std::lround(tally.fraction() * 100.0));
+    out.insert(QStringLiteral("percent"), percent);
+    out.insert(QStringLiteral("level"), levelFor(percent));
+    return out;
 }
 
 }  // namespace iclforge::hearth::ui

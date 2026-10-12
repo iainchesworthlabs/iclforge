@@ -25,6 +25,8 @@ Card {
     // The card is in use: the page is shown and the item is karaoke. The microphone closes when
     // this goes false.
     property bool active: true
+    // The item's position (the lyric clock's reading), which the pitch ribbon is drawn against.
+    property real positionMs: 0
 
     ordinal: "04"
     title: qsTr("Microphone")
@@ -35,6 +37,7 @@ Card {
     readonly property bool on: MicrophoneController.on
     readonly property var score: MicrophoneController.score
     readonly property var live: MicrophoneController.live
+    readonly property var lastPerformance: MicrophoneController.summary
     readonly property var lastTake: MicrophoneController.lastTake
     readonly property int labelWidth: Math.round(150 * Theme.fontScale)
 
@@ -396,6 +399,19 @@ Card {
         font.family: Theme.monoFamily
     }
 
+    // The tune as notes and your voice as a line over them, in time with the words. Shown only
+    // while the microphone is on and there is a tune: it asks the controller for its window a few
+    // times a second, and not at all while hidden.
+    PitchRibbon {
+        objectName: "microphoneRibbon"
+        Layout.fillWidth: true
+        Layout.preferredHeight: Math.round(110 * Theme.fontScale)
+        visible: root.on && MicrophoneController.referenceStatus === "ready"
+        live: visible
+        positionMs: root.positionMs
+        listening: root.live.voiced !== true
+    }
+
     Text {
         objectName: "microphoneScore"
         Layout.fillWidth: true
@@ -424,6 +440,60 @@ Card {
         color: Theme.textMuted
         font.pixelSize: Theme.fontSmall
         wrapMode: Text.WordWrap
+    }
+
+    // --- what the last performance came to -------------------------------------------------------
+    // Kept when the microphone is turned off, the song ends or the device goes, until the next one
+    // starts or another song is chosen. Nothing in it is ranked, named or sent anywhere. The basis
+    // is stated: what it was compared with, within what, and what was not scored.
+    ColumnLayout {
+        objectName: "microphoneSummary"
+        Layout.fillWidth: true
+        visible: root.lastPerformance.percent !== undefined
+        spacing: Math.round(4 * Theme.fontScale)
+        Text {
+            text: qsTr("Last performance")
+            color: Theme.text
+            font.pixelSize: Theme.fontNormal
+            font.bold: true
+        }
+        Text {
+            objectName: "microphoneSummaryScore"
+            Layout.fillWidth: true
+            text: qsTr("Pitch score: %1 %").arg(root.lastPerformance.percent ?? 0)
+            color: Theme.text
+            font.pixelSize: Theme.fontNormal
+            wrapMode: Text.WordWrap
+        }
+        Text {
+            objectName: "microphoneSummaryDetail"
+            Layout.fillWidth: true
+            text: {
+                const parts = [qsTr("You sang for %1 % of the tune's voiced time.")
+                                   .arg(root.lastPerformance.coveragePercent ?? 0)];
+                if (root.lastPerformance.meanCents !== undefined) {
+                    parts.push(qsTr("On average you were %1.").arg(root.centsText(root.lastPerformance.meanCents)));
+                }
+                const lag = root.lagText(root.lastPerformance.lagMs);
+                if (lag.length > 0) {
+                    parts.push(lag);
+                }
+                return parts.join(" ");
+            }
+            color: Theme.text
+            font.pixelSize: Theme.fontSmall
+            wrapMode: Text.WordWrap
+        }
+        Text {
+            objectName: "microphoneSummaryBasis"
+            Layout.fillWidth: true
+            text: qsTr("Compared with %1, within %2 cents, in any octave. Lines the tune has no notes "
+                       + "in were not scored. It is shown here and kept nowhere.")
+                  .arg(root.lastPerformance.reference ?? "").arg(Math.round(root.lastPerformance.toleranceCents ?? 100))
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSmall
+            wrapMode: Text.WordWrap
+        }
     }
 
     // --- the alignment ------------------------------------------------------------------------

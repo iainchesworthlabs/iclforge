@@ -89,6 +89,14 @@ class MicrophoneController : public QObject {
     // reference's voiced time the singer was voiced for), meanCents, lagMs and keyOffsetCents
     // (absent until there is enough), counted, hit, unplaced, timingEstimated.
     Q_PROPERTY(QVariantMap score READ score NOTIFY scoreChanged)
+    // A number that changes whenever the score does, which a line's mark binds to: lineResult()
+    // is a function of the performance so far, and a binding follows only what it reads.
+    Q_PROPERTY(int scoreRevision READ scoreRevision NOTIFY scoreChanged)
+    // What the last performance came to, kept when the microphone is turned off, the item ends or
+    // the device goes (M5): the same fields as `score`, plus `reference` (what it was scored
+    // against) and `toleranceCents`. Empty until one has been scored, and when the person had not
+    // said they wore headphones, since that score is never shown. Cleared by the next start().
+    Q_PROPERTY(QVariantMap summary READ summary NOTIFY summaryChanged)
 
    public:
     // The machine's own input.
@@ -126,6 +134,8 @@ class MicrophoneController : public QObject {
     [[nodiscard]] QString referenceText() const { return reference_text_; }
     [[nodiscard]] QVariantMap live() const { return live_; }
     [[nodiscard]] QVariantMap score() const { return score_; }
+    [[nodiscard]] int scoreRevision() const { return score_revision_; }
+    [[nodiscard]] QVariantMap summary() const { return summary_; }
     [[nodiscard]] bool recording() const { return recording_; }
     [[nodiscard]] double takeSeconds() const { return take_seconds_; }
     [[nodiscard]] QString takeError() const { return take_error_; }
@@ -168,6 +178,26 @@ class MicrophoneController : public QObject {
     // The engine's heard position, as of now. Called whenever it is polled.
     Q_INVOKABLE void anchor(qlonglong positionMs, bool playing);
 
+    // What a view of the last few seconds is drawn from (M5), for [fromMs, toMs] of the item:
+    //   hasReference  false when there is nothing to score against;
+    //   notes         the reference's notes in the window, flat: start, end, MIDI note number;
+    //   trace         the singer's placed frames in the window, flat: item time, MIDI note number
+    //                 (-1 where not voiced) and 1 when within the tolerance of the reference, else
+    //                 0. A voice an octave from the tune is drawn on the tune's octave, as it is
+    //                 scored, so the line is where the notes are.
+    // The window is asked for by the view, so nothing is built while no ribbon is shown.
+    Q_INVOKABLE QVariantMap ribbon(qlonglong fromMs, qlonglong toMs) const;
+
+    // A line's result once it has been sung, for [startMs, endMs) of the item (the line's own
+    // times with the lyrics' delay added): scored (false when the reference has no note in it, or
+    // there is no reference: a line like that has no mark, not a zero), withheld (the headphones
+    // answer is missing), notSung (the singer was voiced for under a fifth of its notes' time:
+    // shown as such and not as a bad score), percent, level (1 to 3: under 45, under 75, 75 and
+    // over: presentation, not measurement) and counted.
+    Q_INVOKABLE QVariantMap lineResult(qlonglong startMs, qlonglong endMs) const;
+    // The level (1 to 3) a line of `percent` is marked with: the same three bands for every line.
+    [[nodiscard]] static int levelFor(int percent);
+
     // What the 20 ms timer does: read the microphone, measure and score it, and tell the page.
     // Public so that a test with its own clock can drive it.
     void tick();
@@ -184,6 +214,7 @@ class MicrophoneController : public QObject {
     void scoreChanged();
     void recordingChanged();
     void takesFolderChanged();
+    void summaryChanged();
 
    private:
     struct State;
@@ -192,6 +223,8 @@ class MicrophoneController : public QObject {
     void publish(bool force);
     void fail(const QString& text);
     void remember_take(const iclforge::hearth::TakeInfo& info);
+    // Keeps what the performance came to, before the session forgets it.
+    void capture_summary();
 
     std::unique_ptr<State> state_data_;
     QTimer timer_;
@@ -211,6 +244,8 @@ class MicrophoneController : public QObject {
     QString reference_text_;
     QVariantMap live_;
     QVariantMap score_;
+    int score_revision_ = 0;
+    QVariantMap summary_;
     bool recording_ = false;
     double take_seconds_ = 0.0;
     QString take_error_;
