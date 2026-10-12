@@ -14,9 +14,13 @@ stream plays.
 `burst_player.cpp`, `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4`). A P4 whose image has the AC-4 decoder
 lists `ac4`, states 6 channels and no objects, and plays AC-4 from a group: 2.0 at 0.18 to 0.33 and
 5.1 at 0.51 to 0.73 of real time, every output's level the host decoder's to 0.01 dB
-([`esp32-p4.md`](../docs/platforms/bare-metal/esp32-p4.md#ac-4-from-a-server)). An S3 does not list
-it by default (its 2.0 A-SPX and the converter fall behind, and the support object cannot list a
-class), and the C6 cannot hold the decoder. Facts 1 and 3 below describe `main` on 2026-10-10.
+([`esp32-p4.md`](../docs/platforms/bare-metal/esp32-p4.md#ac-4-from-a-server)). An S3 image with the
+decoder and the 64 KB data cache lists `ac4` at 2 channels and 25 frames a second (new key
+`max_frame_rate`): over Sendspin every 2.0 stream at 23.44, 24 and 25 frames a second took 0.48 to
+0.80 of its frame with no underruns, and the 29.97 stream took 0.99, so the limit is a frame rate and
+not a codec tool, which the support object could not state and need not
+([`esp32-s3.md`](../docs/platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)). The C6 cannot hold the
+decoder. Facts 1 and 3 below describe `main` on 2026-10-10.
 
 ## The finding that changes the question
 

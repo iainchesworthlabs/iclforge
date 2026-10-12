@@ -283,6 +283,14 @@ Three ways to give every item a title (the choice is [D7](hearth-android.md#deci
 | (b) The `lyrics` command, or a new `item` command, carries `{title, artist, album}` | S | Nothing new on the wire beyond the role | Only for sinks on this role; a second source of the same fact |
 | (c) The lyric file's tags only (today) | none | Already works on the panel | No title for an item without lyrics |
 
+**Built (D7 (a), the host half).** The engine now sets `metadata@v1` when a group plays: at an item's
+start the title, with the artist and the album only where the item's lyrics file has them, and the
+position as the lyrics' anchors give it (a change of speed, a jump, drift and one every few seconds),
+with the item's length. What it does **not** have is a title from the stream or the container:
+nothing in the tree reads a tag from an AC-3, E-AC-3, AC-4 or MP4 file, so an item with no lyrics
+file is named as the queue names it, by its file's name, and has no artist or album. The members'
+state is cleared when the output closes.
+
 ## F9: the three screens as they are today
 
 Read from `LyricView.qml`, `LyricScreen.qml`, `Theme.qml`, `Theme.kt` and the P4X session's plan

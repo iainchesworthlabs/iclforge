@@ -608,8 +608,10 @@ endif()
 
 # What forge's `lyrics-encoding=` and the Forge GUI's Lyrics row read a code page with: the
 # operating system's conversion, as the decoder libs/lyrics asks a program for
-# (planning/karaoke-formats-options.md, D16). Before both programs, which link it.
-if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI)
+# (planning/karaoke-formats-options.md, D16). Before both programs, which link it, and when the
+# tests are on, whichever programs are: the GUI's Qt-free test binary (apps/forge/gui/tests)
+# links it on every leg, including one that builds neither program.
+if(ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFORGE_BUILD_TESTS)
     add_subdirectory(apps/shared/text-encoding)
 endif()
 

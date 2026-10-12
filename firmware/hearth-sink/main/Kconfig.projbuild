@@ -768,23 +768,28 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
 config ICLFORGE_EXAMPLE_SENDSPIN_AC4
     int "List AC-4 among the Sendspin data types (1) or not (0)"
     default 1 if IDF_TARGET_ESP32P4 && ICLFORGE_AC4
+    default 1 if IDF_TARGET_ESP32S3 && ICLFORGE_AC4 && ESP32S3_DATA_CACHE_64KB
     default 0
     range 0 1
     help
         Whether the board's support object lists `ac4`, so that a server sends it AC-4 as it is
         (one sync frame a chunk) and the board decodes it, up to
-        ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS. Needs ICLFORGE_AC4 (sdkconfig.ac4); with
-        it off the board lists none and a server decodes AC-4 itself and sends PCM.
+        ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS channels and
+        ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE frames a second. Needs ICLFORGE_AC4
+        (sdkconfig.ac4); with it off the board lists none and a server decodes AC-4 itself and
+        sends PCM.
 
-        It is one answer for every AC-4 stream, because the support object cannot list a class:
-        the board says "ac4, up to this many channels" and nothing about the codec tools. The
-        ESP32-P4 keeps up with every stream it was measured on up to 5.1 (2.0 0.28 to 0.69,
-        5.1 0.62 to 0.91 with the second core, planning/ac4.md D14g to D14i), so it lists AC-4 and
-        states 6 channels, which leaves 5.1.4 to the server. An ESP32-S3 keeps up with 2.0 SIMPLE
-        alone (0.80 to 0.87; A-SPX 0.99 to 1.09, the frame-rate converter 1.32 and over), so it
-        does not list AC-4 by default: a server then decodes it and sends PCM, which every S3
-        stream plays as. Set it to 1 on an S3 whose streams are SIMPLE at 2.0 and it lists AC-4 up
-        to 2 channels. The ESP32-C6 cannot hold the decoder beside Wi-Fi.
+        The support object states a width and a rate and no codec tool, so the figures are where
+        the slowest stream a board is to be sent still keeps up. The ESP32-P4 keeps up with every
+        stream it was measured on up to 5.1 (2.0 0.28 to 0.69, 5.1 0.62 to 0.91 with the second
+        core, planning/ac4.md D14g to D14i), so it lists AC-4 and states 6 channels, which leaves
+        5.1.4 to the server. An ESP32-S3 with the decoder and the 64 KB data cache
+        (sdkconfig.s3-fast and sdkconfig.s3-dcache, the s3-n16r8-ac4 profile) keeps up with every
+        2.0 stream up to 25 frames a second over Sendspin, 0.48 to 0.59 of a frame at frame rate
+        index 13 and 0.78 to 0.80 at 24 and 25, and falls behind at 29.97 (0.99, with underruns),
+        so it lists AC-4 at 2 channels and 25 frames a second and a server decodes the rest and
+        sends PCM. An S3 without the cache does not list AC-4 by default. The ESP32-C6 cannot
+        hold the decoder beside Wi-Fi.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS
     int "Widest AC-4 frame decoded in real time: channels (0 = no limit)"
@@ -798,6 +803,22 @@ config ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS
         decoder only from a server that did not read the figure, which the board then refuses with
         a console line. Objects are a limit of their own: the board states none placed
         (max_objects of 0), since the decoder hands the player a presentation's channels alone.
+
+config ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE
+    int "Fastest AC-4 stream decoded in real time: frames a second (0 = no limit)"
+    default 25 if IDF_TARGET_ESP32S3 && ICLFORGE_AC4
+    default 0
+    range 0 1000
+    help
+        The rate the support object states for `ac4` (max_frame_rate): a stream whose frames come
+        faster is sent as PCM decoded on the server's side. A frame at any rate but the 2,048
+        samples of frame rate index 13 goes through the frame-rate converter, which on the
+        ESP32-S3 costs a frame about the same at 29.97 a second (33 ms) as at 24 (33 ms), so a
+        board that keeps up with 24 and 25 falls behind at 29.97: 0.78 and 0.80 of a frame
+        become 0.99. The limit is where a whole
+        number of frames a second sits (25 takes 23.976, 24 and 25, 30 takes 29.97 and 30), and
+        a frame of a faster stream is refused by the board, which only a server that did not read
+        the figure sends. The ESP32-P4 states none: its 29.97 stream took 0.38 of a frame.
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
     int "Largest lyric document held for the item playing, bytes (0 = none)"

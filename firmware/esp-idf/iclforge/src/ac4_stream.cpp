@@ -101,6 +101,7 @@ bool Ac4Stream::open(const Config& config) {
     iclforge::ac4::DecoderConfig decoder_config;
     decoder_config.output.downmix = ac4bridge::target(config.fold);
     decoder_config.executor = config.executor;
+    decoder_config.skip_objects = config.skip_objects;
     im.config = config;
     im.decoder.emplace(decoder_config);
     return true;
@@ -175,6 +176,16 @@ Ac4Stream::Result Ac4Stream::decode(std::span<const std::byte> sync_frame, Block
     }
     const iclforge::ac4::FrameInfo& info = **decoded;
     im.frame_samples = info.samples;
+    // A stream's frames come faster than the board keeps up with: the converter's cost is the
+    // same for a frame at 29.97 a second as at 24, so the play would fall behind and underrun.
+    // The slack covers the 1000/1001 rates, whose frames alternate between two lengths.
+    constexpr double kRateSlack = 1.005;
+    if (im.config.max_frame_rate != 0 && info.samples != 0 &&
+        static_cast<double>(im.config.sample_rate_hz) / static_cast<double>(info.samples) >
+            static_cast<double>(im.config.max_frame_rate) * kRateSlack) {
+        im.reason = "more frames a second than this board decodes of AC-4";
+        return Result::kRefused;
+    }
     im.report.channels = static_cast<int>(info.speakers.size());
     im.report.lfe = std::find(info.speakers.begin(), info.speakers.end(),
                               iclforge::ac4::Speaker::kLfe) != info.speakers.end();

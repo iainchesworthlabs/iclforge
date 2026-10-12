@@ -21,7 +21,8 @@
 // What it does not do: objects. decode_by_block() hands over a presentation's channels alone, and
 // a presentation of object audio alone has none, so the board states that it places none
 // (max_objects of 0) and a server sends such a presentation as PCM it decodes itself
-// (apps/hearth/engine/src/sink_form.cpp).
+// (apps/hearth/engine/src/sink_form.cpp). A presentation that has channels besides its objects is
+// played as those channels, with its objects left undecoded (Config::skip_objects).
 
 namespace iclforge {
 
@@ -60,6 +61,15 @@ class Ac4Stream {
         std::size_t max_channels = 0;
         // The one rate the player plays; a frame at another is refused.
         std::uint32_t sample_rate_hz = 48000;
+        // The most frames a second a stream may have, which the board states as max_frame_rate
+        // (the S3's 25): a frame of a stream above it is refused once the decoder has said how
+        // long a frame is, which a server that read the figure never sends. 0 refuses none.
+        std::uint32_t max_frame_rate = 0;
+        // The decoder leaves a presentation's object audio undecoded (DecoderConfig::skip_objects):
+        // the board places none, and states so (max_objects of 0), so what it would reconstruct is
+        // dropped by decode_by_block(). A presentation of objects alone is then refused, which
+        // the server's own choice of PCM for it makes rare.
+        bool skip_objects = true;
     };
 
     // What the decoder found in the last frame that decoded.

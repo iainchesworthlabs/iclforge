@@ -132,6 +132,9 @@ struct Options {
     // The most objects the extension role's support object states it places, for every data type
     // it lists; unset states none. 0 is a statement: bed only.
     std::optional<std::uint8_t> max_objects;
+    // The most frames a second the extension role's support object states it decodes, for every
+    // data type it lists; 0 states none.
+    std::uint16_t max_frame_rate = 0;
 };
 
 // What a sink reports, one line at a time, from any of its threads.
