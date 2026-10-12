@@ -369,6 +369,21 @@ The sections below contain the complete change list and fixes.
   drawn as its picture under the file's name (the shared `CdgPicture`: 300 by 216, as large as
   fits in whole-pixel steps) and followed by the same Start and nudge an `.lrc` has; its words are
   pixels, so none are read as text and the page says so (planning/karaoke-phase2.md, W13f and D11).
+- **Crucible's lyric strip follows an application's media session.** The position is the player's
+  own where it publishes one (the System Media Transport Controls on Windows, MPRIS on Linux, the
+  now-playing information on macOS), so a pause and a seek are followed with no press of Start; the
+  words carry on by the clock if the session goes away, and are not followed against a new track's
+  title, artist or length. Start is by hand and **Follow the media session** takes it back; a
+  session that is not matched is offered when others are playing. The sessions are read on a
+  thread of their own, only while an application with lyrics waits on one. The macOS reader is the
+  private now-playing framework, which developers report macOS 15.4 and later withholds, and no
+  Mac has run it (planning/karaoke-phase2.md, D9; planning/karaoke-phase2-findings.md).
+- **Crucible's lyric strip can say what it follows over OSC.** Settings has a **Lyric events out**
+  block, off until turned on: an IPv4 address and a UDP port (9000 to start with), and which of
+  `/crucible/lyrics/state`, `/line`, `/word` and `/position` are sent, each beginning with the
+  application's name, as single OSC 1.0 messages for a lighting or show-control rig. The sending
+  half of the audio library's socket layer is published as `iclforge::audio::UdpSender`
+  (planning/karaoke-phase2.md, D9's rejected alternative, built on the owner's ask).
 - **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
   offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
   dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
