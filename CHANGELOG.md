@@ -29,6 +29,18 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**E-AC-3 folds a stream with no `mixmdate` at -3 dB, as Dolby's decoder does**
+
+- **The default Lo/Ro levels of an E-AC-3 stream that sends no `mixmdate` are -3 dB for the centre
+  and -3 dB for the surrounds.** They were AC-3's -4.5 and -6 dB, which stand in for a bsi that
+  has no level to read; an E-AC-3 bsi has none to fall back on, and Dolby's decoder, measured,
+  folds such a stream at -3 and -3. A stereo or mono fold of such a stream (the CLI, Hearth, the
+  Forge GUI, the sinks and the WebAssembly decoder all read it through
+  `iclforge::ac3::mix_levels()`) is 1.5 dB louder in the centre and 3 dB louder in the
+  surrounds against its own front channels; a stream that carries `mixmdate`, and every AC-3
+  stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
+  needs a case of its own (`planning/karaoke-eac3.md`, D10).
+
 **Karaoke in E-AC-3: Hearth's Karaoke page knows it**
 
 - **The Karaoke page names an E-AC-3 karaoke stream and takes its choice.** Hearth's engine had
