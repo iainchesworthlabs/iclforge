@@ -137,6 +137,42 @@ TEST_CASE("engine queue commands: insert, move and clear edit the queue and say 
     CHECK(notes(log) == expected);
 }
 
+TEST_CASE("engine queue commands: add_and_play is noted as the add and the play it is, and no items is nothing",
+          "[hearth][engine]") {
+    DiagnosticLog log;
+    {
+        Engine engine(std::make_unique<IdleDevice>(), no_files, stereo(), {}, EngineTiming{.period = 1ms, .budget = 4800},
+                      &log);
+        engine.add({item("a")});
+        engine.add_and_play({});
+        engine.add_and_play({item("b")});
+        engine.sync();
+        CHECK(titles(engine.status()) == std::vector<std::string>{"a", "b"});
+        // The item the play was asked for stays the current one when it cannot be played (here:
+        // no such file), as it does for a play_item() of it. test_engine.cpp holds the case where
+        // it can, behind a queue that was restored a moment before.
+        CHECK(engine.status().current == 1);
+    }
+    // The same steps as the commands they are made of: what the ring says is what it says for
+    // add() and play_item(), whatever the player has to say about the item that was asked for.
+    DiagnosticLog separate;
+    {
+        Engine engine(std::make_unique<IdleDevice>(), no_files, stereo(), {}, EngineTiming{.period = 1ms, .budget = 4800},
+                      &separate);
+        engine.add({item("a")});
+        engine.add({item("b")});
+        engine.play_item(1);
+        engine.sync();
+        CHECK(engine.status().current == 1);
+    }
+    const std::vector<std::string> seen = notes(log);
+    REQUIRE(seen.size() >= 4);
+    CHECK(seen[0] == "add 1 item to a queue of 0");
+    CHECK(seen[1] == "add 1 item to a queue of 1");
+    CHECK(seen[2] == "play item 2 \"b\"");
+    CHECK(seen == notes(separate));
+}
+
 TEST_CASE("engine queue commands: a command made just before the engine goes is still carried out",
           "[hearth][engine]") {
     // ~Engine stops the thread, but every command made before it was queued to run: the
