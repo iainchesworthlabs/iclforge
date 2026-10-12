@@ -29,6 +29,19 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: the live karaoke cases take a layout, and skip a board that is not the one decoding**
+
+- **`network sinks live: a karaoke stream is reproduced by the board that decodes it` and its E-AC-3
+  twin read two options.** `ICLFORGE_HEARTH_LIVE_KARAOKE_LAYOUT` sets the layout the board is
+  given (3.0 by default; a v1.x ESP32-P4 cannot open three slots and takes 2.0), and
+  `ICLFORGE_HEARTH_LIVE_KARAOKE_PUSH` names which of routing, trim, delay and crossover are sent
+  with it (all four by default; `none` sends the layout alone).
+- **A board that decodes fewer channels of the codec than the programme has is skipped, with the
+  reason.** The ESP32-C6 decodes two, so Hearth decodes the stream for it and sends PCM, and the
+  case failed at the board's levels, which a PCM player does not report.
+- **"The choice made a difference" compares every reproduction with as-coded.** At a stereo layout
+  aware is the Lo/Ro fold as-coded already is, so comparing those two alone failed there.
+
 **Hearth tells a group's members what is playing**
 
 - **The engine sets `metadata@v1` for a group.** A member that lists the role gets the item's title
