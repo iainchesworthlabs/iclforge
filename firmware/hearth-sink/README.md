@@ -74,6 +74,35 @@ cores are under *iclforge hearth sink* in `idf.py menuconfig`.
 Chosen in `idf.py menuconfig` under *iclforge hearth sink*, with the output
 layout the stream is rendered onto.
 
+## Build profiles
+
+Each board has one locked build configuration, a **profile**: its fragments in the order ESP-IDF
+reads them, the values of the keys that decide whether a play runs on it (where each stack and ring
+lives and how big it is, the caches, the flash and PSRAM mode), and the budgets its image is held to.
+[`profiles.json`](profiles.json) is the one list. CI builds each profile from it
+(`python3 tools/hearth/sink_profile.py defaults <profile>`) and fails a build that does not hold to
+it, and the other stacks this page spells are held to it too. The list, generated from the file by
+`sink_profile.py check-docs --write`:
+
+<!-- sink-profiles:begin -->
+
+| Profile | Fragments after `sdkconfig.defaults`, in order | Release image | Boards |
+|---|---|---|---|
+| `c6-16mb` | `hw`, `sendspin`, `c6`, `sendspin-c6`, `flash16mb` | `hearth-sink-esp32c6-16mb` | C6 |
+| `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none |
+| `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a, P4b |
+| `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | P4a, P4b |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none |
+| `s3-n16r8` | `hw`, `psram`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
+| `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | S3a, S3b |
+
+<!-- sink-profiles:end -->
+
+A change to a profile, to a fragment it names or to the default of a key it locks is one pull
+request that edits `profiles.json` too and carries a board run
+([`planning/esp32-platform-profiles.md`](../../planning/esp32-platform-profiles.md), "Changing a
+profile").
+
 ## Running it
 
 On a board, with an I2S DAC wired to the three pins under `iclforge hearth sink`
