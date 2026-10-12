@@ -43,6 +43,16 @@ The sections below contain the complete change list and fixes.
   table lists it, and the karaoke support matrix, the programme plan, the findings' correction
   list, the phase 1 plan and the ROADMAP row say which cells are built, in review, or open
   (`planning/karaoke-eac3.md`, E8).
+**Karaoke: a plan for a microphone, scoring and recording**
+
+- **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
+  and `planning/karaoke-microphone-findings.md`). Phase 1 left the microphone, scoring and recording
+  out; this is the plan for them: who sings with what, the latency budget (a voice mixed into a
+  Sendspin group comes out of a sink at least 400 ms late, so the voice is mixed where the
+  microphone is), a pitch score and the references that exist for one, a recording of the dry voice, the
+  decisions with a recommendation each (approved by the owner as recommended), and a build plan by
+  platform. A voice through one Windows 11 workstation's own shared-mode path was measured at about
+  130 ms, so a monitor is offered with its measured latency and not promised.
 
 **Karaoke: a pitch library**
 
@@ -594,6 +604,19 @@ The sections below contain the complete change list and fixes.
   project) when E-AC-3's mixing metadata, or AC-3's Annex D, was off and the stream had neither, so
   the line and the project were a different stream than the window encoded; they are now written
   with their group, and a project that names either asks for it, as `forge` reads it.
+- **The C API reproduces a karaoke stream and reads lyrics.** `iclforge_decoder_create_with_karaoke()`
+  takes an `iclforge_karaoke_config_t` - the reproduction (`ICLFORGE_KARAOKE_OFF`, `_AWARE`,
+  `_CAPABLE`), the listener's vocals and the three part levels in dB against Table C.2.3, the span,
+  units and defaults Hearth's sliders and `forge decode karaoke-melody=` use - and a decoded frame
+  says `bsmod`, `is_karaoke`, `output_acmod`, `output_lfe` and `karaoke_reproduced`, so that a caller
+  lays out the three or four channels of a reproduction and not the five or six it coded. The AC-3
+  decoder had no output configuration at all before. `iclforge_lyrics_parse()` reads the bytes of an
+  LRC (UTF-8 or UTF-16), SubRip, Advanced SubStation Alpha or MIDI karaoke file into lines of timed
+  words with their singers, and `iclforge_lyrics_position()` is the stateless cursor Hearth uses.
+  31 functions are added, and a status, `ICLFORGE_ERROR_LYRICS_UNREADABLE`, with the reason in
+  `iclforge_lyrics_error_message()`. The reader is `libs/lyrics`, compiled into the library; a
+  build whose compiler has no `<filesystem>` answers the lyrics functions with
+  `ICLFORGE_ERROR_UNSUPPORTED` (planning/karaoke-phase2.md, W5).
 - **The browser decode demo reproduces karaoke streams.** `PushDecoder` and the npm package's
   `FoldOptions` take `karaoke` (as coded, aware, capable) and `karaokeVocals` (none, V1, V2, both),
   and every push says whether the unit is Annex C karaoke type. The demo page shows a control for
@@ -3067,6 +3090,26 @@ The sections below contain the complete change list and fixes.
   object inspector's note on exporting now points to Open stream, where I5 put the export. The
   support catalogue's AC-4 encode row and the GUI's pages say so, and the translation catalogues
   take the new strings.
+
+**The ESP-IDF component's link targets are checked in the static job**
+
+- **`tools/checks/check_esp_component_targets.py` fails when the component links an `iclforge::`
+  target that its own options never define.** `firmware/esp-idf/iclforge/CMakeLists.txt` turns its
+  Kconfig symbols into the root build's options and links libraries by name, and whether a library
+  exists under those options is decided by `if()` guards in the root and in each library's
+  directory. The script runs the component's file, the root's and the libraries' through a small
+  interpreter of the CMake language once for each combination of the symbols the component reads,
+  with no ESP-IDF, and holds every `target_link_libraries()` to a definition. A finding names the
+  file that defines the target and the guard (with the values it read) or the `return()` that kept
+  it from running. The rest of the build is held to the same rule: in every combination that
+  configures, each `iclforge::` name that any executed `target_link_libraries()` names, and each
+  one an `iclforge_add_library()` links for its library, must be defined by the end of the run,
+  except inside a conditional generator expression (`$<TARGET_EXISTS:...>`,
+  `$<INSTALL_INTERFACE:...>`), which a build may leave out. A combination the build itself refuses
+  with `message(FATAL_ERROR)` is not a finding. Its tests put the root's guard for `libs/lyrics`
+  back as it was before #1344, when the sink firmware stopped configuring because the sink's player
+  linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
+  ESP-IDF image, so nothing before the merge saw that break.
 
 ### Changed
 
