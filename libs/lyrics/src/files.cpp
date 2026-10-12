@@ -9,6 +9,7 @@
 #include <system_error>
 
 #include "iclforge/lyrics/lyrics.hpp"
+#include "iclforge/lyrics/timing.hpp"
 
 // The part of the lyric reader that touches the file system: a file read, and the file beside an
 // item. A translation unit of its own so that a program that only parses text (the sink firmware,
@@ -34,7 +35,8 @@ constexpr std::uintmax_t kMaxFileBytes = 4U * 1024U * 1024U;
 }  // namespace
 
 std::expected<Lyrics, std::string> read_lyrics(const std::filesystem::path& file,
-                                               std::optional<std::int64_t> duration_ms) {
+                                               std::optional<std::int64_t> duration_ms,
+                                               const TextEncoding& encoding) {
     std::error_code sized;
     const std::uintmax_t size = std::filesystem::file_size(file, sized);
     if (sized) {
@@ -51,7 +53,50 @@ std::expected<Lyrics, std::string> read_lyrics(const std::filesystem::path& file
     if (!bytes.empty() && !in.read(bytes.data(), static_cast<std::streamsize>(bytes.size()))) {
         return std::unexpected(std::string{"The lyrics file could not be read."});
     }
-    return parse_timed_text(bytes, duration_ms);
+    return parse_timed_text(bytes, duration_ms, encoding);
+}
+
+Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
+                              const std::filesystem::path& stream_path,
+                              std::optional<std::int64_t> duration_ms, const TextEncoding& encoding) {
+    Placement out;
+    std::filesystem::path target = stream_path;
+    target.replace_extension(".lrc");
+    out.path = target;
+    std::error_code error;
+    if (std::filesystem::exists(target, error)) {
+        out.status = PlacementStatus::kExists;
+        return out;
+    }
+    const auto read = read_lyrics(lyrics_file, duration_ms, encoding);
+    if (!read) {
+        out.status = PlacementStatus::kUnreadable;
+        out.error = read.error();
+        return out;
+    }
+    const std::string text = write_lrc(*read, LrcWriteOptions{.mark_gaps = true});
+    // Written beside the target and moved into place, so that a write that stops part way never
+    // leaves a short file under the name a player looks for.
+    std::filesystem::path partial = target;
+    partial += ".part";
+    {
+        std::ofstream file(partial, std::ios::binary);
+        if (!file || !file.write(text.data(), static_cast<std::streamsize>(text.size()))) {
+            out.status = PlacementStatus::kFailed;
+            out.error = "The lyrics file could not be written.";
+            std::filesystem::remove(partial, error);
+            return out;
+        }
+    }
+    std::filesystem::rename(partial, target, error);
+    if (error) {
+        out.status = PlacementStatus::kFailed;
+        out.error = "The lyrics file could not be written: " + error.message();
+        std::filesystem::remove(partial, error);
+        return out;
+    }
+    out.status = PlacementStatus::kWritten;
+    return out;
 }
 
 std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path) {

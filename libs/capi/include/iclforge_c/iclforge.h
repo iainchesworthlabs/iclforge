@@ -99,7 +99,11 @@ typedef enum iclforge_status {
 
     /* iclforge::ac4::EncodeError - iclforge::ac4::Encoder::create()/encode()/flush() */
     ICLFORGE_ERROR_AC4_ENCODE_INVALID_CONFIG = 80,
-    ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT = 81
+    ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT = 81,
+
+    /* iclforge_lyrics_parse(): the bytes are not lyrics - empty, in an encoding that is not read,
+     * or with no lyrics in them. iclforge_lyrics_error_message() says which. */
+    ICLFORGE_ERROR_LYRICS_UNREADABLE = 90
 } iclforge_status_t;
 
 /* A short, static, human-readable description of `status` — e.g. for a log
@@ -426,6 +430,102 @@ ICLFORGE_C_EXPORT int iclforge_decoded_frame_block_switched(const iclforge_decod
                                                          size_t channel_index, int block_index);
 
 ICLFORGE_C_EXPORT void iclforge_decoded_frame_destroy(iclforge_decoded_frame_t* frame);
+
+/* --------------------------------------------------------------------- *
+ * Karaoke (ETSI TS 102 366 Annex C, informative; iclforge::ac3::OutputConfig::karaoke)
+ * --------------------------------------------------------------------- */
+
+/* An AC-3 karaoke stream - bsmod 7 with an acmod above 1/0 - carries L and R (the music), a guide
+ * melody M where a programme has its centre, and one or two vocals V1 and V2 where it has its
+ * surrounds (Table C.2.1: 3/0 is L M R, 2/1 is L R V1, 3/1 is L M R V1, 2/2 is L R V1 V2, 3/2 is
+ * L M R V1 V2). A decoder that knows nothing of it plays the channels where they are coded, which
+ * puts the vocals in the rear speakers. Annex C describes two that do better, and a decoder made
+ * with iclforge_decoder_create_with_karaoke() is one of them.
+ *
+ * Mirrors iclforge::ac3::KaraokeReproduction. Ordinals match it. */
+typedef enum iclforge_karaoke_reproduction {
+    /* The channels as they are coded; the default. */
+    ICLFORGE_KARAOKE_OFF = 0,
+    /* The karaoke-AWARE decoder (C.2.3.1, Table C.2.2): L, C, R and then the LFE when there is
+     * one, with M at unity in the centre and the vocals mixed in at the stream's own surround
+     * level. Three or four channels replace the four to six coded. */
+    ICLFORGE_KARAOKE_AWARE = 1,
+    /* The karaoke-CAPABLE decoder (C.2.3.2, Table C.2.3): as aware, with the vocals the listener
+     * chose (iclforge_karaoke_config_t::vocals) and each part at its own level (melody_db and its
+     * two siblings). */
+    ICLFORGE_KARAOKE_CAPABLE = 2
+} iclforge_karaoke_reproduction_t;
+
+/* Which of a stream's vocals a listener hears under ICLFORGE_KARAOKE_CAPABLE. A vocal the stream
+ * does not code - V2 of a 3/1 stream - reproduces nothing. Mirrors
+ * iclforge::ac3::KaraokeVocals. */
+typedef enum iclforge_karaoke_vocals {
+    ICLFORGE_KARAOKE_VOCALS_NONE = 0,
+    ICLFORGE_KARAOKE_VOCALS_V1 = 1,
+    ICLFORGE_KARAOKE_VOCALS_V2 = 2,
+    ICLFORGE_KARAOKE_VOCALS_BOTH = 3
+} iclforge_karaoke_vocals_t;
+
+/* The span a level control for a part covers, in dB against Table C.2.3: the bottom of it is OFF
+ * (the part is out of the sums), and the top is 12 dB over the table. The same span and the same
+ * conversion Hearth's sliders, the wire's karaoke_*_db keys and a sink's decoder use
+ * (iclforge::ac3::kKaraokeMinLevelDb, kKaraokeMaxLevelDb). */
+#define ICLFORGE_KARAOKE_MIN_LEVEL_DB (-24.0)
+#define ICLFORGE_KARAOKE_MAX_LEVEL_DB 12.0
+
+/* Call iclforge_karaoke_config_init() first, as for every other config here: a zero-initialised
+ * struct is the table at 0 dB with no vocals chosen, which is not the default (BOTH). */
+typedef struct iclforge_karaoke_config {
+    iclforge_karaoke_reproduction_t reproduction; /* default ICLFORGE_KARAOKE_OFF */
+    /* Read under ICLFORGE_KARAOKE_CAPABLE alone. Default ICLFORGE_KARAOKE_VOCALS_BOTH. */
+    iclforge_karaoke_vocals_t vocals;
+    /* Annex C.2.3's "additional flexibility", the capable decoder's alone: the level of the guide
+     * melody and of each vocal against Table C.2.3, in dB. 0.0 (the default) is the table bit for
+     * bit; a value is held to ICLFORGE_KARAOKE_MIN_LEVEL_DB..MAX_LEVEL_DB, the bottom of which
+     * is off, and one that is not a number is 0 dB. A part raised far enough lowers the others:
+     * the output stage holds every output's coefficients to a sum of 1. The aware reproduction
+     * ignores them. */
+    double melody_db;
+    double vocal1_db;
+    double vocal2_db;
+} iclforge_karaoke_config_t;
+
+/* Fills `config` with the defaults above: no reproduction, both vocals, every level 0 dB. */
+ICLFORGE_C_EXPORT void iclforge_karaoke_config_init(iclforge_karaoke_config_t* config);
+
+/* As iclforge_decoder_create(), for a decoder that reproduces a karaoke stream as `karaoke`
+ * asks: iclforge::ac3::DecoderConfig::output's karaoke fields. Frames that are not karaoke go
+ * through exactly as they do from iclforge_decoder_create()'s decoder, and so does everything
+ * about a karaoke stream when the reproduction is ICLFORGE_KARAOKE_OFF.
+ *
+ * A reproduced frame has FEWER channels than it codes: 3 (L, C, R) or 4 (with the LFE) in this
+ * header's channel order for those modes, where iclforge_decoded_frame_acmod() still says what
+ * was coded. iclforge_decoded_frame_output_acmod() and _output_lfe() say what the channels are.
+ * The decoder reproduces the 3/0 form only: a stereo or mono reproduction is the §7.8 fold,
+ * which this API has no output stage for. E-AC-3 has no karaoke reproduction here
+ * (iclforge_eac3_decoder_create() takes none), and neither does AC-4. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_decoder_create_with_karaoke(
+    const iclforge_decoder_config_t* config, const iclforge_karaoke_config_t* karaoke,
+    iclforge_decoder_t** out_decoder);
+
+/* The frame's bsmod (A/52 Table 5.7): 7 with an acmod above 1/0 is karaoke. */
+ICLFORGE_C_EXPORT int iclforge_decoded_frame_bsmod(const iclforge_decoded_frame_t* frame);
+
+/* Whether the frame is Annex C's karaoke main service (iclforge::ac3::meta::is_karaoke): bsmod 7
+ * with an acmod above 1/0. Independent of how the decoder was created. */
+ICLFORGE_C_EXPORT int iclforge_decoded_frame_is_karaoke(const iclforge_decoded_frame_t* frame);
+
+/* The layout the frame's channels are in once the decoder has reproduced it: its coded
+ * acmod() and lfe() for everything the decoder left alone, ICLFORGE_ACMOD_3_0 (L, C, R, then
+ * the LFE when the stream has one) for a karaoke frame it reproduced. The channel count an
+ * accessor above reports, and that decode_frame_into() wrote, is this layout's. */
+ICLFORGE_C_EXPORT iclforge_acmod_t iclforge_decoded_frame_output_acmod(
+    const iclforge_decoded_frame_t* frame);
+ICLFORGE_C_EXPORT int iclforge_decoded_frame_output_lfe(const iclforge_decoded_frame_t* frame);
+
+/* Whether the decoder replaced the coded layout with a karaoke reproduction for this frame. */
+ICLFORGE_C_EXPORT int iclforge_decoded_frame_karaoke_reproduced(
+    const iclforge_decoded_frame_t* frame);
 
 /* --------------------------------------------------------------------- *
  * E-AC-3 encoder (iclforge::ac3::eac3::FrameEncoder / AccessUnitEncoder)
@@ -2238,6 +2338,137 @@ ICLFORGE_C_EXPORT int iclforge_ac4_samples_per_frame(const iclforge_ac4_toc_t* t
 ICLFORGE_C_EXPORT iclforge_status_t iclforge_ac4_sync_frame(const uint8_t* raw_frame,
                                                            size_t raw_frame_size, int crc,
                                                            iclforge_bytes_t** out_bytes);
+
+/* --------------------------------------------------------------------- *
+ * Lyrics (iclforge::lyrics, planning/karaoke-phase2.md, W13)
+ * --------------------------------------------------------------------- */
+
+/* Timed lyrics for a karaoke stream: the words of a song with the times they are sung at, read
+ * from a LRC file (UTF-8, or UTF-16 with a byte-order mark in either order), a SubRip `.srt`, an
+ * Advanced SubStation Alpha `.ass` with its karaoke tags, or a MIDI karaoke `.kar`, as a person
+ * handed it (iclforge::lyrics::parse_timed_text): which it is is told by its content and not its
+ * name.
+ *
+ * LRC is informal, so what is read is stated in iclforge/lyrics/lyrics.hpp and
+ * docs/karaoke/index.md: `[mm:ss.xx]` line times, `<mm:ss.xx>` word times, `[offset:]`, the id
+ * tags, and a duet's `V1:`, `V2:` and `V1+V2:` markers. Times are milliseconds from the start of
+ * the item, with the file's own offset applied.
+ *
+ * A lyrics object is immutable, and every string read from it is valid until it is destroyed.
+ * Reading it is safe from several threads at once. */
+typedef struct iclforge_lyrics iclforge_lyrics_t;
+
+/* Mirrors iclforge::lyrics::Singer: which singer of a duet sings a line. UNMARKED is a line that
+ * says nothing, which a solo's every line is. */
+typedef enum iclforge_lyrics_singer {
+    ICLFORGE_LYRICS_SINGER_UNMARKED = 0,
+    ICLFORGE_LYRICS_SINGER_FIRST = 1,  /* V1 */
+    ICLFORGE_LYRICS_SINGER_SECOND = 2, /* V2 */
+    ICLFORGE_LYRICS_SINGER_BOTH = 3    /* V1+V2 */
+} iclforge_lyrics_singer_t;
+
+/* Mirrors iclforge::lyrics::WordState: a word against a position. */
+typedef enum iclforge_lyrics_word_state {
+    ICLFORGE_LYRICS_WORD_SUNG = 0,
+    ICLFORGE_LYRICS_WORD_BEING_SUNG = 1,
+    ICLFORGE_LYRICS_WORD_NOT_YET_SUNG = 2
+} iclforge_lyrics_word_state_t;
+
+/* Reads the bytes of a lyrics file. `duration_ms` is the item's length, which the last line's end
+ * is taken from when the file does not say; negative says it is not known. On success
+ * *out_lyrics receives the lyrics, which the caller must destroy.
+ *
+ * ICLFORGE_ERROR_LYRICS_UNREADABLE when the file is empty, is not UTF-8 or UTF-16 (Latin-1,
+ * Windows-1255 and UTF-32 are named and not guessed at), or has no lyrics in it; the sentence
+ * that says which is iclforge_lyrics_error_message(), and *out_lyrics is left untouched. */
+ICLFORGE_C_EXPORT iclforge_status_t iclforge_lyrics_parse(const uint8_t* data, size_t size,
+                                                         int64_t duration_ms,
+                                                         iclforge_lyrics_t** out_lyrics);
+ICLFORGE_C_EXPORT void iclforge_lyrics_destroy(iclforge_lyrics_t* lyrics);
+
+/* Why the last iclforge_lyrics_parse() on THIS thread refused its bytes: a sentence for a person,
+ * in storage the library owns that is good until that thread's next iclforge_lyrics_parse().
+ * Empty after a parse that succeeded, and before any. */
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_error_message(void);
+
+/* The file's id tags, UTF-8, "" for one it does not have (and for a NULL `lyrics`). */
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_title(const iclforge_lyrics_t* lyrics);
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_artist(const iclforge_lyrics_t* lyrics);
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_album(const iclforge_lyrics_t* lyrics);
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_author(const iclforge_lyrics_t* lyrics);
+/* What the file calls the two singers of a duet (`[v1:name]`, `[v2:name]`). */
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_first_singer_name(const iclforge_lyrics_t* lyrics);
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_second_singer_name(const iclforge_lyrics_t* lyrics);
+
+/* The file's `[length:]` in milliseconds: 0 (out-parameter untouched) when it has none, 1
+ * otherwise - the has-value convention of
+ * iclforge_scanned_stream_uniform_access_unit_samples(). */
+ICLFORGE_C_EXPORT int iclforge_lyrics_length_ms(const iclforge_lyrics_t* lyrics,
+                                               int64_t* out_length_ms);
+/* The file's `[offset:]`, which is already applied to every time. */
+ICLFORGE_C_EXPORT int64_t iclforge_lyrics_offset_ms(const iclforge_lyrics_t* lyrics);
+/* 0 for plain text with no times at all: its lines are the words, in order, and are not
+ * followed. */
+ICLFORGE_C_EXPORT int iclforge_lyrics_timed(const iclforge_lyrics_t* lyrics);
+/* Whether any line has a singer: the file is a duet. */
+ICLFORGE_C_EXPORT int iclforge_lyrics_has_singers(const iclforge_lyrics_t* lyrics);
+
+/* Lines, in time order and stable among equal times. An index out of range reads 0 and "". */
+ICLFORGE_C_EXPORT size_t iclforge_lyrics_line_count(const iclforge_lyrics_t* lyrics);
+ICLFORGE_C_EXPORT int64_t iclforge_lyrics_line_start_ms(const iclforge_lyrics_t* lyrics,
+                                                       size_t line);
+/* The next line's start, or for the last line the item's length, the file's `[length:]` or five
+ * seconds after it starts. */
+ICLFORGE_C_EXPORT int64_t iclforge_lyrics_line_end_ms(const iclforge_lyrics_t* lyrics,
+                                                     size_t line);
+/* The line without its tags; "" for a line that only marks a time. */
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_line_text(const iclforge_lyrics_t* lyrics,
+                                                       size_t line);
+ICLFORGE_C_EXPORT iclforge_lyrics_singer_t iclforge_lyrics_line_singer(
+    const iclforge_lyrics_t* lyrics, size_t line);
+/* 0 for a line with times and no word tags: no word times are invented for it. */
+ICLFORGE_C_EXPORT size_t iclforge_lyrics_line_word_count(const iclforge_lyrics_t* lyrics,
+                                                        size_t line);
+/* A word's text keeps the spacing written after it, so a line's words joined are its text. */
+ICLFORGE_C_EXPORT int64_t iclforge_lyrics_word_start_ms(const iclforge_lyrics_t* lyrics,
+                                                       size_t line, size_t word);
+ICLFORGE_C_EXPORT int64_t iclforge_lyrics_word_end_ms(const iclforge_lyrics_t* lyrics,
+                                                     size_t line, size_t word);
+ICLFORGE_C_EXPORT const char* iclforge_lyrics_word_text(const iclforge_lyrics_t* lyrics,
+                                                       size_t line, size_t word);
+
+/* Where in the lyrics a playing position is: iclforge::lyrics::LyricPosition. Stateless - a seek,
+ * a pause and a stop are only a different position.
+ *
+ * Tagged iclforge_lyrics_position_info rather than iclforge_lyrics_position, for the reason
+ * iclforge_version_info's own comment gives: the function below has that name, and GCC's -Wshadow
+ * (built C++) treats it as hiding the struct's implicit constructor. */
+typedef struct iclforge_lyrics_position_info {
+    /* The line most recently started; 0 before the first. */
+    int has_line;
+    size_t line;
+    /* Whether the position is before that line's end: 0 in the stretch after the last line. */
+    int in_line;
+    /* The word being sung, when that line is word-timed and one word spans the position. */
+    int has_word;
+    size_t word;
+    /* How far through that word, from 0 up to but not including 1, by time. */
+    double fraction;
+    /* The position the answer is for: the one asked, less the delay. */
+    int64_t position_ms;
+} iclforge_lyrics_position_t;
+
+/* `delay_ms` is the singer's nudge: positive shows the lyrics later. With a NULL lyrics or a NULL
+ * `out`, nothing is written. */
+ICLFORGE_C_EXPORT void iclforge_lyrics_position(const iclforge_lyrics_t* lyrics,
+                                               int64_t position_ms, int64_t delay_ms,
+                                               iclforge_lyrics_position_t* out);
+
+/* A word against a position: sung from its end, being sung from its start, not yet sung before
+ * that. A word that starts and ends together is sung from there. An index out of range is not
+ * yet sung. */
+ICLFORGE_C_EXPORT iclforge_lyrics_word_state_t iclforge_lyrics_word_state(
+    const iclforge_lyrics_t* lyrics, size_t line, size_t word, int64_t position_ms);
 
 
 #ifdef __cplusplus

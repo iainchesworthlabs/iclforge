@@ -60,6 +60,11 @@ THIRDPARTY_SECTIONS = (
     "libFLAC 1.4.3\n"
     "Opus 1.5.2\n"
     "Sendspin time filter\n"
+    "LVGL\n"
+    "Noto Sans Greek and Cyrillic\n"
+    "ESP-IDF 6.1\n"
+    "FreeRTOS kernel 10.5.1\n"
+    "picolibc 1.8.10\n"
 )
 WINDOWS_NOTICES = (
     "Hearth 0.10.0 - third-party notices\n" + QT_SECTION + THIRDPARTY_SECTIONS
@@ -189,6 +194,26 @@ class NoticesContentTest(unittest.TestCase):
             code, out = run(windows_zip(directory, without))
             self.assertEqual(code, 1)
             self.assertIn("Sendspin time filter", out)
+
+    def test_missing_firmware_sections_fail(self):
+        # The ESP32 sink images carry ESP-IDF and what it links, and the P4's screen LVGL and a Noto
+        # Sans for Greek and Cyrillic: all are named in Hearth's notices although no desktop binary
+        # holds them.
+        markers = (
+            "LVGL\n",
+            "Noto Sans Greek and Cyrillic\n",
+            "ESP-IDF 6.1\n",
+            "FreeRTOS kernel 10.5.1\n",
+            "picolibc 1.8.10\n",
+        )
+        for marker in markers:
+            with self.subTest(marker=marker), tempfile.TemporaryDirectory() as directory:
+                without = WINDOWS_NOTICES.replace(marker, "")
+                code, out = run(windows_zip(directory, without))
+                self.assertEqual(code, 1)
+                # What the gate names is the short marker ("ESP-IDF"), not the fixture's line.
+                named = next(name for name in gate.FIRMWARE_MARKERS if name in marker)
+                self.assertIn(named, out)
 
     def test_linux_tar_needs_debian_copyright(self):
         with tempfile.TemporaryDirectory() as directory:

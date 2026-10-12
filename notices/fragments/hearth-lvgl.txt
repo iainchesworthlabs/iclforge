@@ -1,0 +1,12 @@
+LVGL
+----
+
+LVGL (https://lvgl.io), the graphics library, is compiled into the image of
+Hearth's ESP32-P4 sink with a screen (the firmware this release carries for
+that board), which draws its lyric screen with it. It is not part of Hearth's
+desktop programs. LVGL is offered under the MIT licence, which follows as LVGL
+distributes it. The third-party parts of LVGL that are compiled into that
+image (stb_truetype, and the Montserrat font) are covered with the
+firmware's components, below.
+
+{{FILE:LVGL_MIT}}

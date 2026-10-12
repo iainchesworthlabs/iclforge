@@ -185,7 +185,21 @@ class TheFile(unittest.TestCase):
         spelled = re.findall(
             r'"-DSDKCONFIG_DEFAULTS=(sdkconfig\.defaults;sdkconfig\.hw[^"]*)"', text
         )
-        self.assertEqual(spelled, [], "a board build in _build.yml spells its own fragment list")
+        # The P4X panel's two builds (#1400) are not profiles yet: p4-rev3 is its own change.
+        # Each is an `other_stacks` entry, so a list that is not one of these still fails.
+        unprofiled = {
+            "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;"
+            "sdkconfig.panel;sdkconfig.panel-dsi",
+            "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;"
+            "sdkconfig.panel-null",
+        }
+        listed = set(sp.load()["other_stacks"])
+        self.assertLessEqual(unprofiled, listed)
+        self.assertEqual(
+            [name for name in spelled if name not in unprofiled],
+            [],
+            "a board build in _build.yml spells its own fragment list",
+        )
 
     def test_the_profiles_are_distinct_builds(self) -> None:
         seen: dict[str, str] = {}

@@ -98,6 +98,67 @@ the C++ `DecodedFrame`/`DecodedSubstream` structs themselves, added here purely 
 `iclforge/ac3/decoder/decoder.hpp` — splitting a raw elementary stream (or one already known to be E-AC-3)
 into individual syncframes or access units before decoding each one.
 
+## Karaoke streams and lyrics
+
+An AC-3 stream flagged `bsmod` 7 with a layout wider than mono is an Annex C karaoke stream: L and
+R, a guide melody M where a centre would be, and one or two vocals V1 and V2 where the surrounds
+would be ([Karaoke](../karaoke/index.md)). A `FrameDecoder` plays the channels where they are coded
+unless its `DecoderConfig` asks for a reproduction:
+
+```python
+config = ac3.DecoderConfig(
+    karaoke=ac3.KaraokeReproduction.kCapable,   # kOff (default), kAware or kCapable
+    karaoke_vocals=ac3.KaraokeVocals.kV1,       # kNone, kV1, kV2 or kBoth; kCapable only
+    karaoke_melody_db=-6.0,                     # against Table C.2.3; kCapable only
+)
+decoder = ac3.FrameDecoder(config)
+decoded = decoder.decode_frame(frame_bytes)
+if decoded.karaoke_reproduced:
+    # three channels (four with the LFE): L, C, R where five were coded.
+    print(decoded.output_acmod, decoded.channel_labels)   # Acmod.k3_0 ['L', 'C', 'R']
+```
+
+- `kAware` is the karaoke-aware decoder (C.2.3.1, Table C.2.2): L, C, R with the melody at unity in
+  the centre and the vocals at the stream's own surround level. `kCapable` (C.2.3.2, Table C.2.3)
+  lets the listener choose the vocals and re-level each part.
+- The levels (`karaoke_melody_db`, `karaoke_vocal1_db`, `karaoke_vocal2_db`) are Annex C.2.3's
+  "additional flexibility", in dB against Table C.2.3: 0 is the table bit for bit, `ac3.KARAOKE_MIN_LEVEL_DB`
+  (-24) is off and `ac3.KARAOKE_MAX_LEVEL_DB` (12) is the top. A value outside the span is held to
+  it and one that is not a number is 0 dB. A part raised far enough lowers the others, because the
+  output stage holds every output's coefficients to a sum of 1. They are the same span, units and
+  defaults as Hearth's sliders and `forge decode karaoke-melody=`.
+- `decoded.acmod` still says what was coded; **`decoded.output_acmod`**, `output_lfe` and
+  `channel_labels` say what `channels` are, `is_karaoke` and `bsmod` what the stream is, and
+  `karaoke_reproduced` whether the decoder replaced the layout. A frame that is not karaoke, and
+  every frame under `kOff`, goes through unchanged. `decode_frame_into` writes the reproduction's
+  channels first. The reproduction is the 3/0 form; `Eac3Decoder` and AC-4 have none.
+
+`ac3.lyrics` reads the words of a song with the times they are sung at, from an LRC file (UTF-8, or
+UTF-16 with a byte-order mark, with the word-timed `<mm:ss.xx>` form and a duet's `V1:`/`V2:`
+markers), a SubRip `.srt`, an Advanced SubStation Alpha `.ass` or a MIDI karaoke `.kar`, told by
+what they hold and not by their names. It is the reader Hearth, Crucible and the sink firmware use:
+
+```python
+lyrics = ac3.lyrics.read("song.lrc", duration_ms=180_000)   # or lyrics.parse(bytes_or_str)
+print(lyrics.title, lyrics.has_singers, len(lyrics.lines))
+for line in lyrics.lines:
+    print(line.start_ms, line.singer, line.text)
+    for word in line.words:            # empty for a line timed as a line only
+        print("   ", word.start_ms, word.end_ms, word.text)
+
+at = lyrics.position(playing_ms, delay_ms=0)   # stateless: a seek is only another position
+if at.line is not None and at.in_line:
+    print(at.line, at.word, at.fraction)
+```
+
+Times are milliseconds from the start of the item with the file's own `[offset:]` applied.
+`position()`'s `delay_ms` is the singer's nudge (positive shows the words later) and
+`word_state()` says whether a word is `kSung`, `kBeingSung` or `kNotYetSung`. `ac3.lyrics.find_file()`
+finds the file beside a media item (`name.lrc`, then `.srt`, `.ass`, `.kar`). A file that is empty,
+in a code page (Latin-1, Windows-1255) or in UTF-32 raises `ValueError` with the reason, and is not
+guessed at. The submodule is absent from a build without `iclforge::lyrics` (the minimum-footprint
+profiles, and compilers with no `<filesystem>`), as `ac3.containers` is from one without them.
+
 ## Zero-copy numpy and buffer reuse
 
 Every `encode_frame`/`encode_access_unit` call above (AC-3, E-AC-3, and

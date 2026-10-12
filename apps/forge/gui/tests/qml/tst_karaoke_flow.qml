@@ -700,6 +700,59 @@ TestCase {
         compare(cliRunner.size(beside2), 0, "a lyrics file the author removed was put beside the stream");
     }
 
+    function test_aSubRipFileBesideTheBackingIsWrittenBesideTheStreamAsUtf8Lrc() {
+        const song = audioFixtures.writeTones("kc-song.wav", 48000, 1.024, [440, 620]);
+        const words = audioFixtures.writeText(
+            "kc-song.srt", "1\n00:00:01,000 --> 00:00:03,000\nLa la\n\n2\n00:00:05,000 --> 00:00:06,000\nLa\n");
+        // What the stream's own lyrics file should hold: LRC, with the silence between the cues
+        // marked as a time with no text, which a player reads as the line being over.
+        const expected = audioFixtures.writeText("kc-song-expected.lrc",
+                                                 "[00:01.00]La la\n[00:03.00]\n[00:05.00]La\n");
+        verify(song.toString().length > 0 && words.toString().length > 0 && expected.toString().length > 0);
+        const ctx = openFlow();
+        useParts(ctx, { backing: song, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        // Offered because an .srt of the backing's name is beside it and there is no .lrc.
+        compare(ctx.flow.lyricsUrl, words.toString());
+        compare(ctx.flow.lyricsProblem, "");
+        ctx.flow.currentStepKey = "save";
+        compare(findByName(ctx.win, "karaokeLyricsFile").text, "kc-song.srt");
+        verify(!findByName(ctx.win, "karaokeLyricsProblem").visible);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_srt_lyrics.ac3");
+        const beside = Qt.resolvedUrl("_test_output/tst_karaoke_srt_lyrics.lrc");
+        verify(audioFixtures.remove(out) && audioFixtures.remove(beside));
+        saveTo(ctx, out);
+        verify(cliRunner.sameBytes(expected, beside), "the SubRip file was not written as LRC beside the stream");
+        verify(ctx.flow.lyricsNote.indexOf("beside the stream") >= 0, ctx.flow.lyricsNote);
+    }
+
+    function test_aLyricsFileInACodePageIsSaidSoWhenChosenAndNothingIsWritten() {
+        const song = audioFixtures.writeTones("kd-song.wav", 48000, 1.024, [440, 620]);
+        // "[00:01.00]Caf" and an e acute as the one byte E9: Latin-1, which is not UTF-8.
+        const words = audioFixtures.writeBytes("kd-song.lrc", [0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x2e, 0x30, 0x30, 0x5d, 0x43, 0x61, 0x66, 0xe9, 0x0a]);
+        verify(song.toString().length > 0 && words.toString().length > 0);
+        const ctx = openFlow();
+        useParts(ctx, { backing: song, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        compare(ctx.flow.lyricsUrl, words.toString());
+        // Said when it is offered, with the reader's own reason, and not found out at save.
+        verify(ctx.flow.lyricsProblem.indexOf("UTF-8") >= 0, ctx.flow.lyricsProblem);
+        ctx.flow.currentStepKey = "save";
+        const problem = findByName(ctx.win, "karaokeLyricsProblem");
+        verify(problem.visible);
+        verify(problem.text.indexOf("cannot be used") >= 0, problem.text);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_codepage_lyrics.ac3");
+        const beside = Qt.resolvedUrl("_test_output/tst_karaoke_codepage_lyrics.lrc");
+        verify(audioFixtures.remove(out) && audioFixtures.remove(beside));
+        saveTo(ctx, out);
+        // The stream is written; the words are not, and the note says why.
+        verify(cliRunner.size(out) > 0, "the stream was not written");
+        compare(cliRunner.size(beside), 0, "a file in a code page was put beside the stream");
+        verify(ctx.flow.lyricsNote.indexOf("could not be read") >= 0, ctx.flow.lyricsNote);
+    }
+
     // Parts of 2.0 s end in half a frame. The window once wrote silence into the
     // rest of that frame where forge held the last sample, so the two files
     // differed in their last frame (610 of 48,384 bytes) for the same plan.

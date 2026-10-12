@@ -785,6 +785,54 @@ TEST_CASE("the mixmdate group is written only when it is asked for") {
     CHECK(config.independent.mixing->lorocmixlev == iclforge::ac3::meta::MixLevel::kMinus3dB);
 }
 
+TEST_CASE("a karaoke service type writes the mixing group, at the levels the plan holds") {
+    // Annex E has no cmixlev or surmixlev in bsi: the Lo/Ro group is where a decoder reads the
+    // levels of Annex C's reproduction (planning/karaoke-eac3.md, D4), so a stream flagged
+    // karaoke carries one without `mixmeta` being asked for.
+    using iclforge::ac3::meta::BitstreamMode;
+    using iclforge::ac3::meta::MixLevel;
+    iclforge::ac3::plan::Plan plan{.codec = iclforge::ac3::plan::Codec::kEac3,
+                                   .layout = iclforge::ac3::plan::LayoutId::k51};
+    plan.meta.infomdat = true;
+    plan.meta.info.bsmod = BitstreamMode::kVoiceOverOrKaraoke;
+    plan.meta.cmixlev = iclforge::ac3::meta::CentreMixLevel::kMinus3dB;
+    plan.meta.surmixlev = iclforge::ac3::meta::SurroundMixLevel::kMinus3dB;
+    const auto written = iclforge::ac3::plan::eac3_config(plan).independent;
+    REQUIRE(written.mixing.has_value());
+    CHECK(written.mixing->lorocmixlev == MixLevel::kMinus3dB);
+    CHECK(written.mixing->lorosurmixlev == MixLevel::kMinus3dB);
+    CHECK(written.info->bsmod == BitstreamMode::kVoiceOverOrKaraoke);
+
+    // The levels an author typed, not defaults of the writer's.
+    plan.meta.surmixlev = iclforge::ac3::meta::SurroundMixLevel::kMinus6dB;
+    CHECK(iclforge::ac3::plan::eac3_config(plan).independent.mixing->lorosurmixlev ==
+          MixLevel::kMinus6dB);
+    // And an explicit Lo/Ro level wins over them, as it does when `mixmeta` is asked for.
+    plan.meta.lorosurmixlev = MixLevel::kMinus3dB;
+    CHECK(iclforge::ac3::plan::eac3_config(plan).independent.mixing->lorosurmixlev ==
+          MixLevel::kMinus3dB);
+}
+
+TEST_CASE("a stream that is not karaoke, or has no level to carry, writes no mixing group") {
+    using iclforge::ac3::meta::BitstreamMode;
+    const auto written = [](iclforge::ac3::plan::LayoutId layout, BitstreamMode bsmod,
+                            bool infomdat) {
+        iclforge::ac3::plan::Plan plan{.codec = iclforge::ac3::plan::Codec::kEac3,
+                                       .layout = layout};
+        plan.meta.infomdat = infomdat;
+        plan.meta.info.bsmod = bsmod;
+        return iclforge::ac3::plan::eac3_config(plan).independent.mixing.has_value();
+    };
+    using iclforge::ac3::plan::LayoutId;
+    CHECK(written(LayoutId::k51, BitstreamMode::kVoiceOverOrKaraoke, true));
+    // A complete main, or no service type stated at all.
+    CHECK_FALSE(written(LayoutId::k51, BitstreamMode::kCompleteMain, true));
+    CHECK_FALSE(written(LayoutId::k51, BitstreamMode::kVoiceOverOrKaraoke, false));
+    // 2/0 has no centre or surround level; mono at bsmod 7 is a voice-over.
+    CHECK_FALSE(written(LayoutId::kStereo, BitstreamMode::kVoiceOverOrKaraoke, true));
+    CHECK_FALSE(written(LayoutId::kMono, BitstreamMode::kVoiceOverOrKaraoke, true));
+}
+
 // ---------------------------------------------------------------------------
 // Routing
 // ---------------------------------------------------------------------------
