@@ -11,7 +11,9 @@
 // The file may be in any format libs/lyrics reads (`.lrc`, `.srt`, `.ass`, `.kar`, in UTF-8 or
 // UTF-16); what is written is the one format every player has, UTF-8 LRC, with a duet's singers
 // and names, word times where the file has them, and the gaps between cues marked. A code page is
-// refused by name, as everywhere else. An `.lrc` of that name already beside the stream is left
+// refused by name, as everywhere else, unless `lyrics-encoding=<page>` says which it is (Windows-1252,
+// Shift-JIS, GBK ...: apps/shared/text-encoding); a page is never guessed at, and a UTF-8 or UTF-16
+// file is read as it is whatever is named. An `.lrc` of that name already beside the stream is left
 // as it was.
 //
 // Two steps around the encode, so that a bad file fails before any work is done and a failed

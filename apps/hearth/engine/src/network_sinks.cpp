@@ -352,6 +352,8 @@ void NetworkSinks::forget_pairing(const std::string& id) {
             entry.known->psk = ss::handshake::PskCategory::kSentinel;
         }
         entry.held_elsewhere = false;
+        // The record goes, and the choice kept with it: a sink paired again starts from PCM.
+        entry.opus_fallback = false;
         publish_locked();
     }
     if (!client_id.empty() && host_) {
@@ -431,23 +433,35 @@ bool NetworkSinks::push_sink_settings(const std::string& id, ss::player::Setting
 }
 
 bool NetworkSinks::set_sink_opus_fallback(const std::string& id, bool opus) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    const auto it = sinks_.find(id);
-    if (it == sinks_.end()) {
-        return false;
+    std::optional<ss::crypto::Key32> client_key;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto it = sinks_.find(id);
+        if (it == sinks_.end()) {
+            return false;
+        }
+        const std::optional<ss::ClientView>& view = it->second.known;
+        const bool lists =
+            view.has_value() && view->player_support.has_value() &&
+            std::ranges::any_of(view->player_support->supported_formats,
+                                [](const ss::messages::AudioFormat& format) {
+                                    return format.codec == ss::messages::Codec::kOpus;
+                                });
+        if (opus && !lists) {
+            return false;
+        }
+        if (it->second.opus_fallback != opus) {
+            it->second.opus_fallback = opus;
+            publish_locked();
+        }
+        if (view.has_value()) {
+            client_key = view->client_key;
+        }
     }
-    const std::optional<ss::ClientView>& view = it->second.known;
-    const bool lists = view.has_value() && view->player_support.has_value() &&
-                       std::ranges::any_of(view->player_support->supported_formats,
-                                           [](const ss::messages::AudioFormat& format) {
-                                               return format.codec == ss::messages::Codec::kOpus;
-                                           });
-    if (opus && !lists) {
-        return false;
-    }
-    if (it->second.opus_fallback != opus) {
-        it->second.opus_fallback = opus;
-        publish_locked();
+    // Outside the lock: the store writes its file. A sink that never said hello has no key to
+    // keep a choice under, and only ever has PCM to leave.
+    if (client_key.has_value()) {
+        store_.set_opus(*client_key, opus);
     }
     return true;
 }
@@ -1216,6 +1230,11 @@ void NetworkSinks::on_client(const ss::ClientView& client) {
         return;
     }
     Entry& entry = sink_it->second;
+    if (!entry.known.has_value()) {
+        // The first time this run the sink says who it is: what the person chose for it before is
+        // read back from the record its key names.
+        entry.opus_fallback = store_.opus(client.client_key);
+    }
     if (!entry.client.has_value()) {
         entry.connected_at = Clock::now();
     }

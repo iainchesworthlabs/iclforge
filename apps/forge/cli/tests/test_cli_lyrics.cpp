@@ -164,6 +164,94 @@ TEST_CASE("encode lyrics= refuses a file that is not lyrics before it encodes an
     }
 }
 
+TEST_CASE("encode lyrics-encoding= reads a lyrics file in a code page and writes it as UTF-8",
+          "[cli][lyrics]") {
+    const auto dir = scratch_dir() / "code_page";
+    fs::create_directories(dir);
+    const auto wav = make_wav("lyrics_code_page.wav");
+    const auto log = dir / "log.txt";
+
+    SECTION("Windows-1252: the file is refused with a hint, and read once the page is named") {
+        const auto latin = write_file(dir / "cafe.lrc", "[00:01.00]Caf\xE9 cr\xE8me\n");
+        const auto refused = dir / "refused.ac3";
+        CHECK(run_cli("encode " + quoted(wav) + " " + quoted(refused) + " 192 lyrics=" + quoted(latin),
+                      log) == 2);
+        const auto text = read_file(log);
+        INFO(text);
+        CHECK(text.find("lyrics-encoding=") != std::string::npos);
+        CHECK_FALSE(fs::exists(refused));
+
+        const auto out = dir / "cafe_stream.ac3";
+        REQUIRE(run_cli("encode " + quoted(wav) + " " + quoted(out) + " 192 lyrics=" + quoted(latin) +
+                            " lyrics-encoding=windows-1252",
+                        log) == 0);
+        INFO(read_file(log));
+        CHECK(read_file(dir / "cafe_stream.lrc") == "[00:01.00]Caf\xC3\xA9 cr\xC3\xA8me\n");
+    }
+
+    SECTION("Shift-JIS under a spelling that is not the canonical name") {
+        const auto sjis = write_file(dir / "kana.lrc", "[00:01.00]\x82\xA0\x82\xA2\n");
+        const auto out = dir / "kana_stream.ac3";
+        REQUIRE(run_cli("encode " + quoted(wav) + " " + quoted(out) + " 192 lyrics=" + quoted(sjis) +
+                            " lyrics-encoding=Shift_JIS",
+                        log) == 0);
+        INFO(read_file(log));
+        CHECK(read_file(dir / "kana_stream.lrc") == "[00:01.00]\xE3\x81\x82\xE3\x81\x84\n");
+    }
+
+    SECTION("bytes the named page does not have are an input error and write nothing") {
+        const auto cut = write_file(dir / "cut.lrc", "[00:01.00]ab\x82\n");
+        const auto out = dir / "cut_stream.ac3";
+        CHECK(run_cli("encode " + quoted(wav) + " " + quoted(out) + " 192 lyrics=" + quoted(cut) +
+                          " lyrics-encoding=shift-jis",
+                      log) == 2);
+        const auto text = read_file(log);
+        INFO(text);
+        CHECK(text.find("code page") != std::string::npos);
+        CHECK_FALSE(fs::exists(out));
+    }
+
+    SECTION("a UTF-8 file is read as UTF-8 whatever page is named") {
+        const auto utf8 = write_file(dir / "utf8.lrc", "[00:01.00]Caf\xC3\xA9\n");
+        const auto out = dir / "utf8_stream.ac3";
+        REQUIRE(run_cli("encode " + quoted(wav) + " " + quoted(out) + " 192 lyrics=" + quoted(utf8) +
+                            " lyrics-encoding=windows-1251",
+                        log) == 0);
+        INFO(read_file(log));
+        CHECK(read_file(dir / "utf8_stream.lrc") == "[00:01.00]Caf\xC3\xA9\n");
+    }
+
+    SECTION("a name that is no page lists the pages, and is a usage error") {
+        const auto words = write_file(dir / "words.srt", kSubRip);
+        CHECK(run_cli("encode " + quoted(wav) + " " + quoted(dir / "n.ac3") + " 192 lyrics=" +
+                          quoted(words) + " lyrics-encoding=klingon",
+                      log) == 1);
+        const auto text = read_file(log);
+        INFO(text);
+        CHECK(text.find("klingon") != std::string::npos);
+        CHECK(text.find("shift-jis") != std::string::npos);
+    }
+
+    SECTION("a page with no lyrics= to read in it is a usage error") {
+        CHECK(run_cli("encode " + quoted(wav) + " " + quoted(dir / "alone.ac3") +
+                          " 192 lyrics-encoding=windows-1252",
+                      log) == 1);
+        const auto text = read_file(log);
+        INFO(text);
+        CHECK(text.find("there is no lyrics=") != std::string::npos);
+        CHECK_FALSE(fs::exists(dir / "alone.ac3"));
+    }
+
+    SECTION("the key belongs to the encoders: a decode refuses it") {
+        CHECK(run_cli("decode " + quoted(dir / "x.ac3") + " " + quoted(dir / "x.wav") +
+                          " lyrics-encoding=windows-1252",
+                      log) == 1);
+        const auto text = read_file(log);
+        INFO(text);
+        CHECK(text.find("lyrics-encoding= goes with") != std::string::npos);
+    }
+}
+
 TEST_CASE("eac3-encode and ac4-encode take lyrics= too", "[cli][lyrics]") {
     const auto dir = scratch_dir() / "codecs";
     fs::create_directories(dir);

@@ -105,6 +105,7 @@ target_link_libraries(forge
         iclforge::containers
         iclforge::ac4
         iclforge::lyrics
+        iclforge::app_text_encoding
         iclforge::warnings
         iclforge::fmt
         iclforge::json
