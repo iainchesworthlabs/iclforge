@@ -668,6 +668,11 @@ void start_player(const iclforge::render::OutputLayout& layout) {
                                                static_cast<std::size_t>(std::max(sink_max_slots(), 1)));
     config.max_delay_ms = static_cast<double>(kMaxDelayMs);
     config.max_coded_channels = kMaxCodedChannels;
+    // A stream declaring more objects than the board states it places is played as its bed
+    // (iclforge/object_limit.hpp): the figure the support object carries is the one it keeps to.
+    if (kMaxObjects >= 0) {
+        config.max_objects = static_cast<std::uint8_t>(kMaxObjects);
+    }
     config.core = kDecodeCore;
     config.stack_bytes = kDecodeStackBytes;
     config.stack_in_psram = kDecodeStackInPsram;

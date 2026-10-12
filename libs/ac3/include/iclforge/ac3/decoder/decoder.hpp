@@ -793,6 +793,15 @@ class ICLFORGE_AC3_EXPORT Eac3Decoder {
     // decoder.
     void reset();
 
+    // Whether this decoder reconstructs a stream's objects from here on (the flag it was made with,
+    // DecoderConfig::skip_object_reconstruction), for a caller that learns after the decoder is
+    // made that a stream carries more objects than it can place: it plays that stream's bed,
+    // without another decoder's allocations. Taking it true lets go of the reconstruction state,
+    // which is the largest block a decode holds (147,504 bytes, in one piece, in single precision
+    // less); false makes it again at the next frame that has objects. The bed's bits are the same
+    // either way. Call it between streams, as reset(), and the decode that follows starts clean.
+    void set_skip_object_reconstruction(bool skip);
+
     // Decodes one syncframe. Overlap-add state is kept per substream identity,
     // so the substreams of successive access units stay independent of each
     // other; a caller stepping through syncframes by hand gets the same audio

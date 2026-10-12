@@ -29,6 +29,16 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Audio: when a packet was captured**
+
+- **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
+  programme, M2). `Capture::stamps()` is a second lock-free ring of `CaptureStamp`s (the packet's
+  first frame in the stream, and its time in nanoseconds on `std::chrono::steady_clock`'s clock);
+  `CaptureTimeline` fits a line through the last 64 and gives the time of any frame, the frame at a
+  time, and the device's measured rate; `Capture::start()` takes `CaptureOptions` with a requested
+  packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
+  `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
+  consumer must treat as "no time", and a caller that does not use any of it sees no change.
 **Karaoke: a plan for a microphone, scoring and recording**
 
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
@@ -109,6 +119,7 @@ The sections below contain the complete change list and fixes.
   (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
   is named on the row when it is chosen, and none is written. The row's strings are translated in
   the six catalogues.
+
 - **The lyric library reads a code page when a program supplies the conversion.**
   `iclforge::lyrics::TextEncoding` carries a decoder callback (the library holds no table of any
   page, as it is linked into firmware), and every reader (`parse_lyrics`, `parse_subrip`,
@@ -126,6 +137,14 @@ The sections below contain the complete change list and fixes.
   the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
   it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
   GUI's picker will link as well.
+
+  refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
+- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
+  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
+  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
+  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
+  is named on the row when it is chosen, and none is written. The row's strings are translated in
+  the six catalogues.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
@@ -279,6 +298,15 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
+  `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
+  part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table
+  C.2.3 (the span and defaults of Hearth's sliders), and a decoded frame says `bsmod`, `is_karaoke`,
+  `output_acmod`, `output_lfe` and `karaoke_reproduced`, with `channel_labels` for the channels that
+  are there. `iclforge.lyrics` reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke files into
+  lines of timed words with their singers (`parse`, `read`, `find_file`) and gives the cursor
+  (`Lyrics.position`, `word_state`): the reader Hearth uses, bound as it is (planning/karaoke-phase2.md,
+  W5).
 - **`forge decode` and `forge monitor` re-level the karaoke-capable decoder's parts.**
   `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
   flexibility" in the units, the span and the defaults of Hearth's sliders and the wire's
@@ -561,6 +589,15 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **Hearth's Karaoke page, lyric views and timing window are translated.** The page, the lyric view,
+  the singer view, the timing window, the lyric delay and the shortcuts that go with them are filled
+  in the German, Spanish, French, Arabic, Hebrew and Yiddish catalogues (145 strings, with the singer view's and
+  the single-word timing's own), reusing the
+  Forge GUI's renderings for the words the two share. They are machine-made and have not been read
+  by a speaker, and Settings now says so under the language chooser, as the Forge GUI's and
+  Crucible's do, and which pages are translated; the rest of the window is English in every
+  language, as it was. The catalogues also hold `lupdate`'s own suggestions: a rendering copied to
+  an identical string on another page, marked unfinished ([Languages](docs/hearth/index.md#languages)).
 - **The Network page says whether a board holds lyrics and which line it is on.** The sink report
   has a Lyrics row: "not offered" for a board that lists no lyric commands, "none held", "held,
   before the first line", or "line 3 of 12" with the line's text. The board reports the item and
@@ -590,6 +627,13 @@ The sections below contain the complete change list and fixes.
   nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
   by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
+- **The Rust binding reproduces a karaoke stream and reads lyrics.** `Decoder::with_karaoke` takes a
+  `KaraokeConfig` (`KaraokeReproduction`, `KaraokeVocals` and the three part levels in dB against
+  Table C.2.3, the span and defaults of Hearth's sliders) and a `DecodedFrame` says `bsmod`,
+  `is_karaoke`, `output_acmod`, `output_lfe` and `karaoke_reproduced`. `iclforge::lyrics::Lyrics`
+  reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke bytes into lines of timed words with
+  their singers, borrowing them, with the stateless cursor; a refusal is
+  `LyricsError::Unreadable` with the reader's reason (planning/karaoke-phase2.md, W5).
 - **The Karaoke flow takes an LFE part.** An optional mono file, the stream's low-frequency
   channel: it chooses no mode, is coded after the full-bandwidth channels (a 3/2 stream with one is
   a 5.1 bed), is band-limited by the window as any channel assigned to the LFE is, and comes out of
@@ -636,6 +680,16 @@ The sections below contain the complete change list and fixes.
   The parsing is `command_line.hpp`, held by `hearth_controller_tests`. The Karaoke guide's page
   screenshot is retaken from the running window, and a duet one is added; the options are in
   [Hearth's command line](docs/hearth/index.md#command-line).
+- **Hearth opens a file it is given.** A file named on its own, as in `hearth song.ac3`, as
+  Windows runs `hearth.exe "%1"` for a double-clicked `.ac3` or `.ec3`, and as the Linux launcher
+  runs `hearth %F` (both registered when the association moved to Hearth, and Hearth read no file
+  from its command line, so the window opened empty), is added behind the queue the window brings
+  back and starts. It waits, cued, on a first run (the "Before you play anything" dialog comes first) and
+  with `--seek`, `--shot` or `--smoke-shot`; `--` ends the options, and `--open <file>` is the
+  same file named as an option. The item to start is chosen on the engine thread
+  (`Engine::add_and_play()`), so the saved queue that is restored at start cannot move it. A
+  second double-click still starts a second Hearth beside the first
+  ([Hearth's command line](docs/hearth/index.md#command-line)).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
@@ -3296,6 +3350,14 @@ The sections below contain the complete change list and fixes.
   for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
   sink, applies at the group's next play, and is kept for the run. The group editor says which a
   member is sent.
+- **The Sendspin player plays a stream's bed when it declares more objects than the board says it
+  places** (`BurstPlayerConfig::max_objects`, `iclforge/object_limit.hpp`,
+  `Eac3Decoder::set_skip_object_reconstruction()`): the decision is made from the first unit's
+  header (the complexity index less the LFE), before the object reconstruction allocates its 147 KB,
+  with the decoder the player already holds and no other made; a listener who chose objects
+  "always" is not overruled. On an ESP32-S3 (release image, lane on, null sink, 7.1.4, over
+  Sendspin) streams of 3 to 11 declared objects that took 1.07 to 2.27 of real time with 63 to
+  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun.
 
 **Library internals**
 
@@ -3561,6 +3623,16 @@ The sections below contain the complete change list and fixes.
   twice the cap, and a valid 4 KB text of 2,000 one-digit values, which needed one 32 KB block,
   is refused at its 513th token with no block taken. A message over the cap is dropped as a
   malformed one is.
+- **A lyrics document left its receive buffers taken from a board's heap.** A session received
+  each frame into a buffer that kept the capacity of the largest message it had held, and a board's
+  WebSocket layer kept another for the ciphertext. An 8,000-byte lyrics document (one string token,
+  inside the cap) left 12.7 KB of an ESP32-S3's internal heap taken for the rest of the connection
+  (30.0 KB free during play down to 17.3 KB, Wi-Fi up). A JSON document above
+  `kRetainedMessageBytes` (4 KB) now has its buffers released: the channel's frame buffer and the
+  reassembler's with the next message, and the board's frame buffer when the session reports the
+  document (`SessionOutput::large_document`). A stream's chunks are binary and keep their buffer,
+  so an E-AC-3 chunk of up to 25 KB is still received into one allocation, as are the small
+  control messages between them.
 
 **Object signing**
 
