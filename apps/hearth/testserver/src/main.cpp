@@ -31,10 +31,12 @@
 #include <utility>
 #include <vector>
 
-#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
-#include "iclforge/sendspin/iclforge_player.hpp"
+#include "iclforge/ac4/core/toc.hpp"
+#include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/sendspin/handshake.hpp"
+#include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/json.hpp"
 #include "iclforge/sendspin/messages.hpp"
 #include "iclforge/sendspin/pairing_messages.hpp"
@@ -61,7 +63,7 @@ constexpr std::string_view kUsage =
     R"(usage: hearth-testserver [options] --play FILE --player URL [player options]...
 
 A Sendspin server for Hearth's tests. It dials each player, pairs it, sends it
-settings, plays one AC-3 or E-AC-3 programme to all of them as a group over
+settings, plays one AC-3, E-AC-3 or AC-4 programme to all of them as a group over
 _iclforge_player@v1, and writes a report of what each said about it.
 
   --player URL         a player to dial, such as ws://192.168.1.40:8928/sendspin;
@@ -86,7 +88,9 @@ _iclforge_player@v1, and writes a report of what each said about it.
     --opus             with --pcm, in Opus (20 ms packets) where the player
                        lists it, a twelfth of PCM's bytes and lossy
 
-  --play FILE          the programme, an .ac3 or .ec3 file
+  --play FILE          the programme, an .ac3, .ec3 or .ac4 file (AC-4 is sent as one
+                       sync frame a burst, at 48 kHz, and a player that lists no `ac4`
+                       refuses it)
   --tone               instead of a file, two tones at 48 kHz stereo for
                        --seconds (default 10); PCM only, so every player
                        played takes --pcm
@@ -115,8 +119,6 @@ constexpr int kExitSetup = 2;
 constexpr int kExitPlay = 3;
 
 constexpr std::uint32_t kSampleRate = 48000;
-// The samples in every burst (planning/hearth-sendspin-extension.md, Burst chunks).
-constexpr std::int64_t kSamplesPerBurst = 1536;
 // How long after its last burst has played a programme ends: past the players' output queues.
 constexpr std::int64_t kEndMarginUs = 500'000;
 
@@ -326,6 +328,115 @@ class BurstSource {
     int pass_ = 0;
     std::size_t unit_ = 0;
     iclforge::containers::iec61937::Eac3BurstPacker packer_;
+    std::vector<std::uint8_t> payload_;
+};
+
+// An AC-4 programme (planning/ac4.md, I6): its sync frames, each one burst, on the timeline of the
+// data-burst periods IEC 61937-14 writes them with. Packed once, so that every pass has the same
+// bursts and the next starts where the last ended.
+struct Ac4Programme {
+    struct Frame {
+        // The sync frame whole, the CRC word included: a view into the file's bytes.
+        std::span<const std::byte> sync_frame;
+        std::uint16_t pc = 0;
+        std::uint16_t pd = 0;
+        // HBR16's payload runs on to a whole 8-byte unit, with zeros.
+        std::size_t payload_bytes = 0;
+        std::uint64_t period = 0;
+    };
+    std::vector<Frame> frames;
+    std::uint64_t pass_samples = 0;
+    std::uint32_t sample_rate = 0;
+};
+
+// Whether `bytes` opens with an AC-4 sync word, 0xAC40 or 0xAC41.
+[[nodiscard]] bool starts_ac4(std::span<const std::byte> bytes) {
+    return bytes.size() >= 2 && bytes[0] == std::byte{0xAC} &&
+           (bytes[1] == std::byte{0x40} || bytes[1] == std::byte{0x41});
+}
+
+[[nodiscard]] std::optional<Ac4Programme> read_ac4_programme(std::span<const std::byte> bytes,
+                                                             std::string& error) {
+    namespace iec = iclforge::containers::iec61937;
+    const iclforge::ac4::ScanResult scanned = iclforge::ac4::scan(bytes);
+    if (scanned.frames.empty() || scanned.frames.front().offset != 0) {
+        error = "it holds no AC-4 sync frame at its start";
+        return std::nullopt;
+    }
+    const auto first = iclforge::ac4::parse_raw_frame(scanned.frames.front().raw_ac4_frame);
+    if (!first) {
+        error = "its first AC-4 frame's table of contents does not read";
+        return std::nullopt;
+    }
+    Ac4Programme out;
+    out.sample_rate = static_cast<std::uint32_t>(first->toc.sample_rate_hz);
+    std::vector<std::span<const std::byte>> frames;
+    std::size_t largest = 0;
+    for (const iclforge::ac4::SyncFrame& frame : scanned.frames) {
+        const auto raw_end = static_cast<std::size_t>(frame.raw_ac4_frame.data() - bytes.data()) +
+                             frame.raw_ac4_frame.size();
+        const std::size_t end = raw_end + (frame.sync_word == 0xAC41 ? 2U : 0U);
+        frames.push_back(bytes.subspan(frame.offset, end - frame.offset));
+        largest = std::max(largest, frames.back().size());
+    }
+    const std::optional<iec::BurstDataType> type = iec::ac4_burst_type_for(
+        largest, first->toc.sample_rate_hz == 44100 ? 0 : 1, first->toc.frame_rate_index);
+    if (!type) {
+        error = "its largest AC-4 frame fits no burst type";
+        return std::nullopt;
+    }
+    iec::Ac4BurstPacker packer{*type};
+    for (const std::span<const std::byte> sync_frame : frames) {
+        if (!packer.push(sync_frame)) {
+            error = "an AC-4 frame could not be packed";
+            return std::nullopt;
+        }
+        const iec::Ac4BurstPacker::Packed& last = *packer.last();
+        out.frames.push_back({.sync_frame = sync_frame,
+                              .pc = last.pc,
+                              .pd = last.pd,
+                              .payload_bytes = last.payload_bytes,
+                              .period = last.period});
+        out.pass_samples += last.period;
+    }
+    return out;
+}
+
+// The programme's bursts: `passes` times through the frames on one timeline.
+class Ac4BurstSource {
+   public:
+    Ac4BurstSource(const Ac4Programme& programme, int passes)
+        : programme_(&programme), passes_(passes) {}
+
+    [[nodiscard]] std::optional<ss::Group::Burst> next(std::string&) {
+        if (pass_ >= passes_) {
+            return std::nullopt;
+        }
+        if (unit_ >= programme_->frames.size()) {
+            unit_ = 0;
+            if (++pass_ >= passes_) {
+                return std::nullopt;
+            }
+        }
+        const Ac4Programme::Frame& frame = programme_->frames[unit_++];
+        payload_.assign(frame.payload_bytes, 0);
+        std::transform(frame.sync_frame.begin(), frame.sync_frame.end(), payload_.begin(),
+                       [](std::byte b) { return std::to_integer<std::uint8_t>(b); });
+        const ss::Group::Burst burst{.pc = frame.pc,
+                                     .pd = frame.pd,
+                                     .payload = payload_,
+                                     .frame = static_cast<std::int64_t>(next_frame_),
+                                     .frames = static_cast<std::int64_t>(frame.period)};
+        next_frame_ += frame.period;
+        return burst;
+    }
+
+   private:
+    const Ac4Programme* programme_;
+    int passes_;
+    int pass_ = 0;
+    std::size_t unit_ = 0;
+    std::uint64_t next_frame_ = 0;
     std::vector<std::uint8_t> payload_;
 };
 
@@ -971,6 +1082,7 @@ int main(int argc, char** argv) {
     // The file's bytes, for as long as `stream` lives: its access units are views into them.
     std::optional<std::vector<std::byte>> bytes;
     std::optional<iclforge::ac3::io::ScannedStream> stream;
+    std::optional<Ac4Programme> ac4_programme;
     std::uint64_t pass_samples = 0;
     int passes = 1;
     if (tone) {
@@ -984,26 +1096,43 @@ int main(int argc, char** argv) {
             std::cerr << "cannot read " << programme.string() << "\n";
             return kExitUsage;
         }
-        std::expected<iclforge::ac3::io::ScannedStream, iclforge::ac3::io::ScanError> scanned =
-            iclforge::ac3::io::scan(*bytes);
-        if (!scanned || scanned->access_units.empty()) {
-            std::cerr << programme.string() << " is not an AC-3 or E-AC-3 stream\n";
-            return kExitUsage;
+        if (starts_ac4(*bytes)) {
+            std::string why;
+            ac4_programme = read_ac4_programme(*bytes, why);
+            if (!ac4_programme) {
+                std::cerr << programme.string() << ": " << why << "\n";
+                return kExitUsage;
+            }
+            if (ac4_programme->sample_rate != kSampleRate || ac4_programme->pass_samples == 0) {
+                std::cerr << programme.string()
+                          << " is not at 48 kHz, which is all a Hearth sink plays\n";
+                return kExitUsage;
+            }
+            pass_samples = ac4_programme->pass_samples;
+            info = {.file = programme.generic_string(), .codec = "AC-4", .channels = 0};
+        } else {
+            std::expected<iclforge::ac3::io::ScannedStream, iclforge::ac3::io::ScanError> scanned =
+                iclforge::ac3::io::scan(*bytes);
+            if (!scanned || scanned->access_units.empty()) {
+                std::cerr << programme.string() << " is not an AC-3, E-AC-3 or AC-4 stream\n";
+                return kExitUsage;
+            }
+            if (scanned->sample_rate != iclforge::ac3::SampleRate::k48000) {
+                std::cerr << programme.string()
+                          << " is not at 48 kHz, which is all a Hearth sink plays\n";
+                return kExitUsage;
+            }
+            stream = std::move(*scanned);
+            pass_samples = iclforge::ac3::io::stream_duration_samples(*stream);
+            info = {
+                .file = programme.generic_string(),
+                .codec = stream->kind == iclforge::ac3::io::StreamKind::kAc3 ? "AC-3" : "E-AC-3",
+                .channels = stream->channels};
         }
-        if (scanned->sample_rate != iclforge::ac3::SampleRate::k48000) {
-            std::cerr << programme.string()
-                      << " is not at 48 kHz, which is all a Hearth sink plays\n";
-            return kExitUsage;
-        }
-        stream = std::move(*scanned);
-        pass_samples = iclforge::ac3::io::stream_duration_samples(*stream);
         passes = seconds ? static_cast<int>(((static_cast<std::uint64_t>(*seconds) * kSampleRate) +
                                              pass_samples - 1) /
                                             pass_samples)
                          : 1;
-        info = {.file = programme.generic_string(),
-                .codec = stream->kind == iclforge::ac3::io::StreamKind::kAc3 ? "AC-3" : "E-AC-3",
-                .channels = stream->channels};
     }
 
     auto store = iclforge::hearth::testserver::FileServerStore::open(state_directory);
@@ -1124,10 +1253,11 @@ int main(int argc, char** argv) {
     }
     // The tone is PCM at --tone-bits; a member is sent the first format it lists, rescaled.
     const std::int32_t kToneBitDepth = tone_bits;
-    const bool from_file = stream.has_value();
-    const ac::DataType data_type = from_file && stream->kind == iclforge::ac3::io::StreamKind::kAc3
-                                       ? ac::DataType::kAc3
-                                       : ac::DataType::kEac3;
+    const bool from_file = stream.has_value() || ac4_programme.has_value();
+    const ac::DataType data_type =
+        ac4_programme.has_value()                                          ? ac::DataType::kAc4
+        : from_file && stream->kind == iclforge::ac3::io::StreamKind::kAc3 ? ac::DataType::kAc3
+                                                                           : ac::DataType::kEac3;
     ss::Group::Programme group_programme{
         .pcm = std::nullopt, .bursts = std::nullopt, .buffered = true};
     if (tone) {
@@ -1184,6 +1314,10 @@ int main(int argc, char** argv) {
     std::optional<BurstSource> source;
     if (stream) {
         source.emplace(*stream, passes);
+    }
+    std::optional<Ac4BurstSource> ac4_source;
+    if (ac4_programme) {
+        ac4_source.emplace(*ac4_programme, passes);
     }
     std::uint64_t sent = 0;
     // The programme frame after the last burst sent.
@@ -1252,14 +1386,14 @@ int main(int argc, char** argv) {
             }
         } else {
             if (!burst) {
-                burst = source->next(error);
+                burst = ac4_source ? ac4_source->next(error) : source->next(error);
                 if (!burst) {
                     break;
                 }
             }
             if (group->push_burst(*burst)) {
                 ++sent;
-                end_frame = burst->frame + kSamplesPerBurst;
+                end_frame = burst->frame + burst->frames;
                 burst.reset();
             } else {
                 std::this_thread::sleep_for(5ms);
