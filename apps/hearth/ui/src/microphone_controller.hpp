@@ -124,6 +124,9 @@ class MicrophoneController : public QObject {
     [[nodiscard]] int inputDelayMs() const { return input_delay_ms_; }
     [[nodiscard]] int offsetMs() const { return offset_ms_; }
     [[nodiscard]] static int maxAlignmentMs() { return kMaxAlignmentMs; }
+    // A test seam: a take's file may hold this many bytes, and the take then ends by itself as
+    // it does when a disk fills. 0 is none; nothing but the tests sets it.
+    void limit_take_bytes_for_test(std::uint64_t bytes);
     void setInputDelayMs(int ms);
     void setOffsetMs(int ms);
     [[nodiscard]] double level() const { return level_; }
