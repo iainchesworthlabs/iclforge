@@ -138,7 +138,7 @@ The sections below contain the complete change list and fixes.
   platform. A voice through one Windows 11 workstation's own shared-mode path was measured at about
   130 ms, so a monitor is offered with its measured latency and not promised. The plan's build table
   says what is built: the pitch library, capture times, the melody reader, the microphone card, takes,
-  the pitch ribbon with per-line marks and the browser demo's microphone card (M1 to M7), and what is not
+  the pitch ribbon with per-line marks and the browser demo's microphone card (M1 to M7, all merged), and what is not
   (the bleed check, the board).
 
 **An Android preset for the libraries Hearth for Android links**
