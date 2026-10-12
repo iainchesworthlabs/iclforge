@@ -343,6 +343,28 @@ TestCase {
         }, 5000, "the playing row shows no \"playing\" pill");
     }
 
+    // A launch with a file (main.cpp's openAndPlay, which a double-clicked .ac3 reaches as
+    // `hearth.exe "%1"`): the file goes behind the queue the window had, and it - not the
+    // item the queue was waiting at - is the one that starts.
+    function test_aFileHandedAtLaunchGoesBehindTheQueueAndPlays() {
+        HearthController.addFiles([shortAc3]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000,
+                  "the waiting item never joined the queue");
+        compare(HearthController.currentIndex, 0);
+        compare(HearthController.state, "stopped");
+        const heardBefore = TestServices.device().framesHeard;
+
+        HearthController.openAndPlay([longEac3]);
+        tryVerify(function() { return HearthController.queue.length === 2; }, 10000,
+                  "the launched file never joined the queue");
+        compare(HearthController.queue[0].path, shortAc3);
+        compare(HearthController.queue[1].path, longEac3);
+        tryCompare(HearthController, "currentIndex", 1, 10000);
+        tryCompare(HearthController, "state", "playing", 10000);
+        tryVerify(function() { return TestServices.device().framesHeard > heardBefore + 24000; }, 10000,
+                  "half a second of the launched file never reached the device");
+    }
+
     // The end of one item runs straight into the next with the output left
     // open (both are 48 kHz; gapless is on by default) - played at eight
     // times real time so the 2.5 s item ends without waiting it out.
