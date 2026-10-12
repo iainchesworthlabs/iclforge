@@ -28,6 +28,7 @@ class LyricControlsTest : RenderTestBase() {
     private class Walk(val view: LyricView, val clock: LongArray) {
         val delays = ArrayList<Int>()
         val steps = ArrayList<Int>()
+        val vocals = ArrayList<Int>()
 
         fun press(code: Int): Boolean = view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
         fun at(ms: Long) {
@@ -45,6 +46,7 @@ class LyricControlsTest : RenderTestBase() {
                 val walking = Walk(view, clock)
                 view.onDelayChanged = { walking.delays += it }
                 view.onTextStepChanged = { walking.steps += it }
+                view.onVocalsRequested = { walking.vocals += it }
                 view.show(frame, nowMs = clock[0])
                 block(walking)
             } catch (t: Throwable) {
@@ -96,6 +98,63 @@ class LyricControlsTest : RenderTestBase() {
         assertFalse(w.view.sheetVisible)
         w.press(KeyEvent.KEYCODE_DPAD_CENTER)
         assertTrue(w.view.sheetVisible)
+    }
+
+    @Test
+    fun theVocalsRowIsOnTheWalkOnlyWhileAStreamIsOpenAndAsksTheServer() = walk { w ->
+        val sheet = w.view.sheet
+        // No stream: no vocals row, and down from the delay lands on the size as it always did.
+        w.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        w.press(KeyEvent.KEYCODE_DPAD_DOWN)
+        assertEquals(ControlsSheet.Control.SIZE_MEDIUM, sheet.focused)
+        w.press(KeyEvent.KEYCODE_BACK)
+
+        // A stream is open: the row is between the delay and the size.
+        w.view.vocalsEnabled = true
+        w.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertEquals(ControlsSheet.Control.DELAY_PLUS, sheet.focused)
+        w.press(KeyEvent.KEYCODE_DPAD_DOWN)
+        assertEquals(ControlsSheet.Control.VOCALS_BOTH, sheet.focused)
+        // Right walks both, V1, V2, none, and the centre asks for the one it is on.
+        w.press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        assertEquals(ControlsSheet.Control.VOCALS_V1, sheet.focused)
+        w.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        w.press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        assertEquals(ControlsSheet.Control.VOCALS_V2, sheet.focused)
+        w.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        w.press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        assertEquals(ControlsSheet.Control.VOCALS_NONE, sheet.focused)
+        w.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        w.press(KeyEvent.KEYCODE_DPAD_LEFT)
+        w.press(KeyEvent.KEYCODE_DPAD_LEFT)
+        w.press(KeyEvent.KEYCODE_DPAD_LEFT)
+        assertEquals(ControlsSheet.Control.VOCALS_BOTH, sheet.focused)
+        w.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        // 1 vocal 1, 2 vocal 2, 0 none, 3 both: what the server was asked, in order.
+        assertEquals(listOf(1, 2, 0, 3), w.vocals)
+        assertEquals(3, w.view.askedVocals)
+        // Nothing here changed the delay or the size.
+        assertTrue(w.delays.isEmpty())
+        assertTrue(w.steps.isEmpty())
+
+        // Down is the size row at the current size, and up from it is the vocals row again.
+        w.press(KeyEvent.KEYCODE_DPAD_DOWN)
+        assertEquals(ControlsSheet.Control.SIZE_MEDIUM, sheet.focused)
+        w.press(KeyEvent.KEYCODE_DPAD_UP)
+        assertEquals(ControlsSheet.Control.VOCALS_BOTH, sheet.focused)
+        w.press(KeyEvent.KEYCODE_DPAD_UP)
+        assertEquals(ControlsSheet.Control.DELAY_PLUS, sheet.focused)
+
+        // The stream ends with the focus on the vocals row: the next key lands on the size row.
+        w.press(KeyEvent.KEYCODE_DPAD_DOWN)
+        assertEquals(ControlsSheet.Control.VOCALS_BOTH, sheet.focused)
+        w.view.vocalsEnabled = false
+        w.press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        assertTrue(sheet.focused == ControlsSheet.Control.SIZE_MEDIUM || sheet.focused == ControlsSheet.Control.SIZE_LARGE)
+        // And a focus left on a vocals control with no row asks for nothing when the centre is pressed.
+        sheet.focus(ControlsSheet.Control.VOCALS_V1, w.clock[0])
+        w.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertEquals(listOf(1, 2, 0, 3), w.vocals)
     }
 
     @Test
@@ -185,5 +244,57 @@ class LyricControlsTest : RenderTestBase() {
         val inside = Rect(centre.left.toInt() + 4, centre.top.toInt() + 4, centre.right.toInt() - 4, centre.bottom.toInt() - 4)
         // The pressed size is filled with the accent: a solid block.
         assertTrue("L is not filled", count(after, inside, Tokens.ACCENT, tolerance = 3) > inside.width() * inside.height() / 3)
+    }
+
+    @Test
+    fun theVocalsRowIsDrawnWithWhatWasAskedFilledAndTheNoteWhenThePassThroughSaysItIsAsCoded() {
+        lateinit var bitmap: Bitmap
+        lateinit var without: Bitmap
+        var v1: android.graphics.RectF? = null
+        var v2: android.graphics.RectF? = null
+        var none: android.graphics.RectF? = null
+        var asked: Int? = null
+        instrumentation.runOnMainSync {
+            val clock = longArrayOf(SystemClock.uptimeMillis())
+            val view = LyricView(target)
+            view.clock = { clock[0] }
+            view.onVocalsRequested = { asked = it }
+            view.route = "passthrough"
+            view.show(lineFrame(), nowMs = clock[0] - 5_000L)
+            view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER))
+            without = drawn(view, "s9-sheet-no-vocals-row")
+            view.vocalsEnabled = true
+            // A tap on V1 asks for it, as a press on the remote does.
+            drawn(view, "s9-sheet-vocals-before")
+            val bounds = view.controlBounds(ControlsSheet.Control.VOCALS_V1)!!
+            v1 = bounds
+            v2 = view.controlBounds(ControlsSheet.Control.VOCALS_V2)
+            none = view.controlBounds(ControlsSheet.Control.VOCALS_NONE)
+            view.dispatchTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, bounds.centerX(), bounds.centerY(), 0))
+            view.dispatchTouchEvent(MotionEvent.obtain(0, 10, MotionEvent.ACTION_UP, bounds.centerX(), bounds.centerY(), 0))
+            bitmap = drawn(view, "s9-sheet-vocals-asked-v1")
+        }
+        assertEquals(1, asked)
+        val chosen = v1!!
+        val other = v2!!
+        fun inside(r: android.graphics.RectF) =
+            Rect(r.left.toInt() + 4, r.top.toInt() + 4, r.right.toInt() - 4, r.bottom.toInt() - 4)
+        // What was asked is filled with the accent, and the others are not.
+        assertTrue(
+            "V1 is not filled",
+            count(bitmap, inside(chosen), Tokens.ACCENT, tolerance = 3) > inside(chosen).width() * inside(chosen).height() / 3,
+        )
+        assertEquals(0, count(bitmap, inside(other), Tokens.ACCENT, tolerance = 3))
+        // The row is a row more: the sheet with it is taller than the one without, and the note is
+        // muted text to the right of the four buttons.
+        val u = height / 600f
+        val sheetRegion = Rect(0, (height * 0.4f).toInt(), width, (height * (1 - Tokens.OVERSCAN) - Tokens.FOOTER_U * u).toInt())
+        assertTrue(
+            "the sheet did not grow a row",
+            count(bitmap, sheetRegion, Tokens.SURFACE, tolerance = 2) > count(without, sheetRegion, Tokens.SURFACE, tolerance = 2),
+        )
+        val last = none!!
+        val note = Rect((last.right + 24 * u).toInt(), last.top.toInt(), (width * (1 - Tokens.OVERSCAN)).toInt(), last.bottom.toInt())
+        assertTrue("no note beside the vocals", count(bitmap, note, Tokens.MUTED) > 100)
     }
 }

@@ -23,6 +23,13 @@
     <!-- The footer's route chip (D6): how the stream leaves this sink. -->
     <string name="route_passthrough">Passing through</string>
     <string name="route_pcm">Decoded here</string>
+    <!-- The controls sheet's vocals row (D8): asked of the server, which decides. -->
+    <string name="sheet_vocals">Vocals</string>
+    <string name="vocals_both">Both</string>
+    <string name="vocals_v1">V1</string>
+    <string name="vocals_v2">V2</string>
+    <string name="vocals_none">None</string>
+    <string name="sheet_vocals_note">Goes to the server.\nTV plays as coded.</string>
     <!-- The starting, idle and attention screens (S0, S1, S10). -->
     <string name="starting_network">Waiting for the network</string>
     <string name="starting_network_hint">Check that the box is connected to your network.</string>

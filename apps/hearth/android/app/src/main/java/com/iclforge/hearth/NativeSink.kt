@@ -76,6 +76,14 @@ object NativeSink {
     external fun lyricFrame(delayMs: Int): ByteArray
 
     /**
+     * Asks the server to play the vocals the remote chose: 0 none, 1 vocal 1, 2 vocal 2, 3 both (the
+     * request path of planning/hearth-android.md, D8). Advice, and it has no answer: this sink hands the
+     * receiver the coded bits, so it plays every vocal whatever the server decides, and what the server
+     * does shows in what its decoding members play.
+     */
+    external fun requestVocals(vocals: Int)
+
+    /**
      * What the idle, starting and attention screens say of the sink: one JSON object as UTF-8 bytes
      * (`connections`, each with `address`, `server_name`, `activity` and `streaming`; `pairing_code`;
      * `paired_servers`). Read with [SinkStatus.parse].

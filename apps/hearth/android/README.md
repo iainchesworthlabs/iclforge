@@ -115,8 +115,22 @@ four directions move a focus ring (the accent, 2 u wide and 2 u out) through the
 one it is on, Back closes it, and it hides itself after eight seconds without a key; a file with no times
 has no delay row. The delay (kept, -1,000 to +1,000 ms in 50 ms steps, drawn in the footer when it is not
 0) and the text size (kept) are what a sink owns of its screen; the vocals and the reproduction are the
-server's, and a request path for them is the plan's D8. With the sheet down, left and right still nudge
-the delay by 50 ms and up and down scroll a file with no times.
+server's, which the sheet can only **ask** for (the vocals row below). With the sheet down, left and right
+still nudge the delay by 50 ms and up and down scroll a file with no times.
+
+**The vocals row (D8).** While a stream is open the sheet has a row between the delay and the size: Both,
+V1, V2 and None. The centre on one asks the server for it (`NativeSink.requestVocals`, a `client/command`
+request, [the spec's Requests](../../../planning/hearth-sendspin-extension.md#requests)), as the capable
+reproduction with those vocals, since the choice of vocals is read by that reproduction alone. It is
+advice with no answer: the row fills what was asked and not what is playing, and **this sink hands the
+receiver the coded bits, so it plays every vocal whatever the server decides** (the spec's SS7). What a
+press changes is what the server's own screens show and what the group's decoding members play, and it
+changes nothing this TV hears until the app decodes for itself (phase 4); the row says so beside the
+buttons while the route is passing through. The server applies it only when the sink is in the group it
+is playing to. It was held by the focus walk on the Shield; a press reaching a real server's Karaoke page
+has not been run.
+
+![The controls sheet with the vocals row: Both, V1 filled as asked, V2 and None, and beside them the note that this TV plays as coded](../../../docs/hearth/screenshots/android-lyric-sheet-vocals.png)
 
 ![The controls sheet: the delay's minus and plus, the three text sizes with the large one filled and the focus ring on it, the line being sung above](../../../docs/hearth/screenshots/android-lyric-sheet.png)
 

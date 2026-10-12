@@ -29,6 +29,16 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth for Android's remote asks the server for the vocals**
+
+- **The controls sheet has a Vocals row (Both, V1, V2, None) while a stream is open.** The centre on
+  one asks the server for it as the capable reproduction with those vocals (the request path of the
+  entries below), and the row fills what was asked. It is advice with no answer, and this app hands the
+  receiver the coded bits, so the TV itself plays every vocal whatever the server decides: the row says so
+  beside the buttons. The sink lists `karaoke` and `karaoke_vocals` as what it may ask for. Held by the
+  focus walk on the Shield (the row between the delay and the size, what each press asks for, the
+  focus when the stream ends) and a picture.
+
 **A sink can ask the server for the singer's karaoke choice**
 
 - **`client/command` carries an `_iclforge_player` request, and the support object's `requests`

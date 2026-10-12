@@ -57,6 +57,11 @@ class NativeSink {
     // What the idle, starting and attention screens say of the sink, as a line of JSON, UTF-8: who is
     // connected and for what, the code a server asked to pair by, and how many servers are paired.
     [[nodiscard]] std::string status_json() const;
+    // Asks the server to play the vocals the remote chose (D8): 0 none, 1 vocal 1, 2 vocal 2, anything
+    // else both. It is sent as the capable reproduction with those vocals, since the choice of vocals
+    // is read by that one alone. Advice: the server decides, and a sink that passes the bits through
+    // plays what is coded whatever it says.
+    void request_vocals(std::int32_t vocals);
 
    private:
     class Impl;

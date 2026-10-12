@@ -160,6 +160,12 @@ JNIEXPORT jbyteArray JNICALL Java_com_iclforge_hearth_NativeSink_lyricFrame(JNIE
     return out;
 }
 
+// The remote chose which vocals play (D8): 0 none, 1 vocal 1, 2 vocal 2, 3 both. Asked of the server.
+JNIEXPORT void JNICALL Java_com_iclforge_hearth_NativeSink_requestVocals(JNIEnv* /*env*/, jobject /*self*/,
+                                                                         jint vocals) {
+    sink().request_vocals(static_cast<std::int32_t>(vocals));
+}
+
 // The sink's status as UTF-8 bytes of one JSON object (a server's name may need four-byte sequences).
 JNIEXPORT jbyteArray JNICALL Java_com_iclforge_hearth_NativeSink_statusJson(JNIEnv* env, jobject /*self*/) {
     const std::string json = sink().status_json();

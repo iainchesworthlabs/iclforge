@@ -217,6 +217,8 @@ std::string NativeSink::start(const std::string& state_directory, const std::str
     // What the server says is playing (metadata@v1), so an item with no lyrics still has a title on
     // the screen (D7). The sink keeps it per connection and Sink::lyric_frame() reads it.
     options.other_roles = {"metadata@v1"};
+    // What the remote may ask the server for (D8): the reproduction and which vocals.
+    options.requests = {"karaoke", "karaoke_vocals"};
 
     std::expected<std::unique_ptr<sink::Sink>, std::string> started =
         sink::Sink::start(std::move(options), impl_->outputs, impl_->log);
@@ -284,6 +286,20 @@ SinkTotals NativeSink::totals() const {
 
 std::vector<std::string> NativeSink::drain_log() {
     return impl_->log.drain();
+}
+
+void NativeSink::request_vocals(std::int32_t vocals) {
+    namespace player = sendspin::player;
+    player::Request request;
+    request.decoder.karaoke = player::Karaoke::kCapable;
+    request.decoder.karaoke_vocals = vocals == 0   ? player::KaraokeVocals::kNone
+                                     : vocals == 1 ? player::KaraokeVocals::kV1
+                                     : vocals == 2 ? player::KaraokeVocals::kV2
+                                                   : player::KaraokeVocals::kBoth;
+    const std::lock_guard lock(impl_->mutex);
+    if (impl_->sink) {
+        impl_->sink->send_request(request);
+    }
 }
 
 std::string NativeSink::status_json() const {

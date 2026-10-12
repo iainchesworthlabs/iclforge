@@ -115,6 +115,31 @@ class LyricView(context: Context) : View(context) {
     /** Called when the singer changes the text size from the sheet, with the step (0, 1 or 2). */
     var onTextStepChanged: ((Int) -> Unit)? = null
 
+    /**
+     * Whether the sheet has the vocals row: the sink may ask the server for them (D8) and a stream is
+     * open. The caller sets it from what the sink says.
+     */
+    var vocalsEnabled: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
+
+    /**
+     * What the remote last asked the server for: 0 none, 1 vocal 1, 2 vocal 2, 3 both, or null before
+     * it has. It is what was asked and not what is playing: the server's answer does not come back to a
+     * sink that passes the stream through, so the row shows the request and says so.
+     */
+    var askedVocals: Int? = null
+        private set
+
+    /** Called when the singer asks for the vocals from the sheet, with 0 none, 1 vocal 1, 2 vocal 2 or 3 both. */
+    var onVocalsRequested: ((Int) -> Unit)? = null
+
+    private val hasVocalsRow: Boolean get() = vocalsEnabled
+
     /** Whether the delay row is on the sheet: a file with no times has no delay to set. */
     private val hasDelayRow: Boolean get() = frame.mode != LyricFrame.Mode.PLAIN
 
@@ -129,7 +154,7 @@ class LyricView(context: Context) : View(context) {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val now = clock()
         if (sheet.visible(now)) {
-            when (val outcome = sheet.onKey(keyCode, now, hasDelayRow, textStep)) {
+            when (val outcome = sheet.onKey(keyCode, now, hasDelayRow, textStep, hasVocalsRow)) {
                 is ControlsSheet.Outcome.Pressed -> press(outcome.control)
                 ControlsSheet.Outcome.Ignored -> return super.onKeyDown(keyCode, event)
                 else -> Unit
@@ -166,10 +191,22 @@ class LyricView(context: Context) : View(context) {
         when (control) {
             ControlsSheet.Control.DELAY_MINUS -> nudge(-Tokens.DELAY_STEP_MS)
             ControlsSheet.Control.DELAY_PLUS -> nudge(Tokens.DELAY_STEP_MS)
+            ControlsSheet.Control.VOCALS_NONE -> askVocals(0)
+            ControlsSheet.Control.VOCALS_V1 -> askVocals(1)
+            ControlsSheet.Control.VOCALS_V2 -> askVocals(2)
+            ControlsSheet.Control.VOCALS_BOTH -> askVocals(3)
             ControlsSheet.Control.SIZE_SMALL -> setStep(0)
             ControlsSheet.Control.SIZE_MEDIUM -> setStep(1)
             ControlsSheet.Control.SIZE_LARGE -> setStep(2)
         }
+    }
+
+    private fun askVocals(vocals: Int) {
+        if (!hasVocalsRow) {
+            return
+        }
+        askedVocals = vocals
+        onVocalsRequested?.invoke(vocals)
     }
 
     private fun setStep(step: Int) {
@@ -337,9 +374,9 @@ class LyricView(context: Context) : View(context) {
         }
     }
 
-    /** The sheet's height: a row of targets for the delay (when there is one) and one for the size. */
+    /** The sheet's height: a row of targets for the delay and the vocals (when there are), and the size. */
     private fun sheetHeight(u: Float): Float {
-        val rows = if (hasDelayRow) 2 else 1
+        val rows = 1 + (if (hasDelayRow) 1 else 0) + (if (hasVocalsRow) 1 else 0)
         return rows * Tokens.MIN_TARGET_U * u + (rows + 1) * Tokens.ROW_GAP_U * u
     }
 
@@ -399,6 +436,38 @@ class LyricView(context: Context) : View(context) {
             canvas.translate(minus.right, y + (target - text.height) / 2f)
             text.draw(canvas)
             canvas.restore()
+            y += target + gap
+        }
+        if (hasVocalsRow) {
+            label(context.getString(R.string.sheet_vocals), y)
+            val width = 90f * u
+            val choices = listOf(
+                ControlsSheet.Control.VOCALS_BOTH to (3 to R.string.vocals_both),
+                ControlsSheet.Control.VOCALS_V1 to (1 to R.string.vocals_v1),
+                ControlsSheet.Control.VOCALS_V2 to (2 to R.string.vocals_v2),
+                ControlsSheet.Control.VOCALS_NONE to (0 to R.string.vocals_none),
+            )
+            var edge = x0
+            for ((index, entry) in choices.withIndex()) {
+                val x = x0 + index * (width + gap)
+                edge = x + width
+                button(entry.first, RectF(x, y, edge, y + target), context.getString(entry.second.second),
+                    askedVocals == entry.second.first)
+            }
+            // What the request can and cannot do here: the stream is handed on as it is coded.
+            if (route == "passthrough") {
+                val room = (right - edge - 24f * u).toInt()
+                if (room > 0) {
+                    // Two short lines: the one thing the row cannot say with a button is that this sink
+                    // plays the stream as it is coded.
+                    val note = layoutOf(context.getString(R.string.sheet_vocals_note), Tokens.SMALL_U, u, room, 400, 2)
+                    note.paint.color = Tokens.MUTED
+                    canvas.save()
+                    canvas.translate(edge + 24f * u, y + (target - note.height) / 2f)
+                    note.draw(canvas)
+                    canvas.restore()
+                }
+            }
             y += target + gap
         }
         label(context.getString(R.string.sheet_size), y)

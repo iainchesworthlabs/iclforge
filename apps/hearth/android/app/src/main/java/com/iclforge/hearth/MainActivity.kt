@@ -112,6 +112,8 @@ class MainActivity : Activity() {
         lyrics.textStep = prefs.getInt(KEY_TEXT_STEP, 1)
         lyrics.onDelayChanged = { prefs.edit().putInt(KEY_DELAY_MS, it).apply() }
         lyrics.onTextStepChanged = { prefs.edit().putInt(KEY_TEXT_STEP, it).apply() }
+        // The remote choosing the vocals asks the server (D8); what it does is the server's.
+        lyrics.onVocalsRequested = { if (NativeSink.available) NativeSink.requestVocals(it) }
         statusView.onQuit = {
             SinkService.quit(this)
             finish()
@@ -176,6 +178,8 @@ class MainActivity : Activity() {
         )
         // The footer's route chip: how the server's stream leaves this sink, while it plays one.
         lyrics.route = status.playingFor?.output
+        // The sheet offers the vocals while a stream is open: the sink may ask the server for them.
+        lyrics.vocalsEnabled = running && status.playingFor?.streaming == true
     }
 
     private companion object {

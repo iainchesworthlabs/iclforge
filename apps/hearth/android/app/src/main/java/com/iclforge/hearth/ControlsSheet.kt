@@ -11,7 +11,12 @@ import android.view.KeyEvent
  * This is the state and the keys; LyricView draws it. No clock of its own: the caller passes the time.
  */
 class ControlsSheet {
-    enum class Control { DELAY_MINUS, DELAY_PLUS, SIZE_SMALL, SIZE_MEDIUM, SIZE_LARGE }
+    enum class Control {
+        DELAY_MINUS, DELAY_PLUS,
+        /** The vocals row (D8), when the sink can ask the server for them: both, vocal 1, vocal 2, none. */
+        VOCALS_BOTH, VOCALS_V1, VOCALS_V2, VOCALS_NONE,
+        SIZE_SMALL, SIZE_MEDIUM, SIZE_LARGE,
+    }
 
     /** What a key did. */
     sealed interface Outcome {
@@ -64,6 +69,9 @@ class ControlsSheet {
         lastKeyAt = now
     }
 
+    private fun isVocals(control: Control) = control == Control.VOCALS_BOTH || control == Control.VOCALS_V1 ||
+        control == Control.VOCALS_V2 || control == Control.VOCALS_NONE
+
     private fun sizeControl(textStep: Int) = when (textStep) {
         0 -> Control.SIZE_SMALL
         2 -> Control.SIZE_LARGE
@@ -72,15 +80,21 @@ class ControlsSheet {
 
     /**
      * A key at [now]. [hasDelay] says whether the delay row is there (a file with no times has none),
-     * and [textStep] which size is current, for where the focus lands going down from the delay row.
+     * [hasVocals] whether the vocals row is (a stream is open and the sink may ask for them), and
+     * [textStep] which size is current, for where the focus lands going down to the size row.
      */
-    fun onKey(keyCode: Int, now: Long, hasDelay: Boolean, textStep: Int): Outcome {
+    fun onKey(keyCode: Int, now: Long, hasDelay: Boolean, textStep: Int, hasVocals: Boolean = false): Outcome {
         if (!visible(now)) {
             lastKeyAt = null
             return Outcome.Ignored
         }
         lastKeyAt = now
+        // The row went away while the focus was on it (the stream ended): land on the size row.
+        if (!hasVocals && isVocals(focused)) {
+            focused = sizeControl(textStep)
+        }
         val inDelayRow = focused == Control.DELAY_MINUS || focused == Control.DELAY_PLUS
+        val inVocalsRow = isVocals(focused)
         when (keyCode) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 hide()
@@ -90,21 +104,39 @@ class ControlsSheet {
                 return Outcome.Pressed(focused)
             KeyEvent.KEYCODE_DPAD_LEFT -> focused = when (focused) {
                 Control.DELAY_PLUS -> Control.DELAY_MINUS
+                Control.VOCALS_NONE -> Control.VOCALS_V2
+                Control.VOCALS_V2 -> Control.VOCALS_V1
+                Control.VOCALS_V1 -> Control.VOCALS_BOTH
                 Control.SIZE_LARGE -> Control.SIZE_MEDIUM
                 Control.SIZE_MEDIUM -> Control.SIZE_SMALL
                 else -> focused
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> focused = when (focused) {
                 Control.DELAY_MINUS -> Control.DELAY_PLUS
+                Control.VOCALS_BOTH -> Control.VOCALS_V1
+                Control.VOCALS_V1 -> Control.VOCALS_V2
+                Control.VOCALS_V2 -> Control.VOCALS_NONE
                 Control.SIZE_SMALL -> Control.SIZE_MEDIUM
                 Control.SIZE_MEDIUM -> Control.SIZE_LARGE
                 else -> focused
             }
+            // The rows run delay, vocals, size: down from the delay row lands on the vocals row when it
+            // is there, and from it on the current size.
             KeyEvent.KEYCODE_DPAD_DOWN -> if (inDelayRow) {
+                focused = if (hasVocals) Control.VOCALS_BOTH else sizeControl(textStep)
+            } else if (inVocalsRow) {
                 focused = sizeControl(textStep)
             }
-            KeyEvent.KEYCODE_DPAD_UP -> if (!inDelayRow && hasDelay) {
-                focused = Control.DELAY_PLUS
+            KeyEvent.KEYCODE_DPAD_UP -> if (inVocalsRow) {
+                if (hasDelay) {
+                    focused = Control.DELAY_PLUS
+                }
+            } else if (!inDelayRow) {
+                focused = when {
+                    hasVocals -> Control.VOCALS_BOTH
+                    hasDelay -> Control.DELAY_PLUS
+                    else -> focused
+                }
             }
             else -> return Outcome.Ignored
         }
