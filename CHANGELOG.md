@@ -29,6 +29,26 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth: a microphone and a pitch score on the Karaoke page**
+
+- **A singer can turn a microphone on and see how close their pitch is to the tune** (the
+  microphone, scoring and recording programme, M4). The Karaoke page gains a **Microphone** card: an
+  input to choose, "I am wearing headphones", a level meter, a **Microphone on** indicator, the part
+  the singer is being scored against (the melody guide M, or the vocal they have taken away), the
+  pitch they are singing and how many cents sharp or flat of the tune, a pitch score so far, and
+  two sliders for the microphone's delay and the singer's own timing. **It is off until it is turned
+  on**: a kept choice of input opens nothing, and it closes when the page is left, when the item
+  ends or changes, and when the device goes away or stops delivering (which it names). **Nothing is
+  recorded and nothing leaves the machine.** The score is shown only when the person has said they
+  wear headphones, because through open speakers the microphone hears the backing and the score
+  reads as nearly perfect for no singing.
+- **`MicrophoneSession` and `MicrophoneInput` in the engine** (Qt-free, so every CI leg tests
+  them with a scripted input): the input seam over `iclforge::audio::Capture` and `CaptureTimeline`,
+  the meter, a stall and a gone device, and a `Performance` against the reference once one has
+  been read. The reference is read on a worker thread and cancelled when the item changes.
+  Hearth's user guide has a section on it.
+
+**Hearth: what a singer's performance is scored against, and how**
 **Karaoke in E-AC-3: the documentation says what the decoder does**
 
 - **The user guide, Hearth's page and the plan stop saying "E-AC-3 has no karaoke mode, this is
@@ -198,6 +218,16 @@ The sections below contain the complete change list and fixes.
   also holds a deterministic synthetic singing voice with a known pitch, which is what its tests and
   the later microphone tests are made of (no recording is bundled). Standard library only, internal,
   and nothing links it yet.
+**Audio: when a packet was captured**
+
+- **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
+  programme, M2). `Capture::stamps()` is a second lock-free ring of `CaptureStamp`s (the packet's
+  first frame in the stream, and its time in nanoseconds on `std::chrono::steady_clock`'s clock);
+  `CaptureTimeline` fits a line through the last 64 and gives the time of any frame, the frame at a
+  time, and the device's measured rate; `Capture::start()` takes `CaptureOptions` with a requested
+  packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
+  `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
+  consumer must treat as "no time", and a caller that does not use any of it sees no change.
 **Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
 
 - **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
@@ -483,6 +513,25 @@ The sections below contain the complete change list and fixes.
   rest of what an AC-3 one needs), and decodes it for any other with the reproduction applied, so
   a group still plays one reproduction. No board lists it yet, so every board is sent PCM for
   such a stream (`planning/karaoke-eac3.md`, E4a, D6; `planning/hearth-sendspin-extension.md`).
+
+**Hearth: a singer can keep a take of their voice**
+
+- **"Record a take" keeps the singer's voice from the microphone, and only when pressed** (the
+  microphone, scoring and recording programme, M6). The Microphone card gains **Record a take** and
+  **Stop recording**, a **Recording** indicator with the elapsed time (a second sign beside
+  **Microphone on**: having the microphone on is not recording), the folder takes go to with
+  **Choose…**, and **Show in folder** and **Delete this take** for the last one. A take stops when the
+  microphone goes off, the page is left, the item ends, the device goes away or the disk fails, and
+  says why. Turning the microphone on never starts one.
+- **A take is the voice alone, lossless, with a description beside it.** One mono 24-bit FLAC at the
+  microphone's rate through the existing encoder, and a `.take.json` that says which item it was,
+  where in the item the first sample was sung (the heard position when the sound reached the
+  microphone, less the microphone's declared delay, plus the singer's timing), and that alignment, so
+  any editor can place it. The backing is never mixed in. Takes go to the documents folder under
+  "Hearth takes" unless the person chose another, never beside the song file, and the folder is not
+  made until the first take, and a take begun in the same second as another is numbered, not
+  written over it. `TakeRecorder` in the engine is Qt-free and is tested with no device.
+  Hearth's user guide has a section on it.
 
 **Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
 
