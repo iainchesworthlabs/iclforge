@@ -51,6 +51,9 @@ The sections below contain the complete change list and fixes.
   dropped the lock after about 0.5 s and the receiver took about 0.8 s to return once the bursts
   resumed; null bursts for 1, 3 or 6 s never dropped it; a cold lock took 1.0 to 1.4 s. The plan's
   decisions D1 to D14 are accepted as recommended.
+- **Dolby JOC streams lock the receiver as Atmos through the Shield's IEC 61937 route.** The three
+  encoder fixtures (5.1.4, 7.1.4, 9.1.6), wrapped into E-AC-3 bursts at the 192 kHz carrier, were
+  reported by the Onkyo as `Dolby Atmos/DD+` after about 2.1 s, with no underruns.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 

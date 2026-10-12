@@ -423,6 +423,16 @@ two it says `N/A`. What this settles:
 - Not measured: whether the sound after a null-burst gap is clean (the receiver's own indicator was
   the oracle, at volume 0), and the same for E-AC-3.
 
+**Real Atmos through the same route.** The tree's three Dolby-encoder JOC streams
+(`testdata/object-fixture/dee_joc_514.ec3`, `_714` and `_916`: 5.1.4, 7.1.4 and 9.1.6) were wrapped
+into IEC 61937 E-AC-3 bursts (24,576 bytes, 192 kHz carrier) by the same test program and played
+for 12 s each. The receiver reported **`HDMI 6, Dolby Atmos/DD+, 48 kHz, 5.0.4 ch`** for all
+three, 2.13 to 2.19 s after the stream started (a cold E-AC-3 lock is slower than AC-3's 1.0 to
+1.4 s), with **0 underruns** and 2,365,440 frames written in each run. It reports 5.0.4 because that
+is the room's speaker configuration, not the stream's. A Dolby-made stream needs no key: the
+signing key matters only for streams this project encodes itself (the Shield demo, `forge atmos`),
+which a sink passes through unchanged.
+
 ### The NDK build (S2)
 
 | Item | Result |
@@ -439,6 +449,6 @@ two it says `N/A`. What this settles:
 
 | Item | Why |
 |---|---|
-| Atmos/JOC lock | The receiver reconstructs objects only from a signed stream. The owner supplied a test key on 2026-10-12 and it is in the demo's gitignored asset path, but no signed JOC stream has been played to the receiver yet. A sink passes bits through unchanged, so a stream signed on the host needs no key on the Android side; a locally built demo does |
+| Atmos/JOC lock of a stream **this project signs** | The owner supplied a test key on 2026-10-12 and it is in the demo's gitignored asset path, but no stream signed with it has been played to the receiver yet. Real Dolby JOC locks (above); a sink passes bits through unchanged, so a stream signed on the host needs no key on the Android side |
 | HOME, standby and reboot (S3), beyond the display-sleep finding | Not run |
 | AC-4 over `ENCODING_IEC61937` | No AC-4 receiver; the route lists no AC-4 profile |
