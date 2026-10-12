@@ -397,6 +397,13 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The timing window corrects one word.** In **Time the lyrics...** a click on a word chooses it
+  (it is outlined, and the item is cued 1.5 s before it) and the window says which word it is and
+  when it starts. In the words pass the next `Space` presses that word, once, in place of the next
+  guess; **Stamp again** presses it at the position now; **-10 ms** and **+10 ms** move it, and
+  not its line. A file that came with the times of its words (from a forced aligner, say) opens
+  with every word taken as given, and only its lines could be stamped again or nudged, so one wrong
+  word could not be put right. A word stays between its neighbours; choosing its line lets it go.
 - **The timing window sets who sings a line.** In **Time the lyrics...** a chosen line takes a
   **Singer** (not marked, V1, V2 or both) and each row shows its marker; two **Name** fields set
   what the file calls the singers (`[v1:]` and `[v2:]`, kept with the file, unlike the names typed on
@@ -442,6 +449,10 @@ The sections below contain the complete change list and fixes.
   second: a tick is a fixed length of time, rounded to the nearest millisecond, and the file's tempo
   events, which name a quarter note, move nothing. Any other rate is refused with the reason, and a
   frame of no ticks is a damaged file (planning/karaoke-phase2.md, W13e).
+- **A `.kar` file's other `@` lines may be in a code page.** The reader checked every Text event as
+  UTF-8, so a copyright line (`@I`) or a key line (`@K`) in Latin-1 refused a file whose words were
+  fine. Only the title and the artist (`@T`) and the words are checked now; the other `@` lines are
+  not shown and are skipped (planning/karaoke-phase2.md, W13e).
 - **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
   `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
   (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
@@ -584,6 +595,15 @@ The sections below contain the complete change list and fixes.
   the decoder was run in Node against `forge decode` of the karaoke example below: all eight cases
   match sample for sample. An AC-3 stream's fold levels now come from its own `cmixlev` and
   `surmixlev` (they were the E-AC-3 defaults) (planning/karaoke-phase2.md, W8).
+- **`hearth --open` and `--smoke-shot`.** `--open <file>` adds a file to the queue (with nothing
+  in it the first is loaded and cued, so the Play, Media and Karaoke pages show it), `--seek <ms>`
+  starts that item there and holds it paused, and `--smoke-shot <png>` is `--shot` with network
+  discovery off: a capture with nobody at the machine neither browses the network nor raises
+  Windows' firewall prompt, which `--shot` does. A capture waits for the file's media information
+  and exits 3 when the file did not load, so a script that retakes screenshots can stop on it.
+  The parsing is `command_line.hpp`, held by `hearth_controller_tests`. The Karaoke guide's page
+  screenshot is retaken from the running window, and a duet one is added; the options are in
+  [Hearth's command line](docs/hearth/index.md#command-line).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
@@ -602,6 +622,13 @@ The sections below contain the complete change list and fixes.
   nothing recorded, in 8.7 MB. The parts and words are held to the generator by a unit test, the
   stream is probed and encoded again by `iclforge-forge-cli-tests`, the words are read by
   Hearth's reader, and the Forge GUI test opens the project and writes the stream's bytes.
+- **The browser decode demo shows the words of a karaoke stream.** A **Words** panel takes a `.lrc`,
+  `.srt`, `.ass` or `.kar` file and follows it against the playing position: the line being sung
+  large, the word being sung filled and underlined, the lines round it small, a duet's singers
+  named and indented, and a delay slider. The reader is `libs/lyrics`, compiled into the demo's
+  module (`parseLyrics` and `LyricsDocument`, `apps/demos/wasm/lyrics_bindings.cpp`) and not a
+  second one in JavaScript, so the page reads UTF-16, SubRip, ASS and MIDI karaoke as Hearth does
+  (planning/karaoke-phase2.md, W8).
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 
