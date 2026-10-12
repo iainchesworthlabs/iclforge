@@ -2,27 +2,35 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQmlIntegration>
 
 #include <memory>
+#include <vector>
 
 #include "cdg_frame_source.hpp"
+#include "lyric_osc.hpp"
+#include "media_session.hpp"
 
 // Lyrics for the application a person has selected (planning/karaoke-phase2.md, W13b, D9): an
 // `.lrc` file imported against one application of the room, and a strip that shows the line being
 // sung. A second QML singleton beside CrucibleController, so that crucible_controller.cpp does not
 // grow. What it wraps is libs/lyrics, the Qt-free reader and cursor that Hearth's window shares.
 //
-// Where the position comes from. Crucible taps an application's audio and knows nothing of a
-// track: a search of this program and libs/audio finds no media session (MPRIS, the Windows
-// transport controls, macOS's now-playing), so the song's position is not known. This is the
-// start-and-nudge source D9 names for where there is none: the person presses Start as the song
-// begins, the strip runs on this process's monotonic clock from there, and a nudge moves the
-// words earlier or later. It is honest about being manual - a pause or a seek in the player is not
-// seen - and says so on the page. The media-session sources (three platform back ends) are a later
-// change that replaces the origin and keeps everything else.
+// Where the position comes from (D9). An application that publishes a media session (the Windows
+// transport controls, MPRIS on Linux, macOS's now-playing information: media_session.hpp) is
+// followed from it: the player's own position, carried forward between reads, so a pause and a seek
+// in it are seen. Where it publishes none, or the platform cannot say, the person presses Start as
+// the song begins and the strip runs on this process's monotonic clock from there; a nudge moves
+// the words earlier or later whichever the origin is. The by-hand source says that it does not see
+// a pause or a seek, and the strip says so.
+//
+// Three things are kept honest. A session that goes away does not make the words jump: they carry
+// on from where they were, by hand, and say so. A session whose track changes (its title, artist
+// or length) is not followed against the lyrics of the last one: they wait for the person. And a
+// platform that cannot read sessions says why, instead of reading as "nothing is playing".
 //
 // A CD+G disc (planning/karaoke-phase2.md, W13f and D11) is imported the same way and is followed by
 // the same clock and nudge, but it carries a picture and no text: status() says "picture", lines()
@@ -35,9 +43,24 @@ class CrucibleLyrics : public iclforge::apps::CdgFrameSource {
     QML_ELEMENT
     QML_SINGLETON
 
+    // Events out (planning/karaoke-phase2.md, D9's alternative): what the strip follows, said over OSC
+    // 1.0 on UDP to a rig that reads it (lyric_osc.hpp has the addresses). Off until a person turns
+    // it on; the destination is an IPv4 address and a port. Kept with the window's other choices.
+    Q_PROPERTY(bool oscEnabled READ oscEnabled WRITE setOscEnabled NOTIFY oscChanged)
+    Q_PROPERTY(QString oscHost READ oscHost WRITE setOscHost NOTIFY oscChanged)
+    Q_PROPERTY(int oscPort READ oscPort WRITE setOscPort NOTIFY oscChanged)
+    Q_PROPERTY(bool oscLines READ oscLines WRITE setOscLines NOTIFY oscChanged)
+    Q_PROPERTY(bool oscWords READ oscWords WRITE setOscWords NOTIFY oscChanged)
+    Q_PROPERTY(bool oscPosition READ oscPosition WRITE setOscPosition NOTIFY oscChanged)
+    // Empty while the destination is usable; otherwise why events are not being sent.
+    Q_PROPERTY(QString oscProblem READ oscProblem NOTIFY oscChanged)
+
 public:
     // How far a nudge may take the words either way, in milliseconds.
     static constexpr int kMaxNudgeMs = 10000;
+    // The OSC destination's defaults: this machine, and a port that show-control software commonly
+    // listens on.
+    static constexpr int kDefaultOscPort = 9000;
 
     explicit CrucibleLyrics(QObject* parent = nullptr);
     ~CrucibleLyrics() override;
@@ -78,7 +101,46 @@ public:
     // has begun is the first picture.
     [[nodiscard]] QImage pictureFrame(int key, qlonglong positionMs) override;
 
-    // Start: the song begins now (or at `nowMs`). Start again to begin it again.
+    // --- the position from the operating system's media session ---------------------------------
+
+    // What application `app` is, so that its session can be found: the name the room shows, its
+    // executable's path and its platform id (a Windows packaged application's user model id, a
+    // Linux desktop entry). The strip says it whenever it is given an application.
+    Q_INVOKABLE void setApplication(int app, const QString& name, const QString& imagePath, const QString& appId);
+
+    // "session": the position is the application's media session where it has one; "hand": the
+    // person's Start. An application with lyrics is in "session" until Start is pressed.
+    Q_INVOKABLE QString positionSource(int app) const;
+    // Where that stands: "none" (no lyrics to follow); "following" (a session has it); "waiting"
+    // (session mode, none matched yet: press Start to begin by hand); "no-timeline" (a session
+    // matched that publishes no position); "changed" (the session's track is not the one the lyrics
+    // were bound to); "unavailable" (this platform cannot read sessions, see
+    // sessionsUnavailableReason()); "lost" (it had a session and it went: now following the clock
+    // from where it was); "hand" (the person started it).
+    Q_INVOKABLE QString sessionState(int app) const;
+    // The matched session's name, or its id when it has none; empty with none.
+    Q_INVOKABLE QString sessionLabel(int app) const;
+    // The matched session's track title and artist, as "Title - Artist"; empty with none.
+    Q_INVOKABLE QString sessionTrack(int app) const;
+    // Follow the media session again after a by-hand start: the best match for the application
+    // when `sessionId` is empty, otherwise that session, held until it goes. Binds the lyrics to
+    // the track it is playing, which is how "changed" is got out of.
+    Q_INVOKABLE void useSession(int app, const QString& sessionId = QString());
+    // Every session as last read: id, name, title, artist, state ("playing", "paused", "stopped"),
+    // hasPosition and matched (it is the one `app`'s), for a picker. `app` -1: none matched.
+    Q_INVOKABLE QVariantList sessions(int app = -1) const;
+    // Whether this platform can read sessions, and when it cannot, why in one sentence.
+    Q_INVOKABLE bool sessionsAvailable() const;
+    Q_INVOKABLE QString sessionsUnavailableReason() const;
+
+    // Applies a read of the sessions as of `nowMs`: what the monitor gives it on the window's
+    // thread, and what a test gives it (applySessionList) in place of a machine's own music.
+    void applySessions(const std::vector<iclforge::crucible::ui::MediaSession>& read, qlonglong nowMs);
+    // The same from maps: id, name, executable, desktopId, title, artist, durationMs, hasPosition,
+    // positionMs, rate and playback ("playing", "paused", "stopped"); the position is as of `nowMs`.
+    Q_INVOKABLE void applySessionList(const QVariantList& read, qlonglong nowMs);
+
+    // Start: the song begins now (or at `nowMs`), by hand. Start again to begin it again.
     Q_INVOKABLE void start(int app);
     Q_INVOKABLE void startAt(int app, qlonglong nowMs);
     // Stops the strip following: the lyrics stay.
@@ -98,11 +160,44 @@ public:
     // not yet. The same keys as KaraokeController.cursor() in the Hearth window.
     Q_INVOKABLE QVariantMap cursor(int app, qlonglong nowMs) const;
 
+    [[nodiscard]] bool oscEnabled() const;
+    void setOscEnabled(bool enabled);
+    [[nodiscard]] QString oscHost() const;
+    void setOscHost(const QString& host);
+    [[nodiscard]] int oscPort() const;
+    void setOscPort(int port);
+    [[nodiscard]] bool oscLines() const;
+    void setOscLines(bool on);
+    [[nodiscard]] bool oscWords() const;
+    void setOscWords(bool on);
+    [[nodiscard]] bool oscPosition() const;
+    void setOscPosition(bool on);
+    [[nodiscard]] QString oscProblem() const;
+
+    // What the events out would say at `nowMs`, as a test reads it: one reading's messages as
+    // "address arg arg ..." lines. The timer sends the same, on this process's clock.
+    Q_INVOKABLE QStringList oscMessagesAt(qlonglong nowMs);
+
 signals:
     // An application's lyrics, clock or nudge changed; the strip for it rereads.
     void changed(int app);
+    // The OSC settings changed.
+    void oscChanged();
+    // The sessions read, or what can be read, changed: the picker rereads.
+    void sessionsChanged();
 
 private:
     struct State;
+
+    // Starts or stops the thread that reads the sessions: it runs while an application with
+    // lyrics is waiting on one.
+    void refresh_monitor();
+    // Starts or stops the events' timer: it runs while they are on and an application has lyrics.
+    void refresh_events();
+    // One tick of it: read every application's place, and send what changed.
+    void send_events(qlonglong now_ms);
+    // Every application with lyrics, as it stands at `now_ms`, for the events out.
+    [[nodiscard]] std::vector<iclforge::crucible::ui::LyricSnapshot> readings(qlonglong now_ms) const;
+
     std::unique_ptr<State> state_;
 };

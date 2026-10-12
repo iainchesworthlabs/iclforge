@@ -11,7 +11,9 @@
 #include <QString>
 #include <QVariantList>
 #include <QStringList>
+#include <QHostAddress>
 #include <QTemporaryDir>
+#include <QUdpSocket>
 #include <QVariant>
 #include <QVariantList>
 #include <QVariantMap>
@@ -290,6 +292,34 @@ public:
         return file.write(data) == data.size() ? path : QString{};
     }
 
+    // A loopback UDP port for the lyric events the window sends over OSC (CrucibleLyrics' OSC
+    // settings): a socket on an ephemeral port of this machine, and its number; 0 when it could not
+    // be had. What arrives is read with oscReceived(). A second call starts again.
+    Q_INVOKABLE int oscListen() {
+        osc_received_.clear();
+        osc_socket_ = std::make_unique<QUdpSocket>();
+        if (!osc_socket_->bind(QHostAddress::LocalHost, 0)) {
+            osc_socket_.reset();
+            return 0;
+        }
+        return static_cast<int>(osc_socket_->localPort());
+    }
+
+    // Every OSC message that has arrived since oscListen(), as "address arg arg ...": an integer
+    // as its number and a string as it is, the same shape CrucibleLyrics.oscMessagesAt() reads out.
+    Q_INVOKABLE QStringList oscReceived() {
+        if (osc_socket_ == nullptr) {
+            return {};
+        }
+        while (osc_socket_->hasPendingDatagrams()) {
+            QByteArray datagram;
+            datagram.resize(static_cast<qsizetype>(osc_socket_->pendingDatagramSize()));
+            osc_socket_->readDatagram(datagram.data(), datagram.size());
+            osc_received_.push_back(decode_osc(datagram));
+        }
+        return osc_received_;
+    }
+
     // The machine back. Every scripted suite calls this in cleanup(),
     // because two of the five seams are held by the controller rather than
     // handed to the engine at start(): a case that ran after a scripted one
@@ -314,6 +344,39 @@ public:
     }
 
 private:
+    // One OSC 1.0 message (strings and int32 only: what the window sends) as a line of text.
+    static QString decode_osc(const QByteArray& data) {
+        qsizetype pos = 0;
+        const auto read_string = [&data, &pos]() {
+            const qsizetype end = data.indexOf('\0', pos);
+            if (end < 0) {
+                pos = data.size();
+                return QString{};
+            }
+            const QString text = QString::fromUtf8(data.mid(pos, end - pos));
+            pos = (end + 4) & ~static_cast<qsizetype>(3);
+            return text;
+        };
+        const QString address = read_string();
+        const QString tags = read_string();
+        QString line = address;
+        for (qsizetype i = 1; i < tags.size(); ++i) {
+            line += QLatin1Char(' ');
+            if (tags.at(i) == QLatin1Char('s')) {
+                line += read_string();
+            } else if (tags.at(i) == QLatin1Char('i') && pos + 4 <= data.size()) {
+                const auto byte = [&data, &pos](int k) { return static_cast<quint32>(static_cast<unsigned char>(data.at(pos + k))); };
+                const quint32 bits = (byte(0) << 24U) | (byte(1) << 16U) | (byte(2) << 8U) | byte(3);
+                line += QString::number(static_cast<qint32>(bits));
+                pos += 4;
+            }
+        }
+        return line;
+    }
+
+    std::unique_ptr<QUdpSocket> osc_socket_;
+    QStringList osc_received_;
+
     static std::vector<iclforge::crucible::AppSession> to_sessions(const QVariantList& apps) {
         std::vector<iclforge::crucible::AppSession> listed;
         listed.reserve(static_cast<std::size_t>(apps.size()));
@@ -402,6 +465,10 @@ class DeskIsolation : public QObject {
 
 public slots:
     void applicationAvailable() {
+        // The window reads what other players are playing (media_monitor.hpp) while an application
+        // has lyrics to follow; a developer's own music must not move a case, so the reader is off
+        // and the lyrics suite scripts what the system would have said (applySessionList).
+        qputenv("ICLFORGE_CRUCIBLE_MEDIA_SESSIONS", "off");
         QCoreApplication::setOrganizationName(QStringLiteral("iclforge"));
         QCoreApplication::setApplicationName(QStringLiteral("Crucible"));
         QQuickStyle::setStyle(QStringLiteral("Basic"));

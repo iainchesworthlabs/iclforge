@@ -75,6 +75,13 @@ struct SinkOptions {
     // does what a board's does (planning/karaoke-phase2.md, W7). Without it a karaoke stream is
     // played as coded, as a sink from before the keys plays it.
     bool karaoke = false;
+    // With `karaoke`: also lists E-AC-3 among the codecs it reproduces karaoke for (the support
+    // object's `karaoke_codecs`), as a board whose firmware has the E-AC-3 path does
+    // (planning/karaoke-eac3.md, D6). Off, it lists none, which a server reads as AC-3 alone: a
+    // board from before it. The decoder is the library's either way, so an E-AC-3 stream sent to
+    // an off sink is reproduced all the same; it is the server's choice, which is what the
+    // sink is for, that is under test.
+    bool karaoke_eac3 = false;
     // With `karaoke`: also lists karaoke_melody_db, karaoke_vocal1_db and karaoke_vocal2_db and
     // applies them (W10), as a board with the part levels does. Off, it is a board from before
     // them: it reproduces karaoke and has no way to be told a level.

@@ -746,9 +746,18 @@ struct DecodedAccessUnit {
 // no V1 or V2, and what a decoder does with one there is nowhere specified), and it carries no
 // object layer. The decoder, the CLI and Hearth ask this one rule, so none of them re-derives it.
 // Inline, so it adds no symbol to the library.
+//
+// This form is for a caller that has read the headers and not decoded: a stream's bsmod and
+// acmod (io::ScannedProgramme's, or a syncframe's), how many substreams its access unit holds,
+// and whether it declares an object layer (a JOC complexity index in its addbsi).
+[[nodiscard]] inline bool is_karaoke_programme(meta::BitstreamMode bsmod, Acmod acmod,
+                                               std::size_t substreams, bool objects) {
+    return substreams == 1 && !objects && meta::is_karaoke(bsmod, acmod);
+}
+
 [[nodiscard]] inline bool is_karaoke_programme(const std::optional<meta::BsiInfo>& info, Acmod acmod,
                                                std::size_t substreams, bool objects) {
-    return info.has_value() && substreams == 1 && !objects && meta::is_karaoke(info->bsmod, acmod);
+    return info.has_value() && is_karaoke_programme(info->bsmod, acmod, substreams, objects);
 }
 
 [[nodiscard]] inline bool is_karaoke_programme(const DecodedAccessUnit& unit) {
