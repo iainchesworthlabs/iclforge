@@ -694,7 +694,7 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS
 config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
     int "E-AC-3 objects reconstructed and placed in real time (-1 = none stated, 0 = none)"
     default 0 if IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C3
-    default 4 if IDF_TARGET_ESP32S3 && ICLFORGE_EXAMPLE_DECODE_LANE = 1
+    default 2 if IDF_TARGET_ESP32S3 && ICLFORGE_EXAMPLE_DECODE_LANE = 1
     default -1
     range -1 15
     help
@@ -706,10 +706,15 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
         server reads as the board placing whatever the format carries (the ESP32-P4: 12 objects
         take 0.79 of real time, 15 extrapolate to about 0.9).
 
-        The ESP32-S3's 4 is its release image's (sdkconfig.s3-fast) with the decode lane on:
-        a 32 ms frame of JOC 7.1.4 takes 0.92 of real time with 4 objects, 1.02 with 5 and 1.15
-        with 6, about 3.1 to 3.7 ms an object; without the lane 4 objects take 1.11
-        (planning/esp32-714-realtime.md, measured 2026-10-11).
+        The ESP32-S3's 2 is its release image's (sdkconfig.s3-fast) with the decode lane on, over
+        Sendspin, which is the path a Hearth server plays it by. A 32 ms frame of channel-based
+        7.1.4 takes 0.77 of real time there with no coding tool and 0.95 with all of them, and each
+        object adds about 0.1 (3.1 to 3.7 ms): 2 objects about 0.97, where the demo stream (about
+        4 objects) took 1.08 with 72 chunks late, objects-mdct 1.17 with 108 late, height 1.38 with
+        190, and a 15-object DEE stream 2.27 (null sink, 2026-10-12). Over HTTP the same streams are
+        0.15 to 0.25 lower, which is where 4 objects at 0.92 came from; that figure is not the
+        Sendspin path's. Without the lane 4 objects take 1.11 even over HTTP
+        (planning/esp32-714-realtime.md).
 
 config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
     int "Largest lyric document held for the item playing, bytes (0 = none)"
