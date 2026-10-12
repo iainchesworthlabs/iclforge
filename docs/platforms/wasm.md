@@ -83,6 +83,67 @@ WSL2/Emscripten 6.0.6 toolchain `build-wasm` uses:
 `apps/demos/wasm/encode/`'s page exposes AC-3/E-AC-3 bed encoding, and the object-authoring page in
 `apps/demos/wasm/atmos/` drives the bound `AtmosBedEncoder`.
 
+## Microphone in the decode demo
+
+A karaoke stream decoded in the decode demo gains a **Microphone** card
+([`planning/karaoke-microphone.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md),
+M7): a singer's pitch against the tune, with the library's own arithmetic and not a second
+implementation in JavaScript. It is the tracker, reference melody and scorer of `libs/pitch` (standard
+library only, the library Hearth's microphone is built on), bound into the decode module by
+`apps/demos/wasm/pitch_bindings.cpp`; the module grew by about 26 KB raw (736 to 762 KB).
+
+| Piece | Where | What it does |
+|---|---|---|
+| `PitchTracker` | `pitch_bindings.cpp` | The McLeod pitch tracker: pushed samples, a frame (centre sample, Hz, clarity, level) every 10 ms |
+| `ReferenceBuilder`, `ReferenceContour` | `pitch_bindings.cpp` | The tune, read from one channel in slices, as a contour and as notes |
+| `PitchScorer` | `pitch_bindings.cpp` | The share of the tune's time within a tolerance of the voice, octaves folded; a line's or the whole; early or late |
+| `MicrophoneSession`, `readReference` | `mic.js` | `getUserMedia`, the capture worklet, the placing of each frame in the item, the headphones gate, the summary |
+| The card | `index.html`, `demo.js` | The button, the answers, the meter, the ribbon, the score |
+
+**Which channel is the tune.** The decode's channel as coded: the guide melody M where the stream has a
+centre (Annex C, Table C.2.1: L M R, with V1 and V2 where the surrounds would be), the first vocal where
+it has not. A stream with neither shows the pitch and no score, and says so.
+
+**Where in the item a frame of the voice was sung** is one subtraction on one clock. Playback and the
+microphone share the page's `AudioContext`; a frame reaches the capture worklet at a time on that clock,
+and the voice was sung the microphone's latency before that, and what was heard then left the output
+`outputLatency` after it was rendered:
+
+```
+item ms = (frame time − input latency − output latency − playback start) × 1000 + the person's timing
+```
+
+The input latency is the track's own `latency` setting where the browser gives one, and the slider
+otherwise; the output latency is `AudioContext.outputLatency` where it is available and `baseLatency`
+where it is not. A quantum that does not follow the last (the worklet's frame counter says so) starts the
+tracker again from there, so that nothing is placed against a time it was not captured at. Nothing is
+placed or scored while the item is not playing.
+
+**What it promises, and what holds it to that** (`apps/demos/wasm/tests/microphone.spec.js`, the
+`microphone` project, with Chromium's fake device and no real microphone):
+
+- the page does not ask the browser for a microphone until the button is pressed, and the call asks for
+  echo cancellation on and noise suppression and gain control off;
+- the score is withheld until the headphones answer is given, and a performance made without it has no
+  summary;
+- nothing is sent: a request that is not a plain GET of the page's own files fails the test;
+- closing it ends every track it opened and the capture port.
+
+The arithmetic is held with synthetic voices: the tracker finds a vibrato tone at 48 kHz and follows 44.1,
+48 and 96 kHz; a
+contour is read in slices from a known channel and its notes land on the notes sung; the scorer folds an
+octave and counts a tritone away as wrong; a session fed made-up quanta places the C4 half of a melody
+at 1 s, moves it by what the person moved it, ignores a voice while the item is not playing and survives
+a quarter of a second of dropped quanta.
+
+**Not covered.** A real microphone in a real room: the tests do not open one, and the browser's echo
+cancellation is not measured here (the plan's U6 leaves it as the browser's own). Firefox and Safari
+(Chromium only), and `MediaTrackSettings.latency` / `AudioContext.outputLatency`, which browsers give
+differently or not at all, so the delay slider may be the only figure. Per-line marks, which Hearth has,
+and recording a take, which the plan leaves out of the browser (D16).
+The reference is read on the page's main thread in two-second slices, so the page stays alive while it
+is.
+
 ## AC-4 module
 
 `apps/demos/wasm/ac4_bindings.cpp` is a third Embind module, `iclforge_wasm_ac4`
@@ -423,7 +484,8 @@ would never trigger a redeploy at all, and the live demo would silently drift fr
     through the bound `Encoder`, measures it with `QcMeter`, asserts the true peak and every preset
     verdict land where that known signal predicts, and round-trips the result through the decode
     module. A regression in any of those numbers now fails CI rather than waiting for the next
-    manual pass.
+    manual pass. The `microphone` project (`microphone.spec.js`, five tests, the decode demo's own
+    directory with Chromium's fake device) holds the pitch bindings and the microphone card.
 
 !!! note "Verified locally while building the push-frame decoder package (this repository's own Windows host, Emscripten 6.0.6)"
     `decoder_bindings.cpp`'s rewrite (the old whole-file `Decoder` class replaced by
