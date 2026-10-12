@@ -1045,6 +1045,30 @@ channels. A `>=v3.0` chip's 160 MHz PLL clears this with room to spare; the sink
 design and its clock-source choice (`I2S_CLK_SRC_APLL`, itself needed - the default
 source cannot open TDM at all on this revision) are otherwise unchanged and correct.
 
+### On a P4 of chip revision v3.x, and a screen
+
+A chip of revision v3.x (v3.1 and newer, the generation with the errata fixes) is a **different
+image** from the one above: `sdkconfig.p4-rev3` after `sdkconfig.p4` takes it to 400 MHz, to
+revisions v3.1 to v3.99 and, in `sink/i2s_wide`, to the 160 MHz PLL as the I2S clock so that TDM
+opens at the full sixteen 32-bit slots. The two images refuse each other's chips at boot. **Not run
+on a v3.x chip yet.**
+
+`main/panel/` is a screen for the lyrics of the item playing, picked by CMake like the sink and the
+source: `none` (every image but a P4's with a panel), and `lvgl`, LVGL 9 drawing
+`lyric_screen.cpp` onto a MIPI DSI panel with touch (`sdkconfig.panel-dsi`, the 7-inch panel of
+Espressif's ESP32-P4X-Function-EV-Board) or into a frame buffer in PSRAM with no panel behind it
+(`sdkconfig.panel-null`), which `GET :8081/panel.bmp` reads back:
+
+```
+idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-null" build
+curl -X POST "http://<board>:8081/panel/demo?mode=2"   # a song loops on the screen, no server needed
+curl -o screen.bmp http://<board>:8081/panel.bmp
+```
+
+`preview/` draws the same `lyric_screen.cpp` on a computer, in seconds. The screens, the pins, the
+fonts and what drawing costs are in [An ESP32-P4 sink](../../docs/hearth/sink-esp32-p4.md) and
+[planning/karaoke-p4x-panel.md](../../planning/karaoke-p4x-panel.md).
+
 ### Under QEMU
 
 `sdkconfig.ci-sendspin`, over `sdkconfig.ci-http`, is the player on QEMU's

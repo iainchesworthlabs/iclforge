@@ -91,6 +91,22 @@ The sections below contain the complete change list and fixes.
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
 
+**A Sendspin sink library, which Hearth's test sink is the first program of**
+
+- **`iclforge::sink` (`libs/sink`): a sink a program runs, with the program's own audio output.**
+  What `hearth-testsink` did that is not writing a WAV file or decoding a burst (it listens and
+  advertises, pairs, admits servers as the specification ranks them, keeps its identity and pairing
+  records, answers the roles a server lists and counts what it was given) is a library, so that the
+  Android app (`planning/hearth-android.md`, D3) does not have to be a third copy beside the test sink
+  and the firmware. A program supplies `iclforge::sink::Outputs`: a `StreamOutput` for `player@v1` and
+  a `BurstStreamOutput` for `_iclforge_player@v1` per connection, which the sink starts, feeds, clears
+  and ends and asks for its counts and its decoder report. The test sink's `WavOutput` and
+  `BurstOutput` are those outputs, and its `Sink` and `SinkOptions` are the same names with the same
+  members, so its suites, and the ones that run it in process, are unchanged. A new project row
+  (`sink`, internal, never installed) and a test binary with outputs that only write down what they
+  were given.
+  This is a move: no message, log line or file the test sink writes is different.
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
@@ -298,6 +314,11 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke guide's "From a program" table has its C API, Python and Rust rows.** Each names the
+  call that reproduces a karaoke stream and the lyric reader, and links the binding's own page
+  ([C API](docs/library/c-api.md#karaoke-streams-annex-c), [Python](docs/library/python-api.md#karaoke-streams-and-lyrics),
+  [Rust](docs/library/rust-api.md#karaoke-and-lyrics)); only the C++ and WebAssembly rows were there
+  until the bindings landed.
 - **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
   `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
   part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table
@@ -589,6 +610,28 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **The ESP32-P4 sink draws the lyrics on a panel, with the colour moving as the song does, and
+  there is an image for a P4 of chip revision v3.x.** `hearth_sink` takes a screen
+  (`main/panel/`, chosen like the sink and the source): LVGL 9 drawing the lines before and after
+  the one being sung, the words of it with the fill moving by time, a duet's two singers by name
+  and side, an instrumental break as four dots, right-to-left text, and an idle screen with the
+  board's name, address and pairing code, with Archivo, Noto Sans Greek and Cyrillic and Noto Sans
+  Hebrew in the image (a line in a script none of them draws is one sentence, not boxes); touch
+  sets the board's own lyric delay and text size. It runs on a MIPI DSI panel with a GT911 (the
+  7-inch panel of Espressif's ESP32-P4X-Function-EV-Board, the pins from its user guide and board
+  support header) or into a frame buffer in PSRAM with no panel, which `GET :8081/panel.bmp` reads
+  back, so the screen is drawn and its cost measured on a board that has none; `firmware/hearth-sink/preview`
+  draws the same code on a computer. What a screen shows is `iclforge::lyrics::Stage` and
+  `Follower::stage()` in the library, tested on the host. The new image,
+  `hearth-sink-esp32p4-rev3`, is built over `sdkconfig.p4` by `sdkconfig.p4-rev3` (chip revisions
+  v3.1 to v3.99, 400 MHz, and the 160 MHz PLL as the I2S clock so that TDM opens at 16 by 32 bits);
+  the two P4 images refuse each other's chips, and `ota.py` picks one by the revision the board
+  reports. The panel and the v3.x chip have not run on a board: CI builds both. Hearth's
+  About, Licences window names LVGL, the new Noto Sans face, and ESP-IDF with the third-party
+  components the ESP32 sink images link (FreeRTOS, lwIP, Mbed TLS, picolibc and the rest, each with
+  its licence text), which no notices file carried before; `gen_esp_idf_notices.py` makes the
+  texts and a test fails when ESP-IDF's version moves without them
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md), planning/karaoke-p4x-panel.md, W12).
 - **Hearth's Karaoke page, lyric views and timing window are translated.** The page, the lyric view,
   the singer view, the timing window, the lyric delay and the shortcuts that go with them are filled
   in the German, Spanish, French, Arabic, Hebrew and Yiddish catalogues (145 strings, with the singer view's and
