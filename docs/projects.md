@@ -47,7 +47,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 
 | Project | Path | What it is | Uses | Used by | CI lanes |
 |---|---|---|---|---|---|
-| `app-cdg-picture` (internal) | `apps/shared/cdg-picture/` | The picture of a CD+G disc as a window shows it: the disc as images by position, the source a controller gives them through, and the Qt Quick item that draws them. Internal; compiled into the programs. | `lyrics` | `crucible`, `hearth` | windows, linux, macos |
+| `app-cdg-picture` (internal) | `apps/shared/cdg-picture/` | The picture of a CD+G disc as a window shows it: the disc as images by position, the source a controller gives them through, and the Qt Quick item that draws them. Internal; compiled into the programs. | `lyrics` | `crucible`, `forge`, `hearth` | windows, linux, macos |
 | `app-media` (internal) | `apps/shared/media/` | The media code the programs compile in: container input, stream playback, recording sinks, the AC-4 object renderer. Internal; compiled into Forge, Hearth and Crucible. | `ac3`, `ac4`, `containers`, `objects`, `render` | `forge`, `hearth` | windows, linux, macos |
 | `app-preferences` (internal) | `apps/shared/preferences/` | The settings store and its migration, shared by the desktop programs. Internal; compiled into the programs. | nothing | `crucible`, `forge`, `hearth` | windows, linux, macos |
 | `app-project` (internal) | `apps/shared/project/` | The project file the Forge GUI and forge share: its document and the command line it stands for. Internal; compiled into the programs. | `ac3` | `forge` | windows, linux, macos |
@@ -60,7 +60,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `crucible` | `apps/crucible/` | Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS. | `ac3`, `ac4`, `audio`, `base`, `containers`, `lyrics`, `objects`, `app-cdg-picture`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 | `demo-android` | `apps/demos/android/` | The Android (Shield) demo application. | `ac3`, `audio`, `base`, `containers` | nothing | android |
 | `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `lyrics`, `objects` | nothing | wasm |
-| `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `lyrics`, `objects`, `render`, `app-media`, `app-preferences`, `app-project`, `app-theme` | nothing | windows, linux, macos |
+| `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `lyrics`, `objects`, `render`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-project`, `app-theme` | nothing | windows, linux, macos |
 | `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `pitch`, `render`, `sendspin`, `app-cdg-picture`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 
 ## Bindings

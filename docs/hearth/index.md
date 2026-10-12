@@ -104,7 +104,9 @@ words:
 With no lyrics file, a `name.cdg` beside the stream, the picture of a karaoke disc ripped on its
 own, is shown instead: its words are part of the picture, so nothing in it is read as text, and
 it moves with the same position and the same lyric delay (see [A CD+G
-disc](../karaoke/index.md#a-cdg-disc)).
+disc](../karaoke/index.md#a-cdg-disc)). With both beside the stream the words are shown, and a
+**Show** choice (Words or Picture) on the Lyrics card and on the singer view's bar shows the disc
+instead, until Hearth is closed.
 
 The format is LRC: `[mm:ss.xx]` for a line, the enhanced `<mm:ss.xx>` tag before a word, and
 `[offset:]`, `[ti:]`, `[ar:]`, `[al:]`, `[by:]` and `[length:]`. The text is UTF-8, with or

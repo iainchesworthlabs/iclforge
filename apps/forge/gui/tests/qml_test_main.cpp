@@ -192,15 +192,18 @@ public:
         return QUrl::fromLocalFile(path);
     }
 
-    // A file of exactly these bytes, given as hexadecimal ("5b30305d"): what writeText cannot
-    // make, since it is UTF-8 whatever it is given (a lyrics file in a code page). The file's URL,
-    // or an empty one where it could not be written.
-    [[nodiscard]] Q_INVOKABLE QUrl writeBytes(const QString& name, const QString& hex) const {
+    // A binary file of the test's own: a CD+G disc beside a stream, whose packets are not text.
+    // `bytes` is a list of numbers 0 to 255 (Qt.btoa() does not carry the high ones). The
+    // file's URL, or an empty one where it could not be written.
+    [[nodiscard]] Q_INVOKABLE QUrl writeBytes(const QString& name, const QVariantList& bytes) const {
+        QByteArray out;
+        out.reserve(static_cast<qsizetype>(bytes.size()));
+        for (const QVariant& value : bytes) {
+            out.append(static_cast<char>(value.toInt() & 0xFF));
+        }
         const QString path = QDir(folder_).filePath(name);
         QFile file(path);
-        const QByteArray bytes = QByteArray::fromHex(hex.toLatin1());
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
-            file.write(bytes) != bytes.size()) {
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) || file.write(out) != out.size()) {
             return {};
         }
         return QUrl::fromLocalFile(path);

@@ -3917,6 +3917,18 @@
             <translation>[%1 / %2 s ~~~~]</translation>
         </message>
         <message>
+            <source>CD+G picture</source>
+            <translation>[CD+G pîctûré ~~~~~]</translation>
+        </message>
+        <message>
+            <source>The picture of the karaoke disc in %1 beside the stream. Its words are part of the picture.</source>
+            <translation>[Thé pîctûré õf thé kàràõké dîsc în %1 bésîdé thé stréàm. Îts wõrds àré pàrt õf thé pîctûré. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>The picture in %1 could not be shown: %2</source>
+            <translation>[Thé pîctûré în %1 cõûld nõt bé shõwn: %2 ~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>Export decoded WAV…</source>
             <translation>[Éxpõrt décõdéd WÀV… ~~~~~~~~]</translation>
         </message>

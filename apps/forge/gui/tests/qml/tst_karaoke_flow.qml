@@ -730,7 +730,7 @@ TestCase {
     function test_aLyricsFileInACodePageIsSaidSoWhenChosenAndNothingIsWritten() {
         const song = audioFixtures.writeTones("kd-song.wav", 48000, 1.024, [440, 620]);
         // "[00:01.00]Caf" and an e acute as the one byte E9: Latin-1, which is not UTF-8.
-        const words = audioFixtures.writeBytes("kd-song.lrc", "5b30303a30312e30305d436166e90a");
+        const words = audioFixtures.writeBytes("kd-song.lrc", [0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x2e, 0x30, 0x30, 0x5d, 0x43, 0x61, 0x66, 0xe9, 0x0a]);
         verify(song.toString().length > 0 && words.toString().length > 0);
         const ctx = openFlow();
         useParts(ctx, { backing: song, melody: melody });
