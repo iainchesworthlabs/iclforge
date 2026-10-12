@@ -3053,6 +3053,26 @@ The sections below contain the complete change list and fixes.
   support catalogue's AC-4 encode row and the GUI's pages say so, and the translation catalogues
   take the new strings.
 
+**The ESP-IDF component's link targets are checked in the static job**
+
+- **`tools/checks/check_esp_component_targets.py` fails when the component links an `iclforge::`
+  target that its own options never define.** `firmware/esp-idf/iclforge/CMakeLists.txt` turns its
+  Kconfig symbols into the root build's options and links libraries by name, and whether a library
+  exists under those options is decided by `if()` guards in the root and in each library's
+  directory. The script runs the component's file, the root's and the libraries' through a small
+  interpreter of the CMake language once for each combination of the symbols the component reads,
+  with no ESP-IDF, and holds every `target_link_libraries()` to a definition. A finding names the
+  file that defines the target and the guard (with the values it read) or the `return()` that kept
+  it from running. The rest of the build is held to the same rule: in every combination that
+  configures, each `iclforge::` name that any executed `target_link_libraries()` names, and each
+  one an `iclforge_add_library()` links for its library, must be defined by the end of the run,
+  except inside a conditional generator expression (`$<TARGET_EXISTS:...>`,
+  `$<INSTALL_INTERFACE:...>`), which a build may leave out. A combination the build itself refuses
+  with `message(FATAL_ERROR)` is not a finding. Its tests put the root's guard for `libs/lyrics`
+  back as it was before #1344, when the sink firmware stopped configuring because the sink's player
+  linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
+  ESP-IDF image, so nothing before the merge saw that break.
+
 ### Changed
 
 **Shared code**
