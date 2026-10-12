@@ -3571,6 +3571,26 @@ The sections below contain the complete change list and fixes.
   mutex of its own, nothing is taken inside it, and a test makes a member leave and come back
   sixty times while a thread polls.
 
+**ESP32-P4: a restart that left the board without Wi-Fi**
+
+- **A restart or an update of an ESP32-P4 board sometimes brought it back with its link to the C6
+  dead, until a USB flash.** After an update over the network (2 of 10; 8 of 16 of a USB flash, a
+  wait and an update; none of 30 `POST /restart`s) the board read the C6's SDIO registers and got
+  no data (`sd_host_wait_for_event returned 0x107`, `Failed to read data - -1 838860`), and every
+  boot after it, esp_hosted's own restart of the host included, did the same, because
+  `esp_restart()` resets the CPU alone. A reset of the whole system clears it (`esptool --after
+  watchdog-reset`, nothing written, in 11 s), and so, from JTAG, does holding the C6's reset line
+  low for two seconds, which esp_hosted's 10 ms pulse at every boot does not. A restart of a board
+  whose Wi-Fi is behind esp_hosted now ends in the RTC watchdog's system reset, armed as
+  `esp_restart_noos` arms its own, from the last shutdown handler (`main/system_reset.cpp`; the S3
+  and C6 are untouched): 24 of 24 updates clean, and 8 of 8 boards that came back dead healed by
+  esp_hosted's own restart. A restart takes a second longer and the USB-Serial-JTAG port
+  re-enumerates. The image that is running when an update arrives does the restart, so a board
+  from before this needs one more update, or one USB flash. The P4 page's "Restarting the board"
+  has the log, the numbers, three requests for a system reset that leave the board dead
+  (`esp_rom_software_reset_system()`, a 20 ms watchdog stage, a stalled core) and how to recover a
+  dead board with the cable alone.
+
 **Sendspin: a sink's heap per message**
 
 - **A Sendspin session reserved eight bytes of heap for every byte of a message.**

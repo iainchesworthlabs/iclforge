@@ -131,6 +131,82 @@ release. The chip presents nothing on either USB connector until this is done; t
 CH34x-style bridge chip that appears in Windows' device history if one was ever tried on this
 machine before is unrelated hardware, not this board (see the two-connector note above).
 
+## Restarting the board
+
+A restart of this board is a reset of the whole system, not of the CPU alone, and the second it
+takes is why. ESP-IDF's `esp_restart()` on the P4 resets the CPU core (`rst:0xc (SW_CPU_RESET)` in
+the ROM's line) and a list of modules, and sometimes the board that came back had no Wi-Fi:
+
+```text
+H_SDIO_DRV: Reset slave using GPIO[54]
+H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE
+E (4300) SD_TRANS: sd_host_wait_for_event returned 0x107
+E (6800) H_SDIO_DRV: sdio_read_task: Failed to read data - -1 838860 838860
+I (13070) transport: Not able to connect with ESP-Hosted slave device
+E (14620) H_SDIO_DRV: failed to read registers
+I (14620) H_SDIO_DRV: Host is resetting itself, to avoid any sdio race condition
+```
+
+The card answers (its registers read) and its data never arrives, and every boot after that does
+the same to the second, whatever restarts the board, until a USB flash. Measured on both boards on
+2026-10-12, with the ESP-IDF restart and esp_hosted 2.13.0: 2 of 10 updates over the network; 8 of 16
+of a USB flash, twenty seconds, then an update (P4a 5 of 8, P4b 3 of 8); none of 30
+`POST /restart`s of a board that had not just been updated, whether it was idle, playing or under a
+flood of traffic.
+
+**What clears it** is a reset of the whole system, and nothing less was found that does it from
+the firmware. `esptool --after watchdog-reset` with nothing written brought a dead board back in
+11 s; a USB flash did the same by the watchdog reset at its end, which is where "only a USB flash
+recovers it" came from. A CPU reset does not, nor does esp_hosted's own reset of the C6 at every
+boot: a pulse of 10 ms on GPIO 54 that 2.13.0 does not make configurable.
+
+**Whose state it is.** The C6's, at least in part. With the P4 halted over JTAG, GPIO 54 held low
+for two seconds and a CPU reset of the P4 and nothing else, a dead board came back in nine seconds,
+twice on each board, with the image that had failed. Holding the same pin from a shutdown handler
+of the firmware, so that it stays low through the CPU reset (it stays driven, and a board on which
+it is not driven pulls it low: the pad reads 0 after a system reset), gave no fault in 10 of 10
+cycles of the protocol that faulted 8 of 16, but did not bring back a board that was already dead,
+in 2 of 2 tries on two boards, where the system reset below brought back 8 of 8. Why the held pin
+cures from JTAG and not from the firmware is not established, nor what in the C6 needs the longer
+reset (its SDIO slave, its flash, a supply a short pulse does not discharge), nor why only some
+restarts leave it so.
+
+**The remedy.** `main/system_reset.cpp` makes every restart of a board whose Wi-Fi is behind
+esp_hosted (a build that links it: the P4 and the H2) end in the RTC watchdog's system reset: a
+shutdown handler, registered first so that it runs after `esp_wifi_stop` and last of all, arms the
+watchdog the way ESP-IDF's own `esp_restart_noos` does (one second, then a reset of the RTC, the
+flash boot protected) and lets it expire. That covers this application's restarts, the update's and
+the one esp_hosted makes when its link fails to come up, which is what heals a board that came back
+dead because the restart into it was done by an image without this (or by a panic, which is not an
+`esp_restart()`), about fifteen seconds into its boot. Measured on both boards the same day:
+24 of 24 updates over the network clean (8 of them on the protocol that faulted 8 of 16), and a
+board that came back dead was healed in 8 of 8.
+
+Three requests for a system reset that look the same and are not, each tried on a board and each
+leaving it dead until a USB-JTAG reset:
+
+- `esp_rom_software_reset_system()` ("digital core include RTC") leaves both cores parked in the
+  ROM (pc `0x4fc00b18` and `0x4fc0283e`).
+- A watchdog stage armed for 20 ms resets the system, and resets it again, for ever: the stage's
+  timeout lives in the RTC domain, survives the reset and expires before the ROM reaches the
+  bootloader. ESP-IDF's own `esp_restart_noos` arms one second for that reason.
+- A core stalled with `esp_cpu_stall()` before the reset stays stalled through it and parks the
+  ROM the same way: the stall is a flag in the RTC domain. Do not stall the other core.
+
+What it costs: a restart takes about a second longer, and the USB-Serial-JTAG port re-enumerates
+(the COM port is gone for a second or two), where a CPU reset kept it, so a serial monitor has to
+reconnect after each restart. What it does not cover: the image that is running when an update
+arrives does the restart, so a board that still runs an image from before this needs one more
+update, or one USB flash, to get it.
+
+Recovering a board that is already dead, with the cable alone:
+`esptool --chip esp32p4 --port COMn --before default-reset --after watchdog-reset read-mac` (the
+serial exception at the end is the port re-enumerating). If esptool answers `Write timeout`, a
+`reset run` over JTAG frees it first (`openocd -c "adapter serial <MAC>" -f
+board/esp32p4-builtin.cfg -c init -c halt -c "reset run" -c shutdown`; the serial must name the
+board, since every Espressif board on the machine answers to the same VID and PID, and OpenOCD has
+to have exited before esptool runs).
+
 ## What the part carries
 
 Fixed-point tier not measured — this part has an FPU, and every board figure here is the float

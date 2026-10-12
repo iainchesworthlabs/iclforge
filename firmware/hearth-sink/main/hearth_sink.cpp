@@ -72,6 +72,7 @@
 #include "provision.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
+#include "system_reset.hpp"
 
 // The example's half of the stage timers. main/CMakeLists.txt links the
 // bare-metal probe's backend (firmware/baremetal/stage_timers.cpp) when the
@@ -795,6 +796,9 @@ extern "C" void app_main() {
     // (iclforge/log.hpp).
     (void)iclforge::log_start(CONFIG_ICLFORGE_LOG_BYTES);
     (void)heap_caps_register_failed_alloc_callback(on_alloc_failed);
+    // Before anything else registers a shutdown handler: this one has to run last
+    // (system_reset.cpp has why a restart resets the whole system).
+    player::restart_through_system_reset();
 
     // What this BOARD is, before anything asks: the name it answers to, the
     // network it joins and how its DAC is wired (settings.hpp). NVS comes up

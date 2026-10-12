@@ -102,6 +102,7 @@ idf_component_register(
     SRCS "hearth_sink.cpp"
          "settings.cpp"
          "provision.cpp"
+         "system_reset.cpp"
          "discovery.cpp"
          "${ICLFORGE_SINK_DIR}/audio_sink.cpp"
          "${ICLFORGE_SOURCE_DIR}/byte_source.cpp"
@@ -110,6 +111,7 @@ idf_component_register(
          ${ICLFORGE_STAGE_TIMER_SRCS}
     INCLUDE_DIRS "." "source/http"
     REQUIRES iclforge esp_driver_i2s esp_timer freertos
+             esp_system esp_hw_support esp_hal_wdt
              esp_partition
              esp_driver_sdmmc sdmmc fatfs wear_levelling
              esp_wifi esp_eth esp_http_client esp_netif esp_event nvs_flash
