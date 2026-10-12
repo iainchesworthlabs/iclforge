@@ -1245,7 +1245,7 @@ namespace {
 // The same five tones as an E-AC-3 stream: one independent substream, flagged `bsmod`, with
 // `options` after the layout.
 fs::path write_eac3_karaoke_candidate(const fs::path& dir, const std::string& name,
-                                      const std::string& options, int channels = 5,
+                                      const std::string& options, std::size_t channels = 5,
                                       const std::string& layout = "L,C,R,Ls,Rs",
                                       int kbps = 448) {
     const auto source = write_wav(dir / (name + "_src.wav"), channels);
