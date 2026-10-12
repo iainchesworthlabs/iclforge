@@ -70,7 +70,7 @@ or laptop sounds like an ideal outcome for this with the esp32 plus a screen".
 | U4 | At a TV with an **ESP32 board that has a screen and a microphone** (the owner's picture; the P4 kit is the board in view) | On the board | The board's output | The "karaoke box": the board decodes, shows the words and mixes the voice itself |
 | U5 | At a TV with sinks around the room and a microphone on **the host** | On the host | The room | The question behind D2: should the sinks play the voice |
 | U6 | A **browser tab** (the WebAssembly demo) | The browser's | Headphones or speakers | Echo cancellation is the browser's own |
-| U7 | A **phone as the microphone** | A phone app | - | No such app and no Android player ([D17](#decisions)); not planned |
+| U7 | A **phone as the microphone** | A phone app | - | Not planned ([D17](#decisions)): no Android capture backend, and a phone app that is a microphone is a separate product from the Android player being planned in planning/hearth-android.md, still in review |
 | U8 | A **Bluetooth headset** | On the host | The headset | Bluetooth's own delay (general knowledge: of the order of 100 to 300 ms for the music profile) puts it outside monitoring and makes scoring alignment unknown |
 
 U1, U2, U4 and U6 are the targets. U3 and U5 are the cases the design has to be honest about, and
@@ -435,7 +435,7 @@ added after the measurements and is the one place they moved.
 | D14 | The wire for a voice that crosses the network | `source@v1` as specified; a new message on the extension role; both | **`source@v1`** for host-bound voice; nothing new for A | Hearth's host side starts using a role the library already implements |
 | D15 | Voice effects (reverb, echo) | None; a simple reverb; chosen later | **None in v1** | A mixer of our own and a place to put it, which D5 avoids |
 | D16 | Browser | The decode demo gains a microphone and a score; nothing | **After the host**, with the browser's own echo cancellation | M: the tracker compiled to WebAssembly, a worklet, no recording beyond a download |
-| D17 | Android | A capture backend and an app; nothing | **Nothing** (phase 2's D4 stands: no player app) | - |
+| D17 | Android | A capture backend and an app; nothing | **Nothing in this programme.** An Android player is planned separately (planning/hearth-android.md, still in review; phase 2's D4 is lifted for it), and a microphone on it would be its own decision | - |
 | D18 | Tests without a microphone | A fake capture and a generator; a hardware rig; manual only | **A fake capture and the synthetic generator in CI**; one hidden live test per platform | The generator is a deliverable of the tracker's PR |
 
 ### D2: where the voice is mixed
