@@ -15,7 +15,7 @@
     |---|---|---|
     | 0 | This page, the findings and the screen spec | Written 2026-10-12, for sign-off |
     | 1 | The owner's answers to [the decisions](#decisions) and [the questions](#questions-for-the-owner) | Waiting |
-    | 2 | Spikes S1 to S4 ([below](#spikes)); S1, S3 and S4 need the Shield and a receiver | Not run |
+    | 2 | Spikes S1 to S4 ([below](#spikes)) | **S2 run and passed; S1 run on the Shield except the receiver's relock; S4 read for one device; S3 only its first finding** ([findings F12](hearth-android-findings.md#f12-what-the-spikes-measured-2026-10-12)) |
     | 3 | Phases 0 to 5 ([the plan](#phases)) | Not started; the order is the plan's |
 
 ## What it is, and what it is not
@@ -205,10 +205,10 @@ Allowed before sign-off. Each is a measurement, with what it decides.
 
 | # | Spike | Needs | Decides |
 |---|---|---|---|
-| S1 | On the Shield: is `getTimestamp()` available on an `ENCODING_IEC61937` track and how steady; the time from a write to the link; how long a receiver takes to relock after PCM silence **and** after null bursts; drift of the link against `CLOCK_MONOTONIC` over 30 minutes | A Shield, a receiver, a person | D10, the start-on-time design, the burst threshold |
-| S2 | Build `libs/lyrics` and `libs/sendspin` (with its five packages) for `arm64-android` through vcpkg and the NDK r26 | This machine; nothing is installed beyond the existing SDK and vcpkg | Phase 0c; D2's cost; whether the player-only profile is needed |
-| S3 | Does the sink survive HOME, standby and a reboot, and is it still advertised | A Shield | D9 |
-| S4 | The route's capabilities on each device available: the encodings and the channel counts (`CapabilityProbe` already reads them), whether `ENCODING_IEC61937` is accepted where the per-codec encodings are, multichannel LPCM | Each device and receiver | D4, D5's table of what works where |
+| S1 | On the Shield: is `getTimestamp()` available on an `ENCODING_IEC61937` track and how steady; the time from a write to the link; how long a receiver takes to relock after PCM silence **and** after null bursts; drift of the link against `CLOCK_MONOTONIC` | A Shield, a receiver, a person | D10, the start-on-time design, the burst threshold. **Run 2026-10-12 except the relock** (needs the receiver's input selected, which was not done unasked): available, steps of ~20 ms, 8 bursts to start and 4 to hold, -0.3 ppm over 600 s, 0 underruns. [F12](hearth-android-findings.md#f12-what-the-spikes-measured-2026-10-12) |
+| S2 | Build `libs/lyrics` and `libs/sendspin` (with its five packages) for `arm64-android` through vcpkg and the NDK r26 | This machine; nothing is installed beyond the existing SDK and vcpkg | Phase 0c; D2's cost; whether the player-only profile is needed. **Passed 2026-10-12**: both libraries and their test binaries build for `arm64-android`; the tests (83 and 243 cases) pass on the Shield; the player-only profile is not needed to build. [F12](hearth-android-findings.md#f12-what-the-spikes-measured-2026-10-12) |
+| S3 | Does the sink survive HOME, standby and a reboot, and is it still advertised | A Shield | D9. **First finding 2026-10-12:** when the Shield's display sleeps its HDMI audio route disappears, so a sink has no route while the TV is asleep unless it holds the display |
+| S4 | The route's capabilities on each device available: the encodings and the channel counts (`CapabilityProbe` already reads them), whether `ENCODING_IEC61937` is accepted where the per-codec encodings are, multichannel LPCM | Each device and receiver | D4, D5's table of what works where. **One device read 2026-10-12** (the Shield and the Onkyo): PCM to 7.1 at up to 192 kHz and `IEC61937` listed; the only device the owner has |
 | S5 | **Only if D2 is (c):** Qt for Android: the kit through aqtinstall, an APK with Quick and Controls, the Gradle template against AGP 9, a D-pad walk of `LyricView.qml` | A Linux build and an emulator; needs an install of the kit, explained first | D2 |
 
 ## Verification
@@ -252,18 +252,11 @@ an Onkyo TX-RZ740 on HDMI. The questions below ask what is there now.
 
 Hardware first, since nothing for a device is planned until these are answered.
 
-1. **What Android TV hardware is there now?** The demo's records name a 2017 Shield. Any other
-   box (a Google TV Streamer, a Chromecast with Google TV, a Fire TV, a TV with it built in) or a
-   phone or tablet changes S4's table.
-2. **Which receiver and which TV are on the Shield's HDMI**, and is the Onkyo TX-RZ740 still the
-   one? Does anything sit in between (a TV on ARC, an eARC link)?
-3. **May the session use the Shield** (install, run, cable and receiver power-cycles by you)? The
-   boards have booking locks; the Shield has no record of one.
-4. **Is there an HDMI audio extractor or a capture device?** Without one, the bytes that reach the
-   link are checked as the demo's were: by the receiver's own lock indicator.
-5. **A receiver that changes mode between songs.** Under D5 a karaoke song makes the Shield send PCM
-   for its length and a bitstream again after. Is that acceptable, or should a karaoke song be
-   passed through "as coded" by default and decoded only when the singer chooses a vocal?
+1. **What Android TV hardware is there now?** *Answered 2026-10-12: one Shield (the 2019 model, `mdarcy`, Android 11), an Onkyo TX-RZ740 on its HDMI and a TV on the receiver. No other box was named; a Google TV Streamer, a Chromecast with Google TV, a Fire TV or a phone would change S4's table.*
+2. **Which receiver and which TV are on the Shield's HDMI?** *Answered 2026-10-12: the Shield is on the Onkyo by HDMI and the Onkyo is on the TV by HDMI. Nothing in between.*
+3. **May the session use the Shield?** *Answered 2026-10-12: yes, it was free for a few hours and its demo had been stopped. Used through `adb` on the network; nothing installed on it.*
+4. **Is there an HDMI audio extractor or a capture device?** *Answered 2026-10-12: no.* The bytes that reach the link are checked as the demo's were, by the receiver's own lock indicator, or over eISCP if the owner lets the session select the Shield's input on the receiver.
+5. **A receiver that changes mode between songs.** *Answered 2026-10-12: acceptable.* D5(a) is not blocked on it.
 6. **Should the sink be always available** (D9c) **or available while it has been opened and not
    left** (D9b)?
 7. **Should the TV remote choose V1 and V2** (D8)? It is the only control that the panel's touch and

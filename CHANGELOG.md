@@ -40,6 +40,12 @@ The sections below contain the complete change list and fixes.
   not measured, and `planning/hearth-sink-screen.md` is the one design (model, screens, layout in
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
+- **The first spikes were run on a Shield.** `planning/hearth-android-findings.md` F12 records them:
+  `libs/lyrics` and `libs/sendspin` (with cpp-httplib, mbedTLS, libFLAC, Opus and mdns from vcpkg)
+  build for `arm64-android` under NDK r26 and their 83 and 243 test cases pass on the Shield; an
+  `ENCODING_IEC61937` track on the Shield reports its position in steps of about 20 ms, needs 8
+  bursts queued to start and 4 to hold, and drifted -0.3 ppm against `CLOCK_MONOTONIC` over 10
+  minutes with no underruns; the Shield's HDMI audio route disappears when its display sleeps.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 

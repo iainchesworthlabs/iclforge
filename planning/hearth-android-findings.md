@@ -65,6 +65,8 @@ subtracts `output_delay_ms` ([Timing](hearth-sendspin-extension.md#timing)). **R
 are "applied to decoded PCM, never to bursts" (R9). A passthrough sink has no decoded PCM, so **the
 role's ±1 ms group promise cannot be kept by a pass-through member** (**Read** + reasoning).
 
+**Measured on the Shield (spike S1) is in [F12](#f12-what-the-spikes-measured-2026-10-12); its figures replace the "not measured" statements below where they overlap.**
+
 **What Android gives to map a position to a time.** `AudioTrack.getTimestamp` returns a frame
 position (the low 32 bits, wrapping, like `getPlaybackHeadPosition`) and a `nanoTime` "on the
 `System.nanoTime()` timebase" (`TIMEBASE_MONOTONIC`), a best-effort estimate that "cannot account
@@ -217,8 +219,8 @@ address, which is what such a permission is about.
 | The repo's `hearth` feature (`vcpkg.json`) is exactly those five, `cpp-httplib` without its default features, at 0.56.0 from an overlay port in `cmake/vcpkg/ports` | **Read** |
 | The Android build has no vcpkg toolchain; the wrapper forces `ICLFORGE_BUILD_HEARTH` OFF | **Read** |
 | `ICLFORGE_SENDSPIN_PLAYER_ONLY` builds the core and the player half (Noise responder, pairing, clock, `PlayerSession`) needing **only mbedTLS**, with no WebSocket, mDNS, FLAC or Opus | **Read**, `libs/sendspin/CMakeLists.txt` |
-| mbedTLS, cpp-httplib, FLAC and Opus building for `arm64-android` through vcpkg with the NDK r26 toolchain has **not been tried** | not measured |
-| NDK r26's libc++ lacks C++23 library features the desktop uses (`std::ranges::contains`, `<format>`; the Android build has had to avoid both). `libs/sendspin` and `libs/lyrics` are C++23 and are not dependencies of the app's `iclforge_jni`, so the Android job does not compile them: whether they build under NDK r26 has not been tried | **Read** (the wrapper's comments, the link line); not measured |
+| mbedTLS 3.6.5, cpp-httplib 0.56.0 (the overlay), libFLAC 1.5.0 with libogg, Opus 1.6.1, mdns 1.4.3 and Catch2 all **build for `arm64-android`** through vcpkg with the NDK r26 toolchain, and so does `libs/sendspin` with all of them | **Measured**, spike S2: [F12](#f12-what-the-spikes-measured-2026-10-12) |
+| NDK r26's libc++ lacks C++23 library features the desktop uses (`std::ranges::contains`, `<format>`; the Android build has had to avoid both). `libs/sendspin` and `libs/lyrics` are C++23 and are not dependencies of the app's `iclforge_jni`, so the Android job does not compile them: whether they build under NDK r26 has not been tried | **Read** (the wrapper's comments, the link line); **Measured**, spike S2: `libs/lyrics`, `libs/sendspin`, `libs/ac3` and `libs/containers` compile and link under NDK r26 as they are ([F12](#f12-what-the-spikes-measured-2026-10-12)) |
 
 So the first build question is a spike (S2), and it has a cheap half: the player-only profile
 plus a Kotlin-side WebSocket would avoid four of the five packages. The cost of that is a second
@@ -331,3 +333,68 @@ output (`315/315 bursts, 0 errors`), compared with the hash of what the server s
 The new part is the last metre: bytes reaching the HDMI link are not visible from the app, and
 the receiver's own lock indicator is the oracle unless the owner has an HDMI audio extractor
 ([question](hearth-android.md#questions-for-the-owner)).
+
+## F12: what the spikes measured (2026-10-12)
+
+Run on 2026-10-12 with the owner's go-ahead: a **NVIDIA SHIELD Android TV**, codename `mdarcy`
+(the 2019 model; the Shield page says 2017), Android 11 (API 30), `arm64-v8a`, connected by HDMI to
+an **Onkyo TX-RZ740**, which is connected to a TV. No HDMI extractor. The instruments were the
+Shield's `getprop` and `dumpsys media.audio_policy`, an `app_process` test program and the
+cross-built test binaries; nothing was installed on the Shield. The program is a single Java file
+(about 350 lines) that wraps real Dolby-encoded fixtures into IEC 61937 bursts as
+`iclforge::containers::iec61937` does and writes them to an `ENCODING_IEC61937` stereo
+`AudioTrack` as the demo does (the karaoke example's AC-3 at 48 kHz, 516 bursts; a DEE E-AC-3 5.1
+at 192 kHz, 79 bursts, looped). Everything below is **Measured** unless a line says otherwise. The
+program and its analysis scripts were scratch and are not in the tree; the recipe is here so that
+they can be written again.
+
+### The Shield's route, from its audio policy (S4, one device)
+
+| Item | Value |
+|---|---|
+| HDMI output profiles | PCM 16-bit at 32, 44.1, 48, 88.2, 96, 176.4 and 192 kHz, with channel masks mono, stereo, quad (`0x33`), 5.1 (`0x3f`), 6.1 (`0x13f`) and 7.1 (`0x63f`); and, at the same rates and masks, AC-3, E-AC-3, E-AC-3 JOC, TrueHD, DTS, DTS-HD and **IEC 61937** |
+| Consequence for karaoke | The 3/0 + LFE reproduction can go out as six-channel LPCM on this route, the 2/0 one as stereo |
+| `isDirectPlaybackSupported` for IEC 61937, stereo, 48 and 192 kHz | `true`, **while the display is on** |
+| The display sleeps | After the screensaver the display goes OFF and the HDMI device **disappears from the audio policy**: `isDirectPlaybackSupported` is `false`, `createTrack` fails with -38, and a test process that tried was killed. `KEYCODE_WAKEUP` brings the route back in about 6 s. A sink that is not in front has no route while the TV is asleep, or has to hold the display: spike S3's first finding |
+
+### The link, from `AudioTrack` (S1)
+
+| Question | Result |
+|---|---|
+| Does `getTimestamp()` work on an `ENCODING_IEC61937` direct track? | **Yes**: 99.3% of 2,676 samples at 48 kHz and 99.9% of 6,985 at 192 kHz (the failures are the first ~20 ms) |
+| How is the position reported? | In **steps of about 20 ms of audio** (983 to 1,021 frames at 48 kHz; 3,900 at 192 kHz), with `nanoTime` about the query time, so distinct pairs arrive every ~8 ms. A single sample is good to about **±10 ms**; against a fitted line the residual is 4.6 ms (stdev) and 14.5 ms (worst) at 48 kHz, and 4.8 ms and 15.7 ms at 192 kHz. A sink has to smooth |
+| What does the position count? | **What the HAL has taken, not what the receiver is playing.** At the first report the position is already about 5,800 frames (120 ms) at 48 kHz and 21,000 (110 ms) at 192 kHz, so it leads the link by the HAL's own FIFO. The offset to the receiver's output cannot be seen from the Shield |
+| Drift of the link against `CLOCK_MONOTONIC` | **600 s at the 48 kHz carrier: -0.3 ppm** by a whole-run fit; five segments between -9 and +2 ppm; end to end +1.7 ppm (the 20 ms step bounds that at ±36 ppm); 28,810,752 frames written and **0 underruns**. 40 s at 192 kHz gave -54 ppm with a bound of several hundred, so only "not worse than the bound". This is the position as the HAL reports it: whether the HAL derives it from a hardware counter or from the system clock is not known, and there was no extractor to compare the link itself |
+| Where does the head start? | **Not until 8 bursts (12,288 frames, 256 ms) are queued**, which is the buffer the demo asks for. With 6 or fewer the head stays at 0 for the whole run and no underrun is counted |
+| First movement | 60 to 130 ms after `play()` with 9 to 10 bursts written (AC-3); write to first reported position 204 to 209 ms (AC-3, 8 starts) and 75 to 82 ms (E-AC-3, 6 starts) |
+| How far ahead must a sink stay once running? | Held at **4 or 6 bursts ahead: 0 underruns in 14 s**. At 3: one underrun, then it carried on. At 2: one underrun and the head **stopped** at 15,872 frames until more was written. At 1: stopped at 16,384 with none counted. So **at least 4 bursts (128 ms) ahead of the head, and 8 to start** |
+| How much is queued when writes block? | 280 to 423 ms (AC-3), 163 to 296 ms (E-AC-3) ahead of the position |
+
+What this settles in [the plan](hearth-android.md): the role state's `min_buffer_ms` for this sink
+is at least 128 ms and its `required_lead_time_ms` at least 256 ms plus the time to the first
+report (about 300 ms is safe); a sink needs a **smoothed** position, not single samples; and the
+Shield's own link drift is a few ppm at most, so the burst slip that D10 worried about is, on this
+device, rare (even the ±36 ppm bound is a burst every ~15 minutes; the fit says far less). What it
+leaves open: the receiver's relock after silence and after null bursts, and the absolute latency to
+the receiver's output.
+
+### The NDK build (S2)
+
+| Item | Result |
+|---|---|
+| Recipe | The repo root as the source directory; vcpkg's toolchain with the NDK's `android.toolchain.cmake` chained (`VCPKG_CHAINLOAD_TOOLCHAIN_FILE`), `VCPKG_TARGET_TRIPLET=arm64-android`, `VCPKG_MANIFEST_FEATURES=hearth`, `VCPKG_OVERLAY_PORTS` the repo's, the SDK's CMake 3.31.6, NDK 26.1.10909125, `ANDROID_PLATFORM=android-26`, `CMAKE_CXX_SCAN_FOR_MODULES=OFF`, `ICLFORGE_BUILD_HEARTH=ON`, `ICLFORGE_BUILD_TESTS=ON` and the CLI, GUI, examples, fuzzers and C API OFF |
+| Configure | 1,485 s, almost all of it vcpkg building its host tools and 11 packages for the target |
+| Build | The four targets `iclforge_lyrics`, `iclforge_sendspin`, `iclforge-lyrics-tests` and `iclforge-sendspin-tests` (with `libs/ac3`, `libs/containers` and the vendored time filter beneath them) in 143 s of ninja; **no NDK r26 library gap was hit** |
+| What does not work cross-compiled | Catch2's `catch_discover_tests` runs the test binary at build time, which a Windows host cannot do for an arm64 binary: the link succeeds and the post-build discovery step fails. An Android test lane needs `DISCOVERY_MODE PRE_TEST` or binaries built without discovery |
+| Running them on the Shield | `iclforge-lyrics-tests`: **83 cases, 961 assertions, all passed**. `iclforge-sendspin-tests`: **243 cases, 15,794 assertions, all passed**, after one fixture was put where the build host's absolute path points (`ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR`, a compile-time define): the burst-chunk test reads a file by that path and failed on `in.good()` before. An Android lane has to make that path relative or overridable |
+| The loopback mDNS test (`[network]`) | Passed on the Shield |
+| Not done | The player-only profile (`ICLFORGE_SENDSPIN_PLAYER_ONLY`), `x64-android` for the emulator, and linking `sendspin` into the app's `iclforge_jni` |
+
+### Not measured, and why
+
+| Item | Why |
+|---|---|
+| The receiver's relock after PCM silence and after null bursts | The Onkyo was on input 05 (PC, analog) at volume 0, so its state did not follow the Shield's stream. Reading its lock over eISCP needs the Shield's HDMI input selected, a setting change on the receiver that was not made unasked. The Shield's own APIs cannot see it |
+| Atmos/JOC lock | The receiver reconstructs objects only from a signed stream, and **no signing key is on this machine** (no worktree asset, no environment variable, no key file; the only copy is the write-only CI secret `ATMOS_SIGNING_KEY`). A sink passes bits through unchanged, so a JOC stream signed on the host would not need the key on the Android side; a locally built demo does |
+| HOME, standby and reboot (S3), beyond the display-sleep finding | Not run |
+| AC-4 over `ENCODING_IEC61937` | No AC-4 receiver; the route lists no AC-4 profile |
