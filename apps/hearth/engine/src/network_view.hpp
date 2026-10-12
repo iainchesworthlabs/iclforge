@@ -115,7 +115,8 @@ struct SinkFacts {
     // when the sink does not offer the role, or lists no PCM.
     std::vector<PcmFormat> pcm_formats{};
     // The person's choice for this sink: audio Hearth decodes for it is sent as Opus where it
-    // lists it (sink_lists_opus()), not PCM. Kept in this run only, as intended_settings is.
+    // lists it (sink_lists_opus()), not PCM. Kept with the sink's pairing record, so that it
+    // outlives the run.
     bool opus_fallback = false;
     // `_iclforge_player@v1_support.outputs`, when the role is offered.
     std::optional<std::uint32_t> output_slots{};
