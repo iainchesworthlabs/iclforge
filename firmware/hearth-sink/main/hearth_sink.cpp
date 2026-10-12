@@ -71,6 +71,7 @@
 #include "discovery.hpp"
 #include "network.hpp"
 #include "provision.hpp"
+#include "panel/panel.hpp"
 #include "sendspin.hpp"
 #include "settings.hpp"
 
@@ -985,6 +986,11 @@ extern "C" void app_main() {
     // has to come from internal RAM in one piece, and after the boot play has
     // started, which holds the sink until it ends.
     start_sendspin();
+    // The screen, if this build has one, after the player: its memory is PSRAM and none of the
+    // internal RAM the server's stack and the decoder's allocations were just given, and it reads
+    // the player, so it has one to read (panel/panel.hpp).
+    (void)player::panel_start();
+    // After the screen, so that the line says what is resident at boot, whatever started.
     report_budget("boot");
     // Whether the calls above had a network to start on. One that comes up
     // later - over Improv, on a board that had none stored or could not join

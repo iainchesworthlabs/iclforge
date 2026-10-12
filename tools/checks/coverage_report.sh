@@ -157,6 +157,11 @@ fi
 # libs/containers, which takes the lowest line and branch floors of the five until a coverage run
 # measures it.
 #
+# libs/sink is the sink core that was apps/hearth/testsink/src/sink.cpp and store.cpp, counted in the
+# apps/hearth row above until it moved. Its floors are under that row's (87/77), which it was part of,
+# and have not been measured on their own: the first hosted run of this job sets them (planning/
+# hearth-android.md, phase 1a).
+#
 # apps/crucible/engine/src is the platform-free engine core iclforge-crucible-tests compiles in;
 # the rest of apps/crucible keeps its own floors in coverage_crucible.ps1.
 components="
@@ -170,6 +175,7 @@ libs/audio             72 58
 libs/capi              84 74
 libs/adm               82 75
 libs/sendspin          85 74
+libs/sink              80 65
 libs/ac4               88 80
 libs/iab               90 87
 apps/forge/cli/src              80 71

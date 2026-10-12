@@ -6,11 +6,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <numbers>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/decoder/output.hpp"
@@ -970,6 +972,8 @@ struct Spoken {
     std::vector<std::string> names;
     std::vector<std::vector<float>> slots;
     std::vector<iclforge::hearth::UnitReport> reports;
+    // The frames finish() delivered: what a unit held back to the end of the stream came to.
+    std::size_t finished = 0;
 };
 
 Spoken speak(const iclforge::render::OutputLayout& layout,
@@ -995,7 +999,7 @@ Spoken speak(const iclforge::render::OutputLayout& layout,
     for (const auto& unit : units) {
         REQUIRE(decoder.decode(unit, deliver, reported).has_value());
     }
-    decoder.finish(deliver, reported);
+    out.finished = decoder.finish(deliver, reported);
     return out;
 }
 
@@ -1154,6 +1158,282 @@ TEST_CASE("stream decoder: the unit report says whether karaoke was reproduced",
         // What the stream is stays the coded layout; what played is the report's neighbour.
         CHECK(report.acmod == iclforge::ac3::Acmod::k3_2);
         CHECK(report.lfe);
+    }
+
+    iclforge::hearth::DecoderSettings coded;
+    coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+    for (const auto& report : speak(*layout, coded, units).reports) {
+        CHECK(report.karaoke);
+        CHECK_FALSE(report.karaoke_reproduced);
+    }
+
+    // Annex C defines no Lt/Rt reproduction: the stream is karaoke and was not reproduced.
+    const auto stereo = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(stereo.has_value());
+    iclforge::hearth::DecoderSettings ltrt;
+    ltrt.stereo_fold = iclforge::ac3::DownmixTarget::kLtRt;
+    for (const auto& report : speak(*stereo, ltrt, units).reports) {
+        CHECK(report.karaoke);
+        CHECK_FALSE(report.karaoke_reproduced);
+    }
+}
+
+// The same programme as karaoke_units(), as E-AC-3 (planning/karaoke-eac3.md, E4a and E4c): one
+// independent substream, 3/2 + LFE, flagged `bsmod`, the same tones in the same channels. The
+// reproduction is the decoder's for an E-AC-3 programme of one independent substream (D1 to D3),
+// and the engine's bed has to be the shape it gives, or the renderer is handed four channels for a
+// five-channel bed. `burst_at` puts a short burst on the first channel at that sample, which makes
+// the encoder signal transient pre-noise processing and the decoder hold frames back, so the last
+// unit comes out of flush(). `dependent` adds the rear pair of a 7.1 programme in a dependent
+// substream.
+namespace {
+
+std::vector<std::vector<std::byte>> eac3_karaoke_units(
+    iclforge::ac3::meta::BitstreamMode bsmod, int count,
+    std::optional<std::uint64_t> burst_at = std::nullopt, bool dependent = false) {
+    iclforge::ac3::eac3::FrameConfig bed;
+    bed.bitrate_kbps = 448;
+    bed.acmod = iclforge::ac3::Acmod::k3_2;
+    bed.lfe = true;
+    bed.info = iclforge::ac3::meta::BsiInfo{.bsmod = bsmod};
+    bed.transient_prenoise = burst_at.has_value();
+    iclforge::ac3::eac3::AccessUnitConfig config;
+    config.independent = bed;
+    if (dependent) {
+        iclforge::ac3::eac3::FrameConfig rear;
+        rear.bitrate_kbps = 320;
+        rear.acmod = iclforge::ac3::Acmod::k2_2;
+        rear.chanmap = iclforge::ac3::eac3::chanmap::k71Rear;
+        config.dependents.push_back(rear);
+    }
+    iclforge::ac3::eac3::AccessUnitEncoder encoder{config};
+    const auto channels = static_cast<std::size_t>(encoder.channel_count());
+    std::vector<std::vector<std::byte>> out;
+    std::uint64_t n0 = 0;
+    for (int f = 0; f < count; ++f) {
+        std::vector<std::vector<float>> pcm;
+        for (std::size_t ch = 0; ch < channels; ++ch) {
+            const double hz = ch < kKaraokeHz.size()
+                                  ? kKaraokeHz[ch]
+                                  : 1300.0 + 200.0 * static_cast<double>(ch - kKaraokeHz.size());
+            std::vector<float> samples =
+                tone(hz, 0.3, iclforge::ac3::kSamplesPerFrame, static_cast<std::size_t>(n0));
+            if (ch == 0 && burst_at) {
+                for (std::size_t i = 0; i < samples.size(); ++i) {
+                    const std::uint64_t at = n0 + i;
+                    if (at >= *burst_at && at < *burst_at + 384) {
+                        const auto k = static_cast<double>(at - *burst_at);
+                        samples[i] += static_cast<float>(
+                            0.6 * std::sin(2.0 * std::numbers::pi * 5000.0 * k / 48000.0) *
+                            std::exp(-k / 96.0));
+                    }
+                }
+            }
+            pcm.push_back(std::move(samples));
+        }
+        n0 += iclforge::ac3::kSamplesPerFrame;
+        std::vector<std::span<const float>> views;
+        for (const auto& channel : pcm) {
+            views.emplace_back(channel);
+        }
+        const auto unit = encoder.encode_access_unit(views);
+        REQUIRE(unit.has_value());
+        out.emplace_back(unit->bytes.begin(), unit->bytes.end());
+    }
+    return out;
+}
+
+// The library's own decode of E-AC-3 units under the configuration the settings make for a layout,
+// the tail flush() holds included: the channels the stream decoder is held to.
+std::vector<std::vector<float>> library_decode_eac3(
+    const iclforge::render::OutputLayout& layout, const iclforge::hearth::DecoderSettings& settings,
+    const std::vector<std::vector<std::byte>>& units) {
+    iclforge::ac3::Eac3Decoder decoder{iclforge::hearth::decoder_setup(settings, layout).config};
+    std::vector<std::vector<float>> channels;
+    const auto append = [&channels](const std::vector<std::vector<float>>& more) {
+        channels.resize(more.size());
+        for (std::size_t c = 0; c < more.size(); ++c) {
+            channels[c].insert(channels[c].end(), more[c].begin(), more[c].end());
+        }
+    };
+    for (const auto& unit : units) {
+        const auto decoded = decoder.decode_access_unit(unit);
+        REQUIRE(decoded.has_value());
+        if (decoded->has_value()) {
+            append((*decoded)->channels);
+        }
+    }
+    for (const auto& tail : decoder.flush()) {
+        append(tail.channels);
+    }
+    return channels;
+}
+
+constexpr std::uint64_t kBurstInSecondFrame = std::uint64_t{1} * 1536 + 900;
+
+}  // namespace
+
+TEST_CASE("stream decoder: an E-AC-3 karaoke stream's reproduction reaches the speakers it names",
+          "[hearth][stream-decoder][karaoke]") {
+    const auto layout = iclforge::render::OutputLayout::parse("5.1");
+    REQUIRE(layout.has_value());
+    const auto units = eac3_karaoke_units(iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke, 9);
+
+    // As coded: V1 and V2 are the surround speakers' own.
+    {
+        iclforge::hearth::DecoderSettings coded;
+        coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+        const Spoken spoken = speak(*layout, coded, units);
+        const auto want = library_decode_eac3(*layout, coded, units);
+        REQUIRE(want.size() == 6);
+        CHECK(carries(spoken.slots[slot_named(spoken, "Ls")], want[3]));
+        CHECK(carries(spoken.slots[slot_named(spoken, "Rs")], want[4]));
+        CHECK(peak(spoken.slots[slot_named(spoken, "Ls")]) > 0.05);
+    }
+
+    // Aware, and capable with each choice of vocals: L, C, R and the LFE are the library's four
+    // channels and the surround speakers are silent.
+    std::vector<iclforge::hearth::DecoderSettings> chosen;
+    chosen.emplace_back();  // aware, the default
+    for (const auto choice :
+         {iclforge::ac3::KaraokeVocals::kNone, iclforge::ac3::KaraokeVocals::kV1,
+          iclforge::ac3::KaraokeVocals::kV2, iclforge::ac3::KaraokeVocals::kBoth}) {
+        iclforge::hearth::DecoderSettings capable;
+        capable.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+        capable.karaoke_vocals = choice;
+        chosen.push_back(capable);
+    }
+    for (const auto& settings : chosen) {
+        INFO(iclforge::hearth::describe(settings));
+        const Spoken spoken = speak(*layout, settings, units);
+        const auto want = library_decode_eac3(*layout, settings, units);
+        REQUIRE(want.size() == 4);
+        CHECK(carries(spoken.slots[slot_named(spoken, "L")], want[0]));
+        CHECK(carries(spoken.slots[slot_named(spoken, "C")], want[1]));
+        CHECK(carries(spoken.slots[slot_named(spoken, "R")], want[2]));
+        CHECK(carries(spoken.slots[slot_named(spoken, "LFE")], want[3]));
+        CHECK(peak(spoken.slots[slot_named(spoken, "Ls")]) < 1e-9);
+        CHECK(peak(spoken.slots[slot_named(spoken, "Rs")]) < 1e-9);
+        CHECK(peak(spoken.slots[slot_named(spoken, "C")]) > 0.05);
+    }
+}
+
+TEST_CASE("stream decoder: the last unit of an E-AC-3 karaoke stream, held back, is the "
+          "reproduction too",
+          "[hearth][stream-decoder][karaoke]") {
+    const auto layout = iclforge::render::OutputLayout::parse("5.1");
+    REQUIRE(layout.has_value());
+    // A burst engages transient pre-noise processing, so the decoder holds frames back and the end
+    // of the stream is released through flush(): the path that lays a programme over its bed.
+    const auto units = eac3_karaoke_units(iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke,
+                                          9, kBurstInSecondFrame);
+
+    const iclforge::hearth::DecoderSettings aware;
+    const Spoken spoken = speak(*layout, aware, units);
+    // The premise: the end of the stream delivered a unit the decoder was holding.
+    REQUIRE(spoken.finished > 0);
+    const auto want = library_decode_eac3(*layout, aware, units);
+    REQUIRE(want.size() == 4);
+    CHECK(want[0].size() == 9 * static_cast<std::size_t>(iclforge::ac3::kSamplesPerFrame));
+    CHECK(carries(spoken.slots[slot_named(spoken, "L")], want[0]));
+    CHECK(carries(spoken.slots[slot_named(spoken, "C")], want[1]));
+    CHECK(carries(spoken.slots[slot_named(spoken, "R")], want[2]));
+    CHECK(carries(spoken.slots[slot_named(spoken, "LFE")], want[3]));
+    CHECK(peak(spoken.slots[slot_named(spoken, "Ls")]) < 1e-9);
+    CHECK(peak(spoken.slots[slot_named(spoken, "Rs")]) < 1e-9);
+}
+
+TEST_CASE("stream decoder: a stereo layout takes an E-AC-3 karaoke stream's reproduction as its fold",
+          "[hearth][stream-decoder][karaoke]") {
+    const auto layout = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(layout.has_value());
+    // The held-back tail is in this stream too: the fold's channel count has to hold for it.
+    const auto units = eac3_karaoke_units(iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke,
+                                          9, kBurstInSecondFrame);
+
+    iclforge::hearth::DecoderSettings capable;
+    capable.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    capable.karaoke_vocals = iclforge::ac3::KaraokeVocals::kV1;
+    const Spoken with_v1 = speak(*layout, capable, units);
+    const auto want = library_decode_eac3(*layout, capable, units);
+    REQUIRE(want.size() == 2);
+    CHECK(carries(with_v1.slots[0], want[0]));
+    CHECK(carries(with_v1.slots[1], want[1]));
+
+    capable.karaoke_vocals = iclforge::ac3::KaraokeVocals::kNone;
+    const Spoken without = speak(*layout, capable, units);
+    CHECK_FALSE(carries(without.slots[0], with_v1.slots[0]));
+}
+
+TEST_CASE("stream decoder: an E-AC-3 stream that is not karaoke is played as it was, whatever the "
+          "setting",
+          "[hearth][stream-decoder][karaoke]") {
+    const auto layout = iclforge::render::OutputLayout::parse("5.1");
+    REQUIRE(layout.has_value());
+    const auto units = eac3_karaoke_units(iclforge::ac3::meta::BitstreamMode::kCompleteMain, 6);
+
+    iclforge::hearth::DecoderSettings coded;
+    coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+    const Spoken as_coded = speak(*layout, coded, units);
+    for (const auto reproduction :
+         {iclforge::ac3::KaraokeReproduction::kAware, iclforge::ac3::KaraokeReproduction::kCapable}) {
+        iclforge::hearth::DecoderSettings asked;
+        asked.karaoke = reproduction;
+        asked.karaoke_vocals = iclforge::ac3::KaraokeVocals::kNone;
+        const Spoken spoken = speak(*layout, asked, units);
+        REQUIRE(spoken.slots.size() == as_coded.slots.size());
+        for (std::size_t slot = 0; slot < spoken.slots.size(); ++slot) {
+            CHECK(carries(spoken.slots[slot], as_coded.slots[slot]));
+        }
+        for (const auto& report : spoken.reports) {
+            CHECK_FALSE(report.karaoke);
+            CHECK_FALSE(report.karaoke_reproduced);
+        }
+    }
+}
+
+TEST_CASE("stream decoder: an E-AC-3 karaoke programme with a dependent substream is played as "
+          "coded (D3)",
+          "[hearth][stream-decoder][karaoke]") {
+    const auto layout = iclforge::render::OutputLayout::parse("7.1");
+    REQUIRE(layout.has_value());
+    const auto units = eac3_karaoke_units(iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke,
+                                          9, std::nullopt, /*dependent=*/true);
+
+    const iclforge::hearth::DecoderSettings aware;
+    const Spoken spoken = speak(*layout, aware, units);
+    const auto want = library_decode_eac3(*layout, aware, units);
+    REQUIRE(want.size() == 8);
+    // Every channel the library decoded as coded is on a speaker, sample for sample: nothing was
+    // folded into L, C and R, and no speaker was handed a channel of another shape.
+    for (const auto& channel : want) {
+        const bool found = std::ranges::any_of(spoken.slots, [&channel](const auto& slot) {
+            return carries(slot, channel);
+        });
+        CHECK(found);
+    }
+    for (const auto& report : spoken.reports) {
+        CHECK_FALSE(report.karaoke);
+        CHECK_FALSE(report.karaoke_reproduced);
+    }
+}
+
+TEST_CASE("stream decoder: the unit report of an E-AC-3 karaoke stream says whether it was "
+          "reproduced",
+          "[hearth][stream-decoder][karaoke]") {
+    const auto layout = iclforge::render::OutputLayout::parse("5.1");
+    REQUIRE(layout.has_value());
+    const auto units = eac3_karaoke_units(iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke, 4);
+
+    const Spoken aware = speak(*layout, iclforge::hearth::DecoderSettings{}, units);
+    REQUIRE_FALSE(aware.reports.empty());
+    for (const auto& report : aware.reports) {
+        CHECK(report.karaoke);
+        CHECK(report.karaoke_reproduced);
+        // What the stream is stays the coded layout.
+        CHECK(report.acmod == iclforge::ac3::Acmod::k3_2);
+        CHECK(report.lfe);
+        CHECK(report.bsmod == 7);
     }
 
     iclforge::hearth::DecoderSettings coded;

@@ -4,6 +4,7 @@
 #include <optional>
 #include <string_view>
 
+#include "panel/lyrics_reader.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/control.hpp"
 

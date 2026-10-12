@@ -349,11 +349,17 @@ void BurstOutput::decode_unit(std::span<const std::byte> unit) {
     // The bed is the layout the decoder's channels are in, which for an AC-3 syncframe is the
     // coded one except under Annex C's reproduction: a karaoke stream comes out as L, C, R and
     // the LFE, and laid out from the coded acmod its vocals would be placed where its surrounds
-    // were. (A fold has no bed: the renderer takes its channels as they come.)
+    // were. An E-AC-3 programme of one independent substream is reproduced the same way
+    // (ac3::is_karaoke_programme). (A fold has no bed: the renderer takes its channels as they
+    // come.)
     ac3::eac3::chanmap::Layout unit_bed = *bed;
-    if (!serving_.fold && header->kind == ac3::io::StreamKind::kAc3 && header->bytes == unit.size()) {
+    if (!serving_.fold && header->bytes == unit.size()) {
+        const auto bsmod = static_cast<ac3::meta::BitstreamMode>(header->bsmod);
         const bool karaoke =
-            ac3::meta::is_karaoke(static_cast<ac3::meta::BitstreamMode>(header->bsmod), header->acmod);
+            header->kind == ac3::io::StreamKind::kAc3
+                ? ac3::meta::is_karaoke(bsmod, header->acmod)
+                : ac3::is_karaoke_programme(bsmod, header->acmod, 1,
+                                            header->oba_complexity_index.has_value());
         const ac3::OutputMode mode = ac3::output_mode(config_.output, header->acmod, header->lfe, karaoke);
         if (mode.acmod != header->acmod) {
             unit_bed = ac3::eac3::chanmap::expand(ac3::eac3::chanmap::acmod_map(mode.acmod, mode.lfe));

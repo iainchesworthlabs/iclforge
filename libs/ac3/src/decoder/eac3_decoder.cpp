@@ -1547,6 +1547,20 @@ void Eac3Decoder::reset() {
     im.dither_ = DitherGenerator{};
 }
 
+void Eac3Decoder::set_skip_object_reconstruction(bool skip) {
+    auto& im = *impl_;
+    if (im.config_.skip_object_reconstruction == skip) {
+        return;
+    }
+    im.config_.skip_object_reconstruction = skip;
+    // Each identity's reconstruction state goes either way: skipped, it is not used and is the
+    // block a part with no spare heap wants back; reconstructing, a state from before the change
+    // has history that is not this stream's.
+    for (auto& state : im.joc_state_) {
+        state.reset();
+    }
+}
+
 int Eac3Decoder::output_latency_samples() const {
     return impl_->output_.latency_samples();
 }

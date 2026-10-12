@@ -1,0 +1,40 @@
+The ESP32 sink firmware
+-----------------------
+
+The firmware images this release carries for the ESP32 sinks (ESP32-S3,
+ESP32-C6 and ESP32-P4) are built from ESP-IDF 6.1 and link what it carries.
+None of it is in Hearth's desktop programs: it is listed here because the
+licences below ask that their notices travel with a binary, and Hearth is
+what carries the firmware. The firmware's own code is the iclforge library,
+free software under the GNU General Public License, version 3 or later.
+
+What the images link from others, and the terms each is used under:
+
+  ESP-IDF 6.1, Copyright Espressif Systems (Shanghai) CO LTD: the Apache
+    License, Version 2.0. So are the Wi-Fi, PHY and coexistence libraries,
+    esp_hosted, mDNS and the LCD and touch drivers, which are Espressif's.
+  FreeRTOS kernel 10.5.1, Copyright Amazon.com, Inc. or its affiliates: MIT.
+  lwIP 2.2.0, Copyright Swedish Institute of Computer Science and others:
+    BSD (3-clause).
+  Mbed TLS 4.1.0 and TF-PSA-Crypto 1.1.0, Copyright The Mbed TLS
+    Contributors: used under the Apache License, Version 2.0.
+  picolibc 1.8.10, the C library: BSD-style licences of its many holders.
+  HTTP Parser 2.7.0 (Joyent, NGINX), argtable3 3.2.2 (Stewart Heitmann and
+    others), the TLSF allocator (Matthew Conte), wpa_supplicant 2.10 (Jouni
+    Malinen and contributors; the ESP32-S3 and ESP32-C6 images) and the
+    Xtensa HAL headers (Tensilica; the ESP32-S3 image).
+  The toolchain's runtime libraries (libgcc, libstdc++), under the GNU
+    General Public License, version 3 with the GCC Runtime Library
+    Exception, which lets them be linked into a program under other terms.
+  On the ESP32-P4 image with a screen: stb_truetype and stb_rect_pack
+    (Sean Barrett, MIT or public domain), which LVGL's tiny_ttf rasterises
+    fonts with, and LVGL's built-in Montserrat font, with Font Awesome's
+    symbols in it (SIL Open Font License; see the typefaces above for the
+    others the screen draws with).
+
+The texts follow, each as its component's own files state it: the first line
+names the ESP-IDF version they were taken from and each heading the file. The
+Apache License is the first of them and is the one ESP-IDF's own code, Mbed
+TLS and Espressif's libraries are under.
+
+{{FILE:ESP_IDF_COMPONENTS}}

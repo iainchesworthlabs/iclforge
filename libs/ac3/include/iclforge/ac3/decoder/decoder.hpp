@@ -746,9 +746,18 @@ struct DecodedAccessUnit {
 // no V1 or V2, and what a decoder does with one there is nowhere specified), and it carries no
 // object layer. The decoder, the CLI and Hearth ask this one rule, so none of them re-derives it.
 // Inline, so it adds no symbol to the library.
+//
+// This form is for a caller that has read the headers and not decoded: a stream's bsmod and
+// acmod (io::ScannedProgramme's, or a syncframe's), how many substreams its access unit holds,
+// and whether it declares an object layer (a JOC complexity index in its addbsi).
+[[nodiscard]] inline bool is_karaoke_programme(meta::BitstreamMode bsmod, Acmod acmod,
+                                               std::size_t substreams, bool objects) {
+    return substreams == 1 && !objects && meta::is_karaoke(bsmod, acmod);
+}
+
 [[nodiscard]] inline bool is_karaoke_programme(const std::optional<meta::BsiInfo>& info, Acmod acmod,
                                                std::size_t substreams, bool objects) {
-    return info.has_value() && substreams == 1 && !objects && meta::is_karaoke(info->bsmod, acmod);
+    return info.has_value() && is_karaoke_programme(info->bsmod, acmod, substreams, objects);
 }
 
 [[nodiscard]] inline bool is_karaoke_programme(const DecodedAccessUnit& unit) {
@@ -783,6 +792,15 @@ class ICLFORGE_AC3_EXPORT Eac3Decoder {
     // point of calling this at the start of a stream instead of making a new
     // decoder.
     void reset();
+
+    // Whether this decoder reconstructs a stream's objects from here on (the flag it was made with,
+    // DecoderConfig::skip_object_reconstruction), for a caller that learns after the decoder is
+    // made that a stream carries more objects than it can place: it plays that stream's bed,
+    // without another decoder's allocations. Taking it true lets go of the reconstruction state,
+    // which is the largest block a decode holds (147,504 bytes, in one piece, in single precision
+    // less); false makes it again at the next frame that has objects. The bed's bits are the same
+    // either way. Call it between streams, as reset(), and the decode that follows starts clean.
+    void set_skip_object_reconstruction(bool skip);
 
     // Decodes one syncframe. Overlap-add state is kept per substream identity,
     // so the substreams of successive access units stay independent of each
