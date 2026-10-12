@@ -94,6 +94,9 @@ bool write_ac4_stream(const std::string& path, const std::string& kind, std::str
 // a complete main service. 3/2 carries an LFE, the other modes none. One tone a coded
 // channel, in Table 5.8's order with the LFE last: L 440, C 800, R 620, Ls 1030,
 // Rs 1270, LFE 90 Hz - so for a karaoke stream L, M, R, V1 and V2 - at -20 dBFS.
+// "eac3-karaoke-3/2" is the same programme as E-AC-3, one independent substream; "eac3-karaoke-3/2+rear"
+// adds the 7.1 rear pair in a dependent substream (1500, 1700, 1900 and 2100 Hz), which a
+// karaoke reproduction has no vocals for.
 bool write_ac3_stream(const std::string& path, const std::string& kind, std::string* error);
 
 // An in-process apps/hearth/testsink Sink on 127.0.0.1, dynamic six-digit

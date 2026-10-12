@@ -5,12 +5,14 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <expected>
 #include <filesystem>
 #include <optional>
 #include <string_view>
 #include <system_error>
 #include <utility>
 
+#include "code_pages.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 #include "karaoke_parts.hpp"
 
@@ -20,6 +22,37 @@ namespace {
 
 using iclforge::ac3::Acmod;
 namespace project = iclforge::apps::project;
+
+// The decoder a file is read with when the question is only whether SOME code page would read it:
+// every byte is a character (Latin-1), so that what comes back is always UTF-8. Nothing shown to
+// the author is ever read with it.
+bool latin1_probe(void* /*context*/, std::string_view bytes, std::string& utf8) {
+    utf8.clear();
+    for (const char c : bytes) {
+        const auto byte = static_cast<unsigned char>(c);
+        if (byte < 0x80) {
+            utf8.push_back(c);
+        } else {
+            utf8.push_back(static_cast<char>(0xC0 | (byte >> 6)));
+            utf8.push_back(static_cast<char>(0x80 | (byte & 0x3F)));
+        }
+    }
+    return true;
+}
+
+// What a file is read with for the page named: nothing (a code page is refused by name) for an
+// empty name, the page's decoder otherwise, and an error sentence for a name that is no page or one
+// this system cannot convert.
+std::expected<iclforge::lyrics::TextEncoding, std::string> encoding_named(const std::string& code_page) {
+    if (code_page.empty()) {
+        return iclforge::lyrics::TextEncoding{};
+    }
+    const iclforge::apps::CodePage* page = iclforge::apps::find_code_page(code_page);
+    if (page == nullptr || !iclforge::apps::code_page_available(*page)) {
+        return std::unexpected(std::string{"This system cannot read a file in that code page."});
+    }
+    return iclforge::apps::lyrics_encoding(*page);
+}
 
 // Two parts whose lengths differ by less than this are the same length: a
 // recording's tail is rarely cut to the frame, and the encoder's own padding
@@ -177,7 +210,7 @@ std::string karaoke_lyrics_beside(const std::string& media_path) {
 }
 
 KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path, const std::string& stream_path,
-                                      std::string* error) {
+                                      std::string* error, const std::string& code_page) {
     namespace fs = std::filesystem;
     std::error_code ec;
     const fs::path source(lyrics_path);
@@ -194,8 +227,15 @@ KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path, const std:
     if (fs::exists(target, ec) && fs::equivalent(source, target, ec)) {
         return KaraokeLyricsCopy::kAlreadyThere;
     }
+    const auto encoding = encoding_named(code_page);
+    if (!encoding) {
+        if (error != nullptr) {
+            *error = encoding.error();
+        }
+        return KaraokeLyricsCopy::kUnreadable;
+    }
     const iclforge::lyrics::Placement placed =
-        iclforge::lyrics::place_lyrics_beside(source, fs::path(stream_path));
+        iclforge::lyrics::place_lyrics_beside(source, fs::path(stream_path), std::nullopt, *encoding);
     switch (placed.status) {
         case iclforge::lyrics::PlacementStatus::kWritten:
             return KaraokeLyricsCopy::kCopied;
@@ -215,9 +255,65 @@ KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path, const std:
     return KaraokeLyricsCopy::kFailed;
 }
 
-std::string karaoke_lyrics_problem(const std::string& lyrics_path) {
-    const auto read = iclforge::lyrics::read_lyrics(std::filesystem::path(lyrics_path));
+std::string karaoke_lyrics_problem(const std::string& lyrics_path, const std::string& code_page) {
+    const auto encoding = encoding_named(code_page);
+    if (!encoding) {
+        return encoding.error();
+    }
+    const auto read =
+        iclforge::lyrics::read_lyrics(std::filesystem::path(lyrics_path), std::nullopt, *encoding);
     return read ? std::string{} : read.error();
+}
+
+std::vector<KaraokeCodePage> karaoke_code_pages() {
+    std::vector<KaraokeCodePage> pages;
+    for (const iclforge::apps::CodePage& page : iclforge::apps::code_pages()) {
+        if (iclforge::apps::code_page_available(page)) {
+            pages.push_back({std::string{page.name}, std::string{page.group}, std::string{page.title}});
+        }
+    }
+    return pages;
+}
+
+bool karaoke_lyrics_needs_code_page(const std::string& lyrics_path) {
+    const std::filesystem::path path(lyrics_path);
+    if (iclforge::lyrics::read_lyrics(path)) {
+        return false;
+    }
+    const iclforge::lyrics::TextEncoding any_page{&latin1_probe, nullptr};
+    return iclforge::lyrics::read_lyrics(path, std::nullopt, any_page).has_value();
+}
+
+std::string karaoke_lyrics_preview(const std::string& lyrics_path, const std::string& code_page,
+                                   std::size_t max_lines) {
+    if (code_page.empty()) {
+        return {};
+    }
+    const auto encoding = encoding_named(code_page);
+    if (!encoding) {
+        return {};
+    }
+    const auto read =
+        iclforge::lyrics::read_lyrics(std::filesystem::path(lyrics_path), std::nullopt, *encoding);
+    if (!read) {
+        return {};
+    }
+    std::string preview;
+    std::size_t shown = 0;
+    for (const auto& line : read->lines) {
+        if (line.text.empty()) {
+            continue;
+        }
+        if (shown == max_lines) {
+            break;
+        }
+        if (!preview.empty()) {
+            preview.push_back('\n');
+        }
+        preview += line.text;
+        ++shown;
+    }
+    return preview;
 }
 
 std::string karaoke_duration_text(double seconds) {

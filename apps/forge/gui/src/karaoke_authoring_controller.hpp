@@ -53,12 +53,28 @@ public:
 
     // Puts a lyrics file beside a saved stream as the stream's own UTF-8 `.lrc`
     // (karaoke_copy_lyrics()): "copied", "already-there", "exists" (one was there and is left
-    // alone), "unreadable" or "failed".
-    Q_INVOKABLE QString copyLyrics(const QString& lyricsUrl, const QString& streamPath) const;
+    // alone), "unreadable" or "failed". `codePage` is the page the author chose for a file that is
+    // not UTF-8 or UTF-16 (a `name` from codePages()), or "" for none.
+    Q_INVOKABLE QString copyLyrics(const QString& lyricsUrl, const QString& streamPath,
+                                   const QString& codePage) const;
 
     // Why a lyrics file cannot be used as lyrics, in the reader's words, or "" when it can
     // (karaoke_lyrics_problem()): a file in a code page is said so when it is chosen, and the page
     // asks again for the reason when a copy came back "unreadable". `url` is a file URL or a
-    // path.
-    Q_INVOKABLE QString lyricsProblem(const QString& url) const;
+    // path; `codePage` as for copyLyrics().
+    Q_INVOKABLE QString lyricsProblem(const QString& url, const QString& codePage) const;
+
+    // The legacy code pages the system can convert, for the picker the row shows when a file is
+    // not UTF-8 or UTF-16: one map each, `name` (what the other calls take) and `label` (the
+    // language group, translated, and the page's own name: "Cyrillic (Windows-1251)").
+    Q_INVOKABLE QVariantList codePages() const;
+
+    // Whether the file is refused only for its encoding, so that the row offers the picker
+    // (karaoke_lyrics_needs_code_page()). `url` is a file URL or a path.
+    Q_INVOKABLE bool lyricsNeedsCodePage(const QString& url) const;
+
+    // The first lines of the file read in `codePage`, one to a line, so that the author sees
+    // whether the page is the right one; "" when it does not read in that page
+    // (karaoke_lyrics_preview()).
+    Q_INVOKABLE QString lyricsPreview(const QString& url, const QString& codePage) const;
 };
