@@ -267,6 +267,25 @@ class TheFile(unittest.TestCase):
         # a real stack key that is not one of these is still not free
         self.assertFalse(sp.is_free(data, "CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"))
 
+    def test_every_profile_locks_the_sendspin_ac4_listing_keys(self) -> None:
+        """#1446's two keys are declared with no dependency, so they are in every profile's
+        configuration and match the watch pattern: a profile that does not lock them is reported
+        [unplaced] by the first build after main is merged in."""
+        for ident, spec in self.data["profiles"].items():
+            locked = spec["locked"]
+            self.assertIn("CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4", locked, ident)
+            self.assertIn("CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS", locked, ident)
+            self.assertTrue(
+                sp.is_watched(self.data, "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4"), "the pattern"
+            )
+
+    def test_the_ac4_profiles_lock_the_burst_player_s_40_kb_decode_stack(self) -> None:
+        for ident in ("s3-n16r8-ac4", "p4-rev1-ac4"):
+            locked = self.data["profiles"][ident]["locked"]
+            self.assertEqual(
+                locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES"], "40960", ident
+            )
+
     def test_the_workflow_builds_each_profile_from_the_file_and_verifies_it(self) -> None:
         """_build.yml takes each board's fragments from `sink_profile.py defaults` and holds
         the build to the profile with `verify`; no board build spells its own list."""
