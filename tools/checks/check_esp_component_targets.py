@@ -25,8 +25,18 @@ iclforge_add_library() makes), and holds every link to a definition:
   - a link no run reaches is a finding too: when every combination that reaches it stops at a
     message(FATAL_ERROR), the check has seen nothing of it, and says so.
 
+The rest of the build is held to the same rule. CMake stops at a link to a name with :: that is not
+a target, whichever directory made the link, so in every run that configures, each iclforge:: name
+that a target_link_libraries() the run executed names, and each one iclforge_add_library() links
+for the library it makes (LINK_PUBLIC, LINK_PRIVATE, LINK_PRIVATE_FIRST, EMBEDS, DEPENDS by stem,
+and the warnings, coverage and minimum-profile targets it always links), must be defined by the end
+of that run. A name inside $<BUILD_INTERFACE:...>, $<COMPILE_ONLY:...> or $<LINK_ONLY:...> is held
+to it; one inside $<INSTALL_INTERFACE:...>, $<TARGET_EXISTS:...>, $<TARGET_NAME_IF_EXISTS:...> or
+any other conditional expression may be left out by the build and is not.
+
 A combination the build itself refuses (message(FATAL_ERROR), for instance the encoder profile with
-AC-4) is not a finding: those are the guards doing their work.
+AC-4) is not a finding: those are the guards doing their work, and a run that stopped is not held
+to links whose definitions come after its stop.
 
 What the interpreter models is if(), set(), option(), unset(), list(APPEND),
 get_filename_component(), include(), add_subdirectory(), return(), message(FATAL_ERROR),
@@ -394,6 +404,61 @@ class Tree:
 # ------------------------------------------------------------------------------ interpreter
 
 
+# The generator expressions a link item can sit in and still be a link the build must resolve; any
+# other (INSTALL_INTERFACE, TARGET_EXISTS, TARGET_NAME_IF_EXISTS, IF, a condition) may leave the
+# item out, and CMake does not stop at a name that is not a target there.
+REQUIRED_HEADS = {"BUILD_INTERFACE", "COMPILE_ONLY", "LINK_ONLY"}
+_TARGET_NAME = re.compile(r"iclforge::[A-Za-z0-9_]+")
+
+
+def _genex_end(text: str, i: int) -> int:
+    """The index after the generator expression that starts at text[i:i+2] == '$<'."""
+    depth, j = 0, i
+    while j < len(text):
+        if text.startswith("$<", j):
+            depth += 1
+            j += 2
+        elif text[j] == ">":
+            depth -= 1
+            j += 1
+            if depth == 0:
+                return j
+        else:
+            j += 1
+    return len(text)
+
+
+def required_iclforge_names(text: str) -> list[str]:
+    """The iclforge:: names in one link item that CMake must find as targets: the item itself, and
+    the ones inside $<BUILD_INTERFACE:...>, $<COMPILE_ONLY:...> and $<LINK_ONLY:...> alone."""
+    out: list[str] = []
+    stack: list[str] = []
+    i = 0
+    while i < len(text):
+        if text.startswith("$<", i):
+            j = i + 2
+            while j < len(text) and text[j] not in ":>":
+                j = _genex_end(text, j) if text.startswith("$<", j) else j + 1
+            head = text[i + 2 : j]
+            if j < len(text) and text[j] == ":":
+                stack.append(head)
+            i = j + 1
+        elif text[i] == ">" and stack:
+            stack.pop()
+            i += 1
+        else:
+            m = _TARGET_NAME.match(text, i)
+            boundary = i == 0 or not (text[i - 1].isalnum() or text[i - 1] == "_"
+                                      or text[i - 2 : i] == "::")
+            if m and boundary:
+                if all(head in REQUIRED_HEADS for head in stack):
+                    out.append(m.group(0))
+                i = m.end()
+            else:
+                i += 1
+    return out
+
+
 @dataclass
 class Scope:
     vars: dict[str, str]
@@ -433,6 +498,7 @@ class Run:
     assignment: dict[str, str]
     aborted: Aborted | None = None
     links: list[Link] = field(default_factory=list)
+    wide_links: list[Link] = field(default_factory=list)
     targets: dict[str, tuple[str, int]] = field(default_factory=dict)
     executed: set[str] = field(default_factory=set)
     skipped: list[Skipped] = field(default_factory=list)
@@ -861,15 +927,44 @@ class Interpreter:
             made += [f"iclforge::{stem}_shared", f"iclforge_{name}_shared"]
         for target in made:
             self.run.targets.setdefault(target, (file, cmd.line))
+        # What the helper links for the library it made: the items of these keywords, the
+        # libraries named by DEPENDS (by stem), and the targets it always links.
+        linked: list[str] = []
+        section = ""
+        for text in texts[1:]:
+            if text in LIBRARY_KEYWORDS:
+                section = text
+            elif section in ("LINK_PUBLIC", "LINK_PRIVATE", "LINK_PRIVATE_FIRST", "EMBEDS"):
+                linked.append(text)
+            elif section == "DEPENDS":
+                linked.append(f"iclforge::{text}")
+        linked += ["iclforge::warnings", "iclforge::coverage"]
+        if minimal:
+            linked.append("iclforge::minimal_profile")
+        self.note_links(linked, file, cmd.line)
 
     def cmd_target_link_libraries(self, cmd: Command, args: list[Arg], scope: Scope,
                                   file: str) -> None:
         if posixpath.dirname(file) != posixpath.dirname(self.component_file):
+            self.note_links([a.text for a in args], file, cmd.line)
             return
         for arg in args:
             if arg.text.startswith("iclforge::"):
                 self.run.links.append(Link(arg.text, file, cmd.line))
 
+    def note_links(self, texts: list[str], file: str, line: int) -> None:
+        """Remember the iclforge:: targets a link line needs, for the rule over the whole build."""
+        for text in texts:
+            for name in required_iclforge_names(text):
+                self.run.wide_links.append(Link(name, file, line))
+
+
+# cmake/IclforgeLibrary.cmake's keywords: what follows one is its items, until the next.
+LIBRARY_KEYWORDS = {
+    "SOURCES", "DEPENDS", "EMBEDS", "LINK_PUBLIC", "LINK_PRIVATE", "LINK_PRIVATE_FIRST",
+    "PUBLIC_INCLUDES", "PRIVATE_INCLUDES", "STEM", "EXPORT_BASE", "EXPORT_HEADER",
+    "EXPORT_CUSTOM_CONTENT_VAR", "BUILD_TREE_DEPENDS", "NO_C4251_SUPPRESSION",
+}
 
 # The commands COMMAND() answers true for; the CMake the tree is read with has all of them.
 KNOWN_COMMANDS = {
@@ -1046,7 +1141,34 @@ def check(tree: Tree, component: str = COMPONENT) -> tuple[list[Finding], list[R
             findings.append(Finding(rel, line,
                 f"{target} is linked here, and no combination of the component's options "
                 f"gets as far: {why}"))
+    findings.extend(_wide_findings(tree, runs))
     return findings, runs
+
+
+def _wide_findings(tree: Tree, runs: list[Run]) -> list[Finding]:
+    """An iclforge:: link anywhere in a run that configured, to a name the run did not define. A
+    run that stopped has not reached what is defined after its stop, so it is not held to this."""
+    seen: dict[tuple[str, int, str], list[tuple[Run, bool]]] = {}
+    for run in runs:
+        if run.aborted:
+            continue
+        for link in run.wide_links:
+            seen.setdefault((link.file, link.line, link.target), []).append(
+                (run, link.target in run.targets))
+    out: list[Finding] = []
+    for (file, line, target), results in sorted(seen.items()):
+        broken = [run for run, ok in results if not ok]
+        if not broken:
+            continue
+        first = broken[0]
+        common = {k: v for k, v in first.assignment.items()
+                  if all(run.assignment.get(k) == v for run in broken)}
+        out.append(Finding(tree.rel(file), line,
+            f"{target} is linked here when {describe(common)} ({len(broken)} of "
+            f"{len(results)} combinations that configure and run this line have no definition "
+            f"of it): the root build, with those options, runs no directory that defines it. "
+            f"{explain(tree, first, target)}"))
+    return out
 
 
 def _declared_links(nodes: list) -> list[tuple[int, str]]:
@@ -1117,9 +1239,12 @@ def main(argv: list[str] | None = None) -> int:
 
     configured = [r for r in runs if not r.aborted]
     linked = sorted({link.target for run in configured for link in run.links})
+    wide = {(link.file, link.line) for run in configured for link in run.wide_links}
     print(f"check_esp_component_targets: {len(runs)} combinations of {args.component}'s options, "
           f"{len(configured)} configure and {len(runs) - len(configured)} are refused by their "
-          f"own guards; every iclforge:: target it links is defined in each: {', '.join(linked)}")
+          f"own guards; every iclforge:: target it links is defined in each: {', '.join(linked)}; "
+          f"so is every one named by the build's {len(wide)} other link lines to iclforge:: "
+          f"targets")
     return 0
 
 

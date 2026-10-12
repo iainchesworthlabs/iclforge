@@ -48,7 +48,14 @@ if((NOT MINIMAL) OR PLAYER_ONLY)
 endif()
 """
 
-BASE_TEXT = "add_library(iclforge::base ALIAS iclforge_base)\n"
+# libs/base: what every library of the real tree links by name (the warnings, the coverage
+# instrumentation and the minimum-footprint profile), as iclforge_add_library() does.
+BASE_TEXT = """\
+add_library(iclforge::base ALIAS iclforge_base)
+add_library(iclforge::warnings INTERFACE)
+add_library(iclforge::coverage INTERFACE)
+add_library(iclforge::minimal_profile INTERFACE)
+"""
 LYRICS_TEXT = """\
 if(MINIMAL AND NOT PLAYER_ONLY)
     return()
@@ -317,6 +324,115 @@ class SmallTrees(unittest.TestCase):
             out.getvalue())
 
 
+class LinkItems(unittest.TestCase):
+    def test_which_names_in_a_link_item_must_be_targets(self) -> None:
+        names = cect.required_iclforge_names
+        self.assertEqual(names("iclforge::base"), ["iclforge::base"])
+        self.assertEqual(names("iclforge::a;iclforge::b"), ["iclforge::a", "iclforge::b"])
+        self.assertEqual(names("$<BUILD_INTERFACE:iclforge::warnings>"), ["iclforge::warnings"])
+        self.assertEqual(names("$<BUILD_INTERFACE:$<COMPILE_ONLY:iclforge::x>>"), ["iclforge::x"])
+        self.assertEqual(names("$<LINK_ONLY:iclforge::z>"), ["iclforge::z"])
+        # A build may leave these out, and CMake does not stop at a name that is not a target.
+        self.assertEqual(names("$<INSTALL_INTERFACE:iclforge::x>"), [])
+        self.assertEqual(names("$<$<TARGET_EXISTS:iclforge::x>:iclforge::x>"), [])
+        self.assertEqual(names("$<TARGET_NAME_IF_EXISTS:iclforge::x>"), [])
+        self.assertEqual(names("$<$<CXX_COMPILER_ID:GNU>:iclforge::x>"), [])
+        self.assertEqual(names("$<IF:$<BOOL:A>,iclforge::a,iclforge::b>"), [])
+        # Not the project's namespace.
+        self.assertEqual(names("iclforge_base"), [])
+        self.assertEqual(names("other::iclforge::x"), [])
+        self.assertEqual(names("not_iclforge::x"), [])
+
+
+class WideRule(unittest.TestCase):
+    """Every iclforge:: link any directory of a configured run makes, not only the component's."""
+
+    COMPONENT_TEXT = (
+        'set(MINIMAL ON CACHE BOOL "" FORCE)\n'
+        'add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../.." build)\n'
+        "target_link_libraries(${COMPONENT_LIB} PUBLIC iclforge::player)\n")
+    ROOT_TEXT = (
+        "add_subdirectory(libs/base)\n"
+        "if(NOT MINIMAL)\n"
+        "    add_subdirectory(libs/lyrics)\n"
+        "endif()\n"
+        "add_subdirectory(libs/player)\n")
+    LYRICS = "add_library(iclforge::lyrics ALIAS l)\n"
+
+    def run_tree(self, player: str, changes: dict[str, str] | None = None) -> list[cect.Finding]:
+        files = {
+            COMPONENT_FILE: self.COMPONENT_TEXT,
+            "CMakeLists.txt": self.ROOT_TEXT,
+            "libs/base/CMakeLists.txt": BASE_TEXT,
+            "libs/lyrics/CMakeLists.txt": self.LYRICS,
+            "libs/player/CMakeLists.txt": player,
+        }
+        files.update(changes or {})
+        return findings(cect.Tree(files=files))
+
+    def test_a_library_that_links_a_target_the_root_left_out_is_found(self) -> None:
+        found = self.run_tree(
+            "add_library(iclforge::player ALIAS p)\n"
+            "target_link_libraries(p PUBLIC iclforge::lyrics)\n")
+        self.assertEqual(len(found), 1, [f.message for f in found])
+        self.assertEqual((found[0].file, found[0].line), ("libs/player/CMakeLists.txt", 2))
+        self.assertIn(
+            "iclforge::lyrics is linked here when no CONFIG_ symbol set", found[0].message)
+        self.assertIn(
+            "CMakeLists.txt:3 would run libs/lyrics, but `if(NOT MINIMAL)` is false (MINIMAL=ON)",
+            found[0].message)
+
+    def test_conditional_forms_are_not_held_and_build_interface_is(self) -> None:
+        head = "add_library(iclforge::player ALIAS p)\n"
+        conditional = (
+            '"$<$<TARGET_EXISTS:iclforge::lyrics>:iclforge::lyrics>"',
+            '"$<TARGET_NAME_IF_EXISTS:iclforge::lyrics>"',
+            '"$<INSTALL_INTERFACE:iclforge::lyrics>"')
+        self.assertEqual(self.run_tree(
+            head + "".join(f"target_link_libraries(p PUBLIC {item})\n" for item in conditional)),
+            [])
+        found = self.run_tree(
+            head + 'target_link_libraries(p PUBLIC "$<BUILD_INTERFACE:iclforge::lyrics>")\n')
+        self.assertEqual([(f.file, f.line) for f in found], [("libs/player/CMakeLists.txt", 2)])
+
+    def test_the_link_keywords_of_iclforge_add_library_are_held(self) -> None:
+        # LINK_PUBLIC and DEPENDS (by stem) both name iclforge::lyrics: one finding, on the call.
+        found = self.run_tree("iclforge_add_library(player LINK_PUBLIC iclforge::lyrics "
+                              "DEPENDS lyrics base)\n")
+        self.assertEqual([(f.file, f.line, f.message.split(" ")[0]) for f in found],
+                         [("libs/player/CMakeLists.txt", 1, "iclforge::lyrics")])
+
+    def test_what_the_helper_always_links_is_held_too(self) -> None:
+        # The profile is the helper's own variable here, so the minimum-footprint target is linked.
+        found = self.run_tree("iclforge_add_library(player)\n", {
+            "libs/base/CMakeLists.txt": "add_library(iclforge::base ALIAS b)\n",
+            COMPONENT_FILE: 'set(ICLFORGE_MINIMAL_DECODER ON CACHE BOOL "" FORCE)\n'
+            + self.COMPONENT_TEXT})
+        self.assertEqual(
+            sorted(f.message.split(" ")[0] for f in found),
+            ["iclforge::coverage", "iclforge::minimal_profile", "iclforge::warnings"])
+
+    def test_a_run_that_stopped_is_not_held_to_what_is_defined_after_its_stop(self) -> None:
+        # With CONFIG_X the root stops before it adds libs/lyrics, after libs/player linked it;
+        # without it the run configures and defines it. Only the second is held to the link.
+        component = self.COMPONENT_TEXT + "if(CONFIG_X)\n    set(UNUSED ON)\nendif()\n"
+        root = ("add_subdirectory(libs/base)\n"
+                "add_subdirectory(libs/player)\n"
+                'if(CONFIG_X)\n    message(FATAL_ERROR "refused")\nendif()\n'
+                "add_subdirectory(libs/lyrics)\n")
+        found, runs = cect.check(cect.Tree(files={
+            COMPONENT_FILE: component,
+            "CMakeLists.txt": root,
+            "libs/base/CMakeLists.txt": BASE_TEXT,
+            "libs/lyrics/CMakeLists.txt": self.LYRICS,
+            "libs/player/CMakeLists.txt": (
+                "add_library(iclforge::player ALIAS p)\n"
+                "target_link_libraries(p PUBLIC iclforge::lyrics)\n"),
+        }), COMPONENT)
+        self.assertEqual([f.message for f in found], [])
+        self.assertEqual(sorted(bool(run.aborted) for run in runs), [False, True])
+
+
 class RealTree(unittest.TestCase):
     """The tree this file is in, held to the check, and put back as it was before #1344."""
 
@@ -341,6 +457,30 @@ class RealTree(unittest.TestCase):
         for run in sink:
             self.assertIn("iclforge::lyrics", run.targets)
             self.assertIn("iclforge::sendspin", run.targets)
+        # And the rest of the build's links were read: what the libraries link by name.
+        wide = {link.target for run in sink for link in run.wide_links}
+        self.assertTrue(
+            {"iclforge::warnings", "iclforge::coverage", "iclforge::minimal_profile",
+             "iclforge::base_headers"} <= wide, wide)
+
+    def test_a_library_link_to_a_target_the_profile_leaves_out_is_a_finding(self) -> None:
+        # libs/containers is added only when neither minimum-footprint profile is on; a sink's
+        # player linking it would stop CMake in a library the component never mentions.
+        text = self.read("libs/sendspin/CMakeLists.txt").rstrip("\n")
+        broken = text + "\ntarget_link_libraries(iclforge_sendspin PUBLIC iclforge::containers)\n"
+        line = broken.count("\n")
+        found, _ = cect.check(
+            cect.Tree(root=ROOT, overrides={"libs/sendspin/CMakeLists.txt": broken}),
+            self.component)
+        self.assertEqual(len(found), 1, [f.message for f in found])
+        self.assertEqual((found[0].file, found[0].line), ("libs/sendspin/CMakeLists.txt", line))
+        for expected in (
+            "iclforge::containers is linked here when CONFIG_ICLFORGE_SENDSPIN=y",
+            "libs/containers/CMakeLists.txt",
+            "would run libs/containers, but `if(NOT ICLFORGE_MINIMAL_DECODER AND NOT "
+            "ICLFORGE_MINIMAL_ENCODER)` is false",
+        ):
+            self.assertIn(expected, found[0].message)
 
     def test_the_encoder_profile_with_ac4_is_refused_by_the_root_and_not_a_finding(self) -> None:
         _, runs = cect.check(cect.Tree(root=ROOT), self.component)

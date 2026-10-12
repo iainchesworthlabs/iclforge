@@ -39,11 +39,15 @@ The sections below contain the complete change list and fixes.
   interpreter of the CMake language once for each combination of the symbols the component reads,
   with no ESP-IDF, and holds every `target_link_libraries()` to a definition. A finding names the
   file that defines the target and the guard (with the values it read) or the `return()` that kept
-  it from running. A combination the build itself refuses with `message(FATAL_ERROR)` is not a
-  finding. Its tests put the root's guard for `libs/lyrics` back as it was before #1344, when the
-  sink firmware stopped configuring because the sink's player linked `iclforge::lyrics`, and show
-  that the check fails on it: the pull-request gate builds no ESP-IDF image, so nothing before the
-  merge saw that break.
+  it from running. The rest of the build is held to the same rule: in every combination that
+  configures, each `iclforge::` name that any executed `target_link_libraries()` names, and each
+  one an `iclforge_add_library()` links for its library, must be defined by the end of the run,
+  except inside a conditional generator expression (`$<TARGET_EXISTS:...>`,
+  `$<INSTALL_INTERFACE:...>`), which a build may leave out. A combination the build itself refuses
+  with `message(FATAL_ERROR)` is not a finding. Its tests put the root's guard for `libs/lyrics`
+  back as it was before #1344, when the sink firmware stopped configuring because the sink's player
+  linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
+  ESP-IDF image, so nothing before the merge saw that break.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 

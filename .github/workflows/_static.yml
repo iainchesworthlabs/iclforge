@@ -277,8 +277,9 @@ jobs:
       # component's CMake, the root's and the libraries' through a small interpreter of the
       # language, once for each combination of the component's Kconfig symbols and with no
       # ESP-IDF, and fails a link that no run defined, naming the file that defines the target and
-      # the guard that kept it from running. Its own suite runs in the Oracle unit tests step
-      # above.
+      # the guard that kept it from running. The links the libraries behind the component make
+      # are held to the same rule in every run that configures. Its own suite runs in the Oracle
+      # unit tests step above.
       - name: ESP-IDF component link targets
         if: ${{ !cancelled() }}
         shell: bash
