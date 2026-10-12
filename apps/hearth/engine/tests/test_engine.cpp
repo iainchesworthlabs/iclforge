@@ -667,6 +667,39 @@ TEST_CASE("engine: a restored queue waits at its item and position until asked t
     CHECK(engine->status().current == 0);
 }
 
+TEST_CASE("engine: add_and_play adds behind a restored queue and plays the first item it added",
+          "[hearth][concurrency]") {
+    Library library;
+    library.files["a"] = eac3_stream(40);
+    library.files["b"] = eac3_stream(40);
+    library.files["c"] = eac3_stream(200);
+    library.files["d"] = eac3_stream(40);
+    auto state = std::make_shared<ClockedDevice::State>();
+    const auto engine = make_engine(library, state);
+
+    // A launch with a file: the saved queue is restored and the file handed in at once, with
+    // no wait between. The position of the new item is taken on the engine thread - read off a
+    // status that the restore has not reached it would be 0, and the saved queue's own first
+    // item would play.
+    engine->restore({item("a"), item("b")}, 1, 0ms);
+    engine->add_and_play({item("c"), item("d")});
+    PlayPosition at;
+    REQUIRE(eventually([&] {
+        at = engine->position();
+        return at.item == 2;
+    }));
+    engine->sync();
+    const EngineStatus status = engine->status();
+    REQUIRE(status.queue.size() == 4);
+    CHECK(status.queue[0].path == "a");
+    CHECK(status.queue[1].path == "b");
+    CHECK(status.queue[2].path == "c");
+    CHECK(status.queue[3].path == "d");
+    CHECK(status.current == 2);
+    CHECK(status.state == TransportState::kPlaying);
+    engine->stop();
+}
+
 TEST_CASE("engine: the speaker setup commands reach EngineStatus, and a refused one leaves it "
           "alone but says so",
           "[hearth][engine]") {

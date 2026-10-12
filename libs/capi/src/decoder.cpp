@@ -12,6 +12,18 @@ iclforge::ac3::DecoderConfig decoder_config_to_cpp(const iclforge_decoder_config
     return iclforge::ac3::DecoderConfig{.drc_scale = config.drc_scale,
                                .heavy_compression = config.heavy_compression != 0};
 }
+
+// What the channels of `frame` are, once the output stage has run: asked of the stage by the
+// function it already answers the question with (output_mode()), so this layer does not restate
+// its rules.
+void describe_output(const iclforge::ac3::OutputConfig& output, iclforge_decoded_frame& frame) {
+    const auto& data = frame.data;
+    frame.karaoke = iclforge::ac3::meta::is_karaoke(
+        static_cast<iclforge::ac3::meta::BitstreamMode>(data.bsmod), data.acmod);
+    frame.output = iclforge::ac3::output_mode(output, data.acmod, data.lfe, frame.karaoke);
+    frame.karaoke_reproduced = frame.karaoke && output.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
+                               (frame.output.acmod != data.acmod || frame.output.lfe != data.lfe);
+}
 }  // namespace
 
 extern "C" {
@@ -36,6 +48,46 @@ iclforge_status_t iclforge_decoder_create(const iclforge_decoder_config_t* confi
     });
 }
 
+void iclforge_karaoke_config_init(iclforge_karaoke_config_t* config) {
+    if (config == nullptr) {
+        return;
+    }
+    const iclforge::ac3::OutputConfig defaults{};
+    *config = iclforge_karaoke_config_t{
+        .reproduction = static_cast<iclforge_karaoke_reproduction_t>(defaults.karaoke),
+        .vocals = static_cast<iclforge_karaoke_vocals_t>(defaults.karaoke_vocals),
+        .melody_db = 0.0,
+        .vocal1_db = 0.0,
+        .vocal2_db = 0.0};
+}
+
+iclforge_status_t iclforge_decoder_create_with_karaoke(const iclforge_decoder_config_t* config,
+                                                        const iclforge_karaoke_config_t* karaoke,
+                                                        iclforge_decoder_t** out_decoder) {
+    if (config == nullptr || karaoke == nullptr || out_decoder == nullptr) {
+        return ICLFORGE_ERROR_INVALID_ARGUMENT;
+    }
+    // An enum a caller built out of range is not a reproduction to guess at.
+    const auto reproduction = static_cast<unsigned>(karaoke->reproduction);
+    const auto vocals = static_cast<unsigned>(karaoke->vocals);
+    if (reproduction > static_cast<unsigned>(ICLFORGE_KARAOKE_CAPABLE) ||
+        vocals > static_cast<unsigned>(ICLFORGE_KARAOKE_VOCALS_BOTH)) {
+        return ICLFORGE_ERROR_INVALID_ARGUMENT;
+    }
+    return guard([&config, &karaoke, &out_decoder] {
+        iclforge::ac3::DecoderConfig cpp = decoder_config_to_cpp(*config);
+        cpp.output.karaoke = static_cast<iclforge::ac3::KaraokeReproduction>(karaoke->reproduction);
+        cpp.output.karaoke_vocals = static_cast<iclforge::ac3::KaraokeVocals>(karaoke->vocals);
+        // One conversion for every surface that has levels in dB (output.hpp): held to the span,
+        // off at its bottom, and a value that is not a number is the table's own 0 dB.
+        cpp.output.karaoke_melody_gain = iclforge::ac3::karaoke_gain_from_db(karaoke->melody_db);
+        cpp.output.karaoke_vocal1_gain = iclforge::ac3::karaoke_gain_from_db(karaoke->vocal1_db);
+        cpp.output.karaoke_vocal2_gain = iclforge::ac3::karaoke_gain_from_db(karaoke->vocal2_db);
+        *out_decoder = new iclforge_decoder(cpp);
+        return ICLFORGE_OK;
+    });
+}
+
 void iclforge_decoder_destroy(iclforge_decoder_t* decoder) { delete decoder; }
 
 iclforge_status_t iclforge_decoder_decode_frame(iclforge_decoder_t* decoder, const uint8_t* frame,
@@ -52,6 +104,7 @@ iclforge_status_t iclforge_decoder_decode_frame(iclforge_decoder_t* decoder, con
         }
         auto owned = std::make_unique<iclforge_decoded_frame>();
         owned->data = std::move(*result);
+        describe_output(decoder->output, *owned);
         *out_frame = owned.release();
         return ICLFORGE_OK;
     });
@@ -86,6 +139,7 @@ iclforge_status_t iclforge_decoder_decode_frame_into(iclforge_decoder_t* decoder
         }
         auto owned = std::make_unique<iclforge_decoded_frame>();
         owned->data = std::move(*result);
+        describe_output(decoder->output, *owned);
         *out_frame = owned.release();
         return ICLFORGE_OK;
     });
@@ -172,6 +226,26 @@ int iclforge_decoded_frame_block_switched(const iclforge_decoded_frame_t* frame,
         return 0;
     }
     return frame->data.blksw[channel_index][static_cast<size_t>(block_index)] ? 1 : 0;
+}
+
+int iclforge_decoded_frame_bsmod(const iclforge_decoded_frame_t* frame) {
+    return frame == nullptr ? 0 : static_cast<int>(frame->data.bsmod);
+}
+
+int iclforge_decoded_frame_is_karaoke(const iclforge_decoded_frame_t* frame) {
+    return frame != nullptr && frame->karaoke ? 1 : 0;
+}
+
+iclforge_acmod_t iclforge_decoded_frame_output_acmod(const iclforge_decoded_frame_t* frame) {
+    return frame == nullptr ? ICLFORGE_ACMOD_2_0 : iclforge_c::from_cpp(frame->output.acmod);
+}
+
+int iclforge_decoded_frame_output_lfe(const iclforge_decoded_frame_t* frame) {
+    return frame != nullptr && frame->output.lfe ? 1 : 0;
+}
+
+int iclforge_decoded_frame_karaoke_reproduced(const iclforge_decoded_frame_t* frame) {
+    return frame != nullptr && frame->karaoke_reproduced ? 1 : 0;
 }
 
 void iclforge_decoded_frame_destroy(iclforge_decoded_frame_t* frame) { delete frame; }

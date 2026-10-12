@@ -1035,6 +1035,64 @@ TEST_CASE("skip_object_reconstruction leaves the bed untouched and the objects a
     }
 }
 
+TEST_CASE(
+    "set_skip_object_reconstruction turns a stream's objects off and on without a new decoder",
+    "[atmos][decoder][joc]") {
+    // A board learns what a stream declares only once it has the first unit, which is after its
+    // decoder is made: the decoder it keeps from stream to stream has to change what it does.
+    iclforge::ac3::oba::AtmosEncoder encoder{{.bitrate_kbps = 448}, 3};
+    const std::array<iclforge::objects::oba::ObjectPlacement, 3> placement{{
+        {.position = {.x = 0.1, .y = 0.2, .z = 0.5}},
+        {.position = {.x = 0.9, .y = 0.2, .z = 0.5}, .gain = 0.5},
+        {.position = {.x = 0.5, .y = 0.9, .z = -0.5}, .lfe_send = 0.3},
+    }};
+    std::vector<std::vector<float>> essences;
+    std::vector<std::span<const float>> views(3);
+    iclforge::ac3::eac3::AccessUnit unit;
+    for (int frame = 0; frame < 3; ++frame) {
+        const auto start = static_cast<std::uint64_t>(frame) * kFrame;
+        essences = {tone(440.0, 0.3, 0.0, start), tone(880.0, 0.3, 0.5, start),
+                    tone(120.0, 0.3, 1.0, start)};
+        for (std::size_t i = 0; i < views.size(); ++i) {
+            views[i] = essences[i];
+        }
+        auto encoded = encoder.encode_frame(views, placement);
+        REQUIRE(encoded.has_value());
+        unit = *encoded;
+    }
+
+    // One decoder, made to reconstruct, then told not to, then told to again.
+    iclforge::ac3::Eac3Decoder decoder;
+    const auto first = decoder.decode_substream(unit.substream(0));
+    REQUIRE(first.has_value());
+    REQUIRE(first->has_value());
+    CHECK_FALSE((*first)->object_audio.empty());
+
+    decoder.set_skip_object_reconstruction(true);
+    decoder.reset();
+    const auto bed = decoder.decode_substream(unit.substream(0));
+    REQUIRE(bed.has_value());
+    REQUIRE(bed->has_value());
+    CHECK((*bed)->object_audio.empty());
+    // Its bed is what a decoder made to skip gives: the same bits.
+    iclforge::ac3::Eac3Decoder made_to_skip{{.skip_object_reconstruction = true}};
+    const auto reference = made_to_skip.decode_substream(unit.substream(0));
+    REQUIRE(reference.has_value());
+    REQUIRE(reference->has_value());
+    REQUIRE((*bed)->channels.size() == (*reference)->channels.size());
+    for (std::size_t ch = 0; ch < (*bed)->channels.size(); ++ch) {
+        CAPTURE(ch);
+        CHECK(std::ranges::equal((*bed)->channels[ch], (*reference)->channels[ch]));
+    }
+
+    decoder.set_skip_object_reconstruction(false);
+    decoder.reset();
+    const auto again = decoder.decode_substream(unit.substream(0));
+    REQUIRE(again.has_value());
+    REQUIRE(again->has_value());
+    CHECK_FALSE((*again)->object_audio.empty());
+}
+
 TEST_CASE("Eac3Decoder reports no object metadata for a plain (non-Atmos) stream", "[atmos][decoder]") {
     const iclforge::ac3::eac3::FrameConfig config{
         .bitrate_kbps = 448, .acmod = iclforge::ac3::Acmod::k3_2, .lfe = true};

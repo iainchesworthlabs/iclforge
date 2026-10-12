@@ -721,9 +721,13 @@ struct KaraokePlan {
     std::size_t centre_terms = 0;
     std::array<Term, 4> right{};
     std::size_t right_terms = 0;
-    // The coded slot of the LFE, which is output after Rk when there is one.
+    // The coded slot of the LFE, which is output after Rk when there is one, and the scale-down
+    // the three sums took: the LFE is in none of Annex C's equations, so what it is given is the
+    // same factor, which keeps its level against L, C and R as the mix put it (D8,
+    // planning/karaoke-eac3.md; Dolby's decoder, which scales nothing, keeps it the same way).
     bool lfe = false;
     std::size_t lfe_channel = 0;
+    Scalar lfe_gain{1};
 };
 
 KaraokePlan plan_karaoke(const OutputConfig& config, Acmod acmod, bool lfe, std::size_t inputs,
@@ -782,6 +786,7 @@ KaraokePlan plan_karaoke(const OutputConfig& config, Acmod acmod, bool lfe, std:
     if (lfe && lfe_slot < inputs) {
         plan.lfe = true;
         plan.lfe_channel = lfe_slot;
+        plan.lfe_gain = static_cast<Scalar>(scale_down);
     }
     return plan;
 }
@@ -1000,9 +1005,16 @@ void OutputStage::apply(std::span<const std::span<float>> channels, Acmod acmod,
             // The LFE first, while the slots it passes over are still the coded
             // channels' own: nothing below reads the coded channels again, so
             // the order within the three writes after it does not matter.
-            if (plan.lfe && channels.size() > 3 && plan.lfe_channel != 3) {
-                std::memcpy(channels[3].data() + offset, channels[plan.lfe_channel].data() + offset,
-                            available(channels[plan.lfe_channel], offset, count) * sizeof(float));
+            if (plan.lfe && channels.size() > 3) {
+                const std::size_t moved = available(channels[plan.lfe_channel], offset, count);
+                if (plan.lfe_channel != 3) {
+                    std::memcpy(channels[3].data() + offset,
+                                channels[plan.lfe_channel].data() + offset,
+                                moved * sizeof(float));
+                }
+                if (plan.lfe_gain != Scalar{1}) {
+                    scale(channels[3].data() + offset, plan.lfe_gain, moved);
+                }
             }
             std::memcpy(channels[0].data() + offset, out_left_.data(), count * sizeof(float));
             std::memcpy(channels[1].data() + offset, out_centre_.data(), count * sizeof(float));

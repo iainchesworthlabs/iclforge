@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cstring>
 #include <thread>
+#include <utility>
 
 #include "windows_support.hpp"
 
@@ -38,6 +39,14 @@ using windows_audio::kIidUnknown;
 // 100-ns units: the unit every WASAPI duration is expressed in.
 constexpr REFERENCE_TIME kBufferDuration = 200'000;  // 20 ms
 constexpr DWORD kPollIntervalMs = 5;
+
+// IAudioClient3, for a requested packet period (windows/monitor.cpp's low-latency path uses it the
+// same way): {7ed4ee07-8e67-4cd4-8c1a-2b7a5987ad42}.
+constexpr IID kIidAudioClient3 = {0x7ed4ee07, 0x8e67, 0x4cd4, {0x8c, 0x1a, 0x2b, 0x7a, 0x59, 0x87, 0xad, 0x42}};
+
+// How many packet stamps are kept waiting for the consumer: a packet is 10 ms, so this is ten
+// seconds, and a consumer that drains every few hundred milliseconds never sees it full.
+constexpr std::size_t kStampRingPackets = 1024;
 
 // PKEY_Device_FriendlyName, spelled out rather than pulling in
 // functiondiscoverykeys_devpkey.h: that header needs DEFINE_PROPERTYKEY to
@@ -417,13 +426,13 @@ struct Capture::Impl {
     // `sample_ready`, which the caller has already handed to the client.
     void launch(ComPtr<IAudioClient> client, ComPtr<IAudioCaptureClient> capture,
                 HANDLE sample_ready, SampleFormat format, bool loopback, std::uint32_t rate,
-                std::uint16_t channel_count, std::size_t ring_capacity_samples);
+                std::uint16_t channel_count, std::size_t ring_capacity_samples, StampRing* stamps);
 };
 
 void Capture::Impl::launch(ComPtr<IAudioClient> client, ComPtr<IAudioCaptureClient> capture,
                            HANDLE sample_ready, SampleFormat format, bool loopback,
                            std::uint32_t rate, std::uint16_t channel_count,
-                           std::size_t ring_capacity_samples) {
+                           std::size_t ring_capacity_samples, StampRing* stamps) {
     ring = std::make_unique<RingBuffer>(ring_capacity_samples);
     sample_rate = rate;
     channels = channel_count;
@@ -432,7 +441,7 @@ void Capture::Impl::launch(ComPtr<IAudioClient> client, ComPtr<IAudioCaptureClie
     running.store(true, std::memory_order_release);
 
     worker = std::jthread([this, client, capture, sample_ready, format, loopback,
-                                  rate, channel_count](const std::stop_token& stop) mutable {
+                                  rate, channel_count, stamps](const std::stop_token& stop) mutable {
         ComScope thread_com;
         // Ask MMCSS for audio scheduling so a busy desktop cannot starve the
         // capture loop into dropping packets.
@@ -464,8 +473,20 @@ void Capture::Impl::launch(ComPtr<IAudioClient> client, ComPtr<IAudioCaptureClie
                 BYTE* data = nullptr;
                 UINT32 frames = 0;
                 DWORD packet_flags = 0;
-                if (FAILED(capture->GetBuffer(&data, &frames, &packet_flags, nullptr, nullptr))) {
+                // The packet's own capture time, which a consumer needs to know where in a
+                // playback a voice was sung (planning/karaoke-microphone.md, MI6): the
+                // performance counter's reading, in 100 ns, at the packet's first frame.
+                UINT64 device_position = 0;
+                UINT64 qpc_position = 0;
+                if (FAILED(capture->GetBuffer(&data, &frames, &packet_flags, &device_position,
+                                              &qpc_position))) {
                     break;
+                }
+                if (stamps != nullptr && (packet_flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR) == 0 &&
+                    qpc_position != 0) {
+                    const CaptureStamp stamp{timeline_frames,
+                                             static_cast<std::int64_t>(qpc_position) * 100};
+                    stamps->write(std::span<const CaptureStamp>(&stamp, 1));
                 }
                 const std::size_t samples =
                     static_cast<std::size_t>(frames) * channel_count;
@@ -552,6 +573,8 @@ std::expected<void, CaptureError> Capture::start(const std::string& device_id, D
     if (running()) {
         return std::unexpected(CaptureError::kAlreadyRunning);
     }
+    // A request is for one start only.
+    const std::uint32_t requested_period = std::exchange(requested_period_frames_, 0U);
 
     // Open the device on this thread so format negotiation failures are
     // reported synchronously, then hand the client to the capture thread.
@@ -600,12 +623,65 @@ std::expected<void, CaptureError> Capture::start(const std::string& device_id, D
     // nothing at all while the machine is silent, so an event wait would
     // stall instead of letting us synthesise the silence.
     const bool loopback = kind == DeviceKind::kLoopback;
-    DWORD flags = loopback ? AUDCLNT_STREAMFLAGS_LOOPBACK : AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
-    const HRESULT init =
-        client->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, kBufferDuration, 0, mix, nullptr);
+
+    // A requested packet period (an input only: a loopback is polled): the engine's shared-mode
+    // period nearest the request that is a multiple of its fundamental, through IAudioClient3.
+    // Whatever it will not do falls back to the ordinary initialise below.
+    HRESULT init = E_FAIL;
+    if (!loopback && requested_period > 0) {
+        ComPtr<IAudioClient3> client3;
+        if (SUCCEEDED(client->QueryInterface(kIidAudioClient3, &client3))) {
+            UINT32 default_frames = 0;
+            UINT32 fundamental_frames = 0;
+            UINT32 minimum_frames = 0;
+            UINT32 maximum_frames = 0;
+            if (SUCCEEDED(client3->GetSharedModeEnginePeriod(mix, &default_frames, &fundamental_frames,
+                                                             &minimum_frames, &maximum_frames)) &&
+                fundamental_frames > 0 && minimum_frames > 0) {
+                UINT32 period = std::clamp<UINT32>(requested_period, minimum_frames, maximum_frames);
+                period = std::max<UINT32>(minimum_frames,
+                                          (period + fundamental_frames / 2) / fundamental_frames *
+                                              fundamental_frames);
+                init = client3->InitializeSharedAudioStream(AUDCLNT_STREAMFLAGS_EVENTCALLBACK, period, mix,
+                                                            nullptr);
+            }
+        }
+    }
+    if (FAILED(init)) {
+        const DWORD flags =
+            loopback ? AUDCLNT_STREAMFLAGS_LOOPBACK : AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+        init = client->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, kBufferDuration, 0, mix, nullptr);
+    }
     CoTaskMemFree(mix);
     if (FAILED(init)) {
         return std::unexpected(CaptureError::kComFailure);
+    }
+
+    // What the platform says it gave: the buffer, and the shared-mode period if it will say.
+    timing_ = {};
+    UINT32 buffer_frames = 0;
+    if (SUCCEEDED(client->GetBufferSize(&buffer_frames))) {
+        timing_.buffer_frames = buffer_frames;
+    }
+    {
+        ComPtr<IAudioClient3> client3;
+        WAVEFORMATEX* current_format = nullptr;
+        UINT32 period_frames = 0;
+        if (SUCCEEDED(client->QueryInterface(kIidAudioClient3, &client3)) &&
+            SUCCEEDED(client3->GetCurrentSharedModeEnginePeriod(&current_format, &period_frames))) {
+            timing_.period_frames = period_frames;
+        }
+        if (current_format != nullptr) {
+            CoTaskMemFree(current_format);
+        }
+        if (timing_.period_frames == 0) {
+            REFERENCE_TIME default_period = 0;
+            REFERENCE_TIME minimum_period = 0;
+            if (SUCCEEDED(client->GetDevicePeriod(&default_period, &minimum_period)) && default_period > 0) {
+                timing_.period_frames = static_cast<std::uint32_t>(
+                    static_cast<std::uint64_t>(default_period) * rate / 10'000'000ULL);
+            }
+        }
     }
 
     HANDLE sample_ready = nullptr;
@@ -627,8 +703,9 @@ std::expected<void, CaptureError> Capture::start(const std::string& device_id, D
         return std::unexpected(CaptureError::kComFailure);
     }
 
+    stamps_ = std::make_unique<StampRing>(kStampRingPackets);
     impl_->launch(client, capture, sample_ready, format, loopback, rate, channel_count,
-                  ring_capacity_samples);
+                  ring_capacity_samples, stamps_.get());
 
     return {};
 }
@@ -719,8 +796,10 @@ std::expected<void, CaptureError> Capture::start_process_loopback(
 
     // Polled, like endpoint loopback: a quiet process delivers no packets and
     // no events, and the timeline downstream still has to advance.
+    timing_ = {};
+    stamps_ = std::make_unique<StampRing>(kStampRingPackets);
     impl_->launch(*client, capture, nullptr, SampleFormat::kFloat32, /*loopback=*/true,
-                  format.sample_rate, format.channels, ring_capacity_samples);
+                  format.sample_rate, format.channels, ring_capacity_samples, stamps_.get());
     return {};
 }
 
