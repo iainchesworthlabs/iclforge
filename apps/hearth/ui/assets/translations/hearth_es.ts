@@ -3381,7 +3381,7 @@
     <message>
         <location filename="../qml/NetworkSinkReport.qml" line="24"/>
         <source>Lyrics</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Letra</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkReport.qml" line="25"/>
