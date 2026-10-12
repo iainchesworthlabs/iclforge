@@ -100,6 +100,12 @@ The sections below contain the complete change list and fixes.
   MIDI file's title, artist and syllables one at a time and never its other `@` lines; a file that
   is UTF-8 or UTF-16 is read as it was whatever is given, and without a decoder a code page is still
   refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
+- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
+  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
+  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
+  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
+  is named on the row when it is chosen, and none is written. The row's strings are translated in
+  the six catalogues.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
@@ -125,6 +131,40 @@ The sections below contain the complete change list and fixes.
   same lossless rewrite `strip_objects` does, so the bed is bit-identical and the result plays in
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
+
+**Karaoke in E-AC-3: the boards reproduce it themselves**
+
+- **A Hearth sink board lists the codecs it reproduces karaoke for.** Its support object now
+  states `karaoke_codecs`, every codec it decodes (AC-3 and E-AC-3), so Hearth sends an E-AC-3
+  karaoke stream to it as it is, with the choice of reproduction, and not as PCM decoded on the
+  host. Checked on a real ESP32-S3 over Wi-Fi: the board's output levels follow the same
+  programme decoded on the host to within 0.25 dB, for as coded, aware, and capable with a
+  vocal, with none, and with the melody and a vocal moved (the live case, `network sinks live:
+  an E-AC-3 karaoke stream is reproduced by the board that decodes it`, beside the AC-3 one it
+  now shares its body with). The P4 and the C6 carry the same line and were not run
+  (`planning/karaoke-eac3.md`, E4b, D6).
+
+**Karaoke in E-AC-3: authoring writes the levels, and the WebAssembly decoder reproduces it**
+
+- **An E-AC-3 stream flagged karaoke carries its Lo/Ro mixing group.** `eac3-encode` with `bsmod=7`
+  above 1/0 (and `plan::eac3_config()` for the Forge GUI and the library) writes `mixmdate` whether
+  or not `mixmeta` is given: Annex E has no `cmixlev` or `surmixlev` in `bsi`, the group is where
+  a decoder reads the levels of Annex C's reproduction, and a stream without one is reproduced at
+  the decoder's own default (-3 dB in Dolby's) and not at the level the author set. Its
+  `lorocmixlev` and `lorosurmixlev` come from `cmixlev=` and `surmixlev=` (-4.5 and -6 dB by
+  default, the level an AC-3 karaoke stream is made at); an explicit `lorosurmixlev` still wins.
+  A 2/0 stream has no such level and gets none (`planning/karaoke-eac3.md`, E5, D4).
+- **`encode` and `eac3-encode` say what `bsmod=7` is on mono and on 1+1.** Table 5.7 gives mono's
+  code 7 the meaning of a voice-over, and Annex A (Table A5.2) and Annex G (Table G.2) prohibit a
+  karaoke service on 1+1; both encoders accepted it silently. The stream is still written as
+  asked, with a warning (for an extra programme, naming which).
+- **The WebAssembly decoder reproduces an E-AC-3 karaoke stream.** `PushDecoder` read karaoke from
+  an AC-3 syncframe only; an E-AC-3 syncframe that is one independent substream with no object
+  layer and `bsmod` 7 above 1/0 is karaoke too, and `karaoke`/`karaokeVocals` apply to its side
+  fold as they do to AC-3's. The JavaScript package's documentation says so.
+- **`verify_karaoke_oracle.py`'s E-AC-3 cases** say what they are now that `bsmod=7` alone writes
+  the group, and one at a -3 dB surround level takes the place of the no-`mixmdate` stream the
+  command line can no longer write (the decoder's default for one is held by the library's tests).
 
 **Karaoke in E-AC-3: Hearth reproduces it, and a sink says which codecs it reproduces it for**
 
