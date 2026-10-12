@@ -4814,6 +4814,14 @@ The sections below contain the complete change list and fixes.
 
 **Build system**
 
+- **A tests-only configure failed with `Target "iclforge-forge-gui-tests" links to:
+  iclforge::app_text_encoding but the target was not found`.** The code-page library was added
+  only for `ICLFORGE_BUILD_CLI` or `ICLFORGE_BUILD_GUI`, and the GUI's Qt-free test binary, which
+  links it, is added whenever `ICLFORGE_BUILD_TESTS` is on, so
+  `-DICLFORGE_BUILD_TESTS=ON -DICLFORGE_BUILD_CLI=OFF -DICLFORGE_BUILD_GUI=OFF` (with Hearth, as a
+  Hearth-only developer configures) stopped the configure. The CI presets build the command line
+  and did not show it. The library is now added when the tests are on, so its own tests run in
+  such a build too.
 - **`libac3forge_c.so` exported the codec it embeds, and the `BUILD_SHARED_LIBS=ON` test pass ran
   on that copy instead of `libac3forge.so`.** On Linux the C library exported the C++ symbols of
   the static codec inside it (346 of the 562 lines in its ABI allowlist, beside its 216 C
