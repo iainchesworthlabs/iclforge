@@ -740,6 +740,25 @@ struct DecodedAccessUnit {
     std::optional<Concealment> concealed = std::nullopt;
 };
 
+// Whether a programme is one Eac3Decoder reproduces karaoke for, when OutputConfig::karaoke asks
+// (planning/karaoke-eac3.md, D1 to D3): its own bsmod and acmod say it is karaoke (Annex C.2.1),
+// it was assembled from exactly one substream (an independent one: the chanmap of a dependent has
+// no V1 or V2, and what a decoder does with one there is nowhere specified), and it carries no
+// object layer. The decoder, the CLI and Hearth ask this one rule, so none of them re-derives it.
+// Inline, so it adds no symbol to the library.
+[[nodiscard]] inline bool is_karaoke_programme(const std::optional<meta::BsiInfo>& info, Acmod acmod,
+                                               std::size_t substreams, bool objects) {
+    return info.has_value() && substreams == 1 && !objects && meta::is_karaoke(info->bsmod, acmod);
+}
+
+[[nodiscard]] inline bool is_karaoke_programme(const DecodedAccessUnit& unit) {
+    return is_karaoke_programme(unit.info, unit.acmod,
+                                unit.substream_count > 0
+                                    ? static_cast<std::size_t>(unit.substream_count)
+                                    : std::size_t{0},
+                                unit.object_metadata.has_value());
+}
+
 class ICLFORGE_AC3_EXPORT Eac3Decoder {
    public:
     // Real work, not =default, because Impl below is incomplete here - same
