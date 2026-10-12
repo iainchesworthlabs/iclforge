@@ -284,6 +284,13 @@ The sections below contain the complete change list and fixes.
   nlohmann/json (a new vcpkg dependency of the two programs, and a new section of their notices),
   by `apps/shared/project`, which both compile in. [Projects](docs/forge/gui/projects.md) has the
   format.
+- **The Rust binding reproduces a karaoke stream and reads lyrics.** `Decoder::with_karaoke` takes a
+  `KaraokeConfig` (`KaraokeReproduction`, `KaraokeVocals` and the three part levels in dB against
+  Table C.2.3, the span and defaults of Hearth's sliders) and a `DecodedFrame` says `bsmod`,
+  `is_karaoke`, `output_acmod`, `output_lfe` and `karaoke_reproduced`. `iclforge::lyrics::Lyrics`
+  reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke bytes into lines of timed words with
+  their singers, borrowing them, with the stateless cursor; a refusal is
+  `LyricsError::Unreadable` with the reader's reason (planning/karaoke-phase2.md, W5).
 - **The Karaoke flow takes an LFE part.** An optional mono file, the stream's low-frequency
   channel: it chooses no mode, is coded after the full-bandwidth channels (a 3/2 stream with one is
   a 5.1 bed), is band-limited by the window as any channel assigned to the LFE is, and comes out of
