@@ -267,6 +267,93 @@ still returns library-owned data even for a decoder driven entirely through this
 own per-substream results were never assembled into one programme to begin with, so there is
 nothing for a `flush_into` to write through a caller's spans (see its own header comment).
 
+## Karaoke streams (Annex C)
+
+An AC-3 stream flagged `bsmod` 7 with a layout wider than mono is an Annex C karaoke stream (ETSI
+TS 102 366): L and R, a guide melody M where a centre would be, and one or two vocals V1 and V2
+where the surrounds would be ([Karaoke](../karaoke/index.md)). A decoder made with
+`iclforge_decoder_create` plays the channels where they are coded, which puts the vocals in the
+rear speakers. `iclforge_decoder_create_with_karaoke` takes the reproduction a karaoke-aware or
+karaoke-capable decoder gives it, which is `iclforge::ac3::DecoderConfig::output`'s karaoke fields:
+
+```c
+iclforge_decoder_config_t decoder_config;
+iclforge_decoder_config_init(&decoder_config);
+
+iclforge_karaoke_config_t karaoke;
+iclforge_karaoke_config_init(&karaoke);          // off, both vocals, every level 0 dB
+karaoke.reproduction = ICLFORGE_KARAOKE_CAPABLE; // C.2.3.2, Table C.2.3
+karaoke.vocals = ICLFORGE_KARAOKE_VOCALS_V1;     // NONE, V1, V2 or BOTH
+karaoke.melody_db = -6.0;                        // the guide melody 6 dB under the table
+
+iclforge_decoder_t* decoder = NULL;
+status = iclforge_decoder_create_with_karaoke(&decoder_config, &karaoke, &decoder);
+
+iclforge_decoded_frame_t* decoded = NULL;
+status = iclforge_decoder_decode_frame(decoder, data, size, &decoded);
+if (iclforge_decoded_frame_karaoke_reproduced(decoded)) {
+    /* three channels (four with the LFE): L, C, R in coded order, where five were coded.
+       iclforge_decoded_frame_output_acmod() is ICLFORGE_ACMOD_3_0 and
+       iclforge_decoded_frame_acmod() still says 3/2. */
+}
+```
+
+- **`ICLFORGE_KARAOKE_AWARE`** (C.2.3.1, Table C.2.2) is L, C and R with M at unity in the centre and
+  the vocals at the stream's own surround level; **`ICLFORGE_KARAOKE_CAPABLE`** (C.2.3.2) lets the
+  listener choose which vocals play, and re-level each part.
+- **Levels** (`melody_db`, `vocal1_db`, `vocal2_db`) are Annex C.2.3's "additional flexibility" and
+  the capable decoder's alone. They are in dB against Table C.2.3 over
+  `ICLFORGE_KARAOKE_MIN_LEVEL_DB` to `ICLFORGE_KARAOKE_MAX_LEVEL_DB` (-24 to +12): 0 is the table,
+  bit for bit, and the bottom is off. A value outside the span is held to it and one that is not a
+  number is 0 dB, the conversion Hearth's sliders, `forge decode karaoke-melody=` and a sink's
+  decoder share. A part raised far enough lowers the others, because the output stage holds every
+  output's coefficients to a sum of 1.
+- **What the channels are.** A reproduced frame has fewer channels than it codes, so a caller
+  that lays channels out from `iclforge_decoded_frame_acmod()` would put the vocals where the
+  surrounds were. `iclforge_decoded_frame_output_acmod()` and `..._output_lfe()` say what the
+  channels are, `..._is_karaoke()` and `..._bsmod()` what the stream is, and
+  `..._karaoke_reproduced()` whether the decoder replaced the layout. The same holds for
+  `iclforge_decoder_decode_frame_into`, which writes the reproduction's channels first.
+- A frame that is not karaoke, and every frame when the reproduction is `ICLFORGE_KARAOKE_OFF`,
+  goes through exactly as a decoder from `iclforge_decoder_create` leaves it. The reproduction is
+  the 3/0 form: the stereo and mono forms are the §7.8 fold, which this API has no output stage
+  for, and E-AC-3 (`iclforge_eac3_decoder_create`) and AC-4 have no karaoke reproduction.
+
+## Lyrics
+
+`iclforge_lyrics_parse` reads the bytes of a lyrics file into an immutable `iclforge_lyrics_t`: an
+LRC file (UTF-8, or UTF-16 with a byte-order mark; the word-timed `<mm:ss.xx>` form and a duet's
+`V1:`/`V2:` markers included), a SubRip `.srt`, an Advanced SubStation Alpha `.ass` with its karaoke
+tags, or a MIDI karaoke `.kar`, told by their content and not their names. It is the reader
+Hearth, Crucible and the sink firmware use. A caller reads its own file and hands over the bytes:
+
+```c
+iclforge_lyrics_t* lyrics = NULL;
+status = iclforge_lyrics_parse(bytes, size, /* duration_ms, or -1 */ -1, &lyrics);
+if (status == ICLFORGE_ERROR_LYRICS_UNREADABLE) {
+    fprintf(stderr, "%s\n", iclforge_lyrics_error_message());   /* "... is not UTF-8 or UTF-16" */
+}
+
+for (size_t i = 0; i < iclforge_lyrics_line_count(lyrics); i++) {
+    printf("%lld %s\n", (long long)iclforge_lyrics_line_start_ms(lyrics, i),
+           iclforge_lyrics_line_text(lyrics, i));
+}
+
+iclforge_lyrics_position_t at;
+iclforge_lyrics_position(lyrics, playing_ms, /* the singer's nudge */ 0, &at);
+if (at.has_line && at.in_line) { /* line at.line, and at.word when at.has_word, at.fraction through it */ }
+iclforge_lyrics_destroy(lyrics);
+```
+
+Times are milliseconds from the start of the item with the file's own `[offset:]` applied. The
+cursor is stateless (a seek, a pause and a stop are only another position), `delay_ms` is the
+singer's nudge (positive shows the words later) and `iclforge_lyrics_word_state` says whether a
+word is sung, being sung or not yet. A file in a code page (Latin-1, Windows-1255) or in UTF-32 is
+refused with a sentence saying so, not guessed at. The error message is the calling thread's, valid
+until its next parse; every other string is valid until the lyrics are destroyed. The reader itself
+is compiled into this library from `libs/lyrics`; what the C++ interface has beyond it (the writer,
+the editing a tap timer needs, a CD+G picture, finding a file beside a media item) is C++ only.
+
 ## Object audio (OAMD + JOC)
 
 A decoded E-AC-3 substream or access unit that carries an Atmos object container exposes it

@@ -13,6 +13,7 @@
 
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
@@ -44,6 +45,17 @@ static_assert(static_cast<int>(iclforge::ac3::Acmod::k2_1) == ICLFORGE_ACMOD_2_1
 static_assert(static_cast<int>(iclforge::ac3::Acmod::k3_1) == ICLFORGE_ACMOD_3_1);
 static_assert(static_cast<int>(iclforge::ac3::Acmod::k2_2) == ICLFORGE_ACMOD_2_2);
 static_assert(static_cast<int>(iclforge::ac3::Acmod::k3_2) == ICLFORGE_ACMOD_3_2);
+
+static_assert(static_cast<int>(iclforge::ac3::KaraokeReproduction::kOff) == ICLFORGE_KARAOKE_OFF);
+static_assert(static_cast<int>(iclforge::ac3::KaraokeReproduction::kAware) == ICLFORGE_KARAOKE_AWARE);
+static_assert(static_cast<int>(iclforge::ac3::KaraokeReproduction::kCapable) ==
+              ICLFORGE_KARAOKE_CAPABLE);
+static_assert(static_cast<int>(iclforge::ac3::KaraokeVocals::kNone) == ICLFORGE_KARAOKE_VOCALS_NONE);
+static_assert(static_cast<int>(iclforge::ac3::KaraokeVocals::kV1) == ICLFORGE_KARAOKE_VOCALS_V1);
+static_assert(static_cast<int>(iclforge::ac3::KaraokeVocals::kV2) == ICLFORGE_KARAOKE_VOCALS_V2);
+static_assert(static_cast<int>(iclforge::ac3::KaraokeVocals::kBoth) == ICLFORGE_KARAOKE_VOCALS_BOTH);
+static_assert(ICLFORGE_KARAOKE_MIN_LEVEL_DB == iclforge::ac3::kKaraokeMinLevelDb);
+static_assert(ICLFORGE_KARAOKE_MAX_LEVEL_DB == iclforge::ac3::kKaraokeMaxLevelDb);
 
 static_assert(static_cast<int>(iclforge::ac3::meta::CentreMixLevel::kMinus3dB) ==
               ICLFORGE_CMIXLEV_MINUS_3DB);
@@ -253,12 +265,21 @@ struct iclforge_encoder {
 };
 
 struct iclforge_decoder {
-    explicit iclforge_decoder(const iclforge::ac3::DecoderConfig& config) : impl(config) {}
+    explicit iclforge_decoder(const iclforge::ac3::DecoderConfig& config)
+        : impl(config), output(config.output) {}
     iclforge::ac3::FrameDecoder impl;
+    // What the frame decoder was told to reproduce, kept so that each frame can say what its
+    // channels came out as (iclforge::ac3::output_mode() is a function of this and the frame).
+    iclforge::ac3::OutputConfig output;
 };
 
 struct iclforge_decoded_frame {
     iclforge::ac3::DecodedFrame data;
+    // The layout `data.channels` is in: the coded one unless a karaoke reproduction replaced it.
+    // Set by the decoder that made the frame; the coded layout for a default-made one.
+    iclforge::ac3::OutputMode output{};
+    bool karaoke = false;
+    bool karaoke_reproduced = false;
 };
 
 struct iclforge_eac3_decoder {
