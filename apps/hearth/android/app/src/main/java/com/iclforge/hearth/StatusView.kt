@@ -232,7 +232,17 @@ class StatusView(context: Context) : View(context) {
         }
     }
 
-    private fun drawIdle(canvas: Canvas, u: Float, left: Float, widthPx: Int, startY: Float) {
+    private fun drawIdle(canvas: Canvas, u: Float, left: Float, fullWidthPx: Int, startY: Float) {
+        // A server that asked for the QR form of its code is shown the QR, large, at the right; the
+        // words keep the rest of the width.
+        val code = content.status.pairingCode
+        val qr = if (code != null && code.startsWith(QR_TOKEN_PREFIX)) QrCode.encode(code) else null
+        val cardSide = if (qr != null) qrCardSide(qr, u) else 0
+        val widthPx = if (qr != null) max(1, fullWidthPx - cardSide - (48 * u).toInt()) else fullWidthPx
+        if (qr != null) {
+            drawQr(canvas, u, qr, left + fullWidthPx - cardSide, startY, cardSide, code!!)
+        }
+
         var y = startY
         fun put(layout: StaticLayout, gap: Float) {
             canvas.save()
@@ -241,12 +251,15 @@ class StatusView(context: Context) : View(context) {
             canvas.restore()
             y += layout.height + gap * u
         }
-        put(layoutOf(content.name, 72f, u, widthPx, 600, Tokens.TEXT, 1), 8f)
+        // With the QR beside it the name has a column and not the width: a size down keeps it whole.
+        put(layoutOf(content.name, if (qr != null) 56f else 72f, u, widthPx, 600, Tokens.TEXT, 1), 8f)
         content.where?.let { put(layoutOf(it, Tokens.SMALL_U * 1.25f, u, widthPx, 400, Tokens.MUTED, 1), 40f) }
 
         val playing = content.status.playingFor
-        val code = content.status.pairingCode
         when {
+            qr != null -> {
+                put(layoutOf(context.getString(R.string.scan_code), 40f, u, widthPx, 400, Tokens.TEXT, 4), 16f)
+            }
             code != null -> {
                 put(layoutOf(context.getString(R.string.enter_code), 40f, u, widthPx, 400, Tokens.TEXT, 2), 16f)
                 put(layoutOf(code, 112f, u, widthPx, 600, Tokens.ACCENT, 1, tracked = true), 16f)
@@ -275,6 +288,51 @@ class StatusView(context: Context) : View(context) {
         }
     }
 
+    /**
+     * The QR's card, whole pixels to a module so that no module is blurred: about 320 u on a side, the
+     * code with the standard's four-module quiet zone, which on a 1080p TV is a hand's breadth.
+     */
+    private fun qrCardSide(modules: QrCode.Modules, u: Float): Int {
+        val perModule = max(2, (QR_CARD_U * u / (modules.size + 2 * QR_QUIET_MODULES)).toInt())
+        return perModule * (modules.size + 2 * QR_QUIET_MODULES)
+    }
+
+    /**
+     * The code as dark modules on a light card (a scanner wants dark on light, and the card's margin is
+     * the quiet zone), with the token under it for a person who would type it.
+     */
+    private fun drawQr(canvas: Canvas, u: Float, modules: QrCode.Modules, x: Float, y: Float, side: Int, token: String) {
+        val perModule = side / (modules.size + 2 * QR_QUIET_MODULES)
+        val paint = Paint()
+        paint.color = Tokens.TEXT
+        canvas.drawRect(x, y, x + side, y + side, paint)
+        paint.color = Tokens.BG
+        val origin = QR_QUIET_MODULES * perModule
+        for (row in 0 until modules.size) {
+            var column = 0
+            while (column < modules.size) {
+                if (!modules.dark(column, row)) {
+                    column++
+                    continue
+                }
+                // A run of dark modules is one rectangle.
+                val start = column
+                while (column < modules.size && modules.dark(column, row)) {
+                    column++
+                }
+                canvas.drawRect(
+                    x + origin + start * perModule, y + origin + row * perModule,
+                    x + origin + column * perModule, y + origin + (row + 1) * perModule, paint,
+                )
+            }
+        }
+        val text = layoutOf(token, Tokens.SMALL_U * 0.8f, u, side, 400, Tokens.MUTED, 3)
+        canvas.save()
+        canvas.translate(x, y + side + 12 * u)
+        text.draw(canvas)
+        canvas.restore()
+    }
+
     private fun attentionSentence(): String = when (content.choice.attention) {
         StatusScreens.Attention.NOT_STARTED -> context.getString(R.string.not_started, content.error ?: "")
         StatusScreens.Attention.REFUSED -> context.getString(R.string.attention_refused)
@@ -287,5 +345,14 @@ class StatusView(context: Context) : View(context) {
         StatusScreens.Attention.REFUSED -> context.getString(R.string.attention_refused_hint)
         StatusScreens.Attention.LOST -> context.getString(R.string.attention_lost_hint)
         null -> ""
+    }
+
+    private companion object {
+        /** What a dynamic pairing code in its QR form starts with (the spec's `SP:1` token). */
+        const val QR_TOKEN_PREFIX = "SP:"
+
+        /** The QR card's side in u, quiet zone included, and the quiet zone the standard asks for. */
+        const val QR_CARD_U = 320f
+        const val QR_QUIET_MODULES = 4
     }
 }
