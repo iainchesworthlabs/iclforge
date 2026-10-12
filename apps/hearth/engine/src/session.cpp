@@ -5,6 +5,7 @@
 #include <array>
 #include <fmt/format.h>
 #include <iterator>
+#include <limits>
 #include <span>
 #include <utility>
 
@@ -112,6 +113,58 @@ struct Ac4Reading {
     return out;
 }
 
+// What an AC-4 presentation does with objects (the table of contents says which substreams carry
+// them, and the decoder what they come to): the dynamic objects its first I-frame decodes to,
+// the LFE object left out because no sink places it, and whether it also puts out channels - a
+// bed - which a decoder that places no objects plays alone. Read by decoding that frame, so that
+// the count is what the decoder makes of it and not a second reading of the table of contents;
+// nothing for a stream with no object substream, which is every one of channels alone and costs
+// no decode.
+struct Ac4ObjectReading {
+    std::uint16_t objects = 0;
+    bool objects_alone = false;
+};
+
+[[nodiscard]] bool has_object_substreams(const iclforge::ac4::Toc& toc) {
+    return std::ranges::any_of(
+        toc.substream_groups, [](const iclforge::ac4::SubstreamGroupInfo& group) {
+            return std::ranges::any_of(
+                group.substreams, [](const iclforge::ac4::GroupSubstream& substream) {
+                    return substream.kind != iclforge::ac4::GroupSubstream::Kind::kChan;
+                });
+        });
+}
+
+[[nodiscard]] Ac4ObjectReading read_ac4_objects(const Ac4Units& units,
+                                                const iclforge::ac4::PresentationChoice& choice) {
+    Ac4ObjectReading out;
+    if (!has_object_substreams(units.first.toc)) {
+        return out;
+    }
+    iclforge::ac4::DecoderConfig config;
+    config.presentation = choice;
+    iclforge::ac4::Decoder decoder{config};
+    // From the first I-frame, which is what a decoder starts at; a few frames if that one will
+    // not decode, since the first may be damaged.
+    constexpr std::size_t kFramesDecoded = 4;
+    const auto first =
+        static_cast<std::size_t>(std::ranges::find(units.iframes, true) - units.iframes.begin());
+    for (std::size_t i = first; i < units.frames.size() && i < first + kFramesDecoded; ++i) {
+        const auto decoded = decoder.decode(raw_frame_of(units.frames[i]));
+        if (!decoded || !decoded->has_value()) {
+            continue;
+        }
+        const iclforge::ac4::DecodedFrame& frame = **decoded;
+        const auto count = std::ranges::count_if(
+            frame.objects, [](const iclforge::ac4::DecodedObject& object) { return !object.lfe; });
+        out.objects = static_cast<std::uint16_t>(
+            std::min<std::ptrdiff_t>(count, std::numeric_limits<std::uint16_t>::max()));
+        out.objects_alone = frame.channels.empty();
+        break;
+    }
+    return out;
+}
+
 // Passthrough's question about the stream, which is a different question
 // from what the bytes are: an AC-3 core carrying E-AC-3 dependents only
 // reaches a sink whole as E-AC-3.
@@ -163,6 +216,9 @@ std::expected<Session, std::string> Session::open(
                 "\"{}\" has no presentation this build decodes{}.", path,
                 reading.refusal.empty() ? std::string{} : fmt::format(": {}", reading.refusal)));
         }
+        const Ac4ObjectReading object_reading = read_ac4_objects(*units, presentation);
+        session.facts_.objects = object_reading.objects;
+        session.facts_.objects_alone = object_reading.objects_alone;
         session.ac4_ = true;
         session.ac4_toc_ = units->first.toc;
         session.units_ = std::move(units->frames);

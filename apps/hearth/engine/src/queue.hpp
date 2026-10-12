@@ -43,10 +43,15 @@ struct ItemFacts {
     bool karaoke = false;
     bool has_objects = false;
     // The most dynamic objects the programme places, as an E-AC-3 stream declares in its
-    // addbsi (TS 103 420's complexity index, which is an object count); 0 for a stream that
-    // declares none and where it is not known (an AC-4 presentation's are not read here).
-    // What a sink's stated limit is compared with (sink_form.hpp).
+    // addbsi (TS 103 420's complexity index, which is an object count) and an AC-4
+    // presentation's first I-frame decodes to (the LFE, which no sink places, is not one); 0 for
+    // a stream that declares none and where it is not known. What a sink's stated limit is
+    // compared with (sink_form.hpp).
     std::uint16_t objects = 0;
+    // An AC-4 presentation of object audio alone: it decodes to no channels, so a decoder that
+    // places no objects has no bed to play and plays nothing. False for every E-AC-3 stream,
+    // whose bed is its core, and for an AC-4 presentation that carries channels.
+    bool objects_alone = false;
     // Measured over the whole programme, the same definition
     // io::ProbeReport::bitrate_kbps uses: its bytes * 8, over its duration.
     // Unset until the item has been probed, the same as the fields above.

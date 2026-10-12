@@ -10,6 +10,14 @@ that settles most of what is open here.
 at 48 kHz, 32 ms for AC-3 and E-AC-3). Below 1 keeps up; above 1 falls behind for as long as the
 stream plays.
 
+**Update, 2026-10-12: the AC-4 path in the burst player (I6) is built** (`ac4_stream.{hpp,cpp}`,
+`burst_player.cpp`, `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4`). A P4 whose image has the AC-4 decoder
+lists `ac4`, states 6 channels and no objects, and plays AC-4 from a group: 2.0 at 0.18 to 0.33 and
+5.1 at 0.51 to 0.73 of real time, every output's level the host decoder's to 0.01 dB
+([`esp32-p4.md`](../docs/platforms/bare-metal/esp32-p4.md#ac-4-from-a-server)). An S3 does not list
+it by default (its 2.0 A-SPX and the converter fall behind, and the support object cannot list a
+class), and the C6 cannot hold the decoder. Facts 1 and 3 below describe `main` on 2026-10-10.
+
 ## The finding that changes the question
 
 Decision 32 says "where it misses, Hearth sends the C6 PCM, which it plays today". **The code does
@@ -126,6 +134,21 @@ What the cells mean:
 | 4 | Layout placeable, <= `kMaxCoded` | Board, `player.cpp:725` | HTTP AC-4 | Play fails, `why: "channel layout"` |
 | 5 | Heap >= 286,365 B | Board, `player.cpp:819` | HTTP AC-4 | Play fails, `why: "memory"`, board runs on |
 | 6 | The decoder's own refusal | Board, `player.cpp:928` | HTTP AC-4 | Play fails, `why: "decode"` |
+
+AC-4 **objects** are a class of their own, and one the boards cannot take whole. The decoder
+puts a presentation's objects out beside its channels (`DecodedFrame::objects`) for the
+application to place; `decode_by_block()`, which the board's player calls, hands over channels
+alone. By the code (none of this has been run on a board), a presentation that has channels (a
+bed) therefore plays as that bed, after the board has paid to reconstruct objects it throws away;
+a presentation of objects alone (A-JOC or direct-coded, which is what this project's encoder
+writes) decodes to no channels, and the board plays nothing. So the AC-4 path of a board that
+lists `ac4` has to state `max_objects.ac4` of 0
+until it places objects, and Hearth, which now reads an AC-4 presentation's object count and
+whether it has channels (`ItemFacts::objects`, `objects_alone`), sends such a board PCM decoded
+here for a presentation past it. What this does not yet do is the board's half: skipping the
+object reconstruction when the player places none (a `DecoderConfig` option the library does not
+have), which is where a bed-and-objects stream's time goes on a P4 or an S3; no AC-4 stream with
+both has been measured on a board.
 
 What is **not** there:
 

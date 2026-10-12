@@ -175,6 +175,20 @@ namespace {
 
 }  // namespace
 
+std::size_t text_line_count(const Lyrics& lyrics) {
+    return static_cast<std::size_t>(std::count_if(
+        lyrics.lines.begin(), lyrics.lines.end(), [](const LyricLine& line) { return has_text(line); }));
+}
+
+std::size_t text_line_number(const Lyrics& lyrics, std::size_t index) {
+    if (index >= lyrics.lines.size() || !has_text(lyrics.lines[index])) {
+        return 0;
+    }
+    return static_cast<std::size_t>(std::count_if(
+        lyrics.lines.begin(), lyrics.lines.begin() + static_cast<std::ptrdiff_t>(index) + 1,
+        [](const LyricLine& line) { return has_text(line); }));
+}
+
 bool text_is_covered(std::string_view text, std::span<const CodePointRange> ranges) {
     for (std::size_t at = 0; at < text.size();) {
         std::size_t length = 1;

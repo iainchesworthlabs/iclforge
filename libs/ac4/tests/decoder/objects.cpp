@@ -19,6 +19,7 @@
 #include "encoder/aspx/aspx_encoder.hpp"
 #include "encoder/aspx/aspx_syntax.hpp"
 #include "iclforge/base/bitwriter.hpp"
+#include "encoder/frame/frame_writer.hpp"
 #include "encoder/frame/toc_writer.hpp"
 #include "encoder/oamd/oamd_syntax.hpp"
 
@@ -1153,6 +1154,8 @@ BuiltObjectStream build_objects(const ObjectCase& c, int frames) {
         throw std::runtime_error("no A-SPX configuration at 48 kHz");
     }
     iclforge::ac4::detail::Analysis analysis(kFrameLength, 1);
+    // The bed's own analysis: its tracks are not the objects'.
+    iclforge::ac4::detail::Analysis bed_analysis(kFrameLength, 1);
     std::optional<OamdTimingFields> carried;
     for (int f = 0; f < frames; ++f) {
         const bool iframe = f % 4 == 0;
@@ -1175,7 +1178,31 @@ BuiltObjectStream build_objects(const ObjectCase& c, int frames) {
         p.md_compat = 3;
         p.pres_ndot = iframe;
         p.presentation_substream = frame.presentation_index;
-        layout.presentations.push_back(p);
+        if (c.channels) {
+            // The bed's substream after the presentation's, its group first, and the
+            // presentation substream of a channel-based presentation of two groups.
+            BitWriter bed = BitWriter::buffered();
+            TrackWriter bed_tracks(bed, bed_analysis, f);
+            write_element(bed, bed_tracks, 5, 0, true);
+            const int bed_index = static_cast<int>(frame.substreams.size());
+            frame.traces.emplace_back();
+            frame.substreams.push_back(audio_substream(bed, bed_index, false, frame.traces.back()));
+            iclforge::ac4::detail::TocGroup bed_group;
+            bed_group.substreams.push_back(iclforge::ac4::detail::TocSubstream{
+                .ch_mode = 4, .iframe = iframe, .substream_index = bed_index});
+            iclforge::ac4::detail::PresentationSubstreamFields fields;
+            fields.iframe = iframe;
+            fields.mix.n_substream_groups = 2;
+            fields.channels.ch_mode = 4;
+            frame.substreams[at(frame.presentation_index)] =
+                iclforge::ac4::detail::write_presentation_substream(fields).bytes();
+            p.presentation_config = 0;
+            p.groups = {0, 1};
+            layout.presentations.push_back(p);
+            layout.groups.push_back(bed_group);
+        } else {
+            layout.presentations.push_back(p);
+        }
         layout.groups.push_back(frame.group);
         if (frame.full_timing) {
             carried = frame.full_timing;
