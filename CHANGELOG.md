@@ -57,6 +57,18 @@ The sections below contain the complete change list and fixes.
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
 
+**Containers: what a file holds besides its audio**
+
+- **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
+  file with Dolby audio often carries a picture, a second audio track or a subtitle track, and the
+  readers gave up one audio track and said nothing of the rest. `mp4::Demuxed::skipped` and
+  `matroska::Demuxed::skipped` now hold each other track's id, kind (`audio`, `video`, `text` or
+  `other`, from the MP4 handler or the Matroska track type), codec (the first sample entry, or the
+  CodecID) and language, in file order and up to 64. `forge probe` prints them on an `other tracks`
+  line and writes them as `container.other_tracks` in its JSON. None of their content is read; it is
+  what the container says, so that a person can see whether a karaoke video's words are in a text
+  track, a bitmap subtitle track or only in the picture.
+
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
 - **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
