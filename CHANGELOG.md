@@ -4172,6 +4172,17 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Footprint probes: the E-AC-3 fold fixtures expect the -3 dB levels**
+
+- **`kEac3FoldRms`, `kEac3714FoldRms` and the fixed-tier pins `eac3_fold` and `eac3_714_fold` are
+  re-measured.** They were taken before an E-AC-3 stream with no `mixmdate` folded at -3 dB centre
+  and -3 dB surround (#1420, D10), so the arm-none-eabi, ESP32-C3 and ESP32-S3 footprint probes
+  failed their level checks on every push since (the 5.1 fold 107,353 / 106,212 to 95,687 / 94,353
+  and the 7.1.4 fold 62,837 / 61,994 to 55,509 / 55,002 per million; the fixed-tier hashes
+  `63f6da64fcb14557` and `3c068ffd950a7e63`). Values are from `forge decode downmix=loro
+  drcmode=line` of the embedded streams and from the fixed-tier probe run natively; no other
+  fixture moved.
+
 **WebAssembly demo: the lyrics test**
 
 - **The browser demo's "follows a lyrics file" test failed against the example it loads, and had
