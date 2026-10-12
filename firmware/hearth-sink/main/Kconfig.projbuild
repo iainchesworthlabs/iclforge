@@ -735,4 +735,135 @@ config ICLFORGE_EXAMPLE_SENDSPIN_PCM
 
 endmenu
 
+menu "Panel (lyrics on a screen)"
+
+# The board's screen (planning/karaoke-p4x-panel.md). A directory CMake picks, like the sink and
+# the source (main/CMakeLists.txt, main/panel/panel.hpp). Read from CMake, never from C++.
+choice ICLFORGE_EXAMPLE_PANEL
+    prompt "Panel"
+    default ICLFORGE_EXAMPLE_PANEL_NONE
+    help
+        None draws nothing and costs nothing: every image but the one for a
+        board with a screen. A frame buffer is LVGL drawing into 1.2 MB of
+        PSRAM with no glass behind it: what runs on a board that has no panel
+        (a FireBeetle 2) to see what the screen looks like and what drawing
+        it costs, read back over HTTP (ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT).
+        A MIPI DSI panel is the same drawing on a 1024 by 600 panel over the
+        P4's DSI host, with touch, as on Espressif's ESP32-P4-Function-EV-Board
+        (see ICLFORGE_EXAMPLE_PANEL_BOARD_* for its pins).
+
+config ICLFORGE_EXAMPLE_PANEL_NONE
+    bool "None"
+
+config ICLFORGE_EXAMPLE_PANEL_NULL
+    bool "A frame buffer with no panel behind it (ESP32-P4, needs PSRAM)"
+    depends on IDF_TARGET_ESP32P4 && SPIRAM
+
+config ICLFORGE_EXAMPLE_PANEL_DSI
+    bool "A MIPI DSI panel with touch (ESP32-P4, needs PSRAM)"
+    depends on IDF_TARGET_ESP32P4 && SPIRAM
+
+endchoice
+
+config ICLFORGE_EXAMPLE_PANEL_WIDTH
+    int "Panel width, pixels"
+    default 1024
+    range 320 1920
+
+config ICLFORGE_EXAMPLE_PANEL_HEIGHT
+    int "Panel height, pixels"
+    default 600
+    range 240 1200
+
+config ICLFORGE_EXAMPLE_PANEL_FPS
+    int "Frames a second while a word is being filled"
+    default 30
+    range 5 60
+    help
+        The fill moves with the sound, so it is redrawn this often. Between
+        words and in a gap the screen asks for a tenth of this.
+
+config ICLFORGE_EXAMPLE_PANEL_TASK_PRIORITY
+    int "Priority of the panel's task"
+    default 2
+    range 1 10
+    help
+        Below the decode task and the I2S writer (the audio is the product),
+        and above the idle task. The screen is a guest: when the cores are
+        busy it is drawn late rather than the audio being.
+
+config ICLFORGE_EXAMPLE_PANEL_STACK_BYTES
+    int "Stack of the panel's task, bytes (PSRAM)"
+    default 16384
+    range 8192 65536
+
+config ICLFORGE_EXAMPLE_PANEL_LINE_BUFFER_ROWS
+    int "Rows of the partial render buffers (two, PSRAM)"
+    default 40
+    range 10 200
+    help
+        LVGL draws a dirty area through two buffers of this many rows of the
+        panel's width, in RGB565: 80 KB each at 1024 wide and 40 rows.
+
+config ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT
+    int "Port that serves the picture as a BMP at /panel.bmp (0 = none)"
+    default 8081
+    range 0 65535
+    help
+        A second, tiny HTTP server for development: GET /panel.bmp is what is
+        on the glass (or in the frame buffer, with no glass), GET /panel is
+        the drawing statistics as JSON and POST /panel/tap?x=..&y=.. is a tap
+        (a touch with no touch controller). It is how a design is checked
+        before the panel is here. Set 0 for a release image.
+
+config ICLFORGE_EXAMPLE_PANEL_BACKLIGHT_GPIO
+    int "Backlight PWM GPIO (-1 = none)"
+    default 26
+    range -1 54
+    help
+        Espressif's ESP32-P4-Function-EV-Board with its 7-inch panel: GPIO26
+        for the backlight, GPIO27 for the panel's reset (both through
+        jumpers on the LCD adapter board). Check against the schematic of
+        the board the image is for.
+
+config ICLFORGE_EXAMPLE_PANEL_RESET_GPIO
+    int "Panel reset GPIO (-1 = none)"
+    default 27
+    range -1 54
+
+config ICLFORGE_EXAMPLE_PANEL_I2C_SDA_GPIO
+    int "Touch controller I2C SDA GPIO"
+    default 7
+    range 0 54
+
+config ICLFORGE_EXAMPLE_PANEL_I2C_SCL_GPIO
+    int "Touch controller I2C SCL GPIO"
+    default 8
+    range 0 54
+
+config ICLFORGE_EXAMPLE_PANEL_TOUCH_INT_GPIO
+    int "Touch controller interrupt GPIO (-1 = polled)"
+    default -1
+    range -1 54
+
+config ICLFORGE_EXAMPLE_PANEL_TOUCH_RST_GPIO
+    int "Touch controller reset GPIO (-1 = none)"
+    default -1
+    range -1 54
+
+config ICLFORGE_EXAMPLE_PANEL_DSI_LDO_CHANNEL
+    int "LDO channel that powers the DSI PHY (-1 = already on)"
+    default 3
+    range -1 4
+    help
+        The P4's MIPI DSI PHY is supplied from an on-chip LDO channel, 3 at
+        2.5 V on the ESP32-P4-Function-EV-Board.
+
+config ICLFORGE_EXAMPLE_PANEL_DSI_LDO_MV
+    int "That LDO's voltage, millivolts"
+    default 2500
+    range 500 3300
+
+endmenu
+
 endmenu

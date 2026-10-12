@@ -98,6 +98,24 @@ if(EXISTS "${ICLFORGE_STAGE_TIMER_DIR}/stage_timers.cpp")
     set(ICLFORGE_STAGE_TIMER_SRCS "${ICLFORGE_STAGE_TIMER_DIR}/stage_timers.cpp")
 endif()
 
+# And the panel, the screen the lyrics are drawn on (main/panel/panel.hpp; a directory CMake picks, as the
+# sink and the source are). panel/lvgl is LVGL drawing the lyric screen, onto a MIPI DSI panel with touch
+# or into a frame buffer with no panel behind it; panel/none is a build with no screen. LVGL and the
+# panel's drivers are the manifest's, for the ESP32-P4 only (idf_component.yml), and an image that
+# picks panel/none links none of them.
+if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
+    set(ICLFORGE_PANEL_SRCS "panel/lvgl/panel.cpp" "panel/lvgl/lyric_screen.cpp"
+                            "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp"
+                            "panel/lvgl/lv_memory.cpp")
+    if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI)
+        list(APPEND ICLFORGE_PANEL_SRCS "panel/lvgl/display_dsi.cpp")
+    else()
+        list(APPEND ICLFORGE_PANEL_SRCS "panel/lvgl/display_null.cpp")
+    endif()
+else()
+    set(ICLFORGE_PANEL_SRCS "panel/none/panel.cpp")
+endif()
+
 idf_component_register(
     SRCS "hearth_sink.cpp"
          "settings.cpp"
@@ -107,13 +125,26 @@ idf_component_register(
          "${ICLFORGE_SOURCE_DIR}/byte_source.cpp"
          ${ICLFORGE_NETWORK_SRCS}
          ${ICLFORGE_SENDSPIN_SRCS}
+         ${ICLFORGE_PANEL_SRCS}
          ${ICLFORGE_STAGE_TIMER_SRCS}
     INCLUDE_DIRS "." "source/http"
     REQUIRES iclforge esp_driver_i2s esp_timer freertos
              esp_partition
              esp_driver_sdmmc sdmmc fatfs wear_levelling
              esp_wifi esp_eth esp_http_client esp_netif esp_event nvs_flash
-             esp_app_format espressif__mdns)
+             esp_app_format espressif__mdns
+             esp_lcd esp_driver_ledc esp_driver_i2c esp_driver_gpio esp_http_server)
+
+# The panel's fonts, in the image (planning/karaoke-p4x-panel.md, D3): the TrueType files the apps bundle,
+# under the SIL Open Font License (panel/fonts/*-OFL.txt), rasterised by LVGL's tiny_ttf from flash. In the
+# application rather than a partition of their own, so that an update over the network carries them.
+if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
+    foreach(_panel_font IN ITEMS Archivo-Regular Archivo-SemiBold NotoSansHebrew-Regular
+                                  NotoSansHebrew-SemiBold)
+        target_add_binary_data(${COMPONENT_LIB}
+            "${CMAKE_CURRENT_SOURCE_DIR}/panel/fonts/${_panel_font}.ttf" BINARY)
+    endforeach()
+endif()
 
 # The backend's object has to be in the link. Nothing that comes before it in
 # the link asks for it: this component's own reset_stages and report_stages
