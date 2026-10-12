@@ -36,7 +36,9 @@ vcpkg_check_features(
 # ICLFORGE_BUILD_HEARTH defaults ON upstream and builds Hearth, an application (apps/hearth) and a
 # library nothing installs (libs/sendspin), with dependencies this port does not declare
 # (cpp-httplib, mdns, mbedTLS, libFLAC, Opus); upstream also refuses it beside
-# ICLFORGE_BUILD_AC4=OFF, the ac4 feature's absence.
+# ICLFORGE_BUILD_AC4=OFF, the ac4 feature's absence. ICLFORGE_BUILD_HEARTH_APPS, which selects the
+# applications among what ICLFORGE_BUILD_HEARTH builds, is pinned OFF beside it so that the pair
+# stays a statement and not a default (tools/checks/check_packaging_versions.sh).
 #
 # ICLFORGE_BUILD_ADM/ICLFORGE_ENABLE_TRACY are already OFF by upstream's own default; pinned
 # explicitly so a future default change upstream can't silently pull an undeclared dependency
@@ -50,6 +52,7 @@ vcpkg_cmake_configure(
         -DICLFORGE_BUILD_CLI=OFF
         -DICLFORGE_BUILD_GUI=OFF
         -DICLFORGE_BUILD_HEARTH=OFF
+        -DICLFORGE_BUILD_HEARTH_APPS=OFF
         -DICLFORGE_BUILD_TESTS=OFF
         -DICLFORGE_BUILD_EXAMPLES=OFF
         -DICLFORGE_BUILD_FUZZERS=OFF

@@ -117,6 +117,8 @@ class IclforgeConan(ConanFile):
         # dependencies this recipe does not declare; upstream also refuses it beside
         # ICLFORGE_BUILD_AC4=OFF.
         tc.variables["ICLFORGE_BUILD_HEARTH"] = False
+        # Which of Hearth's parts ICLFORGE_BUILD_HEARTH builds; pinned beside it, as the portfile does.
+        tc.variables["ICLFORGE_BUILD_HEARTH_APPS"] = False
         tc.variables["ICLFORGE_BUILD_TESTS"] = False
         tc.variables["ICLFORGE_BUILD_EXAMPLES"] = False
         tc.variables["ICLFORGE_BUILD_FUZZERS"] = False
