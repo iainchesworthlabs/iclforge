@@ -46,6 +46,7 @@
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/audio/speakers.hpp"
+#include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/objects/oamd.hpp"
@@ -236,10 +237,20 @@ constexpr int kPollMs = 60;
         row[QStringLiteral("bsmodLabel")] =
             to_qstring(apps::probe_json::bsmod_label(programme.bsmod, programme.acmod));
         // Annex C's karaoke type, and what its channels are, for the Karaoke
-        // page: bsmod 7 with an acmod above 1/0.
+        // page. `karaokeFlagged` is the service type alone (bsmod 7 with an acmod
+        // above 1/0); `karaoke` is a programme the decoder reproduces it for, which
+        // is that service on one independent substream with no object layer
+        // (ac3::is_karaoke_programme, the one rule the decoder, the CLI and the
+        // sinks ask): an E-AC-3 programme flagged karaoke that carries a dependent
+        // substream is flagged and is not reproduced.
         row[QStringLiteral("acmodLabel")] = acmod_label(programme.acmod);
-        const bool karaoke = ac3::meta::is_karaoke(
-            static_cast<ac3::meta::BitstreamMode>(programme.bsmod), programme.acmod);
+        const auto bsmod = static_cast<ac3::meta::BitstreamMode>(programme.bsmod);
+        const bool flagged = ac3::meta::is_karaoke(bsmod, programme.acmod);
+        // A programme always has its independent substream, whatever a caller left of the count.
+        const bool karaoke = ac3::is_karaoke_programme(
+            bsmod, programme.acmod, std::max<std::size_t>(programme.substreams_per_unit, 1),
+            programme.complexity_index.has_value());
+        row[QStringLiteral("karaokeFlagged")] = flagged;
         row[QStringLiteral("karaoke")] = karaoke;
         row[QStringLiteral("karaokeParts")] = karaoke ? karaoke_parts(programme.acmod) : QVariantList{};
         row[QStringLiteral("accessUnits")] = static_cast<qlonglong>(programme.access_units);

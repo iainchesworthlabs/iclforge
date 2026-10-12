@@ -29,6 +29,18 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: Hearth's Karaoke page knows it**
+
+- **The Karaoke page names an E-AC-3 karaoke stream and takes its choice.** Hearth's engine had
+  reproduced such a stream since the decoder did, but the page still said Karaoke is an AC-3
+  mode and disabled its controls. A programme is karaoke to the page when the decoder reproduces
+  it (`ac3::is_karaoke_programme`: the service type, one independent substream, no object
+  layer), so the page's words and the sound agree. A programme that is flagged karaoke and has a
+  dependent substream or objects says so ("Flagged karaoke, but ... it plays as coded"), a
+  plain E-AC-3 stream says it is not a karaoke one, and the signal-path line names the codec
+  ("E-AC-3 karaoke, aware."). Five strings are new or changed, translated in the six catalogues
+  (`planning/karaoke-eac3.md`, E4c).
+
 **Karaoke: a pitch library**
 
 - **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one
