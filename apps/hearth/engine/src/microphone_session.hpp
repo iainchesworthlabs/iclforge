@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <expected>
 #include <memory>
 #include <optional>
@@ -125,6 +126,17 @@ class MicrophoneSession {
     MicrophoneHealth pump(std::int64_t now_ns);
 
     [[nodiscard]] MicrophoneSnapshot snapshot() const;
+
+    // What a view of the performance is drawn from (planning/karaoke-microphone.md, M5). All of it
+    // is empty or null until a reference has been read and the microphone is open.
+    //
+    // The counts for [start_ms, end_ms) of the item: a line's result.
+    [[nodiscard]] pitch::Tally tally(std::int64_t start_ms, std::int64_t end_ms) const;
+    // The singer's last placed frames, oldest first, or null.
+    [[nodiscard]] const std::deque<TracePoint>* trace() const;
+    // The reference, and the tolerance a frame is judged against.
+    [[nodiscard]] const std::optional<pitch::Contour>& reference() const { return reference_; }
+    [[nodiscard]] const pitch::ScoreOptions& score_options() const { return score_options_; }
 
    private:
     void rebuild_performance();

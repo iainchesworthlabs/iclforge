@@ -1234,6 +1234,30 @@ The sections below contain the complete change list and fixes.
   microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
   into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
 
+**Hearth: a singer sees the tune as a ribbon, how each line went, and a summary**
+
+- **A pitch ribbon: the tune as notes and the singer's voice as a line over them** (the microphone,
+  scoring and recording programme, M5). On the Microphone card and under the words in the singer
+  view (`F11`), while the microphone is on and there is a tune: the reference's notes move past a
+  mark for *now*, and the voice is drawn over them, thick and solid where it is within the tolerance
+  and thin and dashed where it is not (a second cue beside colour). A voice an octave away is drawn
+  on the tune's octave, as it is scored. Where nothing is voiced it says **Listening…**.
+- **A mark under each line that has been sung**: three dots and a percentage, in the Karaoke page's
+  lyrics and in the singer view. A line the tune has no notes in has no mark (not a zero); a line
+  the singer was voiced for under a fifth of its notes' time for says **not sung** and carries no
+  number; and without the headphones answer there are none. The line's own times take the lyric
+  delay, so a nudged line is still scored where it is sung.
+- **A summary when it ends**: **Last performance** on the card, kept when the microphone is turned
+  off, the song ends or the device goes, with the pitch score, how much of the tune's time the singer
+  was voiced for, the average sharp or flat, early or late, and the basis (the part, the tolerance,
+  octaves ignored, what was not scored). Cleared by the next start or another song, shown nowhere
+  else and never ranked, named or sent. Not made when the headphones answer is missing.
+- **Engine and controller:** `Performance` keeps its last 30 s of placed frames as a bounded trace;
+  `MicrophoneSession` answers a line's counts, the trace and the reference; `MicrophoneController`
+  gains `ribbon()`, `lineResult()`, `summary` and `scoreRevision`. Two new QML pictures, `LineMark`
+  and `PitchRibbon`, are handed their data, so they are tested without a microphone. Hearth's user
+  guide says what is shown.
+
 **ADM / BW64: rendering constraints, a sample-format option, and what the bridge drops**
 
 - **`zoneExclusion`, `objectDivergence`, `screenRef` and `headLocked` are read and written.**
