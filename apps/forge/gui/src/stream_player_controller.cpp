@@ -300,7 +300,16 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
                                          .arg(ids.join(QStringLiteral(", ")));
         }
         result->codec_label = QStringLiteral("E-AC-3");
-        iclforge::ac3::Eac3Decoder decoder;
+        // A karaoke programme (one independent substream flagged bsmod 7 above 1/0) is reproduced
+        // under the same choice as an AC-3 stream is, below; any other decodes as it did
+        // (planning/karaoke-eac3.md, D1 to D3).
+        iclforge::ac3::DecoderConfig config;
+        config.output.karaoke = karaoke_choice.reproduction;
+        config.output.karaoke_vocals = karaoke_choice.vocals;
+        config.output.karaoke_melody_gain = karaoke_choice.melody_gain;
+        config.output.karaoke_vocal1_gain = karaoke_choice.vocal1_gain;
+        config.output.karaoke_vocal2_gain = karaoke_choice.vocal2_gain;
+        iclforge::ac3::Eac3Decoder decoder{config};
         std::vector<std::size_t> order;
         bool have_first = false;
         double time_s = 0.0;
@@ -309,11 +318,27 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
             if (!have_first) {
                 have_first = true;
                 result->sample_rate_hz = iclforge::ac3::sample_rate_hz(out.sample_rate);
-                result->acmod = out.acmod;
-                result->lfe = layout_has_lfe(out.layout);
+                const bool coded_lfe = layout_has_lfe(out.layout);
+                // The layout the unit comes OUT in: under Annex C's reproduction of a karaoke
+                // programme the decoder reproduces, L, C, R and the LFE in the first channels,
+                // not the coded bed (DecodedAccessUnit::layout still names that). The output
+                // stage decides, as it does for the AC-3 syncframe below.
+                const bool karaoke = iclforge::ac3::is_karaoke_programme(out);
+                const auto mode =
+                    iclforge::ac3::output_mode(config.output, out.acmod, coded_lfe, karaoke);
+                result->karaoke = karaoke;
+                result->karaoke_reproduced =
+                    karaoke && config.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff;
+                result->coded_layout_label =
+                    to_qstring(iclforge::ac3::analysis::layout_name(out.acmod, coded_lfe));
+                result->acmod = mode.acmod;
+                result->lfe = mode.lfe;
                 result->layout_label =
                     to_qstring(iclforge::ac3::analysis::layout_name(result->acmod, result->lfe));
-                if (out.layout.count > 0) {
+                if (karaoke && mode.acmod != out.acmod) {
+                    result->locations = forge_gui::ac3_bed_locations(result->acmod, result->lfe);
+                    order = iclforge::ac3::io::wav_channel_order(result->acmod, result->lfe);
+                } else if (out.layout.count > 0) {
                     result->locations.assign(out.layout.begin(), out.layout.end());
                     order = iclforge::ac3::plan::monitor_order(
                         std::span{out.layout.items}.first(static_cast<std::size_t>(out.layout.count)),

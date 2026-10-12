@@ -68,15 +68,44 @@ enum class KaraokeLyricsCopy : std::uint8_t {
 // it by name: whichever of `.lrc`, `.srt`, `.ass` and `.kar` it is, written as the one format a
 // player reads (UTF-8 LRC, with a duet's singers and the word times the file has). An existing
 // lyrics file there is never overwritten. `error`, when given, is set to the reason for
-// kUnreadable and kFailed.
+// kUnreadable and kFailed. `code_page` is the page a file that is not UTF-8 or UTF-16 is read in
+// (a name from karaoke_code_pages(), chosen by the author); empty, such a file is refused.
 [[nodiscard]] KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path,
                                                     const std::string& stream_path,
-                                                    std::string* error = nullptr);
+                                                    std::string* error = nullptr,
+                                                    const std::string& code_page = {});
 
 // Why `lyrics_path` cannot be used as lyrics, as a sentence for the page, or "" when it can: it is
-// read the way karaoke_copy_lyrics reads it, so that a file in a code page is said so when it is
-// chosen and not when the stream is saved.
-[[nodiscard]] std::string karaoke_lyrics_problem(const std::string& lyrics_path);
+// read the way karaoke_copy_lyrics reads it (in `code_page` where one is named), so that a file in
+// a code page is said so when it is chosen and not when the stream is saved.
+[[nodiscard]] std::string karaoke_lyrics_problem(const std::string& lyrics_path,
+                                                 const std::string& code_page = {});
+
+// One legacy code page the Lyrics row offers when a file is not UTF-8 or UTF-16
+// (apps/shared/text-encoding), in the order the picker lists them: the language groups together.
+struct KaraokeCodePage {
+    // What the functions here take as `code_page`: "windows-1252", "shift-jis".
+    std::string name;
+    // The language group, in English (the page translates it): "Western European".
+    std::string group;
+    // The page's own name, which is not translated: "Windows-1252".
+    std::string title;
+};
+
+// The pages this system can convert. A page is never chosen for the author.
+[[nodiscard]] std::vector<KaraokeCodePage> karaoke_code_pages();
+
+// Whether `lyrics_path` is refused only because of its encoding: it does not read as UTF-8 or
+// UTF-16, and it would read in some code page. A file with no lyrics in it, an empty file and a file
+// that is not there are not, so a picker is not offered for them.
+[[nodiscard]] bool karaoke_lyrics_needs_code_page(const std::string& lyrics_path);
+
+// The words of the first `max_lines` lines of `lyrics_path` read in `code_page`, as UTF-8 and one to
+// a line, so that the author sees whether the page is the right one; "" when the file does not read
+// in that page (karaoke_lyrics_problem() says why).
+[[nodiscard]] std::string karaoke_lyrics_preview(const std::string& lyrics_path,
+                                                 const std::string& code_page,
+                                                 std::size_t max_lines = 4);
 
 enum class KaraokePart : std::uint8_t { kBacking, kMelody, kVocal1, kVocal2, kLfe };
 
