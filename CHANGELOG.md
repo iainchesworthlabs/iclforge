@@ -3487,6 +3487,15 @@ The sections below contain the complete change list and fixes.
   360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun. On an ESP32-P4, which
   states 12, the 14-object stream that took 0.97 with 24 underruns took 0.22, and the 11-object
   streams, within the figure, are reconstructed at 0.85 as before.
+- **An AC-4 item declares its objects to a group** (`ItemFacts::objects`, `objects_alone`;
+  `Session::open()`), so that a sink's stated AC-4 object limit (`max_objects`) is honoured. They
+  were left at 0, so no AC-4 stream was ever held to a limit. The count is what the decoder makes
+  of the chosen presentation's first I-frame, less the LFE, and it is read only for a stream whose
+  table of contents lists an object substream. A presentation of objects alone decodes to no
+  channels, so a sink that places fewer has no bed to play: it is sent PCM decoded here whatever
+  its layout or objects setting say (folded to a width it lists, where it lists none as wide), and
+  nothing, with the reason, where PCM is not possible. One with channels besides is played as its
+  bed, as an E-AC-3 stream is.
 
 **Library internals**
 
