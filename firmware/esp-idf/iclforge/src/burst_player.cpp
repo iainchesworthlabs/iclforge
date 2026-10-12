@@ -239,6 +239,13 @@ struct BurstPlayer::Impl {
     double ac4_decode_ratio = kAc4PriorRatio;
     // Late AC-4 chunks decoded for their state and not played.
     std::uint64_t late_kept_chunks = 0;
+    // The stream's frames that were never handed to the sink: where the timeline is anchored again
+    // after the frames it last pushed (the chunks dropped for being late, the ones the decoder
+    // waited an I-frame through or decoded and discarded), counted from the stream's first chunk.
+    // What a stall costs the listener, which `late` and the playout's silence do not say: the
+    // playout pads a gap only where it had pushed nothing.
+    std::uint64_t lost_frames = 0;
+    std::uint64_t pushed_end_frame = 0;
     std::array<std::int16_t, OpusStream::kMaxFrames * 2> opus_pcm{};
     std::optional<iclforge::ac3::FrameDecoder> ac3_decoder;
     // The decode lane (BurstPlayerConfig::decode_lane): started by the task, given back by it.
@@ -615,6 +622,8 @@ struct BurstPlayer::Impl {
         bursts_played = 0;
         late_chunks = 0;
         late_kept_chunks = 0;
+        lost_frames = 0;
+        pushed_end_frame = 0;
         dropped_chunks.store(0);
         invalid_chunks.store(0);
         channels_refused_warned = false;
@@ -690,8 +699,8 @@ struct BurstPlayer::Impl {
         (void)heap_caps_monitor_local_minimum_free_size_stop();
         const Playout::Stats& p = playout->stats();
         std::printf(
-            "sendspin.stream=%s bursts=%llu late=%llu late_kept=%llu dropped=%llu invalid=%llu "
-            "underruns=%llu "
+            "sendspin.stream=%s bursts=%llu late=%llu late_kept=%llu lost_frames=%llu dropped=%llu "
+            "invalid=%llu underruns=%llu "
             "resyncs=%u silence_frames=%llu skipped_frames=%llu dropped_frames=%llu "
             "repeated_frames=%llu "
             "worst_error_us=%lld burst_us=%llu sink_us=%llu ring_high=%lu heap_free=%lu\n",
@@ -699,6 +708,7 @@ struct BurstPlayer::Impl {
             static_cast<unsigned long long>(bursts_played),
             static_cast<unsigned long long>(late_chunks),
             static_cast<unsigned long long>(late_kept_chunks),
+            static_cast<unsigned long long>(lost_frames),
             static_cast<unsigned long long>(dropped_chunks.load()),
             static_cast<unsigned long long>(invalid_chunks.load()),
             static_cast<unsigned long long>(p.underruns), static_cast<unsigned>(p.resyncs),
@@ -863,6 +873,7 @@ struct BurstPlayer::Impl {
 
         const std::uint64_t first = decoded_frame;
         decoded_frame += n;
+        pushed_end_frame = decoded_frame;
         std::optional<std::int64_t> target = target_of(first);
         if (!target) {
             return;  // frames from before any burst this decode knows of
@@ -1301,6 +1312,9 @@ struct BurstPlayer::Impl {
         if (!decoded_frame_set) {
             decoded_frame_set = true;
             decoded_frame = frame;
+            if (frame > pushed_end_frame) {
+                lost_frames += frame - pushed_end_frame;
+            }
         }
         mark(frame, local_us);
         ++bursts_played;
