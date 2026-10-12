@@ -1,8 +1,9 @@
 # Karaoke
 
 A karaoke stream is an ordinary AC-3 programme whose channels are **parts**, not speakers: the
-backing music, a guide melody, and one or two vocals. ETSI TS 102 366 Annex C defines it. iclforge
-handles it end to end, in three places:
+backing music, a guide melody, and one or two vocals. ETSI TS 102 366 Annex C defines it for AC-3;
+E-AC-3 carries the same service type and is reproduced the same way ([E-AC-3 and
+AC-4](#e-ac-3-and-ac-4)). iclforge handles it end to end, in three places:
 
 | You want to | Use |
 |---|---|
@@ -59,12 +60,28 @@ come out of the rear speakers. Annex C defines two kinds of decoder that do bett
   for singing along to. Annex C also leaves it room to move the level of each part, which
   iclforge's capable decoder offers.
 
-E-AC-3 and AC-4 have no karaoke mode in their specifications; this is AC-3 only.
+### E-AC-3 and AC-4
+
+**E-AC-3** carries the same service type: its `bsmod` is in the `infomdat` group (Annex E, Table
+E1.2), and Annex G (Table G.2) gives the E-AC-3 descriptor a karaoke service type. Annex E defines
+no reproduction for it. iclforge reproduces an E-AC-3 stream flagged this way as it does an AC-3
+one, by analogy and as Dolby's own decoder does ([How it is checked](#how-it-is-checked)), where
+the programme is one independent substream with no object layer. A programme with a dependent
+substream or an object layer is played as coded: Annex C has no vocals for it. The levels the
+reproduction uses are the stream's Lo/Ro mixing group (`lorocmixlev` and `lorosurmixlev`), or
+-3 dB each where the stream has none, and `forge eac3-encode` writes the group whenever `bsmod` is
+7 and the layout has a centre or a surround. A player that does not apply the reproduction plays
+the vocals from the surround speakers, as it does an AC-3 stream.
+
+**AC-4** has no karaoke mode: its specification has no `bsmod` value for it, so there is nothing
+to reproduce, and `forge` warns and ignores the choice on an AC-4 stream. [The options for carrying
+karaoke in AC-4](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-ac4-options.md)
+say what its presentations and objects could do; none is built.
 
 ## Play it in Hearth
 
-Open a karaoke stream in Hearth (a raw `.ac3`, or an MP4, Matroska or MPEG-TS file with an AC-3
-track) and choose the **Karaoke** page (`Ctrl+7`).
+Open a karaoke stream in Hearth (a raw `.ac3` or `.ec3`, or an MP4, Matroska or MPEG-TS file with
+an AC-3 or E-AC-3 track) and choose the **Karaoke** page (`Ctrl+7`).
 
 ![Hearth's Karaoke page: the stream, its reproduction, the words, and what each speaker plays](screenshots/hearth-karaoke-page.png)
 
@@ -87,13 +104,16 @@ stream lacks or the **Vocals** choice leaves out, and its control is closed.
 The page says which part each speaker plays under the choice made, and says in words when the
 choice does not apply:
 
-- The stream is **not karaoke** (it may be an ordinary 5.1 AC-3 stream, or E-AC-3 or AC-4).
+- The stream is **not karaoke**: an ordinary programme, an AC-4 stream, or an E-AC-3 stream flagged
+  karaoke whose programme has a dependent substream or an object layer, which Annex C has no
+  vocals for. The page says which, and that the stream plays as coded.
 - The output is a **bitstream** to a receiver. The receiver decodes it, so the choice is not
   applied; unless it is karaoke-capable, V1 and V2 play from its surround speakers. The page has a
   button to choose another output.
-- The output is a **network group**: a sink that lists the karaoke settings is sent the stream as
-  it is and told your choice, and decodes it itself; one that does not is sent PCM that Hearth has
-  decoded with the choice applied. Every member plays one reproduction, at the same levels (see
+- The output is a **network group**: a sink that lists the karaoke settings (and, for an E-AC-3
+  stream, `eac3` among the codecs it reproduces karaoke for) is sent the stream as it is and told
+  your choice, and decodes it itself; one that does not is sent PCM that Hearth has decoded with
+  the choice applied. Every member plays one reproduction, at the same levels (see
   [the Hearth page](../hearth/index.md#karaoke)).
 - The stereo fold is **Lt/Rt**, for which Annex C defines no reproduction. The page has a button to
   use Lo/Ro, which does.
@@ -439,8 +459,9 @@ made of:
 3. **Hear.** The stream is encoded and played back the way a karaoke player decodes it: as coded,
    aware, or capable with the vocals you choose. It plays the encoded stream, not your source
    files.
-4. **Save.** The file type (the raw stream, or Matroska, MP4 or MPEG-TS), the bit rate, the
-   equivalent `forge encode` command, and the encode.
+4. **Save.** The format (AC-3, the default, or E-AC-3), the file type (the raw stream, or
+   Matroska, MP4 or MPEG-TS), the bit rate, the equivalent `forge encode` (or `forge eac3-encode`)
+   command, and the encode.
 
 ![The Hear step: the stream built, played as an aware decoder plays it, with which part reaches which speaker](screenshots/forge-karaoke-hear.png)
 
@@ -460,6 +481,15 @@ forge encode backing.wav out.ac3 384 L,C,R,Ls,Rs src=melody.wav src=lead.wav src
 ```
 
 A single multichannel WAV whose speakers are named needs no `map=`.
+
+E-AC-3 takes the same sources, mapping and `bsmod`. `forge eac3-encode` has its coding tools
+positional (`none` here) before the layout, and writes the stream's Lo/Ro mixing group, which is
+where a decoder reads the levels of the reproduction:
+
+```text
+forge eac3-encode backing.wav out.ec3 384 none L,C,R,Ls,Rs src=melody.wav src=lead.wav src=harmony.wav \
+      map=0.0:L,0.1:R,1.0:C,2.0:Ls,3.0:Rs bsmod=voiceover
+```
 
 Probe:
 
@@ -481,7 +511,9 @@ forge decode out.ac3 melody-and-v1.wav karaoke=v1
 
 `channels=2` or `channels=1` gives the 2/0 or 1/0 reproduction. `downmix=ltrt` is refused with
 `karaoke`, as Annex C defines no Lt/Rt reproduction. A stream that is not karaoke is decoded as
-coded, and the report says so. The library form is `OutputConfig::karaoke` and
+coded, and the report says so. An E-AC-3 karaoke stream decodes the same way
+(`forge decode out.ec3 aware.wav karaoke`), and the report says the reproduction is applied to
+E-AC-3 as Dolby's decoder does. The library form is `OutputConfig::karaoke` and
 `OutputConfig::karaoke_vocals`; see [Decoding](../library/decoding.md).
 
 `forge monitor` takes the same choice and plays the reproduction on the output:
@@ -506,8 +538,9 @@ They move nothing under the aware reproduction, so a level without a choice of v
 On an output narrower than the stream, which `monitor` folds to unasked, the 2/0 reproduction
 plays. `forge play` applies the choice where it decodes (its PCM fallback), and `forge spdif`
 and `forge play`'s bitstream legs hand the coded stream on: they accept `karaoke` and say it is
-not applied, since a receiver reproduces the stream. E-AC-3 and AC-4 are ignored with a warning
-by all of them.
+not applied, since a receiver reproduces the stream. AC-4 is ignored with a warning by all of
+them, and `forge spatial` ignores the choice with its own: it places an E-AC-3 stream's objects
+and has no karaoke bed.
 
 ## From a program
 
@@ -544,15 +577,23 @@ samples and the same lines as `forge decode` and Hearth do.
   firmware also draws them, with the colour moving as the song does, on a 7-inch panel
   ([An ESP32-P4 sink](../hearth/sink-esp32-p4.md#the-screen)): drawn and measured on a board with no
   panel, not yet run on one, and without a microphone, scoring or recording.
-- **Karaoke in E-AC-3 or AC-4.**
+- **Karaoke in AC-4.** Its specification has no karaoke mode, so nothing is reproduced for it.
+- **Knowing what a receiver does with E-AC-3.** Annex E defines no reproduction and no TV or
+  receiver was tried here: Dolby's reference decoder reproduces an E-AC-3 karaoke stream, and a
+  player that does not reproduce it plays the vocals from the surrounds.
 - **A microphone, scoring or recording.** A [draft plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
   sets out the requirements and the design questions and is awaiting approval; nothing of it is
   built.
 
 ## How it is checked
 
-No other decoder implements Annex C's karaoke reproduction and there is no karaoke stream from
-anyone else, so there is nothing outside to compare with. It is held to the annex's own tables,
-transcribed independently of the code: every mode is encoded with a tone in each part and decoded
-under each reproduction and each choice of vocals, and the tones on each output are what the table
-says. See [Verification](../verification.md).
+Two things stand behind it. The reproduction is held to the annex's own tables, transcribed
+independently of the code: every mode is encoded with a tone in each part and decoded under each
+reproduction and each choice of vocals, and the tones on each output are what the table says. And
+Dolby's reference decoder reproduces karaoke for AC-3 and for E-AC-3, which is the one outside
+decoder to compare with: `tools/checks/verify_karaoke_oracle.py` encodes a tone-per-channel stream
+both ways, decodes it with `forge decode` and with the Reference Player's `dlbac3dec`, and compares
+what each output channel carries as ratios. The player is licensed, so the script runs locally and
+not in CI, and its measured ratios are constants in the library's tests
+(`libs/ac3/tests/decoder/test_eac3_karaoke.cpp`). There is still no karaoke stream from anyone
+else: Dolby's encoder (DEE) cannot write `bsmod` 7. See [Verification](../verification.md).
