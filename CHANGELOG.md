@@ -29,6 +29,17 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**The extension role's state says how the stream leaves the sink**
+
+- **`output` in `_iclforge_player`'s `client/state`: `"passthrough"` (the coded bits go on to a
+  receiver as they came) or `"pcm"` (the sink decoded the stream).** An optional key, present while
+  a stream is open and absent from every sink that does not say, so no version change. A reader
+  that meets a value it does not know reads it as absent and still reads the state; a value that is
+  not a string is a malformed state, as for the other keys. Hearth for Android's sink will say
+  `passthrough`; a host's Network page can show the route once it reads the key (a separate change
+  to a page another session owns). The state's tests cover the round trip, the key beside `layout`
+  and `lyrics`, an unknown name and the wrong types.
+
 **Karaoke in E-AC-3: the documentation says what the decoder does**
 
 - **The user guide, Hearth's page and the plan stop saying "E-AC-3 has no karaoke mode, this is

@@ -222,6 +222,16 @@ struct LyricsReport {
     friend bool operator==(const LyricsReport&, const LyricsReport&) = default;
 };
 
+// How a stream leaves the sink (D6, planning/hearth-android.md): the coded bits go on to a receiver
+// as they came ("passthrough", IEC 61937 over HDMI or S/PDIF), or the sink decoded them and plays
+// the samples ("pcm"). A sink that can do both says which it is doing for the stream it has.
+enum class Output : std::uint8_t {
+    kPassthrough,
+    kPcm,
+};
+
+[[nodiscard]] std::string_view output_name(Output output);
+
 struct State {
     std::optional<std::int32_t> volume;
     std::optional<bool> muted;
@@ -242,6 +252,10 @@ struct State {
     // The lyrics the sink holds, absent while it holds none. Reported when the item's document is
     // taken and whenever the line changes, which is a few times a minute and not each word.
     std::optional<LyricsReport> lyrics;
+    // How the stream the sink has leaves it, while it has one. Absent with no stream, and for a sink
+    // that does not say (every sink from before the key), which a server reads as "not known" and
+    // not as either value. A value a reader does not know reads as absent.
+    std::optional<Output> output;
 };
 
 void write_state(json::Writer& w, const State& state);

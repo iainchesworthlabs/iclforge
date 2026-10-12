@@ -51,6 +51,11 @@ constexpr std::array<Named<DataType>, 3> kDataTypes{{
     {DataType::kAc4, "ac4"},
 }};
 
+constexpr std::array<Named<Output>, 2> kOutputs{{
+    {Output::kPassthrough, "passthrough"},
+    {Output::kPcm, "pcm"},
+}};
+
 constexpr std::array<Named<Command>, 7> kCommands{{
     {Command::kVolume, "volume"},
     {Command::kMute, "mute"},
@@ -208,6 +213,10 @@ void write_numbers(json::Writer& w, std::string_view key, const std::vector<doub
 
 std::string_view data_type_name(DataType type) {
     return name_of(kDataTypes, type);
+}
+
+std::string_view output_name(Output output) {
+    return name_of(kOutputs, output);
 }
 
 BurstDataType burst_data_type(DataType type) {
@@ -522,6 +531,9 @@ void write_state(json::Writer& w, const State& state) {
             .member("line", state.lyrics->line)
             .end_object();
     }
+    if (state.output) {
+        w.member("output", name_of(kOutputs, *state.output));
+    }
     w.end_object();
 }
 
@@ -632,6 +644,13 @@ std::optional<State> read_state(json::Value value) {
             return std::nullopt;
         }
         state.lyrics = LyricsReport{.item = *item, .line = *line};
+    }
+    if (const json::Value output = value["output"]; output.exists()) {
+        if (!output.is_string()) {
+            return std::nullopt;
+        }
+        // A name this reader does not know is a later revision's: it reads as the sink not saying.
+        state.output = value_of(kOutputs, output);
     }
     return state;
 }
