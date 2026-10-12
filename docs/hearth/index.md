@@ -255,8 +255,9 @@ member is sent and why. An ESP32-C6's buffer holds under a fifth of a second of 
 reason carries a note that the stream can drop out on a busy WiFi network, and it is sent PCM in
 units of 10 ms. For a board on such a network, the Decoder tab of its page has an "Audio decoded
 here" choice, PCM or Opus: Opus is lossy and a twelfth of PCM's bytes, so it rides out gaps in the
-link, and it applies the next time the group plays. A board lists Opus only where its firmware
-decodes it, which the C6's does.
+link, and it applies the next time the group plays. The choice is kept for that board, so a
+restart of Hearth does not undo it, and it goes with the board's pairing if that is forgotten. A
+board lists Opus only where its firmware decodes it, which the C6's does.
 
 ### Languages
 

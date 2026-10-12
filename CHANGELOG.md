@@ -3330,8 +3330,10 @@ The sections below contain the complete change list and fixes.
   (`NetworkSinks::set_sink_opus_fallback`, the Decoder tab's "Audio decoded here" choice, and
   `choose_sink_form`'s `PcmCodec`): for a board on a link too poor for PCM, audio Hearth decodes
   for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
-  sink, applies at the group's next play, and is kept for the run. The group editor says which a
-  member is sent.
+  sink, applies at the group's next play, and is kept with the sink's pairing record
+  (`PairingStore::set_opus()`, `pairing/N/opus` in the settings, written only for a sink set to
+  Opus): it is read back at the sink's first hello of a run, so a restart of Hearth does not undo
+  it, and forgetting the pairing forgets the choice. The group editor says which a member is sent.
 - **The Sendspin player plays a stream's bed when it declares more objects than the board says it
   places** (`BurstPlayerConfig::max_objects`, `iclforge/object_limit.hpp`,
   `Eac3Decoder::set_skip_object_reconstruction()`): the decision is made from the first unit's
