@@ -21,6 +21,7 @@
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
+#include "iclforge/sink/sink.hpp"
 
 // A test sink's output for _iclforge_player@v1 (planning/hearth-sendspin-extension.md): each
 // stream's bursts decoded, AC-3 or E-AC-3 with any object layer, or AC-4, and rendered to the
@@ -62,11 +63,11 @@ namespace iclforge::hearth::testsink {
 // layout, 22.2's, is refused rather than placed on some of its channels.
 [[nodiscard]] bool ac4_placeable(std::span<const iclforge::ac4::Speaker> speakers);
 
-class BurstOutput {
+class BurstOutput final : public sink::BurstStreamOutput {
    public:
     // `prefix` starts every file's name.
     BurstOutput(std::filesystem::path directory, std::string prefix, const render::OutputLayout& layout);
-    ~BurstOutput();
+    ~BurstOutput() override;
     BurstOutput(const BurstOutput&) = delete;
     BurstOutput& operator=(const BurstOutput&) = delete;
     BurstOutput(BurstOutput&&) = delete;
@@ -79,24 +80,27 @@ class BurstOutput {
     // `levels_db` are the melody's, vocal 1's and vocal 2's, in dB against the table: absent
     // keys of the command are 0, the table's.
     void set_karaoke(sendspin::player::Karaoke reproduction, sendspin::player::KaraokeVocals vocals,
-                     const std::array<double, 3>& levels_db = {0.0, 0.0, 0.0});
+                     const std::array<double, 3>& levels_db = {0.0, 0.0, 0.0}) override;
 
     // A stream began, or changed in place: new decoders, and a new file.
-    bool start(const sendspin::player::StreamStart& stream);
-    void clear();
-    void end();
+    bool start(const sendspin::player::StreamStart& stream) override;
+    void clear() override;
+    void end() override;
     // One burst to be played from `local_time`.
-    void write(const sendspin::BurstChunk& chunk, std::int64_t local_time);
+    void write(const sendspin::BurstChunk& chunk, std::int64_t local_time) override;
 
     [[nodiscard]] std::uint64_t bursts() const { return bursts_; }
     [[nodiscard]] std::uint64_t frames() const { return frames_; }
     [[nodiscard]] std::uint64_t undecodable() const { return undecodable_; }
     [[nodiscard]] std::uint32_t streams() const { return streams_; }
     // The file the current or last stream went to; empty without a directory.
-    [[nodiscard]] const std::filesystem::path& file() const { return file_; }
+    [[nodiscard]] const std::filesystem::path& file() const override { return file_; }
+    [[nodiscard]] sink::OutputCounts counts() const override { return {streams_, bursts_, frames_}; }
     // What the decoder found in the current stream, once a unit of it has decoded; updated once
     // more by the first unit to carry objects, if the first did not.
-    [[nodiscard]] const std::optional<sendspin::player::DecoderReport>& decoder() const { return decoder_; }
+    [[nodiscard]] const std::optional<sendspin::player::DecoderReport>& decoder() const override {
+        return decoder_;
+    }
 
    private:
     void reset_decoding();

@@ -105,6 +105,7 @@ class InstallerSite(unittest.TestCase):
                 "hearth-sink-esp32c6": "ESP32-C6",
                 "hearth-sink-esp32c6-16mb": "ESP32-C6",
                 "hearth-sink-esp32p4-rev1": "ESP32-P4",
+                "hearth-sink-esp32p4-rev3": "ESP32-P4",
                 "hearth-sink-esp32s3": "ESP32-S3",
             },
         )

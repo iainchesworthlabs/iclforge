@@ -835,9 +835,14 @@ overlay lists the board recipes use:
 | `hearth-sink-esp32c6` | `hw`, `sendspin`, `c6`, `sendspin-c6` | 4 MB | any C6 module |
 | `hearth-sink-esp32c6-16mb` | the same, then `flash16mb` | 16 MB | a C6 with 16 MB of flash, such as the board on COM9 |
 | `hearth-sink-esp32p4-rev1` | `hw`, `p4`, `sendspin` | 16 MB | a P4 of silicon revision v1.x, such as the FireBeetle 2 on COM10 |
+| `hearth-sink-esp32p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | 16 MB | a P4 of silicon revision v3.x with the 7-inch panel of Espressif's ESP32-P4X-Function-EV-Board ([planning/karaoke-p4x-panel.md](karaoke-p4x-panel.md)) |
 
-A P4 of revision v3.x needs a build without `sdkconfig.p4`'s revision settings. It is left out
-until there is such a board to run it on ([decision 14](#decisions)).
+A P4 of revision v3.x needs a build without `sdkconfig.p4`'s revision settings, which
+`sdkconfig.p4-rev3` takes over (v3.1 to v3.99, 400 MHz). It is the one image that carries a
+screen, and the two P4 images refuse each other's chips at boot (a v1.x chip's bootloader sees
+revisions 1.00 to 1.99, a v3.x image's sees 3.01 to 3.99), so a wrong flash cannot happen over the
+network: `ota.py` chooses by the revision the board reports. Built by CI and **not run on a v3.x
+board yet** ([decision 14](#decisions)).
 
 No published image has a network built in: a board gets its network from Improv or from the page,
 and keeps it in NVS. CI refuses to publish an image whose `sdkconfig` sets
