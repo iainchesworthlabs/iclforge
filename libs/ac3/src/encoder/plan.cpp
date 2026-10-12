@@ -1369,7 +1369,14 @@ eac3::ProgrammeConfig eac3_programme(const Plan& plan) {
         independent.drc2 = plan.meta.drc2;
         independent.heavy2 = plan.meta.heavy2;
     }
-    if (plan.meta.mixmeta) {
+    // A karaoke service (bsmod 7 above 1/0) writes the mixing group whether or not `mixmeta` asked
+    // for it: it is where an E-AC-3 stream says the levels its reproduction uses (Annex C's clev
+    // and slev are the Lo/Ro group's, Annex E having no cmixlev or surmixlev in bsi), and a stream
+    // without one is reproduced at a decoder's own default, not at the levels the author set
+    // (planning/karaoke-eac3.md, D4). 2/0 has no centre or surround level to carry.
+    const bool karaoke_levels = plan.meta.infomdat && cp.bed_acmod > Acmod::k2_0 &&
+                                meta::is_karaoke(plan.meta.info.bsmod, cp.bed_acmod);
+    if (plan.meta.mixmeta || karaoke_levels) {
         independent.mixing = mix_metadata(plan.meta);
     }
     if (plan.meta.infomdat) {

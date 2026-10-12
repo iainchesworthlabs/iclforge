@@ -141,14 +141,16 @@ class PushDecoder {
     // foldChannelCount then always report nothing, and apply_fold's copy is
     // skipped entirely.
     //
-    // karaoke / karaokeVocals: Annex C's reproduction of an AC-3 karaoke stream
-    // (bsmod 7 above 1/0), iclforge::ac3::KaraokeReproduction's and KaraokeVocals'
+    // karaoke / karaokeVocals: Annex C's reproduction of a karaoke stream (an AC-3 syncframe,
+    // or an E-AC-3 programme of one independent substream, flagged bsmod 7 above 1/0),
+    // iclforge::ac3::KaraokeReproduction's and KaraokeVocals'
     // own numeric order (0=as coded, 1=aware, 2=capable; 0=none, 1=V1, 2=V2,
     // 3=both). Part of the same side fold: asking for a reproduction is asking
     // for one, so foldPcm/foldChannelCount then report it even at fold target
     // asCoded (three or four channels: L, C, R and the LFE), and at Lo/Ro it
-    // is Annex C's own 2/0 reproduction. Only an AC-3 stream is ever karaoke
-    // (E-AC-3 and AC-4 never set the flag), whatever is asked.
+    // is Annex C's own 2/0 reproduction. Only the streams above are ever karaoke
+    // (an E-AC-3 programme with a dependent substream, an object layer, and AC-4 never
+    // set the flag), whatever is asked.
     PushDecoder(int fold_target, bool fold_apply_dialnorm, bool fold_mix_lfe, int karaoke,
                 int karaoke_vocals)
         : fold_(iclforge::ac3::OutputConfig{
@@ -363,7 +365,8 @@ class PushDecoder {
         result.set("channelCount", static_cast<int>(labels.size()));
         result.set("channelLabels", make_string_array(labels));
         result.set("foldChannelCount", fold_channel_count_);
-        // Annex C: an AC-3 stream flagged bsmod 7 above 1/0, whatever reproduction was asked for.
+        // Annex C: an AC-3 stream, or an E-AC-3 programme of one independent substream, flagged bsmod 7
+        // above 1/0, whatever reproduction was asked for.
         result.set("karaoke", unit_karaoke_);
         result.set("objectCount", static_cast<int>(objects.size()));
         result.set("objectLabels", make_string_array(object_labels_));
@@ -379,15 +382,22 @@ class PushDecoder {
     // free copy, both buffers sized once at construction - keeps both
     // outputs available from one decode.
     // Whether the unit just pushed is Annex C karaoke type, from its own syncframe header: a
-    // lone AC-3 syncframe flagged bsmod 7 above 1/0. Not read from the decoded unit, which does
-    // not carry an AC-3 core's bsmod; and never an E-AC-3 bed, which has a bsmod of its own in
-    // infomdat that the library does not reproduce as karaoke (Annex C is AC-3's).
+    // lone AC-3 syncframe flagged bsmod 7 above 1/0, or an E-AC-3 syncframe standing alone as
+    // one independent substream with the same flag and no object layer - the programme the
+    // decoder reproduces (iclforge::ac3::is_karaoke_programme; planning/karaoke-eac3.md, D1 to
+    // D3). Not read from the decoded unit, which does not carry an AC-3 core's bsmod. An E-AC-3
+    // bed's bsmod is the one in its infomdat, which the header reads the same way.
     [[nodiscard]] static bool is_karaoke_unit(std::span<const std::byte> unit) {
         const auto header = iclforge::ac3::io::read_frame_header(unit);
-        return header.has_value() && header->kind == iclforge::ac3::io::StreamKind::kAc3 &&
-               header->bytes == unit.size() &&
-               iclforge::ac3::meta::is_karaoke(static_cast<iclforge::ac3::meta::BitstreamMode>(header->bsmod),
-                                               header->acmod);
+        if (!header.has_value() || header->bytes != unit.size()) {
+            return false;
+        }
+        const auto bsmod = static_cast<iclforge::ac3::meta::BitstreamMode>(header->bsmod);
+        if (header->kind == iclforge::ac3::io::StreamKind::kAc3) {
+            return iclforge::ac3::meta::is_karaoke(bsmod, header->acmod);
+        }
+        return iclforge::ac3::is_karaoke_programme(bsmod, header->acmod, 1,
+                                                   header->oba_complexity_index.has_value());
     }
 
     void apply_fold(const iclforge::ac3::DecodedAccessUnit& unit) {

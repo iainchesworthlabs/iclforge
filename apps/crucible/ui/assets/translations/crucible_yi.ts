@@ -329,87 +329,132 @@
 <context>
     <name>LyricStrip</name>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="112"/>
+        <location filename="../qml/LyricStrip.qml" line="114"/>
+        <source>Following %1: %2</source>
+        <translation>פֿאָלגט %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="115"/>
+        <source>Following %1.</source>
+        <translation>פֿאָלגט %1.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="118"/>
+        <source>This application has not published where it is in the song (a media session). Press Start to begin by hand, or follow one that is playing:</source>
+        <translation>די אפליקאציע האט נישט פארעפנטלעכט וואו זי געפינט זיך אין ליד (א מעדיע-סעסיע). דריקט אָנהייבן כדי אנצוהייבן מיט דער האנט, אדער פאלגט נאך איינעם וואס שפילט איצט:</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="120"/>
+        <source>Waiting for this application to publish where it is in the song (a media session). Press Start to begin by hand.</source>
+        <translation>ווארט אז די אפליקאציע זאל פארעפנטלעכן וואו זי געפינט זיך אין ליד (א מעדיע-סעסיע). דריקט אָנהייבן כדי אנצוהייבן מיט דער האנט.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="123"/>
+        <source>%1 does not publish where it is in the song. Press Start to begin by hand.</source>
+        <translation>%1 פארעפנטלעכט נישט וואו עס געפינט זיך אין ליד. דריקט אָנהייבן כדי אנצוהייבן מיט דער האנט.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="126"/>
+        <source>Media sessions cannot be read here: %1 Press Start to begin by hand.</source>
+        <translation>מעדיע-סעסיעס קען מען דא נישט לייענען: %1 דריקט אָנהייבן כדי אנצוהייבן מיט דער האנט.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="129"/>
+        <source>The track changed to “%1”, so these lyrics are not followed. Import the lyrics for it, or follow it anyway.</source>
+        <translation>דער טראק האט זיך געביטן צו „%1“, דעריבער ווערן די ווערטער נישט נאכגעפאלגט. אימפארטירט די ווערטער דערפאר, אדער פאלגט נאך סײַ־ווי.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="132"/>
+        <source>The media session went away, so the words carry on by the clock from where they were.</source>
+        <translation>די מעדיע-סעסיע איז פארשווונדן, דעריבער גייען די ווערטער ווײַטער לויט דער זייגער פון וואו זיי זענען געווען.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="175"/>
         <source>Choose the lyrics</source>
         <translation>אויסקלייבן די ווערטער</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="113"/>
+        <location filename="../qml/LyricStrip.qml" line="176"/>
         <source>All files (*)</source>
         <translation>אַלע טעקעס (*)</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="113"/>
+        <location filename="../qml/LyricStrip.qml" line="176"/>
         <source>Lyrics and CD+G (*.lrc *.srt *.ass *.kar *.txt *.cdg)</source>
         <translation>ווערטער און CD+G (*.lrc *.srt *.ass *.kar *.txt *.cdg)</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="121"/>
+        <location filename="../qml/LyricStrip.qml" line="184"/>
         <source>Select an application to give it lyrics.</source>
         <translation>קלייבט אויס אן אפליקאציע כדי צו געבן איר ווערטער.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="137"/>
+        <location filename="../qml/LyricStrip.qml" line="200"/>
         <source>Import lyrics…</source>
         <translation>אימפארטירן ווערטער…</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="142"/>
+        <location filename="../qml/LyricStrip.qml" line="205"/>
         <source>Clear</source>
         <translation>אויסמעקן</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="154"/>
+        <location filename="../qml/LyricStrip.qml" line="217"/>
         <source>%1 · %2 lines</source>
         <translation>%1 · %2 שורות</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="156"/>
+        <location filename="../qml/LyricStrip.qml" line="219"/>
         <source>%1 · a CD+G picture: its words are pixels, so none are read</source>
         <translation>%1 · א CD+G בילד: זײַנע ווערטער זענען פּיקסלען, דעריבער ווערט קיינע נישט געלייענט</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="157"/>
+        <location filename="../qml/LyricStrip.qml" line="220"/>
         <source>%1 · no times, so shown whole and not followed</source>
         <translation>%1 · קיין צייטן, דעריבער ווערן געוויזן גאנץ און נישט נאכגעפאלגט</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="170"/>
+        <location filename="../qml/LyricStrip.qml" line="233"/>
         <source>Start again</source>
         <translation>אנהייבן ווידער</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="170"/>
+        <location filename="../qml/LyricStrip.qml" line="233"/>
         <source>Start</source>
         <translation>אָנהייבן</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="175"/>
+        <location filename="../qml/LyricStrip.qml" line="238"/>
         <source>Stop</source>
         <translation>אָפּשטעלן</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="183"/>
+        <location filename="../qml/LyricStrip.qml" line="245"/>
+        <source>Follow the media session</source>
+        <translation>פאלגט נאך דער מעדיע-סעסיע</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="252"/>
         <source>Show the words earlier</source>
         <translation>ווייזן די ווערטער פריער</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="192"/>
+        <location filename="../qml/LyricStrip.qml" line="261"/>
         <source>Words shifted by %1</source>
         <translation>ווערטער פארשאבן מיט %1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="197"/>
+        <location filename="../qml/LyricStrip.qml" line="266"/>
         <source>Show the words later</source>
         <translation>ווייזן די ווערטער שפעטער</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="332"/>
+        <location filename="../qml/LyricStrip.qml" line="401"/>
         <source>CD+G picture</source>
         <translation>CD+G בילד</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="339"/>
+        <location filename="../qml/LyricStrip.qml" line="134"/>
         <source>Press Start as the song begins. This application&apos;s position is not read, so a pause or a seek in it is not followed: press Start again, or nudge the words.</source>
         <translation>דריקט אָנהייבן ווען דאס ליד הייבט אן. די פאזיציע פון דער אפליקאציע ווערט נישט געלייענט, דעריבער ווערט אן אפשטעל אדער שפרינג נישט נאכגעפאלגט: דריקט ווידער אָנהייבן, אדער שיבט די ווערטער.</translation>
     </message>
@@ -1843,6 +1888,53 @@
         <location filename="../qml/SettingsPage.qml" line="521"/>
         <source>Save diagnostics…</source>
         <translation>היט אָפּ די דיאַגנאָסטיק…</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="532"/>
+        <source>LYRIC EVENTS OUT</source>
+        <translation>ווערטער־געשעענישן (אַרויס)</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="536"/>
+        <source>Send the lyric strip&apos;s events over OSC</source>
+        <translation>שיקן די געשעענישן פון דער ווערטער־שטרײַף דורך OSC</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="537"/>
+        <source>The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.</source>
+        <translation>די שורה און דאס וואָרט וואָס ווערן געזונגען, אלס OSC־מעלדונגען איבער UDP, פֿאַר א ליכט־ אדער שאו־קאנטראל־סיסטעם וואָס פֿאָלגט זיי. אויס ביז איר שאלט עס אָן.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="544"/>
+        <location filename="../qml/SettingsPage.qml" line="547"/>
+        <source>Send to</source>
+        <translation>שיקן צו</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="555"/>
+        <location filename="../qml/SettingsPage.qml" line="558"/>
+        <source>Port</source>
+        <translation>פּאָרט</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="574"/>
+        <source>Lines</source>
+        <translation>שורות</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="582"/>
+        <source>Words</source>
+        <translation>ווערטער</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="590"/>
+        <source>Position, ten times a second</source>
+        <translation>פּאָזיציע, צען מאָל אין סעקונדע</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="596"/>
+        <source>Each message begins with the application&apos;s name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line&apos;s number, text and times; /word the same for a word of a word-timed line; /position the song&apos;s place in milliseconds. Times are milliseconds from the start of the song.</source>
+        <translation>יעדע מעלדונג הייבט אן מיטן נאמען פון דער אפליקאציע. /crucible/lyrics/state זאגט following, stopped אדער cleared; /line גיט די נומער, דעם טעקסט און די צײַטן פון דער שורה; /word דאס זעלבע פֿאַר א וואָרט פון א וואָרט־געצײַטיקטער שורה; /position דעם אָרט פון דעם ליד אין מיליסעקונדעס. צײַטן זענען מיליסעקונדעס פון אָנהייב פון ליד.</translation>
     </message>
     <message>
         <location filename="../qml/SettingsPage.qml" line="370"/>

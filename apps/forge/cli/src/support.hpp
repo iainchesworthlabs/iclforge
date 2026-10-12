@@ -325,6 +325,9 @@ struct Options {
     // the primary positional argument. encode/eac3-encode only; empty unless
     // multi-source input is in play.
     std::vector<std::string> sources;
+    // lyrics= (encode, eac3-encode, ac4-encode): a lyrics file, in any format libs/lyrics reads, to
+    // put beside the stream as its own UTF-8 `.lrc` (commands/lyrics.cpp). Empty for none.
+    std::string lyrics_path;
     // Each offset= occurrence: (sourceIndex, seconds) - leading silence ahead
     // of that source's own audio, in the same 0-based numbering src=
     // establishes (0 = the primary positional argument, 1..N = each src= in
@@ -866,6 +869,78 @@ void warn_associated_gain_unused();
 // having been mixed. `command` and `why` complete the line.
 void warn_associated_not_mixed(const Options& meta, std::string_view command,
                                std::string_view why);
+
+// True when karaoke (or karaoke=<choice>) asked for Annex C's reproduction.
+[[nodiscard]] bool wants_karaoke(const Options& meta);
+
+// karaoke given to a command that hands the coded stream on without decoding it:
+// `spdif` wraps it in IEC 61937 bursts and `play` passes it to a receiver. The
+// receiver reproduces the stream, and a karaoke-capable one is the only kind that
+// does anything with the choice. Said once on stderr, and ignored - silently
+// dropping it would read as the vocals having been chosen. `command` and `why`
+// complete the line.
+void warn_karaoke_not_applied(const Options& meta, std::string_view command,
+                              std::string_view why);
+
+// karaoke given with an AC-4 stream: Annex C is AC-3's (and, by analogy, E-AC-3's:
+// planning/karaoke-eac3.md), AC-4 has no karaoke mode, and the reproduction is not
+// applied. The words `decode` uses for the same case.
+void warn_karaoke_not_ac3(const Options& meta, std::string_view codec);
+
+// karaoke given to `spatial`, which places an E-AC-3 stream's objects and decodes
+// no karaoke bed. Said once on stderr, and ignored.
+void warn_karaoke_not_spatial(const Options& meta);
+
+// A service type of 7 (bsmod 7) asked for on a layout that cannot carry karaoke: Table 5.7
+// gives mono's code 7 the meaning of a voice-over, and Annex A (Table A5.2) and Annex G
+// (Table G.2) prohibit a karaoke service on mono and on 1+1. The stream is written as asked;
+// the words say what it is. Nothing for any other layout or service type. `whose` leads the
+// line for a programme other than the first ("programme 2: ").
+void warn_karaoke_service_layout(const iclforge::ac3::plan::Metadata& meta,
+                                 iclforge::ac3::Acmod acmod, std::string_view whose = {});
+
+// karaoke with an explicit downmix=ltrt: Annex C defines no Lt/Rt reproduction, so
+// the command is refused (with the reason on stderr) rather than quietly taking
+// one or the other. True when it was; the caller returns kExitUsage.
+[[nodiscard]] bool refuse_karaoke_with_ltrt(const iclforge::ac3::OutputConfig& output);
+
+// Whether `output` is going to leave this frame as Annex C's karaoke 3/0
+// reproduction - L, C, R and the LFE, in place of the coded layout - which is
+// what a sink is then opened for, as it is for a fold. The stage is the one that
+// decides (a frame that is not karaoke, an acmod with nothing to reproduce, and
+// a stereo or mono target all leave the layout alone), so this asks it by its own
+// channel count rather than restating its rules.
+[[nodiscard]] bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
+                                      const iclforge::ac3::DecodedFrame& frame);
+
+// The same question of an assembled E-AC-3 programme (planning/karaoke-eac3.md, D1 to D3): the
+// decoder's own rule, iclforge::ac3::is_karaoke_programme(), says whether it is one independent
+// substream flagged karaoke with no object layer, and the stage's channel count says whether
+// the reproduction changed anything.
+[[nodiscard]] bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
+                                      const iclforge::ac3::DecodedAccessUnit& unit);
+
+// The layout the channels of `unit` are in when the reproduction replaced the coded one:
+// DecodedAccessUnit::layout still names the coded bed, as it does under a fold, and this is
+// iclforge::ac3::output_mode()'s answer as a layout. `unit.layout` itself when nothing was
+// reproduced.
+[[nodiscard]] iclforge::ac3::eac3::chanmap::Layout reproduced_layout(
+    const iclforge::ac3::OutputConfig& output, const iclforge::ac3::DecodedAccessUnit& unit);
+
+// What `decode` and `monitor` say of a karaoke choice, from the first frame of a
+// stream: which reproduction was applied, or why none was. `folded` is whether the
+// stage folds to stereo or mono, `reproduced` is karaoke_reproduced(), and `verb`
+// completes "... and was <verb> as coded" ("decoded" or "played"). Prints nothing
+// when no reproduction was asked for.
+void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
+                    const iclforge::ac3::DecodedFrame& first, bool folded, bool reproduced,
+                    std::string_view verb);
+
+// The same for an E-AC-3 programme: which reproduction was applied, or why none was (a
+// programme with a dependent substream, an object layer, or no karaoke flag at all).
+void report_karaoke(FILE* status, const iclforge::ac3::OutputConfig& output,
+                    const iclforge::ac3::DecodedAccessUnit& first, bool folded, bool reproduced,
+                    std::string_view verb);
 
 // `programme 1 (associated service: visually impaired, mono)`: the programme as
 // the stream labels it.

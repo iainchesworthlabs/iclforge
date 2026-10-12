@@ -267,6 +267,41 @@ there is one and from start-and-nudge where there is not, and nothing derived fr
 events could drive beyond a strip (an OSC message a visual rig reads, say) is the owner's call; the
 library's cue type is the same either way.
 
+### The media-session back ends, as found
+
+Read on 2026-10-12 for the position source D9 chose, from each platform's own documentation; the
+sources are linked in the table, and a row says where a fact is **not** from one. The first
+question, which application a session belongs to, has a different answer on each platform, and is
+the thing a back end has to get right.
+
+| | Windows | Linux | macOS |
+|---|---|---|---|
+| Interface | `Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager`: `GetSessions()`, and for each session `GetTimelineProperties()`, `GetPlaybackInfo()` and `TryGetMediaPropertiesAsync()` ([session](https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssession)) | MPRIS 2, `org.mpris.MediaPlayer2.Player`, on the D-Bus session bus ([Player](http://specifications.freedesktop.org/mpris/latest/Player_Interface.html)) | The now-playing information of `MediaRemote.framework`: a **private** framework, so nothing here is from Apple's documentation |
+| The position | `Position`, "current as of `LastUpdatedTime`" (a UTC time), beside `StartTime`, `EndTime`, `MinSeekTime` and `MaxSeekTime` ([timeline](https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssessiontimelineproperties)); a reader carries it forward at the playback rate while playing | `Position`, a signed 64-bit count of **microseconds**, read-only; "The `PropertiesChanged` signal is **not** emitted when this property changes", so it is asked for, and a jump is announced by `Seeked` ([Player](http://specifications.freedesktop.org/mpris/latest/Player_Interface.html)) | An elapsed time with the time stamp it was true at and a rate (names from general knowledge of the framework; **not verified**) |
+| Playing or paused | `GetPlaybackInfo()`'s playback status and rate | `PlaybackStatus`: `Playing`, `Paused` or `Stopped`; `Rate`, a multiplier that is never 0 | The rate: 0 is paused (general knowledge; **not verified**) |
+| Which application | `SourceAppUserModelId` **only**: no process id ([session](https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssession)). A desktop program's is usually its executable's name (`Spotify.exe`); a packaged one is `<family>!<application>`; a browser can be neither (general knowledge) | The bus name, `org.mpris.MediaPlayer2.<name>`, with `.instance<pid>` added by a second instance of one player ([spec](http://specifications.freedesktop.org/mpris/latest/)); `Identity` (a friendly name) and `DesktopEntry` (a `.desktop` file's basename) ([root](http://specifications.freedesktop.org/mpris/latest/Media_Player.html)); the bus daemon says which process owns a name (general knowledge) | The client's process and bundle (general knowledge; **not verified**) |
+| The track | `TryGetMediaPropertiesAsync()`: title and artist | `Metadata`: `mpris:trackid` (required whenever a track is current), `mpris:length`, `xesam:title`, `xesam:artist` | A title and a duration in the same dictionary (**not verified**) |
+| Permission and floor | Windows 10, version 1809; the page lists an app capability, `globalMediaControl`, for packaged applications | None on a desktop session bus; a sandboxed program may need a permission to talk to the names (general knowledge, **not verified**) | Developers report that macOS 15.4 and later withholds it from programs Apple has not entitled ([an adapter project's account](https://github.com/ungive/mediaremote-adapter), [a Keyboard Maestro thread](https://forum.keyboardmaestro.com/t/beware-upgrading-to-macos-15-4-if-you-need-now-playing-data/40285)); Apple has said nothing that was found |
+
+What that does to the design, which is why the reader is a seam and not one function:
+
+- **A session is matched to an application by name, not by process.** Windows gives no process id,
+  so the executable's name (the room already has the image path) is compared to the session's
+  identifier; Linux can use the process id as well. A browser's session on Windows may be named by
+  neither, so a person can **choose** among the sessions that are playing when none matched.
+- **The position is a read, not an event, on Linux**, and an event on Windows that a poll gives
+  just as well; both are carried forward at the rate between reads. A read every half second is
+  enough to follow a seek within a line.
+- **A track's identity is needed**: a session's position starts at 0 for the next track, which
+  would otherwise be followed against the last track's lyrics. Title, artist and length are the
+  three that every platform above gives.
+- **macOS is the weak one.** The only reader named for it is private and, by developers' accounts,
+  gated since 15.4; a Crucible built there returns nothing and says so, and the strip keeps Start
+  and the nudge. Whether to read it at all, to use a documented route for particular players
+  (AppleScript to Music and Spotify, which asks the person for permission), or to leave macOS to
+  Start and the nudge is the owner's call; the code that exists reads the private framework only,
+  and no Mac has executed it.
+
 ### Where the module lives
 
 A **library under `libs/`**. `apps/shared` would reach Hearth, Crucible and the Forge programs and

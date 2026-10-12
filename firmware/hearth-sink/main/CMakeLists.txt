@@ -61,7 +61,7 @@ endif()
 # And the Sendspin player, which needs the component's (CONFIG_ICLFORGE_SENDSPIN)
 # and a network to be found on. See main/sendspin.hpp.
 if(CONFIG_ICLFORGE_SENDSPIN AND CONFIG_ICLFORGE_EXAMPLE_SOURCE_HTTP)
-    set(ICLFORGE_SENDSPIN_SRCS "sendspin/player/sendspin.cpp")
+    set(ICLFORGE_SENDSPIN_SRCS "sendspin/player/sendspin.cpp" "sendspin/player/psram_scope.cpp")
 else()
     set(ICLFORGE_SENDSPIN_SRCS "sendspin/none/sendspin.cpp")
 endif()

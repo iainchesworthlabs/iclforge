@@ -1197,169 +1197,190 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="549"/>
+        <location filename="../qml/KaraokePage.qml" line="551"/>
         <source>, word-timed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="550"/>
+        <location filename="../qml/KaraokePage.qml" line="552"/>
         <source>, line-timed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="560"/>
+        <location filename="../qml/KaraokePage.qml" line="562"/>
         <source>Time the lyrics…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="565"/>
+        <location filename="../qml/KaraokePage.qml" line="567"/>
         <source>Full screen · F11</source>
         <translation type="unfinished">Pantalla completa · F11</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="586"/>
+        <location filename="../qml/KaraokePage.qml" line="583"/>
+        <location filename="../qml/KaraokePage.qml" line="591"/>
+        <source>Show</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="594"/>
+        <source>Words</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="595"/>
+        <source>Picture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="617"/>
+        <source>This is the picture of the CD+G disc beside the lyrics. Its words are part of the picture; choose Words to follow the lyrics file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="621"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="588"/>
+        <location filename="../qml/KaraokePage.qml" line="614"/>
         <source>This is the picture of a CD+G disc. Its words are part of the picture, so there is no text to follow.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="591"/>
+        <location filename="../qml/KaraokePage.qml" line="623"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="611"/>
+        <location filename="../qml/KaraokePage.qml" line="643"/>
         <source>First singer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="620"/>
+        <location filename="../qml/KaraokePage.qml" line="652"/>
         <source>Name of the first singer (V1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="627"/>
+        <location filename="../qml/KaraokePage.qml" line="659"/>
         <source>Second singer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="636"/>
+        <location filename="../qml/KaraokePage.qml" line="668"/>
         <source>Name of the second singer (V2)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="670"/>
+        <location filename="../qml/KaraokePage.qml" line="702"/>
         <source>The stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="675"/>
+        <location filename="../qml/KaraokePage.qml" line="707"/>
         <source>Backing left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="676"/>
+        <location filename="../qml/KaraokePage.qml" line="708"/>
         <source>Backing right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="677"/>
+        <location filename="../qml/KaraokePage.qml" line="709"/>
         <source>Melody guide</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="390"/>
-        <location filename="../qml/KaraokePage.qml" line="678"/>
+        <location filename="../qml/KaraokePage.qml" line="710"/>
         <source>Vocal 1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/KaraokePage.qml" line="391"/>
-        <location filename="../qml/KaraokePage.qml" line="679"/>
+        <location filename="../qml/KaraokePage.qml" line="711"/>
         <source>Vocal 2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="696"/>
+        <location filename="../qml/KaraokePage.qml" line="728"/>
         <source>not in this stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="697"/>
+        <location filename="../qml/KaraokePage.qml" line="729"/>
         <source>heard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="697"/>
+        <location filename="../qml/KaraokePage.qml" line="729"/>
         <source>muted</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="707"/>
+        <location filename="../qml/KaraokePage.qml" line="739"/>
         <source>What plays</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="745"/>
+        <location filename="../qml/KaraokePage.qml" line="777"/>
         <source>Nothing karaoke is playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="753"/>
+        <location filename="../qml/KaraokePage.qml" line="785"/>
         <source>Signal path</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="761"/>
+        <location filename="../qml/KaraokePage.qml" line="793"/>
         <source>Decoded as the stream says.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="764"/>
+        <location filename="../qml/KaraokePage.qml" line="796"/>
         <source>as coded</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="765"/>
+        <location filename="../qml/KaraokePage.qml" line="797"/>
         <source>aware</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="766"/>
+        <location filename="../qml/KaraokePage.qml" line="798"/>
         <source>capable, vocals: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="767"/>
+        <location filename="../qml/KaraokePage.qml" line="799"/>
         <source>none</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="768"/>
+        <location filename="../qml/KaraokePage.qml" line="800"/>
         <source>both</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="771"/>
+        <location filename="../qml/KaraokePage.qml" line="803"/>
         <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="772"/>
+        <location filename="../qml/KaraokePage.qml" line="804"/>
         <source>AC-3 karaoke, %1.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="784"/>
+        <location filename="../qml/KaraokePage.qml" line="816"/>
         <source>Nothing is playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="786"/>
+        <location filename="../qml/KaraokePage.qml" line="818"/>
         <source>%1 · %2 ch at %3 Hz</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1431,27 +1452,42 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="487"/>
-        <source>Vocals</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/LyricScreen.qml" line="500"/>
-        <source>None</source>
+        <location filename="../qml/LyricScreen.qml" line="488"/>
+        <source>Show</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="501"/>
-        <source>V1</source>
+        <source>Words</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/LyricScreen.qml" line="502"/>
+        <source>Picture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="516"/>
+        <source>Vocals</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="529"/>
+        <source>None</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="530"/>
+        <source>V1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="531"/>
         <source>V2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="503"/>
+        <location filename="../qml/LyricScreen.qml" line="532"/>
         <source>Both</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1693,47 +1729,47 @@
 <context>
     <name>LyricView</name>
     <message>
-        <location filename="../qml/LyricView.qml" line="68"/>
+        <location filename="../qml/LyricView.qml" line="73"/>
         <source>%1 + %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="94"/>
+        <location filename="../qml/LyricView.qml" line="99"/>
         <source>guide</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="95"/>
+        <location filename="../qml/LyricView.qml" line="100"/>
         <source>you</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="96"/>
+        <location filename="../qml/LyricView.qml" line="101"/>
         <source>shared</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="107"/>
+        <location filename="../qml/LyricView.qml" line="112"/>
         <source>%1 · %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="423"/>
+        <location filename="../qml/LyricView.qml" line="428"/>
         <source>CD+G picture</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="439"/>
+        <location filename="../qml/LyricView.qml" line="444"/>
         <source>%1 Playback is not affected.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="443"/>
+        <location filename="../qml/LyricView.qml" line="448"/>
         <source>Nothing is playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricView.qml" line="445"/>
+        <location filename="../qml/LyricView.qml" line="450"/>
         <source>No lyrics. Hearth looks for %1 next to the stream.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3380,26 +3416,31 @@
     </message>
     <message>
         <location filename="../qml/NetworkSinkReport.qml" line="24"/>
+        <source>Lyrics</source>
+        <translation type="unfinished">Letra</translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkReport.qml" line="25"/>
         <source>Played</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkReport.qml" line="25"/>
+        <location filename="../qml/NetworkSinkReport.qml" line="26"/>
         <source>Problems</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkReport.qml" line="34"/>
+        <location filename="../qml/NetworkSinkReport.qml" line="35"/>
         <source>What the sink reports</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkReport.qml" line="66"/>
+        <location filename="../qml/NetworkSinkReport.qml" line="67"/>
         <source>—</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkReport.qml" line="79"/>
+        <location filename="../qml/NetworkSinkReport.qml" line="80"/>
         <source>From the sink&apos;s own state messages, which it sends whenever something changes.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4285,96 +4326,96 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="340"/>
+        <location filename="../../src/network_controller.cpp" line="341"/>
         <source>not sent: the sink refused the settings.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="341"/>
+        <location filename="../../src/network_controller.cpp" line="342"/>
         <source>not sent: the sink does not take settings from Hearth.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="343"/>
+        <location filename="../../src/network_controller.cpp" line="344"/>
         <source>The sink does not take settings from Hearth.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="347"/>
+        <location filename="../../src/network_controller.cpp" line="348"/>
         <source>revision %1 sent, not reported yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="349"/>
+        <location filename="../../src/network_controller.cpp" line="350"/>
         <source>revision %1 refused: %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="353"/>
+        <location filename="../../src/network_controller.cpp" line="354"/>
         <source>revision %1 · applied</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="355"/>
+        <location filename="../../src/network_controller.cpp" line="356"/>
         <source>revision %1 sent · sink on %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="360"/>
+        <location filename="../../src/network_controller.cpp" line="361"/>
         <source>Nothing playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="361"/>
-        <location filename="../../src/network_controller.cpp" line="374"/>
+        <location filename="../../src/network_controller.cpp" line="362"/>
+        <location filename="../../src/network_controller.cpp" line="375"/>
         <source>none</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="362"/>
-        <location filename="../../src/network_controller.cpp" line="403"/>
-        <location filename="../../src/network_controller.cpp" line="409"/>
+        <location filename="../../src/network_controller.cpp" line="363"/>
+        <location filename="../../src/network_controller.cpp" line="405"/>
         <location filename="../../src/network_controller.cpp" line="411"/>
+        <location filename="../../src/network_controller.cpp" line="413"/>
         <source>not reported</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="367"/>
+        <location filename="../../src/network_controller.cpp" line="368"/>
         <source>%1 · %2%3 · %4 substream%5</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="375"/>
+        <location filename="../../src/network_controller.cpp" line="376"/>
         <source>%1 carried · %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="376"/>
+        <location filename="../../src/network_controller.cpp" line="377"/>
         <source>placed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="377"/>
+        <location filename="../../src/network_controller.cpp" line="378"/>
         <source>not placed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="378"/>
+        <location filename="../../src/network_controller.cpp" line="379"/>
         <source>dialnorm %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="385"/>
+        <location filename="../../src/network_controller.cpp" line="387"/>
         <source>%1 bursts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="386"/>
+        <location filename="../../src/network_controller.cpp" line="388"/>
         <source>%1 underruns · %2 late · %3 dropped · %4 invalid</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="402"/>
+        <location filename="../../src/network_controller.cpp" line="404"/>
         <source>%1-bit · %2 slots</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5208,12 +5249,12 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::NetworkController</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="920"/>
+        <location filename="../../src/network_controller.cpp" line="922"/>
         <source>it could not be read: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="923"/>
+        <location filename="../../src/network_controller.cpp" line="925"/>
         <source>it is %1 bytes, more than any sink&apos;s app slot holds</source>
         <translation type="unfinished"></translation>
     </message>
