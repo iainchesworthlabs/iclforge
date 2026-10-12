@@ -727,10 +727,12 @@ class SiteScriptsRenderTest(unittest.TestCase):
             {"codec": "ac4", "leg": "ac4-20-music-192", "mos_lqo": 4.71, "bitrate_kbps": 192}],
             commit="24f0bf1f0aaaaaaa", date="2026-09-22T10:00:00Z")
         note = "Last recorded on dd67c646, 2026-09-20."
-        for flags, listening in (((), "Listening quality"), (("--page",), "Predicted listening quality")):
+        surfaces = (((), "Listening quality"), (("--page",), "Predicted listening quality"))
+        for flags, listening in surfaces:
             with self.subTest(surface="page" if flags else "strip"):
                 cards = self.render(*flags)
-                accuracy = {line["codec"]: line["what"] for line in cards["Decode accuracy"]["lines"]}
+                accuracy = {line["codec"]: line["what"]
+                            for line in cards["Decode accuracy"]["lines"]}
                 self.assertIn(note, accuracy["AC-4"])
                 # AC-3 and E-AC-3 are the gold-reference gate's rows, from the newest commit.
                 self.assertNotIn("Last recorded", accuracy["AC-3"])
@@ -748,7 +750,8 @@ class SiteScriptsRenderTest(unittest.TestCase):
 
     def test_the_page_footer_names_the_newest_commit_of_any_series(self):
         self.fixture()
-        self.write("ac4-quality-main", [{"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72}],
+        self.write("ac4-quality-main",
+                   [{"leg": "ac4-20-music-192", "min_snr_db": 34.9, "mos_lqo": 4.72}],
                    commit="dd67c646a0b1c2d3", date="2026-10-20T06:26:42Z")
         asof = self.render_json("--page")["asof"]
         self.assertIn("dd67c646", asof)

@@ -150,8 +150,9 @@ class WhatRunsAfterAMerge(unittest.TestCase):
         ):
             with self.subTest(scorer=scorer):
                 self.assertRegex(ffmpeg, rf"(?m)^        id: {scorer}\n        run: \|")
+                following = r"(?=^      - |^      #|\Z)"
                 step = re.search(
-                    rf"(?ms)^      - name: {re.escape(upload)}\n(.*?)(?=^      - |^      #|\Z)", ffmpeg
+                    rf"(?ms)^      - name: {re.escape(upload)}\n(.*?){following}", ffmpeg
                 )
                 self.assertIsNotNone(step, upload)
                 self.assertIn(
