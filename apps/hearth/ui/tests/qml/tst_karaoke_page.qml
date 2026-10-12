@@ -15,6 +15,8 @@ import "HearthTestHelpers.js" as H
 //   karaoke-3/2  bsmod 7, 3/2 with an LFE: L 440, M 800, R 620, V1 1030,
 //                V2 1270 Hz, LFE 90 Hz
 //   main-3/2     the same audio flagged a complete main service
+//   eac3-karaoke-3/2       the karaoke programme as E-AC-3, one independent substream
+//   eac3-karaoke-3/2+rear  the same with the 7.1 rear pair in a dependent substream
 //
 // Annex C's tables are checked sample for sample by the library's own tests
 // and by apps/hearth/engine/tests/test_stream_decoder.cpp; these hold that the
@@ -31,6 +33,8 @@ TestCase {
     property string karaoke21: ""
     property string main: ""
     property string plainEac3: ""
+    property string eac3Karaoke: ""
+    property string eac3KaraokeRear: ""
     // A tone is "there" above this level and "not there" below the other.
     readonly property real present: -45
     readonly property real absent: -70
@@ -46,7 +50,10 @@ TestCase {
         karaoke21 = TestServices.writeAc3Stream("karaoke21.ac3", "karaoke-2/1");
         plainEac3 = TestServices.stageFixture(repo + "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
                                               "plain.ec3");
+        eac3Karaoke = TestServices.writeAc3Stream("karaoke.ec3", "eac3-karaoke-3/2");
+        eac3KaraokeRear = TestServices.writeAc3Stream("karaoke-rear.ec3", "eac3-karaoke-3/2+rear");
         verify(karaoke.length > 0 && main.length > 0 && plainEac3.length > 0, "the streams could not be made");
+        verify(eac3Karaoke.length > 0 && eac3KaraokeRear.length > 0, "the E-AC-3 streams could not be made");
         HearthController.start();
         tryVerify(function() { return Object.keys(HearthController.decoderSettings).length > 0; }, 15000);
     }
@@ -280,12 +287,72 @@ TestCase {
         verify(level("Ls", 1030) > present, "the surround was not played as coded");
     }
 
-    function test_anEac3StreamIsNotAnAc3KaraokeStream() {
+    function test_aPlainEac3StreamIsNotKaraokeAndSaysSo() {
         const win = openPage();
         play(plainEac3);
         tryCompare(named(win, "notApplicableNotice"), "visible", true, 5000);
         compare(named(win, "reproductionChoice").enabled, false);
-        verify(text(win, "karaokeStreamFacts").indexOf("Karaoke is an AC-3 mode") >= 0);
+        compare(HearthController.currentMedia.programmes[0].karaoke, false);
+        compare(HearthController.currentMedia.programmes[0].karaokeFlagged, false);
+        verify(text(win, "karaokeStreamFacts").indexOf("An E-AC-3 stream, but not a karaoke one") >= 0);
+    }
+
+    // An E-AC-3 programme of one independent substream flagged bsmod 7 is a karaoke stream the
+    // decoder reproduces (planning/karaoke-eac3.md, D1 to D3): named, its parts heard, and the
+    // surrounds silent under the default reproduction, as the AC-3 case above.
+    function test_anEac3KaraokeStreamIsNamedAndReproducedAsAnAc3OneIs() {
+        const win = openPage();
+        play(eac3Karaoke);
+        const programme = HearthController.currentMedia.programmes[0];
+        compare(programme.karaoke, true);
+        compare(programme.karaokeFlagged, true);
+        compare(programme.karaokeParts.join(" "), "L R M V1 V2");
+        tryVerify(function() { return text(win, "karaokeStreamFacts").indexOf("L R M V1 V2") >= 0; }, 5000);
+        compare(named(win, "notApplicableNotice").visible, false);
+        compare(named(win, "reproductionChoice").enabled, true);
+        settled();
+        verify(level("L", 440) > present, "L lost its backing");
+        verify(level("L", 1030) > present, "V1 did not reach L");
+        verify(level("C", 800) > present, "the melody left the centre");
+        verify(level("R", 1270) > present, "V2 did not reach R");
+        verify(level("Ls", 1030) < absent, "V1 still plays from Ls");
+        verify(level("Rs", 1270) < absent, "V2 still plays from Rs");
+        compare(text(win, "speakerCarries-L"), "L + V1");
+        compare(text(win, "speakerCarries-Ls"), qsTr("silent"));
+        verify(HearthController.thisFrame.karaokeReproduced === true, "the report did not say reproduced");
+        // The playing line names the codec.
+        verify(text(win, "decodeStage").indexOf("E-AC-3 karaoke") >= 0);
+    }
+
+    function test_anEac3KaraokeStreamTakesTheCapableChoiceToo() {
+        const win = openPage();
+        play(eac3Karaoke);
+        clickSegment(win, "reproductionChoice", "capable");
+        tryCompare(HearthController.decoderSettings, "karaoke", "capable", 10000);
+        clickSegment(win, "vocalsChoice", "v1");
+        tryCompare(HearthController.decoderSettings, "karaokeVocals", "v1", 10000);
+        settled();
+        // A single vocal joins the melody in the centre.
+        verify(level("C", 800) > present && level("C", 1030) > present, "V1 is not with the melody");
+        verify(level("L", 1030) < absent && level("R", 1270) < absent);
+    }
+
+    // The same service type on a programme with a dependent substream is flagged and not
+    // reproduced: the page says so, the controls do not apply, and the surrounds carry what the
+    // stream coded there.
+    function test_anEac3KaraokeProgrammeWithADependentSubstreamIsFlaggedAndPlaysAsCoded() {
+        const win = openPage();
+        play(eac3KaraokeRear);
+        const programme = HearthController.currentMedia.programmes[0];
+        compare(programme.karaokeFlagged, true);
+        compare(programme.karaoke, false);
+        tryCompare(named(win, "notApplicableNotice"), "visible", true, 5000);
+        compare(named(win, "reproductionChoice").enabled, false);
+        tryVerify(function() { return text(win, "karaokeStreamFacts").indexOf("Flagged karaoke") >= 0; }, 5000);
+        settled();
+        verify(level("Ls", 1500) > present, "the dependent substream's surround was not played as coded");
+        verify(level("L", 1030) < absent, "V1 was reproduced into L");
+        verify(HearthController.thisFrame.karaokeReproduced !== true, "the report said reproduced");
     }
 
     function test_theChoiceRoundTripsThroughTheDecoderSettings() {
