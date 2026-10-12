@@ -535,22 +535,27 @@ void MicrophoneController::load(const QString& itemPath, const QString& prefer) 
         QMetaObject::invokeMethod(
             app,
             [self, outcome, generation] {
-                if (!self || self->state_data_->generation != generation) {
+                // The QPointer is read once: dereferencing it again for each member lets GCC's
+                // flow analysis at -O3 conclude that it may be null at a later use
+                // (-Werror=null-dereference).
+                MicrophoneController* const controller = self.data();
+                if (controller == nullptr || controller->state_data_->generation != generation) {
                     return;
                 }
                 if (outcome->ok) {
-                    self->reference_status_ = QStringLiteral("ready");
-                    self->reference_text_ = outcome->text;
-                    self->state_data_->set_notes(iclforge::pitch::segment_notes(*outcome->contour));
-                    self->state_data_->session.set_reference(std::move(outcome->contour));
+                    controller->reference_status_ = QStringLiteral("ready");
+                    controller->reference_text_ = outcome->text;
+                    controller->state_data_->set_notes(
+                        iclforge::pitch::segment_notes(*outcome->contour));
+                    controller->state_data_->session.set_reference(std::move(outcome->contour));
                 } else {
-                    self->reference_status_ = QStringLiteral("none");
-                    self->reference_text_ = outcome->text;
-                    self->state_data_->set_notes({});
-                    self->state_data_->session.set_reference(std::nullopt);
+                    controller->reference_status_ = QStringLiteral("none");
+                    controller->reference_text_ = outcome->text;
+                    controller->state_data_->set_notes({});
+                    controller->state_data_->session.set_reference(std::nullopt);
                 }
-                emit self->referenceChanged();
-                self->publish(true);
+                emit controller->referenceChanged();
+                controller->publish(true);
             },
             Qt::QueuedConnection);
     });
