@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The platform's NoActionBar theme with the screen's own background behind the first frame,
+         so a launch in a dim room does not flash a light window before the screen draws. -->
+    <style name="Theme.Hearth" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+    </style>
+</resources>

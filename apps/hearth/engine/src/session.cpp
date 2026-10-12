@@ -325,6 +325,11 @@ std::expected<Session, std::string> Session::open(
         session.starts_.push_back(session.starts_.back() + length);
     }
     const std::uint64_t stream_samples = session.starts_.back();
+    if (rate != 0 && stream_samples != 0) {
+        session.facts_.frame_rate = static_cast<double>(rate) *
+                                    static_cast<double>(lengths.size()) /
+                                    static_cast<double>(stream_samples);
+    }
 
     // The part the item plays, clamped to what the stream holds.
     session.window_start_ = std::min(loaded->skip_samples, stream_samples);

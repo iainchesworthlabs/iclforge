@@ -72,6 +72,11 @@ class Sink {
     // restarted its player, or reconnected: a test of what a server does about a member that
     // reports no lyrics (or another item's) for the item it is playing.
     void forget_lyrics() { core_->forget_lyrics(); }
+    // What a screen would draw of the lyrics now (libs/sink's lyric_frame.hpp), for a test of the
+    // chain from a server's document and anchors to the sink's own clock.
+    [[nodiscard]] sink::LyricFrame lyric_frame(std::int64_t delay_ms = 0) const {
+        return core_->lyric_frame(delay_ms);
+    }
 
    private:
     class FileOutputs;

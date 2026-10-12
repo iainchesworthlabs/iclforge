@@ -1231,10 +1231,31 @@ decode and render per burst with the sink's time left out):
 
 Every output's RMS over a play is the host decoder's to 0.01 dB (0.23 dB under on `ac4-stereo-64`,
 whose first second was silent: the player had dropped its first chunk as late, and the decoder waits
-for an I-frame after one). The converter stream's worst burst, 229 ms, came within its first 125
+for an I-frame after one; a late AC-4 chunk is decoded and discarded now where that loses less, which
+an S3 measured at 0.0 to 0.1 s lost in place of 0.9 to 1.0 s at 23.44 fps, and a P4 has not been run
+since). The converter stream's worst burst, 229 ms, came within its first 125
 chunks and not again; the ring held it and nothing ran dry. E-AC-3 plays on the same image are unchanged (`dee-eac3-51` 5.1 0.18,
 internal RAM free 211 to 218 KB), and a player switched from E-AC-3 to AC-4 and back plays each as it
 did alone: the decoders go in turn, and the AC-4 one's 286 KB with them.
+
+A presentation that has objects beside a 5.1 bed is played as the bed, and the decoder does not
+reconstruct the objects (`Ac4Stream::Config::skip_objects`, on by default: the board places none and
+says so). Without that it paid for them and threw them away. Measured 2026-10-12 on board 1 as above,
+with a 5.1 channel-coded bed beside A-JOC (five downmix signals, 16 and 4 objects) and beside
+direct-coded objects, 15 s each; the same board, the same streams, an image with and without the
+option:
+
+| Stream | Objects | x real time, objects decoded | x real time, skipped | Worst burst, skipped | Internal RAM free, least, before and after |
+|---|---:|---:|---:|---:|---:|
+| bed + A-JOC | 16 | 2.51 | 0.59 | 0.89 | 1.0 KB, 9.6 KB |
+| bed + A-JOC | 4 | 1.26 | 0.58 | 0.90 | 2.7 KB, 18 KB |
+| bed + direct-coded | dynamic | 1.00 | 0.56 | 0.90 | 2.5 KB, 28 KB |
+| A-JOC alone | 16 | decoded, then dropped: 1.62, 186 chunks late | refused, every chunk | 0.15 | 2.1 KB, 253 KB |
+
+The bed's RMS on each output is the host decoder's to 0.01 dB with and without the option, since an
+object's audio is never mixed into the channels `decode_by_block()` hands over. A stream of objects
+alone is refused by the decoder with its reason, every chunk counted invalid; a server does not
+send one as it is, because the board's `max_objects` of 0 makes it send PCM decoded there.
 
 What is not measured, and is the thing to watch: the decoder takes nearly all the internal RAM while
 it plays, the 1 to 11 KB at its lowest that the HTTP source's plays leave (sdkconfig.p4), now beside

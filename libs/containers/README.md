@@ -7,7 +7,7 @@ The codec-blind carriage: IEC 61937 burst packing and detection, the Matroska, M
 A library.
 
 - **Uses:** `base`
-- **Used by:** `app-media`, `audio`, `crucible`, `demo-android`, `examples`, `forge`, `hearth`, `python`
+- **Used by:** `app-media`, `audio`, `crucible`, `demo-android`, `examples`, `forge`, `hearth`, `python`, `sink`
 - **CI lanes:** core
 - **CMake target:** `iclforge::containers`
 

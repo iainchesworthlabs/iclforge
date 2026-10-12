@@ -714,6 +714,18 @@ so a stream packed from any frame gives each frame the same period. And it gives
 AC-4 and AC-4 LD, where IEC 61937-2 Table 2 says bytes: the packer writes bits, and the reader
 takes either, since the sync frame states its own length.
 
+**From a burst's parts.** A receiver of Hearth's Sendspin burst chunk holds a burst's `Pc`, `Pd`
+and payload in stream order, and none of its sync words, word swap or stuffing. `burst_from_parts(pc,
+pd, payload, sequence_index)` puts them back as the packer wrote them (a packer chooses `Pc` itself,
+so a burst rebuilt with another `Pc` would be another stream to a receiver), refusing what the
+packers refuse: a data type not carried, a payload that is not the length `Pd` says in its unit, one
+that does not open with a syncword, one the period cannot hold. `burst_period_bytes(pc,
+sequence_index)` is the burst's length, which is its repetition period, without building it. For a
+link with nothing to send, `null_burst(period_bytes)` is a null-data burst of that length, which a
+reader steps over and which, on the one receiver it was measured on, kept its Dolby lock where PCM
+silence lost it in half a second. `iclforge-containers-tests` rebuilds every burst the packers write
+over the Dolby encoder's AC-3, E-AC-3 (JOC included) and AC-4 fixtures and compares the bytes.
+
 **De-framing** (the other direction) is `BurstReader`, `unwrap_stream` and
 `PassthroughDetector`. `BurstReader` is a streaming `Pa`/`Pb`/`Pc`/`Pd` parser: data types 0x01
 and 0x15 and AC-4's four types, both 16-bit word orders, the stuffing between bursts, `Pd`'s

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The same value as MainActivity's BACKGROUND, painted before the first frame draws. -->
+    <color name="background">#FF08090B</color>
+    <color name="accent">#FFFFB040</color>
+</resources>

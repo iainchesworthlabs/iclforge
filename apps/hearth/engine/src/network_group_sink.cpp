@@ -81,6 +81,7 @@ public:
                     .coded_channels = format.coded_channels,
                     .objects = format.objects,
                     .objects_alone = format.objects_alone,
+                    .frame_rate = format.frame_rate,
                     .karaoke = format.karaoke,
                     .layout = format.layout});
          for (const render::OutputLayout& layout : planned) {
@@ -112,6 +113,7 @@ public:
      taken_ = 0;
      flushed_ = 0;
      lyrics_item_.reset();
+     now_item_.reset();
      return OpenOutputFormat{.sample_rate = format.sample_rate,
                              .channels = static_cast<std::uint16_t>(channels),
                              .mode = OutputMode::kNetworkGroup,
@@ -120,6 +122,11 @@ public:
 
     void close() override {
         if (group_) {
+            if (now_item_) {
+                // Nothing is playing once the output is closed: the members that showed the item stop
+                // showing it, and are told again if the next item opens the group.
+                group_->set_metadata(std::nullopt);
+            }
             group_->stop();
         }
         group_.reset();
@@ -128,6 +135,7 @@ public:
         taken_ = 0;
         flushed_ = 0;
         lyrics_item_.reset();
+        now_item_.reset();
     }
 
     [[nodiscard]] bool is_open() const override { return group_ != nullptr; }
@@ -155,6 +163,26 @@ public:
         // On the group's own clock, which is the server's: a member's time filter maps it to its own.
         if (const std::optional<LyricsUpdate::Anchor> anchor = anchors_.sample(heard_ms, clock_.now_us())) {
             lyrics_(open_group_name_, LyricsUpdate{.item = item, .document = std::nullopt, .anchor = *anchor});
+        }
+    }
+
+    void set_now_playing(std::int64_t item, const NowPlaying& now) override {
+        if (!group_) {
+            return;
+        }
+        now_item_ = item;
+        now_ = now;
+        // Nothing is known of where the sound is until the next sample.
+        progress_.reset();
+        send_now_playing(std::nullopt);
+    }
+
+    void follow_now_playing(std::int64_t item, std::int64_t heard_ms) override {
+        if (!group_ || !now_item_ || *now_item_ != item) {
+            return;
+        }
+        if (const std::optional<LyricsUpdate::Anchor> anchor = progress_.sample(heard_ms, clock_.now_us())) {
+            send_now_playing(anchor);
         }
     }
 
@@ -253,6 +281,26 @@ public:
 private:
  // `slots` as interleaved 32-bit samples at `channels`, a slot the block
  // does not have as silence.
+ // metadata@v1's state for the item playing: its tags, and where the sound is when an anchor says,
+ // which a member moves on at the speed from the time (metadata::position_ms()). The state takes
+ // effect at the anchor's time on the server's clock, which is the group's.
+ void send_now_playing(const std::optional<LyricsUpdate::Anchor>& anchor) {
+     sendspin::metadata::State state;
+     state.timestamp = anchor ? anchor->at_us : clock_.now_us();
+     if (!now_.title.empty()) {
+         state.title = now_.title;
+     }
+     state.artist = now_.artist;
+     state.album = now_.album;
+     if (anchor) {
+         state.progress = sendspin::metadata::Progress{
+             .track_progress_ms = anchor->position_ms,
+             .track_duration_ms = now_.duration_ms,
+             .playback_speed = static_cast<std::int32_t>(std::lround(anchor->speed * 1000.0))};
+     }
+     group_->set_metadata(std::move(state));
+ }
+
  static void interleave(std::span<const std::span<const float>> slots, std::size_t frames,
                         std::size_t channels, std::vector<std::int32_t>& out) {
      out.resize(frames * channels);
@@ -273,6 +321,11 @@ private:
     // The lyrics the members were last told of: the item, and when its anchors are due.
     std::optional<std::int64_t> lyrics_item_;
     LyricsAnchors anchors_;
+    // What the members that show what is playing were last told: the item, its tags, and when its
+    // position is due again (the same terms as the lyrics' anchors, and no lyrics applier needed).
+    std::optional<std::int64_t> now_item_;
+    NowPlaying now_;
+    LyricsAnchors progress_;
     std::shared_ptr<sendspin::Group> group_;
     // The layouts beyond the player's the open group carries, and the
     // interleaved block of each, reused across calls.

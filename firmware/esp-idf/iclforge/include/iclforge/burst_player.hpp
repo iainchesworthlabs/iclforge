@@ -99,6 +99,12 @@ struct BurstPlayerConfig {
     // what the board keeps up with (the P4's 6, the S3's 2), refused once the decoder has said how
     // many a frame has. 0 refuses none.
     std::size_t max_ac4_channels = 0;
+    // The most frames a second an AC-4 stream may have, which the support object states as
+    // max_frame_rate (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE): the S3's decode of a
+    // frame through the frame-rate converter takes the same time at 29.97 a second as at 24, which
+    // is a play it cannot keep up with. A frame of a faster stream is refused, as one with more
+    // channels is. 0 refuses none.
+    std::uint32_t max_ac4_frame_rate = 0;
     // The most objects an E-AC-3 stream may declare for the board to place them in real time, which
     // the support object states as max_objects (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS), and
     // nothing for a board that states none. A stream that declares more (iclforge/object_limit.hpp:

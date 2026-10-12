@@ -51,6 +51,11 @@ constexpr std::array<Named<DataType>, 3> kDataTypes{{
     {DataType::kAc4, "ac4"},
 }};
 
+constexpr std::array<Named<Output>, 2> kOutputs{{
+    {Output::kPassthrough, "passthrough"},
+    {Output::kPcm, "pcm"},
+}};
+
 constexpr std::array<Named<Command>, 7> kCommands{{
     {Command::kVolume, "volume"},
     {Command::kMute, "mute"},
@@ -106,6 +111,8 @@ constexpr std::int32_t kMaxCodedChannels = 64;
 // The most objects a sink may state it places: a JOC programme carries sixteen, an AC-4
 // presentation more, and the count is a byte.
 constexpr std::int32_t kMaxObjects = 255;
+// AC-4's fastest frame rate is 120 fps; a limit above 1000 is not a limit.
+constexpr std::int32_t kMaxFrameRate = 1000;
 // The longest layout text a state may carry. A layout is a name or a speaker list, a few hundred
 // characters at the most.
 constexpr std::size_t kMaxLayoutText = 512;
@@ -210,6 +217,10 @@ std::string_view data_type_name(DataType type) {
     return name_of(kDataTypes, type);
 }
 
+std::string_view output_name(Output output) {
+    return name_of(kOutputs, output);
+}
+
 BurstDataType burst_data_type(DataType type) {
     switch (type) {
         case DataType::kAc3:
@@ -266,6 +277,17 @@ void write_support(json::Writer& w, const Support& support) {
         w.key("max_coded_channels").begin_object();
         for (const Named<DataType>& entry : kDataTypes) {
             if (const std::uint8_t limit = support.max_coded_channels_of(entry.value); limit != 0) {
+                w.member(entry.name, static_cast<std::int32_t>(limit));
+            }
+        }
+        w.end_object();
+    }
+    const bool any_rate_limit =
+        std::ranges::any_of(support.max_frame_rate, [](std::uint16_t limit) { return limit != 0; });
+    if (any_rate_limit) {
+        w.key("max_frame_rate").begin_object();
+        for (const Named<DataType>& entry : kDataTypes) {
+            if (const std::uint16_t limit = support.max_frame_rate_of(entry.value); limit != 0) {
                 w.member(entry.name, static_cast<std::int32_t>(limit));
             }
         }
@@ -429,6 +451,25 @@ std::optional<Support> read_support(json::Value value) {
                 static_cast<std::uint8_t>(*objects);
         }
     }
+    // The frames a second a sink keeps up with, the same shape as the channel count: a type the
+    // object does not name states none, and a rate that is not a rate refuses the object.
+    if (const json::Value limits = value["max_frame_rate"]; limits.exists()) {
+        if (!limits.is_object()) {
+            return std::nullopt;
+        }
+        for (const Named<DataType>& entry : kDataTypes) {
+            const json::Value limit = limits[entry.name];
+            if (!limit.exists()) {
+                continue;
+            }
+            const std::optional<std::int32_t> rate = read_int32(limit, 1, kMaxFrameRate);
+            if (!rate) {
+                return std::nullopt;
+            }
+            support.max_frame_rate[static_cast<std::size_t>(entry.value)] =
+                static_cast<std::uint16_t>(*rate);
+        }
+    }
     // The lyric document a sink holds: an object with the size, absent for a sink that takes none.
     if (const json::Value lyrics = value["lyrics"]; lyrics.exists()) {
         if (!lyrics.is_object()) {
@@ -546,6 +587,9 @@ void write_state(json::Writer& w, const State& state) {
             .member("line", state.lyrics->line)
             .end_object();
     }
+    if (state.output) {
+        w.member("output", name_of(kOutputs, *state.output));
+    }
     w.end_object();
 }
 
@@ -656,6 +700,13 @@ std::optional<State> read_state(json::Value value) {
             return std::nullopt;
         }
         state.lyrics = LyricsReport{.item = *item, .line = *line};
+    }
+    if (const json::Value output = value["output"]; output.exists()) {
+        if (!output.is_string()) {
+            return std::nullopt;
+        }
+        // A name this reader does not know is a later revision's: it reads as the sink not saying.
+        state.output = value_of(kOutputs, output);
     }
     return state;
 }

@@ -30,17 +30,22 @@ CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES=24576
 CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS=0
 
 # What an HTTP play (POST /play) needs free before it starts, and refuses with the reason
-# "memory" under, instead of being met as an abort() inside the decoder. 134,008 bytes: the
-# ring (32,768) and the decode task's stack (32,768) and the fetch task's (8,192) that the
-# example's Kconfig gives a play, the I2S queue (12 buffers of 256 frames of 16-bit stereo,
-# 12,288 bytes, and 384 for its descriptors: 12,672) and the least a decoder has asked for, the
-# fixed tier's AC-3 1/0 at 47,608 (docs/platforms/bare-metal/esp32-c6.md). With the
-# Sendspin player up the part has 117 KB free when a play opens its source (2026-10-12, main
-# 3d6b2aa0a), so every play is refused, which is the answer the board gives today in a worse form:
-# the stack's allocation fails, or a smaller stack and ring get as far as the decoder's
-# and it aborts (E-AC-3 2.0), or AC-3 plays beside 129 failed Wi-Fi buffer allocations. A floor and
-# not a fit: a wider stream asks for more. Sendspin plays are not tested by it.
-CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES=134008
+# "memory" under, instead of being met as an abort() inside the decoder. 160,796 bytes, two parts.
+# What the play takes: the ring (32,768) and the decode task's stack (32,768) and the fetch
+# task's (8,192) that the example's Kconfig gives a play, the I2S queue (12 buffers of 256 frames
+# of 16-bit stereo, 12,288 bytes, and 384 for its descriptors: 12,672) and the least a decoder has
+# asked for, the fixed tier's AC-3 1/0 at 47,608 (docs/platforms/bare-metal/esp32-c6.md): 134,008.
+# And what Wi-Fi and the Sendspin session need free to keep running beside it: 26,788, the least
+# internal heap a Sendspin E-AC-3 2.0 stream left on this part (2026-10-12), the decoder with the
+# most to take of those the part plays. The first part was the whole of the floor while the part
+# had 117 KB free with the Sendspin player up, so every play was refused, which is the answer the
+# board gives in a better form than it did: the stack's allocation fails, or a smaller stack and
+# ring get as far as the decoder's and it aborts (E-AC-3 2.0), or AC-3 plays beside 129 failed
+# Wi-Fi buffer allocations. With the decoder's feature tables out of static RAM the part has
+# 136 to 140 KB free there, and an AC-3 2.0 play started and ran its 938 units beside failed Wi-Fi
+# buffer allocations at 6 to 14 KB free: over the first part and nowhere near room for both. A
+# floor and not a fit: a wider stream asks for more. Sendspin plays are not tested by it.
+CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES=160796
 
 # 2.0 played every fixture measured on this board; AC-3 and E-AC-3 5.1 each aborted
 # within about 10 to 12 seconds, the decoder's own scratch failing an allocation the

@@ -307,6 +307,7 @@ is what a chunk carries, what the sink reports, and the settings the server can 
 | `buffer_capacity` | integer | Maximum bytes of burst chunks held and not yet played, counting each chunk's whole plaintext message |
 | `max_chunk_bytes?` | integer | 1 to 1,048,576: the most bytes one chunk to the sink may be, counted as `buffer_capacity` counts a chunk (the whole plaintext message, header included, the encryption's tag not). It bounds a burst chunk and a `player@v1` PCM chunk alike, so a server that plays this sink PCM sizes its units to it; absent when the sink does not say, and a server then sends what its codec allows |
 | `max_coded_channels?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 64: the most channels, full-bandwidth and LFE, the sink decodes of a stream of that type. A syncframe wider than it is refused, so a server sends such a stream another way. A type the object does not name has no stated limit, which is not a limit of none; absent when the sink states none for any type. A name a reader does not know is skipped |
+| `max_frame_rate?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 1,000: the most frames a second, an access unit and so a burst chunk each, the sink decodes of a stream of that type in real time. A stream whose frame rate is higher is refused by the sink, so a server sends it another way, as it does one past `max_coded_channels`. A frame rate is compared as it is, to within half a percent, so `25` takes 23.976, 24 and 25 and `30` takes 29.97 and 30. A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
 | `max_objects?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 0 to 255: the most objects the sink reconstructs and places of a stream of that type in real time. `0` is a statement and not an absence: the sink decodes the stream's bed and does not reconstruct its objects. A stream with more objects than the limit is decoded as its bed by the sink, never reconstructed past it, so a server that wants the objects placed sends it PCM it renders itself. A sink counts what a stream declares from its first unit, before it decodes: the OBA complexity index of the addbsi less the LFE, which is also the figure a server falls back to; a listener who chose objects `always` is not overruled A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
 | `lyrics?` | object | `max_bytes`: 1 to 60,000, the most bytes of lyric document (an LRC text in UTF-8) the sink holds for the item playing. Absent when the sink holds none. A sink that states it lists `lyrics` and `lyrics_position` in `supported_commands` ([Lyrics](#lyrics)) |
 | `karaoke_codecs?` | string[] | Data type names (`"ac3"`, `"eac3"`, `"ac4"`): the codecs the sink reproduces karaoke for when it is told to, which is the `karaoke` decoder setting. Absent, or empty, for a sink that states none, and a server then reads it as `["ac3"]`: the codec every sink's karaoke path was written for. A sink that reproduces an E-AC-3 stream's lists `"eac3"`. A karaoke stream of a type the sink does not list is played as coded by its own decoder, so a server that wants the reproduction sends it PCM it has decoded itself. A name a reader does not know is skipped |
@@ -332,6 +333,7 @@ the rest are this role's.
 | `why?` | string | A short sentence when the sink stopped playing for a reason of its own; absent otherwise |
 | `layout?` | string | The layout in force, in the grammar `layout_grammar` names, as the sink's page or the last settings made it; absent when the sink does not say. A server that renders for the sink reads it here, and not from what it last sent, since the page can change it |
 | `lyrics?` | object | `{item, line}`: the item number of the document the sink holds, and the line its own clock has the sound in (-1 before the first line, and for a document with no times); absent while it holds none. Sent when a document is taken and when the line changes, which is a few times a minute |
+| `output?` | string | How the stream the sink has leaves it: `"passthrough"`, the coded bits go on to a receiver as they came (IEC 61937); `"pcm"`, the sink decoded the stream and plays the samples. Present while a stream is open; absent with none, and for a sink that does not say, which a server reads as not known. A sink that can do either, as Hearth for Android does, says which it is doing, so a server's page can show it. A value a reader does not know is read as absent. An added optional key, so no version change ([Versions](#versions)) |
 
 The sink sends `client/state` whenever a field other than `levels` changes, and while a stream
 plays it also sends one at most ten times a second with fresh `levels`. `levels` are measured on
@@ -418,9 +420,15 @@ does not close the connection.
   durations, so the timeline does not drift.
 - Synchronisation corrections are applied to decoded PCM, never to bursts
   ([R9](#playerv1)).
-- A late chunk is dropped before it is decoded, and counted in `late_chunks`. Because a decoder
-  carries state from frame to frame, the sink then treats the next chunk as the start of a stream:
-  it resets the decoder and conceals the gap as its `concealment` setting says.
+- A late chunk is not played, and is counted in `late_chunks`. It is dropped before it is decoded,
+  and because a decoder carries state from frame to frame, the sink then treats the next chunk as
+  the start of a stream: it resets the decoder and conceals the gap as its `concealment` setting
+  says. An AC-4 frame depends on the ones before it back to the last I-frame, which can be a second
+  or more away, so a sink may instead decode a late AC-4 chunk and discard what it decodes to, when
+  that loses less audio than dropping it would: the decoder keeps its state and the audio lost is
+  the chunk's lateness over the share of a frame that decoding leaves free (an ESP32-S3's 0.51 at
+  23.44 frames a second), where a dropped chunk costs its lateness and then the wait for the next
+  I-frame. A sink that does says so in `late_chunks` all the same: the chunk was not played.
 
 ### Settings
 

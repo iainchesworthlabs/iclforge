@@ -101,6 +101,10 @@ class BurstOutput final : public sink::BurstStreamOutput {
     [[nodiscard]] const std::optional<sendspin::player::DecoderReport>& decoder() const override {
         return decoder_;
     }
+    // This output decodes what it is sent and writes the samples.
+    [[nodiscard]] std::optional<sendspin::player::Output> output() const override {
+        return sendspin::player::Output::kPcm;
+    }
 
    private:
     void reset_decoding();

@@ -190,6 +190,24 @@
     },
 
     {
+      "name": "android-arm64",
+      "hidden": true,
+      "description": "Android arm64-v8a through vcpkg's own arm64-android triplet, with the NDK's CMake toolchain (ANDROID_NDK_HOME, NDK r26.1 as apps/demos/android pins) chained behind vcpkg's. This is not the Shield app, which is Gradle's: its wrapper add_subdirectory()s the repo root and leaves ICLFORGE_BUILD_HEARTH off, because libs/sendspin needs the vcpkg 'hearth' feature and that wrapper has no vcpkg. This preset has one, and builds what Hearth for Android links (planning/hearth-android.md, phase 0c) under the NDK: libs/lyrics, libs/sendspin and libs/sink with cpp-httplib, mbedTLS, libFLAC, Opus and mdns. CMAKE_CXX_SCAN_FOR_MODULES is off because the NDK ships no clang-scan-deps. A Catch2 test binary cannot be listed by the host that builds it, so discovery runs when ctest runs (PRE_TEST) and the build only compiles and links them.",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "arm64-android",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
+        "ANDROID_ABI": "arm64-v8a",
+        "ANDROID_PLATFORM": "android-26",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF",
+        "CMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE": "PRE_TEST",
+        "ICLFORGE_BUILD_CLI": "OFF",
+        "ICLFORGE_BUILD_GUI": "OFF",
+        "ICLFORGE_BUILD_EXAMPLES": "OFF",
+        "ICLFORGE_BUILD_FUZZERS": "OFF",
+        "ICLFORGE_BUILD_CAPI": "OFF"
+      }
+    },
+    {
       "name": "sanitize-asan-ubsan",
       "hidden": true,
       "description": "AddressSanitizer + UndefinedBehaviorSanitizer, fatal on first violation (-fno-sanitize-recover=all in cmake/Sanitizers.cmake) rather than logging and continuing. Deliberately does NOT add -fsanitize=integer's unsigned-integer-overflow check: this codec relies on intentional unsigned wraparound (CRC16, ring-buffer indices, the splice counter), and blanket-enabling it drowns real findings in expected wraparound. Signed overflow and out-of-range shifts - the precedent bug's own category (commit 8386c8f) - are already part of the default 'undefined' set.",
@@ -354,6 +372,11 @@
       "name": "config-wasm-emscripten",
       "inherits": [ "release", "wasm-emscripten" ],
       "displayName": "Emscripten/WASM Release (browser decode demo)"
+    },
+    {
+      "name": "config-android-arm64",
+      "inherits": [ "release", "android-arm64", "core" ],
+      "displayName": "Android arm64-v8a Release (libs/lyrics, libs/sendspin and libs/sink, for Hearth for Android)"
     },
     {
       "name": "config-linux-llvm-asan-ubsan",
@@ -589,6 +612,12 @@
       "name": "build-wasm-emscripten",
       "configurePreset": "config-wasm-emscripten",
       "displayName": "Emscripten/WASM Release (browser decode demo)"
+    },
+    {
+      "name": "build-android-arm64",
+      "configurePreset": "config-android-arm64",
+      "displayName": "Android arm64-v8a Release (libs/lyrics, libs/sendspin and libs/sink, for Hearth for Android)",
+      "targets": [ "iclforge_lyrics", "iclforge_sendspin", "iclforge_sink", "iclforge-lyrics-tests", "iclforge-sendspin-tests", "iclforge-sink-tests" ]
     },
     {
       "name": "build-linux-llvm-asan-ubsan",

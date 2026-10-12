@@ -29,30 +29,17 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
-**Hearth applies a sink's request for the karaoke choice**
+**Hearth tells a group's members what is playing**
 
-- **A request from a member of the group Hearth plays to changes the singer's choice.** The vocals,
-  the reproduction and the levels a sink asked for (the protocol of the entry below) are applied as the
-  Karaoke page's own change is: kept across starts, and reaching every member that decodes for itself
-  through the settings it is sent, so the server's screens and the other members move together. A
-  request from a sink in another group, or in none, changes nothing; two sinks asking at once are
-  decided by the last. Nothing sends a request yet: the Android remote and the panel's touch control
-  are the next changes. Held by a case on a real group (the host's event reaches the application with
-  the group and the sink's name, cut to what the sink listed), and by cases for the map a request
-  makes and for the group it must come from.
-
-**A sink can ask the server for the singer's karaoke choice**
-
-- **`client/command` carries an `_iclforge_player` request, and the support object's `requests`
-  lists what a sink may ask for.** The five karaoke keys (the reproduction, which vocals, and the
-  three levels) with the settings command's names and ranges: the protocol half of D8, for a touch
-  or remote control of the vocals on a board or a TV. A sink sends only the keys it listed, a server
-  acts only on those and only while the role is active, a request out of range is refused whole,
-  and the server decides: nothing is sent back, and the sink sees the result in its settings. The
-  host's event (`on_sink_request`, with the group the sink is in) is there; applying it to the
-  singer's settings, and a control on the Android or the panel screen, are the next changes.
-  Held by unit cases for the object, the support key and the cut, a session case (the sink's own cut
-  and a sink that lists none), the message, and the host's event on a real group.
+- **The engine sets `metadata@v1` for a group.** A member that lists the role gets the item's title
+  when it starts and its position as the lyrics' anchors give it (a pause is speed 0, a seek moves
+  it, with the item's length), and nothing once the output closes. The title is the lyrics file's
+  `[ti:]` when the item has one, and otherwise the name the queue shows; the artist and the album come
+  from the lyrics file only, since nothing in the tree reads a tag from an AC-3, E-AC-3, AC-4 or MP4
+  file, and are left out when it has none. A sink that does not list the role is sent nothing.
+  Music Assistant's players and Hearth for Android's screen can use it; Hearth itself did not send it
+  before. Held by a case on a real group with a member that lists the role and one that does not, and
+  by an engine case that plays an item through to its end.
 
 **Hearth: a microphone and a pitch score on the Karaoke page**
 
@@ -153,6 +140,30 @@ The sections below contain the complete change list and fixes.
   says what is built: the pitch library, capture times, the melody reader, the microphone card, takes,
   the pitch ribbon with per-line marks and the browser demo's microphone card (M1 to M7), and what is not
   (the bleed check, the board).
+
+**An Android preset for the libraries Hearth for Android links**
+
+- **`config-android-arm64` and `build-android-arm64`.** `libs/lyrics` and `libs/sendspin`, with
+  cpp-httplib, mbedTLS, libFLAC, Opus and mdns from vcpkg's `arm64-android` triplet, build for
+  `arm64-v8a` under NDK r26 from one preset (the Shield app's wrapper has no vcpkg and leaves
+  Hearth off). The two test binaries link; discovery is deferred to `ctest` because an arm64
+  binary cannot be listed on the host. On a Shield the lyrics suite (83 cases) and the sendspin
+  suite (243) passed (planning/hearth-android.md, phase 0c).
+- **A CI job builds them.** `build-android-native` in `_build.yml` runs the preset on a hosted
+  runner whenever the `android` lane runs, `continue-on-error` until it has gone green three times
+  on hosted runners (`build-android` and `macos-llvm` each started the same way).
+
+**The Android audio backend names no Java package**
+
+- **A second Android app can link `iclforge::audio`'s passthrough backend.** The backend exported
+  `JNI_OnLoad` and a native method named for the Shield app's package
+  (`Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge`), and a shared object
+  defines `JNI_OnLoad` once and a JNI name is a package, so only that one app could use it. It is
+  now two plain C++ functions, `iclforge::audio::android::set_java_vm()` and
+  `register_passthrough_bridge()` (`passthrough_bridge.hpp`), called from the app's own
+  `JNI_OnLoad` and its own native method; the Shield app's behaviour and its Kotlin are unchanged.
+  `check_android_jni.py` checks each app of a list against its own package, and a test holds the
+  audio backend to defining no JNI name (planning/hearth-android.md, phase 0a).
 
 **Karaoke: a pitch library**
 
@@ -1137,6 +1148,30 @@ The sections below contain the complete change list and fixes.
 - **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
   microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
   into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
+
+**Hearth: a singer sees the tune as a ribbon, how each line went, and a summary**
+
+- **A pitch ribbon: the tune as notes and the singer's voice as a line over them** (the microphone,
+  scoring and recording programme, M5). On the Microphone card and under the words in the singer
+  view (`F11`), while the microphone is on and there is a tune: the reference's notes move past a
+  mark for *now*, and the voice is drawn over them, thick and solid where it is within the tolerance
+  and thin and dashed where it is not (a second cue beside colour). A voice an octave away is drawn
+  on the tune's octave, as it is scored. Where nothing is voiced it says **Listening…**.
+- **A mark under each line that has been sung**: three dots and a percentage, in the Karaoke page's
+  lyrics and in the singer view. A line the tune has no notes in has no mark (not a zero); a line
+  the singer was voiced for under a fifth of its notes' time for says **not sung** and carries no
+  number; and without the headphones answer there are none. The line's own times take the lyric
+  delay, so a nudged line is still scored where it is sung.
+- **A summary when it ends**: **Last performance** on the card, kept when the microphone is turned
+  off, the song ends or the device goes, with the pitch score, how much of the tune's time the singer
+  was voiced for, the average sharp or flat, early or late, and the basis (the part, the tolerance,
+  octaves ignored, what was not scored). Cleared by the next start or another song, shown nowhere
+  else and never ranked, named or sent. Not made when the headphones answer is missing.
+- **Engine and controller:** `Performance` keeps its last 30 s of placed frames as a bounded trace;
+  `MicrophoneSession` answers a line's counts, the trace and the reference; `MicrophoneController`
+  gains `ribbon()`, `lineResult()`, `summary` and `scoreRevision`. Two new QML pictures, `LineMark`
+  and `PitchRibbon`, are handed their data, so they are tested without a microphone. Hearth's user
+  guide says what is shown.
 
 **ADM / BW64: rendering constraints, a sample-format option, and what the bridge drops**
 
@@ -3442,6 +3477,229 @@ The sections below contain the complete change list and fixes.
   pitch, is refused with the reason. On the repository's karaoke example the tune comes out of M and
   of V1 note for note, and V2 comes out a diatonic third below.
 
+**Hearth for Android's remote asks the server for the vocals**
+
+- **The controls sheet has a Vocals row (Both, V1, V2, None) while a stream is open.** The centre on
+  one asks the server for it as the capable reproduction with those vocals (the request path of the
+  entries below), and the row fills what was asked. It is advice with no answer, and this app hands the
+  receiver the coded bits, so the TV itself plays every vocal whatever the server decides: the row says so
+  beside the buttons. The sink lists `karaoke` and `karaoke_vocals` as what it may ask for. Held by the
+  focus walk on the Shield (the row between the delay and the size, what each press asks for, the
+  focus when the stream ends) and a picture.
+
+**A sink can ask the server for the singer's karaoke choice**
+
+- **`client/command` carries an `_iclforge_player` request, and the support object's `requests`
+  lists what a sink may ask for.** The five karaoke keys (the reproduction, which vocals, and the
+  three levels) with the settings command's names and ranges: the protocol half of D8, for a touch
+  or remote control of the vocals on a board or a TV. A sink sends only the keys it listed, a server
+  acts only on those and only while the role is active, a request out of range is refused whole,
+  and the server decides: nothing is sent back, and the sink sees the result in its settings. The
+  host's event (`on_sink_request`, with the group the sink is in) is there; applying it to the
+  singer's settings, and a control on the Android or the panel screen, are the next changes.
+  Held by unit cases for the object, the support key and the cut, a session case (the sink's own cut
+  and a sink that lists none), the message, and the host's event on a real group.
+
+**Hearth for Android names an item that has no lyrics**
+
+- **The sink lists `metadata@v1` and the lyric screen's header shows what the server says is playing.**
+  `Sink::lyric_frame()` takes the title, artist and album from the server's `metadata@v1` state for
+  the connection, with the document's own tags as the fallback, so an item with no lyrics has a name
+  over "No lyrics for this item" (the spec's S7). A cleared state falls back to the document. Held by a
+  loopback case (nothing said, said, said over a document, cleared) and the Shield's render test.
+
+**Hearth for Android says its route**
+
+- **The sink core reports `output` and the app draws it.** A `BurstStreamOutput` may say how a
+  stream it took leaves the sink (`output()`, unset by default); `libs/sink` puts it in the
+  extension role's state while that stream is open and in `Sink::Status::Peer::output`, the
+  pass-through output says `passthrough` and the test sink's decoding output says `pcm`. The
+  Android app's status JSON carries it and the lyric screen's footer has a "Passing through" or
+  "Decoded here" chip. A stream the output did not take, and an output that does not say, report
+  nothing. A loopback case holds all four (a server reads the state; the status says the same),
+  and the Shield's render test holds the chip.
+
+**The extension role's state says how the stream leaves the sink**
+
+- **`output` in `_iclforge_player`'s `client/state`: `"passthrough"` (the coded bits go on to a
+  receiver as they came) or `"pcm"` (the sink decoded the stream).** An optional key, present while
+  a stream is open and absent from every sink that does not say, so no version change. A reader
+  that meets a value it does not know reads it as absent and still reads the state; a value that is
+  not a string is a malformed state, as for the other keys. Hearth for Android's sink will say
+  `passthrough`; a host's Network page can show the route once it reads the key (a separate change
+  to a page another session owns). The state's tests cover the round trip, the key beside `layout`
+  and `lyrics`, an unknown name and the wrong types.
+
+**Hearth for Android: the starting, idle and attention screens**
+
+- **S0, S1 and S10 of `planning/hearth-sink-screen.md`** (phase 3c of `planning/hearth-android.md`): the
+  plain screen of the skeleton is replaced by the family's. The idle screen has the sink's name large, its
+  address and network, who it is paired with or waiting for, **the pairing code large in the accent**, and
+  the formats the route takes; the starting screen says it waits for the network or for the receiver and
+  what to check; the attention screen says in one sentence that the sink did not start, that the receiver
+  would not take the stream, or that the link dropped (a banner at the foot over a dimmed lyric). The core
+  gains **`Sink::status()`** (who is connected and for what, the code asked, the paired servers), so the
+  code no longer comes from reading the log; the bridge reports a refused or lost link; the choice of
+  screen is a function held by a table of cases, and each screen is drawn and probed on a Shield.
+
+**Hearth for Android: the controls sheet and a focus walk**
+
+- **The lyric screen's controls** (phase 3b of `planning/hearth-android.md`; S9 of
+  `planning/hearth-sink-screen.md`): the D-pad's centre or a tap opens a sheet with the lyric delay's "-"
+  and "+" and the text size S, M and L, a focus ring moves through them by the four directions, the centre
+  presses, Back closes it and it hides itself after eight seconds without a key. The text size is the
+  person's (SS8) and is kept. `LyricControlsTest` walks it with key events (every control reached and
+  pressed, the eight seconds, a file with no times having no delay row, a tap), which is AR7's "a focus
+  walk", and draws it with the ring on the focused control (`android-lyric-sheet.png`).
+
+**Hearth for Android: the sink screen's tokens in one file**
+
+- **`docs/hearth/design/sink-screen-tokens.json`** (phase 3a of `planning/hearth-android.md`, D13): the
+  Signal dark palette, the layout units, the length rule's sizes, the delay's steps and the timings
+  the sink screen is drawn with, written once. The Android app's `Tokens.kt` is generated from it
+  (`tools/checks/sink_screen_tokens.py --write`), and the same script, run by the static lane, holds the
+  desktop's Signal dark palette (`Theme.qml`) and the P4X panel's screen (`lyric_screen.cpp`) to the
+  same values without writing to either, naming the value each holds when one drifts. The sung line is
+  70% accent in the file, the panel and the app; the desktop's 55% is the owner's call (open item 1 of
+  the spec) and the check does not read it.
+
+**Hearth for Android: the lyric screen against the spec's fixtures**
+
+- **The conformance fixtures at fixed positions** (`planning/hearth-android.md`, phase 2's exit, AR3):
+  `libs/sink/tests/lyric-frames` lists the documents (the karaoke examples, lines of 18, 36, 44, 54 and
+  55 characters, a gap of 3.9 s and of 4.0 s, Hebrew and Yiddish in UTF-8 and UTF-16, Arabic, Japanese,
+  Cyrillic, Greek, a plain file) with their positions, and `golden.txt` holds the frame the library gives
+  for each (48). The host's tests and the Android app's instrumented test, on the device's own build of
+  the library, are held to it. On a Shield the view draws tiers T1 to T4 on the box's faces (Arabic shaped,
+  Hebrew and Yiddish right to left, Japanese by the system's face), the length rule's five sizes are
+  asserted on what the view chose, and the idle screen dims and walks a small ring after two quiet minutes
+  (an OLED TV's burn-in), held by seven new instrumented cases.
+
+**Hearth for Android: the lyric screen**
+
+- **The app draws the lyrics** (`apps/hearth/android`, phase 2b of `planning/hearth-android.md`; S2 to
+  S8 of `planning/hearth-sink-screen.md`): the past line, the line being sung with the fill running
+  through its words and the word underlined, the next lines, a duet's two vocals with the singers'
+  names, the count-in of an instrumental gap, a line timed as a whole, plain text, "no lyrics" after a
+  one-second grace, each line in its own direction, and a sentence in place of a line no face can
+  draw. Sizes are in `u` by the panel's length rule, the colours are the family's (the sung line at
+  70% accent), the faces the shared theme's (Archivo, Noto Sans Hebrew and Arabic, staged into the
+  APK from `apps/shared/theme`, with the system's for the rest), and the D-pad's left and right nudge
+  the delay by 50 ms. `LyricViewRenderTest` draws the karaoke examples' documents through the
+  library's own frame into 1080p bitmaps on the device's text engine and probes the pixels (13
+  cases, run on a Shield); four of the pictures are in `docs/hearth/screenshots`.
+  `hearth-testserver --lyrics FILE` also takes a reference sink with `--sink`, which reports the line
+  its clock had the sound in.
+
+**Hearth for Android: the sink core follows the lyrics and hands the screen a frame**
+
+- **`Sink::lyric_frame()`** (`libs/sink`, phase 2a of `planning/hearth-android.md`): the lyric document
+  a server sends and its anchors are followed on the sink's own clock (the session's time filter gives
+  the server's for it), and what a screen draws at that moment is one value with the text in it
+  (`LyricFrame`: the mode, the current line and its words with the one being sung and how far through
+  it, the lines before and after, a duet's singers, the gap and its count-in, the line's place among
+  the lines with text, the tags), with the singer's delay applied. `lyric_frame_json()` writes it for
+  a layer with no C++ types, and the app's JNI hands it over as UTF-8 bytes. The app lists the lyric
+  commands (`lyrics_max_bytes`), so a Hearth server sends them. Nine cases hold the frame at fixed
+  positions of the karaoke examples' documents, a Hebrew line, a plain file and a gap; one more drives
+  a real server session through it. `hearth-testserver --lyrics FILE` sends a player the document and
+  the playhead's anchors, as the engine does.
+
+**Hearth for Android: a run on a real Shield and receiver, recorded**
+
+- **The pass-through path on a Shield and an Onkyo receiver** (`planning/hearth-android.md`, phase 1e):
+  the receiver reported `Dolby Audio - DD` 5.1 for an AC-3 stream and `Dolby Audio - DD+` 5.1 for an
+  E-AC-3 one, over 121 s each, with no underrun in any of eleven runs. `apps/hearth/android/README.md`
+  keeps the table and what else it showed: two or three bursts dropped late at a stream age of about
+  9.2 s in three of ten AC-3 runs (cause not found; the output now notes a step of more than 8 ms in the
+  sync offset), and a re-pairing that timed out. Bursts lost while the link was down are now counted as
+  dropped: a Shield whose HDMI link dropped every 20 s played a quarter fewer bursts than were sent and
+  reported none dropped.
+
+**A burst rebuilt from its parts, and a null burst**
+
+- **`iec61937::burst_from_parts`, `burst_period_bytes` and `null_burst`.** A sink that bitstreams a
+  Sendspin burst chunk to a link holds `Pc`, `Pd` and the payload, not the sync words, the word swap
+  or the stuffing; `burst_from_parts` writes the burst the packers wrote (checked byte for byte over
+  the Dolby encoder's AC-3, E-AC-3 with JOC, and AC-4 fixtures at every burst type), refusing what
+  the packers refuse. `burst_period_bytes` gives its length without building it and `null_burst`
+  gives a null-data burst, which a receiver's Dolby lock survived for 6 s where PCM silence lost it
+  in half a second. Additive: three exported functions and their ABI allowlist entries
+  (planning/hearth-android.md, phase 0b).
+
+**Hearth for Android: the pass-through path, held end to end**
+
+- **A loopback harness, `iclforge::sink::harness::play_through`** (`libs/sink`, phase 1d, AR1). A Sendspin
+  server session packs an AC-3 or E-AC-3 elementary stream into IEC 61937 bursts the way Hearth's server
+  does (`wrap_frame`, `Eac3BurstPacker`), sends each as a burst chunk over a loopback WebSocket to a
+  sink whose extension-role output is the `PassthroughOutput` over a model of the Shield's device, and
+  compares what the device was handed with what the packer wrote, byte for byte and in order, with the
+  output's late, dropped and underrun counts. Five Dolby-encoder fixtures (AC-3 5.1 and stereo, E-AC-3 5.1,
+  Atmos JOC 5.1.4 and 9.1.6) are `ctest` cases of `iclforge-sink-tests`, about seven seconds each; a
+  deliberate change to the rebuild's `Pc` makes them fail.
+- **On the device's runtime**: the same cases are three instrumented tests of Hearth for Android
+  (`PassthroughPathInstrumentedTest`), through a JNI entry compiled into the debug build only, and
+  `build-android-hearth` runs them on an x86_64 emulator (the debug build carries x86_64 beside
+  arm64-v8a, whose vcpkg triplet `x64-android` the app's CMake already chooses). The Shield's lockfile
+  gains the test platform's entries, written by running `connectedDebugAndroidTest` against a device.
+
+**Hearth for Android: the pass-through output**
+
+- **The coded stream goes to the receiver as it is** (`planning/hearth-android.md`, phase 1c).
+  `iclforge::sink::PassthroughOutput` (`libs/sink`, the `sink_passthrough` target) takes each Sendspin
+  burst chunk, rebuilds the IEC 61937 burst it came from (`iec61937::burst_from_parts`), and writes it
+  to a link in the slot it is due in, with null bursts between, never silence, so that a receiver keeps
+  its lock. A burst more than half its length late is dropped and counted; the link is kept 6 bursts
+  ahead (the Shield held with 4 and not with 3) and is primed with 8 before it is expected to move;
+  after a stream ends it is held open with null bursts for 3 s, so that the next stream, which is
+  usually a song later, does not wait for a relock. The link is a seam: the app's is the process's
+  `AudioTrack` through `iclforge::audio`'s passthrough backend, and the host tests drive the output
+  against a model of the Shield's device (8 bursts to start, 20 ms position steps) with a clock of
+  their own.
+- **The app uses it.** The extension role lists AC-3 and E-AC-3 as the route takes them when a server
+  dials (asked each time: a TV box loses its HDMI route when the display sleeps), reports the decoder
+  from the first syncframe's header, and carries the output's counters (bursts, underruns, late,
+  dropped) in its role state. The service takes audio focus when a stream starts and gives it back
+  when it ends; losing it pauses the link and tells the server the device is held elsewhere
+  (`external_source`). `libs/audio`'s Android backend reads `AudioTrack.getUnderrunCount()` through an
+  optional bridge method, which a write that was accepted cannot show.
+- **What the device needs of a sink.** The state asks a server for 0.8 s of lead (`required_lead_time_ms`,
+  now an option): the first burst can be placed once the track is open, eight bursts are queued and its
+  position has begun to report, about 0.5 s on a Shield, and 0.5 s lost the first two. A burst is
+  dropped only when it is three quarters of its length late, so that the estimate of the clock moving
+  a few milliseconds does not flip one between played and dropped. The display stays on while the
+  screen is shown (a TV box that lets it sleep loses the HDMI route, and the track dies with it), and a
+  link that has gone is opened again within a second of the route's return.
+- **Library changes** (`libs/sink`): the role's data types are the program's (`Options::data_types`,
+  or `data_types_now` asked per connection, and an empty answer leaves the extension role unlisted),
+  `OutputCounts` carries underruns, late and dropped chunks into the role state, and
+  `Sink::set_external_source()`. `main`'s change to the test sink (it holds the lyrics and reports an
+  anchor's line, and `forget_lyrics()`) is made in the library, where that code is.
+
+**Hearth for Android: the app's skeleton**
+
+- **`apps/hearth/android`: a Gradle project and an app that is a Sendspin sink and plays nothing yet**
+  (`planning/hearth-android.md`, phase 1b). A foreground service of the media-playback type starts
+  one `iclforge::sink`, advertises it as `_sendspin._tcp` through `NsdManager`, and keeps both until
+  the notification's Quit or the screen's button; the screen shows the sink's name, whether it is
+  listening and advertised, and the pairing code a server asked for, as large as the screen can make
+  it. The sink accepts a stream, counts it and drops it: the pass-through output is the next phase.
+  A new project row (`hearth-android`, lane `android`), `check_android_jni.py` taught the second
+  package, and a CI job, `build-android-hearth`, that builds the debug APK with vcpkg in front of the
+  NDK's toolchain (`continue-on-error` until it has gone green on hosted runners).
+
+**Hearth applies a sink's request for the karaoke choice**
+
+- **A request from a member of the group Hearth plays to changes the singer's choice.** The vocals,
+  the reproduction and the levels a sink asked for (the protocol of the entry below) are applied as the
+  Karaoke page's own change is: kept across starts, and reaching every member that decodes for itself
+  through the settings it is sent, so the server's screens and the other members move together. A
+  request from a sink in another group, or in none, changes nothing; two sinks asking at once are
+  decided by the last. Nothing sends a request yet: the Android remote and the panel's touch control
+  are the next changes. Held by a case on a real group (the host's event reaches the application with
+  the group and the sink's name, cut to what the sink listed), and by cases for the map a request
+  makes and for the group it must come from.
+
 ### Changed
 
 **Shared code**
@@ -3662,6 +3920,47 @@ The sections below contain the complete change list and fixes.
   through, which the first board run showed it had not been (every frame after a late first chunk
   was dropped). `hearth-testserver` plays an `.ac4` file; `libs/device`'s `ac4_sync_frame.hpp` is
   the raw frame of a sync frame without a list, tested on the host.
+- **A late AC-4 chunk is decoded and discarded, not dropped, when that loses less audio**
+  (`burst_player.cpp`, `late_ac4_is_kept()`; `late_kept` and `lost_frames` in the
+  `sendspin.stream=` line): an AC-4 frame depends on the ones before it, so a chunk dropped for being
+  late cost the stream everything up to the next I-frame, 0.96 s in every play of these streams (24
+  frames), whether the chunk was a few frames late at a play's start or came after a network stall.
+  The player decodes it and throws the output away when `late * r <= (1 - r) * 0.5 s`, `r` being a
+  frame's decode time over its duration (0.6 until measured, per stream), which is where keeping
+  loses less than dropping and waiting half the I-frames' interval. On an ESP32-S3 over Sendspin the
+  audio lost at the start of a play fell from 0.90 to 0.98 s to 0.00 to 0.09 s at 23.44 fps and 0.05
+  to 0.92 s at 24 and 25 fps, and a stall of 2.2 s from 1.6 to 2.6 s to 0.6 to 1.0 s; `ac4-stereo-64`'s
+  RMS went from 0.43 dB under the host's to equal; no play had an invalid chunk. AC-3 and E-AC-3 are
+  dropped as they were. `lost_frames` counts the stream's frames never handed to the sink; the
+  test server's `--stall-after N --stall-ms M` simulates a network stall.
+- **The AC-4 decoder's inverse transform has built-in tables for every frame length**
+  (`gen_ac4_transform_tables.py`, `libs/dsp/src/tiered/transform_tables.cpp`): the FFT roots, the
+  IMDCT's pre-twiddles and the KBD windows were built in for the five block lengths of a 2,048-sample
+  frame and built when the first frame arrived for every other, in software double on a part with no
+  double-precision unit. A stream whose frames are 1,920, 1,536, 960, 768 or 384 samples (frame rate
+  index 0, 1, 3, 4, 5, 6, 8, 9, 11 or 12: 24, 29.97 and 30 fps and the high frame rates) took 0.49 s on
+  an ESP32-S3 at its first frame for 24 fps and 0.41 s for 29.97, so a play opened with 12 chunks late;
+  it takes 47 and 54 ms. The fifteen lengths of Table 186 are
+  built in (ten more, 89 KB at `float`), generated by the same script, and held to the runtime
+  code's bits by the same test at `float` and fixed. `double` builds its own, as before.
+- **An ESP32-S3 with the AC-4 decoder lists `ac4` at 2 channels and 25 frames a second**
+  (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4` defaults to 1 with `ESP32S3_DATA_CACHE_64KB`, and the new
+  `..._AC4_MAX_FRAME_RATE` is 25 there): the support object gains `max_frame_rate`, per data type,
+  which a sink states and a server compares with the item's frame rate
+  (`ItemFacts::frame_rate`, from the samples and frames of the stream; `StreamNeeds::frame_rate`).
+  A faster stream is sent as PCM, and a frame of one that reaches the board is refused. Over
+  Sendspin on an S3 every 2.0 stream at 23.44, 24 and 25 frames a second took 0.48 to 0.80 of its
+  frame with no underruns, and 29.97 took 0.99 (39 underruns in one play, none in another): the
+  frame-rate converter costs a frame the same at 24 as at 29.97, so the limit is a rate and not a
+  codec tool. The release image has no decoder, and an S3 without the cache does not list AC-4.
+- **The board's AC-4 decoder does not reconstruct objects it would throw away**
+  (`Ac4Stream::Config::skip_objects`, on, through `DecoderConfig::skip_objects`): a 5.1 bed beside
+  A-JOC or direct-coded objects plays as the bed. On a P4 over Sendspin a bed with 16 A-JOC objects
+  took 2.51 of real time and now takes 0.59, with 4 objects 1.26 and now 0.58, with direct-coded
+  objects 1.00 and now 0.56; the bed's level is the host decoder's to 0.01 dB, and the least
+  internal RAM free over a play rose from 1.0 to 9.6 KB (4 objects: 2.7 to 18 KB). A presentation of
+  objects alone is refused with a reason where it was decoded and dropped (1.62 of real time, 186
+  chunks late).
 
 **Library internals**
 
@@ -4791,6 +5090,14 @@ The sections below contain the complete change list and fixes.
 
 **Build system**
 
+- **A tests-only configure failed with `Target "iclforge-forge-gui-tests" links to:
+  iclforge::app_text_encoding but the target was not found`.** The code-page library was added
+  only for `ICLFORGE_BUILD_CLI` or `ICLFORGE_BUILD_GUI`, and the GUI's Qt-free test binary, which
+  links it, is added whenever `ICLFORGE_BUILD_TESTS` is on, so
+  `-DICLFORGE_BUILD_TESTS=ON -DICLFORGE_BUILD_CLI=OFF -DICLFORGE_BUILD_GUI=OFF` (with Hearth, as a
+  Hearth-only developer configures) stopped the configure. The CI presets build the command line
+  and did not show it. The library is now added when the tests are on, so its own tests run in
+  such a build too.
 - **`libac3forge_c.so` exported the codec it embeds, and the `BUILD_SHARED_LIBS=ON` test pass ran
   on that copy instead of `libac3forge.so`.** On Linux the C library exported the C++ symbols of
   the static codec inside it (346 of the 562 lines in its ABI allowlist, beside its 216 C
@@ -5047,6 +5354,32 @@ The sections below contain the complete change list and fixes.
   for a sink the host has just moved to PCM` fails without the change, the moved sink holding
   9,600 of 14,400 frames each of three times. The karaoke group cases' waits for a board's
   totals now report what each board holds and what both sides logged when they expire.
+
+**ESP32-C6 internal RAM**
+
+- **The decoder's tool tables were 27,776 bytes of a C6's static RAM, and an E-AC-3 stream over
+  Sendspin was left 0.9 to 4.5 KB of heap and failed after an AC-3 stream in the same boot.** The
+  `c6-16mb` image's static internal RAM was 144,139 bytes, 39,752 of it the AC-3 library's
+  `.bss`, and nearly all of that was function-local tables of tools a plain stereo stream never
+  uses: enhanced coupling's double tables (10,240, read once to be narrowed into the scratch's own
+  copies, which now evaluate the same expressions where they are made) and its 512-point DFT's
+  twiddles (5,536), the transient pre-noise cross-fades (3,072) and the double MDCT tables that
+  only JOC's direct-form branches named, in a profile that has no direct form and refuses it
+  before it gets there (8,928). The DFT's twiddles and the cross-fades are members of heap
+  objects that exist only for a stream that uses those tools; the rest are not linked. The
+  image's DIRAM is 116,307 (budget 122,000, was a wrong 108,000 and then 151,000), and on the C6
+  at the record: boot free 134,196 to 140,428 and largest block 116,736 to 124,928 (108,792 and
+  88,064 to 96,256 before), the E-AC-3 stream's least heap 18,936 to 30,920 on single plays after
+  AC-3 streams (6,836 once in five), every play of 938 bursts, and the AC-3 stream's 48,148 to
+  85,100. The decoders' output is the same: the ac3 test binary's results on the fixed tier are
+  the same 7 failing cases of 1,011 before and after, and all 1,011 pass on the double tier.
+  `eac3-2.0-sendspin` is a row of the C6's board suite, after the AC-3 one.
+- **The C6 refused an HTTP play only because it had too little free RAM to start one.** With the
+  RAM back, the 134,008-byte floor of `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` stopped
+  refusing, and an AC-3 2.0 play over HTTP ran beside Wi-Fi buffer allocations failing at 6 to
+  14 KB free. The floor is 160,796 in both C6 profiles: what a play takes (134,008) and the
+  26,788 bytes the network was left at its least beside an E-AC-3 stream. The C6 still refuses
+  an HTTP play with `why: memory` and plays over Sendspin.
 
 ## [0.10.0-beta.1] - 2026-09-01
 

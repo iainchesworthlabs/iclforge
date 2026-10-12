@@ -268,6 +268,55 @@ class ICLFORGE_CONTAINERS_EXPORT Ac4BurstPacker {
     std::span<const std::span<const std::byte>> frames, BurstDataType type = BurstDataType::kAc4);
 
 // ---------------------------------------------------------------------------
+// A burst from its parts.
+//
+// A receiver of a Sendspin `_iclforge_player@v1` burst chunk (planning/hearth-sendspin-extension.md)
+// holds what the packers above chose and none of what they added: Pc, Pd and the payload's
+// bytes in stream order, without Pa and Pb, the word swap or the stuffing to the repetition
+// period. A sink that bitstreams to a link has to put them back, and has to put back the burst
+// the packer wrote, not one it chose again: a packer chooses Pc itself (an AC-3 frame's bsmod, an
+// AC-4 frame's period code), and a rebuilt burst with another Pc is another stream to a receiver.
+// These are the functions for that, and for keeping a link's lock while there is no burst to
+// send. Everything is byte-equal with the packers' own output, which iclforge-containers-tests
+// holds over every data type.
+// ---------------------------------------------------------------------------
+
+// The burst's length in bytes, which is its repetition period at four bytes to an IEC 60958
+// frame, for the data type and period code Pc names: 6,144 for AC-3, 24,576 for E-AC-3, and for
+// AC-4 the period of data-burst `sequence_index` (0 to 4) of the rate Pc's bits 8 to 11 code
+// (Ac4BurstTiming::periods; all five are the same at the integer frame rates). Nothing for a
+// data type this project does not carry, an AC-4 code with no row for the type, or a sequence
+// index outside 0 to 4.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::optional<std::size_t> burst_period_bytes(
+    std::uint16_t pc, int sequence_index = 0);
+
+// The burst the packers write for a payload whose Pc and Pd are known: Pa, Pb, `pc` and `pd` as
+// given, the payload big-endian within little-endian 16-bit words, zeros to the repetition
+// period. `payload` is the elementary-stream bytes in stream order, as many as Pd counts in its
+// data type's unit: bits for AC-3, AC-4 and AC-4 LD, bytes for E-AC-3 and AC-4 HBR4, 8-byte
+// units for AC-4 HBR16, whose payload includes the zeros that fill its last unit. Refused as
+// wrap_frame, Eac3BurstPacker and Ac4BurstPacker refuse what they are given: kNotAFrame for a
+// data type not carried, a payload that is not the length Pd says or does not open with a
+// syncframe's syncword (0x0B77, or 0xAC40 and 0xAC41 for AC-4), or an AC-3 or E-AC-3 payload
+// of odd length; kFrameTooLarge for a payload the period cannot hold, or an AC-4 Pd over the
+// type's maximum at that rate; kUnsupportedRate for an AC-4 code the type has no row for, or a
+// `sequence_index` outside 0 to 4. `sequence_index` is the burst's place in its AC-4 sequence
+// (Ac4BurstPacker::Packed::sequence_index); it is read for AC-4 only.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, WrapError> burst_from_parts(
+    std::uint16_t pc, std::uint16_t pd, std::span<const std::byte> payload, int sequence_index = 0);
+
+// A null-data burst (IEC 61937-1's data type 0) of `period_bytes`: Pa, Pb, a Pc of 0 and a Pd of
+// 0, then zeros. What a link carries while there is no burst to send, in place of PCM silence:
+// a receiver that sees zeros leaves its Dolby mode, and one that sees these does not
+// (planning/hearth-android-findings.md, F12: on one receiver, zeros lost the lock in half a
+// second and took 0.8 s to return, and null bursts of 1, 3 and 6 s never dropped it). The
+// length is the period of the stream the link carries, which burst_period_bytes() gives; a
+// length under 8 or not a whole number of IEC 60958 frames is kNotAFrame, and over 131,072 (AC-4
+// HBR16's longest period) is kFrameTooLarge.
+[[nodiscard]] ICLFORGE_CONTAINERS_EXPORT std::expected<std::vector<std::byte>, WrapError> null_burst(
+    std::size_t period_bytes);
+
+// ---------------------------------------------------------------------------
 // De-framing: recovering the elementary stream from a burst carrier.
 //
 // The inverse of everything above, and the only way to check it against

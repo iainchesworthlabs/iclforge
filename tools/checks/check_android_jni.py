@@ -32,8 +32,21 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-APP = "apps/demos/android/app"
-NATIVE_DIRS = ("apps/demos/android/app/src/main/cpp", "libs/audio/src/backend/android")
+# The Android apps of the tree, each checked on its own: a package, its Kotlin, its native
+# definitions, its library. A second app (planning/hearth-android.md) is one more entry here.
+APPS = ("apps/demos/android/app", "apps/hearth/android/app")
+APP = APPS[0]
+# The native code besides an app's own that a JNI name could be defined in. The audio backend
+# defines none since its registration became two plain C++ functions the app calls
+# (libs/audio/src/backend/android/passthrough_bridge.hpp), so a definition found there is a name
+# in no app's package, and is reported for every app.
+SHARED_NATIVE_DIRS = ("libs/audio/src/backend/android",)
+
+
+def native_dirs(app: str) -> tuple[str, ...]:
+    return (f"{app}/src/main/cpp", *SHARED_NATIVE_DIRS)
+
+
 # the app's Gradle source sets, under <app>/src: their Kotlin and the native code of `main`
 SOURCE_SETS = ("main", "androidTest")
 KOTLIN_DIRS = tuple("/".join(("src", name, "java")) for name in SOURCE_SETS)
@@ -92,20 +105,21 @@ FIND_CLASS_RX = re.compile(r'FindClass\(\s*"([^"]+)"')
 KEEP_RX = re.compile(r"^\s*-keep\w*\s+(?:,\w+\s+)*class\s+([\w.$]+)", re.M)
 
 
-def kotlin_sources(root: Path) -> list[Path]:
+def kotlin_sources(root: Path, app: str = APP) -> list[Path]:
     files: list[Path] = []
     for sub in KOTLIN_DIRS:
-        base = root / APP / sub
+        base = root / app / sub
         if base.is_dir():
             files += sorted(base.rglob("*.kt"))
     return files
 
 
-def check(root: Path) -> list[Problem]:
+def check(root: Path, app: str = APP) -> list[Problem]:
+    """What disagrees in one app: `app` is its directory under the root (build.gradle.kts)."""
     problems: list[Problem] = []
-    gradle = root / APP / "build.gradle.kts"
+    gradle = root / app / "build.gradle.kts"
     names = gradle_names(read(gradle)) if gradle.is_file() else {}
-    rel_gradle = f"{APP}/build.gradle.kts"
+    rel_gradle = f"{app}/build.gradle.kts"
     if set(names) != {"namespace", "applicationId"}:
         return [Problem(rel_gradle, "namespace and applicationId must both be set")]
     namespace, application = names["namespace"][0], names["applicationId"][0]
@@ -121,14 +135,14 @@ def check(root: Path) -> list[Problem]:
     # (a) the Kotlin sources
     classes: dict[str, str] = {}  # class name -> the file it is declared in
     external: dict[str, tuple[str, int]] = {}  # (class, function) key as "Class.fn" -> where
-    for path in kotlin_sources(root):
+    for path in kotlin_sources(root, app):
         rel = path.relative_to(root).as_posix()
         text = read(path)
         m = PACKAGE_RX.search(text)
         declared = m.group(1) if m else ""
         if declared != package:
             problems.append(Problem(rel, f'declares package "{declared}", not "{package}"'))
-        directory = path.parent.relative_to(root / APP).as_posix()
+        directory = path.parent.relative_to(root / app).as_posix()
         if not directory.endswith("/" + package.replace(".", "/")):
             problems.append(
                 Problem(rel, f"sits in {directory}, which is not the directory of {package}")
@@ -149,7 +163,7 @@ def check(root: Path) -> list[Problem]:
 
     # (b) the native definitions
     natives: dict[str, str] = {}  # function name -> file:line
-    for sub in NATIVE_DIRS:
+    for sub in native_dirs(app):
         base = root / sub
         if not base.is_dir():
             continue
@@ -191,9 +205,9 @@ def check(root: Path) -> list[Problem]:
             )
 
     # (c) the library
-    cmake = root / APP / "src" / "main" / "cpp" / "CMakeLists.txt"
+    cmake = root / app / "src" / "main" / "cpp" / "CMakeLists.txt"
     built = set(ADD_LIBRARY_RX.findall(read(cmake))) if cmake.is_file() else set()
-    for path in kotlin_sources(root):
+    for path in kotlin_sources(root, app):
         for m in LOAD_RX.finditer(read(path)):
             if m.group(1) not in built:
                 line = read(path).count("\n", 0, m.start()) + 1
@@ -207,7 +221,7 @@ def check(root: Path) -> list[Problem]:
 
     # (d) class paths the C++ and ProGuard name
     slash = package.replace(".", "/")
-    for sub in NATIVE_DIRS:
+    for sub in native_dirs(app):
         base = root / sub
         if not base.is_dir():
             continue
@@ -230,7 +244,7 @@ def check(root: Path) -> list[Problem]:
                     problems.append(
                         Problem(where, f'FindClass("{cls}") is not in package {package}')
                     )
-    proguard = root / APP / "proguard-rules.pro"
+    proguard = root / app / "proguard-rules.pro"
     if proguard.is_file():
         text = read(proguard)
         for m in KEEP_RX.finditer(text):
@@ -240,17 +254,25 @@ def check(root: Path) -> list[Problem]:
                 if cls[len(package) + 1 :].split("$")[0] not in classes:
                     problems.append(
                         Problem(
-                            f"{APP}/proguard-rules.pro:{line}",
+                            f"{app}/proguard-rules.pro:{line}",
                             f"keeps {cls}, which no Kotlin source declares",
                         )
                     )
             elif cls.startswith(("com.iclforge", "com.ac3forge")):
                 problems.append(
                     Problem(
-                        f"{APP}/proguard-rules.pro:{line}",
+                        f"{app}/proguard-rules.pro:{line}",
                         f"keeps {cls}, which is not in package {package}",
                     )
                 )
+    return problems
+
+
+def check_all(root: Path) -> list[Problem]:
+    """Every app of APPS, each held to its own package."""
+    problems: list[Problem] = []
+    for app in APPS:
+        problems += check(root, app)
     return problems
 
 
@@ -260,12 +282,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     args = ap.parse_args(argv)
-    problems = check(args.root)
+    problems = check_all(args.root)
     for problem in problems:
         print(problem)
     if problems:
         return 1
-    print(f"android jni: {APP} agrees at every end (package, native names, library, class paths)")
+    print(
+        f"android jni: {len(APPS)} app(s) agree at every end "
+        "(package, native names, library, class paths)"
+    )
     return 0
 
 

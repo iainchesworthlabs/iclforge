@@ -45,6 +45,23 @@ namespace sp = sendspin::player;
     return text + " Hz";
 }
 
+// "25", "29.97": a frame rate to two places with its trailing zeros dropped.
+[[nodiscard]] std::string rate_text(double frames_per_second) {
+    std::string text = fmt::format("{:.2f}", frames_per_second);
+    while (text.back() == '0') {
+        text.pop_back();
+    }
+    if (text.back() == '.') {
+        text.pop_back();
+    }
+    return text;
+}
+
+// A stream's frame rate is read from its sample counts and lasts to a few parts in a thousand
+// (29.97 as 29.9700 or 29.9712 by where the programme's frames are counted), and a sink's limit
+// is a whole number a rate may sit on: 25 takes 25.
+constexpr double kFrameRateSlack = 1.005;
+
 // Why the stream cannot go to the sink as it is, or nothing when it can.
 // Every sentence names the sink's own limit, because that is what a person
 // holding the phone can act on.
@@ -74,6 +91,11 @@ namespace sp = sendspin::player;
     if (limit != 0 && stream.coded_channels > limit) {
         return fmt::format("This sink decodes {} up to {} channels, and this stream has {}",
                            type_text(type), limit, stream.coded_channels);
+    }
+    const std::uint16_t rate_limit = support.max_frame_rate_of(type);
+    if (rate_limit != 0 && stream.frame_rate > static_cast<double>(rate_limit) * kFrameRateSlack) {
+        return fmt::format("This sink decodes {} up to {} frames a second, and this stream has {}",
+                           type_text(type), rate_limit, rate_text(stream.frame_rate));
     }
     return std::nullopt;
 }
