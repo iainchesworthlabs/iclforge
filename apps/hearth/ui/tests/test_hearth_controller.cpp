@@ -62,6 +62,7 @@
 // here calls them.
 #include "hearth_controller.cpp"
 #include "sink_lyrics_text.hpp"
+#include "sink_output_text.hpp"
 
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/audio/passthrough.hpp"
@@ -1084,4 +1085,32 @@ TEST_CASE("sink_lyrics_text: a sink says whether it takes lyrics, holds none, or
     facts.lyrics_lines.reset();
     facts.lyrics_line_text.clear();
     CHECK(iclforge::hearth::ui::sink_lyrics_text(facts).toStdString() == "line 3");
+}
+
+// ---- the Network page's output row (D6) -----------------------------------------------------------
+
+TEST_CASE("sink_output_text: a sink says whether it passes the bits on or decodes them, and nothing without a stream",
+          "[hearth][network]") {
+    namespace sp = iclforge::sendspin::player;
+    iclforge::hearth::SinkFacts facts;
+    const auto text = [&] { return iclforge::hearth::ui::sink_output_text(facts).toStdString(); };
+
+    // No state yet, then a state with no stream open: the row has nothing to say.
+    CHECK(text().empty());
+    facts.iclforge_state = sp::State{};
+    CHECK(text().empty());
+
+    // A stream is open and the sink does not say how it plays it (every sink from before the key).
+    facts.iclforge_state->decoder = sp::DecoderReport{};
+    CHECK(text() == "not reported");
+
+    // It says: the bits go on to a receiver as they came, or the sink decoded them.
+    facts.iclforge_state->output = sp::Output::kPassthrough;
+    CHECK(text() == "passed through as coded");
+    facts.iclforge_state->output = sp::Output::kPcm;
+    CHECK(text() == "decoded by the sink");
+
+    // The sink says it before its decoder has found anything in the stream, and the row follows.
+    facts.iclforge_state->decoder.reset();
+    CHECK(text() == "decoded by the sink");
 }
