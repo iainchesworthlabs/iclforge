@@ -102,9 +102,11 @@ bool write_ac3_stream(const std::string& path, const std::string& kind, std::str
 class TestSinkHost;
 
 // `accept_settings`: the sink lists the Settings command and applies one
-// (SinkOptions::accept_settings).
+// (SinkOptions::accept_settings). `lyrics_max_bytes` above 0: it states a size of lyric document it
+// holds and lists the lyric commands (SinkOptions::lyrics_max_bytes).
 [[nodiscard]] std::shared_ptr<TestSinkHost> start_test_sink(const std::string& name, const std::string& directory,
-                                                            bool accept_settings, std::string* error);
+                                                            bool accept_settings, std::string* error,
+                                                            std::uint32_t lyrics_max_bytes = 0);
 // Hands `host` to `sinks` as a found `_sendspin._tcp` service (instance
 // `host`'s name), which dials it.
 void announce(iclforge::hearth::NetworkSinks& sinks, const TestSinkHost& host);

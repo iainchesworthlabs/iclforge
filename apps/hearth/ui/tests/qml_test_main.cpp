@@ -293,9 +293,10 @@ public:
     // no suite code has yet. `acceptSettings`: the sink lists the Settings
     // command and applies one (SinkOptions::accept_settings). Every sink
     // started stays up for the process; the code/log calls below read the
-    // most recent one. Returns the empty string on success, otherwise why
-    // not.
-    Q_INVOKABLE QString startTestSink(const QString& name, bool acceptSettings = false) {
+    // most recent one. `lyricsBytes` above 0: the sink states a size of lyric
+    // document it holds and lists the lyric commands. Returns the empty
+    // string on success, otherwise why not.
+    Q_INVOKABLE QString startTestSink(const QString& name, bool acceptSettings = false, int lyricsBytes = 0) {
         auto* network = this->network();
         if (network == nullptr) {
             return QStringLiteral("NetworkController is not registered");
@@ -308,7 +309,7 @@ public:
         auto sink = iclforge::hearth::uitest::start_test_sink(
             name.toStdString(),
             QDir(scratch_.path()).filePath(QStringLiteral("sink-%1").arg(sinks_.size())).toStdString(),
-            acceptSettings, &error);
+            acceptSettings, &error, static_cast<std::uint32_t>(lyricsBytes > 0 ? lyricsBytes : 0));
         if (!sink) {
             return QString::fromStdString(error);
         }
