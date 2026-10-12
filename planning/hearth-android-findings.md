@@ -152,13 +152,18 @@ on a sofa accepts a receiver that changes mode between songs is [a question for 
 **The cheap-looking alternative has a hole: the PCM fallback and the words.** The engine can plan
 a member as PCM and send it the host's decode over `player@v1` (`MemberAction::kPcm`,
 `network_sinks.cpp`), which would give the Android sink the singer's reproduction with no decoder
-of its own. The role page says lyrics go "only to a member that is sent the stream as it is, on
-this role", because "a member that is sent PCM over `player@v1` is on a role that has none". The
-code that sends them (`apply_lyrics`) checks that the sink *lists* the commands and does not check
-the member's planned form, so what actually happens to such a member's words is **not known from
-reading**: the role may still be active beside `player@v1`, or the command may be dropped. Until a
-host test settles it, the PCM fallback is a route to the right sound with possibly no lyrics,
-which is the wrong way round for a karaoke app.
+of its own. **Such a member is sent no lyrics, and that is tested, not inferred.**
+`apply_lyrics` does not look at the planned form, but its commands go through
+`ServerSession::iclforge_command`, which refuses (`kNoPlayerState`) unless the member's extension
+role is the one activated for playback; a member planned PCM has `player@v1` active, and
+`test_engine_network_group.cpp` ("the lyrics beside an item reach the boards that hold them")
+checks that the `player@v1` member's lyric commands are empty. The converse was run by the lyrics
+session on 2026-10-12: before a stream starts, a member that lists the extension role and the
+commands is active on it and takes a document. So the gate is the session's **active role**, not
+the planner. Host-PCM karaoke on the Android sink is therefore the right sound with no words,
+the wrong way round for a karaoke app, unless the host is changed to keep the extension role
+active beside `player@v1` for a member that holds lyrics (a host change, M; the role page allows
+both to be active, and a server "sends a stream to at most one of them at a time").
 
 **Which streams are karaoke is not Android's to decide.** The first burst's `Pc` carries `bsmod`
 in bits 8 to 10 for AC-3 (**Read**, the role page), so the route is known at the first burst, before
