@@ -308,6 +308,14 @@ standard-library only, so a sink *could* draw the picture. The TV is the one sin
 | C2: the packet stream | A timed binary stream of 24-byte packets on a new binary message ID of this role (193 to 195 are reserved), each tagged to the playhead's clock, decoded by `libs/lyrics` on the sink | M to L | Needs a new support key, flow control against `buffer_capacity`, and the picture's view; the picture is timed by the same anchors |
 | C3: rendered pictures | The host renders frames and sends them as `artwork@v1` | M | A role every sink already can list; 16 colours at 300 by 216 is small as PNG; frame rate and the cost of a redraw per packet are unknown |
 
+**Confirmed by the CD+G session (a533fc, 2026-10-12):** a sink receives no CD+G picture today and
+none of C1 to C3 is built or planned. The decoder (`parse_cdg`, `CdgScreen`, `find_cdg_file` in
+`libs/lyrics`' `cdg.hpp`) stays where it is, standard library only. What their PR #1360 adds is
+Qt-side only (`CdgFrames`, `CdgFrameSource` and `CdgPicture` over `QImage`), which a sink would not
+use. Session b0ad7d's PR #1346 changes `CdgScreen::pixels()` (the fine scroll offset applied, a
+transparent colour with alpha 0; still 300 by 216 ARGB); the packets and `parse_cdg` are
+unchanged, so C2 is unaffected and any figure on pixels should cite the pixel function after that PR.
+
 ## F11: what can be verified without a device
 
 | Check | Needs | Known |
