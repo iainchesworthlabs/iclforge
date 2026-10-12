@@ -119,6 +119,19 @@ The sections below contain the complete change list and fixes.
   what the container says, so that a person can see whether a karaoke video's words are in a text
   track, a bitmap subtitle track or only in the picture.
 
+**Subtitle karaoke: who sings an ASS line, and which line at one time is read**
+
+- **An ASS script's duet is read.** Where exactly two different actors (the `Name` column) are named
+  on the sung lines, they are the two singers, in the order they first appear, with their names;
+  failing that, where exactly two styles are used on them, those are the singers (a style's name is
+  not shown as one). One, three or none marks nobody. The lines carry `V1:` and `V2:` through
+  `write_lrc` like any other duet, so Hearth's singer view and a sink read them.
+- **Lines that share a time are read once.** A line written on two layers is one line; of lines in
+  different styles at one start and end, a translation or a romanisation beside the sung line is
+  dropped, and with no sung line the file's commonest style is read. Lines in one style at one time
+  are all read. The reader no longer shows a doubled line or an interleaved translation for such a
+  script (planning/karaoke-formats-options.md, D14).
+
 **Forge writes the lyrics beside the stream it encodes**
 
 - **`lyrics=<file>` on `forge encode`, `eac3-encode` and `ac4-encode`.** The file may be an `.lrc`, a
