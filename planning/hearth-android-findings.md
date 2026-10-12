@@ -167,6 +167,15 @@ the wrong way round for a karaoke app, unless the host is changed to keep the ex
 active beside `player@v1` for a member that holds lyrics (a host change, M; the role page allows
 both to be active, and a server "sends a stream to at most one of them at a time").
 
+**What the host does when a sink does not report the item** (from the lyrics session, PR #1396,
+`network_sinks.cpp`): a member whose state does not report the item it was sent is sent the
+document again, but **not within 2 s of a send**; and an item the sink was **told has none** (its
+document larger than the sink's `lyrics.max_bytes`, or than its `max_chunk_bytes`) is **not
+resent**. Everything is keyed on the role's support and state objects, so an Android sink is
+handled as a board is. For this sink that means: state `max_bytes` honestly (up to 60,000) and
+report `lyrics{item,line}` as soon as a document is taken, because a sink that is slow to report
+is sent the document a second time.
+
 **Which streams are karaoke is not Android's to decide.** The first burst's `Pc` carries `bsmod`
 in bits 8 to 10 for AC-3 (**Read**, the role page), so the route is known at the first burst, before
 a frame is decoded. Karaoke in E-AC-3 and AC-4 is the other session's work (the "Karaoke in E-AC-3
