@@ -1651,11 +1651,12 @@ jobs:
         shell: bash
         run: cmake --build --preset build-android-arm64 -- -k 0
 
-  # Hearth for Android's debug APK (planning/hearth-android.md, phase 1b): the Gradle project at
-  # apps/hearth/android, whose native build puts vcpkg in front of the NDK's toolchain
-  # (app/src/main/cpp/CMakeLists.txt), which is the part build-android above cannot do. It
-  # builds the APK and runs no test: the emulator's instrumented tests come with the host harness
-  # (phase 1d), and a Shield and a receiver are a person's.
+  # Hearth for Android's debug APK and its instrumented tests (planning/hearth-android.md, phases 1b
+  # and 1d): the Gradle project at apps/hearth/android, whose native build puts vcpkg in front of the
+  # NDK's toolchain (app/src/main/cpp/CMakeLists.txt), which is the part build-android above cannot
+  # do. The instrumented tests run the pass-through path (a server session, a loopback WebSocket, the
+  # sink, the output, a model device) in the app's own process on an x86_64 emulator, and hold what the
+  # device was handed to the bursts the packer wrote; a Shield and a receiver are a person's.
   #
   # continue-on-error until it has gone green three times in a row on hosted runners, as
   # build-android-native above and every new hosted leg before it. The vcpkg ports are the same
@@ -1670,7 +1671,7 @@ jobs:
     concurrency:
       group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'android-hearth-main' || format('android-hearth-run-{0}', github.run_id) }}
       cancel-in-progress: false
-    timeout-minutes: 75
+    timeout-minutes: 90
     permissions:
       contents: read
     steps:
@@ -1706,6 +1707,30 @@ jobs:
           set -euo pipefail
           chmod +x gradlew
           ./gradlew :app:assembleDebug --console=plain
+
+      # Hosted Linux runners have KVM acceleration for x86 system images only, which is why the debug
+      # build carries x86_64 beside arm64-v8a (app/build.gradle.kts).
+      - name: Enable KVM group perms for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' |             sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # -noaudio: there is no host audio device to bridge to, and the tests need none: the device in
+      # them is a model. What they hold is the NDK build of the sink and the output, the JNI, and the
+      # library's threads and sockets under Android.
+      - name: Instrumented tests (emulator)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          working-directory: apps/hearth/android
+          disable-animations: true
+          emulator-options: >-
+            -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio
+            -no-boot-anim -camera-back none
+          script: ./gradlew :app:connectedDebugAndroidTest --console=plain
 
   # The WASM browser decode demo (apps/demos/wasm, WASM browser demo): a real CMake
   # preset (config-wasm-emscripten) unlike build-android above, but still its

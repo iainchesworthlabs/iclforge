@@ -83,6 +83,14 @@ add_library(iclforge_hearth_jni SHARED
     audio_link.cpp
     jni_entry.cpp
     native_sink.cpp)
+
+# The loopback harness the instrumented tests call (harness_jni.cpp): the debug build only, so that the
+# shipped library carries no test hook and no server half it does not otherwise use.
+option(HEARTH_ANDROID_HARNESS "Compile the loopback harness's JNI entry into iclforge_hearth_jni" OFF)
+if(HEARTH_ANDROID_HARNESS)
+    target_sources(iclforge_hearth_jni PRIVATE harness_jni.cpp)
+    target_link_libraries(iclforge_hearth_jni PRIVATE iclforge::sink_harness)
+endif()
 target_compile_features(iclforge_hearth_jni PRIVATE cxx_std_23)
 # The audio backend's registration (android/passthrough_bridge.hpp) is the one header of
 # iclforge::audio's src/backend tree this app includes, which the project table exposes for it.

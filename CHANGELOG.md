@@ -142,6 +142,22 @@ The sections below contain the complete change list and fixes.
   were given.
   This is a move: no message, log line or file the test sink writes is different.
 
+**Hearth for Android: the pass-through path, held end to end**
+
+- **A loopback harness, `iclforge::sink::harness::play_through`** (`libs/sink`, phase 1d, AR1). A Sendspin
+  server session packs an AC-3 or E-AC-3 elementary stream into IEC 61937 bursts the way Hearth's server
+  does (`wrap_frame`, `Eac3BurstPacker`), sends each as a burst chunk over a loopback WebSocket to a
+  sink whose extension-role output is the `PassthroughOutput` over a model of the Shield's device, and
+  compares what the device was handed with what the packer wrote, byte for byte and in order, with the
+  output's late, dropped and underrun counts. Five Dolby-encoder fixtures (AC-3 5.1 and stereo, E-AC-3 5.1,
+  Atmos JOC 5.1.4 and 9.1.6) are `ctest` cases of `iclforge-sink-tests`, about seven seconds each; a
+  deliberate change to the rebuild's `Pc` makes them fail.
+- **On the device's runtime**: the same cases are three instrumented tests of Hearth for Android
+  (`PassthroughPathInstrumentedTest`), through a JNI entry compiled into the debug build only, and
+  `build-android-hearth` runs them on an x86_64 emulator (the debug build carries x86_64 beside
+  arm64-v8a, whose vcpkg triplet `x64-android` the app's CMake already chooses). The Shield's lockfile
+  gains the test platform's entries, written by running `connectedDebugAndroidTest` against a device.
+
 **Hearth for Android: the pass-through output**
 
 - **The coded stream goes to the receiver as it is** (`planning/hearth-android.md`, phase 1c).

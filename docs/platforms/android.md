@@ -788,6 +788,19 @@ counts the bursts and drops them; the pass-through output is the next phase. `ic
 cross-built by that preset and run on the same Shield, passes (6 cases, 108 assertions), which
 includes a server pairing by the code the sink shows.
 
+The pass-through path has a harness, `iclforge::sink::harness::play_through` (`libs/sink`): a Sendspin
+server session packs a Dolby-encoded stream into IEC 61937 bursts the way Hearth's server does, sends
+them over a loopback WebSocket to the sink with the pass-through output over a model of the Shield's
+device, and compares what the device was handed with what the packer wrote. Held 2026-10-12: five
+fixtures (AC-3 5.1 and stereo, E-AC-3 5.1, Atmos JOC 5.1.4 and 9.1.6) are equal on the host (`ctest -L
+end-to-end`, about 7 s each, 100 bursts of each), `iclforge-sink-tests` cross-built by the preset passes
+all 20 of its cases on the Shield with the fixtures pushed (`ICLFORGE_FIXTURE_ROOT`), and three
+instrumented tests (`PassthroughPathInstrumentedTest`, the harness's JNI entry in the debug build only)
+run on it through `connectedDebugAndroidTest`: the instrumentation reports `3 tests, 0 failed`. On this
+Shield, with AGP 9.4.1, Gradle then calls the task failed ("There were failing tests") whatever the
+report says, as it does for the Shield app's own 18 instrumented tests; the emulator job is where the
+task's exit status is read.
+
 ## Release / CI
 
 The app builds alongside the desktop packages rather than only ever being hand-built locally:

@@ -41,7 +41,24 @@ Install on a TV box with `adb install -r app/build/outputs/apk/debug/app-debug.a
 `Hearth on <the box's name>`; a server's `_sendspin._tcp` browse finds it, and the pairing code it
 asks for is shown on the screen and written to logcat under the tag `HearthSink`.
 
-## What is checked
+## Tests
+
+The pass-through path, end to end (planning/hearth-android.md, AR1): a Sendspin server session packs a
+Dolby-encoded fixture into IEC 61937 bursts the way Hearth's server does, sends each over a loopback
+WebSocket to the sink with the pass-through output over a model of the Shield's device, and the bursts
+the device was handed are compared, byte for byte and in order, with the ones the packer wrote.
+
+| Where | How |
+|---|---|
+| The host | `ctest -L end-to-end` (`libs/sink/tests/test_end_to_end.cpp`): five fixtures, about seven seconds each |
+| A device or an emulator | `./gradlew :app:connectedDebugAndroidTest` (`PassthroughPathInstrumentedTest`): three fixtures, the harness's JNI entry compiled into the debug build only |
+| A device, without Gradle | the preset's `iclforge-sink-tests` pushed with `adb`, and `ICLFORGE_FIXTURE_ROOT` naming a directory that holds `external-baseline/` and `object-fixture/` |
+
+Nothing in them needs an HDMI route or a receiver. The debug build carries `x86_64` beside `arm64-v8a`,
+for the emulator CI runs them on; a run on one device builds one ABI with
+`-Pandroid.injected.build.abi=arm64-v8a`.
+
+## What else is checked
 
 `tools/checks/check_android_jni.py` holds the package, the `external fun`s and the native symbol
 names to each other without a device. CI's `build-android-hearth` job builds the APK

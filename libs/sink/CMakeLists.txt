@@ -33,3 +33,14 @@ add_library(iclforge_sink_passthrough STATIC src/passthrough_output.cpp)
 add_library(iclforge::sink_passthrough ALIAS iclforge_sink_passthrough)
 target_link_libraries(iclforge_sink_passthrough PUBLIC iclforge::sink iclforge::containers iclforge::ac3)
 target_link_libraries(iclforge_sink_passthrough PRIVATE iclforge::warnings iclforge::coverage)
+
+# The pass-through path end to end in one process (include/iclforge/sink/loopback_harness.hpp): a
+# server session packs a stream into bursts, a sink with the pass-through output over a model device
+# is played them over a loopback WebSocket, and what the device was handed is compared with what the
+# packer wrote. Its own target for the app's instrumented test and the host tests; nothing ships it
+# but the debug build of the Android app.
+add_library(iclforge_sink_harness STATIC src/loopback_harness.cpp)
+add_library(iclforge::sink_harness ALIAS iclforge_sink_harness)
+target_link_libraries(iclforge_sink_harness PUBLIC iclforge::sink iclforge::sink_passthrough iclforge::sendspin
+    iclforge::containers iclforge::ac3)
+target_link_libraries(iclforge_sink_harness PRIVATE iclforge::warnings iclforge::coverage)

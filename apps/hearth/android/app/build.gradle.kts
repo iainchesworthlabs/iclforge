@@ -32,6 +32,10 @@ android {
         versionCode = 1
         versionName = "0.1.0-alpha.1"
 
+        // The instrumented tests (src/androidTest): connectedDebugAndroidTest needs a runner declared
+        // before Gradle will run anything under that source set.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
         externalNativeBuild {
             cmake {
                 // c++_shared, as the Shield app: the libraries linked into the one shared object
@@ -92,8 +96,17 @@ android {
             // APK debuggable and uses the release builds of the ports.
             externalNativeBuild {
                 cmake {
-                    arguments += listOf("-DCMAKE_BUILD_TYPE=RelWithDebInfo")
+                    // HEARTH_ANDROID_HARNESS compiles the loopback harness's JNI entry in, for the
+                    // instrumented tests; the release build has none.
+                    arguments += listOf("-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DHEARTH_ANDROID_HARNESS=ON")
                 }
+            }
+            // x86_64 as well as arm64, for the emulator the CI's instrumented tests run on (KVM is only
+            // there for x86 images on the hosted runners). arm64-v8a is listed again here so that this
+            // build type keeps it whether AGP merges the two lists or this one wins. A local run on a
+            // device builds one ABI with -Pandroid.injected.build.abi=arm64-v8a.
+            ndk {
+                abiFilters += listOf("arm64-v8a", "x86_64")
             }
         }
         release {
@@ -118,8 +131,42 @@ android {
     }
 }
 
-// No dependency of its own: the screens are platform Views and the service, the notification and
-// NsdManager are the platform's. Nothing for a lockfile to hold beyond what AGP and Kotlin bring.
+dependencies {
+    // The screens are platform Views and the service, the notification and NsdManager are the
+    // platform's: the app has no dependency of its own. These are the instrumented tests', the
+    // versions the Shield app's are at.
+    androidTestImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test:core:1.7.0")
+}
+
+// The fixtures the instrumented tests play, from the repository's testdata/ (a few hundred KB, staged
+// here rather than copied into the tree, so that there is one copy of each).
+val harnessFixtures = tasks.register<Copy>("stageHarnessFixtures") {
+    val testdata = rootDir.resolve("../../../testdata")
+    from(testdata.resolve("external-baseline")) {
+        include("ac3-51-448/dee.ac3", "eac3-51-256/dee.ec3")
+        into("external-baseline")
+    }
+    from(testdata.resolve("object-fixture")) {
+        include("dee_joc_514.ec3")
+        into("object-fixture")
+    }
+    into(layout.buildDirectory.dir("harness-assets"))
+}
+// AGP 9 takes no Provider in the source set API: the variant's androidTest assets get the directory by
+// path, and the task above is made a dependency of the tasks that merge them.
+androidComponents {
+    onVariants { variant ->
+        variant.androidTest?.sources?.assets?.addStaticSourceDirectory(
+            layout.buildDirectory.dir("harness-assets").get().asFile.absolutePath
+        )
+    }
+}
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets") }.configureEach {
+    dependsOn(harnessFixtures)
+}
 
 // SonarCloud text:S8569 - pin resolved dependency versions so a build is reproducible from the
 // committed lockfile. Regenerate with `./gradlew :app:dependencies --write-locks` after changing a
@@ -131,12 +178,25 @@ dependencyLocking {
 // This app has no dependency of its own, so what the lockfile holds is AGP's: the lint tool
 // (androidLintTool) and the unified test platform's work action, build-time only and not in the APK.
 // Their pinned releases carry advisories OSV-Scanner reports, so each is forced to the release that
-// fixes it, as apps/demos/android/app/build.gradle.kts forces the same set (and, there, the Netty
-// artifacts the emulator tests' own configurations bring, which this app has no tests to resolve
-// yet: they are added with its instrumented tests, together with a lock refresh against a device).
+// fixes it, as apps/demos/android/app/build.gradle.kts forces the same set, with the Netty artifacts
+// and the protobuf pair that AGP's unified test platform brings for connectedDebugAndroidTest (its
+// own configurations are created only inside that task, behind a device check, so the lock lines for
+// them are written by running it against a device with --write-locks, as the Shield app's comment
+// says at length).
 configurations.all {
     resolutionStrategy {
         force(
+            "io.netty:netty-buffer:4.2.18.Final",
+            "io.netty:netty-codec:4.2.18.Final",
+            "io.netty:netty-codec-http:4.2.18.Final",
+            "io.netty:netty-codec-http2:4.2.18.Final",
+            "io.netty:netty-codec-socks:4.2.18.Final",
+            "io.netty:netty-common:4.2.18.Final",
+            "io.netty:netty-handler:4.2.18.Final",
+            "io.netty:netty-handler-proxy:4.2.18.Final",
+            "io.netty:netty-resolver:4.2.18.Final",
+            "io.netty:netty-transport:4.2.18.Final",
+            "io.netty:netty-transport-native-unix-common:4.2.18.Final",
             // The protobuf-java and protobuf-kotlin pair stays matched: GHSA-735f-pc8j-v9w8.
             "com.google.protobuf:protobuf-java:4.36.2",
             "com.google.protobuf:protobuf-kotlin:4.36.2",
