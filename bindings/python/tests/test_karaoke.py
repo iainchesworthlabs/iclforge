@@ -124,7 +124,7 @@ def test_the_capable_decoders_vocals_and_levels_change_what_is_heard(frames: lis
     # L, C, R in coded order. With no vocals the centre is the melody alone; V1 puts the vocal in.
     assert len(none[0]) == 3
     assert peak(none, 1) > 0.05, "the melody is real signal"
-    assert any(not np.array_equal(a[1], b[1]) for a, b in zip(none, v1))
+    assert any(not np.array_equal(a[1], b[1]) for a, b in zip(none, v1, strict=True))
 
     # The melody 6 dB down moves only the centre, by exactly that: the sums are 1, 1 and the
     # gain, so nothing is scaled down.
@@ -135,7 +135,7 @@ def test_the_capable_decoders_vocals_and_levels_change_what_is_heard(frames: lis
         karaoke_melody_db=-6.0,
     )
     gain = 10 ** (-6.0 / 20.0)
-    for a, b in zip(none, down):
+    for a, b in zip(none, down, strict=True):
         np.testing.assert_allclose(b[0], a[0], atol=1e-6)
         np.testing.assert_allclose(b[2], a[2], atol=1e-6)
         np.testing.assert_allclose(b[1], a[1] * gain, atol=1e-6)
@@ -254,5 +254,5 @@ def test_bytes_that_are_not_lyrics_are_refused_with_the_reason() -> None:
     with pytest.raises(ValueError, match=r"."):
         ac3.lyrics.parse(b"")
     # Latin-1 is named and not guessed at.
-    with pytest.raises(ValueError, match="(?i)utf"):
+    with pytest.raises(ValueError, match=r"(?i)utf"):
         ac3.lyrics.parse(b"[00:01.00]caf\xe9\n")
