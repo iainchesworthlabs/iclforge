@@ -994,393 +994,403 @@
 <context>
     <name>KaraokePage</name>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="83"/>
+        <location filename="../qml/KaraokePage.qml" line="90"/>
         <source>The lines are marked for %1 and for %2.</source>
         <translation>די שורות זענען אָנגעצייכנט פֿאַר %1 און פֿאַר %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="86"/>
+        <location filename="../qml/KaraokePage.qml" line="93"/>
         <source>Both vocals play, so %1 and %2 are both in the mix.</source>
         <translation>ביידע געזאַנגען שפּילן, אַזוי אַז %1 און %2 זענען ביידע אין דעם מיקס.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="89"/>
+        <location filename="../qml/KaraokePage.qml" line="96"/>
         <source>No vocal plays: you sing the lines of %1 and of %2.</source>
         <translation>קיין געזאַנג שפּילט ניט: איר זינגט די שורות פֿון %1 און פֿון %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="92"/>
-        <location filename="../qml/KaraokePage.qml" line="93"/>
+        <location filename="../qml/KaraokePage.qml" line="99"/>
+        <location filename="../qml/KaraokePage.qml" line="100"/>
         <source>The vocal of %1 plays: you sing the lines of %2.</source>
         <translation>דער געזאַנג פֿון %1 שפּילט: איר זינגט די שורות פֿון %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="140"/>
+        <location filename="../qml/KaraokePage.qml" line="147"/>
         <source>off</source>
         <translation>אויס</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="142"/>
+        <location filename="../qml/KaraokePage.qml" line="149"/>
         <source>%1 dB</source>
         <translation>%1 dB</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="253"/>
+        <location filename="../qml/KaraokePage.qml" line="260"/>
         <source>the LFE, as coded</source>
         <translation>דער LFE, ווי קאָדירט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="257"/>
+        <location filename="../qml/KaraokePage.qml" line="264"/>
         <source>silent</source>
         <translation>שטיל</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="290"/>
+        <location filename="../qml/KaraokePage.qml" line="297"/>
         <source>Karaoke</source>
         <translation>קאַראַאָקע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="296"/>
+        <location filename="../qml/KaraokePage.qml" line="303"/>
         <source>Nothing is playing</source>
         <translation>גאָרנישט שפּילט ניט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="307"/>
+        <location filename="../qml/KaraokePage.qml" line="314"/>
         <source>Add a karaoke stream to the queue and play it. What you choose here applies to it.</source>
         <translation>לייגט צו אַ קאַראַאָקע־סטרים צום ריי און שפּילט אים. וואָס איר קלײַבט דאָ גילט פֿאַר אים.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="311"/>
+        <location filename="../qml/KaraokePage.qml" line="318"/>
         <source>Karaoke, %1 coded: %2</source>
         <translation>קאַראַאָקע, %1 קאָדירט: %2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="316"/>
+        <location filename="../qml/KaraokePage.qml" line="328"/>
         <source>An AC-3 stream, but not a karaoke one: its service is %1.</source>
         <translation>אַן AC-3־סטרים, אָבער ניט קיין קאַראַאָקע־סטרים: זײַן סערוויס איז %1.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="318"/>
-        <source>Karaoke is an AC-3 mode (Annex C of ETSI TS 102 366). This is not an AC-3 stream.</source>
-        <translation>קאַראַאָקע איז אַ מאָדוס פֿון AC-3 (אַנעקס C פֿון ETSI TS 102 366). דאָס איז ניט קיין AC-3־סטרים.</translation>
-    </message>
-    <message>
-        <location filename="../qml/KaraokePage.qml" line="329"/>
+        <location filename="../qml/KaraokePage.qml" line="346"/>
         <source>Reproduction</source>
         <translation>רעפּראָדוקציע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="330"/>
+        <location filename="../qml/KaraokePage.qml" line="347"/>
         <source>Annex C, ETSI TS 102 366</source>
         <translation>אַנעקס C, ETSI TS 102 366</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="336"/>
-        <location filename="../qml/KaraokePage.qml" line="340"/>
+        <location filename="../qml/KaraokePage.qml" line="353"/>
+        <location filename="../qml/KaraokePage.qml" line="357"/>
         <source>Decoder</source>
         <translation>דעקאָדער</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="344"/>
+        <location filename="../qml/KaraokePage.qml" line="361"/>
         <source>As coded</source>
         <translation type="unfinished">ווי קאדירט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="345"/>
+        <location filename="../qml/KaraokePage.qml" line="362"/>
         <source>Aware</source>
         <translation>באַוווּסט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="346"/>
+        <location filename="../qml/KaraokePage.qml" line="363"/>
         <source>Capable</source>
         <translation>פֿעיִק</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="354"/>
+        <location filename="../qml/KaraokePage.qml" line="371"/>
         <source>The channels as the stream codes them: the vocals come from the surround speakers.</source>
         <translation>די קאַנאַלן ווי דער סטרים קאָדירט זיי: דער געזאַנג קומט פֿון די סראַונד־הילכערס.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="357"/>
+        <location filename="../qml/KaraokePage.qml" line="374"/>
         <source>L, C and R, with the vocals at the level the programme set (Table C.2.2).</source>
         <translation>L, C און R, מיט דעם געזאַנג אויפֿן ניוואָ וואָס די פּראָגראַם האָט באַשטימט (טאַבעלע C.2.2).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="359"/>
+        <location filename="../qml/KaraokePage.qml" line="376"/>
         <source>L, C and R, with the vocals you choose (Table C.2.3).</source>
         <translation>L, C און R, מיט דעם געזאַנג וואָס איר קלײַבט (טאַבעלע C.2.3).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="368"/>
-        <location filename="../qml/KaraokePage.qml" line="372"/>
+        <location filename="../qml/KaraokePage.qml" line="385"/>
+        <location filename="../qml/KaraokePage.qml" line="389"/>
         <source>Vocals</source>
         <translation>געזאַנג</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="376"/>
+        <location filename="../qml/KaraokePage.qml" line="393"/>
         <source>None</source>
         <translation>קיינע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="377"/>
+        <location filename="../qml/KaraokePage.qml" line="394"/>
         <source>V1</source>
         <translation>V1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="378"/>
+        <location filename="../qml/KaraokePage.qml" line="395"/>
         <source>V2</source>
         <translation>V2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="379"/>
+        <location filename="../qml/KaraokePage.qml" line="396"/>
         <source>Both</source>
         <translation>ביידע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="389"/>
+        <location filename="../qml/KaraokePage.qml" line="406"/>
         <source>Melody</source>
         <translation>מעלאָדיע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="410"/>
+        <location filename="../qml/KaraokePage.qml" line="427"/>
         <source>%1 level, dB</source>
         <translation>ניוואָ פֿון %1, dB</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="437"/>
+        <location filename="../qml/KaraokePage.qml" line="454"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable decoder only.</source>
         <translation>דער ניוואָ פֿון יעדן טייל לגבי טאַבעלע C.2.3: 0 dB איז די טאַבעלע, און דער אונטערשטער עק פֿון דער קאָנטראָל איז אויס. אויב מען הייבט אײנעם גענוג הויך, ווערן די אַנדערע אַראָפּגעלאָזט, כּדי קיין הילכער זאָל ניט ווערן געטריבן איבער דער פֿולער סקאַלע. נאָר בײַם פֿעיִקן דעקאָדער.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="447"/>
+        <location filename="../qml/KaraokePage.qml" line="464"/>
         <source>Reset levels</source>
         <translation>צוריקשטעלן די ניוואָען</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="461"/>
+        <location filename="../qml/KaraokePage.qml" line="478"/>
         <source>These controls do not apply to the stream that is playing.</source>
         <translation>די קאָנטראָלן גילטן ניט פֿאַר דעם סטרים וואָס שפּילט איצט.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="474"/>
+        <location filename="../qml/KaraokePage.qml" line="491"/>
         <source>This is going out as a bitstream, so the receiver decodes it and the choice above is not applied. Unless the receiver is karaoke-capable, V1 and V2 play from its surround speakers.</source>
         <translation>דאָס גייט אַרויס ווי אַ ביטסטרים, דעריבער דעקאָדירט דער רעסיווער עס און די אויסוואַל אויבן ווערט ניט אָנגעווענדט. סײַדן דער רעסיווער איז פֿעיִק צו קאַראַאָקע, קומען V1 און V2 פֿון זײַנע סראַונד־הילכערס.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="483"/>
+        <location filename="../qml/KaraokePage.qml" line="500"/>
         <source>Choose output…</source>
         <translation>קלײַבט אַרויסגאַנג…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="492"/>
+        <location filename="../qml/KaraokePage.qml" line="509"/>
         <source>This is going to a network group. A sink that takes the karaoke settings decodes the stream itself and reproduces it as chosen here; one that does not is sent PCM with the reproduction applied, so the group plays one reproduction. The Network page says which each sink was sent.</source>
         <translation>דאָס גייט צו אַ נעץ־גרופּע. אַ שפּילער וואָס נעמט אָן די קאַראַאָקע־אײַנשטעלונגען דעקאָדירט דעם סטרים אַליין און רעפּראָדוצירט אים ווי אויסגעקליבן דאָ; אײנער וואָס נעמט זיי ניט אָן באַקומט PCM מיט דער רעפּראָדוקציע שוין אָנגעווענדט, אַזוי אַז די גרופּע שפּילט איין רעפּראָדוקציע. די נעץ־בלאַט ווײַזט וואָס איז געשיקט געוואָרן צו יעדן.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="509"/>
+        <location filename="../qml/KaraokePage.qml" line="526"/>
         <source>The stereo fold is Lt/Rt. Annex C defines no Lt/Rt reproduction, so the stream plays as its Lt/Rt fold and the choice above has no effect. The Lo/Ro fold reproduces karaoke.</source>
         <translation>דער סטערעא־פֿאָלד איז Lt/Rt. אַנעקס C דעפֿינירט קיין Lt/Rt־רעפּראָדוקציע ניט, אַזוי אַז דער סטרים שפּילט ווי זײַן Lt/Rt־פֿאָלד און די אויסוואַל אויבן האָט קיין השפּעה ניט. דער Lo/Ro־פֿאָלד רעפּראָדוצירט קאַראַאָקע.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="518"/>
+        <location filename="../qml/KaraokePage.qml" line="535"/>
         <source>Use Lo/Ro</source>
         <translation>ניצט Lo/Ro</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="527"/>
+        <location filename="../qml/KaraokePage.qml" line="544"/>
         <source>Lyrics</source>
         <translation>ווערטער</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="529"/>
+        <location filename="../qml/KaraokePage.qml" line="546"/>
         <source>%1 · line %2 of %3</source>
         <translation>%1 · שורה %2 פֿון %3</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="551"/>
+        <location filename="../qml/KaraokePage.qml" line="568"/>
         <source>, word-timed</source>
         <translation>, מיט צײַט פֿאַר יעדן וואָרט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="552"/>
+        <location filename="../qml/KaraokePage.qml" line="569"/>
         <source>, line-timed</source>
         <translation>, מיט צײַט פֿאַר יעדע שורה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="562"/>
+        <location filename="../qml/KaraokePage.qml" line="579"/>
         <source>Time the lyrics…</source>
         <translation>סינכראָניזירן די ווערטער…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="567"/>
+        <location filename="../qml/KaraokePage.qml" line="584"/>
         <source>Full screen · F11</source>
         <translation>פֿולער עקראַן · F11</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="583"/>
-        <location filename="../qml/KaraokePage.qml" line="591"/>
+        <location filename="../qml/KaraokePage.qml" line="600"/>
+        <location filename="../qml/KaraokePage.qml" line="608"/>
         <source>Show</source>
         <translation>ווײַזן</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="594"/>
+        <location filename="../qml/KaraokePage.qml" line="611"/>
         <source>Words</source>
         <translation>ווערטער</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="595"/>
+        <location filename="../qml/KaraokePage.qml" line="612"/>
         <source>Picture</source>
         <translation>בילד</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="617"/>
+        <location filename="../qml/KaraokePage.qml" line="634"/>
         <source>This is the picture of the CD+G disc beside the lyrics. Its words are part of the picture; choose Words to follow the lyrics file.</source>
         <translation>דאָס איז דאָס בילד פֿון דער CD+G־דיסק לעבן די ווערטער. זײַנע ווערטער זענען אַ טייל פֿונעם בילד; קלײַבט „ווערטער“ כּדי נאָכצופֿאָלגן די ווערטער־טעקע.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="621"/>
+        <location filename="../qml/KaraokePage.qml" line="638"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
         <translation>די ווערטער האָבן קיין צײַטן ניט, דעריבער ווערן זיי געוויזן גאַנץ און ניט נאָכגעפֿאָלגט.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="614"/>
+        <location filename="../qml/KaraokePage.qml" line="820"/>
+        <source>%1 karaoke, %2: not reproduced (see the notice).</source>
+        <translation>%1־קאַראַאָקע, %2: ניט רעפּראָדוצירט (זעט די באַמערקונג).</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="822"/>
+        <source>%1 karaoke, %2.</source>
+        <translation>%1־קאַראַאָקע, %2.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="631"/>
         <source>This is the picture of a CD+G disc. Its words are part of the picture, so there is no text to follow.</source>
         <translation>דאָס איז דאָס בילד פֿון אַ CD+G־דיסק. די ווערטער זענען אַ טייל פֿונעם בילד, דעריבער איז דאָ קיין טעקסט צו נאָכפֿאָלגן.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="623"/>
+        <location filename="../qml/KaraokePage.qml" line="640"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
         <translation>די טעקע גיט צײַטן פֿאַר שורות, ניט פֿאַר ווערטער: אַ גאַנצע שורה ווערט הערויסגעהויבן בשעת מען זינגט זי.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="643"/>
+        <location filename="../qml/KaraokePage.qml" line="660"/>
         <source>First singer</source>
         <translation>ערשטער זינגער</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="652"/>
+        <location filename="../qml/KaraokePage.qml" line="669"/>
         <source>Name of the first singer (V1)</source>
         <translation>נאָמען פֿון דעם ערשטן זינגער (V1)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="659"/>
+        <location filename="../qml/KaraokePage.qml" line="676"/>
         <source>Second singer</source>
         <translation>צווייטער זינגער</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="668"/>
+        <location filename="../qml/KaraokePage.qml" line="685"/>
         <source>Name of the second singer (V2)</source>
         <translation>נאָמען פֿון דעם צווייטן זינגער (V2)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="702"/>
+        <location filename="../qml/KaraokePage.qml" line="719"/>
         <source>The stream</source>
         <translation>דער סטרים</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="707"/>
+        <location filename="../qml/KaraokePage.qml" line="724"/>
         <source>Backing left</source>
         <translation>באַגלײטונג לינקס</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="708"/>
+        <location filename="../qml/KaraokePage.qml" line="725"/>
         <source>Backing right</source>
         <translation>באַגלײטונג רעכטס</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="709"/>
+        <location filename="../qml/KaraokePage.qml" line="726"/>
         <source>Melody guide</source>
         <translation>גיד־מעלאָדיע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="390"/>
-        <location filename="../qml/KaraokePage.qml" line="710"/>
+        <location filename="../qml/KaraokePage.qml" line="407"/>
+        <location filename="../qml/KaraokePage.qml" line="727"/>
         <source>Vocal 1</source>
         <translation>געזאַנג 1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="391"/>
-        <location filename="../qml/KaraokePage.qml" line="711"/>
+        <location filename="../qml/KaraokePage.qml" line="323"/>
+        <source>Flagged karaoke, but this %1 programme has a dependent substream or objects, which Annex C has no vocals for: it plays as coded.</source>
+        <translation>אַנגעצייכנט ווי קאַראַאָקע, אָבער דער %1־פּראָגראַם האָט אַן אָפּהענגיקן סאַבסטרים אָדער אָביעקטן, פֿאַר וועלכע אַנעקס C האָט ניט קיין שטימען: ער שפּילט זיך אָפּ ווי קאָדירט.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="332"/>
+        <source>An E-AC-3 stream, but not a karaoke one: its service is %1.</source>
+        <translation>אַן E-AC-3־סטרים, אָבער ניט קיין קאַראַאָקע־סטרים: זײַן סערוויס איז %1.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="335"/>
+        <source>Karaoke is an AC-3 and E-AC-3 mode (Annex C of ETSI TS 102 366). This is neither.</source>
+        <translation>קאַראַאָקע איז אַ מאָדוס פֿון AC-3 און E-AC-3 (אַנעקס C פֿון ETSI TS 102 366). דאָס איז ניט קיינע פֿון זיי.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="408"/>
+        <location filename="../qml/KaraokePage.qml" line="728"/>
         <source>Vocal 2</source>
         <translation>געזאַנג 2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="728"/>
+        <location filename="../qml/KaraokePage.qml" line="745"/>
         <source>not in this stream</source>
         <translation>ניטאָ אין דעם סטרים</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="729"/>
+        <location filename="../qml/KaraokePage.qml" line="746"/>
         <source>heard</source>
         <translation>הערבאַר</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="729"/>
+        <location filename="../qml/KaraokePage.qml" line="746"/>
         <source>muted</source>
         <translation>אָפּגעשטילט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="739"/>
+        <location filename="../qml/KaraokePage.qml" line="756"/>
         <source>What plays</source>
         <translation>וואָס שפּילט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="777"/>
+        <location filename="../qml/KaraokePage.qml" line="794"/>
         <source>Nothing karaoke is playing.</source>
         <translation>קיין קאַראַאָקע שפּילט ניט.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="785"/>
+        <location filename="../qml/KaraokePage.qml" line="802"/>
         <source>Signal path</source>
         <translation>סיגנאַל־וועג</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="793"/>
+        <location filename="../qml/KaraokePage.qml" line="810"/>
         <source>Decoded as the stream says.</source>
         <translation>דעקאָדירט ווי דער סטרים זאָגט.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="796"/>
+        <location filename="../qml/KaraokePage.qml" line="813"/>
         <source>as coded</source>
         <translation>ווי קאָדירט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="797"/>
+        <location filename="../qml/KaraokePage.qml" line="814"/>
         <source>aware</source>
         <translation>באַוווּסט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="798"/>
+        <location filename="../qml/KaraokePage.qml" line="815"/>
         <source>capable, vocals: %1</source>
         <translation>פֿעיִק, געזאַנג: %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="799"/>
+        <location filename="../qml/KaraokePage.qml" line="816"/>
         <source>none</source>
         <translation>קיינע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="800"/>
+        <location filename="../qml/KaraokePage.qml" line="817"/>
         <source>both</source>
         <translation>ביידע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="803"/>
-        <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
-        <translation>AC-3־קאַראַאָקע, %1: ניט רעפּראָדוצירט (זעט די באַמערקונג).</translation>
-    </message>
-    <message>
-        <location filename="../qml/KaraokePage.qml" line="804"/>
-        <source>AC-3 karaoke, %1.</source>
-        <translation>AC-3־קאַראַאָקע, %1.</translation>
-    </message>
-    <message>
-        <location filename="../qml/KaraokePage.qml" line="816"/>
+        <location filename="../qml/KaraokePage.qml" line="834"/>
         <source>Nothing is playing.</source>
         <translation>גאָרנישט שפּילט ניט.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="818"/>
+        <location filename="../qml/KaraokePage.qml" line="836"/>
         <source>%1 · %2 ch at %3 Hz</source>
         <translation>%1 · %2 קאַנאַלן ביי %3 הערץ</translation>
     </message>
@@ -5231,17 +5241,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1332"/>
+        <location filename="../../src/hearth_controller.cpp" line="1354"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2391"/>
+        <location filename="../../src/hearth_controller.cpp" line="2415"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2394"/>
+        <location filename="../../src/hearth_controller.cpp" line="2418"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>

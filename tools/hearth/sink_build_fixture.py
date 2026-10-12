@@ -165,7 +165,7 @@ def make_build(
     return build
 
 
-# The four images a release publishes, as make_build's arguments.
+# The five images a release publishes, as make_build's arguments.
 RELEASE_IMAGES = {
     "hearth-sink-esp32s3": {"target": "esp32s3", "flash_size": "16MB", "psram": True},
     "hearth-sink-esp32c6": {"target": "esp32c6", "flash_size": "4MB", "psram": False},
@@ -176,5 +176,12 @@ RELEASE_IMAGES = {
         "psram": True,
         "min_rev": 100,
         "max_rev": 199,
+    },
+    "hearth-sink-esp32p4-rev3": {
+        "target": "esp32p4",
+        "flash_size": "16MB",
+        "psram": True,
+        "min_rev": 301,
+        "max_rev": 399,
     },
 }

@@ -1,0 +1,9 @@
+# The panel on a MIPI DSI panel with touch (planning/karaoke-p4x-panel.md): the 7-inch 1024 by 600
+# EK79007 panel and GT911 of Espressif's ESP32-P4X-Function-EV-Board. After sdkconfig.panel. The pins
+# are that board's, from its BSP header (the Kconfig defaults of ICLFORGE_EXAMPLE_PANEL_*): check
+# them against the schematic of the board the image is for.
+#
+# NOT RUN ON A BOARD YET. The read-back route is left on while the panel is brought up (set the port
+# to 0 for a release image).
+CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI=y
+CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT=8081

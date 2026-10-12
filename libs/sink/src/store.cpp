@@ -1,4 +1,4 @@
-#include "store.hpp"
+#include "iclforge/sink/store.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -20,7 +20,7 @@
 #include "iclforge/sendspin/handshake_session.hpp"
 #include "iclforge/sendspin/noise.hpp"
 
-namespace iclforge::hearth::testsink {
+namespace iclforge::sink {
 
 namespace {
 
@@ -236,4 +236,4 @@ void Store::set_last_playback(const Key32& server_key) {
     (void)write_text(directory_ / kLastPlaybackFile, hex_of(server_key) + "\n");
 }
 
-}  // namespace iclforge::hearth::testsink
+}  // namespace iclforge::sink

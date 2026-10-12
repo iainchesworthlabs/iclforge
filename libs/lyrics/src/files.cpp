@@ -35,7 +35,8 @@ constexpr std::uintmax_t kMaxFileBytes = 4U * 1024U * 1024U;
 }  // namespace
 
 std::expected<Lyrics, std::string> read_lyrics(const std::filesystem::path& file,
-                                               std::optional<std::int64_t> duration_ms) {
+                                               std::optional<std::int64_t> duration_ms,
+                                               const TextEncoding& encoding) {
     std::error_code sized;
     const std::uintmax_t size = std::filesystem::file_size(file, sized);
     if (sized) {
@@ -52,12 +53,12 @@ std::expected<Lyrics, std::string> read_lyrics(const std::filesystem::path& file
     if (!bytes.empty() && !in.read(bytes.data(), static_cast<std::streamsize>(bytes.size()))) {
         return std::unexpected(std::string{"The lyrics file could not be read."});
     }
-    return parse_timed_text(bytes, duration_ms);
+    return parse_timed_text(bytes, duration_ms, encoding);
 }
 
 Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
                               const std::filesystem::path& stream_path,
-                              std::optional<std::int64_t> duration_ms) {
+                              std::optional<std::int64_t> duration_ms, const TextEncoding& encoding) {
     Placement out;
     std::filesystem::path target = stream_path;
     target.replace_extension(".lrc");
@@ -67,7 +68,7 @@ Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
         out.status = PlacementStatus::kExists;
         return out;
     }
-    const auto read = read_lyrics(lyrics_file, duration_ms);
+    const auto read = read_lyrics(lyrics_file, duration_ms, encoding);
     if (!read) {
         out.status = PlacementStatus::kUnreadable;
         out.error = read.error();

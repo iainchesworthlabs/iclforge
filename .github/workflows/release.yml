@@ -344,6 +344,7 @@ jobs:
             "release-artifacts/hearth-sink-esp32c6-v*-factory.bin|ESP32-C6 sink firmware, 4 MB table (package-esp32-firmware)"
             "release-artifacts/hearth-sink-esp32c6-16mb-*-factory.bin|ESP32-C6 sink firmware, 16 MB table (package-esp32-firmware)"
             "release-artifacts/hearth-sink-esp32p4-rev1-*-factory.bin|ESP32-P4 sink firmware (package-esp32-firmware)"
+            "release-artifacts/hearth-sink-esp32p4-rev3-*-factory.bin|ESP32-P4 (chip revision v3.x) sink firmware with its panel (package-esp32-firmware)"
             "release-artifacts/hearth-sink-manifest.json|sink firmware manifest (package-esp32-firmware)"
           )
 

@@ -133,7 +133,8 @@ if(EXISTS "${ICLFORGE_HEARTH_VCPKG_SHARE}/libogg/copyright")
     list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS "LIBOGG_VERSION=${version}")
     list(APPEND ICLFORGE_HEARTH_NOTICE_FILES "LIBOGG_COPYRIGHT=${ICLFORGE_HEARTH_VCPKG_SHARE}/libogg/copyright")
 endif()
-list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt nlohmann-json hearth-fonts material-symbols trademarks)
+list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt nlohmann-json hearth-fonts hearth-lvgl
+       hearth-firmware material-symbols trademarks)
 # Tracy's client library: hearth_engine (engine/CMakeLists.txt) links iclforge::tracy
 # unconditionally, which only pulls in Tracy::TracyClient - and so is only worth
 # disclosing - when ICLFORGE_ENABLE_TRACY is on (cmake/Tracy.cmake). Same fact,
@@ -159,16 +160,23 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS
     "TRACY_VERSION=${ICLFORGE_HEARTH_TRACY_VERSION}"
     "TRACY_USERS=Hearth's programs")
 # LGPL3 is read only when qt-bundled is actually in the fragment list above; FMT_MIT
-# and OFL are read by the unconditional fmt/fonts fragments just added; MATERIAL_SYMBOLS_
+# and OFL are read by the unconditional fmt/fonts fragments just added; LVGL_MIT and
+# ESP_IDF_COMPONENTS by the unconditional hearth-lvgl and hearth-firmware fragments (LVGL
+# and ESP-IDF are in the ESP32 sinks' firmware images, not in these programs, and are named
+# here because the notices are the one place Hearth shows what its releases carry from
+# others; notices/licences/ESP-IDF-components.txt is made by
+# tools/generators/gen_esp_idf_notices.py); MATERIAL_SYMBOLS_
 # LICENSE by the unconditional material-symbols fragment; TRACY_BSD only when
 # ICLFORGE_ENABLE_TRACY added tracy above. ac3_generate_notices ignores a {{FILE:...}}
-# marker no fragment mentions, so passing all five here unconditionally is safe
+# marker no fragment mentions, so passing all of them here unconditionally is safe
 # regardless of platform, Qt-bundling or ICLFORGE_ENABLE_TRACY.
 list(APPEND ICLFORGE_HEARTH_NOTICE_FILES
     "LGPL3=${CMAKE_SOURCE_DIR}/notices/licences/LGPL-3.0.txt"
     "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
     "JSON_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-nlohmann-json.txt"
     "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
+    "LVGL_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-lvgl.txt"
+    "ESP_IDF_COMPONENTS=${CMAKE_SOURCE_DIR}/notices/licences/ESP-IDF-components.txt"
     "MATERIAL_SYMBOLS_LICENSE=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Apache-2.0.txt"
     "TRACY_BSD=${CMAKE_SOURCE_DIR}/notices/licences/BSD-3-Clause-Tracy.txt")
 

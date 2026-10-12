@@ -1,0 +1,545 @@
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cmath>
+#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <filesystem>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <vector>
+
+#include "iclforge/sendspin/chunks.hpp"
+#include "iclforge/sendspin/crypto.hpp"
+#include "iclforge/sendspin/handshake.hpp"
+#include "iclforge/sendspin/iclforge_player.hpp"
+#include "iclforge/sendspin/messages.hpp"
+#include "iclforge/sendspin/noise.hpp"
+#include "iclforge/sendspin/pairing_messages.hpp"
+#include "iclforge/sendspin/server_session.hpp"
+#include "iclforge/sendspin/session_driver.hpp"
+#include "iclforge/sendspin/websocket.hpp"
+#include "iclforge/sink/sink.hpp"
+#include "iclforge/sink/store.hpp"
+
+// iclforge::sink with no program behind it: outputs that only write down what they were given. What
+// libs/sink promises is the seam: each connection asks the program for its outputs, a stream's
+// start, its audio and its end reach them as the server sent them, and what the output says it has
+// counted is what the sink reports. hearth-testsink's own suites (apps/hearth/engine/tests) hold the
+// rest of the sink's behaviour, through the program's real outputs.
+//
+// It dials a loopback WebSocket, so under ThreadSanitizer it needs what libs/sendspin/tests/
+// test_websocket.cpp says.
+
+namespace {
+
+namespace fs = std::filesystem;
+namespace m = iclforge::sendspin::messages;
+namespace hs = iclforge::sendspin::handshake;
+namespace ac = iclforge::sendspin::player;
+namespace websocket = iclforge::sendspin::transport::websocket;
+using iclforge::sendspin::crypto::Key32;
+using namespace std::chrono_literals;
+
+// Every line the sink logs, for a case to wait on.
+class Lines final : public iclforge::sink::Log {
+   public:
+    void line(std::string_view text) override {
+        {
+            const std::lock_guard lock(mutex_);
+            lines_.emplace_back(text);
+        }
+        changed_.notify_all();
+    }
+
+    bool wait(std::string_view needle, std::chrono::milliseconds timeout = 10s) {
+        std::unique_lock lock(mutex_);
+        return changed_.wait_for(lock, timeout, [&] {
+            return std::ranges::any_of(lines_,
+                                       [&](const std::string& l) { return l.find(needle) != std::string::npos; });
+        });
+    }
+
+   private:
+    std::mutex mutex_;
+    std::condition_variable changed_;
+    std::vector<std::string> lines_;
+};
+
+// What the program's outputs were given, shared by both of a connection's outputs and read by the
+// case's thread.
+struct Recording {
+    std::mutex mutex;
+    std::vector<std::uint64_t> stream_connections;
+    std::vector<std::uint64_t> burst_connections;
+    // player@v1
+    std::vector<m::PlayerStream> started;
+    std::vector<std::vector<std::uint8_t>> chunks;
+    std::vector<std::int64_t> chunk_times;
+    int ended = 0;
+    // _iclforge_player@v1
+    std::vector<ac::StreamStart> burst_started;
+    struct Burst {
+        std::uint16_t pc = 0;
+        std::uint16_t pd = 0;
+        std::vector<std::uint8_t> payload;
+    };
+    std::vector<Burst> bursts;
+    int burst_ended = 0;
+    struct Karaoke {
+        ac::Karaoke reproduction = ac::Karaoke::kOff;
+        ac::KaraokeVocals vocals = ac::KaraokeVocals::kBoth;
+        std::array<double, 3> levels{};
+    };
+    std::vector<Karaoke> karaoke;
+    // What the output says it has counted, as the program's would.
+    std::uint32_t streams = 0;
+    std::uint32_t burst_streams = 0;
+};
+
+class FakeStream final : public iclforge::sink::StreamOutput {
+   public:
+    explicit FakeStream(Recording& recording) : recording_(&recording) {}
+
+    bool start(const m::PlayerStream& stream) override {
+        const std::lock_guard lock(recording_->mutex);
+        recording_->started.push_back(stream);
+        ++recording_->streams;
+        return true;
+    }
+    void clear() override {}
+    void end() override {
+        const std::lock_guard lock(recording_->mutex);
+        ++recording_->ended;
+    }
+    void write(std::span<const std::uint8_t> frame, std::int64_t local_time) override {
+        const std::lock_guard lock(recording_->mutex);
+        recording_->chunks.emplace_back(frame.begin(), frame.end());
+        recording_->chunk_times.push_back(local_time);
+    }
+    [[nodiscard]] iclforge::sink::OutputCounts counts() const override {
+        const std::lock_guard lock(recording_->mutex);
+        std::uint64_t frames = 0;
+        for (const auto& chunk : recording_->chunks) {
+            frames += chunk.size() / 4;
+        }
+        return {.streams = recording_->streams, .units = recording_->chunks.size(), .frames = frames};
+    }
+    [[nodiscard]] const fs::path& file() const override { return file_; }
+
+   private:
+    Recording* recording_;
+    fs::path file_;
+};
+
+class FakeBursts final : public iclforge::sink::BurstStreamOutput {
+   public:
+    explicit FakeBursts(Recording& recording) : recording_(&recording) {}
+
+    bool start(const ac::StreamStart& stream) override {
+        const std::lock_guard lock(recording_->mutex);
+        recording_->burst_started.push_back(stream);
+        ++recording_->burst_streams;
+        return true;
+    }
+    void clear() override {}
+    void end() override {
+        const std::lock_guard lock(recording_->mutex);
+        ++recording_->burst_ended;
+    }
+    void write(const iclforge::sendspin::BurstChunk& chunk, std::int64_t /*local_time*/) override {
+        const std::lock_guard lock(recording_->mutex);
+        recording_->bursts.push_back({.pc = chunk.pc,
+                                      .pd = chunk.pd,
+                                      .payload = {chunk.chunk.data.begin(), chunk.chunk.data.end()}});
+    }
+    void set_karaoke(ac::Karaoke reproduction, ac::KaraokeVocals vocals,
+                     const std::array<double, 3>& levels_db) override {
+        const std::lock_guard lock(recording_->mutex);
+        recording_->karaoke.push_back({.reproduction = reproduction, .vocals = vocals, .levels = levels_db});
+    }
+    [[nodiscard]] iclforge::sink::OutputCounts counts() const override {
+        const std::lock_guard lock(recording_->mutex);
+        return {.streams = recording_->burst_streams, .units = recording_->bursts.size(), .frames = 0};
+    }
+    [[nodiscard]] const fs::path& file() const override { return file_; }
+    [[nodiscard]] const std::optional<ac::DecoderReport>& decoder() const override { return decoder_; }
+
+   private:
+    Recording* recording_;
+    fs::path file_;
+    std::optional<ac::DecoderReport> decoder_;
+};
+
+class FakeOutputs final : public iclforge::sink::Outputs {
+   public:
+    explicit FakeOutputs(Recording& recording) : recording_(&recording) {}
+
+    [[nodiscard]] std::unique_ptr<iclforge::sink::StreamOutput> stream(std::uint64_t connection) override {
+        {
+            const std::lock_guard lock(recording_->mutex);
+            recording_->stream_connections.push_back(connection);
+        }
+        return std::make_unique<FakeStream>(*recording_);
+    }
+    [[nodiscard]] std::unique_ptr<iclforge::sink::BurstStreamOutput> bursts(std::uint64_t connection) override {
+        {
+            const std::lock_guard lock(recording_->mutex);
+            recording_->burst_connections.push_back(connection);
+        }
+        return std::make_unique<FakeBursts>(*recording_);
+    }
+
+   private:
+    Recording* recording_;
+};
+
+class Keys final : public hs::ServerKeyring {
+   public:
+    [[nodiscard]] hs::PskChoice choose(const Key32& /*client_key*/) const override { return hs::sentinel_choice(); }
+};
+
+class Events final : public iclforge::sendspin::ServerListener {
+   public:
+    void on_hello(const m::ClientHello& /*hello*/) override { update([&] { ++hellos; }); }
+    void on_state(const m::ClientState& state) override { update([&] { available = state.available; }); }
+    void on_goodbye(m::GoodbyeReason /*reason*/) override {}
+    void on_leave() override {}
+    void on_pairing_held_back(const std::optional<std::string>& /*message*/) override {}
+    void on_pairing_code_wanted() override {}
+    bool on_paired(const Key32& /*client_key*/, const Key32& /*psk*/) override { return true; }
+    void on_pairing_ended(std::optional<iclforge::sendspin::pairing_messages::AbortReason> /*reason*/) override {}
+
+    template <class Predicate>
+    bool wait(Predicate&& predicate, std::chrono::milliseconds timeout = 10s) {
+        std::unique_lock lock(mutex_);
+        return changed_.wait_for(lock, timeout, std::forward<Predicate>(predicate));
+    }
+
+    int hellos = 0;
+    bool available = false;
+
+   private:
+    template <class Update>
+    void update(Update&& change) {
+        {
+            const std::lock_guard lock(mutex_);
+            change();
+        }
+        changed_.notify_all();
+    }
+
+    std::mutex mutex_;
+    std::condition_variable changed_;
+};
+
+// One server dialled at a sink, active for `roles`.
+struct Dialled {
+    iclforge::sendspin::SteadyClock clock;
+    Keys keys;
+    Events events;
+    iclforge::sendspin::ServerSession server;
+    std::unique_ptr<iclforge::sendspin::SessionDriver> driver;
+
+    Dialled(const iclforge::sink::Sink& sink, const iclforge::sendspin::noise::KeyPair& identity)
+        : server({.identity = identity, .name = "Test server", .languages = {}, .max_message_bytes = 1 << 22}, keys,
+                 events, clock) {
+        auto dialled = websocket::connect("ws://127.0.0.1:" + std::to_string(sink.port()) + "/sendspin");
+        REQUIRE(dialled.has_value());
+        driver = std::make_unique<iclforge::sendspin::SessionDriver>(
+            std::move(*dialled), iclforge::sendspin::DrivenSession{
+                                     .receive = [this](const auto& frame) { return server.receive(frame); },
+                                     .tick = [this] { return server.tick(); },
+                                     .next_tick_us = [this] { return server.next_tick_us(); },
+                                     .ended = {}});
+        driver->start();
+        REQUIRE(events.wait([&] { return events.hellos >= 1; }));
+    }
+
+    ~Dialled() {
+        driver->close();
+        driver->join();
+    }
+    Dialled(const Dialled&) = delete;
+    Dialled& operator=(const Dialled&) = delete;
+    Dialled(Dialled&&) = delete;
+    Dialled& operator=(Dialled&&) = delete;
+
+    template <class Call>
+    bool call(Call&& work) {
+        return driver->call(std::forward<Call>(work)).has_value();
+    }
+
+    bool play(std::vector<std::string> roles) {
+        return call([&] {
+            return server.activate(
+                {.activities = {m::Activity::kPlayback}, .active_roles = std::move(roles), .pairing = std::nullopt});
+        });
+    }
+};
+
+iclforge::sendspin::noise::KeyPair generated() {
+    std::optional<iclforge::sendspin::noise::KeyPair> pair = iclforge::sendspin::noise::KeyPair::generate();
+    REQUIRE(pair.has_value());
+    return *pair;
+}
+
+fs::path scratch(std::string_view leaf) {
+    const fs::path dir = fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("iclforge_sink_" + std::string(leaf));
+    fs::remove_all(dir);
+    return dir;
+}
+
+iclforge::sink::Options options_in(const fs::path& dir) {
+    iclforge::sink::Options options;
+    options.name = "Library sink";
+    options.product_name = "iclforge-sink-tests";
+    options.address = "127.0.0.1";
+    options.port = 0;
+    options.state_directory = dir / "state";
+    options.advertise = false;
+    options.codecs = {m::Codec::kPcm};
+    options.unpaired_access = true;
+    return options;
+}
+
+}  // namespace
+
+TEST_CASE("sink: a connection asks the program for its outputs and a PCM stream reaches the stream output",
+          "[sink][websocket]") {
+    const fs::path dir = scratch("stream");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    auto sink = iclforge::sink::Sink::start(options_in(dir), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({"player@v1"}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+
+    const m::AudioFormat format{.codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    REQUIRE(server.call([&] { return server.server.start_stream({.format = format, .codec_header = {}}); }));
+    CHECK(log.wait("stream PCM 48000 Hz 16-bit 2 ch"));
+
+    // Three chunks of 480 frames, each different, at times 20 ms apart.
+    std::vector<std::vector<std::uint8_t>> sent;
+    const std::int64_t first = server.clock.now_us() + 400'000;
+    for (int index = 0; index < 3; ++index) {
+        std::vector<std::uint8_t> chunk(480 * 4);
+        for (std::size_t byte = 0; byte < chunk.size(); ++byte) {
+            chunk[byte] = static_cast<std::uint8_t>((byte * 7U) + static_cast<std::size_t>(index) * 31U);
+        }
+        const std::int64_t at = first + (static_cast<std::int64_t>(index) * 10'000);
+        REQUIRE(server.call([&] { return server.server.send_audio(at, chunk); }));
+        sent.push_back(std::move(chunk));
+    }
+    REQUIRE(server.call([&] { return server.server.end_stream(); }));
+    CHECK(log.wait("stream ended after 3 chunks"));
+
+    const std::lock_guard lock(recording.mutex);
+    // The sink's own number for the connection, from 1.
+    REQUIRE(recording.stream_connections == std::vector<std::uint64_t>{1});
+    REQUIRE(recording.burst_connections == std::vector<std::uint64_t>{1});
+    REQUIRE(recording.started.size() == 1);
+    CHECK(recording.started[0].format.codec == m::Codec::kPcm);
+    CHECK(recording.started[0].format.channels == 2);
+    CHECK(recording.started[0].format.sample_rate == 48000);
+    CHECK(recording.started[0].format.bit_depth == 16);
+    CHECK(recording.chunks == sent);
+    REQUIRE(recording.chunk_times.size() == 3);
+    // In the order sent, 10 ms of the sink's clock apart (the clock filter may move a little between
+    // two chunks).
+    CHECK(std::abs(recording.chunk_times[1] - recording.chunk_times[0] - 10'000) < 1'000);
+    CHECK(std::abs(recording.chunk_times[2] - recording.chunk_times[1] - 10'000) < 1'000);
+    CHECK(recording.ended == 1);
+    CHECK(recording.burst_started.empty());
+}
+
+TEST_CASE("sink: a burst stream and its karaoke settings reach the burst output", "[sink][websocket]") {
+    const fs::path dir = scratch("bursts");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.karaoke = true;
+    options.layout = "5.1";
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole)}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    CHECK(log.wait("burst stream AC-3 48000 Hz to 5.1"));
+
+    // Two bursts' payloads: a syncword, which the server's session checks, and bytes the sink does not
+    // read.
+    std::vector<std::vector<std::uint8_t>> sent;
+    const std::int64_t first = server.clock.now_us() + 400'000;
+    for (int index = 0; index < 2; ++index) {
+        std::vector<std::uint8_t> payload(1792);
+        for (std::size_t byte = 0; byte < payload.size(); ++byte) {
+            payload[byte] = static_cast<std::uint8_t>((byte * 3U) + static_cast<std::size_t>(index));
+        }
+        payload[0] = 0x0B;
+        payload[1] = 0x77;
+        const std::uint16_t pd = iclforge::sendspin::burst_length_code(iclforge::sendspin::BurstDataType::kAc3,
+                                                                       payload.size());
+        const std::int64_t at = first + (static_cast<std::int64_t>(index) * 32'000);
+        REQUIRE(server.call([&] {
+            return server.server.send_burst(
+                at, static_cast<std::uint16_t>(iclforge::sendspin::BurstDataType::kAc3), pd, payload);
+        }));
+        sent.push_back(std::move(payload));
+    }
+
+    // A settings command: the karaoke keys go to the output, and the revision is reported.
+    ac::CommandMessage command;
+    command.command = ac::Command::kSettings;
+    command.settings.revision = 7;
+    command.settings.decoder.karaoke = ac::Karaoke::kAware;
+    command.settings.decoder.karaoke_vocals = ac::KaraokeVocals::kV1;
+    command.settings.decoder.karaoke_melody_db = -6.0;
+    REQUIRE(server.call([&] { return server.server.iclforge_command(command); }));
+    CHECK(log.wait("settings 7 applied (karaoke aware, vocals v1, melody -6 dB)"));
+
+    REQUIRE(server.call([&] { return server.server.end_burst_stream(); }));
+    CHECK(log.wait("burst stream ended after 2 bursts"));
+
+    const std::lock_guard lock(recording.mutex);
+    REQUIRE(recording.burst_started.size() == 1);
+    CHECK(recording.burst_started[0].data_type == ac::DataType::kAc3);
+    CHECK(recording.burst_started[0].sample_rate == 48000);
+    REQUIRE(recording.bursts.size() == 2);
+    for (std::size_t index = 0; index < 2; ++index) {
+        CHECK(recording.bursts[index].pc == static_cast<std::uint16_t>(iclforge::sendspin::BurstDataType::kAc3));
+        CHECK(recording.bursts[index].payload == sent[index]);
+    }
+    CHECK(recording.bursts[0].pd == recording.bursts[1].pd);
+    REQUIRE(recording.karaoke.size() == 1);
+    CHECK(recording.karaoke[0].reproduction == ac::Karaoke::kAware);
+    CHECK(recording.karaoke[0].vocals == ac::KaraokeVocals::kV1);
+    CHECK(recording.karaoke[0].levels == std::array<double, 3>{-6.0, 0.0, 0.0});
+    CHECK(recording.burst_ended == 1);
+    CHECK(recording.started.empty());
+}
+
+TEST_CASE("sink: the totals are what the outputs say they counted", "[sink][websocket]") {
+    const fs::path dir = scratch("totals");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    auto sink = iclforge::sink::Sink::start(options_in(dir), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    {
+        Dialled server(**sink, identity);
+        REQUIRE(server.play({"player@v1"}));
+        REQUIRE(log.wait("activated for playback"));
+        REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+        const m::AudioFormat format{.codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+        REQUIRE(server.call([&] { return server.server.start_stream({.format = format, .codec_header = {}}); }));
+        const std::vector<std::uint8_t> chunk(480 * 4, 0x5A);
+        const std::int64_t first = server.clock.now_us() + 400'000;
+        for (int index = 0; index < 4; ++index) {
+            const std::int64_t at = first + (static_cast<std::int64_t>(index) * 10'000);
+            REQUIRE(server.call([&] { return server.server.send_audio(at, chunk); }));
+        }
+        REQUIRE(log.wait("stream PCM"));
+        // While the connection is open.
+        const auto deadline = std::chrono::steady_clock::now() + 10s;
+        while ((*sink)->totals().chunks < 4 && std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(20ms);
+        }
+        const iclforge::sink::Sink::Totals open = (*sink)->totals();
+        CHECK(open.connections == 1);
+        CHECK(open.streams == 1);
+        CHECK(open.chunks == 4);
+        CHECK(open.frames == 4 * 480);
+    }
+    // Once it has closed, what it counted is still counted.
+    const auto deadline = std::chrono::steady_clock::now() + 10s;
+    while ((*sink)->totals().connections != 0 && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(20ms);
+    }
+    const iclforge::sink::Sink::Totals closed = (*sink)->totals();
+    CHECK(closed.connections == 0);
+    CHECK(closed.streams == 1);
+    CHECK(closed.chunks == 4);
+    CHECK(closed.frames == 4 * 480);
+}
+
+TEST_CASE("sink: the store keeps the identity, the pairing PSK and the records between runs", "[sink][store]") {
+    const fs::path dir = scratch("store") / "state";
+    Key32 server_a{};
+    Key32 psk_a{};
+    server_a.fill(0x11);
+    psk_a.fill(0x22);
+    Key32 server_b{};
+    Key32 psk_b{};
+    server_b.fill(0x33);
+    psk_b.fill(0x44);
+
+    Key32 identity_key{};
+    Key32 pairing_psk{};
+    {
+        auto store = iclforge::sink::Store::open(dir);
+        REQUIRE(store.has_value());
+        identity_key = (*store)->identity().public_key();
+        pairing_psk = (*store)->pairing_psk();
+        CHECK((*store)->records() == 0);
+        CHECK((*store)->add_record(server_a, psk_a));
+        CHECK((*store)->add_record(server_b, psk_b));
+        (*store)->set_last_playback(server_b);
+        // A record for a server already held replaces it.
+        CHECK((*store)->add_record(server_a, psk_b));
+        CHECK((*store)->records() == 2);
+    }
+    {
+        auto store = iclforge::sink::Store::open(dir);
+        REQUIRE(store.has_value());
+        CHECK((*store)->identity().public_key() == identity_key);
+        CHECK((*store)->pairing_psk() == pairing_psk);
+        CHECK((*store)->records() == 2);
+        CHECK((*store)->last_playback() == std::optional<Key32>{server_b});
+        (*store)->remove_record(server_a);
+        CHECK((*store)->records() == 1);
+    }
+    {
+        auto store = iclforge::sink::Store::open(dir);
+        REQUIRE(store.has_value());
+        CHECK((*store)->records() == 1);
+    }
+}
+
+TEST_CASE("sink: a key's hex text goes back and forth, and only whole keys do", "[sink][store]") {
+    Key32 key{};
+    for (std::size_t index = 0; index < key.size(); ++index) {
+        key[index] = static_cast<std::uint8_t>(index * 5U);
+    }
+    const std::string text = iclforge::sink::hex_of(key);
+    CHECK(text.size() == 64);
+    CHECK(iclforge::sink::key_from_hex(text) == std::optional<Key32>{key});
+    CHECK_FALSE(iclforge::sink::key_from_hex(text.substr(1)).has_value());
+    CHECK_FALSE(iclforge::sink::key_from_hex(text + "00").has_value());
+    std::string bad = text;
+    bad[10] = 'g';
+    CHECK_FALSE(iclforge::sink::key_from_hex(bad).has_value());
+}
