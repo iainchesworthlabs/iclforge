@@ -109,6 +109,18 @@ The sections below contain the complete change list and fixes.
   muted (the one they are taking over). A stream that is not karaoke, or whose part has no clear
   pitch, is refused with the reason. On the repository's karaoke example the tune comes out of M and
   of V1 note for note, and V2 comes out a diatonic third below.
+**Karaoke in E-AC-3: Hearth's Karaoke page knows it**
+
+- **The Karaoke page names an E-AC-3 karaoke stream and takes its choice.** Hearth's engine had
+  reproduced such a stream since the decoder did, but the page still said Karaoke is an AC-3
+  mode and disabled its controls. A programme is karaoke to the page when the decoder reproduces
+  it (`ac3::is_karaoke_programme`: the service type, one independent substream, no object
+  layer), so the page's words and the sound agree. A programme that is flagged karaoke and has a
+  dependent substream or objects says so ("Flagged karaoke, but ... it plays as coded"), a
+  plain E-AC-3 stream says it is not a karaoke one, and the signal-path line names the codec
+  ("E-AC-3 karaoke, aware."). Five strings are new or changed, translated in the six catalogues
+  (`planning/karaoke-eac3.md`, E4c).
+
 **Audio: when a packet was captured**
 
 - **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
@@ -119,6 +131,7 @@ The sections below contain the complete change list and fixes.
   packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
   `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
   consumer must treat as "no time", and a caller that does not use any of it sees no change.
+
 **Karaoke: a plan for a microphone, scoring and recording**
 
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
@@ -181,6 +194,22 @@ The sections below contain the complete change list and fixes.
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
 
+**A Sendspin sink library, which Hearth's test sink is the first program of**
+
+- **`iclforge::sink` (`libs/sink`): a sink a program runs, with the program's own audio output.**
+  What `hearth-testsink` did that is not writing a WAV file or decoding a burst (it listens and
+  advertises, pairs, admits servers as the specification ranks them, keeps its identity and pairing
+  records, answers the roles a server lists and counts what it was given) is a library, so that the
+  Android app (`planning/hearth-android.md`, D3) does not have to be a third copy beside the test sink
+  and the firmware. A program supplies `iclforge::sink::Outputs`: a `StreamOutput` for `player@v1` and
+  a `BurstStreamOutput` for `_iclforge_player@v1` per connection, which the sink starts, feeds, clears
+  and ends and asks for its counts and its decoder report. The test sink's `WavOutput` and
+  `BurstOutput` are those outputs, and its `Sink` and `SinkOptions` are the same names with the same
+  members, so its suites, and the ones that run it in process, are unchanged. A new project row
+  (`sink`, internal, never installed) and a test binary with outputs that only write down what they
+  were given.
+  This is a move: no message, log line or file the test sink writes is different.
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
@@ -193,6 +222,19 @@ The sections below contain the complete change list and fixes.
   what the container says, so that a person can see whether a karaoke video's words are in a text
   track, a bitmap subtitle track or only in the picture.
 
+**Subtitle karaoke: who sings an ASS line, and which line at one time is read**
+
+- **An ASS script's duet is read.** Where exactly two different actors (the `Name` column) are named
+  on the sung lines, they are the two singers, in the order they first appear, with their names;
+  failing that, where exactly two styles are used on them, those are the singers (a style's name is
+  not shown as one). One, three or none marks nobody. The lines carry `V1:` and `V2:` through
+  `write_lrc` like any other duet, so Hearth's singer view and a sink read them.
+- **Lines that share a time are read once.** A line written on two layers is one line; of lines in
+  different styles at one start and end, a translation or a romanisation beside the sung line is
+  dropped, and with no sung line the file's commonest style is read. Lines in one style at one time
+  are all read. The reader no longer shows a doubled line or an interleaved translation for such a
+  script (planning/karaoke-formats-options.md, D14).
+
 **Forge writes the lyrics beside the stream it encodes**
 
 - **`lyrics=<file>` on `forge encode`, `eac3-encode` and `ac4-encode`.** The file may be an `.lrc`, a
@@ -203,6 +245,14 @@ The sections below contain the complete change list and fixes.
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
   `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The lyric library reads a code page when a program supplies the conversion.**
+  `iclforge::lyrics::TextEncoding` carries a decoder callback (the library holds no table of any
+  page, as it is linked into firmware), and every reader (`parse_lyrics`, `parse_subrip`,
+  `parse_ass`, `parse_midi_karaoke`, `parse_timed_text`, `read_lyrics`, `place_lyrics_beside`) takes
+  one as its last argument. It is asked only for text that is not UTF-8 and has no UTF-16 mark, a
+  MIDI file's title, artist and syllables one at a time and never its other `@` lines; a file that
+  is UTF-8 or UTF-16 is read as it was whatever is given, and without a decoder a code page is still
+  refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
   name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
   dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
@@ -362,6 +412,11 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke guide's "From a program" table has its C API, Python and Rust rows.** Each names the
+  call that reproduces a karaoke stream and the lyric reader, and links the binding's own page
+  ([C API](docs/library/c-api.md#karaoke-streams-annex-c), [Python](docs/library/python-api.md#karaoke-streams-and-lyrics),
+  [Rust](docs/library/rust-api.md#karaoke-and-lyrics)); only the C++ and WebAssembly rows were there
+  until the bindings landed.
 - **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
   `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
   part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table
@@ -653,6 +708,28 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **The ESP32-P4 sink draws the lyrics on a panel, with the colour moving as the song does, and
+  there is an image for a P4 of chip revision v3.x.** `hearth_sink` takes a screen
+  (`main/panel/`, chosen like the sink and the source): LVGL 9 drawing the lines before and after
+  the one being sung, the words of it with the fill moving by time, a duet's two singers by name
+  and side, an instrumental break as four dots, right-to-left text, and an idle screen with the
+  board's name, address and pairing code, with Archivo, Noto Sans Greek and Cyrillic and Noto Sans
+  Hebrew in the image (a line in a script none of them draws is one sentence, not boxes); touch
+  sets the board's own lyric delay and text size. It runs on a MIPI DSI panel with a GT911 (the
+  7-inch panel of Espressif's ESP32-P4X-Function-EV-Board, the pins from its user guide and board
+  support header) or into a frame buffer in PSRAM with no panel, which `GET :8081/panel.bmp` reads
+  back, so the screen is drawn and its cost measured on a board that has none; `firmware/hearth-sink/preview`
+  draws the same code on a computer. What a screen shows is `iclforge::lyrics::Stage` and
+  `Follower::stage()` in the library, tested on the host. The new image,
+  `hearth-sink-esp32p4-rev3`, is built over `sdkconfig.p4` by `sdkconfig.p4-rev3` (chip revisions
+  v3.1 to v3.99, 400 MHz, and the 160 MHz PLL as the I2S clock so that TDM opens at 16 by 32 bits);
+  the two P4 images refuse each other's chips, and `ota.py` picks one by the revision the board
+  reports. The panel and the v3.x chip have not run on a board: CI builds both. Hearth's
+  About, Licences window names LVGL, the new Noto Sans face, and ESP-IDF with the third-party
+  components the ESP32 sink images link (FreeRTOS, lwIP, Mbed TLS, picolibc and the rest, each with
+  its licence text), which no notices file carried before; `gen_esp_idf_notices.py` makes the
+  texts and a test fails when ESP-IDF's version moves without them
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md), planning/karaoke-p4x-panel.md, W12).
 - **Hearth's Karaoke page, lyric views and timing window are translated.** The page, the lyric view,
   the singer view, the timing window, the lyric delay and the shortcuts that go with them are filled
   in the German, Spanish, French, Arabic, Hebrew and Yiddish catalogues (145 strings, with the singer view's and
@@ -751,9 +828,16 @@ The sections below contain the complete change list and fixes.
   back and starts. It waits, cued, on a first run (the "Before you play anything" dialog comes first) and
   with `--seek`, `--shot` or `--smoke-shot`; `--` ends the options, and `--open <file>` is the
   same file named as an option. The item to start is chosen on the engine thread
-  (`Engine::add_and_play()`), so the saved queue that is restored at start cannot move it. A
-  second double-click still starts a second Hearth beside the first
+  (`Engine::add_and_play()`), so the saved queue that is restored at start cannot move it
   ([Hearth's command line](docs/hearth/index.md#command-line)).
+- **A second launch hands its files to the running Hearth.** A second double-click on a stream
+  used to start a second Hearth with its own engine and output, and since a launch plays, two
+  played over each other. A launch that would play files now offers them (and its `--page`) to a
+  Hearth already running under the same account over a local socket that only that account can
+  open; the running one queues them, plays the first, comes forward and switches page, and the
+  second process ends before it has a window. A launch with no file, with `--seek`, or a capture
+  runs on its own, and a Hearth that does not answer is not waited for. Hearth now links Qt
+  Network for it (`QLocalServer`).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
@@ -3414,6 +3498,16 @@ The sections below contain the complete change list and fixes.
   for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
   sink, applies at the group's next play, and is kept for the run. The group editor says which a
   member is sent.
+- **The Sendspin player plays a stream's bed when it declares more objects than the board says it
+  places** (`BurstPlayerConfig::max_objects`, `iclforge/object_limit.hpp`,
+  `Eac3Decoder::set_skip_object_reconstruction()`): the decision is made from the first unit's
+  header (the complexity index less the LFE), before the object reconstruction allocates its 147 KB,
+  with the decoder the player already holds and no other made; a listener who chose objects
+  "always" is not overruled. On an ESP32-S3 (release image, lane on, null sink, 7.1.4, over
+  Sendspin) streams of 3 to 11 declared objects that took 1.07 to 2.27 of real time with 63 to
+  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun. On an ESP32-P4, which
+  states 12, the 14-object stream that took 0.97 with 24 underruns took 0.22, and the 11-object
+  streams, within the figure, are reconstructed at 0.85 as before.
 
 **Library internals**
 
@@ -3652,6 +3746,26 @@ The sections below contain the complete change list and fixes.
   it hung on its first run), and could on any rejoin while the page was open. The trail has a
   mutex of its own, nothing is taken inside it, and a test makes a member leave and come back
   sixty times while a thread polls.
+
+**ESP32-P4: a restart that left the board without Wi-Fi**
+
+- **A restart or an update of an ESP32-P4 board sometimes brought it back with its link to the C6
+  dead, until a USB flash.** After an update over the network (2 of 10; 8 of 16 of a USB flash, a
+  wait and an update; none of 30 `POST /restart`s) the board read the C6's SDIO registers and got
+  no data (`sd_host_wait_for_event returned 0x107`, `Failed to read data - -1 838860`), and every
+  boot after it, esp_hosted's own restart of the host included, did the same, because
+  `esp_restart()` resets the CPU alone. A reset of the whole system clears it (`esptool --after
+  watchdog-reset`, nothing written, in 11 s), and so, from JTAG, does holding the C6's reset line
+  low for two seconds, which esp_hosted's 10 ms pulse at every boot does not. A restart of a board
+  whose Wi-Fi is behind esp_hosted now ends in the RTC watchdog's system reset, armed as
+  `esp_restart_noos` arms its own, from the last shutdown handler (`main/system_reset.cpp`; the S3
+  and C6 are untouched): 24 of 24 updates clean, and 8 of 8 boards that came back dead healed by
+  esp_hosted's own restart. A restart takes a second longer and the USB-Serial-JTAG port
+  re-enumerates. The image that is running when an update arrives does the restart, so a board
+  from before this needs one more update, or one USB flash. The P4 page's "Restarting the board"
+  has the log, the numbers, three requests for a system reset that leave the board dead
+  (`esp_rom_software_reset_system()`, a 20 ms watchdog stage, a stalled core) and how to recover a
+  dead board with the cable alone.
 
 **Sendspin: a sink's heap per message**
 

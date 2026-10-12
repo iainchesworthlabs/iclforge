@@ -22,7 +22,7 @@
 # package CONTAINS is never shared - the Qt sections, the header and the
 # Windows runtime section differ per product, and are named for it
 # (forge-header, crucible-header, hearth-header, forge-windows-runtime,
-# crucible-windows-runtime, hearth-fonts).
+# crucible-windows-runtime, hearth-fonts, hearth-lvgl, hearth-firmware).
 #
 # Substitution is string(REPLACE) on {{TOKEN}} markers, deliberately not
 # configure_file(@ONLY): licence texts must stay byte-exact, and copyright

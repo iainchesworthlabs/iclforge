@@ -35,7 +35,14 @@ ScrollView {
     // A stream is loaded once its media information has been read.
     readonly property bool loaded: root.media.codec !== undefined
     readonly property bool isKaraoke: root.programme.karaoke === true
+    // Flagged karaoke by its service type, whether or not the decoder reproduces it: an
+    // E-AC-3 programme with a dependent substream or objects is, and plays as coded.
+    readonly property bool isFlagged: root.programme.karaokeFlagged === true
     readonly property string codec: root.media.codec ?? ""
+    // The codec's own name, for the lines that name it: not translated, as a codec's name is not.
+    readonly property string codecName: root.codec === "ac3" ? "AC-3"
+                                        : (root.codec === "eac3" || root.codec === "ac3+eac3") ? "E-AC-3"
+                                        : ""
     readonly property string reproduction: root.settings.karaoke ?? "aware"
     readonly property string vocals: root.settings.karaokeVocals ?? "both"
     // The level of each part against Table C.2.3, in dB (capable only), and the
@@ -312,11 +319,21 @@ ScrollView {
                                     .arg(root.programme.acmodLabel ?? "")
                                     .arg(root.parts.join(" "));
                             }
-                            return root.codec === "ac3"
-                                ? qsTr("An AC-3 stream, but not a karaoke one: its service is %1.")
-                                      .arg(root.programme.bsmodLabel ?? "")
-                                : qsTr("Karaoke is an AC-3 mode (Annex C of ETSI TS 102 366). "
-                                       + "This is not an AC-3 stream.");
+                            if (root.isFlagged) {
+                                return qsTr("Flagged karaoke, but this %1 programme has a dependent "
+                                            + "substream or objects, which Annex C has no vocals for: "
+                                            + "it plays as coded.").arg(root.codecName);
+                            }
+                            if (root.codec === "ac3") {
+                                return qsTr("An AC-3 stream, but not a karaoke one: its service is %1.")
+                                    .arg(root.programme.bsmodLabel ?? "");
+                            }
+                            if (root.codec === "eac3" || root.codec === "ac3+eac3") {
+                                return qsTr("An E-AC-3 stream, but not a karaoke one: its service is %1.")
+                                    .arg(root.programme.bsmodLabel ?? "");
+                            }
+                            return qsTr("Karaoke is an AC-3 and E-AC-3 mode (Annex C of ETSI TS 102 366). "
+                                        + "This is neither.");
                         }
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
@@ -810,8 +827,9 @@ ScrollView {
                                          : (root.vocals === "both" ? qsTr("both")
                                             : root.vocals.toUpperCase())));
                             return reproduced === false && root.reproduction !== "asCoded"
-                                ? qsTr("AC-3 karaoke, %1: not reproduced (see the notice).").arg(how)
-                                : qsTr("AC-3 karaoke, %1.").arg(how);
+                                ? qsTr("%1 karaoke, %2: not reproduced (see the notice).")
+                                      .arg(root.codecName).arg(how)
+                                : qsTr("%1 karaoke, %2.").arg(root.codecName).arg(how);
                         }
                         color: Theme.text
                         font.pixelSize: Theme.fontSmall

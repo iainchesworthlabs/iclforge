@@ -147,6 +147,19 @@ THIRDPARTY_VERSIONED = (
     ("Opus", re.compile(r"Opus \d")),
 )
 TIME_FILTER_MARKER = "Sendspin time filter"
+# What the ESP32 sink firmware images carry, which Hearth's releases ship and whose notices are
+# Hearth's (notices/fragments/hearth-lvgl.txt, hearth-fonts.txt and hearth-firmware.txt): LVGL, the
+# Greek and Cyrillic face with its own copyright line, and ESP-IDF with the third-party components
+# it links (the texts of notices/licences/ESP-IDF-components.txt). None is in a desktop binary, so
+# no version token stands guard over them and a fragment dropped from the list would otherwise go
+# unseen.
+FIRMWARE_MARKERS = (
+    "LVGL",
+    "Noto Sans Greek and Cyrillic",
+    "ESP-IDF",
+    "FreeRTOS kernel",
+    "picolibc",
+)
 
 # The Qt section (notices/fragments's qt-bundled entry comes
 # from notices/fragments/qt-bundled.txt, shared rather than
@@ -176,6 +189,10 @@ def check_notices(text: str, qt_bundled: bool) -> list[str]:
     ]
     if TIME_FILTER_MARKER not in text:
         problems.append(f"NOTICES.txt does not mention {TIME_FILTER_MARKER!r}")
+    problems += [
+        f"NOTICES.txt does not mention {marker!r}, which the ESP32 sink firmware images carry"
+        for marker in FIRMWARE_MARKERS if marker not in text
+    ]
     if qt_bundled:
         problems += [
             f"NOTICES.txt does not mention {phrase!r}"

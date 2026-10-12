@@ -1,143 +1,46 @@
 #pragma once
 
-#include <condition_variable>
-#include <cstdint>
-#include <deque>
 #include <expected>
 #include <filesystem>
-#include <functional>
-#include <map>
 #include <memory>
-#include <mutex>
-#include <optional>
 #include <string>
-#include <string_view>
-#include <thread>
-#include <vector>
 
-#include "iclforge/render/layout.hpp"
-#include "iclforge/sendspin/arbiter.hpp"
-#include "iclforge/sendspin/discovery.hpp"
-#include "iclforge/sendspin/messages.hpp"
-#include "iclforge/sendspin/pairing_flow.hpp"
-#include "iclforge/sendspin/session.hpp"
-#include "iclforge/sendspin/session_driver.hpp"
-#include "iclforge/sendspin/state_roles.hpp"
-#include "iclforge/sendspin/stream_roles.hpp"
-#include "iclforge/sendspin/websocket.hpp"
-#include "store.hpp"
+#include "iclforge/sink/sink.hpp"
 
-// hearth-testsink: libs/sendspin's player half as a program (planning/hearth-reference-player.md,
-// The test sink). A Sendspin client that waits for servers: it listens on a WebSocket, advertises
-// _sendspin._tcp, pairs by its pairing PSK and a dynamic or static code, admits servers as the
-// specification ranks them, and decodes each stream it plays to a WAV file with a play-time log:
-// PCM, FLAC or Opus over player@v1, and AC-3 or E-AC-3, objects included, or AC-4, over
-// _iclforge_player@v1 (planning/hearth-sendspin-extension.md), rendered to its speaker layout. It
-// can list the other roles too, keeping what a server sends them and sending controller commands.
+// hearth-testsink: iclforge::sink as a program (planning/hearth-reference-player.md, The test
+// sink). A Sendspin client that waits for servers, which decodes each stream it plays to a WAV file
+// with a play-time log: PCM, FLAC or Opus over player@v1, and AC-3 or E-AC-3, objects included, or
+// AC-4, over _iclforge_player@v1 (planning/hearth-sendspin-extension.md), rendered to its speaker
+// layout. The sink itself, the pairing and the store are libs/sink's; what is here is the output
+// (wav_output.hpp, burst_output.hpp) and the speaker layout it renders to.
 //
 // Several sinks run side by side in one process or several, with distinct names, ports and state
 // directories.
 
 namespace iclforge::hearth::testsink {
 
-enum class CodeMethod : std::uint8_t {
-    kNone,
-    kDynamic,
-    kStatic,
-};
+using sink::CodeMethod;
+using SinkLog = sink::Log;
 
-struct SinkOptions {
-    std::string name = "Hearth test sink";
-    std::string address = "0.0.0.0";
-    std::uint16_t port = sendspin::transport::websocket::kClientPort;
-    // The identity, pairing PSK and pairing records.
-    std::filesystem::path state_directory;
+// libs/sink's options, with where the files go and the layout the streams are rendered to.
+struct SinkOptions : sink::Options {
+    SinkOptions() {
+        name = "Hearth test sink";
+        product_name = "hearth-testsink";
+        layout = "7.1.4";
+    }
+
     // WAV files and play-time logs; empty to count what is played and write nothing.
     std::filesystem::path output_directory;
-    bool unpaired_access = false;
-    // The codecs offered, most preferred first: each as stereo at 48 kHz 16-bit, and PCM and FLAC
-    // also at 44.1 kHz 16-bit and 48 kHz 24-bit.
-    std::vector<sendspin::messages::Codec> codecs{sendspin::messages::Codec::kPcm, sendspin::messages::Codec::kFlac,
-                                                  sendspin::messages::Codec::kOpus};
-    // The channel counts PCM and FLAC are offered at, each of the formats above (Opus stays at
-    // two): a player that renders to a layout wider than stereo lists that width.
-    std::vector<std::int32_t> pcm_channels{2};
-    // Offer _iclforge_player@v1 before player@v1, as a Hearth sink does.
-    bool extension_role = true;
-    // Lists the Settings command in the extension role's state and applies
-    // a settings command by reporting its revision (logged "settings N
-    // applied") - for a server-side test of a sink that takes settings.
-    // Off by default: the sink manages nothing (see Sink's config).
-    bool accept_settings = false;
-    // Lists karaoke and karaoke_vocals in the extension role's decoder settings, takes the
-    // settings command (as accept_settings does), and reproduces a karaoke AC-3 stream as the
-    // settings say, laying its speakers out from ac3::output_mode(): a sink with a decoder that
-    // does what a board's does (planning/karaoke-phase2.md, W7). Without it a karaoke stream is
-    // played as coded, as a sink from before the keys plays it.
-    bool karaoke = false;
-    // With `karaoke`: also lists E-AC-3 among the codecs it reproduces karaoke for (the support
-    // object's `karaoke_codecs`), as a board whose firmware has the E-AC-3 path does
-    // (planning/karaoke-eac3.md, D6). Off, it lists none, which a server reads as AC-3 alone: a
-    // board from before it. The decoder is the library's either way, so an E-AC-3 stream sent to
-    // an off sink is reproduced all the same; it is the server's choice, which is what the
-    // sink is for, that is under test.
-    bool karaoke_eac3 = false;
-    // With `karaoke`: also lists karaoke_melody_db, karaoke_vocal1_db and karaoke_vocal2_db and
-    // applies them (W10), as a board with the part levels does. Off, it is a board from before
-    // them: it reproduces karaoke and has no way to be told a level.
-    bool karaoke_levels = true;
-    // The most bytes of lyric document the sink says it holds, and lists the `lyrics` and
-    // `lyrics_position` commands (W7d, planning/karaoke-phase2.md); 0 lists neither, as a board
-    // from before them, or one with no heap to spare. What it receives is kept (Sink::roles()).
-    std::uint32_t lyrics_max_bytes = 0;
-    // The speaker layout the extension role's streams are rendered to, in iclforge::render::OutputLayout's
-    // grammar.
-    std::string layout = "7.1.4";
-    // Roles beyond the playback roles to list, for testing a server's: any of controller@v1,
-    // metadata@v1, color@v1, artwork@v1 and visualizer@v1. What they receive is kept (Sink::roles).
-    std::vector<std::string> other_roles;
-    // artwork@v1's channels, and visualizer@v1's request, when those roles are listed.
-    sendspin::artwork::Channels artwork_channels;
-    sendspin::visualizer::State visualizer_request;
-    CodeMethod code_method = CodeMethod::kDynamic;
-    // Eight digits, for CodeMethod::kStatic.
-    std::string static_code;
-    bool advertise = true;
-    // The IPv4 interfaces to advertise on; empty for every one.
-    std::vector<std::string> mdns_interfaces;
-    std::size_t max_connections = 4;
-    // The buffer the sink says it has, in bytes (player@v1's and the extension role's
-    // buffer_capacity): what a server may have sent that has not played yet. A board's is a
-    // few tens of KB.
-    std::uint64_t buffer_capacity = 32ULL * 1024 * 1024;
-    // The most bytes one chunk to the sink may be, which the extension role's support object
-    // states; 0 states none, as a sink from before the key does.
-    std::uint32_t max_chunk_bytes = 0;
-    // The most channels the extension role's support object states it decodes, for every data
-    // type it lists; 0 states none, as a sink from before the key does.
-    std::uint8_t max_coded_channels = 0;
-    // The most objects the extension role's support object states it places, for every data type
-    // it lists; unset states none. 0 is a statement: bed only.
-    std::optional<std::uint8_t> max_objects;
+    // `layout` is the speaker layout the extension role's streams are rendered to, in
+    // iclforge::render::OutputLayout's grammar.
 };
-
-// What a sink reports, one line at a time, from any of its threads.
-class SinkLog {
-   public:
-    SinkLog() = default;
-    virtual ~SinkLog() = default;
-    SinkLog(const SinkLog&) = delete;
-    SinkLog& operator=(const SinkLog&) = delete;
-    SinkLog(SinkLog&&) = delete;
-    SinkLog& operator=(SinkLog&&) = delete;
-
-    virtual void line(std::string_view text) = 0;
-};
-
-class Connection;
 
 class Sink {
    public:
+    using Totals = sink::Sink::Totals;
+    using Roles = sink::Sink::Roles;
+
     [[nodiscard]] static std::expected<std::unique_ptr<Sink>, std::string> start(SinkOptions options, SinkLog& log);
     ~Sink();
     Sink(const Sink&) = delete;
@@ -145,94 +48,38 @@ class Sink {
     Sink(Sink&&) = delete;
     Sink& operator=(Sink&&) = delete;
 
-    [[nodiscard]] std::uint16_t port() const;
+    [[nodiscard]] std::uint16_t port() const { return core_->port(); }
     // client_id, and the SP:0 token that pairs this sink by its pairing PSK.
-    [[nodiscard]] std::string client_id() const;
-    [[nodiscard]] std::string pairing_token() const;
+    [[nodiscard]] std::string client_id() const { return core_->client_id(); }
+    [[nodiscard]] std::string pairing_token() const { return core_->pairing_token(); }
 
     // The operator's actions on the device: a gesture opening the static code's window, a reset
     // of the round limit, and cancelling the attempt in progress.
-    void open_window();
-    void reset_rounds();
-    void cancel_pairing();
+    void open_window() { core_->open_window(); }
+    void reset_rounds() { core_->reset_rounds(); }
+    void cancel_pairing() { core_->cancel_pairing(); }
 
     // Totals over every connection, for tests.
-    struct Totals {
-        std::uint32_t connections = 0;
-        std::uint32_t streams = 0;
-        std::uint64_t chunks = 0;
-        std::uint64_t frames = 0;
-        // _iclforge_player@v1's.
-        std::uint32_t burst_streams = 0;
-        std::uint64_t bursts = 0;
-        std::uint64_t burst_frames = 0;
-    };
-    [[nodiscard]] Totals totals() const;
-
-    // What the other roles have received, over every connection: the server/state messages and the
-    // latest state of each state role, none once cleared; the last image on each artwork channel,
-    // empty once cleared; and the visualizer streams and frames.
-    struct Roles {
-        std::uint32_t states = 0;
-        std::optional<sendspin::metadata::State> metadata;
-        std::optional<sendspin::controller::State> controller;
-        std::optional<sendspin::color::State> colors;
-        std::uint32_t artwork_streams = 0;
-        std::map<std::size_t, std::vector<std::uint8_t>> images;
-        std::optional<sendspin::visualizer::StreamStart> visualizer;
-        std::uint64_t visualizer_frames = 0;
-        // The extension role's lyric commands, in the order they came, over every connection.
-        std::vector<sendspin::player::CommandMessage> lyric_commands;
-    };
-    [[nodiscard]] Roles roles() const;
+    [[nodiscard]] Totals totals() const { return core_->totals(); }
+    // What the other roles have received, over every connection.
+    [[nodiscard]] Roles roles() const { return core_->roles(); }
     // A controller@v1 command, sent on every connection where the role is active.
-    void send_controller_command(const sendspin::controller::CommandMessage& command);
+    void send_controller_command(const sendspin::controller::CommandMessage& command) {
+        core_->send_controller_command(command);
+    }
     // The sink loses the lyrics it holds and says so on every connection, as a board does that
     // restarted its player, or reconnected: a test of what a server does about a member that
     // reports no lyrics (or another item's) for the item it is playing.
-    void forget_lyrics();
+    void forget_lyrics() { core_->forget_lyrics(); }
 
    private:
-    friend class Connection;
+    class FileOutputs;
 
-    Sink(SinkOptions options, render::OutputLayout layout, SinkLog& log, std::unique_ptr<Store> store);
-    void accept(std::unique_ptr<sendspin::transport::Connection> transport);
-    // Runs `work` on the sink's own thread, where connections may be called and destroyed.
-    void post(std::function<void()> work);
-    void run_posted();
-    // Tells connection `id` that another server has taken the sink.
-    void displace(sendspin::Arbiter::Id id);
-    // Forgets connection `id`, whose connection has ended.
-    void remove(sendspin::Arbiter::Id id);
-    void for_each_connection(const std::function<void(Connection&)>& visit);
-    void log(std::string_view text);
+    Sink(std::unique_ptr<FileOutputs> outputs);
 
-    SinkOptions options_;
-    render::OutputLayout layout_;
-    SinkLog* log_;
-    std::unique_ptr<Store> store_;
-    sendspin::SteadyClock clock_;
-    sendspin::Arbiter arbiter_;
-    // Every connection's session lock, which also guards the pairing state they share.
-    std::shared_ptr<std::mutex> session_lock_ = std::make_shared<std::mutex>();
-    sendspin::pairing_flow::ClientPairingState pairing_state_;
-
-    mutable std::mutex connections_mutex_;
-    std::map<sendspin::Arbiter::Id, std::shared_ptr<Connection>> connections_;
-    std::uint64_t next_id_ = 1;
-    Totals ended_totals_;
-
-    mutable std::mutex roles_mutex_;
-    Roles roles_;
-
-    std::mutex posted_mutex_;
-    std::condition_variable posted_changed_;
-    std::deque<std::function<void()>> posted_;
-    bool stopping_ = false;
-    std::thread worker_;
-
-    std::unique_ptr<sendspin::transport::websocket::Listener> listener_;
-    std::unique_ptr<sendspin::discovery::Advertiser> advertiser_;
+    // The outputs are the sink's own: declared first, so that they outlive it.
+    std::unique_ptr<FileOutputs> outputs_;
+    std::unique_ptr<sink::Sink> core_;
 };
 
 }  // namespace iclforge::hearth::testsink
