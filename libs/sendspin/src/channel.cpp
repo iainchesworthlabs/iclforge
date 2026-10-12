@@ -62,16 +62,25 @@ bool Channel::seal_json(std::string_view json, std::vector<std::vector<std::uint
 }
 
 Channel::Opened Channel::open(std::span<const std::uint8_t> ciphertext) {
-    plaintext_.clear();
+    // The frame buffer is reused, so a stream's chunks are received into one allocation. A large
+    // document's is not: the message it carried has been delivered (and is valid only until
+    // here), and the capacity it grew would stay taken.
+    if (release_plaintext_) {
+        std::vector<std::uint8_t>().swap(plaintext_);
+        release_plaintext_ = false;
+    } else {
+        plaintext_.clear();
+    }
     if (!receive_.decrypt(ciphertext, plaintext_)) {
-        return {.error = OpenError::kDecrypt, .message = {}};
+        return {.error = OpenError::kDecrypt, .message = {}, .large_document = false};
     }
     const Reassembler::Result result = reassembler_.push(plaintext_);
     if (result.error != FrameError::kNone) {
         frame_error_ = result.error;
-        return {.error = OpenError::kFrame, .message = {}};
+        return {.error = OpenError::kFrame, .message = {}, .large_document = false};
     }
-    return {.error = OpenError::kNone, .message = result.message};
+    release_plaintext_ = is_large_document(result.message);
+    return {.error = OpenError::kNone, .message = result.message, .large_document = release_plaintext_};
 }
 
 void Channel::rekey(noise::Handshake::Transport keys) {

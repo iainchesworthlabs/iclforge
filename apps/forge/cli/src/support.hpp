@@ -891,6 +891,14 @@ void warn_karaoke_not_ac3(const Options& meta, std::string_view codec);
 // no karaoke bed. Said once on stderr, and ignored.
 void warn_karaoke_not_spatial(const Options& meta);
 
+// A service type of 7 (bsmod 7) asked for on a layout that cannot carry karaoke: Table 5.7
+// gives mono's code 7 the meaning of a voice-over, and Annex A (Table A5.2) and Annex G
+// (Table G.2) prohibit a karaoke service on mono and on 1+1. The stream is written as asked;
+// the words say what it is. Nothing for any other layout or service type. `whose` leads the
+// line for a programme other than the first ("programme 2: ").
+void warn_karaoke_service_layout(const iclforge::ac3::plan::Metadata& meta,
+                                 iclforge::ac3::Acmod acmod, std::string_view whose = {});
+
 // karaoke with an explicit downmix=ltrt: Annex C defines no Lt/Rt reproduction, so
 // the command is refused (with the reason on stderr) rather than quietly taking
 // one or the other. True when it was; the caller returns kExitUsage.

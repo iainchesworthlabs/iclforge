@@ -265,6 +265,8 @@ std::unique_ptr<PlannedExtraProgramme> open_extra_programme(int n,
                      n, n);
         return nullptr;
     }
+    warn_karaoke_service_layout(out->p.meta, plan::resolve(out->p).bed_acmod,
+                                fmt::format("programme {}: ", n));
     auto routing = routing_or_error(out->p, out->source.channels(), stated);
     if (!routing.has_value()) {
         return nullptr;
@@ -515,6 +517,7 @@ int run_eac3_encode_multi(std::string_view in_path, std::string_view out_path,
     };
 
     const auto cp = plan::resolve(p);
+    warn_karaoke_service_layout(p.meta, cp.bed_acmod);
     const bool dual_mono = cp.bed_acmod == iclforge::ac3::Acmod::kDualMono;
     const bool want_dialnorm = p.meta.measure_dialnorm;
     // dialnorm2 only means anything under 1+1 - silently inert otherwise,
@@ -753,6 +756,7 @@ int run_eac3_encode(std::string_view in_path, std::string_view out_path,
         return kExitUsage;
     }
     const auto cp = plan::resolve(p);
+    warn_karaoke_service_layout(p.meta, cp.bed_acmod);
     const bool dual_mono = cp.bed_acmod == iclforge::ac3::Acmod::kDualMono;
     // status_stream(out_path): stderr instead of stdout when out_path is "-"
     // - the E-AC-3 bytes this function writes below already own stdout in
@@ -1107,6 +1111,7 @@ int run_encode_multi(std::string_view in_path, std::string_view out_path, std::u
     };
 
     const auto cp = plan::resolve(p);
+    warn_karaoke_service_layout(p.meta, cp.bed_acmod);
     const bool dual_mono = cp.bed_acmod == iclforge::ac3::Acmod::kDualMono;
     const bool want_dialnorm = p.meta.measure_dialnorm;
     // dialnorm2 only means anything under 1+1 - silently inert otherwise,
@@ -1323,6 +1328,7 @@ int run_encode(std::string_view in_path, std::string_view out_path, std::uint32_
     // gets the OUTPUT layout, because the BS.1770 channel weighting depends on
     // which coded positions are surrounds.
     const auto cp = plan::resolve(p);
+    warn_karaoke_service_layout(p.meta, cp.bed_acmod);
     const bool dual_mono = cp.bed_acmod == iclforge::ac3::Acmod::kDualMono;
     // status_stream(out_path): stderr instead of stdout when out_path is "-"
     // - the AC-3 bytes this function writes below already own stdout in that

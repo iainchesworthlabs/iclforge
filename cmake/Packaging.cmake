@@ -147,9 +147,11 @@ if(WIN32)
         # Explorer with no entry.
         #
         # The gesture itself - the app's own DropArea and
-        # `hearth <file>` launch handling already understanding a file
-        # once it reaches the process - is unchanged from forge-gui's own
-        # original comment; this is only what gets it there from Explorer.
+        # `hearth <file>` launch handling (apps/hearth/ui/src/command_line.hpp:
+        # an argument that is not an option is a file, and a launch plays it)
+        # understanding a file once it reaches the process - is unchanged
+        # from forge-gui's own original comment; this is only what gets it
+        # there from Explorer.
         # One ProgID for both extensions - they are the same stream format
         # (bsid decides AC-3 vs E-AC-3) - so a single "open in" entry is the
         # honest description rather than two identical ones. $INSTDIR\bin

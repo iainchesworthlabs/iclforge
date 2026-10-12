@@ -9,6 +9,7 @@
 #include <string_view>
 #include <utility>
 
+#include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/sendspin/json.hpp"
 #include "iclforge/sendspin/mdns.hpp"
 #include "sink_form.hpp"
@@ -663,7 +664,7 @@ std::shared_ptr<sendspin::Group> NetworkSinks::group(const std::string& group_id
 }
 
 std::vector<std::string> NetworkSinks::take_log() {
-    const std::lock_guard<std::mutex> lock(mutex_);
+    const std::lock_guard<std::mutex> lock(log_mutex_);
     return std::exchange(log_, {});
 }
 
@@ -766,6 +767,23 @@ SinkFacts NetworkSinks::facts_locked(const std::string& instance, const Entry& e
     facts.intended_settings = entry.intended_settings;
     facts.identify_slot = entry.identify_slot;
     facts.opus_fallback = entry.opus_fallback;
+
+    // The lyrics it reports, read against the document its group was last given for that item.
+    if (facts.iclforge_state.has_value() && facts.iclforge_state->lyrics.has_value()) {
+        const sendspin::player::LyricsReport& reported = *facts.iclforge_state->lyrics;
+        for (const auto& named : groups_) {
+            const GroupEntry& group = named.second;
+            if (std::ranges::find(group.member_sink_ids, instance) == group.member_sink_ids.end() ||
+                group.lyrics_item != reported.item) {
+                continue;
+            }
+            facts.lyrics_lines = group.lyrics_line_texts.size();
+            if (reported.line >= 0 && static_cast<std::size_t>(reported.line) < group.lyrics_line_texts.size()) {
+                facts.lyrics_line_text = group.lyrics_line_texts[static_cast<std::size_t>(reported.line)];
+            }
+            break;
+        }
+    }
 
     return facts;
 }
@@ -978,16 +996,32 @@ namespace {
     return json.size() + 64 <= limit;
 }
 
+// How long a document just sent is given to be reported before a sink that does not report it is
+// sent it again (apply_lyrics()): a round trip and the sink's own polling are well inside it.
+constexpr std::chrono::seconds kLyricsResendAfter{2};
+
 }  // namespace
 
 void NetworkSinks::apply_lyrics(const std::string& group_id, const LyricsUpdate& update) {
     namespace sp = sendspin::player;
     struct Member {
+        std::string sink_id;
         std::string client_id;
         SinkFacts facts;
     };
     std::vector<Member> members;
     std::string text;
+    // The document's lines as a sink counts them (its reader is this one), read before the lock is
+    // taken: what the Network page says a sink's reported line is.
+    std::vector<std::string> line_texts;
+    if (update.document && !update.document->empty()) {
+        if (const auto parsed = lyrics::parse_lyrics(*update.document)) {
+            line_texts.reserve(parsed->lines.size());
+            for (const lyrics::LyricLine& line : parsed->lines) {
+                line_texts.push_back(line.text);
+            }
+        }
+    }
     {
         std::lock_guard<std::mutex> lock(mutex_);
         const auto found = groups_.find(group_id);
@@ -998,6 +1032,7 @@ void NetworkSinks::apply_lyrics(const std::string& group_id, const LyricsUpdate&
         if (update.document) {
             entry.lyrics_item = update.item;
             entry.lyrics_text = *update.document;
+            entry.lyrics_line_texts = std::move(line_texts);
         } else if (update.item != entry.lyrics_item) {
             // An anchor of an item the group was given no document for: nothing to hold it by.
             return;
@@ -1008,19 +1043,34 @@ void NetworkSinks::apply_lyrics(const std::string& group_id, const LyricsUpdate&
             if (sink == sinks_.end() || !sink->second.client.has_value() || sink->second.client_id.empty()) {
                 continue;
             }
-            members.push_back({.client_id = sink->second.client_id, .facts = facts_locked(sink_id, sink->second)});
+            members.push_back({.sink_id = sink_id,
+                               .client_id = sink->second.client_id,
+                               .facts = facts_locked(sink_id, sink->second)});
         }
     }
     if (!host_) {
         return;
     }
+    const Clock::time_point now = Clock::now();
     for (const Member& member : members) {
         const SinkFacts& facts = member.facts;
         if (!holds_lyrics(facts)) {
             continue;
         }
         const bool holds_item = facts.iclforge_state->lyrics.has_value() && facts.iclforge_state->lyrics->item == update.item;
-        if (update.document.has_value() || (!holds_item && !text.empty())) {
+        bool send_document = update.document.has_value();
+        if (!send_document && !holds_item && !text.empty()) {
+            // The sink does not say it holds the item: one that joined, reconnected or restarted
+            // while it played. Not while the document sent a moment ago is still on its way to being
+            // reported (an anchor follows the document at once, and the sink's report takes a round
+            // trip: that sent it three times), and not an item the sink was told has none.
+            const std::lock_guard<std::mutex> lock(mutex_);
+            const auto sink = sinks_.find(member.sink_id);
+            send_document = sink != sinks_.end() &&
+                            !(sink->second.lyrics_sent_item == update.item &&
+                              (sink->second.lyrics_sent_none || now - sink->second.lyrics_sent_at < kLyricsResendAfter));
+        }
+        if (send_document) {
             sp::CommandMessage message;
             message.command = sp::Command::kLyrics;
             message.lyrics = sp::LyricsDocument{.item = update.item, .text = text};
@@ -1028,7 +1078,15 @@ void NetworkSinks::apply_lyrics(const std::string& group_id, const LyricsUpdate&
                 // Too much for this sink: it is told the item has none, so that it drops the last.
                 message.lyrics.text.clear();
             }
-            (void)host_->iclforge_command(member.client_id, message);
+            const bool none = message.lyrics.text.empty();
+            if (host_->iclforge_command(member.client_id, message)) {
+                const std::lock_guard<std::mutex> lock(mutex_);
+                if (const auto sink = sinks_.find(member.sink_id); sink != sinks_.end()) {
+                    sink->second.lyrics_sent_item = update.item;
+                    sink->second.lyrics_sent_at = now;
+                    sink->second.lyrics_sent_none = none;
+                }
+            }
         }
         if (update.anchor) {
             sp::CommandMessage message;
@@ -1321,7 +1379,9 @@ void NetworkSinks::on_pairing_ended(const std::string& client_id,
 }
 
 void NetworkSinks::on_log(std::string_view line) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // Called from inside the group's lock as well as from the host's thread: only the trail's own
+    // mutex is taken here (see log_mutex_).
+    std::lock_guard<std::mutex> lock(log_mutex_);
     if (log_.size() == kLogLines) {
         log_.erase(log_.begin());
     }
