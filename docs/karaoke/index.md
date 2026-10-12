@@ -68,7 +68,7 @@ track) and choose the **Karaoke** page (`Ctrl+7`).
 
 ![Hearth's Karaoke page: the stream, its reproduction, the words, and what each speaker plays](screenshots/hearth-karaoke-page.png)
 
-*A generated karaoke stream and its lyrics on a test output, paused part-way through a word.*
+*The "Auld Lang Syne" example, 1.8 s in and held there: the word being sung is part way through its fill. Taken from the running window with `hearth --smoke-shot ... --open ... --seek 1800` ([Hearth's command line](../hearth/index.md#command-line)).*
 
 **Reproduction** is the decoder's choice, kept across starts:
 
@@ -157,6 +157,10 @@ sings it, **you** when it does not, and **shared** when it is a line for both an
 two plays. A sentence under the names says the same for the whole file ("The vocal of Shantyman
 plays: you sing the lines of Crew."), which is what choosing **V1**, **V2**, **None** or **Both**
 under Capable changes.
+
+![Hearth's Karaoke page for the duet example: each line is tagged with who sings it and whether the playing vocal guides it](screenshots/hearth-karaoke-duet.png)
+
+*"Leave Her, Johnny", 6.3 s in: the crew's line, indented and tagged **guide** because both vocals play.*
 ### SubRip
 
 A `.srt` file is read as lyrics too, which is what subtitle tools and ripped karaoke subtitles write:

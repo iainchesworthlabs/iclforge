@@ -308,6 +308,15 @@ The sections below contain the complete change list and fixes.
   the decoder was run in Node against `forge decode` of the karaoke example below: all eight cases
   match sample for sample. An AC-3 stream's fold levels now come from its own `cmixlev` and
   `surmixlev` (they were the E-AC-3 defaults) (planning/karaoke-phase2.md, W8).
+- **`hearth --open` and `--smoke-shot`.** `--open <file>` adds a file to the queue (with nothing
+  in it the first is loaded and cued, so the Play, Media and Karaoke pages show it), `--seek <ms>`
+  starts that item there and holds it paused, and `--smoke-shot <png>` is `--shot` with network
+  discovery off: a capture with nobody at the machine neither browses the network nor raises
+  Windows' firewall prompt, which `--shot` does. A capture waits for the file's media information
+  and exits 3 when the file did not load, so a script that retakes screenshots can stop on it.
+  The parsing is `command_line.hpp`, held by `hearth_controller_tests`. The Karaoke guide's page
+  screenshot is retaken from the running window, and a duet one is added; the options are in
+  [Hearth's command line](docs/hearth/index.md#command-line).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
