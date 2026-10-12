@@ -283,6 +283,18 @@ The sections below contain the complete change list and fixes.
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
 
+**Karaoke: the melody of a MIDI karaoke file**
+
+- **`iclforge::lyrics::read_midi_melody()` reads the notes of a `.kar` and says which track is the
+  tune** (the microphone, scoring and recording programme, M3). The words' reader has always skipped
+  every note; this reads them, and uses the words only to choose. A file does not say which track is
+  the melody, so the track and channel whose note starts coincide with the most syllable starts wins
+  (percussion excluded, and at an equal match the one with fewer notes, which is the lead line and
+  not a chord track), the share of syllables it matches is returned, and a file with no words, or
+  whose best track matches under half of them, is refused with the reason instead of guessed at.
+  Tempo changes, running status and a note-on of velocity 0 are read. It is the reference a singer's
+  pitch will be scored against; nothing links it yet.
+
 **Karaoke in E-AC-3: the boards reproduce it themselves**
 
 - **A Hearth sink board lists the codecs it reproduces karaoke for.** Its support object now
