@@ -199,9 +199,24 @@ Each `Dialogue:` event is a line from its start to its end. Each `{\k50}` (and `
 the same duration, drawn differently) begins a **syllable** that lasts that many hundredths of a
 second after the one before; a syllable is a word of the line, so the fill moves by syllable, as
 the script's own sweep does. Everything else is dropped: the other override tags (`{\an8}`,
-`{\pos(...)}`), the styles, and any event that draws (`{\p1}`) or is a `Comment:`. `\N` is a
-space. The columns are the script's own `Format:` line, with the v4+ order where it has none, and
-an event with no karaoke tags is a line with no words.
+`{\pos(...)}`), the styles' fonts, colours and positions, and any event that draws (`{\p1}`) or is
+a `Comment:`. `\N` is a space. The columns are the script's own `Format:` line, with the v4+ order
+where it has none, and an event with no karaoke tags is a line with no words.
+
+Two columns are read for what they say and not for how they look:
+
+- **Who sings.** Where exactly two different **actors** (the `Name` column) are named on the sung
+  lines, the ones with karaoke tags, they are the two singers, the one who appears first being the
+  first vocal, and their names are the file's. Failing that, where exactly two different
+  **styles** are used on the sung lines, those are the two singers; a style's name is its
+  author's own label, so it is not shown as a name. One, three or none marks nobody, because it is
+  not clear who is who. Hearth's [duet view](#a-duet) then tells each line's singer, as it does for
+  a `V1:` or `V2:` marker in an `.lrc`.
+- **Which line at one time.** A line written on two layers, an outline under a fill, is one line.
+  Where lines in different styles share a start and an end, a line that is not sung and is in a
+  style of its own (a translation, a romanisation) is dropped beside the sung one, and where none
+  is sung the style that is commonest in the file is the one read. Lines of one style at one time
+  are all read, and a line that ends at another time than the sung one is a line of its own.
 
 ### MIDI karaoke
 
@@ -224,11 +239,14 @@ its words: the music in it is not played or read. What is taken:
   four are read.
 
 A file with no words, that is cut short, or that counts SMPTE frames at some other rate says so. A
-MIDI file carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
-are not guessed at, so a Western karaoke file with accented letters saved in Latin-1 (and Hebrew in
-Windows-1255) is refused with the reason, as an LRC file in a code page is. Plain ASCII is UTF-8, and
-most are. Only the title, the artist and the words are checked: the other `@` lines are not shown,
-so a copyright or key line in a code page does not refuse a file whose words are fine.
+MIDI file carries **no word of its encoding**, and what is read is UTF-8 unless the program is told
+the page: Latin-1 and the other code pages are not guessed at, so a Western karaoke file with
+accented letters saved in Latin-1 (and Hebrew in Windows-1255) is refused with the reason, as an LRC
+file in a code page is, until `forge encode ... lyrics=<file> lyrics-encoding=<page>` says which
+page it is in ([`lyrics-encoding=`](../forge/cli/commands.md#lyrics-beside-the-stream-lyrics)). Plain
+ASCII is UTF-8, and most are. Only the title, the artist and the words are checked (and, when a page
+is named, read in it): the other `@` lines are not shown, so a copyright or key line in a code page
+does not refuse a file whose words are fine.
 
 ### What is shown
 
@@ -415,9 +433,11 @@ samples and the same lines as `forge decode` and Hearth do.
   lyrics](../hearth/index.md#timing-the-lyrics)) takes word times from your presses, and an estimate
   by the letters of a word is only where a press starts from. A forced aligner is outside software,
   and [Timing a song with a forced aligner](forced-alignment.md) runs one and reads its result in.
-- **Reading a lyrics file in a code page.** UTF-8 and UTF-16 are read; Latin-1, Windows-1255 and the
-  other 8-bit encodings are named and not guessed at. A MIDI karaoke file has no way to say its
-  encoding, so its words must be UTF-8.
+- **Reading a lyrics file in a code page, in Hearth and Crucible.** UTF-8 and UTF-16 are read there;
+  Latin-1, Windows-1255 and the other encodings are named and not guessed at. Forge reads one when it
+  is told the page (`lyrics-encoding=`) and writes the words beside the stream as UTF-8, which every
+  player reads, so a file in a code page is brought in once, at the encode. A MIDI karaoke file has
+  no way to say its encoding; Forge's `lyrics-encoding=` is how to name it.
 - **Text from a CD+G disc.** Its words are pixels, so Hearth shows the picture and cannot follow the
   words.
 - **A screen on a sink that has not been run.** A board that decodes for itself is sent the lyrics
