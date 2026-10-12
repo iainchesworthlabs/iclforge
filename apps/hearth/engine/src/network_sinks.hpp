@@ -436,6 +436,11 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     std::string selected_id_;
     std::string pairing_error_;
     std::uint64_t generation_ = 0;
+    // The host's trail, under a mutex of its own and never with another held through it: the group
+    // logs from inside its own lock (Group::State::try_start), the group's facts are read from
+    // inside mutex_ (group_facts_locked), and the trail guarded by mutex_ made those two a deadlock
+    // that stopped the engine when a member came back to a group that was playing.
+    std::mutex log_mutex_;
     std::vector<std::string> log_;
 
     // Keyed by iclforge::sendspin::Group::id() - already unique per host, so

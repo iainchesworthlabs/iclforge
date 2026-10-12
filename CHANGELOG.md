@@ -3164,6 +3164,17 @@ The sections below contain the complete change list and fixes.
   anchor, had no test: it has a unit test with a board that loses its document and a live case
   that restarts a real one (S3: back holding the item 7 s after the restart).
 
+**Hearth: a member that comes back to a playing group**
+
+- **A member rejoining a group that was playing could stop the engine for good.** The group logs
+  from inside its own lock when a member starts, and the Network page's poll reads the group's
+  facts from inside `NetworkSinks`' lock; the host's trail was guarded by that lock, so the two
+  were taken in opposite orders and the engine, the poll and the host's own thread waited on each
+  other. It showed when a board was restarted in the middle of an item (the live case that does
+  it hung on its first run), and could on any rejoin while the page was open. The trail has a
+  mutex of its own, nothing is taken inside it, and a test makes a member leave and come back
+  sixty times while a thread polls.
+
 **Sendspin: a sink's heap per message**
 
 - **A Sendspin session reserved eight bytes of heap for every byte of a message.**

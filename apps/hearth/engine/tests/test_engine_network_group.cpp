@@ -2,11 +2,14 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <fstream>
@@ -2082,4 +2085,61 @@ TEST_CASE("engine: a board that lost the lyrics is sent the document again befor
     position(7, 3000);
     REQUIRE(eventually([&] { return item_line(7) == std::optional<std::int32_t>{2}; }));
     CHECK(of_kind(group.decodes->roles().lyric_commands, Command::kLyrics).size() == 2);
+}
+
+TEST_CASE("engine: members that leave and rejoin a group while it plays do not deadlock the page's poll",
+          "[hearth][group][websocket][iclforge]") {
+    // The group logs from inside its own lock when a member starts (Group::State::try_start), and
+    // NetworkSinks::status() reads the group's facts from inside NetworkSinks' own: the trail was
+    // guarded by that mutex, so a member rejoining a playing group while the page polled took the
+    // two in opposite orders and stopped the engine for good (found by a real board restarting
+    // mid-item, planning/karaoke-phase2.md, W7d).
+    constexpr int kFrameCount = 200;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    KaraokeGroup rig("hearth_engine_group_rejoin_poll", kFrameCount, wanted);
+
+    std::atomic<bool> stop{false};
+    std::atomic<std::uint64_t> polls{0};
+    std::thread page([&] {
+        while (!stop.load()) {
+            (void)rig.sinks->status();
+            (void)rig.sinks->take_log();
+            ++polls;
+        }
+    });
+    rig.engine->play();
+    // Back and forth while it plays: each rejoin starts the member afresh, logging as it does.
+    std::atomic<bool> finished{false};
+    std::thread churn([&] {
+        for (int round = 0; round < 60 && !finished.load(); ++round) {
+            rig.sinks->remove_group_member(rig.group_id, "legacy");
+            std::this_thread::sleep_for(15ms);
+            rig.sinks->add_group_member(rig.group_id, "legacy");
+            std::this_thread::sleep_for(15ms);
+        }
+    });
+    const auto deadline = std::chrono::steady_clock::now() + 40s;
+    while (std::chrono::steady_clock::now() < deadline) {
+        const EngineStatus status = rig.engine->status();
+        if (status.state == TransportState::kStopped && !status.history.empty()) {
+            finished = true;
+            break;
+        }
+        std::this_thread::sleep_for(20ms);
+    }
+    const std::uint64_t before = polls.load();
+    std::this_thread::sleep_for(200ms);
+    const bool page_alive = polls.load() > before || finished.load();
+    if (!finished.load() || !page_alive) {
+        // A deadlock leaves threads that cannot be joined: say what happened and stop the process.
+        std::fprintf(stderr, "a rejoining member deadlocked the poll: finished=%d page_alive=%d\n",
+                     finished.load() ? 1 : 0, page_alive ? 1 : 0);
+        std::fflush(stderr);
+        std::_Exit(3);
+    }
+    churn.join();
+    stop = true;
+    page.join();
+    CHECK(polls.load() > 0);
 }

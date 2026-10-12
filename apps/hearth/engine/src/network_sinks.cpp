@@ -664,7 +664,7 @@ std::shared_ptr<sendspin::Group> NetworkSinks::group(const std::string& group_id
 }
 
 std::vector<std::string> NetworkSinks::take_log() {
-    const std::lock_guard<std::mutex> lock(mutex_);
+    const std::lock_guard<std::mutex> lock(log_mutex_);
     return std::exchange(log_, {});
 }
 
@@ -1379,7 +1379,9 @@ void NetworkSinks::on_pairing_ended(const std::string& client_id,
 }
 
 void NetworkSinks::on_log(std::string_view line) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // Called from inside the group's lock as well as from the host's thread: only the trail's own
+    // mutex is taken here (see log_mutex_).
+    std::lock_guard<std::mutex> lock(log_mutex_);
     if (log_.size() == kLogLines) {
         log_.erase(log_.begin());
     }
