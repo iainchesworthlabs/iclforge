@@ -99,7 +99,16 @@ The sections below contain the complete change list and fixes.
   one as its last argument. It is asked only for text that is not UTF-8 and has no UTF-16 mark, a
   MIDI file's title, artist and syllables one at a time and never its other `@` lines; a file that
   is UTF-8 or UTF-16 is read as it was whatever is given, and without a decoder a code page is still
-  refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
+  refused by name. Forge supplies one with `lyrics-encoding=` (the next entry).
+- **`lyrics-encoding=<page>` on `forge encode`, `eac3-encode` and `ac4-encode` reads a lyrics file in a
+  code page.** With `lyrics=`, a file that is not UTF-8 or UTF-16 (Windows-1250 to 1258, Windows-874,
+  ISO 8859-1, -2 and -15, DOS 437 and 850, KOI8-R and -U, Shift-JIS, EUC-JP, GBK, GB18030, Big5,
+  EUC-KR, in the usual spellings and any case) is read in the page named and written beside the
+  stream as UTF-8 LRC, where it was refused. A page is still never guessed at: without the key the
+  refusal now says what to name, and bytes the page does not have refuse the file. The conversion is
+  the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
+  it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
+  GUI's picker will link as well.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 

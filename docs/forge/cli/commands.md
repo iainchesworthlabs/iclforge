@@ -368,9 +368,27 @@ karaoke syllables, a MIDI file's), and a time with no text where a cue ends befo
 begins, so that the gap is not shown as the line going on. Styling and positions are not carried.
 
 The file is read before the encode, so a file that is not lyrics is refused first, with exit code
-2, and a code page such as Latin-1 or Shift-JIS is named and not guessed at. A `.lrc` of that name
-already beside the stream is left as it was, and the run says so. `-` as the output has no name to
-put a file beside and is refused (exit code 1).
+2. A file in a code page (Latin-1, Windows-1251, Shift-JIS and the like) is not guessed at either:
+it is refused until you say which page it is in with `lyrics-encoding=<page>`, and then it is read
+in that page and written as UTF-8. A `.lrc` of that name already beside the stream is left as it
+was, and the run says so. `-` as the output has no name to put a file beside and is refused (exit
+code 1).
+
+`lyrics-encoding=` takes the name of the page: `windows-1252` (Western European), `iso-8859-1`,
+`iso-8859-15`, `cp850`, `cp437`, `windows-1250` and `iso-8859-2` (Central European),
+`windows-1251`, `koi8-r` and `koi8-u` (Cyrillic), `windows-1253` (Greek), `windows-1254` (Turkish),
+`windows-1255` (Hebrew), `windows-1256` (Arabic), `windows-1257` (Baltic), `windows-1258`
+(Vietnamese), `windows-874` (Thai), `shift-jis` and `euc-jp` (Japanese), `gbk` and `gb18030`
+(Simplified Chinese), `big5` (Traditional Chinese) and `euc-kr` (Korean). The common spellings of
+each are read as well (`cp1252`, `latin1`, `Shift_JIS`, `sjis`, `gb2312`), in any case. The
+conversion is the operating system's own (Windows' code pages, `iconv` elsewhere), so Forge carries
+no table of any page. A file that is UTF-8 or UTF-16 is read as it is whatever page is named, and
+bytes the named page does not have refuse the file (exit code 2) and are not replaced by a mark. It
+goes with `lyrics=`, and is a usage error (exit code 1) without it.
+
+```bash
+forge encode backing.wav sing-along.ac3 384 L,C,R,Cs lyrics=words-jp.lrc lyrics-encoding=shift-jis
+```
 
 ```bash
 forge encode backing.wav sing-along.ac3 384 L,C,R,Cs src=melody.wav src=lead.wav \
