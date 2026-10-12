@@ -291,6 +291,52 @@ TEST_CASE("performance: clearing the singer keeps the reference and starts over"
     CHECK(performance.total().fraction() > 0.85);
 }
 
+TEST_CASE("performance: the trace is where the voice was placed, for drawing", "[performance]") {
+    Performance performance = make();
+    performance.anchor(0, kT0, 1.0);
+    CHECK(performance.trace().empty());
+    feed_all(performance, voice_of(), kT0);
+
+    const auto& trace = performance.trace();
+    REQUIRE(trace.size() > 200);
+    // In the order placed, moving forward through the item at the 10 ms hop.
+    for (std::size_t i = 1; i < trace.size(); ++i) {
+        REQUIRE(trace[i].item_ms >= trace[i - 1].item_ms);
+    }
+    // Voiced inside the first note (C4, 261.6 Hz) and not voiced in the gap between the second and
+    // the third notes (1500 to 1700 ms), to within the tracker's window.
+    float inside = 0.0F;
+    float gap_max = 0.0F;
+    for (const auto& p : trace) {
+        if (p.item_ms >= 300 && p.item_ms <= 500) {
+            inside = std::max(inside, p.hz);
+        }
+        if (p.item_ms >= 1560 && p.item_ms <= 1640) {
+            gap_max = std::max(gap_max, p.hz);
+        }
+    }
+    CHECK(inside == Catch::Approx(261.6F).epsilon(0.03));
+    CHECK(gap_max == 0.0F);
+}
+
+TEST_CASE("performance: the trace is bounded and cleared with the singer", "[performance]") {
+    Performance performance = make();
+    performance.anchor(0, kT0, 1.0);
+    // Far more than the capacity: forty seconds of the voice, over and over.
+    const std::vector<float> once = voice_of();
+    std::vector<float> long_voice;
+    for (int i = 0; i < 12; ++i) {
+        long_voice.insert(long_voice.end(), once.begin(), once.end());
+    }
+    feed_all(performance, long_voice, kT0);
+    CHECK(performance.trace().size() == Performance::kTraceCapacity);
+    // The latest frames are the ones kept.
+    CHECK(performance.trace().back().item_ms > performance.trace().front().item_ms);
+
+    performance.clear_singer();
+    CHECK(performance.trace().empty());
+}
+
 TEST_CASE(
     "performance: a reference with no note in it, or a rate that cannot be tracked, is refused",
     "[performance]") {
