@@ -29,6 +29,17 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Forge writes the lyrics beside the stream it encodes**
+
+- **`lyrics=<file>` on `forge encode`, `eac3-encode` and `ac4-encode`.** The file may be an `.lrc`, a
+  SubRip `.srt`, an Advanced SubStation Alpha `.ass` or a MIDI karaoke `.kar`; what is written beside the
+  stream is `<stream>.lrc`, the one format Hearth finds by name and sends to every sink: UTF-8, with a
+  duet's `V1:`/`V2:` markers and names, word times where the file has them, and a time with no text
+  where a cue ends before the next begins. The file is read before the encode (a code page is
+  named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
+  `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
+  `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
 - **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read

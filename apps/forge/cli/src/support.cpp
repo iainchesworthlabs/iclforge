@@ -2850,6 +2850,20 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.p.mixdepth.blkmixcfginfo = words;
             continue;
         }
+        if (key == "lyrics") {
+            if (command != "encode" && command != "eac3-encode" && command != "ac4-encode") {
+                fmt::println(stderr,
+                             "error: lyrics= goes with encode, eac3-encode and ac4-encode: it puts "
+                             "a lyrics file beside the stream they write");
+                return false;
+            }
+            if (value.empty()) {
+                fmt::println(stderr, "error: lyrics= needs a file path");
+                return false;
+            }
+            out.lyrics_path = std::string{value};
+            continue;
+        }
         if (key == "src") {
             if (value.empty()) {
                 fmt::println(stderr, "error: src= needs a file path");
