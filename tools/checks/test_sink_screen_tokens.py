@@ -1,5 +1,5 @@
-"""Tests for sink_screen_tokens.py: the tree agrees with the tokens file, and a value that moves is found
-in whichever of the three places it moved."""
+"""Tests for sink_screen_tokens.py: the tree agrees with the tokens file, and a value that moves
+is found in whichever of the three places it moved."""
 import json
 import shutil
 import tempfile
@@ -27,7 +27,9 @@ class Tokens(unittest.TestCase):
         self.tokens_path.write_text(json.dumps(tokens), encoding="utf-8")
 
     def problems(self):
-        return tokens_module.check(self.tokens_path, self.kotlin_path, self.qml_path, self.panel_path)
+        return tokens_module.check(
+            self.tokens_path, self.kotlin_path, self.qml_path, self.panel_path
+        )
 
     def test_the_tree_agrees_with_the_tokens(self):
         self.assertEqual(tokens_module.check(), [])
