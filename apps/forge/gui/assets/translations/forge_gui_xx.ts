@@ -1225,6 +1225,14 @@
             <translation>[Rését lévéls ~~~~~]</translation>
         </message>
         <message>
+            <source>E-AC-3</source>
+            <translation>[É-ÀC-3 ~~]</translation>
+        </message>
+        <message>
+            <source>Format</source>
+            <translation>[Fõrmàt ~~]</translation>
+        </message>
+        <message>
             <source>Lyrics</source>
             <translation>[Lyrîcs ~~]</translation>
         </message>
@@ -1379,6 +1387,10 @@
         <message>
             <source>AC-3</source>
             <translation>[ÀC-3 ~~]</translation>
+        </message>
+        <message>
+            <source>E-AC-3 carries the same karaoke service type, but its specification gives no reproduction for it. Hearth, forge and Dolby's reference decoder reproduce it as Annex C does for AC-3. A player that does not reproduce it plays V1 and V2 from the surround speakers. AC-3 is the format Annex C defines.</source>
+            <translation>[É-ÀC-3 càrrîés thé sàmé kàràõké sérvîcé typé, bût îts spécîfîcàtîõn gîvés nõ réprõdûctîõn fõr ît. Héàrth, fõrgé ànd Dõlby's référéncé décõdér réprõdûcé ît às Ànnéx C dõés fõr ÀC-3. À plàyér thàt dõés nõt réprõdûcé ît plàys V1 ànd V2 frõm thé sûrrõûnd spéàkérs. ÀC-3 îs thé fõrmàt Ànnéx C défînés. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>File type</source>

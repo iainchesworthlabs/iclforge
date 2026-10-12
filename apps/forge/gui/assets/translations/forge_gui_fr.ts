@@ -1242,575 +1242,593 @@
         <translation>Encoder maintenant</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="275"/>
+        <location filename="../qml/KaraokeFlow.qml" line="288"/>
         <source>The lyrics are beside the stream, as the same name with .lrc.</source>
         <translation>Les paroles se trouvent à côté du flux, sous le même nom avec .lrc.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="278"/>
+        <location filename="../qml/KaraokeFlow.qml" line="291"/>
         <source>The lyrics are already beside the stream.</source>
         <translation>Les paroles se trouvent déjà à côté du flux.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="281"/>
+        <location filename="../qml/KaraokeFlow.qml" line="294"/>
         <source>A lyrics file of that name was already beside the stream, and was left as it is.</source>
         <translation>Un fichier de paroles de ce nom se trouvait déjà à côté du flux et a été laissé tel quel.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="289"/>
+        <location filename="../qml/KaraokeFlow.qml" line="302"/>
         <source>The lyrics could not be written beside the stream.</source>
         <translation>Les paroles n&apos;ont pas pu être écrites à côté du flux.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="346"/>
+        <location filename="../qml/KaraokeFlow.qml" line="362"/>
         <source>Backing</source>
         <translation>Accompagnement</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="347"/>
+        <location filename="../qml/KaraokeFlow.qml" line="363"/>
         <source>Melody guide</source>
         <translation>Mélodie guide</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="348"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1088"/>
+        <location filename="../qml/KaraokeFlow.qml" line="364"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1105"/>
         <source>Vocal 1</source>
         <translation>Voix 1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="349"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1089"/>
+        <location filename="../qml/KaraokeFlow.qml" line="365"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1106"/>
         <source>Vocal 2</source>
         <translation>Voix 2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="350"/>
+        <location filename="../qml/KaraokeFlow.qml" line="366"/>
         <source>LFE</source>
         <translation>LFE</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="352"/>
+        <location filename="../qml/KaraokeFlow.qml" line="368"/>
         <source>File</source>
         <translation>Fichier</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="359"/>
+        <location filename="../qml/KaraokeFlow.qml" line="375"/>
         <source>A karaoke stream needs a backing: the music on the left and the right.</source>
         <translation>Un flux karaoké a besoin d&apos;un accompagnement : la musique à gauche et à droite.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="361"/>
+        <location filename="../qml/KaraokeFlow.qml" line="377"/>
         <source>%1 has %2 channel(s); the backing is the left and the right, so it needs two.</source>
         <translation>%1 a %2 canal(aux) ; l&apos;accompagnement est la gauche et la droite, il en faut donc deux.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="364"/>
+        <location filename="../qml/KaraokeFlow.qml" line="380"/>
         <source>%1 has %2 channels, already a surround bed. Give the backing as a stereo file, or use it as the one multichannel file whose speakers name the parts.</source>
         <translation>%1 a %2 canaux, c&apos;est déjà un lit ambiophonique. Fournissez l&apos;accompagnement en fichier stéréo, ou utilisez-le comme l&apos;unique fichier multicanal dont les enceintes nomment les parties.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="368"/>
+        <location filename="../qml/KaraokeFlow.qml" line="384"/>
         <source>%1 has %2 channels; each melody and vocal is one channel.</source>
         <translation>%1 a %2 canaux ; chaque mélodie et chaque voix est un canal.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="370"/>
+        <location filename="../qml/KaraokeFlow.qml" line="386"/>
         <source>%1 is Vocal 2, and a stream has no mode that carries Vocal 2 without Vocal 1. Use it as Vocal 1.</source>
         <translation>%1 est la Voix 2, et un flux n&apos;a pas de mode qui porte la Voix 2 sans la Voix 1. Utilisez-le comme Voix 1.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="373"/>
+        <location filename="../qml/KaraokeFlow.qml" line="389"/>
         <source>A backing alone is stereo, with nothing to sing along to. Add a melody guide or a vocal.</source>
         <translation>Un accompagnement seul est du stéréo, sans rien pour chanter. Ajoutez une mélodie guide ou une voix.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="376"/>
+        <location filename="../qml/KaraokeFlow.qml" line="392"/>
         <source>%1 is %2 and the backing is %3: the shorter part is padded with silence.</source>
         <translation>%1 dure %2 et l&apos;accompagnement %3 : la partie la plus courte est complétée par du silence.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="379"/>
+        <location filename="../qml/KaraokeFlow.qml" line="395"/>
         <source>%1 is %2 kHz and the backing is %3 kHz: it is resampled to the backing&apos;s rate.</source>
         <translation>%1 est à %2 kHz et l&apos;accompagnement à %3 kHz : il est rééchantillonné à la fréquence de l&apos;accompagnement.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="382"/>
+        <location filename="../qml/KaraokeFlow.qml" line="398"/>
         <source>All parts are %1 at %2 kHz.</source>
         <translation>Toutes les parties durent %1 à %2 kHz.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="384"/>
+        <location filename="../qml/KaraokeFlow.qml" line="400"/>
         <source>Each part is one place in the stream.</source>
         <translation>Chaque partie occupe une seule place dans le flux.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="386"/>
+        <location filename="../qml/KaraokeFlow.qml" line="402"/>
         <source>%1 is the LFE channel: the encoder band-limits it as it does any LFE.</source>
         <translation>%1 est le canal LFE : l&apos;encodeur en limite la bande comme pour tout LFE.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="389"/>
+        <location filename="../qml/KaraokeFlow.qml" line="405"/>
         <source>Choose a file.</source>
         <translation>Choisissez un fichier.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="391"/>
+        <location filename="../qml/KaraokeFlow.qml" line="407"/>
         <source>%1 has %2 channels and does not say which speakers they are, so the parts cannot be told apart. Use separate parts, or a file whose speakers are named.</source>
         <translation>%1 a %2 canaux et ne dit pas de quelles enceintes il s&apos;agit, les parties ne peuvent donc pas être distinguées. Utilisez des parties séparées, ou un fichier dont les enceintes sont nommées.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="395"/>
+        <location filename="../qml/KaraokeFlow.qml" line="411"/>
         <source>The speakers (%1) are not one of Annex C&apos;s five layouts: L C R, L R S, L C R S, L R Ls Rs or L C R Ls Rs.</source>
         <translation>Les enceintes (%1) ne sont aucune des cinq configurations de l&apos;annexe C : L C R, L R S, L C R S, L R Ls Rs ou L C R Ls Rs.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="407"/>
+        <location filename="../qml/KaraokeFlow.qml" line="423"/>
         <source>Chosen from what you supplied: a backing and a melody guide.</source>
         <translation>Choisi d&apos;après ce que vous avez fourni : un accompagnement et une mélodie guide.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="408"/>
+        <location filename="../qml/KaraokeFlow.qml" line="424"/>
         <source>Chosen from what you supplied: a backing and one vocal.</source>
         <translation>Choisi d&apos;après ce que vous avez fourni : un accompagnement et une voix.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="409"/>
+        <location filename="../qml/KaraokeFlow.qml" line="425"/>
         <source>Chosen from what you supplied: a melody guide and one vocal.</source>
         <translation>Choisi d&apos;après ce que vous avez fourni : une mélodie guide et une voix.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="410"/>
+        <location filename="../qml/KaraokeFlow.qml" line="426"/>
         <source>Chosen from what you supplied: a backing and two vocals.</source>
         <translation>Choisi d&apos;après ce que vous avez fourni : un accompagnement et deux voix.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="411"/>
+        <location filename="../qml/KaraokeFlow.qml" line="427"/>
         <source>Chosen from what you supplied: a melody guide and two vocals.</source>
         <translation>Choisi d&apos;après ce que vous avez fourni : une mélodie guide et deux voix.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="522"/>
+        <location filename="../qml/KaraokeFlow.qml" line="539"/>
         <source>silent</source>
         <translation>silencieux</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="550"/>
+        <location filename="../qml/KaraokeFlow.qml" line="567"/>
         <source>off</source>
         <translation>désactivé</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="552"/>
+        <location filename="../qml/KaraokeFlow.qml" line="569"/>
         <source>%1 dB</source>
         <translation>%1 dB</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="571"/>
+        <location filename="../qml/KaraokeFlow.qml" line="588"/>
         <source>As a plain surround player plays it: the vocals come from the rear speakers.</source>
         <translation>Tel qu&apos;un lecteur ambiophonique ordinaire le lit : les voix viennent des enceintes arrière.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="574"/>
+        <location filename="../qml/KaraokeFlow.qml" line="591"/>
         <source>As a karaoke-aware decoder plays it: the vocals at the surround level you chose (Table C.2.2).</source>
         <translation>Tel qu&apos;un décodeur « karaoke-aware » le lit : les voix au niveau ambiophonique que vous avez choisi (tableau C.2.2).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="578"/>
+        <location filename="../qml/KaraokeFlow.qml" line="595"/>
         <source>This stream has no vocals to choose between.</source>
         <translation>Ce flux n&apos;a pas de voix parmi lesquelles choisir.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="581"/>
+        <location filename="../qml/KaraokeFlow.qml" line="598"/>
         <source>No vocals: the backing and the melody guide, for singing along.</source>
         <translation>Pas de voix : l&apos;accompagnement et la mélodie guide, pour chanter par-dessus.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="582"/>
+        <location filename="../qml/KaraokeFlow.qml" line="599"/>
         <source>Vocal 1 alone: a single vocal sits in the centre with the melody (Table C.2.3).</source>
         <translation>Voix 1 seule : une voix unique se place au centre avec la mélodie (tableau C.2.3).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="584"/>
+        <location filename="../qml/KaraokeFlow.qml" line="601"/>
         <source>Vocal 2 alone: a single vocal sits in the centre with the melody (Table C.2.3).</source>
         <translation>Voix 2 seule : une voix unique se place au centre avec la mélodie (tableau C.2.3).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="585"/>
+        <location filename="../qml/KaraokeFlow.qml" line="602"/>
         <source>This stream has no Vocal 2, so nothing is played.</source>
         <translation>Ce flux n&apos;a pas de Voix 2, rien n&apos;est donc lu.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="587"/>
+        <location filename="../qml/KaraokeFlow.qml" line="604"/>
         <source>Both vocals: Vocal 1 on the left and Vocal 2 on the right.</source>
         <translation>Les deux voix : la Voix 1 à gauche et la Voix 2 à droite.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="723"/>
+        <location filename="../qml/KaraokeFlow.qml" line="740"/>
         <source>Which recordings make the song?</source>
         <translation>Quels enregistrements forment la chanson ?</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="731"/>
+        <location filename="../qml/KaraokeFlow.qml" line="748"/>
         <source>Give each part its own file. The stream is built from what you supply: a melody guide and one or two vocals go in the places a centre and surrounds would be, and the backing stays left and right.</source>
         <translation>Donnez à chaque partie son propre fichier. Le flux est construit à partir de ce que vous fournissez : une mélodie guide et une ou deux voix vont là où seraient le centre et les ambiophoniques, et l&apos;accompagnement reste à gauche et à droite.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="741"/>
+        <location filename="../qml/KaraokeFlow.qml" line="758"/>
         <source>Where the parts come from</source>
         <translation>D&apos;où viennent les parties</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="743"/>
+        <location filename="../qml/KaraokeFlow.qml" line="760"/>
         <source>Separate files</source>
         <translation>Fichiers séparés</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="744"/>
-        <location filename="../qml/KaraokeFlow.qml" line="862"/>
+        <location filename="../qml/KaraokeFlow.qml" line="761"/>
+        <location filename="../qml/KaraokeFlow.qml" line="879"/>
         <source>One multichannel file</source>
         <translation>Un fichier multicanal</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="754"/>
+        <location filename="../qml/KaraokeFlow.qml" line="771"/>
         <source>stereo · L R</source>
         <translation>stéréo · L R</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="755"/>
+        <location filename="../qml/KaraokeFlow.qml" line="772"/>
         <source>mono · M</source>
         <translation>mono · M</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="756"/>
+        <location filename="../qml/KaraokeFlow.qml" line="773"/>
         <source>mono · V1</source>
         <translation>mono · V1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="757"/>
+        <location filename="../qml/KaraokeFlow.qml" line="774"/>
         <source>mono · V2</source>
         <translation>mono · V2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="758"/>
+        <location filename="../qml/KaraokeFlow.qml" line="775"/>
         <source>mono · LFE</source>
         <translation>mono · LFE</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="797"/>
+        <location filename="../qml/KaraokeFlow.qml" line="814"/>
         <source>(optional) %1</source>
         <translation>(facultatif) %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="810"/>
+        <location filename="../qml/KaraokeFlow.qml" line="827"/>
         <source>not chosen</source>
         <translation>non choisi</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="820"/>
+        <location filename="../qml/KaraokeFlow.qml" line="837"/>
         <source>%1 kHz · %2 · %3 channel(s)</source>
         <translation>%1 kHz · %2 · %3 canal(aux)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="831"/>
-        <location filename="../qml/KaraokeFlow.qml" line="881"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1345"/>
+        <location filename="../qml/KaraokeFlow.qml" line="848"/>
+        <location filename="../qml/KaraokeFlow.qml" line="898"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1399"/>
         <source>Change</source>
         <translation>Modifier</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="831"/>
-        <location filename="../qml/KaraokeFlow.qml" line="881"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1345"/>
+        <location filename="../qml/KaraokeFlow.qml" line="848"/>
+        <location filename="../qml/KaraokeFlow.qml" line="898"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1399"/>
         <source>Choose…</source>
         <translation>Choisir…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="837"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1351"/>
+        <location filename="../qml/KaraokeFlow.qml" line="854"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1405"/>
         <source>Remove</source>
         <translation>Supprimer</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1087"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1104"/>
         <source>Melody</source>
         <translation>Mélodie</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1101"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1118"/>
         <source>%1 level</source>
         <translation>Niveau de %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1114"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1131"/>
         <source>%1 level, dB</source>
         <translation>Niveau de %1, en dB</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1142"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1159"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable player only.</source>
         <translation>Le niveau de chaque partie par rapport au tableau C.2.3 : 0 dB est le tableau, et le bas du réglage est désactivé. Relever une partie assez loin abaisse les autres, afin qu&apos;aucune enceinte ne soit poussée au-delà de la pleine échelle. Uniquement pour la lecture « Capable ».</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1152"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1169"/>
         <source>Reset levels</source>
         <translation>Réinitialiser les niveaux</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1328"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1287"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1309"/>
+        <source>E-AC-3</source>
+        <translation>E-AC-3</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokeFlow.qml" line="1300"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1313"/>
+        <source>Format</source>
+        <translation>Format</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokeFlow.qml" line="1382"/>
         <source>Lyrics</source>
         <translation>Paroles</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1336"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1390"/>
         <source>none</source>
         <translation>aucune</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1587"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1641"/>
         <source>Lyrics (*.lrc *.srt *.ass *.kar)</source>
         <translation>Paroles (*.lrc *.srt *.ass *.kar)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1460"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1514"/>
         <source>CODING MODE</source>
         <translation>MODE DE CODAGE</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1468"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1522"/>
         <source>%1 · %2</source>
         <translation>%1 · %2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1469"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1523"/>
         <source>not yet</source>
         <translation>pas encore</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="872"/>
+        <location filename="../qml/KaraokeFlow.qml" line="889"/>
         <source>A WAV whose speakers are already named L C R Ls Rs (or L R S, L C R S, L R Ls Rs), with an LFE if it has one.</source>
         <translation>Un WAV dont les enceintes sont déjà nommées L C R Ls Rs (ou L R S, L C R S, L R Ls Rs), avec un LFE s&apos;il en a un.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="285"/>
+        <location filename="../qml/KaraokeFlow.qml" line="298"/>
         <source>The lyrics file could not be read, so none was put beside the stream: %1</source>
         <translation>Le fichier de paroles n&apos;a pas pu être lu, aucun n&apos;a donc été placé à côté du flux : %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="896"/>
+        <location filename="../qml/KaraokeFlow.qml" line="913"/>
         <source>How loud do the melody and the vocals sit?</source>
         <translation>Quel est le volume de la mélodie et des voix ?</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="904"/>
+        <location filename="../qml/KaraokeFlow.qml" line="921"/>
         <source>These are the two levels Annex C reads from the stream. A karaoke-aware decoder mixes the melody guide and the vocals with them; a karaoke-capable one lets the singer choose the vocals but still folds with them.</source>
         <translation>Ce sont les deux niveaux que l&apos;annexe C lit dans le flux. Un décodeur « karaoke-aware » mélange avec eux la mélodie guide et les voix ; un décodeur « karaoke-capable » laisse le chanteur choisir les voix mais replie quand même avec eux.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="920"/>
+        <location filename="../qml/KaraokeFlow.qml" line="937"/>
         <source>Centre level (melody)</source>
         <translation>Niveau central (mélodie)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="926"/>
+        <location filename="../qml/KaraokeFlow.qml" line="943"/>
         <source>Centre level</source>
         <translation>Niveau central</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="942"/>
+        <location filename="../qml/KaraokeFlow.qml" line="959"/>
         <source>cmixlev: how loud the melody guide M is in a stereo fold. The aware decoder applies it to M at 2/0 (Table C.2.2).</source>
         <translation>cmixlev : le volume de la mélodie guide M dans un repli stéréo. Le décodeur « aware » l&apos;applique à M en 2/0 (tableau C.2.2).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="944"/>
+        <location filename="../qml/KaraokeFlow.qml" line="961"/>
         <source>This stream has no melody guide, so there is no centre level.</source>
         <translation>Ce flux n&apos;a pas de mélodie guide, il n&apos;y a donc pas de niveau central.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="957"/>
+        <location filename="../qml/KaraokeFlow.qml" line="974"/>
         <source>Surround level (vocals)</source>
         <translation>Niveau ambiophonique (voix)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="963"/>
+        <location filename="../qml/KaraokeFlow.qml" line="980"/>
         <source>Surround level</source>
         <translation>Niveau ambiophonique</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="979"/>
+        <location filename="../qml/KaraokeFlow.qml" line="996"/>
         <source>surmixlev: how loud the vocals V1 and V2 are in the aware decoder&apos;s reproduction and in a stereo fold (Table C.2.2).</source>
         <translation>surmixlev : le volume des voix V1 et V2 dans la reproduction du décodeur « aware » et dans un repli stéréo (tableau C.2.2).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="981"/>
+        <location filename="../qml/KaraokeFlow.qml" line="998"/>
         <source>This stream has no vocals, so there is no surround level.</source>
         <translation>Ce flux n&apos;a pas de voix, il n&apos;y a donc pas de niveau ambiophonique.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="996"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1013"/>
         <source>Hear it the way a singer will</source>
         <translation>Écoutez-le comme le fera un chanteur</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1004"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1021"/>
         <source>This plays the stream you just built, decoded the way a karaoke player decodes it: not your source files. Try each choice a singer has.</source>
         <translation>Ceci lit le flux que vous venez de construire, décodé comme le décode un lecteur de karaoké : pas vos fichiers sources. Essayez chaque choix dont dispose un chanteur.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1016"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1033"/>
         <source>Building the stream…</source>
         <translation>Construction du flux…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1018"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1035"/>
         <source>Could not build the stream: %1</source>
         <translation>Impossible de construire le flux : %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1019"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1036"/>
         <source>The stream is built when you reach this step.</source>
         <translation>Le flux est construit lorsque vous atteignez cette étape.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1035"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1041"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1052"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1058"/>
         <source>Player</source>
         <translation>Lecteur</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1043"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1060"/>
         <source>As coded</source>
         <translation>Tel que codé</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1044"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1061"/>
         <source>Aware</source>
         <translation>Aware</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1045"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1062"/>
         <source>Capable</source>
         <translation>Capable</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1058"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1064"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1075"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1081"/>
         <source>Vocals</source>
         <translation>Voix</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1066"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1083"/>
         <source>None</source>
         <translation>Aucun</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1067"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1084"/>
         <source>V1</source>
         <translation>V1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1068"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1085"/>
         <source>V2</source>
         <translation>V2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1069"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1086"/>
         <source>Both</source>
         <translation>Les deux</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1164"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1181"/>
         <source>Pause</source>
         <translation>Pause</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1164"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1181"/>
         <source>Play</source>
         <translation>Lire</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1171"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1188"/>
         <source>%1 / %2</source>
         <translation>%1 / %2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1206"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1223"/>
         <source>WHAT PLAYS</source>
         <translation>CE QUI JOUE</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1261"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1278"/>
         <source>Save the stream</source>
         <translation>Enregistrer le flux</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1269"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1286"/>
         <source>%1 · karaoke %2 · %3 kbps</source>
         <translation>%1 · karaoké %2 · %3 kbps</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1269"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1287"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1309"/>
         <source>AC-3</source>
         <translation>AC-3</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1281"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1293"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1320"/>
+        <source>E-AC-3 carries the same karaoke service type, but its specification gives no reproduction for it. Hearth, forge and Dolby&apos;s reference decoder reproduce it as Annex C does for AC-3. A player that does not reproduce it plays V1 and V2 from the surround speakers. AC-3 is the format Annex C defines.</source>
+        <translation>L&apos;E-AC-3 porte le même type de service karaoké, mais sa spécification n&apos;en définit aucune reproduction. Hearth, forge et le décodeur de référence de Dolby le reproduisent comme l&apos;annexe C le fait pour l&apos;AC-3&#xa0;; un lecteur qui ne le fait pas joue V1 et V2 sur les haut-parleurs surround. L&apos;AC-3 est le format que définit l&apos;annexe C.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokeFlow.qml" line="1335"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1347"/>
         <source>File type</source>
         <translation>Type de fichier</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1301"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1314"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1355"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1368"/>
         <source>Bit rate</source>
         <translation>Débit binaire</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1317"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1371"/>
         <source>kbps</source>
         <translation>kbps</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1360"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1414"/>
         <source>A lyrics file (.lrc, .srt, .ass or .kar) is written beside the stream as the stream&apos;s own .lrc, in UTF-8, where Hearth finds it. One of the backing&apos;s name beside it is offered.</source>
         <translation>Un fichier de paroles (.lrc, .srt, .ass ou .kar) est écrit à côté du flux comme le .lrc du flux, en UTF-8, où Hearth le trouve. Celui qui porte le nom de l&apos;accompagnement et se trouve à côté de lui est proposé.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1372"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1426"/>
         <source>These lyrics cannot be used: %1</source>
         <translation>Ces paroles ne peuvent pas être utilisées : %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1402"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1456"/>
         <source>THE SAME FROM THE COMMAND LINE</source>
         <translation>LA MÊME CHOSE EN LIGNE DE COMMANDE</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1521"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1575"/>
         <source>No LFE part: the stream carries none. An LFE part is optional.</source>
         <translation>Pas de partie LFE : le flux n&apos;en porte aucune. Une partie LFE est facultative.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1542"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1596"/>
         <source>Back</source>
         <translation>Retour</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1585"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1639"/>
         <source>Choose the lyrics</source>
         <translation>Choisir les paroles</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1596"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1650"/>
         <source>Choose %1</source>
         <translation>Choisir %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1598"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1652"/>
         <source>WAV audio (*.wav)</source>
         <translation>Audio WAV (*.wav)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokeFlow.qml" line="1587"/>
-        <location filename="../qml/KaraokeFlow.qml" line="1598"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1641"/>
+        <location filename="../qml/KaraokeFlow.qml" line="1652"/>
         <source>All files (*)</source>
         <translation>Tous les fichiers (*)</translation>
     </message>
