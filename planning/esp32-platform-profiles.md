@@ -2,9 +2,11 @@
 
 **Status, 2026-10-12, later the same day:** the design was merged (#1369) and the owner approved the
 first steps. Built: the S3 fix (#1387, verified on S3a and S3b), the C6's clean refusal (#1395,
-verified on the C6), and the profiles file with its reader and guard (`firmware/hearth-sink/profiles.json`,
-`tools/hearth/sink_profile.py`); nothing reads them yet but their own tests. Not built: everything
-from the boot budget line on ([Order of work](#order-of-work)). Two things this page said before the
+verified on the C6), the profiles file with its reader and guard (`firmware/hearth-sink/profiles.json`,
+`tools/hearth/sink_profile.py`), and CI reading it: every board build in `_build.yml` takes its
+fragments from the file and is held to it, packaging checks the profile, and the docs' fragment
+lists are held to it. Not built: everything from the boot budget line on
+([Order of work](#order-of-work)). Two things this page said before the
 boards ran are corrected where they stood: the C6 is not a config value away
 ([the C6](#the-c6-is-not-a-config-value-away)), and `realtime_permille` is not a speed figure on a
 paced sink ([the board suite](#3-the-board-suite)).
@@ -225,33 +227,44 @@ writes the `sdkconfig`):
 
 ## Boot-time budget line
 
-The failure showed at the first play, after the board had been "fine" since boot. The board
-already prints `heap: internal free N (largest block M)` at a play's start and `sendspin: player up
-with internal heap ...`. One more line, at boot, after the network is up and the Sendspin player
-has started (and again when a network comes up later):
+**Built (PR 4).** The failure showed at the first play, after the board had been "fine" since
+boot. The board already prints `heap: internal free N (largest block M)` at a play's start and
+`sendspin: player up with internal heap ...`. One more line, after the network is up and the
+Sendspin player has started at boot, and again when a network comes up later
+(`report_budget` in `firmware/hearth-sink/main/hearth_sink.cpp`):
 
 ```
-budget: internal free 158,320, largest 31,744; asks: http_decode_stack 0 (psram), ring 0 (psram),
-        sendspin_decode_stack 0 (psram), server_stack 8,192, ...; biggest internal ask 8,192;
-        headroom 23,552 -- ok
+budget: when=boot net=1 internal_free=86231 largest=31744 ask_ring=0 ask_decode_stack=0
+ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 headroom=23552 floor=0 verdict=ok
 ```
 
-The asks are compile-time constants from the Kconfig; the headroom is the largest internal block
-minus the biggest ask that is internal. If it is short, the line says `SHORT` and the figure that
-was missing, and the failed-allocation hook's own line is what follows at the first play. The line
-goes to the console and so to `GET /log`, which is where the suite reads it. It cannot be
-sufficient (later allocations take more), so the profile carries a floor for the largest block
-that the suite holds a board to, and the headroom floor is the profile's stated reserve for what
-comes after boot. Whether a `SHORT` should also reach the page is left to PR 4: `GET /hardware`'s
-JSON is built once, when the control surface starts, which is before the Sendspin player does, so
-a notice there would need that JSON rebuilt.
+(One line on the console; this is the S3b's, 2026-10-12, the `s3-n16r8` image. The C6's, from its
+serial console on the `c6-16mb` image: `internal_free=113188 largest=98304 ask_ring=32768
+ask_decode_stack=32768 ask_fetch_stack=8192 ask_total=73728 ask_biggest=32768 headroom=65536
+floor=134008 verdict=below-floor`, which is the C6 profile saying that it refuses an HTTP play.) The asks are the HTTP play's ring and stacks that this build puts in
+internal RAM, from the same Kconfig the play reads: a ring or a stack in PSRAM asks for 0. The
+headroom is the largest internal block less the biggest single ask. `verdict` is `ok`,
+`short-block` (no block that size), `short-total` (not that much in all) or `below-floor` (the
+build's `PLAY_MIN_FREE_BYTES` would refuse a play). An S3 image with its 32,768-byte decode
+stack internal, as 4065's was, has a 31,744-byte largest block against a 32,768-byte ask, so the
+code gives `short-block` at boot where the failure used to be met at the first play; that shape has
+not been run with this line on a board.
 
-`GET /hardware` also reports the **profile id and a hash of its locked values**. Both are
-compile-time constants, from a generated fragment the profile build adds, so they fit that JSON as
-it is built. A board then says what it runs; the suite refuses a board that runs another profile
-or a `+scratch` image, and a session no longer has to guess from a version string what a slot
-holds.
+It is a floor and not a fit: the decoder, the I2S queue and the heap's fragmentation come after
+it, so the suite also holds a board to a headroom of its own
+(`check_esp_console.py --min-budget-headroom`, which fails a verdict that is not `ok` or a margin
+under the figure). The line goes to the console and so to `GET /log` (2 KB on a C6, where a
+crash clears it: read the serial console there). Whether a `short-*` should also reach the page is
+still open: `GET /hardware`'s JSON is built once, when the control surface starts, before the
+Sendspin player does.
 
+**`GET /hardware` reports the profile id and a hash of its locked values** (`profile`,
+`profile_hash`). Both are compile-time constants: the build is configured with
+`sink_profile.py identity <profile> --cmake` (`-DICLFORGE_PROFILE=` and
+`-DICLFORGE_PROFILE_HASH=`), `verify` fails a build that does not carry its own profile's id and
+current hash, and the board suite refuses a board that runs another profile, an older definition of
+this one, or an image built with neither. A session no longer has to guess from a version string
+what a slot holds.
 ## The suite
 
 Per profile, three layers. A new feature is a new row in the profile's play list and a new figure
@@ -273,27 +286,52 @@ baseline PRs replace them with numbers from a passing one.
 
 ### 2. A QEMU twin of the release shape
 
-CI runs the HTTP play only on a shape that is not a board's. The twin keeps the release profile's
-fragments, and adds one declared overlay (`qemu-net`) that changes only what QEMU cannot do:
-Ethernet in place of Wi-Fi, the capture sink in place of I2S, and QEMU's PSRAM mode. Then it runs
-what the existing step runs: the boot play, `/status`, `POST /play` of a second stream, `/stop`,
-the console check.
+**Built (PR 5).** CI ran the HTTP play only on a shape that is not a board's. The twin is the
+release profile's own fragments (`s3-n16r8`) with one declared overlay, `qemu-net`
+(`sdkconfig.qemu-net`), which changes only what QEMU has no hardware for: Ethernet in place of
+Wi-Fi, the capture sink in place of I2S, QUAD PSRAM in place of octal (QEMU started with
+`-m 8M`), and the console on UART0 (QEMU's `-serial`; `sdkconfig.hw` puts it on USB-Serial-JTAG,
+which QEMU does not model, so the console was silent until this was added). A test holds the
+overlay to those: it may not name a key with a stack, a ring, a cache, a DMA queue, AC-4, the
+Sendspin player or the lane in it.
 
-What this buys and what it does not:
+The step "Play the S3 board's release shape over QEMU's Ethernet" in the ESP lane (`_build.yml`):
 
-- It runs the **same tasks, stacks, ring placement, PSRAM stack path and Kconfig defaults** as the
-  release image. The 2026-10-12 failure was a `could not start the decode task`; this catches it.
-- It does **not** reproduce Wi-Fi's share of internal RAM (QEMU has no Wi-Fi). Heap figures stay a
-  board's. Its `--min-heap-free` floor is a smoke test, not the budget.
-- **Open until tried:** QEMU emulates quad PSRAM at `-m 8M` and fails the flash mapping at 32M
-  (`sdkconfig.ci-lane` has the story), so the twin uses quad where the board is octal; and whether
-  `SPIRAM_FETCH_INSTRUCTIONS` and `SPIRAM_RODATA` run under QEMU's MMU is not known. If they do
-  not, the overlay declares exactly those two keys and the guard lists them as "not exercised under
-  QEMU", so that the board suite is known to be the only place they run.
-- It lives in the existing ESP lane job, as another step, so it adds minutes, not a runner.
+1. configures the twin with the profile's identity and holds it to the profile with
+   `verify --overlay qemu-net` (without the overlay named, `verify` names the extra fragment
+   and the console, network and PSRAM-mode keys, and nothing else, which is the check that the
+   overlay is only them);
+2. boots it and waits for the boot `budget:` line;
+3. reads `GET /hardware`: the profile and its hash are `sink_profile.py identity`'s;
+4. plays over `POST /play`, as a board gets it: an AC-3 2/0, an E-AC-3 2/0 and the 5.1 with
+   objects, each to `result=pass` with every unit and no resynchronised byte, the demo at the
+   host's Lo/Ro levels (56,673 and 47,346, the same figures the HTTP step holds);
+5. holds the console to `sink_profile.py expect-console s3-n16r8`: the lines that say the HTTP
+   play's ring and decode stack, the Sendspin ring and its decode stack are in PSRAM, at the sizes
+   the profile locks, and that the decode lane started on cores 1 and 0;
+6. runs `check_esp_console.py --min-budget-headroom 4096`: one boot, no panic, no failed
+   allocation, and a boot budget with a margin.
+
+What the spike found, run locally under QEMU's esp_develop 9.2.2 on Windows:
+
+- **PSRAM execution runs.** With quad PSRAM at `-m 8M` and `SPIRAM_FETCH_INSTRUCTIONS` and
+  `SPIRAM_RODATA` on, as the release shape has them, the image boots, brings the network up,
+  starts the Sendspin player and the control surface, and plays. `GET /hardware` says
+  `psram_bytes: 8388608`. Nothing needed declaring as "not exercised under QEMU".
+- **It does not reproduce the 2026-10-12 failure's symptom.** QEMU has no Wi-Fi, so its internal
+  RAM is far larger than a board's with the network up: 226,679 bytes free and a 135,168-byte
+  largest block at boot against the S3b's 86,231 and 31,744. A 32,768-byte stack in internal RAM
+  would be made without trouble, and the play would pass. What the twin catches is the **cause**:
+  the stack's placement. A build whose HTTP stack is internal fails `verify` (the key) and fails the
+  console expectation (the line `player: decode stack 32768 bytes in PSRAM` is not printed), as
+  4065's S3b console did not print it. Heap stays the board's: the twin's budget line is a smoke
+  floor, and the board suite owns the budget.
+- **The stream set's level checker is for the 7.1.4 shapes.** `check_stream_set.py` holds a play
+  to the twelve slots of the layout the CI shapes render to; the release shape plays 2.0, so the
+  step checks the verdicts and the demo's two levels itself, as the HTTP step does.
+- **Cost:** one more S3 build in the ESP lane, and about two minutes of QEMU for the three plays.
 
 The C6 and the P4 have no emulator, so for them layer 1 and layer 3 are the whole suite.
-
 ### The C6 is not a config value away
 
 The brief's config-only candidate for the C6 (the decode stack at 24,576, as `sdkconfig.ci-http`
@@ -317,44 +355,67 @@ and 24 KB stack given back for the length of a play.
 
 ### 3. The board suite
 
-`board_suite.py`, in `tools/hearth/` (standard library), replacing the scripts that
-live in `D:\ac3bld` and the session scratchpads:
+**Built (PR 6).** `board_suite.py`, in `tools/hearth/` (standard library), reads the play list
+from `firmware/hearth-sink/suite.json` and writes baselines under
+`firmware/hearth-sink/baselines/`. It replaces the scripts that lived in `D:\ac3bld` and the
+session scratchpads:
 
 ```
-board_suite.py run --profile s3-n16r8 --host 192.168.1.156 --lock D:/ac3bld/s3-board-156.lock \
-                   --session <id> [--record | --compare]
+board_suite.py run --profile s3-n16r8 --host 192.168.1.45 --lock D:/ac3bld/s3-board-45.lock \
+                   --session <id> [--repeat 3] [--record | --compare baselines/s3-n16r8.json]
+board_suite.py plan --profile s3-n16r8
+board_suite.py compare --run board-run.json --baseline baselines/s3-n16r8.json
+board_suite.py lock take|release|show --file <lock> --session <id>
 ```
 
 It does, in this order, and stops at the first refusal:
 
 1. **Booking.** Refuses with no `--lock` and `--session`. Takes the lock file atomically
    (create-new, one line `session=... | purpose=... | start=... | expected_end=...`) and refuses if
-   one exists. It does not read or print Wi-Fi values; they live in the build, never in the
-   suite's output or its recorded files. The rest of the booking rule (the other four locks,
-   `ListAgents`, running `idf.py`/`esptool`/`ota.py`) is the operator's, and the suite prints it
-   first as a checklist, because a script cannot see another session.
-2. **Identity.** `GET /hardware`: the profile id and locked-value hash are the profile's; the board
-   is `state: stopped`.
-3. **Plays.** Serves the fixture streams from the host (its own LAN address, no listener left
-   behind) and for each row of the play list: `POST /play`, poll `/status` to `finished`, read the
-   console lines of that play from `/log?from=`.
-4. **Asserts,** per play: `state` finished, not failed; `stream.units` equals the stream's frame
-   count; sink underruns 0; the decoder's time per frame against the baseline (below);
-   `stream.decode_stack_free` at least the baseline's margin; for AC-4, the `pcm_hash=` of the play's `ac4.<label>=` line
-   equal to the host's pin in
-   [`testdata/ac4-probe-pcm-hashes.json`](../testdata/ac4-probe-pcm-hashes.json). The AC-4 profiles
-   carry `ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` and play each AC-4 row twice, with `?hash=off` for the
-   speed figure, as the player's own comment describes.
-5. **Heap.** The boot `budget:` line and the free low-water over the list, against the profile.
-6. **Writes `board-run.json`** (what was measured, the image's version and profile hash, the
-   board, the date). `--record` writes `baselines/<profile>.json` from it; `--compare` fails on a
-   regression and prints an improvement as "re-baseline".
+   one exists, unless it is this session's own (a run on a board the session booked to put an
+   image on it uses that lock and leaves it for its owner). It releases only a lock it took. It
+   does not read or keep anything the board says about its network. The rest of the booking rule
+   (the other four locks, `ListAgents`, running `idf.py`/`esptool`/`ota.py`) is the operator's, and
+   the suite prints it first as a checklist, because a script cannot see another session.
+2. **Identity.** `GET /hardware`: the profile id and the hash of the file's current definition are
+   the board's (`sink_profile.py identity`); the board is `state: stopped`.
+3. **Plays.** Serves the fixture streams from this machine (its own LAN address, a server that is
+   shut down at the end) and for each row: `POST /play` of a location of its own, `/status` to
+   `finished` or `failed`, then `/log?from=` until the play's `result=` line, because the state
+   flips before the end-of-play lines print.
+4. **Asserts,** per row: finished and not failed; every unit and no resynchronised byte; sink
+   underruns 0; no failed allocation; no reboot (the log is shorter than where it was); and for
+   AC-4 the `pcm_hash=` of the `ac4.<label>=` line equal to the host's pin in
+   [`testdata/ac4-probe-pcm-hashes.json`](../testdata/ac4-probe-pcm-hashes.json). A row that
+   expects the C6's refusal expects state `failed`, why `memory`, and no reboot.
+5. **Figures,** per row: the decoder's time per frame, the decode stack left and the sink queue's
+   least headroom. `--repeat N` plays a row N times and holds the median time and the worst of the
+   rest.
+6. **Writes `board-run.json`** (the figures, the image's version and profile hash, the chip, the
+   date). `--record` writes `baselines/<profile>.json` from a clean run; `--compare` holds a run to
+   a baseline with the tolerance in `suite.json` and prints an improvement as "re-baseline".
 
-The fixed play list per profile, the first rows today's: AC-3 2.0, E-AC-3 2.0, E-AC-3 5.1 with
-JOC (`apps/demos/wasm/assets/demo.ec3`, 250 units, the one CI's HTTP step plays), and on the AC-4
-profiles the 2.0 SIMPLE and A-SPX gold streams. The streams are the repository's; the suite does
-not generate its own.
+Tests (`test_board_suite.py`, 53) run it against a stand-in board that answers with what the real
+boards printed on 2026-10-12, and hold the file to the tree (every stream is in the repository,
+every AC-4 row names a pin the host holds, every profile has a list).
 
+**Run on S3b (2026-10-12, the `s3-n16r8` image, 4175):** AC-3 2.0 and E-AC-3 2.0, 938 frames each,
+no underruns, the decode stack 18,256 and 18,064 bytes free, the queue's least headroom 5 ms, and
+the decoder at **123 and 88 permille of a frame** where `realtime_permille` read 981 for both.
+
+Not in PR 6, and said so: the boot `budget:` line was not read into the run (S3's `/log` may have
+rotated it out and the C6's is 2 KB). PR 7 reads it: `--restart` restarts the board so that the boot
+line is the log's first, the suite parses it, and `--record` refuses a baseline when the log holds
+none; the C6's 2 KB log is read from the serial console where it has to be. The 5.1 and
+wider rows (`demo.ec3` with objects) wait for the baselines; the AC-4 rows need an image built with
+`CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` (the `measure` overlay) and say so when the hash is not on
+the line; and a Sendspin play list for the C6 needs a server on the bench.
+
+The play list, in `suite.json`: AC-3 2.0 and E-AC-3 2.0 (30 s of music each) on every profile with
+an HTTP play, the C6's two rows as the refusal they are, and on the AC-4 profiles the pinned
+streams the host and the boards' PCM agree on (`ac4_20_music`, `ac4_20_acpl`,
+`ac4_20_companding`, and `ac4_51_music` on the P4). The streams are the repository's; the suite
+does not generate its own.
 **The speed figure is not `realtime_permille`.** On an I2S sink every stereo play on an S3 read
 981 to 992 permille in 2026-10-12's runs, whatever it decoded, because the figure includes the
 wait for the DAC (the player's own comment says so for a paced sink). The suite's figure is the
@@ -365,13 +426,35 @@ S3's plays held `sink.min_headroom_ms` at 5 ms of a 64 ms queue (0 on the one pl
 underran, with `sink.dry_ms` at 88), and that figure, with `sink.dry_ms`, is the other number a
 baseline records.
 
-**Tolerance, and the ratchet.** The decoder's time per frame may be at most 5% and 20 permille
-above the baseline's median of three plays, whichever is more. The 5% and the 20 are a proposal,
-not a measurement of the spread: the first recording runs (PR 7) take each row five times and the
-tolerance is set from what they show, then written into the profile. A figure better than the
-baseline by more than the tolerance is reported, and the PR that made the speed-up changes the
-baseline in the same commit, so the next regression is measured from the new floor. A baseline
-only changes in a PR that edits the profile or the code and carries a board run.
+**Tolerance, and the ratchet.** The decoder's time per frame may be at most the larger of 5% and
+5 permille of a frame above the baseline's median. The 20 permille this page proposed was a guess;
+PR 7 measured the spread, ten plays a row on S3b (the `s3-n16r8` image, 2026-10-12): AC-3 2.0
+122 to 124 permille, E-AC-3 2.0 87 to 90. With the spread that narrow, 20 permille would have let
+a 23% slowdown of the E-AC-3 decoder through; 5 holds it to under 6%. The
+other figures are held one way only, each against the baseline less its margin: the decode stack's
+free bytes 512 (the spread was 180), the queue's least headroom 2 ms (it read 5 every play), and at
+boot the largest internal block 1,024 and the free internal RAM 2,048. The values are in
+`suite.json`, with this paragraph's numbers beside them. A figure better than the baseline by more
+than the tolerance is reported, and the PR that made the speed-up changes the baseline in the same
+commit, so the next regression is measured from the new floor. A baseline only changes in a PR
+that edits the profile or the code and carries a board run.
+
+**The boot line's free RAM is read twice over, and the baseline sits at the common value.** The
+Sendspin player starts on a 16 KiB task stack of its own (`sendspin-keys`) that goes when the work
+is done, and `report_budget("boot")` runs just after: it read 85,923 to 86,235 bytes free on eight
+of nine boots on S3b and 102,539 on the ninth, the idle task having freed that stack first. The
+largest block (31,744) and the headroom (23,552) did not move. Because the ratchet is one-way, the
+high reading can only look like an improvement; a baseline recorded on it would fail every ordinary
+boot with a figure 16 KB under it, so `s3-n16r8`'s is the common value, and a re-record that lands
+on the high one is run again. Making the line wait for the idle task is a firmware change and not
+made here.
+
+**Recorded (PR 7, `s3-n16r8`):** S3b, not S3a (S3a was booked by another session; the S3a run is
+the cross-check and is not done), the identity image `v0.10.0-beta.1-4175-g79d2e7618-`, profile
+hash `c4b8d369cf36`, five plays a row after a restart: AC-3 2.0 124 permille and E-AC-3 2.0 88, 938
+frames each, no underruns, 0 ms dry, queue headroom 5 ms, decode stack 18,256 and 18,068 bytes
+free; boot line `internal_free=86223 largest=31744 headroom=23552 verdict=ok`. A second run of
+two plays a row after another restart held to it with no finding.
 
 ## Changing a profile
 
@@ -409,11 +492,11 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 1 | **The fix**, as profile values: `DECODE_STACK_IN_PSRAM` defaults to 1 on S3 with PSRAM (the AC-4 condition goes) and `sdkconfig.psram` says so in words | yes | **Built, #1387**: A/B/A on S3b (4065 fails, the fix plays AC-3 and E-AC-3 2.0, 938 frames, stack in PSRAM) and the same on S3a. The C6's half did not work as config; see [the C6](#the-c6-is-not-a-config-value-away) |
 | 1b | The C6 refuses a play it cannot hold: `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` | yes | **Built, #1395**: refused in under half a second with `why: memory`, no reboot, Sendspin stayed connected |
 | 2 | `profiles.json` and `sink_profile.py`, with tests and the guard; no consumer yet | no | **Built**: six profiles; its tests hold the file to `_build.yml`'s fragment lists and to `check_firmware_package.py`'s rules |
-| 3 | `_build.yml`, `package_firmware.py`, `check_firmware_package.py` and the docs tables read it; the guard on every profile build | no | The README's seven stacks become one generated table |
-| 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | |
-| 5 | The QEMU twin of `s3-n16r8` | no | A spike first (PSRAM mode, XIP): the PR says what ran and what did not |
-| 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | |
-| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
+| 3 | `_build.yml`, `package_firmware.py` and the docs read it; the guard on every profile build | no | **Built**: each board build takes `sink_profile.py defaults <id>` and is held by `verify` (with `idf.py size` for the static-RAM budget); `package_firmware.py package --profile` refuses a build that is not the profile; `check-docs` holds every fragment list the tree spells to a profile or to `other_stacks`, and the README's profile table is generated; `s3-n16r8-ac4` gets a CI build for the first time. Left: `check_firmware_package.py`'s `IMAGES` still carries its own copy, held to the file by a test, until #1400 lands its row. The repository variable `ESP32_PROFILE_GUARD=warn` turns a finding into an annotation |
+| 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
+| 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
+| 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
+| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)); `c6-16mb`, `p4-rev1`, `p4-rev1-ac4` and `s3-n16r8-ac4` each need their board and, for AC-4, the `measure` image. `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | |
 
 PR 3 follows 2. PR 2 adds `p4-rev3` once #1400 is on main, since its fragments are not.
@@ -428,8 +511,9 @@ Still open:
 1. **The recording board for each profile.** Proposed: S3a for both S3 profiles with S3b as the
    cross-check, C6 `.117` for `c6-16mb`, P4a `.99` for both P4 profiles (P4b needs a USB flash
    after any OTA).
-2. **The tolerance:** 5% and 20 permille over a median of three, for the decoder's time per
-   frame; 0 underruns; the stack margin the baseline's. Say if looser or tighter.
+2. **The tolerance:** now measured, not proposed: the larger of 5% and 5 permille over the
+   median, for the decoder's time per frame; 0 underruns; the stack's margin within 512 bytes of
+   the baseline's (see the ratchet above). Say if looser or tighter.
 3. **QEMU is not the heap authority.** The twin runs the release shape but not Wi-Fi, so a heap
    number from it is a smoke floor. The board suite owns the budget. Confirm that is acceptable.
 4. **An HTTP play on the C6.** Left refused. The alternative is giving the Sendspin player's ring

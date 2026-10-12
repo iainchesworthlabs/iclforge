@@ -179,8 +179,47 @@ def file_entry(path: Path) -> dict[str, Any]:
     return {"name": path.name, "size": len(data), "sha256": sha256_hex(data)}
 
 
-def package(build: Path, name: str, out: Path) -> dict[str, Any]:
+def hold_to_profile(
+    build: Path, name: str, ident: str, profiles: Path | None, warn_only: bool = False
+) -> None:
+    """Refuses a build that is not the profile `ident` (firmware/hearth-sink/profiles.json),
+    or whose profile publishes an image of another name. An image published under a board's
+    name goes onto that board, so what it was built from is held to the board's profile."""
+    # Beside this file, and it imports this one's chip table: imported here, not at the top.
+    import sink_profile  # noqa: PLC0415
+
+    try:
+        data = sink_profile.load(profiles) if profiles else sink_profile.load()
+        spec = sink_profile.profile(data, ident)
+        findings = sink_profile.verify(data, ident, build)
+    except sink_profile.ProfileError as error:
+        raise PackageError(str(error)) from error
+    image = spec.get("image")
+    if not image or image.get("name") != name:
+        raise PackageError(f"profile {ident} does not publish an image named '{name}'")
+    if findings:
+        shown = "; ".join(f"[{finding.rule}] {finding.message}" for finding in findings[:5])
+        more = f" (and {len(findings) - 5} more)" if len(findings) > 5 else ""
+        if warn_only:
+            print(
+                f"package_firmware: warning: the build is not profile {ident}: {shown}{more}",
+                file=sys.stderr,
+            )
+            return
+        raise PackageError(f"the build is not profile {ident}: {shown}{more}")
+
+
+def package(
+    build: Path,
+    name: str,
+    out: Path,
+    profile: str | None = None,
+    profiles: Path | None = None,
+    warn_only: bool = False,
+) -> dict[str, Any]:
     """Writes one image's files and its manifest fragment into `out`, and returns the fragment."""
+    if profile:
+        hold_to_profile(build, name, profile, profiles, warn_only)
     try:
         description = json.loads((build / "project_description.json").read_text("utf-8"))
     except (OSError, ValueError) as error:
@@ -283,6 +322,7 @@ def package(build: Path, name: str, out: Path) -> dict[str, Any]:
         "partitions": partitions,
         "elf_sha256": app[APP_DESC_AT + 144 : APP_DESC_AT + 176].hex(),
         "network_built_in": False,
+        "profile": profile or "",
         "files": {
             "app": file_entry(app_file),
             "factory": file_entry(factory_file),
@@ -322,6 +362,16 @@ def main(argv: list[str] | None = None) -> int:
     one.add_argument("--build-dir", type=Path, required=True)
     one.add_argument("--name", required=True, help="the image's name, such as hearth-sink-esp32s3")
     one.add_argument("--out", type=Path, required=True)
+    one.add_argument(
+        "--profile",
+        help="the profile of firmware/hearth-sink/profiles.json the build must hold to; "
+        "without it the build is packaged as it is",
+    )
+    one.add_argument(
+        "--warn-only",
+        action="store_true",
+        help="with --profile, say what the build differs in and package it anyway",
+    )
     merge = commands.add_parser(
         "manifest", help="merge the fragments in DIR into hearth-sink-manifest.json"
     )
@@ -329,7 +379,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "package":
-            fragment = package(args.build_dir, args.name, args.out)
+            fragment = package(
+                args.build_dir, args.name, args.out, args.profile, warn_only=args.warn_only
+            )
             print(
                 f"{args.name} {fragment['version']}: {len(fragment['parts'])} regions, "
                 f"{fragment['files']['app']['size']:,}-byte app, "

@@ -34,6 +34,7 @@
 //   sink/capture/      converts and checks; what CI runs.
 //   sink/null/         counts blocks.
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <charconv>
@@ -107,6 +108,15 @@ constexpr std::size_t kMaxSlots = iclforge::render::OutputLayout::kMaxSlots;
 constexpr std::uint32_t kMaxLaps = CONFIG_ICLFORGE_EXAMPLE_MAX_LAPS;
 constexpr std::uint64_t kReportEveryFrames = CONFIG_ICLFORGE_EXAMPLE_REPORT_EVERY_FRAMES;
 constexpr std::uint16_t kControlPort = CONFIG_ICLFORGE_EXAMPLE_CONTROL_PORT;
+
+// The locked profile this image was built as and a hash of what it locks, from the build
+// (main/CMakeLists.txt); empty for a build that was not made as one.
+#ifndef ICLFORGE_PROFILE_ID
+#define ICLFORGE_PROFILE_ID ""
+#endif
+#ifndef ICLFORGE_PROFILE_HASH_TEXT
+#define ICLFORGE_PROFILE_HASH_TEXT ""
+#endif
 constexpr const char* kLayoutText = CONFIG_ICLFORGE_EXAMPLE_LAYOUT;
 constexpr iclforge::ac3::DownmixTarget kStereoFold = CONFIG_ICLFORGE_EXAMPLE_STEREO_FOLD != 0
                                                ? iclforge::ac3::DownmixTarget::kLtRt
@@ -609,6 +619,9 @@ void report_end(const Session& session, const iclforge::PlayerStats& stats) {
 // atomic.
 iclforge::ControlHandlers control_handlers() {
     iclforge::ControlHandlers h;
+    // Which locked profile this image was built as (CMakeLists.txt, ICLFORGE_PROFILE).
+    h.profile = ICLFORGE_PROFILE_ID;
+    h.profile_hash = ICLFORGE_PROFILE_HASH_TEXT;
     h.play = [](std::string_view location) {
         Command c;
         c.kind = CommandKind::kPlay;
@@ -799,6 +812,57 @@ void on_alloc_failed(std::size_t size, std::uint32_t caps, const char* function)
                 static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)));
 }
 
+// What a play asks of internal RAM, set against what is free now, in the line a bench check
+// and the board suite read (planning/esp32-platform-profiles.md, "Boot-time budget line"):
+//
+//   budget: when=boot net=1 internal_free=90931 largest=31744 ask_ring=0 ask_decode_stack=0
+//   ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 headroom=23552 floor=0 verdict=ok
+//
+// The asks are the HTTP play's ring and stacks that this build puts in internal RAM, from the
+// same Kconfig the play reads, so the line says at boot what the first play would meet: the
+// failure that started this (a 32,768-byte stack where no block over 31,744 was left, on
+// 2026-10-12) shows here and not at the first play. It is a floor, not a fit: the decoder, the
+// I2S queue and the heap's fragmentation come after it. headroom is the largest block less the
+// biggest single ask; verdict is ok, short-block (no block that size), short-total (not that
+// much in all) or below-floor (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES would refuse).
+void report_budget(const char* when) {
+    const bool psram = heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0;
+    const std::size_t free_now = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const std::size_t largest =
+        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const iclforge::PlayerConfig defaults;
+    const std::size_t ring =
+        (psram && CONFIG_ICLFORGE_EXAMPLE_RING_IN_PSRAM != 0) ? 0 : CONFIG_ICLFORGE_EXAMPLE_RING_BYTES;
+    const std::size_t stack =
+        (psram && CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM != 0)
+            ? 0
+            : static_cast<std::size_t>(CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES);
+    const std::size_t fetch = defaults.fetch_stack_bytes;
+    const std::size_t biggest = std::max({ring, stack, fetch});
+    const std::size_t total = ring + stack + fetch;
+    std::size_t floor = 0;
+#if CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES > 0
+    floor = CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES;
+#endif
+    const char* verdict = "ok";
+    if (floor != 0 && free_now < floor) {
+        verdict = "below-floor";
+    } else if (largest < biggest) {
+        verdict = "short-block";
+    } else if (free_now < total) {
+        verdict = "short-total";
+    }
+    std::printf("budget: when=%s net=%d internal_free=%lu largest=%lu ask_ring=%lu "
+                "ask_decode_stack=%lu ask_fetch_stack=%lu ask_total=%lu ask_biggest=%lu "
+                "headroom=%ld floor=%lu verdict=%s\n",
+                when, player::network_ready() ? 1 : 0, static_cast<unsigned long>(free_now),
+                static_cast<unsigned long>(largest), static_cast<unsigned long>(ring),
+                static_cast<unsigned long>(stack), static_cast<unsigned long>(fetch),
+                static_cast<unsigned long>(total), static_cast<unsigned long>(biggest),
+                static_cast<long>(largest) - static_cast<long>(biggest),
+                static_cast<unsigned long>(floor), verdict);
+}
+
 // The Sendspin player, on a board that is on a network. A play that has the
 // sink when the player starts keeps it: the player starts held, as
 // begin_play leaves one that was already running, and end_play hands it the
@@ -930,6 +994,8 @@ extern "C" void app_main() {
     // internal RAM the server's stack and the decoder's allocations were just given, and it reads
     // the player, so it has one to read (panel/panel.hpp).
     (void)player::panel_start();
+    // After the screen, so that the line says what is resident at boot, whatever started.
+    report_budget("boot");
     // Whether the calls above had a network to start on. One that comes up
     // later - over Improv, on a board that had none stored or could not join
     // the one it had, or by itself once a network that was down at boot is
@@ -947,6 +1013,7 @@ extern "C" void app_main() {
             networked = true;
             player::discovery_start();
             start_sendspin();
+            report_budget("network-up");
             if (player::sendspin_running()) {
                 player::provisioning_start(&player::sendspin_console);
             } else if (player::sendspin_built()) {
