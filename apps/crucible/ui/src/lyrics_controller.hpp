@@ -8,6 +8,8 @@
 
 #include <memory>
 
+#include "cdg_frame_source.hpp"
+
 // Lyrics for the application a person has selected (planning/karaoke-phase2.md, W13b, D9): an
 // `.lrc` file imported against one application of the room, and a strip that shows the line being
 // sung. A second QML singleton beside CrucibleController, so that crucible_controller.cpp does not
@@ -22,9 +24,13 @@
 // seen - and says so on the page. The media-session sources (three platform back ends) are a later
 // change that replaces the origin and keeps everything else.
 //
+// A CD+G disc (planning/karaoke-phase2.md, W13f and D11) is imported the same way and is followed by
+// the same clock and nudge, but it carries a picture and no text: status() says "picture", lines()
+// is empty and the strip draws it with the shared CdgPicture, asking pictureFrame(app, position).
+//
 // Nothing here owns a timer: the strip asks cursor(app, nowMs()) on its own, and every function
 // that depends on the time takes it as an argument, so a test can set the clock.
-class CrucibleLyrics : public QObject {
+class CrucibleLyrics : public iclforge::apps::CdgFrameSource {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
@@ -57,13 +63,20 @@ public:
     Q_INVOKABLE void prune(const QVariantList& liveApps);
 
     // "none": nothing imported (and no error); "timed": a file with times; "plain": a file with no
-    // times, shown whole and not followed; "error": a file that could not be read.
+    // times, shown whole and not followed; "picture": a CD+G disc (a `.cdg` file), whose words are
+    // pixels and which is followed as a picture; "error": a file that could not be read.
     Q_INVOKABLE QString status(int app) const;
     Q_INVOKABLE QString fileName(int app) const;
     Q_INVOKABLE QString errorText(int app) const;
     // Each line: text, startMs, endMs, wordTimed and words (text, startMs, endMs, gap), as the
     // Hearth window's controller gives them. Empty for an application with no lyrics.
     Q_INVOKABLE QVariantList lines(int app) const;
+
+    // The picture of application `key`'s CD+G disc at `positionMs` of the song, with the nudge taken
+    // off: 300 by 216, 0xAARRGGBB. A null image for an application without a disc. This is what
+    // the shared CdgPicture asks, and `key` is the application's id. A position before the song
+    // has begun is the first picture.
+    [[nodiscard]] QImage pictureFrame(int key, qlonglong positionMs) override;
 
     // Start: the song begins now (or at `nowMs`). Start again to begin it again.
     Q_INVOKABLE void start(int app);

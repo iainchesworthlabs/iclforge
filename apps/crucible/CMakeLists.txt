@@ -388,6 +388,13 @@ else()
         ../shared/preferences/src/language_manager.hpp
         ../shared/preferences/src/settings_migration.cpp
         ../shared/preferences/src/settings_migration.hpp
+        # The picture of a CD+G disc the lyric strip draws, shared with Hearth and the Forge GUI
+        # (apps/shared/cdg-picture): a QML_ELEMENT is registered only by a target that compiles it.
+        ../shared/cdg-picture/src/cdg_frame_source.hpp
+        ../shared/cdg-picture/src/cdg_frames.cpp
+        ../shared/cdg-picture/src/cdg_frames.hpp
+        ../shared/cdg-picture/src/cdg_picture.cpp
+        ../shared/cdg-picture/src/cdg_picture.hpp
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/app_icon_provider.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/tray_support.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/app_entry.hpp"
@@ -438,6 +445,7 @@ else()
     # theme for system_theme.hpp and the shared preferences for language_manager.hpp and
     # settings_migration.hpp.
     target_include_directories(crucible PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shared/cdg-picture/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/theme/src")
     # The driver folder in the source tree is the default place the
