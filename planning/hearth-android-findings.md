@@ -433,6 +433,22 @@ is the room's speaker configuration, not the stream's. A Dolby-made stream needs
 signing key matters only for streams this project encodes itself (the Shield demo, `forge atmos`),
 which a sink passes through unchanged.
 
+**A stream this project signs, with the owner's test key.** `forge atmos` (24 s, 768 kbit/s,
+3 dynamic objects over a 5.1 bed, 750 access units) with `sign-objects` and the key was verified by
+`forge decode ... verify-objects` against the same key (750 valid, 0 mismatched), then played
+through the same route, and the same stream written without the key was played beside it:
+
+| Stream | What the receiver reported | After |
+|---|---|---|
+| Signed with the key | **`Dolby Atmos/DD+, 48 kHz, 5.0.4 ch`** | 2.15 s |
+| The same, object container not signed | **`Dolby Audio - DD+, 48 kHz, 5.1 ch`**, 5.0 out: the 5.1 bed, no objects | 1.69 s |
+
+Both with 0 underruns. So on this receiver the key is exactly what makes the objects reconstruct,
+and an unsigned container **falls back to the bed** here instead of being refused (the demo's
+`atmos.hpp` comment says a validating decoder may refuse the whole stream; this one does not).
+That is one receiver and one firmware. The signed stream is not in the tree: the project's rule is
+that the key and what it signs stay off the public remote.
+
 ### The NDK build (S2)
 
 | Item | Result |
@@ -449,6 +465,6 @@ which a sink passes through unchanged.
 
 | Item | Why |
 |---|---|
-| Atmos/JOC lock of a stream **this project signs** | The owner supplied a test key on 2026-10-12 and it is in the demo's gitignored asset path, but no stream signed with it has been played to the receiver yet. Real Dolby JOC locks (above); a sink passes bits through unchanged, so a stream signed on the host needs no key on the Android side |
+| Atmos lock of a stream **this project signs** | Measured above: a stream signed with the owner's test key locks as Atmos |
 | HOME, standby and reboot (S3), beyond the display-sleep finding | Not run |
 | AC-4 over `ENCODING_IEC61937` | No AC-4 receiver; the route lists no AC-4 profile |

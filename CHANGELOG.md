@@ -54,6 +54,10 @@ The sections below contain the complete change list and fixes.
 - **Dolby JOC streams lock the receiver as Atmos through the Shield's IEC 61937 route.** The three
   encoder fixtures (5.1.4, 7.1.4, 9.1.6), wrapped into E-AC-3 bursts at the 192 kHz carrier, were
   reported by the Onkyo as `Dolby Atmos/DD+` after about 2.1 s, with no underruns.
+- **A stream this project signs locks as Atmos, and the same stream unsigned falls back to the
+  bed.** `forge atmos ... sign-objects` with the owner's test key verified 750 of 750 frames and
+  was reported by the Onkyo as `Dolby Atmos/DD+` (5.0.4); the same stream with its object
+  container unsigned was reported as `Dolby Audio - DD+` (5.1), with no underruns in either.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
