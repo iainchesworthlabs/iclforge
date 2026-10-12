@@ -95,7 +95,7 @@ jobs:
         run: |
           set -euo pipefail
           status=0
-          for f in index.html demo.js favicon.svg favicon-32.png assets/demo.ec3; do
+          for f in index.html demo.js mic.js favicon.svg favicon-32.png assets/demo.ec3; do
             if ! cmp -s "apps/demos/wasm/$f" "docs/assets/wasm-decode-demo/$f"; then
               echo "::error file=docs/assets/wasm-decode-demo/$f::Out of sync with apps/demos/wasm/$f - re-copy it (see docs/platforms/wasm.md)."
               status=1

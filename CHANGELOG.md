@@ -104,7 +104,10 @@ The sections below contain the complete change list and fixes.
   microphone is), a pitch score and the references that exist for one, a recording of the dry voice, the
   decisions with a recommendation each (approved by the owner as recommended), and a build plan by
   platform. A voice through one Windows 11 workstation's own shared-mode path was measured at about
-  130 ms, so a monitor is offered with its measured latency and not promised.
+  130 ms, so a monitor is offered with its measured latency and not promised. The plan's build table
+  says what is built: the pitch library, capture times, the melody reader, the microphone card, takes,
+  the pitch ribbon with per-line marks and the browser demo's microphone card (M1 to M7), and what is not
+  (the bleed check, the board).
 
 **Karaoke: a pitch library**
 
@@ -279,6 +282,18 @@ The sections below contain the complete change list and fixes.
   same lossless rewrite `strip_objects` does, so the bed is bit-identical and the result plays in
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
+
+**Karaoke: the melody of a MIDI karaoke file**
+
+- **`iclforge::lyrics::read_midi_melody()` reads the notes of a `.kar` and says which track is the
+  tune** (the microphone, scoring and recording programme, M3). The words' reader has always skipped
+  every note; this reads them, and uses the words only to choose. A file does not say which track is
+  the melody, so the track and channel whose note starts coincide with the most syllable starts wins
+  (percussion excluded, and at an equal match the one with fewer notes, which is the lead line and
+  not a chord track), the share of syllables it matches is returned, and a file with no words, or
+  whose best track matches under half of them, is refused with the reason instead of guessed at.
+  Tempo changes, running status and a note-on of velocity 0 are read. It is the reference a singer's
+  pitch will be scored against; nothing links it yet.
 
 **Karaoke in E-AC-3: the boards reproduce it themselves**
 
@@ -1025,6 +1040,29 @@ The sections below contain the complete change list and fixes.
   padded and trimmed.
 - **The Mix Presentation's rendering config follows v2.0.** `rendering_config_extension_size` now counts
   the `num_parameters` field after it, as v2.0 defines; readers of the earlier syntax skip it.
+
+**Browser: a microphone and a pitch score in the decode demo**
+
+- **A karaoke stream in the WebAssembly decode demo gains a Microphone card** (the microphone,
+  scoring and recording programme, M7). The page's tune is the guide melody's channel as coded,
+  read by the library's pitch tracker compiled into the demo's module (`pitch_bindings.cpp`:
+  `PitchTracker`, `ReferenceBuilder`, `ReferenceContour`, `PitchScorer`; the module grew by about
+  26 KB); the microphone is the browser's, with its own echo cancellation, through an
+  `AudioWorklet`; the score is `libs/pitch`'s, the library Hearth's microphone is built on. The
+  card shows a level meter, the pitch you are singing and how sharp or flat of the tune, a ribbon
+  of the tune's notes with your voice over it, a pitch score so far with how early or late you are,
+  and a summary when it is turned off.
+- **What it promises is checked.** The microphone is off until the button is pressed (the page asks
+  the browser for none before); the score is shown only when the person says they wear headphones,
+  and no summary is made without it; nothing is sent; closing it ends every track. A new
+  `microphone` Playwright project (5 tests, Chromium's fake device, no real microphone) holds those
+  and the arithmetic: the tracker at 44.1, 48 and 96 kHz, a contour read in slices, octaves folded,
+  a voice placed at where the sound it sang along to was (with the microphone's and the output's
+  latency and the person's timing), a dropped stretch of quanta, nothing scored while paused. Thirteen
+  mutants of `mic.js` were applied and all killed.
+- **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
+  microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
+  into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
 
 **ADM / BW64: rendering constraints, a sample-format option, and what the bridge drops**
 
@@ -3310,6 +3348,25 @@ The sections below contain the complete change list and fixes.
   back as it was before #1344, when the sink firmware stopped configuring because the sink's player
   linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
   ESP-IDF image, so nothing before the merge saw that break.
+
+**Hearth: what a singer's performance is scored against, and how**
+
+- **Hearth's engine can place a singer's voice in the item and score it** (the microphone, scoring
+  and recording programme, M4's engine half; the Qt window and the microphone itself are later pull
+  requests). `Performance` takes two things and owns no device or thread: where in the item the heard
+  sound is at a time on the steady clock (the engine's `PlayPosition::heard`, which is what a person
+  singing along is hearing), and blocks of the microphone's samples with the time the first was
+  captured. It tracks the pitch, places each frame at the heard position at the moment the sound
+  reached the microphone less the microphone's declared delay plus an offset the person can move,
+  and scores it against a reference with `iclforge::pitch`. Nothing is scored before the first
+  position, or while the item is held; those frames are counted as unplaced, not as wrong. It says
+  how sharp or flat and how early or late the singer is.
+- **`reference_from_karaoke()` takes the reference from the karaoke stream being played.** A karaoke
+  AC-3 decoded as coded leaves the guide melody M and the vocals V1 and V2 in their channels
+  (Annex C, Table C.2.1); the first present of M, V1 and V2 is tracked, or the part the singer has
+  muted (the one they are taking over). A stream that is not karaoke, or whose part has no clear
+  pitch, is refused with the reason. On the repository's karaoke example the tune comes out of M and
+  of V1 note for note, and V2 comes out a diatonic third below.
 
 ### Changed
 

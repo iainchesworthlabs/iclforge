@@ -82,6 +82,18 @@
   /* The words follow the sound: the line being sung large, the ones round it small. Colour is never
      the only cue (a word being sung is also underlined and bold, a singer is named and indented). */
   #lyricsView { margin-top: 12px; line-height: 1.5; text-align: center; }
+  #micPanel label { color: var(--muted); font-size: 0.9rem; }
+  #micPanel input[type="range"] { accent-color: var(--accent); }
+  #micPanel .value { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; min-width: 5.5em; }
+  #micIndicator { color: var(--accent); font-weight: 600; }
+  #micMeter { height: 10px; margin-top: 10px; background: var(--panel-alt, #1e293b); border: 1px solid var(--border, #334155); }
+  #micMeterFill { height: 100%; width: 0; background: var(--muted); }
+  #micMeterFill.clip { background: var(--accent); }
+  #micRibbon { width: 100%; max-width: 640px; height: 130px; margin-top: 10px; display: block; }
+  #micPitch { margin-top: 8px; font-family: ui-monospace, monospace; }
+  #micStatus, #micScore, #micSummary { margin-top: 8px; color: var(--muted); font-size: 0.9rem; min-height: 1.2em; }
+  #micStatus.error { color: #f87171; }
+  #micScore { color: var(--text); }
   #lyricsView .lyric { margin: 4px 0; color: var(--muted); font-size: 0.95rem; }
   #lyricsView .lyric.current { color: var(--text); font-size: 1.5rem; margin: 10px 0; }
   #lyricsView .lyric .who { font-size: 0.8rem; margin-right: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -177,6 +189,44 @@
       A <code>.lrc</code>, <code>.srt</code>, <code>.ass</code> or <code>.kar</code> file follows the
       decoded sound, a word at a time where the file times its words: the reader is the library's, the
       one Hearth and Crucible use, compiled into this page. A positive delay shows the words later.
+    </p>
+  </div>
+
+  <div id="micPanel" class="panel" style="display:none;">
+    <h2 style="font-size:1rem;margin:0 0 8px;">Microphone</h2>
+    <p class="hint" style="margin:0 0 10px;">
+      Sing along and see how close your pitch is to the tune. The microphone is off until you turn
+      it on, nothing is recorded, and nothing leaves this page.
+    </p>
+    <div class="controls">
+      <button id="micToggle" disabled>Turn the microphone on</button>
+      <label><input type="checkbox" id="micHeadphones"> I am wearing headphones</label>
+      <span id="micIndicator" style="display:none;">Microphone on</span>
+    </div>
+    <div class="controls" style="margin-top:10px;">
+      <label for="micDelay">Microphone delay</label>
+      <input type="range" id="micDelay" min="0" max="500" step="5" value="0"
+             aria-label="Microphone delay in milliseconds">
+      <span id="micDelayText" class="value">0 ms</span>
+      <label for="micOffset">Move your timing</label>
+      <input type="range" id="micOffset" min="-500" max="500" step="10" value="0"
+             aria-label="Move your timing in milliseconds">
+      <span id="micOffsetText" class="value">0 ms</span>
+    </div>
+    <div id="micStatus"></div>
+    <canvas id="micRibbon" width="640" height="130" role="img"
+            aria-label="Pitch ribbon: the tune as notes, and your voice as a line over them"></canvas>
+    <div id="micMeter" role="progressbar" aria-label="Microphone level"><div id="micMeterFill"></div></div>
+    <div id="micPitch">Listening…</div>
+    <div id="micScore"></div>
+    <div id="micSummary"></div>
+    <p class="hint">
+      Through open speakers the microphone hears the backing as well as you, and a score reads as
+      nearly perfect for no singing, so the score is shown only when you say you are wearing
+      headphones. The browser's own echo cancellation is on. It counts how much of the tune's time
+      your pitch was within a semitone of it, in any octave: pitch only, not timing, words or
+      feeling. The tracker, tune reader and scorer are the project's own library (<code>libs/pitch</code>),
+      compiled into this page.
     </p>
   </div>
 
