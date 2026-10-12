@@ -875,6 +875,51 @@ TestCase {
         verify(ctx.flow.lyricsNote.indexOf("could not be read") >= 0, ctx.flow.lyricsNote);
     }
 
+    function test_aLyricsFileInACodePageIsReadInThePageTheAuthorChoosesAndWrittenAsUtf8() {
+        const song = audioFixtures.writeTones("ke-song.wav", 48000, 1.024, [440, 620]);
+        // "[00:01.00]" and two Shift-JIS characters (hiragana A and I), which is not UTF-8.
+        const words = audioFixtures.writeBytes("ke-song.lrc", [0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x2e, 0x30, 0x30, 0x5d, 0x82, 0xa0, 0x82, 0xa2, 0x0a]);
+        // The stream's own lyrics file: the same line as UTF-8.
+        const expected = audioFixtures.writeBytes("ke-song-expected.lrc", [0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x2e, 0x30, 0x30, 0x5d, 0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0x0a]);
+        verify(song.toString().length > 0 && words.toString().length > 0 && expected.toString().length > 0);
+        const ctx = openFlow();
+        useParts(ctx, { backing: song, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        compare(ctx.flow.lyricsUrl, words.toString());
+        ctx.flow.currentStepKey = "save";
+
+        // Refused for its encoding, which is when the picker is offered, with no page chosen.
+        compare(ctx.flow.lyricsCodePage, "");
+        verify(ctx.flow.lyricsNeedsCodePage);
+        verify(ctx.flow.lyricsProblem.length > 0);
+        const box = findByName(ctx.win, "karaokeLyricsCodePage");
+        verify(box.visible);
+        verify(!findByName(ctx.win, "karaokeLyricsPreview").visible);
+
+        // The author chooses; the file reads, and shows how.
+        const at = ctx.flow.codePageChoices.findIndex((page) => page.name === "shift-jis");
+        verify(at > 0);
+        box.currentIndex = at;
+        box.activated(at);
+        compare(ctx.flow.lyricsCodePage, "shift-jis");
+        compare(ctx.flow.lyricsProblem, "");
+        verify(!findByName(ctx.win, "karaokeLyricsProblem").visible);
+        const preview = findByName(ctx.win, "karaokeLyricsPreview");
+        verify(preview.visible);
+        verify(preview.text.indexOf(String.fromCharCode(0x3042, 0x3044)) >= 0, preview.text);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_codepage_chosen.ac3");
+        const beside = Qt.resolvedUrl("_test_output/tst_karaoke_codepage_chosen.lrc");
+        verify(audioFixtures.remove(out) && audioFixtures.remove(beside));
+        saveTo(ctx, out);
+        verify(cliRunner.sameBytes(expected, beside), "the file was not written as UTF-8 LRC beside the stream");
+        verify(ctx.flow.lyricsNote.indexOf("beside the stream") >= 0, ctx.flow.lyricsNote);
+
+        // Another file starts with no page chosen: nothing carries over.
+        press(ctx, "karaokeRemoveLyrics");
+        compare(ctx.flow.lyricsCodePage, "");
+    }
+
     // Parts of 2.0 s end in half a frame. The window once wrote silence into the
     // rest of that frame where forge held the last sample, so the two files
     // differed in their last frame (610 of 48,384 bytes) for the same plan.

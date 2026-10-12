@@ -206,7 +206,13 @@ The sections below contain the complete change list and fixes.
   refusal now says what to name, and bytes the page does not have refuse the file. The conversion is
   the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
   it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
-  GUI's picker will link as well.
+  GUI's picker links as well.
+- **The Forge GUI's Lyrics row offers a code page for a file that is not UTF-8 or UTF-16.** A
+  **Code page** list appears under the problem line, with no page chosen and none guessed; the
+  page chosen reads the file, the first lines are shown as it reads them, and the stream is saved
+  with the words beside it as UTF-8 LRC (the same conversion as `lyrics-encoding=`). Choosing
+  another file forgets the page. The page names' language groups are translated in the six
+  catalogues.
 
   refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's

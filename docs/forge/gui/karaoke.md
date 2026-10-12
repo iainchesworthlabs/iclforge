@@ -99,9 +99,14 @@ the stream: one of the backing's name beside it is offered (an `.lrc`, else an `
 `.lrc`, where Hearth looks for lyrics. Whatever the file's format, what is written is UTF-8 LRC,
 with a duet's singers, the word times the file has, and the silence between a subtitle file's cues
 marked, which is the one format Hearth reads and sends to a network sink. A file in a code page
-(Latin-1, Shift-JIS, Windows-1255) is named on the row when it is chosen, and none is written; the
-stream is saved as usual. A lyrics file already there is left as it is. `forge encode` does the
-same with `lyrics=`.
+(Latin-1, Shift-JIS, Windows-1255) is named on the row when it is chosen, with a **Code page** list
+under it: choose the page the file was written in, and the first lines are shown as that page reads
+them, so a wrong choice is seen before anything is written. Nothing is chosen for you and nothing is
+guessed; with no page chosen none is written, and the stream is saved as usual. The pages are
+Windows 1250 to 1258 and 874, ISO 8859-1, -2 and -15, DOS 437 and 850, KOI8-R and -U, Shift-JIS,
+EUC-JP, GBK, GB18030, Big5 and EUC-KR, converted by the operating system. A lyrics file already
+there is left as it is. `forge encode` does the same with `lyrics=` and, for a code page,
+[`lyrics-encoding=`](../cli/commands.md#lyrics-beside-the-stream-lyrics).
 
 The start offsets and trims you set on the parts stay when you add, replace or remove a part.
 

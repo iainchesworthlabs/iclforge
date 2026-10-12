@@ -273,7 +273,23 @@ ColumnLayout {
     // Why the file cannot be used as lyrics (a code page is named, not guessed at), as the
     // reader says it, or empty. Asked when a file is chosen, so that it is not found out at save.
     readonly property string lyricsProblem: flow.lyricsUrl.length > 0
-                                            ? KaraokeAuthoring.lyricsProblem(flow.lyricsUrl) : ""
+                                            ? KaraokeAuthoring.lyricsProblem(flow.lyricsUrl,
+                                                                             flow.lyricsCodePage) : ""
+    // The code page the author chose for a file that is not UTF-8 or UTF-16, by name, or empty for
+    // none, in which case such a file is refused: a page is never guessed at. Forgotten when
+    // another file is chosen.
+    property string lyricsCodePage: ""
+    onLyricsUrlChanged: flow.lyricsCodePage = ""
+    // Whether the file is refused only for its encoding, which is when the picker is offered.
+    readonly property bool lyricsNeedsCodePage: flow.lyricsUrl.length > 0
+                                                && KaraokeAuthoring.lyricsNeedsCodePage(flow.lyricsUrl)
+    // What the picker lists: nothing chosen, then each page this system can convert.
+    readonly property var codePageChoices: [{ name: "", label: qsTr("Choose the code page…") }]
+                                           .concat(KaraokeAuthoring.codePages())
+    // The first lines of the file as the chosen page reads them, so that a wrong page is seen.
+    readonly property string lyricsPreview: flow.lyricsCodePage.length > 0 && flow.lyricsUrl.length > 0
+                                            ? KaraokeAuthoring.lyricsPreview(flow.lyricsUrl, flow.lyricsCodePage)
+                                            : ""
     // What became of the copy, as a sentence; empty until a stream has been saved.
     property string lyricsNote: ""
 
@@ -282,7 +298,8 @@ ColumnLayout {
         if (flow.lyricsUrl.length === 0 || EncoderController.outputIsFolder()) {
             return;
         }
-        const result = KaraokeAuthoring.copyLyrics(flow.lyricsUrl, EncoderController.outputPath);
+        const result = KaraokeAuthoring.copyLyrics(flow.lyricsUrl, EncoderController.outputPath,
+                                                   flow.lyricsCodePage);
         switch (result) {
         case "copied":
             flow.lyricsNote = qsTr("The lyrics are beside the stream, as the same name with .lrc.");
@@ -296,7 +313,8 @@ ColumnLayout {
             break;
         case "unreadable":
             flow.lyricsNote = qsTr("The lyrics file could not be read, so none was put beside the "
-                                   + "stream: %1").arg(KaraokeAuthoring.lyricsProblem(flow.lyricsUrl));
+                                   + "stream: %1").arg(KaraokeAuthoring.lyricsProblem(flow.lyricsUrl,
+                                                                                      flow.lyricsCodePage));
             break;
         default:
             flow.lyricsNote = qsTr("The lyrics could not be written beside the stream.");
@@ -1427,6 +1445,56 @@ ColumnLayout {
                         wrapMode: Text.WordWrap
                         font.pixelSize: Theme.fontSmall
                         font.bold: true
+                        color: Theme.text
+                    }
+                    // A file that is not UTF-8 or UTF-16 is in some code page, and which is the
+                    // author's to say: nothing is chosen for them, and the first lines show how the
+                    // page chosen reads it.
+                    Text {
+                        objectName: "karaokeLyricsCodePageHint"
+                        Layout.fillWidth: true
+                        visible: flow.lyricsNeedsCodePage
+                        text: qsTr("Choose the code page this file was written in. Nothing is guessed: "
+                                   + "the first lines show how the page chosen reads it.")
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        color: Theme.textMuted
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: flow.lyricsNeedsCodePage
+                        spacing: Theme.space3
+                        Text {
+                            Layout.preferredWidth: Math.round(110 * Theme.fontScale)
+                            text: qsTr("Code page")
+                            font.pixelSize: Theme.fontNormal
+                            color: Theme.text
+                        }
+                        ComboBox {
+                            id: lyricsCodePageBox
+                            objectName: "karaokeLyricsCodePage"
+                            Layout.preferredWidth: Math.round(360 * Theme.fontScale)
+                            model: flow.codePageChoices
+                            textRole: "label"
+                            onActivated: (index) => flow.lyricsCodePage = flow.codePageChoices[index].name
+                            Accessible.name: qsTr("Code page")
+                            // Another file starts with no page chosen, whatever this box shows.
+                            Connections {
+                                target: flow
+                                function onLyricsUrlChanged() {
+                                    lyricsCodePageBox.currentIndex = 0;
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        objectName: "karaokeLyricsPreview"
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        text: flow.lyricsPreview.length > 0
+                              ? qsTr("It reads as:") + "\n" + flow.lyricsPreview : ""
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontNormal
                         color: Theme.text
                     }
                     Text {
