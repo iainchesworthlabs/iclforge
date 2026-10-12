@@ -1212,6 +1212,28 @@ side data, so `DecoderConfig::skip_object_reconstruction` decodes the bed withou
 asserts the rendered channels are bit-for-bit what a full decode produces. `object_metadata`
 still arrives, parsed out of a block's skip field.
 
+**The Sendspin player falls back to the bed by itself.** A board states how many objects it places
+in real time (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS`, which the support object carries as
+`max_objects`), and a stream whose first unit declares more (the OBA complexity index less the
+LFE, `iclforge/object_limit.hpp`) is played as its bed: `Eac3Decoder::set_skip_object_reconstruction()`
+on the decoder the player already holds, so the 147 KB is never asked for and no decoder is made.
+Measured on the release image (`sdkconfig.s3-fast`, decode lane on, null sink, 7.1.4, over Sendspin,
+a 32 ms frame, S3a 2026-10-12) with the board stating 2:
+
+| Stream | declared objects | Before (the same streams, S3b) | With the fallback |
+|---|---|---|---|
+| joc4 | 3 | 1.13, 96 late | 0.55, 1 late |
+| demo | 3 | 1.07, 63 late | 0.51, 3 late |
+| objects-mdct | 4 | 1.14, 92 late | 0.47, 5 late, 1 under |
+| height | 5 | 1.35, 174 late | 0.50, 10 late |
+| 514-joc-dee | 11 | 2.27, 360 late (S3a) | 0.54, 0 late |
+| joc3 | 2 (within the figure) | 0.98, 370 under | 0.98, 680 under: reconstructed, as stated |
+| 714-none | channel-based | 0.78 | 0.78 |
+
+The bed of an object stream costs less than a channel-based 7.1.4 stream (5.1 core, rendered to
+7.1.4), so the fallback lands under it. The within-the-figure row is why the S3 states 0: 2 objects
+still do not keep up over Sendspin.
+
 ### Placed on loudspeakers
 
 Reconstructed objects are mono signals with a position each; a part driving a 7.1.4 DAC has to
