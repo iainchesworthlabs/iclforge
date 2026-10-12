@@ -15,7 +15,7 @@
     | 1 | Research: capture path, the Sendspin source role, references, pitch trackers, bleed | Done, in [the findings](karaoke-microphone-findings.md) |
     | 2 | Measurements that open the microphone ([R1 to R3](karaoke-microphone-findings.md#f8-the-measurements-still-to-run)) | **Run 2026-10-12 with the owner's OK**: a voice through this workstation's own path is about 130 ms ([Latency](#latency)) |
     | 3 | Design (this page, [Decisions](#decisions) D1 to D18) | **Approved by the owner on 2026-10-12, as recommended** (three of them leave something open: [below](#decisions)) |
-    | 4 | Builds, in [the order below](#build-plan), one small pull request each | **Started with the desktop** (M1, M2); the board (M8 to M10) waits for D3 |
+    | 4 | Builds, in [the order below](#build-plan), one small pull request each | **Under way on the desktop**: M1 to M4 are open as PRs #1372, #1378, #1379, #1385 and #1397; recording and the lyric view's marks are next; the board (M8 to M10) waits for D3 |
 
 ## What this is
 
@@ -493,19 +493,19 @@ Sizes are in pull requests as in phase 2: **S** one small PR, **M** one of a few
 with its tests, **L** two to four stacked. None starts before the owner approves the requirements
 and the design.
 
-| Step | What | Size | Needs |
-|---|---|---|---|
-| M0 | The measurements that open the microphone (R1 to R3) and a listening check (R6) | S | The owner's OK; a person |
-| M1 | The `pitch` library: tracker, reference notes, scorer, the synthetic-voice generator and its tests | M | D7 |
-| M2 | `Capture` timestamps, a requested period and a latency report, Windows first; then macOS, PipeWire and ALSA, one S each | M, then S x3 | D4 |
-| M3 | Reference extraction: M, V1 and V2 from a karaoke AC-3 (decode as coded, track), and the MIDI note reader with its track choice | M | M1; the lyric library's reader |
-| M4 | Hearth's microphone session: the card on the Karaoke page, the indicator, the meter, the sidetone, the preferences, with a fake capture in the tests | M to L | M2; D5, D6 |
-| M5 | Scoring in Hearth: the live view, the per-line marks, the summary, the bleed checks | M to L | M1, M3, M4 |
-| M6 | Recording: the take, the sidecar, the list, the Forge recipe in the user guide | M | M4; D11, D13 |
-| M7 | The browser: the tracker in WebAssembly, a microphone card in the decode demo | M | M1; D16 |
-| M8 | The board as a source: I2S receive, `source@v1`, the indicator; Hearth's host side (`allow_source`, `start_source`) and scoring from a board's voice | L | The firmware owner (D3); M1, M2 |
-| M9 | The board's local mix and monitor: the mix stage, `voice` and a level in the settings keys, measured sidetone | L | M8; R4 |
-| M10 | A room mix at every sink (C) | L | Only if D2 asks for it; R4, R5 |
+| Step | What | Size | Needs | State |
+|---|---|---|---|---|
+| M0 | The measurements that open the microphone (R1 to R3) and a listening check (R6) | S | The owner's OK; a person | R1 and R2 run, R3 half run (2026-10-12); R6 (a listening check) not run |
+| M1 | The `pitch` library: tracker, reference notes, scorer, the synthetic-voice generator and its tests | M | D7 | **Built**, PR #1372 |
+| M2 | `Capture` timestamps, a requested period and a latency report, Windows first; then macOS, PipeWire and ALSA, one S each | M, then S x3 | D4 | **Built for Windows**, PR #1378; macOS, PipeWire and ALSA not started |
+| M3 | Reference extraction: M, V1 and V2 from a karaoke AC-3 (decode as coded, track), and the MIDI note reader with its track choice | M | M1; the lyric library's reader | **Built**: the MIDI melody reader PR #1379; the reference from a karaoke stream's M, V1 and V2 in PR #1385 |
+| M4 | Hearth's microphone session: the card on the Karaoke page, the indicator, the meter, the sidetone, the preferences, with a fake capture in the tests | M to L | M2; D5, D6 | **Built**: the engine's `Performance` PR #1385, the card PR #1397 |
+| M5 | Scoring in Hearth: the live view, the per-line marks, the summary, the bleed checks | M to L | M1, M3, M4 | Not started; until the bleed check exists the score is withheld unless the person says they wear headphones |
+| M6 | Recording: the take, the sidecar, the list, the Forge recipe in the user guide | M | M4; D11, D13 | Not started |
+| M7 | The browser: the tracker in WebAssembly, a microphone card in the decode demo | M | M1; D16 | Not started |
+| M8 | The board as a source: I2S receive, `source@v1`, the indicator; Hearth's host side (`allow_source`, `start_source`) and scoring from a board's voice | L | The firmware owner (D3); M1, M2 | Not started: waits for D3 |
+| M9 | The board's local mix and monitor: the mix stage, `voice` and a level in the settings keys, measured sidetone | L | M8; R4 | Not started: waits for D3 and M8 |
+| M10 | A room mix at every sink (C) | L | Only if D2 asks for it; R4, R5 | Not started: not approved (D2) |
 
 **Order and dependencies.** Desktop first: M1 and M2 are independent and can go at once, M3 needs
 M1, and M4 to M6 stack on them, so a Windows desktop has a microphone, a score and a take before a
