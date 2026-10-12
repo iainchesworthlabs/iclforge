@@ -420,7 +420,7 @@ It does, in this order, and stops at the first refusal:
    date). `--record` writes `baselines/<profile>.json` from a clean run; `--compare` holds a run to
    a baseline with the tolerance in `suite.json` and prints an improvement as "re-baseline".
 
-Tests (`test_board_suite.py`, 89) run it against a stand-in board that answers with what the real
+Tests (`test_board_suite.py`, 94) run it against a stand-in board that answers with what the real
 boards printed on 2026-10-12, and hold the file to the tree (every stream is in the repository,
 every AC-4 row names a pin the host holds, every profile has a list).
 
@@ -576,8 +576,9 @@ re-recorded**: `s3-n16r8`'s was, on S3b, the worst of eight boots now (AC-3 123 
 permille against 124 and 88; boot free RAM 85,755 against 86,223). Nothing material moved: the new
 image held to the old baseline before it was replaced. The C6 and P4 profiles were not touched:
 their locked values still equal the Kconfig's defaults (and the P4 builds of PR 10 and 11 held).
-`compare` does not look at a baseline's hash, so a stale one is a number that is still right and a
-hash that is not; the PR that changes a locked default carries the re-record.
+`compare` does not hold a run to a baseline's hash, so a stale one is a number that is still right
+and a hash that is not: it says which hash the baseline was recorded under when the run's
+differs (a one-line note), and the PR that changes a locked default carries the re-record.
 
 ## Changing a profile
 
@@ -588,6 +589,22 @@ A change to a profile, a fragment it names, or a locked key's Kconfig default is
 3. attaches `board-run.json` from a board booked for the run, and updates
    `baselines/<profile>.json` if a figure moved;
 4. says in the description which keys moved, why, and what the heap table did.
+
+**When a baseline is re-recorded, and when it is only noted (the owner's rule, 2026-10-12).** A
+baseline carries the hash of the profile it was recorded under, and the hash is the fragments and
+the locked values, so it moves whenever the profile is edited. The two kinds of edit are not the
+same:
+
+- **A locked value that changes** (the S3's lyric budget and object count in PR 12) is a change of
+  what the image is, where a figure can have moved: the baseline is re-recorded in the same PR.
+- **A key that is added at the value it already had in effect** (a new Sendspin switch left off,
+  locked so that the guard knows it) re-hashes the profile and moves no figure: **the baselines are
+  kept**, and `board_suite.py` says on every compare against one that it was recorded under the
+  earlier hash and that the figures are compared as recorded. The PR says which keys it locked.
+
+A kept baseline's hash is then not the file's, and that is read from the note, not from a
+failure: the suite still refuses an *image* built under another hash, so a board is only ever
+run on the definition the file has.
 
 CI fails a PR that touches a fragment or the Kconfig defaults of a locked key and not the profile
 file. A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it

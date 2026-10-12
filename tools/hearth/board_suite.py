@@ -742,6 +742,25 @@ def run_record(
     return record
 
 
+def baseline_note(run: dict[str, Any], baseline: dict[str, Any]) -> str | None:
+    """One line when the baseline was recorded under another profile hash than the run's image
+    carries, and None when they are the same or either is not known. The hash is the profile's
+    fragments and locked values, so a different one is a different definition, and the baseline's
+    figures are still the ones recorded: `compare` holds the run to them as they are, and this says
+    which definition they were taken under. A profile gains a locked key at the value it already
+    had in effect (a new switch left off) without a figure moving; the baselines are then kept,
+    and this is the note that goes with them (planning/esp32-platform-profiles.md, "Changing a
+    profile")."""
+    recorded, carried = baseline.get("profile_hash"), run.get("profile_hash")
+    if not recorded or not carried or recorded == carried:
+        return None
+    return (
+        f"note: the baseline was recorded under profile hash {recorded} and this run's image "
+        f"carries {carried}: the definition has changed since (git log -p "
+        "firmware/hearth-sink/profiles.json), and the figures are compared as they were recorded"
+    )
+
+
 def compare(
     run: dict[str, Any], baseline: dict[str, Any], tolerance: dict[str, Any]
 ) -> tuple[list[str], list[str]]:
@@ -924,6 +943,9 @@ def cmd_run(args: argparse.Namespace) -> int:
                 print(f"regression: {line}")
             for line in improvements:
                 print(f"improved: {line}")
+            note = baseline_note(record, baseline)
+            if note:
+                print(note)
         if args.record:
             if not boot:
                 print("not recorded: the log holds no boot budget line; run with --restart")
@@ -1030,15 +1052,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "compare":
             suite = load_suite()
             recorded = json.loads(args.run.read_text("utf-8"))
+            baseline = json.loads(args.baseline.read_text("utf-8"))
             regressions, improvements = compare(
-                recorded,
-                json.loads(args.baseline.read_text("utf-8")),
-                tolerance_for(suite, recorded.get("profile")),
+                recorded, baseline, tolerance_for(suite, recorded.get("profile"))
             )
             for line in regressions:
                 print(f"regression: {line}")
             for line in improvements:
                 print(f"improved: {line}")
+            note = baseline_note(recorded, baseline)
+            if note:
+                print(note)
             if not regressions:
                 print("the run holds to the baseline")
             return 1 if regressions else 0
