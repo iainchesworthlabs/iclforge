@@ -296,6 +296,9 @@ strip says whose session it follows and what track it is.
   way) on top of either origin, which is what a slow player or a sluggish output needs.
 - **Stop** stops following and keeps the lyrics, and **Clear** drops them.
 
+What the strip follows can also be sent over OSC to a lighting or show-control rig
+([Settings, 08](settings.md#08-lyric-events-out)); it is off until it is turned on.
+
 Where the platform cannot read sessions, the strip says why and keeps Start and the nudge: a
 Linux build without Qt's D-Bus module, and **macOS**, whose only reader is a private framework that
 developers report macOS 15.4 and later withholds from programs Apple has not entitled (no Mac has

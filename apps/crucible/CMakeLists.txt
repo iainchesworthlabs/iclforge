@@ -394,6 +394,8 @@ else()
         ui/src/main.cpp
         ui/src/crucible_controller.cpp
         ui/src/crucible_controller.hpp
+        ui/src/lyric_osc.cpp
+        ui/src/lyric_osc.hpp
         ui/src/lyrics_controller.cpp
         ui/src/lyrics_controller.hpp
         ui/src/media_monitor.cpp
@@ -487,6 +489,7 @@ else()
     # be compiled under it (apps/forge/gui carries a workaround for exactly that).
     target_link_libraries(crucible PRIVATE
         iclforge::crucible_engine
+        iclforge::audio
         iclforge::lyrics
         iclforge::coverage
         Qt6::Core Qt6::Gui Qt6::Qml Qt6::Widgets Qt6::Quick Qt6::QuickControls2 ${ICLFORGE_CRUCIBLE_QUICK3D_LIB})

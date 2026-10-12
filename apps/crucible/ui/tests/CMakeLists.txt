@@ -11,12 +11,16 @@
 # edited. Second, independent embedding of the Crucible module, not a
 # shared library, for the WHOLE_ARCHIVE reason the GUI gives.
 # ---------------------------------------------------------------------------
-find_package(Qt6 6.8 REQUIRED COMPONENTS QuickTest)
+# Network is the suite's own: TestServices listens on a loopback UDP port for the lyric events the
+# window sends (qml_test_main.cpp), which the window itself sends through iclforge::audio.
+find_package(Qt6 6.8 REQUIRED COMPONENTS QuickTest Network)
 
 qt_add_executable(crucible_qmltests
     ui/tests/qml_test_main.cpp
     ui/src/crucible_controller.cpp
     ui/src/crucible_controller.hpp
+    ui/src/lyric_osc.cpp
+    ui/src/lyric_osc.hpp
     ui/src/lyrics_controller.cpp
     ui/src/lyrics_controller.hpp
     ui/src/media_monitor.cpp
@@ -110,9 +114,10 @@ target_compile_definitions(crucible_qmltests PRIVATE WIN32_LEAN_AND_MEAN NOMINMA
     QUICK_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/ui/tests/qml")
 target_link_libraries(crucible_qmltests PRIVATE
     iclforge::crucible_engine
+    iclforge::audio
     iclforge::lyrics
     iclforge::coverage
-    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::QuickTest Qt6::Widgets
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::QuickTest Qt6::Widgets Qt6::Network
     ${ICLFORGE_CRUCIBLE_QUICK3D_LIB})
 if(Qt6Svg_FOUND)
     target_link_libraries(crucible_qmltests PRIVATE ${ICLFORGE_CRUCIBLE_SVG_LIB})

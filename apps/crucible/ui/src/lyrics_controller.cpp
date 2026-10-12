@@ -3,6 +3,9 @@
 #include <QFile>
 #include <QImage>
 #include <QSet>
+#include <QSettings>
+#include <QStringList>
+#include <QTimer>
 #include <QUrl>
 
 #include <algorithm>
@@ -18,7 +21,9 @@
 #include <vector>
 
 #include "cdg_frames.hpp"
+#include "iclforge/audio/udp_sender.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
+#include "lyric_osc.hpp"
 #include "media_monitor.hpp"
 
 namespace {
@@ -136,6 +141,38 @@ struct Entry {
     return out;
 }
 
+// The keys the OSC choices are kept under, in the window's own settings.
+constexpr auto kOscEnabledKey = "lyrics/osc/enabled";
+constexpr auto kOscHostKey = "lyrics/osc/host";
+constexpr auto kOscPortKey = "lyrics/osc/port";
+constexpr auto kOscLinesKey = "lyrics/osc/lines";
+constexpr auto kOscWordsKey = "lyrics/osc/words";
+constexpr auto kOscPositionKey = "lyrics/osc/position";
+// How often the events' timer reads where every followed application is: a word is a fifth of a
+// second at the shortest, so 25 ms says it within a frame of the strip showing it.
+constexpr int kOscTickMs = 25;
+
+// A dotted-quad IPv4 literal (the sender never resolves a name), with "localhost" meaning this
+// machine. The address to send to, or empty when `host` is neither.
+[[nodiscard]] std::string ipv4_literal(const QString& host) {
+    const QString text = host.trimmed();
+    if (text.compare(QStringLiteral("localhost"), Qt::CaseInsensitive) == 0) {
+        return "127.0.0.1";
+    }
+    const QStringList parts = text.split(QLatin1Char('.'));
+    if (parts.size() != 4) {
+        return {};
+    }
+    for (const QString& part : parts) {
+        bool ok = false;
+        const int value = part.toInt(&ok);
+        if (!ok || value < 0 || value > 255 || part.size() > 3) {
+            return {};
+        }
+    }
+    return text.toStdString();
+}
+
 // What a list of sessions is, for knowing whether a picker has to reread.
 [[nodiscard]] std::string signature(const std::vector<MediaSession>& sessions) {
     std::string out;
@@ -206,6 +243,14 @@ struct CrucibleLyrics::State {
     // The thread that reads them; null when the environment turns it off (and in the QML suite).
     MediaMonitor* monitor = nullptr;
 
+    // Events out: the choices, what was said last, the socket and the timer that reads.
+    bool osc_enabled = false;
+    QString osc_host = QStringLiteral("127.0.0.1");
+    int osc_port = CrucibleLyrics::kDefaultOscPort;
+    iclforge::crucible::ui::LyricEventTracker osc_tracker;
+    iclforge::audio::UdpSender osc_sender;
+    QTimer* osc_timer = nullptr;
+
     [[nodiscard]] const Entry* find(int app) const {
         const auto it = entries.find(app);
         return it == entries.end() ? nullptr : &it->second;
@@ -216,6 +261,23 @@ CrucibleLyrics::CrucibleLyrics(QObject* parent)
     : iclforge::apps::CdgFrameSource(parent), state_(std::make_unique<State>()) {
     // A new file, a clear or a nudge is a different picture at the same position.
     connect(this, &CrucibleLyrics::changed, this, &CrucibleLyrics::pictureChanged);
+    // Events out: the choices come back from the last run, and the timer is made now and runs only
+    // while it has something to do.
+    {
+        QSettings settings(QSettings::defaultFormat(), QSettings::UserScope, QStringLiteral("iclforge"),
+                           QStringLiteral("Crucible"));
+        state_->osc_enabled = settings.value(QLatin1StringView(kOscEnabledKey), false).toBool();
+        state_->osc_host = settings.value(QLatin1StringView(kOscHostKey), state_->osc_host).toString();
+        state_->osc_port = std::clamp(settings.value(QLatin1StringView(kOscPortKey), kDefaultOscPort).toInt(), 1, 65535);
+        iclforge::crucible::ui::LyricEventOptions options = state_->osc_tracker.options();
+        options.lines = settings.value(QLatin1StringView(kOscLinesKey), true).toBool();
+        options.words = settings.value(QLatin1StringView(kOscWordsKey), true).toBool();
+        options.position = settings.value(QLatin1StringView(kOscPositionKey), false).toBool();
+        state_->osc_tracker.set_options(options);
+    }
+    state_->osc_timer = new QTimer(this);
+    state_->osc_timer->setInterval(kOscTickMs);
+    connect(state_->osc_timer, &QTimer::timeout, this, [this] { send_events(nowMs()); });
     // The sessions are read by a thread of the monitor's, only while an application with lyrics
     // wants one. ICLFORGE_CRUCIBLE_MEDIA_SESSIONS=off turns it off (and is what the QML suite sets, so
     // that a developer's own music does not move a test).
@@ -412,10 +474,231 @@ qlonglong CrucibleLyrics::positionMs(int app, qlonglong now_ms) const {
     return position ? static_cast<qlonglong>(*position) : -1;
 }
 
+void CrucibleLyrics::refresh_events() {
+    if (state_->osc_timer == nullptr) {
+        return;
+    }
+    // Nothing is said while the events are off, so nothing is remembered as said.
+    if (!state_->osc_enabled) {
+        state_->osc_tracker.reset();
+    }
+    const bool wanted = state_->osc_enabled && !ipv4_literal(state_->osc_host).empty()
+                        && std::any_of(state_->entries.begin(), state_->entries.end(),
+                                       [](const auto& item) { return is_followable(item.second); });
+    if (wanted && !state_->osc_timer->isActive()) {
+        state_->osc_timer->start();
+    } else if (!wanted && state_->osc_timer->isActive()) {
+        // One last reading, so that an application whose lyrics have just gone is said to be
+        // cleared, if the events are still on and have somewhere to go.
+        if (state_->osc_enabled && !ipv4_literal(state_->osc_host).empty()) {
+            send_events(nowMs());
+        }
+        state_->osc_timer->stop();
+        // What was said is forgotten with the stopping, so that turning it on again is said in full.
+        state_->osc_tracker.reset();
+    }
+}
+
+namespace {
+
+// An application's place at `now_ms`, for the events out: the strip's cursor without the maps.
+[[nodiscard]] iclforge::crucible::ui::LyricSnapshot snapshot_of(int app, const Entry& entry, const QString& name,
+                                                                qlonglong position_ms, bool following) {
+    iclforge::crucible::ui::LyricSnapshot out;
+    out.key = app;
+    out.app = name.toStdString();
+    out.following = following;
+    if (!following) {
+        return out;
+    }
+    out.position_ms = position_ms;
+    if (!entry.lyrics.timed) {
+        return out;
+    }
+    const LyricPosition at = iclforge::lyrics::lyric_position(entry.lyrics, position_ms, entry.nudge_ms);
+    if (!at.line || *at.line >= entry.lyrics.lines.size() || !at.in_line) {
+        return out;
+    }
+    const LyricLine& line = entry.lyrics.lines[*at.line];
+    out.line = static_cast<int>(*at.line);
+    out.line_text = line.text;
+    out.line_start_ms = line.start_ms;
+    out.line_end_ms = line.end_ms;
+    if (at.word && *at.word < line.words.size()) {
+        std::string body = line.words[*at.word].text;
+        while (!body.empty() && is_space(body.back())) {
+            body.pop_back();
+        }
+        out.word = static_cast<int>(*at.word);
+        out.word_text = std::move(body);
+        out.word_start_ms = line.words[*at.word].start_ms;
+        out.word_end_ms = line.words[*at.word].end_ms;
+    }
+    return out;
+}
+
+}  // namespace
+
+std::vector<iclforge::crucible::ui::LyricSnapshot> CrucibleLyrics::readings(qlonglong now_ms) const {
+    std::vector<iclforge::crucible::ui::LyricSnapshot> out;
+    out.reserve(state_->entries.size());
+    for (const auto& item : state_->entries) {
+        if (!is_followable(item.second)) {
+            continue;
+        }
+        const auto facts = state_->applications.find(item.first);
+        const QString name = facts != state_->applications.end() && !facts->second.name.empty()
+                                 ? from_utf8(facts->second.name)
+                                 : QStringLiteral("Application %1").arg(item.first);
+        out.push_back(snapshot_of(item.first, item.second, name, positionMs(item.first, now_ms),
+                                  is_following(item.second)));
+    }
+    return out;
+}
+
+void CrucibleLyrics::send_events(qlonglong now_ms) {
+    const std::string host = ipv4_literal(state_->osc_host);
+    for (const iclforge::crucible::ui::OscMessage& message : state_->osc_tracker.update(readings(now_ms), now_ms)) {
+        if (host.empty()) {
+            continue;
+        }
+        const std::vector<std::byte> bytes = iclforge::crucible::ui::encode_osc(message);
+        (void)state_->osc_sender.send_to(host, static_cast<std::uint16_t>(state_->osc_port), bytes);
+    }
+}
+
+QStringList CrucibleLyrics::oscMessagesAt(qlonglong nowMs) {
+    QStringList out;
+    for (const iclforge::crucible::ui::OscMessage& message : state_->osc_tracker.update(readings(nowMs), nowMs)) {
+        QString line = QString::fromStdString(message.address);
+        for (const iclforge::crucible::ui::OscArg& arg : message.args) {
+            line += QLatin1Char(' ');
+            switch (arg.type) {
+                case iclforge::crucible::ui::OscArg::Type::kInt:
+                    line += QString::number(arg.integer);
+                    break;
+                case iclforge::crucible::ui::OscArg::Type::kFloat:
+                    line += QString::number(static_cast<double>(arg.real));
+                    break;
+                case iclforge::crucible::ui::OscArg::Type::kString:
+                    line += QString::fromStdString(arg.text);
+                    break;
+            }
+        }
+        out.push_back(line);
+    }
+    return out;
+}
+
+bool CrucibleLyrics::oscEnabled() const {
+    return state_->osc_enabled;
+}
+
+void CrucibleLyrics::setOscEnabled(bool enabled) {
+    if (enabled == state_->osc_enabled) {
+        return;
+    }
+    state_->osc_enabled = enabled;
+    QSettings(QSettings::defaultFormat(), QSettings::UserScope, QStringLiteral("iclforge"), QStringLiteral("Crucible"))
+        .setValue(QLatin1StringView(kOscEnabledKey), enabled);
+    refresh_events();
+    emit oscChanged();
+}
+
+QString CrucibleLyrics::oscHost() const {
+    return state_->osc_host;
+}
+
+void CrucibleLyrics::setOscHost(const QString& host) {
+    const QString trimmed = host.trimmed();
+    if (trimmed == state_->osc_host) {
+        return;
+    }
+    state_->osc_host = trimmed;
+    QSettings(QSettings::defaultFormat(), QSettings::UserScope, QStringLiteral("iclforge"), QStringLiteral("Crucible"))
+        .setValue(QLatin1StringView(kOscHostKey), trimmed);
+    // A new destination hears everything from where it is, not only what changes after.
+    state_->osc_tracker.reset();
+    refresh_events();
+    emit oscChanged();
+}
+
+int CrucibleLyrics::oscPort() const {
+    return state_->osc_port;
+}
+
+void CrucibleLyrics::setOscPort(int port) {
+    const int held = std::clamp(port, 1, 65535);
+    if (held == state_->osc_port) {
+        return;
+    }
+    state_->osc_port = held;
+    QSettings(QSettings::defaultFormat(), QSettings::UserScope, QStringLiteral("iclforge"), QStringLiteral("Crucible"))
+        .setValue(QLatin1StringView(kOscPortKey), held);
+    state_->osc_tracker.reset();
+    emit oscChanged();
+}
+
+bool CrucibleLyrics::oscLines() const {
+    return state_->osc_tracker.options().lines;
+}
+
+void CrucibleLyrics::setOscLines(bool on) {
+    iclforge::crucible::ui::LyricEventOptions options = state_->osc_tracker.options();
+    if (options.lines == on) {
+        return;
+    }
+    options.lines = on;
+    state_->osc_tracker.set_options(options);
+    QSettings(QSettings::defaultFormat(), QSettings::UserScope, QStringLiteral("iclforge"), QStringLiteral("Crucible"))
+        .setValue(QLatin1StringView(kOscLinesKey), on);
+    emit oscChanged();
+}
+
+bool CrucibleLyrics::oscWords() const {
+    return state_->osc_tracker.options().words;
+}
+
+void CrucibleLyrics::setOscWords(bool on) {
+    iclforge::crucible::ui::LyricEventOptions options = state_->osc_tracker.options();
+    if (options.words == on) {
+        return;
+    }
+    options.words = on;
+    state_->osc_tracker.set_options(options);
+    QSettings(QSettings::defaultFormat(), QSettings::UserScope, QStringLiteral("iclforge"), QStringLiteral("Crucible"))
+        .setValue(QLatin1StringView(kOscWordsKey), on);
+    emit oscChanged();
+}
+
+bool CrucibleLyrics::oscPosition() const {
+    return state_->osc_tracker.options().position;
+}
+
+void CrucibleLyrics::setOscPosition(bool on) {
+    iclforge::crucible::ui::LyricEventOptions options = state_->osc_tracker.options();
+    if (options.position == on) {
+        return;
+    }
+    options.position = on;
+    state_->osc_tracker.set_options(options);
+    QSettings(QSettings::defaultFormat(), QSettings::UserScope, QStringLiteral("iclforge"), QStringLiteral("Crucible"))
+        .setValue(QLatin1StringView(kOscPositionKey), on);
+    emit oscChanged();
+}
+
+QString CrucibleLyrics::oscProblem() const {
+    if (ipv4_literal(state_->osc_host).empty()) {
+        return QStringLiteral("The address must be an IPv4 address such as 127.0.0.1, or localhost.");
+    }
+    return {};
+}
+
 void CrucibleLyrics::refresh_monitor() {
     if (state_->monitor != nullptr) {
         state_->monitor->setWanted(any_wants_sessions(state_->entries));
     }
+    refresh_events();
 }
 
 void CrucibleLyrics::setApplication(int app, const QString& name, const QString& imagePath, const QString& appId) {

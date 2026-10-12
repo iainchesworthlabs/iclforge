@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQmlIntegration>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #include "cdg_frame_source.hpp"
+#include "lyric_osc.hpp"
 #include "media_session.hpp"
 
 // Lyrics for the application a person has selected (planning/karaoke-phase2.md, W13b, D9): an
@@ -41,9 +43,24 @@ class CrucibleLyrics : public iclforge::apps::CdgFrameSource {
     QML_ELEMENT
     QML_SINGLETON
 
+    // Events out (planning/karaoke-phase2.md, D9's alternative): what the strip follows, said over OSC
+    // 1.0 on UDP to a rig that reads it (lyric_osc.hpp has the addresses). Off until a person turns
+    // it on; the destination is an IPv4 address and a port. Kept with the window's other choices.
+    Q_PROPERTY(bool oscEnabled READ oscEnabled WRITE setOscEnabled NOTIFY oscChanged)
+    Q_PROPERTY(QString oscHost READ oscHost WRITE setOscHost NOTIFY oscChanged)
+    Q_PROPERTY(int oscPort READ oscPort WRITE setOscPort NOTIFY oscChanged)
+    Q_PROPERTY(bool oscLines READ oscLines WRITE setOscLines NOTIFY oscChanged)
+    Q_PROPERTY(bool oscWords READ oscWords WRITE setOscWords NOTIFY oscChanged)
+    Q_PROPERTY(bool oscPosition READ oscPosition WRITE setOscPosition NOTIFY oscChanged)
+    // Empty while the destination is usable; otherwise why events are not being sent.
+    Q_PROPERTY(QString oscProblem READ oscProblem NOTIFY oscChanged)
+
 public:
     // How far a nudge may take the words either way, in milliseconds.
     static constexpr int kMaxNudgeMs = 10000;
+    // The OSC destination's defaults: this machine, and a port that show-control software commonly
+    // listens on.
+    static constexpr int kDefaultOscPort = 9000;
 
     explicit CrucibleLyrics(QObject* parent = nullptr);
     ~CrucibleLyrics() override;
@@ -143,9 +160,29 @@ public:
     // not yet. The same keys as KaraokeController.cursor() in the Hearth window.
     Q_INVOKABLE QVariantMap cursor(int app, qlonglong nowMs) const;
 
+    [[nodiscard]] bool oscEnabled() const;
+    void setOscEnabled(bool enabled);
+    [[nodiscard]] QString oscHost() const;
+    void setOscHost(const QString& host);
+    [[nodiscard]] int oscPort() const;
+    void setOscPort(int port);
+    [[nodiscard]] bool oscLines() const;
+    void setOscLines(bool on);
+    [[nodiscard]] bool oscWords() const;
+    void setOscWords(bool on);
+    [[nodiscard]] bool oscPosition() const;
+    void setOscPosition(bool on);
+    [[nodiscard]] QString oscProblem() const;
+
+    // What the events out would say at `nowMs`, as a test reads it: one reading's messages as
+    // "address arg arg ..." lines. The timer sends the same, on this process's clock.
+    Q_INVOKABLE QStringList oscMessagesAt(qlonglong nowMs);
+
 signals:
     // An application's lyrics, clock or nudge changed; the strip for it rereads.
     void changed(int app);
+    // The OSC settings changed.
+    void oscChanged();
     // The sessions read, or what can be read, changed: the picker rereads.
     void sessionsChanged();
 
@@ -155,6 +192,12 @@ private:
     // Starts or stops the thread that reads the sessions: it runs while an application with
     // lyrics is waiting on one.
     void refresh_monitor();
+    // Starts or stops the events' timer: it runs while they are on and an application has lyrics.
+    void refresh_events();
+    // One tick of it: read every application's place, and send what changed.
+    void send_events(qlonglong now_ms);
+    // Every application with lyrics, as it stands at `now_ms`, for the events out.
+    [[nodiscard]] std::vector<iclforge::crucible::ui::LyricSnapshot> readings(qlonglong now_ms) const;
 
     std::unique_ptr<State> state_;
 };

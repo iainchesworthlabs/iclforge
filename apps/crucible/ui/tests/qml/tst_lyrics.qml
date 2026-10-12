@@ -35,6 +35,13 @@ TestCase {
         }
         // No session of an earlier case is left for the next to be matched with.
         CrucibleLyrics.applySessionList([], 0);
+        // And the events out are off again, with the destination they were given.
+        CrucibleLyrics.oscEnabled = false;
+        CrucibleLyrics.oscHost = "127.0.0.1";
+        CrucibleLyrics.oscPort = 9000;
+        CrucibleLyrics.oscLines = true;
+        CrucibleLyrics.oscWords = true;
+        CrucibleLyrics.oscPosition = false;
     }
 
     // --- the controller, on a clock of the test's own ------------------------------
@@ -507,6 +514,89 @@ TestCase {
         compare(findChild(strip, "lyricsUseSession").visible, true);
         findChild(strip, "lyricsUseSession").clicked();
         tryCompare(strip, "positionSource", "session", 5000);
+    }
+
+    // --- events out over OSC (planning/karaoke-phase2.md, D9's alternative) ----------------------
+
+    function test_theEventsOutAreOffUntilTurnedOnAndAnAddressThatIsNotIpv4IsSaid() {
+        compare(CrucibleLyrics.oscEnabled, false);
+        compare(CrucibleLyrics.oscHost, "127.0.0.1");
+        compare(CrucibleLyrics.oscPort, 9000);
+        compare(CrucibleLyrics.oscLines, true);
+        compare(CrucibleLyrics.oscWords, true);
+        compare(CrucibleLyrics.oscPosition, false);
+        compare(CrucibleLyrics.oscProblem, "");
+
+        // A name is not resolved (nothing here may block on DNS), and says so; "localhost" is this machine.
+        CrucibleLyrics.oscHost = "example.com";
+        verify(CrucibleLyrics.oscProblem.length > 0);
+        CrucibleLyrics.oscHost = "300.1.1.1";
+        verify(CrucibleLyrics.oscProblem.length > 0);
+        CrucibleLyrics.oscHost = "localhost";
+        compare(CrucibleLyrics.oscProblem, "");
+        CrucibleLyrics.oscHost = "192.168.1.20";
+        compare(CrucibleLyrics.oscProblem, "");
+
+        // A port is held to 1 to 65535.
+        CrucibleLyrics.oscPort = 70000;
+        compare(CrucibleLyrics.oscPort, 65535);
+        CrucibleLyrics.oscPort = 0;
+        compare(CrucibleLyrics.oscPort, 1);
+    }
+
+    function test_whatTheEventsWouldSayIsReadableWithoutASocket() {
+        importForSpotify(7);
+        CrucibleLyrics.startAt(7, 10000);
+        // 1.25 s in: the first line, at its first word.
+        const first = CrucibleLyrics.oscMessagesAt(11250);
+        compare(first[0], "/crucible/lyrics/state Spotify following");
+        verify(first[1].indexOf("/crucible/lyrics/line Spotify 0 Should auld acquaintance 1000 ") === 0, first[1]);
+        verify(first[2].indexOf("/crucible/lyrics/word Spotify 0 0 Should 1000 1500") === 0, first[2]);
+        // The same moment says nothing again; 1.6 s in is the second word.
+        compare(CrucibleLyrics.oscMessagesAt(11260).length, 0);
+        const next = CrucibleLyrics.oscMessagesAt(11600);
+        compare(next.length, 1);
+        verify(next[0].indexOf("/crucible/lyrics/word Spotify 0 1 auld 1500 2000") === 0, next[0]);
+    }
+
+    function test_theLyricEventsArriveOverUdpAtTheDestinationChosen() {
+        const port = TestServices.oscListen();
+        verify(port > 0, "no loopback port could be had");
+        CrucibleLyrics.oscHost = "127.0.0.1";
+        CrucibleLyrics.oscPort = port;
+        CrucibleLyrics.oscEnabled = true;
+        importForSpotify(7);
+        // The song began 1.25 s ago.
+        CrucibleLyrics.startAt(7, CrucibleLyrics.nowMs() - 1250);
+        tryVerify(function() { return TestServices.oscReceived().length >= 4; }, 5000);
+        const got = TestServices.oscReceived();
+        compare(got[0], "/crucible/lyrics/state Spotify following");
+        verify(got[1].indexOf("/crucible/lyrics/line Spotify 0 Should auld acquaintance 1000 ") === 0, got[1]);
+        verify(got[2].indexOf("/crucible/lyrics/word Spotify 0 0 Should 1000 1500") === 0, got[2]);
+        // The next word follows on the song's own time, a quarter of a second later.
+        verify(got[3].indexOf("/crucible/lyrics/word Spotify 0 1 auld 1500 2000") === 0, got[3]);
+
+        // Stop says stopped; clearing the lyrics says cleared.
+        CrucibleLyrics.stop(7);
+        tryVerify(function() {
+            return TestServices.oscReceived().indexOf("/crucible/lyrics/state Spotify stopped") >= 0;
+        }, 5000);
+        CrucibleLyrics.clear(7);
+        tryVerify(function() {
+            return TestServices.oscReceived().indexOf("/crucible/lyrics/state Spotify cleared") >= 0;
+        }, 5000);
+    }
+
+    function test_nothingIsSentWhileTheEventsAreOff() {
+        const port = TestServices.oscListen();
+        verify(port > 0);
+        CrucibleLyrics.oscHost = "127.0.0.1";
+        CrucibleLyrics.oscPort = port;
+        importForSpotify(7);
+        CrucibleLyrics.startAt(7, CrucibleLyrics.nowMs() - 1250);
+        // A moment for what would have been sent to have been; the socket stays empty.
+        wait(300);
+        compare(TestServices.oscReceived().length, 0);
     }
 
     // --- the picture of a CD+G disc (planning/karaoke-phase2.md, W13f and D11) -----------------

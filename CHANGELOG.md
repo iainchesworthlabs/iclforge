@@ -272,6 +272,12 @@ The sections below contain the complete change list and fixes.
   thread of their own, only while an application with lyrics waits on one. The macOS reader is the
   private now-playing framework, which developers report macOS 15.4 and later withholds, and no
   Mac has run it (planning/karaoke-phase2.md, D9; planning/karaoke-phase2-findings.md).
+- **Crucible's lyric strip can say what it follows over OSC.** Settings has a **Lyric events out**
+  block, off until turned on: an IPv4 address and a UDP port (9000 to start with), and which of
+  `/crucible/lyrics/state`, `/line`, `/word` and `/position` are sent, each beginning with the
+  application's name, as single OSC 1.0 messages for a lighting or show-control rig. The sending
+  half of the audio library's socket layer is published as `iclforge::audio::UdpSender`
+  (planning/karaoke-phase2.md, D9's rejected alternative, built on the owner's ask).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the

@@ -1890,6 +1890,53 @@
         <translation>Guardar el diagnóstico…</translation>
     </message>
     <message>
+        <location filename="../qml/SettingsPage.qml" line="532"/>
+        <source>LYRIC EVENTS OUT</source>
+        <translation>EVENTOS DE LETRA (SALIDA)</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="536"/>
+        <source>Send the lyric strip&apos;s events over OSC</source>
+        <translation>Enviar los eventos de la franja de letra por OSC</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="537"/>
+        <source>The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.</source>
+        <translation>La línea y la palabra que se canta, como mensajes OSC por UDP, para un equipo de iluminación o control de espectáculos que los siga. Desactivado hasta que lo active.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="544"/>
+        <location filename="../qml/SettingsPage.qml" line="547"/>
+        <source>Send to</source>
+        <translation>Enviar a</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="555"/>
+        <location filename="../qml/SettingsPage.qml" line="558"/>
+        <source>Port</source>
+        <translation>Puerto</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="574"/>
+        <source>Lines</source>
+        <translation>Líneas</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="582"/>
+        <source>Words</source>
+        <translation>Palabras</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="590"/>
+        <source>Position, ten times a second</source>
+        <translation>Posición, diez veces por segundo</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="596"/>
+        <source>Each message begins with the application&apos;s name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line&apos;s number, text and times; /word the same for a word of a word-timed line; /position the song&apos;s place in milliseconds. Times are milliseconds from the start of the song.</source>
+        <translation>Cada mensaje empieza con el nombre de la aplicación. /crucible/lyrics/state dice following, stopped o cleared; /line da el número, el texto y los tiempos de la línea; /word lo mismo para una palabra de una línea con tiempos por palabra; /position el punto de la canción en milisegundos. Los tiempos son milisegundos desde el inicio de la canción.</translation>
+    </message>
+    <message>
         <location filename="../qml/SettingsPage.qml" line="370"/>
         <source>Costs two slots per application; the pair sits either side of the position you place, and an application that cannot get two free slots waits in the bed. Applies to applications the engine meets from now on; each application&apos;s row can override it.</source>
         <translation>Cuesta dos ranuras por aplicación; el par se sitúa a ambos lados de la posición colocada, y una aplicación que no consigue dos ranuras libres espera en la cama. Se aplica a las aplicaciones que el motor encuentre a partir de ahora; la fila de cada aplicación puede anularlo.</translation>

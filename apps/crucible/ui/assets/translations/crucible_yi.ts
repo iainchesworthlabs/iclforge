@@ -1890,6 +1890,53 @@
         <translation>היט אָפּ די דיאַגנאָסטיק…</translation>
     </message>
     <message>
+        <location filename="../qml/SettingsPage.qml" line="532"/>
+        <source>LYRIC EVENTS OUT</source>
+        <translation>ווערטער־געשעענישן (אַרויס)</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="536"/>
+        <source>Send the lyric strip&apos;s events over OSC</source>
+        <translation>שיקן די געשעענישן פון דער ווערטער־שטרײַף דורך OSC</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="537"/>
+        <source>The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.</source>
+        <translation>די שורה און דאס וואָרט וואָס ווערן געזונגען, אלס OSC־מעלדונגען איבער UDP, פֿאַר א ליכט־ אדער שאו־קאנטראל־סיסטעם וואָס פֿאָלגט זיי. אויס ביז איר שאלט עס אָן.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="544"/>
+        <location filename="../qml/SettingsPage.qml" line="547"/>
+        <source>Send to</source>
+        <translation>שיקן צו</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="555"/>
+        <location filename="../qml/SettingsPage.qml" line="558"/>
+        <source>Port</source>
+        <translation>פּאָרט</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="574"/>
+        <source>Lines</source>
+        <translation>שורות</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="582"/>
+        <source>Words</source>
+        <translation>ווערטער</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="590"/>
+        <source>Position, ten times a second</source>
+        <translation>פּאָזיציע, צען מאָל אין סעקונדע</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="596"/>
+        <source>Each message begins with the application&apos;s name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line&apos;s number, text and times; /word the same for a word of a word-timed line; /position the song&apos;s place in milliseconds. Times are milliseconds from the start of the song.</source>
+        <translation>יעדע מעלדונג הייבט אן מיטן נאמען פון דער אפליקאציע. /crucible/lyrics/state זאגט following, stopped אדער cleared; /line גיט די נומער, דעם טעקסט און די צײַטן פון דער שורה; /word דאס זעלבע פֿאַר א וואָרט פון א וואָרט־געצײַטיקטער שורה; /position דעם אָרט פון דעם ליד אין מיליסעקונדעס. צײַטן זענען מיליסעקונדעס פון אָנהייב פון ליד.</translation>
+    </message>
+    <message>
         <location filename="../qml/SettingsPage.qml" line="370"/>
         <source>Costs two slots per application; the pair sits either side of the position you place, and an application that cannot get two free slots waits in the bed. Applies to applications the engine meets from now on; each application&apos;s row can override it.</source>
         <translation>קאָסט צוויי שטעלן פּער אַפּליקאַציע; דאָס פּאָר זיצט אויף ביידע זײַטן פֿון דער געשטעלטער פּאָזיציע, און אַן אַפּליקאַציע וואָס קען נישט קריגן צוויי פֿרײַע שטעלן וואַרט אין בעט. גילט פֿאַר אַפּליקאַציעס וואָס דער מאָטאָר טרעפֿט פֿון איצט אָן; די שורה פֿון יעדער אַפּליקאַציע קען דאָס איבערשרײַבן.</translation>
