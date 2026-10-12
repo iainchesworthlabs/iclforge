@@ -13,7 +13,7 @@ is recorded below. The sink core follows a karaoke item's lyrics on its own cloc
 [the lyric screen](#the-lyric-screen-phase-2) draws them, held to the spec's fixtures at fixed
 positions. [The starting, idle and attention screens](#the-status-screens-phase-3c), the controls
 sheet and its D-pad focus walk, and the family's tokens (one file, `Tokens.kt` generated from it)
-are the common design. The route a stream takes is reported to the server and drawn as a chip
+are the common design, and a pairing code the server asks for in its QR form is drawn as a QR. The route a stream takes is reported to the server and drawn as a chip
 (D6); what is playing comes from the server's `metadata@v1` (D7); and the remote's vocals row asks
 the server for the singer's karaoke choice (D8).
 
@@ -86,8 +86,8 @@ of paired servers; `NativeSink.statusJson()`), the active network's address and 
 `LinkHealth`, which the pass-through bridge writes when a link is refused or lost. The pairing code
 comes from the core and no longer from reading the log. **Quit** is the screen's one control, with the
 family's focus ring, and the D-pad's centre presses it; the foot also carries a small muted note
-(the advertiser's trouble, when it has one). Not here: the QR code the spec names beside the code (a
-QR encoder is a dependency of its own), and the layout line (a pass-through sink has none).
+(the advertiser's trouble, when it has one). Not here: the layout line (a pass-through sink has none);
+the QR for a server that asks for it is described below.
 
 ![The idle screen: the sink's name, its address, the code a server asked for in the accent, and Quit](../../../docs/hearth/screenshots/android-status-idle-code.png)
 ![The starting screen: the name and what it is waiting for](../../../docs/hearth/screenshots/android-status-starting.png)
@@ -97,6 +97,21 @@ QR encoder is a dependency of its own), and the layout line (a pass-through sink
 open that undoes it, the native status as the JNI writes it (read by the parser), and each screen drawn at
 1080p and probed (the code is the accent, the sentence is a banner over a dimmed lyric, Quit has the ring
 and the centre presses it).
+
+**The pairing code as a QR (S1).** A server that asks to pair by a dynamic code may ask for its QR
+form, the `SP:1` token; the idle screen then draws a QR at the right, large, on a light card (a scanner
+wants dark on light, and the card's margin is the standard's four-module quiet zone), with the token
+under it for a person who would type it. The encoder is `QrCode.kt`: byte mode, error correction
+level M, versions 1 to 6 (up to 106 bytes; the token is 43, version 4), no dependency, and a token too
+long for it is shown as text and not as a wrong code. It is held by structure tests on the Shield (the
+finder and timing patterns, the dark module, a format word that is a valid BCH codeword for level M, the
+size of each version and the limit) and by an independent decoder: `tools/hearth/check_qr_matrices.py`
+decodes the matrices `QrCodeTest` writes with OpenCV (16 of 16 payloads, versions 1 to 6, UTF-8
+included), the token's matrix is pinned after that, and the whole 1080p idle-screen picture decodes to
+the token at full size and at half and 0.35 scale (a phone camera's view of a TV). **Not tested:** a
+phone's own scanner app and a real server's pairing flow with the QR form of the code.
+
+![The idle screen with the pairing code as a QR: the name and address at the left, the code on a light card at the right and the token under it](../../../docs/hearth/screenshots/android-idle-qr.png)
 
 ## The lyric screen (phase 2)
 
