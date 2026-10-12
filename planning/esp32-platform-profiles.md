@@ -591,6 +591,31 @@ S3b's, so it is the firmware's (the Sendspin start task's stack freed before the
 not a board's. With the AC-4 image's cross-check in PR 12, both S3 profiles have been run on both
 boards, and the two agree to within the rows' own noise. S3a was put back on its 4065 and released.
 
+**Re-recorded (the two AC-4 profiles, the 40 KB decode stack).** #1446 gave the burst player's
+decode task 40,960 bytes where the decoder is, and the two AC-4 profiles locked 32,768
+(`ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES`). The lock commit moves the value, which is a
+changed locked value, so both baselines are re-recorded here (the two keys #1446 added at an
+inert value are not: those baselines were kept and carry the hash note). Same image on both,
+`v0.10.0-beta.1-4517-g84efde0e7` built with the `measure` overlay, five plays a row after eight
+restarts, then a compare run (two plays, three boots) that holds with no finding:
+
+| | hash | boot `internal_free` | `largest` | `headroom` |
+| --- | --- | --- | --- | --- |
+| `p4-rev1-ac4`, P4a | `6cd3fe4b015f` to `85e6b4f66269` | 289,271 to 281,063 | 217,088 to 208,896 | 176,128 to 167,936 |
+| `s3-n16r8-ac4`, S3a | `6124ef3f591f` to `d7a1513e42b6` | 52,075 to 51,699 | 31,744 to 31,744 | 23,552 to 23,552 |
+
+The P4's three boot figures each fall by exactly 8,192 bytes, which is the stack: on the P4 the
+Sendspin decode task's stack is internal SRAM (`..._DECODE_STACK_IN_PSRAM` defaults to 1 only on
+an S3 with PSRAM), so the board pays for it at boot. On the S3 it is in PSRAM, so the internal
+figures do not move (376 bytes of free RAM, inside the S3's bimodal spread, and the largest block
+and headroom equal). The rows hardly moved either way: on the P4 AC-3 and E-AC-3 2.0 at 61 and 40
+permille (61 and 41), `ac4-20-music` 239 (241), `ac4-20-acpl` 289 (281), the folded 5.1 row 603
+(617) and `ac4-20-companding` 286 (282); on the S3 120 and 84 (120 and 84), 517 (510), 644 (645)
+and 605 (608). **Every PCM hash is equal to the one before, and to the host's pin where there is
+one**, and `decode_stack_free` did not move on a row of the P4 (the plays run on the `/play`
+decode task, not the burst player's stack). Both boards were put back on the images they had, and
+their locks released.
+
 ## Changing a profile
 
 A change to a profile, a fragment it names, or a locked key's Kconfig default is one PR that:
@@ -648,7 +673,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
 | 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
-| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash) and **`s3-n16r8-ac4` built** (S3a, cross-checked on S3b; `s3-n16r8` re-recorded under its new hash). `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
+| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash) and **`s3-n16r8-ac4` built** (S3a, cross-checked on S3b; `s3-n16r8` re-recorded under its new hash); **both AC-4 baselines re-recorded** under the hashes the 40 KB Sendspin decode stack gave them (P4a, S3a). `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
 | 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; no board has run the image, so no list and no baseline |
