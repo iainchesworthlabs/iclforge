@@ -10,6 +10,7 @@
 
 #include "ac4_stream.hpp"
 #include "iclforge/ac3/core/tables.hpp"
+#include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/ac3/io/probe.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
@@ -237,10 +238,22 @@ std::expected<Session, std::string> Session::open(
             lengths = session.scanned_.access_unit_samples;
         }
         session.facts_.stream = format_of(session.scanned_.kind);
-        session.facts_.karaoke =
-            session.scanned_.kind == ac3::io::StreamKind::kAc3 &&
-            ac3::meta::is_karaoke(static_cast<ac3::meta::BitstreamMode>(session.scanned_.bsmod),
-                                  session.scanned_.acmod);
+        // Annex C's karaoke type, of the programme that plays. An AC-3 stream is one when its
+        // bsmod and acmod say so; an E-AC-3 one when the decoder's own rule does, which asks
+        // for one independent substream and no object layer (ac3::is_karaoke_programme, the
+        // rule the decoder reproduces by: planning/karaoke-eac3.md, D1 to D3).
+        const bool other = chosen != nullptr && chosen != &session.scanned_.programmes.front();
+        const auto bsmod = static_cast<ac3::meta::BitstreamMode>(
+            other ? chosen->bsmod : session.scanned_.bsmod);
+        const ac3::Acmod acmod = other ? chosen->acmod : session.scanned_.acmod;
+        if (session.scanned_.kind == ac3::io::StreamKind::kAc3) {
+            session.facts_.karaoke = ac3::meta::is_karaoke(bsmod, acmod);
+        } else if (session.scanned_.kind == ac3::io::StreamKind::kEac3) {
+            session.facts_.karaoke = ac3::is_karaoke_programme(
+                bsmod, acmod, other ? chosen->substreams_per_unit : session.scanned_.substreams_per_unit,
+                (other ? chosen->oba_complexity_index : session.scanned_.oba_complexity_index)
+                    .has_value());
+        }
         rate = sample_rate_hz(session.scanned_.sample_rate);
     }
     if (session.units_.empty()) {

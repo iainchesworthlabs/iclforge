@@ -158,6 +158,10 @@ QString KaraokeAuthoring::lyricsBeside(const QString& url) const {
     return found.empty() ? QString() : QUrl::fromLocalFile(to_q(found)).toString();
 }
 
+QString KaraokeAuthoring::lyricsProblem(const QString& url) const {
+    return to_q(forge_gui::karaoke_lyrics_problem(local_path(url)));
+}
+
 QString KaraokeAuthoring::copyLyrics(const QString& lyricsUrl, const QString& streamPath) const {
     switch (forge_gui::karaoke_copy_lyrics(local_path(lyricsUrl), local_path(streamPath))) {
         case forge_gui::KaraokeLyricsCopy::kCopied: return QStringLiteral("copied");

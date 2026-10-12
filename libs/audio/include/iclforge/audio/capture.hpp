@@ -106,6 +106,45 @@ struct CaptureStats {
     std::uint64_t frames_dropped = 0;  // ring buffer overruns (consumer too slow)
 };
 
+// When a packet of captured audio was captured (planning/karaoke-microphone.md, MI6). A score and
+// a take both need to know where in the playback a voice was sung, and that is the capture time of
+// its samples on the clock the playback position is read on, not the time a consumer got round to
+// them.
+//
+// The time is in nanoseconds on std::chrono::steady_clock's clock (on Windows the performance
+// counter the packet's own position is read from, in the same epoch), so a consumer compares it
+// with a playback position it took from that clock. `frame` is counted from the first frame the
+// capture put in buffer() since start(), silence fill included, so it indexes the same stream a
+// consumer reads. capture_timeline.hpp turns a run of stamps into the time of any frame.
+//
+// A loopback packet's time is when the render endpoint will play it, which is a little after the
+// packet arrives, not when it was "captured".
+struct CaptureStamp {
+    std::uint64_t frame = 0;
+    std::int64_t time_ns = 0;
+};
+
+using StampRing = BasicRingBuffer<CaptureStamp>;
+
+// What the platform told the capture about its own timing, in frames at sample_rate(), or 0 where
+// it did not say. Not a promise about the path from a sound to the microphone: the device and its
+// driver add delay this cannot see (planning/karaoke-microphone-findings.md, F2).
+struct CaptureTiming {
+    // How often a packet arrives.
+    std::uint32_t period_frames = 0;
+    // The size of the endpoint's buffer.
+    std::uint32_t buffer_frames = 0;
+};
+
+struct CaptureOptions {
+    std::size_t ring_capacity_samples = 1u << 18;
+    // The packet period asked for, in frames at the endpoint's rate; 0 takes the device's default.
+    // Where the platform has a smaller shared-mode period than its default, a smaller request is
+    // given the nearest it offers. A platform that cannot honour the request takes its default, and
+    // says what it did in timing().
+    std::uint32_t period_frames = 0;
+};
+
 class Capture {
 public:
     Capture();
@@ -120,6 +159,12 @@ public:
                                                           DeviceKind kind,
                                                           std::size_t ring_capacity_samples = 1u
                                                                                               << 18);
+
+    // As above, with the options a microphone wants: a requested packet period. timing() says what
+    // was given.
+    [[nodiscard]] std::expected<void, CaptureError> start(const std::string& device_id,
+                                                          DeviceKind kind,
+                                                          const CaptureOptions& options);
 
     // WASAPI loopback tap. Taps what `process_id` (and, in kIncludeProcessTree
     // mode, its child processes) renders, whichever endpoint that is, and
@@ -151,9 +196,28 @@ public:
     // Valid while running; the consumer reads from here.
     [[nodiscard]] RingBuffer* buffer();
 
+    // One stamp per packet, as above; the consumer drains them with read() and keeps what it wants
+    // (a CaptureTimeline). Valid while running. Null on a platform that gives no capture times,
+    // which is every one but Windows so far; a consumer then has no time for a frame and has to say
+    // so.
+    [[nodiscard]] StampRing* stamps() { return stamps_.get(); }
+
+    // Valid from a successful start() until the next.
+    [[nodiscard]] CaptureTiming timing() const { return timing_; }
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
+    // Kept here and not in Impl so that a platform without stamps needs no code for them.
+    std::unique_ptr<StampRing> stamps_;
+    CaptureTiming timing_{};
+    std::uint32_t requested_period_frames_ = 0;
 };
+
+inline std::expected<void, CaptureError> Capture::start(const std::string& device_id, DeviceKind kind,
+                                                        const CaptureOptions& options) {
+    requested_period_frames_ = options.period_frames;
+    return start(device_id, kind, options.ring_capacity_samples);
+}
 
 }  // namespace iclforge::audio
