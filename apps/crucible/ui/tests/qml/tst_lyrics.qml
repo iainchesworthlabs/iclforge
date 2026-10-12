@@ -334,4 +334,133 @@ TestCase {
         tryCompare(strip, "fileName", "b.lrc", 5000);
         compare(strip.lines.length, 1);
     }
+
+    // --- the picture of a CD+G disc (planning/karaoke-phase2.md, W13f and D11) -----------------
+
+    // One 24-byte CD+G packet appended to `bytes`: command 9, the instruction, two parity bytes,
+    // sixteen data bytes, four parity bytes.
+    function addCdgPacket(bytes, instruction, data) {
+        const packet = new Array(24).fill(0);
+        packet[0] = 9;
+        packet[1] = instruction;
+        for (let i = 0; i < data.length; ++i) {
+            packet[4 + i] = data[i];
+        }
+        for (const value of packet) {
+            bytes.push(value);
+        }
+    }
+
+    // Colour 1 is red and colour 2 green; the picture is red from the first packets and green from
+    // the packet at one second (300 packets in, applied by 1004 ms).
+    function cdgDiscBytes() {
+        const colours = new Array(16).fill(0);
+        colours[2] = 0x3C;
+        colours[4] = 0x03;
+        colours[5] = 0x30;
+        const bytes = [];
+        addCdgPacket(bytes, 30, colours);
+        addCdgPacket(bytes, 1, [1]);
+        for (let i = 2; i < 300; ++i) {
+            addCdgPacket(bytes, 0, []);
+        }
+        addCdgPacket(bytes, 1, [2]);
+        return bytes;
+    }
+
+    function test_aCdgFileIsImportedAsAPictureWithNoLinesToFollow() {
+        const path = TestServices.writeBinaryFile("disc.cdg", cdgDiscBytes());
+        verify(path.length > 0, "the CD+G file could not be written");
+        verify(CrucibleLyrics.importFile(7, path), CrucibleLyrics.errorText(7));
+        compare(CrucibleLyrics.status(7), "picture");
+        compare(CrucibleLyrics.fileName(7), "disc.cdg");
+        compare(CrucibleLyrics.errorText(7), "");
+        // Its words are pixels: no text is extracted, and the cursor has nothing to say.
+        compare(CrucibleLyrics.lines(7).length, 0);
+        compare(CrucibleLyrics.cursor(7, 5000).line, -1);
+        // A disc is started and followed like a file with times.
+        compare(CrucibleLyrics.running(7), false);
+        CrucibleLyrics.startAt(7, 10000);
+        compare(CrucibleLyrics.running(7), true);
+        compare(CrucibleLyrics.positionMs(7, 15000), 5000);
+        // Another application has no disc.
+        compare(CrucibleLyrics.status(8), "none");
+    }
+
+    function test_aCdgFileInAnyCaseIsADiscAndOneThatIsNotCdgSaysWhy() {
+        const shout = TestServices.writeBinaryFile("SHOUT.CDG", cdgDiscBytes());
+        verify(CrucibleLyrics.importFile(7, shout), CrucibleLyrics.errorText(7));
+        compare(CrucibleLyrics.status(7), "picture");
+
+        // 25 bytes is not a whole number of 24-byte packets.
+        const bad = TestServices.writeBinaryFile("bad.cdg", new Array(25).fill(120));
+        compare(CrucibleLyrics.importFile(8, bad), false);
+        compare(CrucibleLyrics.status(8), "error");
+        compare(CrucibleLyrics.fileName(8), "bad.cdg");
+        verify(CrucibleLyrics.errorText(8).length > 0);
+        // And an error is not started.
+        CrucibleLyrics.startAt(8, 1000);
+        compare(CrucibleLyrics.running(8), false);
+    }
+
+    function test_theStripDrawsTheDiscsPictureAtThePositionAndTheNudgeMovesIt() {
+        const path = TestServices.writeBinaryFile("disc.cdg", cdgDiscBytes());
+        verify(path.length > 0);
+        const strip = newStrip({ app: 7 });
+        const picture = findChild(strip, "lyricPicture");
+        verify(picture !== null);
+        compare(picture.visible, false);
+
+        verify(CrucibleLyrics.importFile(7, path), CrucibleLyrics.errorText(7));
+        tryCompare(strip, "status", "picture", 5000);
+        compare(findChild(strip, "lyricsFile").text,
+                qsTr("%1 · a CD+G picture: its words are pixels, so none are read").arg("disc.cdg"));
+        // The same Start, Stop and nudge a file with times has, and no words' stage.
+        compare(findChild(strip, "lyricsStart").visible, true);
+        compare(findChild(strip, "lyricsLater").visible, true);
+        compare(findChild(strip, "lyricStage").visible, false);
+        tryVerify(function() { return picture.visible && picture.ready; }, 5000);
+
+        // Not started is the first picture, a black screen. The strip is 320 wide, so the 300 by
+        // 216 picture is drawn once over, centred.
+        waitForRendering(picture);
+        // The layout has given it its size by the time a frame has been drawn.
+        verify(picture.width > 0 && picture.height > 0, "the picture has no size");
+        const mid = Math.round(picture.width / 2);
+        const row = Math.round(picture.height / 2);
+        let image = grabImage(picture);
+        compare(image.red(mid, row), 0);
+        compare(image.green(mid, row), 0);
+
+        // A nudge of -0.5 s shows the picture that is 0.5 s further on, which is red; of -1.1 s,
+        // past the packet at one second, green. The position is not running, so nothing but the
+        // nudge decides which.
+        CrucibleLyrics.setNudgeMs(7, -500);
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(mid, row), 255);
+        compare(image.green(mid, row), 0);
+        CrucibleLyrics.setNudgeMs(7, -1100);
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(mid, row), 0);
+        compare(image.green(mid, row), 255);
+
+        // Started long ago, with no nudge, it is past the end: the last picture, green; and going
+        // back is back (a nudge of +59 s of a song begun a minute ago is 1 s in).
+        CrucibleLyrics.setNudgeMs(7, 0);
+        CrucibleLyrics.startAt(7, CrucibleLyrics.nowMs() - 60000);
+        tryCompare(strip, "following", true, 5000);
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.green(mid, row), 255);
+
+        // Stop keeps the disc; Clear drops it and the picture goes.
+        findChild(strip, "lyricsStop").clicked();
+        tryCompare(strip, "following", false, 5000);
+        compare(strip.status, "picture");
+        findChild(strip, "lyricsClear").clicked();
+        tryCompare(strip, "status", "none", 5000);
+        tryCompare(picture, "visible", false, 5000);
+    }
 }

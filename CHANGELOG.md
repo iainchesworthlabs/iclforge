@@ -29,6 +29,35 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke: a pitch library**
+
+- **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one
+  against the other** (the microphone, scoring and recording programme, M1). A fundamental-frequency
+  tracker (the McLeod Pitch Method, written from the paper) that takes samples at any rate that is a
+  whole multiple of its analysis rate, low-passes and decimates them, and answers a pitch, a clarity and
+  a level every 10 ms; a reference as a contour on a fixed grid, from audio or from MIDI-style notes,
+  and the notes of a contour; and a scorer that counts, for a stretch of an item, how much of the
+  reference's voiced time the singer was within a tolerance of it (octaves folded, a key shift
+  optional), with how sharp or flat on average and an estimate of how early or late the singer is. It
+  also holds a deterministic synthetic singing voice with a known pitch, which is what its tests and
+  the later microphone tests are made of (no recording is bundled). Standard library only, internal,
+  and nothing links it yet.
+**Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
+
+- **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
+  field (`bsmod` 7 above 1/0 in Table E1.2 by reference to Table 5.7; a service-type value in
+  Annex G and EN 300 468) and defines no reproduction; Dolby's reference decoder reproduces it with
+  Annex C's coefficients, taking `clev` and `slev` from the Lo/Ro mixing group. AC-4 has no karaoke
+  value at all. `planning/karaoke-eac3-findings.md` gives the clauses and the commands, and the
+  corrections to what the repository said (`planning/karaoke-eac3.md`, E0).
+- **A support matrix, AC-3 beside E-AC-3.** Every karaoke capability by platform and feature, each
+  cell with its test or command and its owner, and two AC-3 gaps found by measuring: `forge
+  transcode` drops `bsmod`, and the LFE's level in the reproduction differs from Dolby's
+  (`planning/karaoke-support-matrix.md`).
+- **The AC-4 options.** Presentations, a dialogue substream with the listener's gain, and a vocal
+  object, side by side with what each does on a stock decoder, how it is authored from stems and
+  carried to a sink, measured with the repository's own decoder (`planning/karaoke-ac4-options.md`).
+
 **Hearth for Android: the plan**
 
 - **A plan, its findings and one screen design for Hearth's three surfaces.** `planning/hearth-android.md`
@@ -40,6 +69,18 @@ The sections below contain the complete change list and fixes.
   not measured, and `planning/hearth-sink-screen.md` is the one design (model, screens, layout in
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
+
+**Containers: what a file holds besides its audio**
+
+- **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
+  file with Dolby audio often carries a picture, a second audio track or a subtitle track, and the
+  readers gave up one audio track and said nothing of the rest. `mp4::Demuxed::skipped` and
+  `matroska::Demuxed::skipped` now hold each other track's id, kind (`audio`, `video`, `text` or
+  `other`, from the MP4 handler or the Matroska track type), codec (the first sample entry, or the
+  CodecID) and language, in file order and up to 64. `forge probe` prints them on an `other tracks`
+  line and writes them as `container.other_tracks` in its JSON. None of their content is read; it is
+  what the container says, so that a person can see whether a karaoke video's words are in a text
+  track, a bitmap subtitle track or only in the picture.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
@@ -240,6 +281,13 @@ The sections below contain the complete change list and fixes.
   offset and a channel trim set on a part survive another part being added, replaced or removed;
   and a `.lrc` of the backing's name beside it (or one the author chooses) is put beside the saved
   stream under the stream's name, where Hearth finds it, never over a file already there.
+- **The Forge GUI's Hear step re-levels the capable player's parts.** Under **Capable**, a slider
+  for the melody and for each vocal sets its level against Table C.2.3 (0 dB is the table, -24 is
+  off, 12 dB the top: Hearth's span and `forge decode karaoke-melody=`'s), a part the stream lacks has
+  none, **Reset levels** puts them back, and the What plays table leaves out a part pulled to off.
+  The stream player takes the three levels (`karaokeMelodyDb`, `karaokeVocal1Db`,
+  `karaokeVocal2Db`, held to the library's span) and decodes the stream again when one moves
+  (planning/karaoke-phase2.md, W10).
 - **Hearth reproduces a karaoke stream.** `DecoderSettings` gains `karaoke` (aware by default,
   or capable, or off) and `karaoke_vocals`, which `decoder_setup()` hands to the output stage, and
   the stream decoder lays an AC-3 unit out from `output_mode()`: a karaoke stream played to a 5.1
@@ -271,6 +319,13 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The timing window corrects one word.** In **Time the lyrics...** a click on a word chooses it
+  (it is outlined, and the item is cued 1.5 s before it) and the window says which word it is and
+  when it starts. In the words pass the next `Space` presses that word, once, in place of the next
+  guess; **Stamp again** presses it at the position now; **-10 ms** and **+10 ms** move it, and
+  not its line. A file that came with the times of its words (from a forced aligner, say) opens
+  with every word taken as given, and only its lines could be stamped again or nudged, so one wrong
+  word could not be put right. A word stays between its neighbours; choosing its line lets it go.
 - **The timing window sets who sings a line.** In **Time the lyrics...** a chosen line takes a
   **Singer** (not marked, V1, V2 or both) and each row shows its marker; two **Name** fields set
   what the file calls the singers (`[v1:]` and `[v2:]`, kept with the file, unlike the names typed on
@@ -316,6 +371,10 @@ The sections below contain the complete change list and fixes.
   second: a tick is a fixed length of time, rounded to the nearest millisecond, and the file's tempo
   events, which name a quarter note, move nothing. Any other rate is refused with the reason, and a
   frame of no ticks is a damaged file (planning/karaoke-phase2.md, W13e).
+- **A `.kar` file's other `@` lines may be in a code page.** The reader checked every Text event as
+  UTF-8, so a copyright line (`@I`) or a key line (`@K`) in Latin-1 refused a file whose words were
+  fine. Only the title and the artist (`@T`) and the words are checked now; the other `@` lines are
+  not shown and are skipped (planning/karaoke-phase2.md, W13e).
 - **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
   `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
   (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
@@ -352,6 +411,10 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **Crucible's lyric strip draws a CD+G disc.** A `.cdg` file imported against an application is
+  drawn as its picture under the file's name (the shared `CdgPicture`: 300 by 216, as large as
+  fits in whole-pixel steps) and followed by the same Start and nudge an `.lrc` has; its words are
+  pixels, so none are read as text and the page says so (planning/karaoke-phase2.md, W13f and D11).
 - **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
   offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
   dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
@@ -372,6 +435,15 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **The singer view moves about and shows the queue, and the Play page shows the lyrics.** The
+  full-screen view's position bar is pressed or dragged to move the item (the words and the clock
+  show the place held, and the item moves when it is let go, playing or paused), `Left` and
+  `Right` move it five seconds, **Queue** (or `Q`) opens the queue beside the words with the
+  playing item marked and a press playing another, and the top strip names the next item. The
+  Play page gets a **Lyrics** card for an item with lyrics or a CD+G picture: a column beside the
+  queue in a window 1,580 pixels wide or more, the first card of the monitor column in a narrower
+  one, and nothing for an item without. The shortcuts reference lists the singer view's keys
+  (planning/karaoke.md, "Found while building").
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the
@@ -410,6 +482,15 @@ The sections below contain the complete change list and fixes.
   the decoder was run in Node against `forge decode` of the karaoke example below: all eight cases
   match sample for sample. An AC-3 stream's fold levels now come from its own `cmixlev` and
   `surmixlev` (they were the E-AC-3 defaults) (planning/karaoke-phase2.md, W8).
+- **`hearth --open` and `--smoke-shot`.** `--open <file>` adds a file to the queue (with nothing
+  in it the first is loaded and cued, so the Play, Media and Karaoke pages show it), `--seek <ms>`
+  starts that item there and holds it paused, and `--smoke-shot <png>` is `--shot` with network
+  discovery off: a capture with nobody at the machine neither browses the network nor raises
+  Windows' firewall prompt, which `--shot` does. A capture waits for the file's media information
+  and exits 3 when the file did not load, so a script that retakes screenshots can stop on it.
+  The parsing is `command_line.hpp`, held by `hearth_controller_tests`. The Karaoke guide's page
+  screenshot is retaken from the running window, and a duet one is added; the options are in
+  [Hearth's command line](docs/hearth/index.md#command-line).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
@@ -428,6 +509,13 @@ The sections below contain the complete change list and fixes.
   nothing recorded, in 8.7 MB. The parts and words are held to the generator by a unit test, the
   stream is probed and encoded again by `iclforge-forge-cli-tests`, the words are read by
   Hearth's reader, and the Forge GUI test opens the project and writes the stream's bytes.
+- **The browser decode demo shows the words of a karaoke stream.** A **Words** panel takes a `.lrc`,
+  `.srt`, `.ass` or `.kar` file and follows it against the playing position: the line being sung
+  large, the word being sung filled and underlined, the lines round it small, a duet's singers
+  named and indented, and a delay slider. The reader is `libs/lyrics`, compiled into the demo's
+  module (`parseLyrics` and `LyricsDocument`, `apps/demos/wasm/lyrics_bindings.cpp`) and not a
+  second one in JavaScript, so the page reads UTF-16, SubRip, ASS and MIDI karaoke as Hearth does
+  (planning/karaoke-phase2.md, W8).
 
 **Stream carriage: legacy cores, every programme, and moov-last MP4 files**
 

@@ -1025,6 +1025,18 @@ void write_container(JsonSink& json, const ContainerFacts& facts) {
     } else {
         json.member_null("channels");
     }
+    // The other tracks the file declares: a picture, a subtitle track, a second audio track.
+    json.key("other_tracks");
+    json.begin_array();
+    for (const OtherTrack& other : facts.other_tracks) {
+        json.begin_object();
+        json.member("track", static_cast<std::uint64_t>(other.id));
+        json.member("kind", other.kind);
+        text_or_null("codec_id", other.codec_id);
+        text_or_null("language", other.language);
+        json.end_object();
+    }
+    json.end_array();
     json.key("mp4");
     if (facts.kind == ContainerKind::kMp4) {
         json.begin_object();
