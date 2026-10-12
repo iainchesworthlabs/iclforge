@@ -16,6 +16,9 @@
 import {
     decodeFile, DownmixTarget, IclForgeDecoderNode, KaraokeReproduction, KaraokeVocals, scanStream,
 } from './package/index.js';
+import {
+    MicrophoneSession, drawRibbon, guideChannelIndex, guidePartName, noteName, readReference,
+} from './mic.js';
 
 // Ear-level ring: iclforge::spatial's kSpeakerAzimuthDeg
 // (libs/render/include/iclforge/render/spatial.hpp), ITU-R BS.775, degrees CCW from
@@ -608,6 +611,8 @@ async function handleDecoded(bytes, label, options = {}) {
         el('scrubTime').textContent = `${playStartOffset.toFixed(1)}s / ${result.durationSeconds.toFixed(1)}s`;
         buildSoloControls(result.objectCount, result.objectLabels);
         setStatus(`Decoded ${label}.`, false);
+        // The tune of a karaoke stream is read in the background; the microphone card waits for it.
+        prepareMicrophone(result, bytes).catch((err) => micStatus(`Could not read the melody: ${err.message}`, true));
         if (options.play) play();
     } catch (err) {
         decoded = null;
@@ -642,6 +647,226 @@ function loadFile(file) {
     const reader = new FileReader();
     reader.onload = () => handleDecoded(new Uint8Array(reader.result), file.name);
     reader.readAsArrayBuffer(file);
+}
+
+// --- Microphone ----------------------------------------------------------------------------
+// A singer's pitch against the tune (planning/karaoke-microphone.md, M7). The tune is the guide
+// melody's channel as coded, read by the library's tracker compiled into this module; the
+// microphone is the browser's, opened only by the button, with its own echo cancellation; the
+// score is the library's. mic.js has the pieces and the promises.
+let micModule = null;          // its own module instance: a contour lives in the module that made it
+let micReference = null;       // a ReferenceContour, or null
+let micReferenceBytes = null;  // the decode it was read from, so that a re-decode of it is not re-read
+let micReading = null;         // an AbortController for a read in flight
+let micSession = null;
+let micNotes = [];
+let micRange = { low: 55, high: 79 };
+let micPartText = '';
+let micDrawScheduled = false;
+
+function micStatus(text, isError) {
+    const status = el('micStatus');
+    status.textContent = text;
+    status.classList.toggle('error', Boolean(isError));
+}
+
+function micClearReference() {
+    micReading?.abort();
+    micReading = null;
+    micReference?.delete();
+    micReference = null;
+    micReferenceBytes = null;
+    micNotes = [];
+    micPartText = '';
+}
+
+// Called with every decode. A stream that is not karaoke has no tune and no card; a karaoke stream
+// of the same bytes (a change of the vocals decodes it again) keeps the tune it has.
+async function prepareMicrophone(result, bytes) {
+    const panel = el('micPanel');
+    if (!result.karaoke) {
+        micSession?.stop();
+        micClearReference();
+        panel.style.display = 'none';
+        return;
+    }
+    panel.style.display = '';
+    if (micReferenceBytes === bytes && micReference) {
+        return;
+    }
+    micSession?.stop();
+    micClearReference();
+    el('micToggle').disabled = true;
+    micModule = micModule ?? await loadModule();
+
+    const index = guideChannelIndex(result.channelLabels);
+    if (index < 0) {
+        micPartText = '';
+        micStatus('This stream has no melody or vocal channel to score against; the microphone shows your pitch only.', false);
+        el('micToggle').disabled = false;
+        return;
+    }
+    const part = guidePartName(result.channelLabels, index);
+    const reading = new AbortController();
+    micReading = reading;
+    micStatus(`Reading the melody (${part})… 0%`, false);
+    const reference = await readReference(micModule, result.channels[index], result.sampleRate, {
+        signal: reading.signal,
+        onProgress: (share) => micStatus(`Reading the melody (${part})… ${Math.round(share * 100)}%`, false),
+    });
+    if (reading.signal.aborted) {
+        reference?.delete();
+        return;
+    }
+    micReading = null;
+    if (!reference || reference.voicedFrames() === 0) {
+        reference?.delete();
+        micStatus(`The ${part} has no clear tune to score against; the microphone shows your pitch only.`, false);
+        el('micToggle').disabled = false;
+        return;
+    }
+    micReference = reference;
+    micReferenceBytes = bytes;
+    micPartText = part;
+    micNotes = reference.notes();
+    let low = Infinity;
+    let high = -Infinity;
+    for (let i = 2; i < micNotes.length; i += 3) {
+        low = Math.min(low, micNotes[i]);
+        high = Math.max(high, micNotes[i]);
+    }
+    low -= 2;
+    high += 2;
+    if (high - low < 18) {
+        const grow = (18 - (high - low)) / 2;
+        low -= grow;
+        high += grow;
+    }
+    micRange = { low, high };
+    micStatus(`Scored against ${part}.`, false);
+    el('micToggle').disabled = false;
+}
+
+async function toggleMicrophone() {
+    if (micSession?.on) {
+        micSession.stop();
+        return;
+    }
+    el('micToggle').disabled = true;
+    try {
+        // The context is the one playback uses: the voice and the sound it sings along to share a clock.
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        await audioCtx.resume();
+        micModule = micModule ?? await loadModule();
+        micSession = new MicrophoneSession({
+            module: micModule,
+            reference: micReference,
+            audioContext: audioCtx,
+            playback: () => ({ playing, startCtxTime: playStartCtxTime }),
+            onUpdate: scheduleMicDraw,
+        });
+        micSession.headphones = el('micHeadphones').checked;
+        micSession.offsetMs = Number(el('micOffset').value);
+        await micSession.start();
+        // The track's own figure, when the browser gives one, is where the delay slider starts.
+        if (micSession.inputLatencySec > 0) {
+            el('micDelay').value = String(Math.round(micSession.inputLatencySec * 1000));
+        } else {
+            micSession.inputLatencySec = Number(el('micDelay').value) / 1000;
+        }
+        el('micDelayText').textContent = `${Math.round(micSession.inputLatencySec * 1000)} ms`;
+        micStatus(micPartText ? `Scored against ${micPartText}.` : 'Showing your pitch.', false);
+    } catch (err) {
+        micSession = null;
+        micStatus(micMessage(err), true);
+    } finally {
+        el('micToggle').disabled = false;
+        scheduleMicDraw();
+    }
+}
+
+// A sentence for a person: what the browser's error means for a microphone.
+function micMessage(err) {
+    switch (err && err.name) {
+        case 'NotAllowedError': return 'The microphone was blocked. Allow it for this page in the browser and try again.';
+        case 'NotFoundError': return 'No microphone was found.';
+        case 'NotReadableError': return 'The microphone is in use by another application.';
+        default: return String((err && err.message) || err);
+    }
+}
+
+function scheduleMicDraw() {
+    if (micDrawScheduled) return;
+    micDrawScheduled = true;
+    requestAnimationFrame(drawMic);
+}
+
+function drawMic() {
+    micDrawScheduled = false;
+    const session = micSession;
+    const on = Boolean(session?.on);
+    el('micToggle').textContent = on ? 'Turn the microphone off' : 'Turn the microphone on';
+    el('micIndicator').style.display = on ? '' : 'none';
+    const fill = el('micMeterFill');
+    fill.style.width = `${Math.round((on ? session.level : 0) * 100)}%`;
+
+    // The ribbon follows the sound being heard: the playing position less the output's latency.
+    const canvas = el('micRibbon');
+    const outputLatency = audioCtx ? (audioCtx.outputLatency || audioCtx.baseLatency || 0) : 0;
+    const positionMs = (currentPlaybackSeconds() - outputLatency) * 1000;
+    drawRibbon(canvas.getContext('2d'), canvas.width, canvas.height, {
+        notes: micNotes,
+        trace: on ? session.trace : [],
+        positionMs: Math.max(0, positionMs),
+        lowMidi: micRange.low,
+        highMidi: micRange.high,
+    });
+
+    const pitch = el('micPitch');
+    const score = el('micScore');
+    if (!on) {
+        pitch.textContent = 'Listening…';
+        score.textContent = '';
+    } else {
+        const live = session.live;
+        if (!live.voiced) {
+            pitch.textContent = 'Listening…';
+        } else {
+            const base = `${noteName(live.hz)} · ${Math.round(live.hz)} Hz`;
+            pitch.textContent = live.cents === null ? base
+                : `${base} · ${Math.abs(live.cents) < 10 ? 'in tune' : `${Math.round(Math.abs(live.cents))} cents ${live.cents > 0 ? 'sharp' : 'flat'}`}`;
+        }
+        const s = session.score;
+        if (!micReference || !s) {
+            score.textContent = '';
+        } else if (s.withheld) {
+            score.textContent = 'Say you are wearing headphones to see a score.';
+        } else if (s.percent < 0) {
+            score.textContent = 'Sing a few notes to get a score.';
+        } else {
+            let text = `Pitch score so far: ${s.percent} %`;
+            if (s.lagMs !== null && Math.abs(s.lagMs) >= 40) {
+                const ms = Math.round(Math.abs(s.lagMs) / 10) * 10;
+                text += s.lagMs > 0 ? ` You are about ${ms} ms behind the tune.` : ` You are about ${ms} ms ahead of the tune.`;
+            }
+            score.textContent = text;
+        }
+        scheduleMicDraw();   // the ribbon moves with the sound
+    }
+
+    const summary = el('micSummary');
+    const last = session?.summary;
+    if (!on && last && micReference) {
+        const parts = [`Last performance: pitch score ${last.percent} %.`,
+                       `You sang for ${last.coveragePercent} % of the tune's voiced time.`];
+        if (Math.abs(last.meanCents) >= 10) {
+            parts.push(`On average you were ${Math.round(Math.abs(last.meanCents))} cents ${last.meanCents > 0 ? 'sharp' : 'flat'}.`);
+        }
+        parts.push(`Compared with ${micPartText}, within ${last.toleranceCents} cents, in any octave. Shown here, kept nowhere.`);
+        summary.textContent = parts.join(' ');
+    } else {
+        summary.textContent = '';
+    }
 }
 
 // --- Realtime push-decode demo (AudioWorklet) ------------------------------
@@ -759,6 +984,20 @@ window.addEventListener('DOMContentLoaded', () => {
         if (playing) pause(); else play();
     });
     el('karaokeChoice').addEventListener('change', onKaraokeChange);
+    el('micToggle').addEventListener('click', toggleMicrophone);
+    el('micHeadphones').addEventListener('change', (e) => {
+        if (micSession) micSession.headphones = e.target.checked;
+        scheduleMicDraw();
+    });
+    el('micDelay').addEventListener('input', (e) => {
+        el('micDelayText').textContent = `${Number(e.target.value)} ms`;
+        if (micSession) micSession.inputLatencySec = Number(e.target.value) / 1000;
+    });
+    el('micOffset').addEventListener('input', (e) => {
+        const ms = Number(e.target.value);
+        el('micOffsetText').textContent = `${ms > 0 ? '+' : ''}${ms} ms`;
+        if (micSession) micSession.offsetMs = ms;
+    });
     el('lyricsInput').addEventListener('change', (e) => {
         if (e.target.files.length > 0) loadLyrics(e.target.files[0]);
     });

@@ -1,0 +1,143 @@
+{
+  "format": 1,
+  "profile": "s3-n16r8-ac4",
+  "profile_hash": "6124ef3f591f",
+  "version": "v0.10.0-beta.1-4460-g12c4fdaaf",
+  "chip": "ESP32-S3",
+  "board": "S3a",
+  "recorded": "2026-10-12T10:06Z",
+  "boot": {
+    "when": "boot",
+    "net": 1,
+    "internal_free": 52075,
+    "largest": 31744,
+    "ask_total": 8192,
+    "ask_biggest": 8192,
+    "headroom": 23552,
+    "verdict": "ok",
+    "floor": 0
+  },
+  "plays": {
+    "ac3-2.0": {
+      "state": "finished",
+      "frames": 938,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        121,
+        120,
+        120,
+        120,
+        120
+      ],
+      "decoder_permille": 120,
+      "units": 938,
+      "decode_stack_free": 26020,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0
+    },
+    "eac3-2.0": {
+      "state": "finished",
+      "frames": 938,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        84,
+        83,
+        84,
+        84,
+        82
+      ],
+      "decoder_permille": 84,
+      "units": 938,
+      "decode_stack_free": 25824,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0
+    },
+    "ac4-20-music": {
+      "state": "finished",
+      "frames": 3,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        506,
+        510,
+        499,
+        514,
+        518
+      ],
+      "decoder_permille": 510,
+      "units": 3,
+      "decode_stack_free": 19712,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0,
+      "pcm_hash": "f860e51f602ae753"
+    },
+    "ac4-20-acpl": {
+      "state": "finished",
+      "frames": 4,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        645,
+        644,
+        648,
+        640,
+        649
+      ],
+      "decoder_permille": 645,
+      "units": 4,
+      "decode_stack_free": 16432,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0,
+      "pcm_hash": "e8b8cfa716dd0e1c"
+    },
+    "ac4-20-companding": {
+      "state": "finished",
+      "frames": 3,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        609,
+        617,
+        605,
+        608,
+        605
+      ],
+      "decoder_permille": 608,
+      "units": 3,
+      "decode_stack_free": 16304,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0,
+      "pcm_hash": "5b93c61c57566b0c"
+    }
+  },
+  "findings": {},
+  "boot_samples": {
+    "internal_free": [
+      52091,
+      52075,
+      52079,
+      52083,
+      52103,
+      52079,
+      52087,
+      52087
+    ],
+    "largest": [
+      31744,
+      31744,
+      31744,
+      31744,
+      31744,
+      31744,
+      31744,
+      31744
+    ]
+  }
+}

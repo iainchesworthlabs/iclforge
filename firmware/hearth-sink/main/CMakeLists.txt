@@ -215,3 +215,15 @@ endif()
 set_property(SOURCE "hearth_sink.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
     "ICLFORGE_FIRMWARE_TEST_UNHEALTHY=${iclforge_firmware_test_unhealthy}"
     "ICLFORGE_FIRMWARE_TEST_PANIC_ON_TRIAL=${iclforge_firmware_test_panic}")
+
+# Which locked profile this image was built as (firmware/hearth-sink/profiles.json,
+# planning/esp32-platform-profiles.md): its id and a hash of what it locks, from
+# `tools/hearth/sink_profile.py identity <profile> --cmake`. GET /hardware reports both, so a
+# board says what it runs and the board suite can refuse one that runs another profile or a
+# scratch build. Cache variables for the reason ICLFORGE_FIRMWARE_TEST is one: a change
+# recompiles this one file. Empty for a build that was not made as a profile.
+set(ICLFORGE_PROFILE "" CACHE STRING "the locked profile this image is, or empty")
+set(ICLFORGE_PROFILE_HASH "" CACHE STRING "a hash of that profile's locked values")
+set_property(SOURCE "hearth_sink.cpp" APPEND PROPERTY COMPILE_DEFINITIONS
+    "ICLFORGE_PROFILE_ID=\"${ICLFORGE_PROFILE}\""
+    "ICLFORGE_PROFILE_HASH_TEXT=\"${ICLFORGE_PROFILE_HASH}\"")
