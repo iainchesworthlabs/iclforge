@@ -6,9 +6,10 @@
     from the source on `main`; **measured** was run on this workstation on 2026-10-12 and the
     method is given; **existing** is a number an earlier session measured, with its date;
     **general knowledge** is not from this repository and is to be checked when the step that
-    needs it starts. **No microphone was opened and no sound was played** for any figure on this
-    page: the measurements that need one are listed in [F8](#f8-the-measurements-still-to-run)
-    and wait for the owner's say.
+    needs it starts. **The microphone was opened once**, with the owner's OK on 2026-10-12, for
+    R1 to R3 ([F2](#measured-2026-10-12-with-the-microphone-open)); every other figure was read or
+    measured without opening one. The measurements that still wait are listed in
+    [F8](#f8-the-measurements-still-to-run).
 
 ## F1: the capture path that exists
 
@@ -56,6 +57,62 @@ The endpoints this machine has (`forge devices`, enumeration only, nothing opene
 The microphone is a webcam's, which is the ordinary case for a person at a laptop and is not a
 singer's microphone.
 
+### Measured 2026-10-12 with the microphone open
+
+**The owner approved opening the default input for this (2026-10-12).** Method: `mic_roundtrip`, a
+throwaway C++ program (not in the repository) that makes the same WASAPI calls and passes the same
+flags as `libs/audio`'s Windows backend: the render side as `MonitorSink` opens one (shared mode,
+event callback, `AUTOCONVERTPCM`, the default period) and the capture side as `Capture::start`
+opens an input (shared mode, event callback, a 20 ms buffer requested, an MMCSS "Audio" thread).
+It plays eight 20 ms chirps (1 to 6 kHz, -26 dBFS) 0.55 to 0.8 s apart, finds each in the captured
+stream with a matched filter, and reads three times from one QPC clock:
+
+- **hand-over**: when the render buffer holding the chirp's first frame was released;
+- **stamp**: the capture packet's device QPC position plus the chirp's offset in the packet;
+- **arrival**: when `GetBuffer` returned the packet that holds the chirp's first frame.
+
+`D_total` is arrival minus hand-over: what a voice monitor path costs, less the air and any
+processing. Samples were kept in memory for about ten seconds a run and **nothing was written to
+disk or sent anywhere**. Endpoints: input "Microphone (Logitech StreamCam)", 48 kHz float stereo,
+endpoint volume 84 %; output "Speakers (Realtek(R) Audio)", 48 kHz float stereo, endpoint volume
+70 %. The speakers and the microphone are a desk's distance apart.
+
+| Configuration | Chirps found | `D_total` hand-over -> app has it | hand-over -> stamp | stamp -> app has it |
+|---|---|---|---|---|
+| **A**: as the library opens them (render default period, capture 20 ms buffer) | 8 of 8, in each of 3 runs | **130 to 136 ms** across 3 runs; **within a run +-0.5 ms** | 106.1 ms | 24 to 30 ms |
+| **B**: `IAudioClient3` at the minimum period on both | 8 of 8, 3 runs | 135 to 142 ms | 106.1 ms | 29 to 36 ms |
+| **C**: the same render stream captured in **loopback** (polled every 5 ms), the engine side only | 8 of 8 | 60 to 75 ms | 78.5 ms (the loopback stamp) | the packet arrives before its own stamp |
+
+What it says:
+
+- **A voice through this workstation's own shared-mode path is about 130 ms behind the singer**,
+  with almost no jitter. The 10 ms engine period and 22 ms buffer measured earlier understate it
+  by a factor of four to six.
+- **`IAudioClient3` buys nothing here.** Both endpoints answer 480 frames as default, fundamental,
+  minimum and maximum, and configuration B is no faster than A.
+- **A rough split, with its assumptions.** If the loopback stamp is the time the sample is played
+  out (the packet arrives before its stamp, which says so), the render side is about 78 ms from
+  hand-over to the endpoint. That leaves about 28 ms from the speaker to the microphone's stamp
+  (air is about 1 to 3 ms, so the rest is the microphone's own USB and processing path) and about
+  24 to 30 ms from the stamp to the application. So **roughly 55 ms on the microphone side and
+  78 ms on the speaker side**. Which part of the 78 ms is the Realtek driver's enhancement chain
+  and which is buffering, and what the webcam's own audio processing adds, is not known.
+- **It is this equipment.** A webcam microphone and a motherboard's speakers are the ordinary
+  laptop case and not the singer's equipment. A USB headset, an interface with its own driver or
+  exclusive mode may be an order of magnitude faster, and none of them was available to measure.
+
+### Bleed, measured (R3)
+
+A 1 kHz tone sent at **-30.0 dBFS** through the speakers (endpoint volume 70 %) arrived at the
+microphone at **-36.7 and -37.4 dBFS** in two runs (peak amplitude): a speaker-to-microphone
+transfer of **-7 dB**, and the tone 20.5 to 21.5 dB above the microphone's own floor
+(-58 dBFS rms). With the microphone this close and the webcam's gain, **the speakers are nearly as
+loud in the microphone as the signal that was played**, which is far worse than the -30 dB
+[the bleed experiment](#f6-bleed-looks-like-perfect-singing) used, and is why a score through open
+speakers on this machine is not an edge case but the ordinary one. A singer's voice at arm's
+length was not measured: the comparison of a voice with the bleed needs a person to sing or
+speak, and none was present.
+
 ### Existing
 
 | Figure | Where | Date |
@@ -76,6 +133,7 @@ is the floor for a path that goes through the OS mixer twice, not a microphone's
 | How far past its lead a group reads a buffered source ahead | 1.5 s | `kReadAhead`, same file |
 | A burst chunk on the extension role | 1,536 samples = 32 ms (AC-3) | the extension page, Burst chunks |
 | Capture buffer requested | Windows 20 ms; ALSA 85 ms; macOS, PipeWire: the default | F1 |
+| **Measured, not a constant:** a voice through the host's shared-mode path | about 130 ms on this workstation | [above](#measured-2026-10-12-with-the-microphone-open) |
 
 **What the 400 ms means.** A chunk the host sends now is played at a sink's audio port 400 ms from
 now at the earliest, with a sink as it ships. A voice that is mixed into the group's stream at the
@@ -84,10 +142,9 @@ singer cannot monitor through the group; that is the central fact of the program
 
 ### Not measured
 
-- The microphone's own path (a capture endpoint's period, the driver, the ADC), and so the round
-  trip from a voice to a headphone on this machine ([F8, R1](#f8-the-measurements-still-to-run)).
+- A voice's own level at this microphone against the bleed, which needs a person ([R3](#f8-the-measurements-still-to-run)).
+- The round trip with any other microphone or output: a headset, an interface, exclusive mode.
 - Anything on a board: the DMA ring's depth for a sidetone, an I2S capture's delay, the codec's.
-- Any acoustic quantity: the bleed of speakers into a microphone.
 
 ## F3: the Sendspin source role
 
@@ -247,6 +304,9 @@ the last four the singer is silent.
 | -12 dB | silent | 98 % | 1 % |
 | -6 dB | silent | 98 % | 1 % |
 
+*The levels above were chosen before the microphone was opened. [Measured on this workstation](#bleed-measured-r3)
+the speakers reach the microphone at about -7 dB of what was played, not -30 dB.*
+
 **This is the integrity hazard of scoring through speakers.** When the singer is louder than the
 speakers' bleed the tracker follows the singer, as it should. When the singer is silent or quiet,
 the tracker follows the bleed, and the bleed is *the reference melody*: the score reads as near
@@ -275,13 +335,15 @@ Each is a procedure so it can be run in a few minutes once permitted, and each s
 
 | # | Measurement | Procedure | Needs |
 |---|---|---|---|
-| R1 | **Voice-to-headphone round trip on this workstation** (the number the whole latency budget hangs on) | Play a short click through the Realtek speakers at a low level while capturing the default input, both on QPC; the delay from submit to arrival in the capture is output latency + air + input latency, and a voice's monitor path is input + output. Repeat with the render stream at 10 ms and at the default | **The owner's OK to open the default input** (the webcam's microphone) for about ten seconds per run; no audio is stored, only the delays are printed; and quiet clicks through the speakers |
-| R2 | The capture endpoint's own periods | `GetDevicePeriod` and `GetSharedModeEnginePeriod` on the input endpoint, activation only, nothing started | The same permission, or none if activation alone is acceptable; asked, not assumed |
-| R3 | Speaker-to-microphone bleed level on this machine at a normal listening level | A reference tone through the speakers, level at the microphone against the level of speech at arm's length | The same permission, and a person speaking |
+| R1 | **Voice-to-headphone round trip on this workstation** | **Run 2026-10-12**: [about 130 ms](#measured-2026-10-12-with-the-microphone-open), within a run +-0.5 ms | Done, for this microphone and these speakers only |
+| R2 | The capture endpoint's own periods | **Run 2026-10-12**: 10 ms default, fundamental, minimum and maximum, `GetDevicePeriod` 10 ms / 3 ms | Done |
+| R3 | Speaker-to-microphone bleed level | **Run 2026-10-12** for a tone: [-7 dB transfer](#bleed-measured-r3). The comparison with a voice needs a person singing | Half done: the voice level needs a person |
 | R4 | A board's input-to-output delay (a sidetone through the DMA tail) | An I2S loopback or a second board; the P4 kit's codec when it arrives | A board, its booking checked, and the P4 session's firmware |
 | R5 | Host-to-sink delay of a live voice through a group | A voice stamp mixed into a PCM stream sent to a board; compare the board's reported `timestamp - output_delay_ms` with the capture time | A board and a source |
 | R6 | A listening check of monitor latency and of voice-against-backing alignment in a room | The owner at 20, 40, 80, 150 and 400 ms | The owner |
 | R7 | Tracker accuracy on a real voice | A recording of a person singing a known melody, kept out of the repository | A recording the owner makes and says may be used |
 
-R1 to R3 open the microphone and are not done. R4 to R7 wait for hardware, a firmware peer or a
-person.
+R1 and R2 are done and R3 is half done (above). R4 to R7 wait for hardware, a firmware peer or a
+person. **A further one, from what R1 found:** the same round trip with a **headset or an
+interface** and with **exclusive mode**, because the 130 ms is this equipment's and the plan's
+budget depends on what a singer actually uses ([plan, open question 3](karaoke-microphone.md#open-questions-for-the-owner)).

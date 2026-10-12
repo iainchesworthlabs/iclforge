@@ -1,6 +1,6 @@
 # Karaoke: a microphone, scoring and recording
 
-!!! note "Status as of 2026-10-12: a first draft of the requirements and the design, for the owner; nothing is built"
+!!! note "Status as of 2026-10-12: decisions D1 to D18 approved by the owner as recommended; the microphone measurements are run; builds start with the desktop"
     [Phase 1](karaoke.md) left three things out on purpose ("Microphone, scoring, recording and stem
     files as a source were **not selected**") and wrote the microphone down as "a question we need
     to understand". The owner has now asked for them, as one programme, in this order: **identify
@@ -11,11 +11,11 @@
 
     | Step | What | State |
     |---|---|---|
-    | 0 | Requirements and open questions (this page, [Requirements](#requirements)) | **Draft 2026-10-12, awaiting the owner** |
+    | 0 | Requirements and open questions (this page, [Requirements](#requirements)) | Drafted 2026-10-12; read as approved with the decisions, which are written against them (MI8 added after the measurements) |
     | 1 | Research: capture path, the Sendspin source role, references, pitch trackers, bleed | Done, in [the findings](karaoke-microphone-findings.md) |
-    | 2 | Measurements that open the microphone ([R1 to R3](karaoke-microphone-findings.md#f8-the-measurements-still-to-run)) | **Not run**: they need the owner's say |
-    | 3 | Design (this page, [Decisions](#decisions) D1 to D18) | **Draft, recommendations given, none decided** |
-    | 4 | Builds, in [the order below](#build-plan), one small pull request each | **Not started**; waits for steps 0 and 3 |
+    | 2 | Measurements that open the microphone ([R1 to R3](karaoke-microphone-findings.md#f8-the-measurements-still-to-run)) | **Run 2026-10-12 with the owner's OK**: a voice through this workstation's own path is about 130 ms ([Latency](#latency)) |
+    | 3 | Design (this page, [Decisions](#decisions) D1 to D18) | **Approved by the owner on 2026-10-12, as recommended** (three of them leave something open: [below](#decisions)) |
+    | 4 | Builds, in [the order below](#build-plan), one small pull request each | **Started with the desktop** (M1, M2); the board (M8 to M10) waits for D3 |
 
 ## What this is
 
@@ -91,6 +91,7 @@ Each is one statement a test or a recorded check can pass or fail. The IDs are f
 | MI5 | **Mono.** A stereo microphone is used as one channel; the tracker runs at 16 kHz on a host and 8 kHz on a board; a recording keeps the device's rate |
 | MI6 | **Time.** Every block of captured audio carries the time of its first sample on the clock the playback position uses. Today `Capture` carries none |
 | MI7 | **Latency declared.** The application shows the input and output latencies it measured or was told, and which; where it cannot know, it says "unknown", never 0 |
+| MI8 | **Calibrate.** Where there are speakers the person can measure the round trip (a chirp through the speakers and the microphone, as [R1](karaoke-microphone-findings.md#measured-2026-10-12-with-the-microphone-open) did), and an offset the person can move is always there. Added after R1 found about 130 ms on a common setup: more than the lyric clock's whole tolerance |
 
 ### Monitor
 
@@ -165,8 +166,8 @@ The question every other decision hangs on. All figures are in
 
 | Path | Pieces | Number | Status |
 |---|---|---|---|
-| **Desktop, wired headphones, shared mode** | capture period + a ring + render period + render buffer | Render side on this workstation: a 10 ms engine period and a 22 ms buffer; the capture side asks for 20 ms; **about 25 to 45 ms, an estimate from parts** | **Measured in parts, not as a whole**: the microphone has not been opened (R1) |
-| Software round trip, render -> loopback | | 19 ms on the Realtek endpoint | Existing, 2026-09-03 |
+| **Desktop, this workstation, shared mode** (a webcam microphone, Realtek speakers) | capture packets + a ring + the render stream + the driver | **About 130 ms** (130 to 136 ms across runs, +-0.5 ms within one): roughly 55 ms on the microphone side and 78 ms on the speaker side | **Measured 2026-10-12** (R1); the engine period (10 ms) and buffer (22 ms) understate it four to six times |
+| Software round trip, render -> process loopback | | 19 ms on the Realtek endpoint | Existing, 2026-09-03; a different tap, before the driver |
 | **USB audio interface, vendor driver** | | single-digit milliseconds in practice | General knowledge; not the shared-mode path this code uses |
 | **A group member, host-mixed** | `min_buffer_ms` 300 + 100 ms network lead + capture + decode of the burst | **>= 400 ms** from capture to the sink's audio port | From the code's constants |
 | **A board's own mix** | I2S receive frame + the DMA tail the sidetone is inserted behind | Not known | **Not measured** (R4); depends on the firmware |
@@ -179,13 +180,30 @@ hears an echo and starts to hesitate. The budget in this plan is therefore **at 
 the mouth to the ears** on a desktop with wired headphones, and the answer for anything over that
 is "do not monitor through this path".
 
+**What the measurement changed.** This workstation's own path is about **130 ms**, three times the
+budget, and `IAudioClient3` does not help (both endpoints' minimum period is the 10 ms default).
+So on common equipment **the application cannot give a singer a usable sidetone through the
+operating system's shared mode**, and the plan says so rather than hoping:
+
+- A monitor is offered with its **measured** latency beside it and is flagged above the budget
+  (MO5); it is not promised.
+- The way to hear yourself in time on such equipment is the **device's own sidetone** (general
+  knowledge: many USB headsets and interfaces mix the microphone into the headphones in hardware);
+  what the application then has to get right is the backing, the score and the take, which need
+  the latency *known*, not small (MI6 to MI8).
+- Exclusive mode, ASIO or a platform's low-latency path is the route to a small number on the
+  host, and none is built; whether it is worth building depends on the equipment the owner
+  actually sings into (open question 3).
+
 **Two consequences that do not depend on the numbers.**
 
 1. A voice that is mixed at the host and sent to a group is at least 400 ms behind the singer, so
    a person singing in the room hears their own voice from the sinks 0.4 s late. **That is why the
    voice is mixed where the microphone is** ([D2](#d2-where-the-voice-is-mixed)).
-2. A score and a take do not need low latency, **but they need to know it**. A recording that
-   starts 200 ms late against the backing is wrong however good the singing is, and the Sendspin
+2. A score and a take do not need low latency, **but they need to know it**. Measured here, the
+   path is about 130 ms: a take placed without compensating for it is 130 ms late against the
+   backing, which is more than the lyric clock's whole tolerance (L6, 50 ms). A recording that
+   starts that late is wrong however good the singing is, and the Sendspin
    `source@v1` stamps each chunk with its capture time on the server's clock, which makes a board's
    voice exact against the host's playback without any monitoring path ([F3](karaoke-microphone-findings.md#f3-the-sendspin-source-role)).
 
@@ -197,7 +215,7 @@ Three different problems with one cause (the speakers are heard by the microphon
 |---|---|---|---|
 | **Feedback** | The monitored voice comes out of the speakers, into the microphone, and round again, until it howls | The room | A limiter and a gain ceiling on the sidetone; no sidetone with speakers (MO3, MO4) |
 | **Bleed into a recording** | The backing is in the take, under the voice | The recording | Headphones; echo cancellation against the known playback signal |
-| **Bleed into a score** | The microphone hears the reference melody and the tracker follows it | The score, silently | The same, plus a check that cannot be fooled ([F6](karaoke-microphone-findings.md#f6-bleed-looks-like-perfect-singing): at a bleed 30 dB below the singer's level a **silent** singer scored 97 % of frames at the reference pitch) |
+| **Bleed into a score** | The microphone hears the reference melody and the tracker follows it | The score, silently | The same, plus a check that cannot be fooled ([F6](karaoke-microphone-findings.md#f6-bleed-looks-like-perfect-singing): at a bleed 30 dB below the singer's level a **silent** singer scored 97 % of frames at the reference pitch). **Measured on this workstation the speakers reach the microphone at about -7 dB of what was played**, so a quiet backing is already as loud in the microphone as a voice ([findings](karaoke-microphone-findings.md#bleed-measured-r3)) |
 
 Three ways to deal with it, which [D6](#d6-echo-feedback-and-bleed) puts to the owner:
 
@@ -383,7 +401,21 @@ recording is bundled with the project (the phase 1 rule), so the test content is
 
 ## Decisions
 
-Recommendations are mine; **none is decided**. Each can be answered separately.
+**Approved by the owner on 2026-10-12: "approve D1 to D18"**, read as approved *as recommended in
+the table below*. Three of the recommendations leave a thing open, and the approval is of that
+recommendation and not of more:
+
+- **D2**: A is approved for v1. C (a room mix at each sink) is **not** approved: it stays gated on
+  R4 and R5, and the owner has not asked for a room mix.
+- **D3**: the recommendation was "the owner decides", so no one has been assigned the board's
+  microphone path. **M8 to M10 do not start** until the owner names who builds it; the desktop
+  does not wait for it.
+- **D6**: (a) and the two checks that are ours are approved, and (b) as a measured spike.
+  **Vendoring an echo canceller (c) is not approved**; it needs the owner's separate OK on a
+  dependency, as the table said.
+
+The requirements are read as approved with the decisions, which are written against them; MI8 was
+added after the measurements and is the one place they moved.
 
 | # | Decision | Options | Recommendation | What it costs |
 |---|---|---|---|---|
@@ -391,7 +423,7 @@ Recommendations are mine; **none is decided**. Each can be answered separately.
 | D2 | Where the voice is mixed | A at the microphone's device; B at the host; C at each sink | **A**; C only after R4 and R5 | A: firmware mix stage and two settings keys; C: protocol revision, three chips, a measurement |
 | D3 | Who builds the board microphone path | The P4X session [dab81f]; a new session; later | **The owner decides**: the P4X session says the microphone is not in its brief and holds the firmware and the panel | A firmware peer for I2S receive, the mix stage and `source@v1` |
 | D4 | Capture API | Extend `Capture` additively (a timestamp per block, a requested period, the period got, a latency report); a new duplex object; leave it | **Extend additively**, one platform file at a time | One S per backend; the `audio_backend` table gains a row |
-| D5 | The monitor path | A second shared-mode stream (the OS mixes); an in-application mixer; no monitoring | **A second stream**, off by default, on the chosen device, with `low_latency` | Nothing to mix in v1; exclusive mode or ASIO for lower latency is later |
+| D5 | The monitor path | A second shared-mode stream (the OS mixes); an in-application mixer; no monitoring | **A second stream**, off by default, on the chosen device, with `low_latency`, **showing its measured latency and flagged over budget** | Nothing to mix in v1. R1 found about 130 ms on this workstation, so it may be unusable on common equipment; exclusive mode or ASIO is later and depends on the owner's equipment |
 | D6 | Echo, feedback and bleed | (a) Headphones for a score and a take; (b) the OS's echo cancellation; (c) our own, vendoring WebRTC's AEC3 (BSD-licensed, to be verified) | **(a), plus the two checks that are ours (silence calibration, coherence)**; (b) as a measured spike; (c) only with the owner's OK on a dependency | (a): U3 and U5 cannot score; (c): a BSD dependency, its build on five platforms and a firmware port |
 | D7 | Pitch tracker | YIN-family written here; a neural tracker; a third-party library | **Written here, YIN or MPM with a voicing rule**, float and int16, 16 and 8 kHz | One library, no dependency; a test generator; real-voice validation (R7) |
 | D8 | Where scoring runs | Host only; the board also (a reference document pushed like lyrics, a tracker on the board); the board only | **Host first.** Board-side scoring only if the standalone box needs a score with no host | A board tracker is a few percent of a core ([F5](karaoke-microphone-findings.md#f5-pitch-trackers-a-spike)), a pitch document of about 6 KB (an estimate: four to six notes a second at four bytes, for four minutes), and the same lyric-clock plumbing |
@@ -482,6 +514,10 @@ the kit and the host's side of `source@v1`, which M8 builds first.
 
 ## Open questions for the owner
 
+Answered by the approval of D1 to D18 on 2026-10-12: **1** (A, and no room mix in v1), **4**
+(the microphone was opened; the results are in the findings), **5**, **6**, **7** and **8** (as
+recommended, with no echo canceller vendored). **Still open: 2 and 3.**
+
 1. **The mixing model (D2).** Is the owner's picture (a sink with a microphone mixes the voice
    locally, and other sinks play the backing alone) the one to build? And is a room mix, with the
    voice from every sink about 0.1 s behind or more, wanted at all?
@@ -504,8 +540,9 @@ the kit and the host's side of `source@v1`, which M8 builds first.
 
 ## Risks
 
-- **The microphone path is the least measured thing here.** Every latency that matters for
-  monitoring is an estimate until R1, and a board's is unknown until R4.
+- **The measured path is this equipment's.** About 130 ms is one webcam microphone and one set of
+  speakers; a headset or an interface could be far faster and was not available. Nothing in the
+  plan should be tuned to 130 ms, and the board's path is unknown until R4.
 - **A tracker that works on a generator.** Real voices are untested (R7); the plan keeps the
   tolerance a setting and the reference named for that reason.
 - **macOS has never run the backend.** A microphone permission under an unsigned build is the kind

@@ -34,10 +34,11 @@ The sections below contain the complete change list and fixes.
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
   and `planning/karaoke-microphone-findings.md`). Phase 1 left the microphone, scoring and recording
   out; this is the plan for them: who sings with what, the latency budget (a voice mixed into a
-  Sendspin group comes out of a sink at least 400 ms late, so the voice is mixed where the microphone
-  is), a pitch score and the references that exist for one, a recording of the dry voice, the
-  decisions with a recommendation each, and a build plan by platform. Nothing is built and no
-  microphone was opened.
+  Sendspin group comes out of a sink at least 400 ms late, so the voice is mixed where the
+  microphone is), a pitch score and the references that exist for one, a recording of the dry voice, the
+  decisions with a recommendation each (approved by the owner as recommended), and a build plan by
+  platform. A voice through one Windows 11 workstation's own shared-mode path was measured at about
+  130 ms, so a monitor is offered with its measured latency and not promised.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
