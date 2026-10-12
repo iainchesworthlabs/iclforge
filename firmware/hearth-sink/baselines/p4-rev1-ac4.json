@@ -1,0 +1,164 @@
+{
+  "format": 1,
+  "profile": "p4-rev1-ac4",
+  "profile_hash": "6cd3fe4b015f",
+  "version": "v0.10.0-beta.1-4413-g43d19b5c1",
+  "chip": "ESP32-P4",
+  "board": "P4a",
+  "recorded": "2026-10-12T09:27Z",
+  "boot": {
+    "when": "boot",
+    "net": 1,
+    "internal_free": 289271,
+    "largest": 217088,
+    "ask_total": 49152,
+    "ask_biggest": 40960,
+    "headroom": 176128,
+    "verdict": "ok",
+    "floor": 0
+  },
+  "plays": {
+    "ac3-2.0": {
+      "state": "finished",
+      "frames": 938,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        61,
+        61,
+        61,
+        61,
+        61
+      ],
+      "decoder_permille": 61,
+      "units": 938,
+      "decode_stack_free": 26292,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0
+    },
+    "eac3-2.0": {
+      "state": "finished",
+      "frames": 938,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        41,
+        41,
+        41,
+        41,
+        41
+      ],
+      "decoder_permille": 41,
+      "units": 938,
+      "decode_stack_free": 26212,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0
+    },
+    "ac4-20-music": {
+      "state": "finished",
+      "frames": 3,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        239,
+        220,
+        241,
+        251,
+        253
+      ],
+      "decoder_permille": 241,
+      "units": 3,
+      "decode_stack_free": 20720,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0,
+      "pcm_hash": "f860e51f602ae753"
+    },
+    "ac4-20-acpl": {
+      "state": "finished",
+      "frames": 4,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        281,
+        281,
+        280,
+        285,
+        294
+      ],
+      "decoder_permille": 281,
+      "units": 4,
+      "decode_stack_free": 16920,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0,
+      "pcm_hash": "e8b8cfa716dd0e1c"
+    },
+    "ac4-51-music": {
+      "state": "finished",
+      "frames": 3,
+      "why": "end of stream",
+      "layout": "2.0",
+      "decoder_permille_samples": [
+        621,
+        617,
+        599,
+        626,
+        593
+      ],
+      "decoder_permille": 617,
+      "units": 3,
+      "decode_stack_free": 16840,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0,
+      "pcm_hash": "7162259f3e596916"
+    },
+    "ac4-20-companding": {
+      "state": "finished",
+      "frames": 3,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        276,
+        298,
+        282,
+        303,
+        268
+      ],
+      "decoder_permille": 282,
+      "units": 3,
+      "decode_stack_free": 16920,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0,
+      "pcm_hash": "5b93c61c57566b0c"
+    }
+  },
+  "findings": {},
+  "boot_samples": {
+    "internal_free": [
+      289271,
+      289891,
+      289891,
+      289875,
+      289863,
+      289863,
+      289827,
+      289883
+    ],
+    "largest": [
+      217088,
+      217088,
+      217088,
+      221184,
+      217088,
+      217088,
+      217088,
+      221184
+    ]
+  }
+}

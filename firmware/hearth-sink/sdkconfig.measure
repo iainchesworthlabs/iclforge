@@ -1,0 +1,16 @@
+# The measurement overlay of a profile (planning/esp32-platform-profiles.md, "measure"): keys
+# that only observe, given after the profile's own fragments, for an image that is run to be
+# measured. Declared in profiles.json, where the keys it may touch are listed; the guard holds
+# the build to them, so an image built with it is the profile's and not a scratch build.
+#
+#   SDKCONFIG_DEFAULTS="$(sink_profile.py defaults p4-rev1-ac4 --overlay measure)"
+#
+# The AC-4 decoder hashes the bit pattern of every sample it hands over (ac4.pcm_hash, the
+# probe's FNV-1a), which is what says whether the float output equals the host's
+# (testdata/ac4-probe-pcm-hashes.json). The profile locks it off: hashing costs time, which the
+# decoder measures and takes back out of its own, so the speed figure is not moved by it. A play's
+# location can still ask for no hash (?hash=off), so one image measures both.
+#
+# The board suite's AC-4 rows need it: a row whose line carries no pcm_hash says so and is not
+# held to a pin. Nothing else is set here, and a key added to this file is a key to declare.
+CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1

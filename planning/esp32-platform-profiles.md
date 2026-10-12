@@ -115,6 +115,7 @@ Proposed ids, from the board and not from the codec:
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none on the bench: any C6 module |
 | `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a `.99`, P4b `.76` |
 | `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | the same boards |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none on the bench: the owner's ESP32-P4X-Function-EV-Board has not arrived |
 
 **AC-4 on the S3 is its own profile, not an overlay on `s3-n16r8`, and so is AC-4 on the P4
 (`p4-rev1-ac4`).** Both were decided by the owner on 2026-10-12. The reason it holds up: AC-4 changes
@@ -127,10 +128,29 @@ run the AC-4 profile.
 A C6 has no AC-4 profile: the decoder's floor (286,365 bytes) never fits beside Wi-Fi
 ([`esp32-sink-compatibility-matrix.md`](esp32-sink-compatibility-matrix.md)).
 
-**A P4 of revision 3.x is a profile of its own, `p4-rev3`, which this file does not have yet.**
-#1400 adds its image (`hearth-sink-esp32p4-rev3`, chips 3.01 to 3.99, `panel` and `panel-dsi`
-fragments over `p4-rev3`, 400 MHz, the bootloader at warn level to fit). It has never run on a
-board, so when it is added it has its guard and its budgets and no play list.
+**A P4 of revision 3.x is a profile of its own, `p4-rev3`** (PR 13, once #1400 was on main). Its
+image is `hearth-sink-esp32p4-rev3` (chips 3.01 to 3.99, `panel` and `panel-dsi` fragments over
+`p4-rev3`, 400 MHz, the bootloader at warn level to fit). It has never run on a board, so it has
+its guard and its budgets and **no play list and no baseline**; `suite.json` has its entry with
+an empty list and says why, and the first board that runs the image adds the rows, as the v1.x
+profiles' were added. What it is:
+
+- **133 locked keys**, snapshotted from a real configured build (2026-10-12): the two revision
+  bounds (`ESP32P4_REV_MIN_FULL` 301 and `ESP32P4_REV_MAX_FULL` 399, so it refuses a v1.x chip,
+  as `p4-rev1` refuses a v3.x one), 400 MHz, the DSI panel and no null display, LVGL's heap in PSRAM
+  (`LV_USE_CUSTOM_MALLOC`), and the I2S queue. **The screen task's stack
+  (`ICLFORGE_EXAMPLE_PANEL_STACK_BYTES`, 16,384, in PSRAM) is locked by hand**: it is `free` for
+  every profile with no screen, where it is inert, and `snapshot` skips a free key, while
+  `verify` reads a locked key first. A test holds it locked here and in no other profile.
+- **Budgets**, about 5% over what the build measured, as the S3's and C6's are: the app
+  2,600,000 bytes (2,469,920 built; CI's #1400 build 2,466,032), static internal RAM 175,000
+  (DIRAM 166,948), the bootloader 24,576 (22,448).
+- **CI reads it**: the `_build.yml` step for this image takes its fragments from
+  `sink_profile.py defaults p4-rev3`, is held by `verify` and packaged with `--profile p4-rev3`,
+  as the boards' are. The release rules' list and the profiles are one list now:
+  `IMAGES_WITHOUT_A_PROFILE` in the test is empty. The panel's null-display build stays an
+  `other_stacks` entry: a development build, not a board's image.
+- **The hash is `6e5a68ebbb57`.** The real build holds to it.
 
 ## What a profile locks
 
@@ -361,12 +381,17 @@ from `firmware/hearth-sink/suite.json` and writes baselines under
 session scratchpads:
 
 ```
-board_suite.py run --profile s3-n16r8 --host 192.168.1.45 --lock D:/ac3bld/s3-board-45.lock \
-                   --session <id> [--repeat 3] [--record | --compare baselines/s3-n16r8.json]
+board_suite.py run --profile s3-n16r8 --board S3b --session <id> [--repeat 3] [--restart [--boots 8]] \
+                   [--record | --compare baselines/s3-n16r8.json]
 board_suite.py plan --profile s3-n16r8
 board_suite.py compare --run board-run.json --baseline baselines/s3-n16r8.json
 board_suite.py lock take|release|show --file <lock> --session <id>
 ```
+
+`--board` names a row of [`bench.json`](../tools/hearth/bench.json), which gives `--host` and the
+lock, and refuses an address or a lock that is not that board's; `--restart` is refused on a P4
+(see [the board bench](esp32-board-bench.md)). Without `--board`, `--host` and `--lock` are
+given by hand as before.
 
 It does, in this order, and stops at the first refusal:
 
@@ -395,7 +420,7 @@ It does, in this order, and stops at the first refusal:
    date). `--record` writes `baselines/<profile>.json` from a clean run; `--compare` holds a run to
    a baseline with the tolerance in `suite.json` and prints an improvement as "re-baseline".
 
-Tests (`test_board_suite.py`, 53) run it against a stand-in board that answers with what the real
+Tests (`test_board_suite.py`, 89) run it against a stand-in board that answers with what the real
 boards printed on 2026-10-12, and hold the file to the tree (every stream is in the repository,
 every AC-4 row names a pin the host holds, every profile has a list).
 
@@ -406,7 +431,8 @@ the decoder at **123 and 88 permille of a frame** where `realtime_permille` read
 Not in PR 6, and said so: the boot `budget:` line was not read into the run (S3's `/log` may have
 rotated it out and the C6's is 2 KB). PR 7 reads it: `--restart` restarts the board so that the boot
 line is the log's first, the suite parses it, and `--record` refuses a baseline when the log holds
-none; the C6's 2 KB log is read from the serial console where it has to be. The 5.1 and
+none; the C6's 2 KB log still holds the line a moment after a restart (27 boots, PR 9), so
+its serial console is not needed for it. The 5.1 and
 wider rows (`demo.ec3` with objects) wait for the baselines; the AC-4 rows need an image built with
 `CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` (the `measure` overlay) and say so when the hash is not on
 the line; and a Sendspin play list for the C6 needs a server on the bench.
@@ -456,6 +482,103 @@ frames each, no underruns, 0 ms dry, queue headroom 5 ms, decode stack 18,256 an
 free; boot line `internal_free=86223 largest=31744 headroom=23552 verdict=ok`. A second run of
 two plays a row after another restart held to it with no finding.
 
+**A board's boot figures are not one number (PR 9).** The S3's free RAM has two modes, above;
+the C6's largest internal block at boot was 96,256 bytes on 21 of 27 boots and 94,208 on four,
+92,160 on one and 88,064 on one, with free RAM at 108,988 on one boot and 112,204 to 113,128
+on the rest. A baseline taken from one boot would fail one boot in five of the next runs, so
+`board_suite.py run --restart --boots N` restarts N times and holds **the worst boot** (the
+smallest largest block, then the least free RAM), keeps every sample in the record
+(`boot_samples`), and a run that starts higher than the baseline is not a regression. A profile
+whose figures jitter by more than the S3's carries its own tolerance in `suite.json`, with the
+spread it came from: the C6's largest block is allowed 12,288 bytes (three 4 KB steps, where
+8,192 was seen) and keeps the suite's 2,048 for free RAM, which is held below the worst boot.
+
+**Recorded (PR 9, `c6-16mb`):** the C6 (`.117`), the
+identity image `v0.10.0-beta.1-4175-g79d2e7618-`, profile hash `c256f286a410`, five refused
+plays a row after eight restarts. Both rows are state `failed`, `why: memory`, no frames and no
+reboot; the boot line is the worst of the eight: `internal_free=108988 largest=94208
+headroom=61440 floor=134008 verdict=below-floor`. A run of two refusals a row after the worst
+of three more boots (112,172 free, 96,256 largest) held to it with no finding. Not in it: a
+Sendspin play, which needs a server on the bench, and the C6's `4mb` twin, which has no board.
+
+**The log is read to its end (PR 10).** `GET /log` answers at most 4 KB (`kLogReplyBytes`)
+out of a 16 KB ring, and a client follows `X-Log-Next` for the rest. The suite's whole-log read
+took the first reply only: on the P4 the boot `budget:` line lay past the first 4 KB and was cut
+off mid-word, and a mark taken from a log longer than that sat in the middle of the ring, where
+an old play's `result=` line could end the wait for the new one. The S3 and C6 baselines (PR 7
+and 9) were taken after `--restart`, from logs under 4 KB, so their reads were whole; the fix is
+in `Board.log`, with a stand-in that caps its replies as the board does.
+
+**Recorded (PR 10, `p4-rev1`):** P4a (`.99`), the identity image
+`v0.10.0-beta.1-4367-g957c80e16`, profile hash `1da8144216fb`, five plays a row after eight
+restarts by esptool's watchdog reset (`--reset-by esptool`, because a P4's `POST /restart` can
+lose its C6 link): AC-3 2.0 at **61 permille** of a frame and E-AC-3 2.0 at **40**, 938 frames
+each, no underruns, 0 ms dry, queue headroom 5 ms, decode stack 18,480 and 18,400 bytes free.
+The boot line is the worst of the eight: `internal_free=291875 largest=217088
+headroom=184320 verdict=ok`. Its largest block steps by 4 KB (221,184 on eight of ten boots read
+one by one, 217,088 on two), so `p4-rev1` carries its own tolerance of 8,192 bytes there, as
+`c6-16mb` does. A run of two plays a row after the worst of three more boots held to it with no
+finding. About half the S3's decoder time per frame, at 400 MHz. Not in it: `p4-rev1-ac4`, which
+needs the `measure` image for the PCM hash, and the P4b, which another session's build holds.
+
+**Recorded (PR 11, `p4-rev1-ac4`):** P4a again, the image `v0.10.0-beta.1-4413-g43d19b5c1`
+built with the `measure` overlay, profile hash `6cd3fe4b015f` (the overlay does not move it),
+five plays a row after eight watchdog-reset boots. AC-3 2.0 at 61 permille and E-AC-3 2.0 at
+41, as the release shape, with the AC-4 build's 40 KB decode stack (26,292 and 26,212 bytes
+free). The three 2.0 AC-4 rows carry the host's pins, equal on the board: `ac4-20-music` 241
+permille of the audio, `ac4-20-acpl` 281 and `ac4-20-companding` 282. The boot line is the worst
+of eight: `internal_free=289271 largest=217088 headroom=176128 verdict=ok`.
+
+**The 5.1 row has no host oracle on this sink.** The image's I2S sink has two outputs, and asked
+for a 5.1 layout it fails (`could not start I2S in TDM mode`: the APLL's maximum frequency,
+`sample rate is too large`), so the decoder folds the stream to Lo/Ro and hands over stereo, whose
+hash is not the 5.1 probe's. The row has `pin_layout: 5.1` in `suite.json`: a play on another
+layout is not held to the pin and is recorded with its layout and its own hash
+(`7162259f3e596916`, 617 permille), which `compare` holds to the baseline's. D14e's 5.1 numbers
+were taken on a null sink; whether the float output of the 6-output render equals the host's is
+not tested by this profile on this board.
+
+**Why the profile has its own tolerance.** The first compare run, after the record, failed two
+findings: free RAM at boot 2,940 bytes under the recorded worst, and `ac4-20-acpl` at 297 permille
+against 281 (allowed 295). The rows are three or four frames, so a play is noisy by about 6% of
+itself (`ac4-20-music` read 220 to 253 in five plays), against the S3's 122 to 124 on a 30 s AC-3;
+and free RAM at boot has a second mode, 286,331 against 289,3xx to 289,9xx, on two of 17 boots.
+`p4-rev1-ac4` therefore carries `relative` 12% (twice the noise, and still calling a fifth more
+decoder time a regression), 4,096 bytes of free RAM and 8,192 of largest block. The saved compare
+run holds to it, and a run 20% slower on `ac4-20-acpl` and 8 KB lower on RAM still fails.
+
+**Recorded (PR 12, `s3-n16r8-ac4`):** S3a (`.156`, the proposed recording board), the image
+`v0.10.0-beta.1-4460-g12c4fdaaf` built with the `measure` overlay, profile hash
+`6124ef3f591f`, five plays a row after eight restarts. AC-3 2.0 at 120 permille and E-AC-3 2.0 at
+84 (with the AC-4 build's 64 KB data cache, a few percent under the release shape's 123 and 87);
+`ac4-20-music` at 510 permille of the audio, `ac4-20-acpl` at 645 and `ac4-20-companding` at 608,
+so all three decode inside real time on an S3, and their PCM hashes are **the host's pins, equal**
+(`f860e51f602ae753`, `e8b8cfa716dd0e1c`, `5b93c61c57566b0c`), as the P4's are. The boot line is
+the worst of eight: `internal_free=52075 largest=31744 headroom=23552 verdict=ok`, which spread
+28 bytes, and is 33 KB under the release shape's 85,755 (the 64 KB data cache takes 32 KB of heap).
+The S3 is steady where the C6's and the P4's boots are not, so the profile has no tolerance of its
+own.
+
+**Cross-checked on S3b**, the second board: the same image against S3a's baseline, worst of three
+boots and three plays a row, holds with no finding: AC-3 120 and E-AC-3 82 permille, the three
+AC-4 rows at 510, 646 and 598 with the same three hashes, boot free RAM 51,927 against 52,075. The
+two S3 boards agree to within the noise of the rows.
+
+**A locked default moved under the profile (PR 12).** The first S3 build after `main` was merged in
+failed the guard on two locked keys, for both S3 profiles and for nothing else: the Sendspin
+lyric budget (`ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES`, 16,384 to 2,048 on the S3, because a
+lyric document costs about ten times its text of internal RAM at the peak) and the objects a
+board states (`ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS`, 2 to 0). Both are other sessions' commits to
+the Kconfig, which is what the guard is for. The profiles follow them in one commit at the bottom
+of the stack, so the profile hashes change (`s3-n16r8` `c4b8d369cf36` to `0fb46709d4bb`,
+`s3-n16r8-ac4` `9d72f4f00ba8` to `6124ef3f591f`) and **a baseline recorded under the old hash is
+re-recorded**: `s3-n16r8`'s was, on S3b, the worst of eight boots now (AC-3 123 and E-AC-3 87
+permille against 124 and 88; boot free RAM 85,755 against 86,223). Nothing material moved: the new
+image held to the old baseline before it was replaced. The C6 and P4 profiles were not touched:
+their locked values still equal the Kconfig's defaults (and the P4 builds of PR 10 and 11 held).
+`compare` does not look at a baseline's hash, so a stale one is a number that is still right and a
+hash that is not; the PR that changes a locked default carries the re-record.
+
 ## Changing a profile
 
 A change to a profile, a fragment it names, or a locked key's Kconfig default is one PR that:
@@ -484,7 +607,8 @@ Wi-Fi values, which are credentials and stay out of the profile.
 ## Order of work
 
 Each is a small PR. The suite and the baselines need board time, and a board is booked through its
-lock file in `D:/ac3bld` before anything is run on it, and restored and released after.
+lock file in `D:/ac3bld` before anything is run on it, and restored and released after
+([the rule](esp32-board-bench.md#the-rule)).
 
 | # | PR | Needs a board | Notes |
 |---|---|---|---|
@@ -496,10 +620,12 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
 | 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
-| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)); `c6-16mb`, `p4-rev1`, `p4-rev1-ac4` and `s3-n16r8-ac4` each need their board and, for AC-4, the `measure` image. `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
-| 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | |
+| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash) and **`s3-n16r8-ac4` built** (S3a, cross-checked on S3b; `s3-n16r8` re-recorded under its new hash). `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
+| 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
-PR 3 follows 2. PR 2 adds `p4-rev3` once #1400 is on main, since its fragments are not.
+| 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; no board has run the image, so no list and no baseline |
+
+PR 3 follows 2. `p4-rev3` waited for #1400's fragments to be on main (row 9).
 
 ## Decisions for the owner
 
@@ -510,7 +636,8 @@ Still open:
 
 1. **The recording board for each profile.** Proposed: S3a for both S3 profiles with S3b as the
    cross-check, C6 `.117` for `c6-16mb`, P4a `.99` for both P4 profiles (P4b needs a USB flash
-   after any OTA).
+   after any OTA). Done so: S3a for `s3-n16r8-ac4` with the S3b cross-check, S3b for
+   `s3-n16r8` (its S3a cross-check is not run), the C6 and P4a for theirs.
 2. **The tolerance:** now measured, not proposed: the larger of 5% and 5 permille over the
    median, for the decoder's time per frame; 0 underruns; the stack's margin within 512 bytes of
    the baseline's (see the ratchet above). Say if looser or tighter.
@@ -526,3 +653,5 @@ Still open:
 - That QEMU can run the release shape's PSRAM execution. It is a spike (PR 5).
 - That the boot line is sufficient. It is an early warning for the failure this page started with,
   and the play list is what holds the rest.
+- That the v3.x image works. No board of that revision has run it: `p4-rev3` holds the shape of
+  its build (placement, sizes, caches, the screen's keys), not that LVGL draws or the panel lights.
