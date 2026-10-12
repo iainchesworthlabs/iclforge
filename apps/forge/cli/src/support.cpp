@@ -3594,13 +3594,27 @@ bool refuse_karaoke_with_ltrt(const iclforge::ac3::OutputConfig& output) {
     return true;
 }
 
+namespace {
+
+// Whether the reproduction changed the layout: its mode, not its channel count. A 2/1 stream's
+// reproduction is three channels (L, C, R) where three were coded (L, R, S), so the counts agree
+// and the channels do not, and a count comparison would have labelled the reproduction as the
+// coded layout (the oracle script found it: the vocal came out in the file's right channel).
+bool mode_changed(const iclforge::ac3::OutputConfig& output, iclforge::ac3::Acmod acmod,
+                  bool lfe, bool karaoke) {
+    const iclforge::ac3::OutputMode with = iclforge::ac3::output_mode(output, acmod, lfe, karaoke);
+    const iclforge::ac3::OutputMode without = iclforge::ac3::output_mode(output, acmod, lfe, false);
+    return with.acmod != without.acmod || with.lfe != without.lfe;
+}
+
+}  // namespace
+
 bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
                         const iclforge::ac3::DecodedFrame& frame) {
     const bool karaoke = iclforge::ac3::meta::is_karaoke(
         static_cast<iclforge::ac3::meta::BitstreamMode>(frame.bsmod), frame.acmod);
     return output.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
-           iclforge::ac3::output_channel_count(output, frame.acmod, frame.lfe, karaoke) !=
-               iclforge::ac3::output_channel_count(output, frame.acmod, frame.lfe, false);
+           mode_changed(output, frame.acmod, frame.lfe, karaoke);
 }
 
 namespace {
@@ -3619,9 +3633,7 @@ bool karaoke_reproduced(const iclforge::ac3::OutputConfig& output,
         !iclforge::ac3::is_karaoke_programme(unit)) {
         return false;
     }
-    const bool lfe = unit_has_lfe(unit);
-    return iclforge::ac3::output_channel_count(output, unit.acmod, lfe, true) !=
-           iclforge::ac3::output_channel_count(output, unit.acmod, lfe, false);
+    return mode_changed(output, unit.acmod, unit_has_lfe(unit), true);
 }
 
 iclforge::ac3::eac3::chanmap::Layout reproduced_layout(

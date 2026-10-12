@@ -1388,3 +1388,52 @@ TEST_CASE("transcode carries the service type between AC-3 and E-AC-3, and bsmod
                     dir / "tke_named.log") == 0);
     CHECK(bsmod_of(named, "named").find("0 (complete main)") != std::string::npos);
 }
+
+TEST_CASE("decode karaoke labels a 2/1 stream's reproduction as the 3/0 it is, for AC-3 and E-AC-3",
+          "[cli][decode][karaoke][eac3]") {
+    // L, R and one vocal V1: three channels coded and three reproduced, so the counts agree and the
+    // layouts do not. Table C.2.2's 3/0, one vocal: L and R as they are, V1 into the centre at the
+    // stream's surround level, nothing to scale down. The oracle script
+    // (tools/checks/verify_karaoke_oracle.py) found the reproduction written under the coded
+    // layout's labels, the vocal in the file's right channel.
+    const auto dir = scratch_dir();
+    const auto check = [&](const fs::path& stream, const std::string& name) {
+        std::string report;
+        const auto coded = decode_to_wav(stream, dir / (name + "_coded.wav"), "");
+        const auto heard = decode_to_wav(stream, dir / (name + "_heard.wav"), "karaoke", &report);
+        INFO(name << ": " << report);
+        REQUIRE(coded.channels.size() == 3);
+        REQUIRE(heard.channels.size() == 3);
+        CHECK(coded.channel_mask == (kFL | kFR | kBC));
+        CHECK(heard.channel_mask == (kFL | kFR | kFC));
+        REQUIRE(heard.frame_count() == coded.frame_count());
+        double worst = 0.0;
+        double centre = 0.0;
+        for (std::size_t i = 0; i < heard.frame_count(); ++i) {
+            const double l = static_cast<double>(coded.channels[0][i]);
+            const double r = static_cast<double>(coded.channels[1][i]);
+            const double v1 = static_cast<double>(coded.channels[2][i]);
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[0][i]) - l));
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[1][i]) - r));
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[2][i]) - 0.5 * v1));
+            centre = std::max(centre, std::abs(static_cast<double>(heard.channels[2][i])));
+        }
+        CHECK(worst < 1e-6);
+        CHECK(centre > 0.02);  // a real vocal in the centre, not silence agreeing with silence
+    };
+
+    const auto source = write_wav(dir / "k21_src.wav", 3);
+    const auto ac3 = dir / "k21.ac3";
+    fs::remove(ac3);
+    REQUIRE(run_cli("encode " + quoted(source) + " " + quoted(ac3) +
+                        " 192 L,R,Cs surmixlev=-6 cmixlev=-3 bsmod=7",
+                    dir / "k21_ac3.log") == 0);
+    check(ac3, "k21_ac3");
+
+    const auto eac3 = dir / "k21.ec3";
+    fs::remove(eac3);
+    REQUIRE(run_cli("eac3-encode " + quoted(source) + " " + quoted(eac3) +
+                        " 192 none L,R,Cs bsmod=7 mixmeta cmixlev=-3 surmixlev=-6",
+                    dir / "k21_eac3.log") == 0);
+    check(eac3, "k21_eac3");
+}

@@ -86,6 +86,19 @@ The sections below contain the complete change list and fixes.
   transcoded between AC-3 and E-AC-3 used to come out `bsmod` 0, "complete main", with the vocals
   still in the surrounds and no flag; it keeps its `bsmod` (E-AC-3 writes it in the informational
   group), and `bsmod=` still names another one (`planning/karaoke-eac3.md`, E3).
+- **The karaoke reproduction's LFE keeps its level against L, C and R.** The output stage scaled
+  the three sums down by the largest's (§7.8.1's way) and passed the LFE at unity, so the LFE came
+  out 3.5 dB above where the mix put it for a -6 dB surround level (4.6 dB at -3 dB); it now takes
+  the same factor. Dolby's decoder, which scales nothing, leaves it level with the three, and the
+  oracle script below agrees with it on all five streams (`planning/karaoke-eac3.md`, E9, D8).
+- **`forge decode` no longer labels a 2/1 karaoke stream's reproduction as the coded layout.** A
+  2/1 stream (L R V1) reproduces as L, C, R: three channels where three were coded, so a comparison
+  of channel counts called it "already what Annex C gives" and wrote the vocal under the coded
+  mask, in the file's right channel. The mode is compared now, for AC-3 and E-AC-3.
+- **`tools/checks/verify_karaoke_oracle.py`** writes tone-per-channel AC-3 and E-AC-3 karaoke
+  streams, decodes them with `forge decode karaoke` and with the Dolby Reference Player's decoder,
+  and compares each output channel's tones as ratios to L's. Local only (the player is licensed and
+  never runs in CI); it says so and exits 0 without it.
 
 **E-AC-3: an associated service mixed into the main**
 
