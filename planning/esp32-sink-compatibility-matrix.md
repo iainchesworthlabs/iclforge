@@ -135,6 +135,21 @@ What the cells mean:
 | 5 | Heap >= 286,365 B | Board, `player.cpp:819` | HTTP AC-4 | Play fails, `why: "memory"`, board runs on |
 | 6 | The decoder's own refusal | Board, `player.cpp:928` | HTTP AC-4 | Play fails, `why: "decode"` |
 
+AC-4 **objects** are a class of their own, and one the boards cannot take whole. The decoder
+puts a presentation's objects out beside its channels (`DecodedFrame::objects`) for the
+application to place; `decode_by_block()`, which the board's player calls, hands over channels
+alone. By the code (none of this has been run on a board), a presentation that has channels (a
+bed) therefore plays as that bed, after the board has paid to reconstruct objects it throws away;
+a presentation of objects alone (A-JOC or direct-coded, which is what this project's encoder
+writes) decodes to no channels, and the board plays nothing. So the AC-4 path of a board that
+lists `ac4` has to state `max_objects.ac4` of 0
+until it places objects, and Hearth, which now reads an AC-4 presentation's object count and
+whether it has channels (`ItemFacts::objects`, `objects_alone`), sends such a board PCM decoded
+here for a presentation past it. What this does not yet do is the board's half: skipping the
+object reconstruction when the player places none (a `DecoderConfig` option the library does not
+have), which is where a bed-and-objects stream's time goes on a P4 or an S3; no AC-4 stream with
+both has been measured on a board.
+
 What is **not** there:
 
 - **No test on time.** Nothing refuses, or falls back, because a stream would not keep up.

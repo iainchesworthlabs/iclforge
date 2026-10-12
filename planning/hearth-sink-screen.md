@@ -159,7 +159,7 @@ session to confirm ([plan, D13](hearth-android.md#decisions)).
 |---|---|
 | Spacing | 4, 8, 12, 16, 24, 32 `u` (`Theme.space1` to `space8`) |
 | Radius | 0, everywhere |
-| Faces | Archivo (Regular, Medium, SemiBold, ExtraBold) for Latin (its `cmap` has no Cyrillic and four Greek letters, checked 2026-10-12), with a Noto Sans for Greek and Cyrillic where the surface has no system face to fall back to (the ESP32-P4 image carries one); Noto Sans Hebrew (Regular and SemiBold static instances; the bundled file is variable and its default instance is Thin) for Hebrew and Yiddish; Noto Sans Arabic where the surface can shape; the system's CJK face where there is one |
+| Faces | Archivo (Regular, Medium, SemiBold, ExtraBold) for Latin **only** (its `cmap` has 398 Latin codepoints, four Greek letters and no Cyrillic, checked on all four weights 2026-10-12), with a Noto Sans for Greek and Cyrillic where the surface has no system face to fall back to (the ESP32-P4 image carries one, 473 KB for its three faces; the desktop and Android fall back to the system's until one is bundled); Noto Sans Hebrew (Regular and SemiBold static instances; the bundled file is variable and its default instance is Thin) for Hebrew and Yiddish; Noto Sans Arabic where the surface can shape; the system's CJK face where there is one |
 | Type size | the `u` sizes in [layout](#layout), times the surface's text-size step (S, M, L; `Theme.fontScale` on the desktop) |
 | Case and tracking | header and chips: uppercase, tracked at `trackingWide` (1.2 `u`), as `LyricScreen.qml` draws them |
 | Icons | Material Symbols Sharp, the handful of glyphs `Theme.qml` lists |
@@ -195,7 +195,7 @@ Scripts, by tier, so SS5 has something to test against:
 
 | Tier | Scripts | Desktop | Android | Panel |
 |---|---|---|---|---|
-| T1 | Latin, Greek, Cyrillic | Yes | Yes | Yes |
+| T1 | Latin, Greek, Cyrillic | Yes (Greek and Cyrillic through the system's fallback face) | Yes (the same) | Yes (Noto Sans in the image) |
 | T2 | Hebrew, Yiddish (right to left, no joining) | Yes | Yes | Yes |
 | T3 | Arabic (right to left, joining, shaping) | Yes | Yes | **No** |
 | T4 | CJK (no spaces; a face of 5 to 16 MB) | Yes (system face) | Yes (system face) | **No** |
@@ -262,3 +262,4 @@ they are checked in beside the fixture so a renderer's test and the library's ag
 | 6 | A request path from a sink to the server for the vocals and the reproduction | The plan's D8; a protocol PR, shared with the panel's Q6 |
 | 7 | Where tokens live: one file generating QML, Kotlin and a C header, or this page only | The plan's D13 |
 | 8 | Where `title` and `artist` come from for an item with no lyric document | The plan's D7 |
+| 9 | Greek and Cyrillic have no face bundled with the family: Archivo does not cover them. The panel bundles Noto Sans for both; the desktop and Android rely on the system's fallback, which changes the look of a Cyrillic line | Owner; the P4X session's panel PR corrects its own rows |

@@ -70,7 +70,7 @@ struct RawResult {
     bool ac4 = false;
     QStringList presentations;
     std::size_t presentation = 0;
-    // AC-3 karaoke (Annex C): the stream is bsmod 7 with a mode above 1/0,
+    // Karaoke (Annex C, E-AC-3 by analogy): the stream is bsmod 7 with a mode above 1/0,
     // whether the decode applied the karaoke reproduction (so `acmod` above
     // is the layout it came out in, not the coded one), and the layout as
     // coded for the page to say beside it.
