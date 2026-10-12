@@ -259,6 +259,10 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **Crucible's lyric strip draws a CD+G disc.** A `.cdg` file imported against an application is
+  drawn as its picture under the file's name (the shared `CdgPicture`: 300 by 216, as large as
+  fits in whole-pixel steps) and followed by the same Start and nudge an `.lrc` has; its words are
+  pixels, so none are read as text and the page says so (planning/karaoke-phase2.md, W13f and D11).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the
