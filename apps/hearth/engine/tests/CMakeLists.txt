@@ -184,6 +184,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     # itself - all of which need libs/sendspin's server half, which a
     # core-only build leaves out.
     target_sources(iclforge-hearth-tests PRIVATE
+        test_ac4_object_facts.cpp
         test_pairing_store.cpp
         test_network_sinks.cpp
         test_network_sinks_rows.cpp
