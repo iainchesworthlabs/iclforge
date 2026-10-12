@@ -37,6 +37,9 @@ The sections below contain the complete change list and fixes.
   Hearth off). The two test binaries link; discovery is deferred to `ctest` because an arm64
   binary cannot be listed on the host. On a Shield the lyrics suite (83 cases) and the sendspin
   suite (243) passed (planning/hearth-android.md, phase 0c).
+- **A CI job builds them.** `build-android-native` in `_build.yml` runs the preset on a hosted
+  runner whenever the `android` lane runs, `continue-on-error` until it has gone green three times
+  on hosted runners (`build-android` and `macos-llvm` each started the same way).
 
 **Karaoke: a pitch library**
 
