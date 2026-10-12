@@ -744,9 +744,10 @@ cmake --preset config-android-arm64
 cmake --build --preset build-android-arm64
 ```
 
-It builds `libs/lyrics` and `libs/sendspin` for `arm64-v8a` with the `hearth` feature's five
-packages (cpp-httplib, mbedTLS, libFLAC, Opus, mdns) from vcpkg's `arm64-android` triplet, and
-links the two test binaries (`iclforge-lyrics-tests`, `iclforge-sendspin-tests`). The first
+It builds `libs/lyrics`, `libs/sendspin` and `libs/sink` for `arm64-v8a` with the `hearth` feature's
+five packages (cpp-httplib, mbedTLS, libFLAC, Opus, mdns) from vcpkg's `arm64-android` triplet, and
+links the three test binaries (`iclforge-lyrics-tests`, `iclforge-sendspin-tests`,
+`iclforge-sink-tests`). The first
 configure builds the ports and takes the time that takes; with them cached it took 16 seconds here,
 and the build 82. The binaries are arm64, so they are linked and not run by the build: Catch2's test
 discovery runs when `ctest` does (`CMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST`). Pushed to a
@@ -754,6 +755,38 @@ Shield with `adb`, the lyrics suite (83 cases) and the sendspin suite (243) pass
 one case that reads a fixture by the build host's absolute path needs that file put at that path
 relative to the working directory. This is the groundwork of [Hearth for Android](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-android.md),
 not a second app.
+
+### Hearth for Android: the app (phase 1b)
+
+`apps/hearth/android` is a second Gradle project, a Sendspin sink for Android TV
+([plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-android.md)). Unlike
+the Shield app above it links `libs/sendspin`, so its native build puts vcpkg in front of the NDK's
+toolchain (`app/src/main/cpp/CMakeLists.txt`):
+
+```bash
+export VCPKG_ROOT=/path/to/vcpkg
+cd apps/hearth/android
+./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Three things the wrapper has to do that the Shield app's does not: name the pinned NDK to vcpkg's
+own Android toolchain through `ANDROID_NDK_HOME` (it looks in the environment and nowhere else),
+leave Hearth's own applications out (`ICLFORGE_BUILD_HEARTH_APPS=OFF`, whose notices read the
+wrapper's directory as the repository root), and build only `iclforge_hearth_jni`
+(`targets` in `app/build.gradle.kts`), because AGP otherwise packages every shared object of the
+repository root. A clean build with vcpkg's binary cache warm took 2 minutes 7 seconds here (the
+first, cold, builds the ports: about 25 minutes); the debug APK is 4.3 MB and the release APK 3.5 MB,
+each `libiclforge_hearth_jni.so` and `libc++_shared.so`.
+
+What it does today, measured on a 2017 Shield (Android 11) on 2026-10-12: it starts a foreground
+service that advertises `Hearth on SHIELD` as `_sendspin._tcp` on port 8928 through `NsdManager` (a
+Hearth on the LAN connected within a second), and a `hearth-testserver` on the build machine paired
+with it by the dynamic code the screen shows and played `testdata/external-baseline/ac3-51-448/ffmpeg.ac3`
+twice through: **158 bursts played of 158, 0 underruns, 0 late, 0 dropped, 0 invalid**. The output
+counts the bursts and drops them; the pass-through output is the next phase. `iclforge-sink-tests`,
+cross-built by that preset and run on the same Shield, passes (6 cases, 108 assertions), which
+includes a server pairing by the code the sink shows.
 
 ## Release / CI
 

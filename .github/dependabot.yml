@@ -120,3 +120,17 @@ updates:
       # come through. Remove this when compileSdk can move to 37.
       - dependency-name: "androidx.core:core-ktx"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+
+  # Hearth for Android (planning/hearth-android.md): its own Gradle project and lockfile, which
+  # carries the plugin and the build tooling and no library of its own.
+  - package-ecosystem: "gradle"
+    directory: "/apps/hearth/android"
+    target-branch: "main"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "build"

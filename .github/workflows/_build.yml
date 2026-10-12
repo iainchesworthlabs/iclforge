@@ -103,7 +103,7 @@ on:
         type: boolean
         default: true
       run_android:
-        description: "Build/test build-android and build-android-native."
+        description: "Build/test build-android, build-android-native and build-android-hearth."
         type: boolean
         default: true
       run_wasm:
@@ -1650,6 +1650,62 @@ jobs:
       - name: Build
         shell: bash
         run: cmake --build --preset build-android-arm64 -- -k 0
+
+  # Hearth for Android's debug APK (planning/hearth-android.md, phase 1b): the Gradle project at
+  # apps/hearth/android, whose native build puts vcpkg in front of the NDK's toolchain
+  # (app/src/main/cpp/CMakeLists.txt), which is the part build-android above cannot do. It
+  # builds the APK and runs no test: the emulator's instrumented tests come with the host harness
+  # (phase 1d), and a Shield and a receiver are a person's.
+  #
+  # continue-on-error until it has gone green three times in a row on hosted runners, as
+  # build-android-native above and every new hosted leg before it. The vcpkg ports are the same
+  # ones that job builds, in the same cache (the same key suffix).
+  build-android-hearth:
+    name: Android (Hearth app)
+    needs: [toolchain-versions]
+    if: inputs.run_android
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    # Newest main commit only (linux-appimage's concurrency comment).
+    concurrency:
+      group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'android-hearth-main' || format('android-hearth-run-{0}', github.run_id) }}
+      cancel-in-progress: false
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      # The second committed gradle-wrapper.jar of the tree, checked as the first is.
+      - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Select JDK 17
+        shell: bash
+        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+
+      - name: Install pinned Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.1.10909125"
+
+      # Exports VCPKG_ROOT and the binary cache, which the app's CMakeLists.txt reads.
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          vcpkg-commit: ${{ needs.toolchain-versions.outputs.vcpkg_commit }}
+          cache-key-suffix: android-arm64-hearth
+
+      - name: Build debug APK
+        working-directory: apps/hearth/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --console=plain
 
   # The WASM browser decode demo (apps/demos/wasm, WASM browser demo): a real CMake
   # preset (config-wasm-emscripten) unlike build-android above, but still its

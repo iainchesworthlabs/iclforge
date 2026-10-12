@@ -251,8 +251,10 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         const std::string_view codec = stream.data_type == ac::DataType::kAc3    ? "AC-3 "
                                        : stream.data_type == ac::DataType::kEac3 ? "E-AC-3 "
                                                                                  : "AC-4 ";
-        log("burst stream " + std::string(codec) + std::to_string(stream.sample_rate) + " Hz to " +
-            sink_->options_.layout +
+        // "to 7.1.4" when the program renders to a layout, and nothing when it does not (it hands the
+        // bytes on, as the Android app does).
+        const std::string layout = sink_->options_.layout.empty() ? std::string{} : " to " + sink_->options_.layout;
+        log("burst stream " + std::string(codec) + std::to_string(stream.sample_rate) + " Hz" + layout +
             (writing ? (bursts_->file().empty() ? std::string{} : " in " + bursts_->file().string())
                      : std::string(" (not written)")));
         post_iclforge_state();
@@ -634,7 +636,9 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
         support.lyrics_max_bytes = options_.lyrics_max_bytes;
         config.iclforge_support = std::move(support);
         // What the sink's streams are rendered to, as its own page would say.
-        config.iclforge_state.layout = options_.layout;
+        if (!options_.layout.empty()) {
+            config.iclforge_state.layout = options_.layout;
+        }
         config.iclforge_state.volume = 100;
         config.iclforge_state.muted = false;
         config.iclforge_state.required_lead_time_ms = 500;

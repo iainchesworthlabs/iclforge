@@ -69,6 +69,18 @@ class Lines final : public iclforge::sink::Log {
         });
     }
 
+    // The pairing code of the last "PAIRING CODE " line, as the sink shows it (digits and a dash).
+    [[nodiscard]] std::optional<std::string> code() {
+        const std::lock_guard lock(mutex_);
+        for (auto it = lines_.rbegin(); it != lines_.rend(); ++it) {
+            const std::size_t at = it->find("PAIRING CODE ");
+            if (at != std::string::npos) {
+                return it->substr(at + 13);
+            }
+        }
+        return std::nullopt;
+    }
+
    private:
     std::mutex mutex_;
     std::condition_variable changed_;
@@ -215,8 +227,11 @@ class Events final : public iclforge::sendspin::ServerListener {
     void on_goodbye(m::GoodbyeReason /*reason*/) override {}
     void on_leave() override {}
     void on_pairing_held_back(const std::optional<std::string>& /*message*/) override {}
-    void on_pairing_code_wanted() override {}
-    bool on_paired(const Key32& /*client_key*/, const Key32& /*psk*/) override { return true; }
+    void on_pairing_code_wanted() override { update([&] { code_wanted = true; }); }
+    bool on_paired(const Key32& /*client_key*/, const Key32& /*psk*/) override {
+        update([&] { paired = true; });
+        return true;
+    }
     void on_pairing_ended(std::optional<iclforge::sendspin::pairing_messages::AbortReason> /*reason*/) override {}
 
     template <class Predicate>
@@ -227,6 +242,8 @@ class Events final : public iclforge::sendspin::ServerListener {
 
     int hellos = 0;
     bool available = false;
+    bool code_wanted = false;
+    bool paired = false;
 
    private:
     template <class Update>
@@ -283,6 +300,15 @@ struct Dialled {
         return call([&] {
             return server.activate(
                 {.activities = {m::Activity::kPlayback}, .active_roles = std::move(roles), .pairing = std::nullopt});
+        });
+    }
+
+    bool pair(m::PairMethod method, std::optional<m::CodeFormat> format, std::int32_t pin_length) {
+        return call([&] {
+            return server.activate({.activities = {m::Activity::kPairing},
+                                    .active_roles = std::vector<std::string>{},
+                                    .pairing = m::PairingActivation{
+                                        .method = method, .format = format, .pin_length = pin_length, .languages = {}}});
         });
     }
 };
@@ -484,6 +510,33 @@ TEST_CASE("sink: the totals are what the outputs say they counted", "[sink][webs
     CHECK(closed.streams == 1);
     CHECK(closed.chunks == 4);
     CHECK(closed.frames == 4 * 480);
+}
+
+TEST_CASE("sink: a server pairs by the dynamic code the sink shows, and is then admitted", "[sink][websocket]") {
+    const fs::path dir = scratch("pairing");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.unpaired_access = false;
+    options.code_method = iclforge::sink::CodeMethod::kDynamic;
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.pair(m::PairMethod::kDynamicCode, m::CodeFormat::kDigits, 6));
+    REQUIRE(server.events.wait([&] { return server.events.code_wanted; }));
+    REQUIRE(log.wait("PAIRING CODE "));
+    std::string shown = log.code().value_or("");
+    std::erase(shown, '-');
+    REQUIRE(shown.size() == 6);
+
+    // The code the sink shows is the one that pairs: a round with it ends in a record on both sides.
+    REQUIRE(server.call(
+        [&] { return server.server.enter_code(iclforge::sendspin::pairing_flow::Code{shown}); }));
+    CHECK(log.wait("paired with server "));
+    CHECK(server.events.wait([&] { return server.events.paired; }));
 }
 
 TEST_CASE("sink: the store keeps the identity, the pairing PSK and the records between runs", "[sink][store]") {

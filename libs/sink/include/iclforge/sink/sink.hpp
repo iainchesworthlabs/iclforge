@@ -100,9 +100,10 @@ struct Options {
     // from before them, or one with no heap to spare. What it receives is kept (Sink::roles()).
     std::uint32_t lyrics_max_bytes = 0;
     // What the extension role's streams are rendered to, as its support and state objects say it:
-    // the layout in the layout grammar (state.layout), the number of outputs (support.outputs.count)
-    // and the crossover's range in Hz (support.management.crossover_hz). The sink does not render:
-    // the program's output does, and says here what it renders to.
+    // the layout in the layout grammar (state.layout; none is stated when it is empty, as for a program
+    // that bitstreams and renders nothing), the number of outputs (support.outputs.count) and the
+    // crossover's range in Hz (support.management.crossover_hz). The sink does not render: the
+    // program's output does, and says here what it renders to.
     std::string layout;
     std::int32_t output_count = 2;
     std::array<double, 2> crossover_hz{0.0, 0.0};

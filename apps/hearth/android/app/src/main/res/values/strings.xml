@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hearth</string>
+    <string name="channel_name">Sink</string>
+    <string name="notification_text">Ready to play from Hearth</string>
+    <string name="quit">Quit</string>
+    <string name="starting">Starting…</string>
+    <string name="native_failed">The native library did not load - see logcat</string>
+    <string name="not_started">The sink did not start: %1$s</string>
+    <string name="listening">Listening as \"%1$s\" on port %2$d</string>
+    <string name="listening_unadvertised">Listening on port %1$d (not advertised yet)</string>
+    <string name="waiting">Waiting for Hearth. Choose this sink there, and its pairing code appears here.</string>
+    <string name="enter_code">Enter this code in Hearth</string>
+    <string name="activity">%1$d connection(s) · %2$d stream(s) · %3$d chunk(s) · %4$d burst(s)</string>
+</resources>

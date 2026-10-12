@@ -110,6 +110,18 @@ The sections below contain the complete change list and fixes.
   were given.
   This is a move: no message, log line or file the test sink writes is different.
 
+**Hearth for Android: the app's skeleton**
+
+- **`apps/hearth/android`: a Gradle project and an app that is a Sendspin sink and plays nothing yet**
+  (`planning/hearth-android.md`, phase 1b). A foreground service of the media-playback type starts
+  one `iclforge::sink`, advertises it as `_sendspin._tcp` through `NsdManager`, and keeps both until
+  the notification's Quit or the screen's button; the screen shows the sink's name, whether it is
+  listening and advertised, and the pairing code a server asked for, as large as the screen can make
+  it. The sink accepts a stream, counts it and drops it: the pass-through output is the next phase.
+  A new project row (`hearth-android`, lane `android`), `check_android_jni.py` taught the second
+  package, and a CI job, `build-android-hearth`, that builds the debug APK with vcpkg in front of the
+  NDK's toolchain (`continue-on-error` until it has gone green on hosted runners).
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
