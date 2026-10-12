@@ -630,6 +630,9 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
                                                 {"karaoke_melody_db", "karaoke_vocal1_db",
                                                  "karaoke_vocal2_db"});
             }
+            if (options_.karaoke_eac3) {
+                support.karaoke_codecs = {ac::DataType::kAc3, ac::DataType::kEac3};
+            }
         }
         support.management.crossover_hz = {render::LayoutRenderer::kMinCrossoverHz,
                                            render::LayoutRenderer::kMaxCrossoverHz};
