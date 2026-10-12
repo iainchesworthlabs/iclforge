@@ -57,6 +57,20 @@ class KaraokeController : public iclforge::apps::CdgFrameSource {
     // A duet (planning/karaoke-phase2.md, W11b). Each line also carries `singer`: "" for a
     // line that says nothing, else "v1", "v2" or "both". hasSingers is whether any does.
     Q_PROPERTY(bool hasSingers READ hasSingers NOTIFY lyricsChanged)
+    // A CD+G disc beside the item, with or without a lyrics file (planning/karaoke-phase2.md, W13f;
+    // the owner's answer to C12, 2026-10-12): whether one is there and could be read, and its file
+    // name. With no lyrics file the status is "picture" and the picture is all there is; with one
+    // the status is the file's, and the words are shown unless the singer chose the picture.
+    Q_PROPERTY(bool hasPicture READ hasPicture NOTIFY lyricsChanged)
+    Q_PROPERTY(QString pictureFileName READ pictureFileName NOTIFY lyricsChanged)
+    // The choice between the words and the picture where both are beside the item: true shows the
+    // picture. It is for this run of the app, like the singers' names: not for a song, not kept, and
+    // it holds from one item to the next until the app is closed. It changes nothing where there is
+    // no disc (the words are all there is) or no lyrics file (the picture is).
+    Q_PROPERTY(bool preferPicture READ preferPicture WRITE setPreferPicture NOTIFY pictureShownChanged)
+    // Whether the picture is what is shown now: a disc is there, and either it is all there is
+    // (status "picture") or the choice is the picture. The views read this and not the two above.
+    Q_PROPERTY(bool showingPicture READ showingPicture NOTIFY pictureShownChanged)
     // The two singers' names as a person typed them: for this run of the app, not for a song
     // and not kept (D7), and empty until typed. A typed name comes before the file's
     // `[v1:]` / `[v2:]` tag, which comes before "V1" and "V2".
@@ -131,6 +145,13 @@ public:
     [[nodiscard]] int maxDelayMs() const { return kMaxDelayMs; }
     void setDelayMs(int delay_ms);
     [[nodiscard]] bool hasSingers() const { return has_singers_; }
+    [[nodiscard]] bool hasPicture() const { return disc_.loaded(); }
+    [[nodiscard]] QString pictureFileName() const { return picture_file_name_; }
+    [[nodiscard]] bool preferPicture() const { return prefer_picture_; }
+    void setPreferPicture(bool prefer);
+    [[nodiscard]] bool showingPicture() const {
+        return disc_.loaded() && (status_ == QLatin1String("picture") || prefer_picture_);
+    }
     [[nodiscard]] QString firstSingerName() const { return first_name_; }
     [[nodiscard]] QString secondSingerName() const { return second_name_; }
     [[nodiscard]] QString fileFirstSingerName() const { return file_first_name_; }
@@ -208,6 +229,7 @@ signals:
     void timingChanged();
     void reactionChanged();
     void singerNamesChanged();
+    void pictureShownChanged();
 
 private:
     struct State;
@@ -241,8 +263,11 @@ private:
     int stamped_lines_ = 0;
     QString timing_error_;
     int reaction_ms_ = kDefaultReactionMs;
-    // The disc of a "picture" status and the screen that follows it (apps/shared/cdg-picture).
+    // The disc beside the item and the screen that follows it (apps/shared/cdg-picture): held for
+    // a "picture" status, and beside a lyrics file too, for the singer to choose.
     iclforge::apps::CdgFrames disc_;
+    QString picture_file_name_;
+    bool prefer_picture_ = false;
 };
 
 }  // namespace iclforge::hearth::ui
