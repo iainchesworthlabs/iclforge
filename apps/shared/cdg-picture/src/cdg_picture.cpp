@@ -6,32 +6,44 @@
 #include <algorithm>
 #include <cmath>
 
-namespace iclforge::hearth::ui {
+namespace iclforge::apps {
 
 CdgPicture::CdgPicture(QQuickItem* parent) : QQuickPaintedItem(parent) {
-    // What is drawn is the frame, a whole image: nothing to blend under it.
+    // What is drawn is a black backdrop and the frame over it: nothing to blend under it.
     setOpaquePainting(true);
 }
 
-QObject* CdgPicture::controller() const {
-    return controller_.data();
+QObject* CdgPicture::source() const {
+    return source_.data();
 }
 
-void CdgPicture::setController(QObject* controller) {
-    auto* typed = qobject_cast<KaraokeController*>(controller);
-    if (typed == controller_.data()) {
+void CdgPicture::setSource(QObject* source) {
+    auto* typed = qobject_cast<CdgFrameSource*>(source);
+    if (typed == source_.data()) {
         return;
     }
-    if (controller_ != nullptr) {
-        disconnect(controller_.data(), nullptr, this, nullptr);
+    if (source_ != nullptr) {
+        disconnect(source_.data(), nullptr, this, nullptr);
     }
-    controller_ = typed;
+    source_ = typed;
     if (typed != nullptr) {
-        // A new item or a nudge of the delay is a different picture at the same position.
-        connect(typed, &KaraokeController::lyricsChanged, this, &CdgPicture::refresh);
-        connect(typed, &KaraokeController::delayChanged, this, &CdgPicture::refresh);
+        // Another file or another delay is a different picture at the same position.
+        connect(typed, &CdgFrameSource::pictureChanged, this, [this](int key) {
+            if (key == key_) {
+                refresh();
+            }
+        });
     }
-    emit controllerChanged();
+    emit sourceChanged();
+    refresh();
+}
+
+void CdgPicture::setKey(int key) {
+    if (key == key_) {
+        return;
+    }
+    key_ = key;
+    emit keyChanged();
     refresh();
 }
 
@@ -46,8 +58,8 @@ void CdgPicture::setPositionMs(qreal position_ms) {
 
 void CdgPicture::refresh() {
     const bool was_ready = ready();
-    frame_ = controller_ != nullptr ? controller_->pictureFrame(static_cast<qlonglong>(std::llround(position_ms_)))
-                                    : QImage{};
+    frame_ = source_ != nullptr ? source_->pictureFrame(key_, static_cast<qlonglong>(std::llround(position_ms_)))
+                                : QImage{};
     update();
     if (was_ready != ready()) {
         emit frameChanged();
@@ -70,4 +82,4 @@ void CdgPicture::paint(QPainter* painter) {
     painter->drawImage(target, frame_);
 }
 
-}  // namespace iclforge::hearth::ui
+}  // namespace iclforge::apps
