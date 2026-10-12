@@ -83,7 +83,8 @@ std::vector<double> tones_for(const ac3::eac3::AccessUnitConfig& config,
 }
 
 std::vector<std::vector<std::byte>> encode_units(const ac3::eac3::AccessUnitConfig& config,
-                                                 const std::vector<double>& tones, int frames) {
+                                                 const std::vector<double>& tones, int frames,
+                                                 std::optional<std::uint64_t> burst_at = std::nullopt) {
     ac3::eac3::AccessUnitEncoder encoder{config};
     const auto channels = static_cast<std::size_t>(encoder.channel_count());
     REQUIRE(channels == tones.size());
@@ -95,9 +96,17 @@ std::vector<std::vector<std::byte>> encode_units(const ac3::eac3::AccessUnitConf
     for (int f = 0; f < frames; ++f) {
         for (std::size_t ch = 0; ch < channels; ++ch) {
             for (std::size_t i = 0; i < block[ch].size(); ++i) {
-                block[ch][i] = static_cast<float>(
-                    kAmplitude * std::sin(2.0 * std::numbers::pi * tones[ch] *
-                                          static_cast<double>(n0 + i) / 48000.0));
+                double v = kAmplitude * std::sin(2.0 * std::numbers::pi * tones[ch] *
+                                                 static_cast<double>(n0 + i) / 48000.0);
+                // A short decaying burst on the first channel: what makes the encoder signal a
+                // transient correction, so the decoder holds frames back that flush() must return.
+                if (ch == 0 && burst_at.has_value() && n0 + i >= *burst_at &&
+                    n0 + i < *burst_at + 384) {
+                    const auto k = static_cast<double>(n0 + i - *burst_at);
+                    v += 0.6 * std::sin(2.0 * std::numbers::pi * 5000.0 * k / 48000.0) *
+                         std::exp(-k / 96.0);
+                }
+                block[ch][i] = static_cast<float>(v);
             }
             views[ch] = block[ch];
         }
@@ -116,6 +125,7 @@ struct Heard {
     ac3::Acmod acmod = ac3::Acmod::k2_0;
     int substreams = 0;
     int units = 0;
+    std::size_t flushed = 0;  // how many substreams flush() handed back
 };
 
 Heard decode_all(const std::vector<std::vector<std::byte>>& units, const ac3::OutputConfig& output,
@@ -149,6 +159,7 @@ Heard decode_all(const std::vector<std::vector<std::byte>>& units, const ac3::Ou
     }
     if (flush_tail) {
         for (const auto& tail : decoder.flush()) {
+            ++heard.flushed;
             append(tail.channels);
         }
     }
@@ -403,10 +414,18 @@ TEST_CASE("E-AC-3 karaoke: the last access unit has the channel count the rest h
     // flush() folds what the hold-back still has, one substream at a time; for a karaoke stream it
     // has to come out as L, C, R and the LFE too, or a sink opened for four channels would be
     // handed six for the final unit.
-    const ac3::eac3::AccessUnitConfig config{.independent = karaoke_bed(ac3::Acmod::k3_2, true)};
-    const auto units = encode_units(config, tones_for(config, kBedHz), kFrames);
+    // A burst early on engages transient pre-noise processing, which makes the decoder hold
+    // frames back; a second near the end keeps some of them held at the end of the stream.
+    ac3::eac3::FrameConfig bed = karaoke_bed(ac3::Acmod::k3_2, true);
+    bed.transient_prenoise = true;
+    const ac3::eac3::AccessUnitConfig config{.independent = bed};
+    const auto units = encode_units(config, tones_for(config, kBedHz), kFrames,
+                                    std::uint64_t{1} * ac3::kSamplesPerFrame + 900);
     const Heard heard = decode_all(units, aware(), /*flush_tail=*/true);
+    // decode_all() requires every piece, flushed ones included, to have the same channel count
+    // as the first, so a tail left as six channels would have failed there.
     REQUIRE(heard.channels.size() == 4);
+    CHECK(heard.flushed > 0);
     for (const auto& channel : heard.channels) {
         CHECK(channel.size() >= static_cast<std::size_t>(kFrames) * ac3::kSamplesPerFrame);
     }
