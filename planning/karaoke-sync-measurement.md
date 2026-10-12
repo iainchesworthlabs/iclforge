@@ -93,5 +93,23 @@ the fix for a drift is in the clock. Record the number and the setup in the PR t
 
 ## Measured, protocol level (2026-10-12)
 
-See the results table in the pull request that added this file; it is not repeated here so that it is
-not stale the day the clock changes.
+Real boards on one Wi-Fi network, a 40 s stereo E-AC-3 programme played to both as one group by
+Hearth's own engine, the boards' own counters afterwards:
+
+| | S3 (hearth-eb2c64) | P4 (hearth-ea6d66) |
+|---|---|---|
+| Bursts played of 1,250 | 1,250 | 1,250 |
+| Late, dropped, underruns | 0, 0, 0 | 0, 0, 0 |
+| Worst playout error against the server's timeline (`worst_error_us`) | -268 us | -433 us |
+
+So the two were within 0.7 ms of each other and of the server's clock for the whole play. A file
+with a line every 3 s, the host polling the board's reported line every 5 ms (the board's own state
+message arrives within a few milliseconds of the change): the lines of an S3 came 3.00, 3.04, 3.01,
+2.99 and 2.90 s apart, a P4's 2.98, 3.31, 2.87 and 3.15 s (the spread is the Wi-Fi's and the
+host's scheduling, not the board's clock: its lines move at the file's pace). A board restarted
+in the middle of an item came back holding the item 7 to 8 s later and its lines came in a run (13 s
+into the play, then 18 to 21 s) before settling at 3 s: its clock has to converge again, and the
+engine, which does not push while the only member is away, catches up.
+
+Not measured here: what the sink's DAC and the room do after the port (above), and the Hearth
+window's own clock against a local output, which is L6 proper.
