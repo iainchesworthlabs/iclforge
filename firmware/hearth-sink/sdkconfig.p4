@@ -180,3 +180,10 @@ CONFIG_ICLFORGE_EXAMPLE_I2S_DOUT_GPIO=22
 # bootloader is the size it was, an update over the network works as before, and code that
 # must run while the flash is written needs no IRAM for it any more.
 CONFIG_SPIRAM_XIP_FROM_PSRAM=y
+
+# LVGL (the panel's graphics library, main/idf_component.yml) is a dependency of every P4 image, and
+# its component compiles its own examples and demos into its archive unless told not to: some 330
+# object files and a minute or two of a build for code nothing calls, in the images that have no
+# panel as much as in the one that has (sdkconfig.panel).
+CONFIG_LV_BUILD_EXAMPLES=n
+CONFIG_LV_BUILD_DEMOS=n

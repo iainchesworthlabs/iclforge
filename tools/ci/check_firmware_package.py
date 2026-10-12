@@ -66,8 +66,11 @@ IMAGES = {
     "hearth-sink-esp32s3": Rule("esp32s3", 0x0009, "16MB", True, 0, 99),
     "hearth-sink-esp32c6": Rule("esp32c6", 0x000D, "4MB", False, 0, 99),
     "hearth-sink-esp32c6-16mb": Rule("esp32c6", 0x000D, "16MB", False, 0, 99),
-    # sdkconfig.p4 builds for v1.x silicon; a v3.x board needs another build.
+    # sdkconfig.p4 builds for v1.x silicon; a v3.x board needs another build, which is
+    # sdkconfig.p4-rev3 over it (planning/karaoke-p4x-panel.md, D7): ESP-IDF's minimum for v3.x is
+    # v3.1, and its maximum is 3.99. Each refuses the other's chip at boot.
     "hearth-sink-esp32p4-rev1": Rule("esp32p4", 0x0012, "16MB", True, 100, 199, refuse_above=199),
+    "hearth-sink-esp32p4-rev3": Rule("esp32p4", 0x0012, "16MB", True, 301, 399, refuse_above=399),
 }
 
 FLASH_CODES = {"1MB": 0, "2MB": 1, "4MB": 2, "8MB": 3, "16MB": 4, "32MB": 5, "64MB": 6, "128MB": 7}
