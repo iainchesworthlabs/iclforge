@@ -245,6 +245,27 @@ writes the `sdkconfig`):
    byte of static use is a byte less in the largest block at runtime, on any board, with no board
    run.
 
+### Where each check runs
+
+Read from the workflows on 2026-10-13, because the question "how is the canon enforced while other
+sessions change the firmware" has a shorter answer than the guard's size suggests:
+
+| where | what it holds | when | fails a PR? |
+|---|---|---|---|
+| PR Gate, `Static` (`_static.yml`) | `sink_profile.py check-docs`; `test_sink_profile.py` (the file against `_build.yml`'s fragment lists, `check_firmware_package.py`'s image rules, the keys every profile must lock); `test_board_suite.py` (a baseline holds exactly its profile's rows) | every PR | **yes**, but these are checks that the *files agree*, not that a configured build is the profile |
+| `ci.yml` → `_build.yml`: `build-esp32s3`, `hearth-esp32s3`, `build-esp32c3`, `package-esp32-firmware` | the build **is** the profile: `sink_profile.py defaults`/`identity` configure it, `verify` holds it (asked against given, locked values, watched keys nobody placed, the app, bootloader and static RAM budgets from `idf.py size`), `package_firmware.py --profile` refuses an image that is not one | push to `main` only | **no**: red on `main`, and skipped there while the minimum-footprint legs above them in the same job fail |
+| `bench_flash.py build <id>` | the same guard, on a bench build | by hand | no |
+| a booked board | the boot `budget:` line, the identity in `/hardware`, `board_suite.py` (it refuses an image built under another hash) and `compare` | by hand | no |
+
+`ESP32_PROFILE_GUARD=warn` (a repository variable, unset) makes the build steps warn instead of
+fail. What this means for another session's valid change: it is never blocked, and the guard
+makes it *decide* when a configured build sees something new: a locked key whose effective value
+changed (`[locked] KEY is X, the profile says Y`) is locked at its new value in `profiles.json`
+and, by the owner's rule, re-recorded; a new key matching a watch pattern (`[unplaced]`) is locked
+or named `free`; a key added at an inert value is locked and its baselines kept. The gap is *when*
+the decision is forced: after the merge, on `main`, where two PRs that are each valid alone
+can first meet.
+
 ## Boot-time budget line
 
 **Built (PR 4).** The failure showed at the first play, after the board had been "fine" since
@@ -769,6 +790,56 @@ were within the tolerance, so those baselines were holding; the new figures:
   booked by another session for a network-stall experiment around then, which may or may not be
   related. It is noted and not reproduced.
 
+### AC-4 over Sendspin, and the S3's AC-4 baseline re-recorded (PR 16)
+
+**Which baseline was owed a re-record.** #1459 (merged after my S3a and P4a images were built) made
+`s3-n16r8-ac4` list `ac4` to a server, at two channels and 25 frames a second
+(`ICLFORGE_EXAMPLE_SENDSPIN_AC4` 0 to 1, and a third key, `..._AC4_MAX_FRAME_RATE`, 25), and added
+that key to every other profile at 0. Under [the owner's rule](#changing-a-profile) the first is a
+**changed locked value**, so `s3-n16r8-ac4` carries a re-record, which it had not had: its baseline
+was under `d7a1513e42b6`, the definition is `5654f90ee458`. The key at 0 on the others is an
+**inert addition**, so their baselines are kept and say so (`s3-n16r8` `9ed6f4eb5c70` to
+`156f7310e8d0`, `p4-rev1` `af3ac10bdf67` to `60ce70a0bf92`, `c6-16mb` `cc71ee4908ff` to
+`0021e64331a6`; the P4 AC-4 profile's re-record below is for its new rows).
+
+**Recorded**, `s3-n16r8-ac4` on S3a and `p4-rev1-ac4` on P4a, the images built from `main` at
+`e3da66cb3` with the `measure` overlay, five plays a row after eight restarts:
+
+| | boot free / largest block, before to now | `/play` rows, before to now (permille) |
+|---|---|---|
+| `s3-n16r8-ac4` (S3a) | 51,919 / 31,744 to 66,159 / 31,744 | AC-3 120 to 120, E-AC-3 86 to 82, AC-4 music 517 to 505, A-CPL 642 to 641, companding 601 to 606 |
+| `p4-rev1-ac4` (P4a) | 281,191 / 208,896 to 295,707 / 208,896 | AC-3 61 to 61, E-AC-3 40 to 40, AC-4 music 241 to 240, A-CPL 283 to 287, 5.1 604 to 619, companding 278 to 281 |
+
+Every PCM hash is equal to the one before and to the host's pin. The S3's boot free RAM rose by
+14,240 bytes between the two images, which
+includes #1474's move of the AC-3 decoder's tables out of static RAM (27,776 bytes on the C6); it is
+not isolated.
+
+**AC-4 over Sendspin rows.** The AC-4 seeds are three frames, which is not a stream, so the server
+plays one over and over for `sendspin_seconds` (20) and the row holds that **every burst the server
+sent is accounted for** (its report's `programme.bursts`, 471 or 472 for these). All four seeds are
+23.4375 frames a second (`frame_rate_index` 13, 2,048 samples), a burst period of 42,667 µs, which
+is the `period_us` the permille is taken over and is inside the S3's 25 frames a second.
+
+| row | S3a, `s3-n16r8-ac4` | P4a, `p4-rev1-ac4` |
+|---|---|---|
+| AC-3 | 200 permille, 0 of 5 plays glitched, least heap 36,843 | 85 permille, 0 of 5 plays glitched, least heap 259,719 |
+| E-AC-3 | 162 permille, 2 of 5 plays glitched, least heap 2,523 | 67 permille, 1 of 5 plays glitched, least heap 207,527 |
+| AC-4 2.0 music | 516 permille, 2 of 5 plays glitched, least heap 4,787 | 189 permille, 1 of 5 plays glitched, least heap 17,951 |
+| AC-4 2.0 A-CPL | 689 permille, 3 of 5 plays glitched, least heap 64,947 | not in the list |
+| AC-4 5.1 (folded to 2.0 on the P4's two-slot sink) | not in the list (the S3 lists two channels) | 590 permille, 1 of 5 plays glitched, least heap 27,687 |
+
+- **The S3 plays AC-4 over Sendspin inside real time, with glitches.** A-CPL, the heaviest 2.0
+  stream, takes 689 permille of a burst and glitched 3 plays of five (late chunks and a few
+  underruns); the music stream 516 permille and 2 of five. The decoder leaves 0.31 to 0.48 of
+  every burst spare, so it looks like the same lateness the S3's E-AC-3 row has
+  ([PR 15](#sendspin-rows-for-the-s3-and-the-p4-pr-15)), but where in a stream the late chunks fall
+  is not something the board's totals say and it was not measured.
+- **Allowances.** A row's `glitched_plays` allowance is now a number by row id: the S3 profiles allow
+  the E-AC-3 row two more than its baseline and every other row the default one, so that a row
+  that glitched 3 of 5 cannot only fail at 5 of 5. The two AC-4 music and E-AC-3 rows carry a
+  2,048-byte `play_heap_free_bytes` allowance on the S3 (4.8 KB and 2.5 KB at their least).
+
 ## Changing a profile
 
 A change to a profile, a fragment it names, or a locked key's Kconfig default is one PR that:
@@ -795,8 +866,10 @@ A kept baseline's hash is then not the file's, and that is read from the note, n
 failure: the suite still refuses an *image* built under another hash, so a board is only ever
 run on the definition the file has.
 
-CI fails a PR that touches a fragment or the Kconfig defaults of a locked key and not the profile
-file. A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
+**Nothing fails a PR yet for touching a fragment or a locked key's Kconfig default without the
+profile file**: the guard runs after the merge, on `main`
+([where each check runs](#where-each-check-runs)), so such a PR is first seen red on `main`, or not
+at all while the sink steps are skipped there. A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
 reports `<id>+scratch`, is refused by the suite's `--record`, and its overlay is committed beside
 the measurement if the figure is quoted anywhere.
 
@@ -832,6 +905,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; no board has run the image, so no list and no baseline |
 | 10 | Sendspin rows: the suite plays a stream the way the C6's product path does, with the test server | yes | **Built** (the harness, tests, the C6's AC-3 row and its baseline); the E-AC-3 row joined it in PR 16, once the decoder's feature tables were out of static RAM, see [Sendspin rows](#sendspin-rows-pr-14) |
 | 11 | Sendspin rows for the S3 and the P4 profiles, and their baselines | yes | **Built** (S3a and P4a, the four baselines re-recorded); the S3's E-AC-3 stream starts late in two plays of five, see [PR 15](#sendspin-rows-for-the-s3-and-the-p4-pr-15) |
+| 12 | AC-4 over Sendspin rows for the two AC-4 profiles, and the S3 AC-4 baseline re-recorded under its #1459 hash | yes | **Built** (S3a and P4a); see [PR 16](#ac-4-over-sendspin-and-the-s3s-ac-4-baseline-re-recorded-pr-16) |
 
 PR 3 follows 2. `p4-rev3` waited for #1400's fragments to be on main (row 9).
 
