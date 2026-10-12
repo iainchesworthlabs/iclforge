@@ -15,6 +15,13 @@ object Harness {
      */
     external fun playThrough(stream: ByteArray, stateDirectory: String, maxBursts: Int): String
 
+    /**
+     * The lyric frame [document] (an LRC, UTF-8) gives at [positionMs] with the singer's [delayMs]: the
+     * JSON `NativeSink.lyricFrame()` would hand the view, made by the same libs/sink code from the
+     * document and no server. [streaming] is the frame's flag of a stream being open.
+     */
+    external fun lyricFrameJson(document: ByteArray, positionMs: Long, delayMs: Int, streaming: Boolean): ByteArray
+
     /** The line as a map. */
     fun parse(line: String): Map<String, String> =
         line.split(';').filter { it.contains('=') }.associate {

@@ -1054,6 +1054,11 @@ int main(int argc, char** argv) {
         options.advertise = false;
         options.codecs = {m::Codec::kPcm};
         options.layout = sink_layout;
+        if (lyrics_path) {
+            // The reference sink takes the document and the anchors too, so that the chain from them
+            // to a sink's own clock is run here and reported at the end.
+            options.lyrics_max_bytes = ac::kMaxLyricsBytes;
+        }
         auto started = testsink::Sink::start(options, sink_log);
         if (!started) {
             std::cerr << "hearth-testserver: the test sink: " << started.error() << "\n";
@@ -1250,6 +1255,11 @@ int main(int argc, char** argv) {
         source.emplace(*stream, passes);
     }
     std::uint64_t sent = 0;
+    // The reference sink's view of the lyrics, sampled with the players' checks: the last line it had
+    // the sound in, where, and how many samples were on a line at all.
+    std::string reference_line;
+    std::int64_t reference_position_ms = 0;
+    std::uint64_t reference_frames = 0;
     // The programme frame after the last burst sent.
     std::int64_t end_frame = 0;
     std::string failure;
@@ -1333,6 +1343,14 @@ int main(int argc, char** argv) {
         if (SteadyClock::now() >= next_check) {
             next_check = SteadyClock::now() + 250ms;
             check_players();
+            if (sink && lyrics_sent) {
+                const auto frame = sink->lyric_frame();
+                if (frame.mode == iclforge::lyrics::StageMode::kLine) {
+                    reference_line = frame.current.text;
+                    reference_position_ms = frame.position_ms;
+                    ++reference_frames;
+                }
+            }
             if (SteadyClock::now() >= play_deadline) {
                 failure = "the play took too long: the group stopped taking bursts";
             }
@@ -1354,6 +1372,10 @@ int main(int argc, char** argv) {
         }
     }
     group->stop();
+    if (sink && lyrics_sent) {
+        note("reference sink: " + std::to_string(reference_frames) + " lyric frame(s) on a line, the last at " +
+             std::to_string(reference_position_ms) + " ms: \"" + reference_line + "\"");
+    }
 
     // Every player has played every burst, or has stopped counting.
     if (failure.empty()) {

@@ -5,10 +5,9 @@ plays what Hearth sends it. The plan is [`planning/hearth-android.md`](../../../
 and the one screen design it, the desktop Hearth and the ESP32-P4X panel share is
 [`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md).
 
-**State: phase 2a** (the pass-through path held end to end on the host and on a device, one run on a
-Shield and a receiver recorded below, and the sink core following a karaoke item's lyrics on its own
-clock: `NativeSink.lyricFrame(delayMs)` hands the screen one frame of JSON, UTF-8, per call; the view
-that draws it is phase 2b). The service, the advertisement, the listener, the pairing records, a plain
+**State: phase 2b** (the pass-through path held end to end on the host and on a device, one run on a
+Shield and a receiver recorded below, the sink core following a karaoke item's lyrics on its own
+clock, and [the lyric screen](#the-lyric-screen-phase-2) that draws them). The service, the advertisement, the listener, the pairing records, a plain
 pairing screen and the pass-through output are here: an AC-3 or E-AC-3 stream a Hearth sends is
 rebuilt into the IEC 61937 bursts it came from and written to the receiver, between null bursts, in the
 slot each is due in. What it does not do yet: show the lyrics (phase 2), the common design and the
@@ -60,6 +59,57 @@ the device was handed are compared, byte for byte and in order, with the ones th
 Nothing in them needs an HDMI route or a receiver. The debug build carries `x86_64` beside `arm64-v8a`,
 for the emulator CI runs them on; a run on one device builds one ABI with
 `-Pandroid.injected.build.abi=arm64-v8a`.
+
+## The lyric screen (phase 2)
+
+When a document is held or a stream is playing, the app's one screen is the lyric view
+([`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md), S2 to S8): the past line,
+the line being sung with the fill running through it, the next lines, a duet's two vocals, the count-in
+of an instrumental gap, a line timed as a whole, plain text, "no lyrics" after a one-second grace, and
+each line in its own direction. It draws one `LyricFrame` the sink's core answers
+(`NativeSink.lyricFrame(delayMs)`, 30 times a second while a word is sung, 5 while a line is shown, 1
+otherwise): the document the server sent, followed on the sink's own clock by the server's anchors, less
+the singer's delay. Sizes are in `u`, a 600th of the height, and the colours are the family's, always
+dark; the faces are the shared theme's (Archivo, with Noto Sans Hebrew and Arabic, and the system's for
+Greek, Cyrillic and CJK).
+
+![The line being sung: the words before it in the accent, the word being sung filled from the left and underlined, the rest muted, with the line before and after](../../../docs/hearth/screenshots/android-lyric-singing.png)
+![A duet: each vocal's line carries its singer's name, the second vocal indented](../../../docs/hearth/screenshots/android-lyric-duet.png)
+![An instrumental gap: four dots that go out one a second, the line before above and the next line under](../../../docs/hearth/screenshots/android-lyric-count-in.png)
+![A Hebrew line: right-aligned, its words flowing right to left](../../../docs/hearth/screenshots/android-lyric-hebrew.png)
+
+The D-pad's left and right nudge the lyric delay by 50 ms (kept, and drawn in the footer when it is not
+0); up and down scroll a file with no times. The settings screen of the plan's phase 3 gives these a
+home; the keys are what the view takes until then.
+
+**How it is checked.** `LyricViewRenderTest` (`src/androidTest`) takes the karaoke examples' documents
+(`examples/karaoke`, staged by Gradle) through the library's own frame (`Harness.lyricFrameJson`: the
+pure half of `Sink::lyric_frame()`), the parse and the view, draws it to a 1920 by 1080 bitmap with no
+display and no server, writes the picture to the app's external files directory (`lyric-renders/`), and
+probes the pixels where the spec puts things: the fill grows with the fraction and the word is
+underlined, a line stays inside the margins, a duet's second vocal is indented, the dots go out, a
+line-timed file draws no word, "no lyrics" waits its grace, a Hebrew line is at the right edge and a
+line in no face's script is said and not drawn. It runs on an emulator and on a TV box that is asleep:
+
+```sh
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest '-Pandroid.injected.build.abi=arm64-v8a'
+adb install -r -t app/build/intermediates/apk/debug/app-debug.apk
+adb install -r -t app/build/intermediates/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -e class com.iclforge.hearth.LyricViewRenderTest \
+    com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner
+adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders
+```
+
+To see it live, `hearth-testserver --lyrics examples/karaoke/auld-lang-syne/auld-lang-syne.lrc
+--play examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --player ws://<the Shield>:8928/sendspin ...`
+sends the sink the document and the anchors with the audio. With `--sink <directory>` instead of a
+player the same run is made to a reference sink in the test server's own process, which reports what its
+core had the sound in (`reference sink: 55 lyric frame(s) on a line, the last at 14279 ms: "And auld
+lang syne!"` for that file): the chain from a server's document and anchors, through the time filter, to
+the sink's clock, run on the host. It has not been run to a Shield here. **Not shown here:** the pictures on a
+television (they are the view's own render at 1080p, not a photograph of a set), the lyric screen's
+controls sheet and the text-size setting (phase 3), the format and route chips (they need the role's
+`output` key, D6), and a duet's "you" and "guide" words (they need the reproduction the singer chose).
 
 ## A run on a Shield and a receiver (phase 1e)
 

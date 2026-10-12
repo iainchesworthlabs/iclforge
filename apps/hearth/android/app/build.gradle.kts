@@ -153,16 +153,47 @@ val harnessFixtures = tasks.register<Copy>("stageHarnessFixtures") {
         include("dee_joc_514.ec3")
         into("object-fixture")
     }
+    // The lyric view's fixtures: the karaoke examples' documents (planning/hearth-sink-screen.md,
+    // Conformance).
+    from(rootDir.resolve("../../../examples/karaoke")) {
+        include("**/*.lrc")
+        into("karaoke")
+    }
     into(layout.buildDirectory.dir("harness-assets"))
 }
-// AGP 9 takes no Provider in the source set API: the variant's androidTest assets get the directory by
-// path, and the task above is made a dependency of the tasks that merge them.
+// The family's faces, from the shared theme (apps/shared/theme/assets/fonts), so that there is one copy
+// of each (planning/hearth-sink-screen.md, Tokens): Archivo for Latin, Noto Sans Hebrew and Arabic for
+// the scripts a phone may lack, with their licences beside them as the SIL Open Font License asks.
+// Greek, Cyrillic and CJK fall back to the system's faces.
+val stagedFonts = tasks.register<Copy>("stageFonts") {
+    from(rootDir.resolve("../../../apps/shared/theme/assets/fonts")) {
+        include(
+            "Archivo-Regular.ttf", "Archivo-Medium.ttf", "Archivo-SemiBold.ttf", "Archivo-ExtraBold.ttf",
+            "NotoSansHebrew.ttf", "NotoSansArabic.ttf",
+            "OFL.txt", "NotoSansHebrew-OFL.txt", "NotoSansArabic-OFL.txt"
+        )
+        into("fonts")
+    }
+    into(layout.buildDirectory.dir("font-assets"))
+}
+
+// AGP 9 takes no Provider in the source set API: the variant's assets get each directory by path, and
+// the tasks above are made dependencies of the tasks that merge them.
 androidComponents {
     onVariants { variant ->
+        variant.sources.assets?.addStaticSourceDirectory(
+            layout.buildDirectory.dir("font-assets").get().asFile.absolutePath
+        )
         variant.androidTest?.sources?.assets?.addStaticSourceDirectory(
             layout.buildDirectory.dir("harness-assets").get().asFile.absolutePath
         )
     }
+}
+// Every task that reads the assets directory by path, the lint model's among them, runs after the copy.
+tasks.matching {
+    (it.name.startsWith("merge") && it.name.endsWith("Assets")) || it.name.contains("lint", ignoreCase = true)
+}.configureEach {
+    dependsOn(stagedFonts)
 }
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("AndroidTestAssets") }.configureEach {
     dependsOn(harnessFixtures)

@@ -8,16 +8,19 @@ import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * The plain screen of phase 1b (planning/hearth-sink-screen.md is the design it grows into): what
- * the sink is called, whether it is listening and advertised, and the pairing code a server asked
- * for, as large as the screen can make it. It reads the native sink by polling, as Hearth's own
- * live view does: the sink calls no one back.
+ * The app's one screen. It is the plain screen of phase 1b (what the sink is called, whether it is
+ * listening and advertised, and the pairing code a server asked for, as large as the screen can make
+ * it) until lyrics are held or a stream is playing, and then the lyric view (planning/hearth-sink-
+ * screen.md, S2 to S8), which takes the whole surface. It reads the native sink by polling, as
+ * Hearth's own live view does: the sink calls no one back.
  *
  * Opening it starts the service (SinkService), and leaving it does not stop it.
  */
@@ -29,6 +32,8 @@ class MainActivity : Activity() {
     private lateinit var hint: TextView
     private lateinit var activity: TextView
     private lateinit var quit: Button
+    private lateinit var plain: LinearLayout
+    private lateinit var lyrics: LyricView
 
     /** The pairing code the sink is showing, or null while no server has asked to pair. */
     private var pairingCode: String? = null
@@ -41,9 +46,37 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * Asks the core for a lyric frame and shows it, at the rate the frame says: 30 a second while a
+     * word is being sung, 5 while a line is shown, 1 otherwise (planning/hearth-sink-screen.md,
+     * Motion). The screen is a guest of the audio, which it shares no thread with: the core answers
+     * from its own state under a lock it holds for microseconds.
+     */
+    private val frames = object : Runnable {
+        override fun run() {
+            val frame = if (NativeSink.available && NativeSink.running()) {
+                LyricFrame.parse(NativeSink.lyricFrame(lyrics.delayMs))
+            } else {
+                LyricFrame.EMPTY
+            }
+            lyrics.show(frame)
+            val showing = lyrics.active
+            lyrics.visibility = if (showing) View.VISIBLE else View.GONE
+            plain.visibility = if (showing) View.GONE else View.VISIBLE
+            if (showing && !lyrics.hasFocus()) {
+                lyrics.requestFocus()
+            }
+            handler.postDelayed(this, 1000L / Tokens.framesPerSecond(frame))
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(build())
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        lyrics.delayMs = prefs.getInt(KEY_DELAY_MS, 0)
+        lyrics.textStep = prefs.getInt(KEY_TEXT_STEP, 1)
+        lyrics.onDelayChanged = { prefs.edit().putInt(KEY_DELAY_MS, it).apply() }
         // A TV box that lets its display sleep loses its HDMI audio route with it, and a bitstream with
         // it (planning/hearth-android-findings.md, F12). While this screen is the one shown, the
         // display stays on; what keeps it on once the person leaves is the next phase's (spike S3).
@@ -54,10 +87,12 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         handler.post(refresh)
+        handler.post(frames)
     }
 
     override fun onPause() {
         handler.removeCallbacks(refresh)
+        handler.removeCallbacks(frames)
         super.onPause()
     }
 
@@ -68,7 +103,17 @@ class MainActivity : Activity() {
             typeface = if (mono) Typeface.MONOSPACE else if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
 
-    private fun build(): LinearLayout {
+    private fun build(): FrameLayout {
+        plain = buildPlain()
+        lyrics = LyricView(this).apply { visibility = View.GONE }
+        return FrameLayout(this).apply {
+            setBackgroundColor(Tokens.BG)
+            addView(plain, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            addView(lyrics, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        }
+    }
+
+    private fun buildPlain(): LinearLayout {
         val pad = (48 * resources.displayMetrics.density).toInt()
         heading = text(32f, Color.WHITE, bold = true).apply { setText(R.string.app_name) }
         status = text(20f, MUTED)
@@ -138,6 +183,9 @@ class MainActivity : Activity() {
     }
 
     private companion object {
+        const val PREFS = "hearth"
+        const val KEY_DELAY_MS = "lyric_delay_ms"
+        const val KEY_TEXT_STEP = "text_step"
         const val POLL_MS = 500L
         const val RECENT_LINES = 8
         val BACKGROUND = Color.rgb(8, 9, 11)

@@ -10,11 +10,15 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
 
+#include "iclforge/lyrics/lyrics.hpp"
+#include "iclforge/lyrics/stage.hpp"
 #include "iclforge/sink/loopback_harness.hpp"
+#include "iclforge/sink/lyric_frame.hpp"
 
 extern "C" {
 
@@ -45,6 +49,36 @@ JNIEXPORT jstring JNICALL Java_com_iclforge_hearth_Harness_playThrough(JNIEnv* e
                        ";written_hash=" + std::to_string(result.written_hash) +
                        ";play_ms=" + std::to_string(result.play_us / 1000);
     return env->NewStringUTF(line.c_str());
+}
+
+// The lyric frame a document gives at `position_ms`, as the sink's core would answer it for an anchor
+// that put the sound there: the document parsed, its stage made with the delay and the same options
+// the app asks with, and the frame written as JSON (UTF-8 bytes). It is the pure half of
+// Sink::lyric_frame(), so that the view's test needs no server and no clock.
+JNIEXPORT jbyteArray JNICALL Java_com_iclforge_hearth_Harness_lyricFrameJson(JNIEnv* env, jobject /*self*/,
+                                                                             jbyteArray document, jlong position_ms,
+                                                                             jint delay_ms, jboolean streaming) {
+    const jsize size = env->GetArrayLength(document);
+    std::string text(static_cast<std::size_t>(size), '\0');
+    env->GetByteArrayRegion(document, 0, size, reinterpret_cast<jbyte*>(text.data()));
+    constexpr iclforge::lyrics::StageOptions kStage{.lines_before = 1, .lines_after = 3};
+    std::string json;
+    if (auto parsed = iclforge::lyrics::parse_lyrics(text)) {
+        const iclforge::lyrics::Stage stage = iclforge::lyrics::make_stage(
+            &*parsed, static_cast<std::int64_t>(position_ms), static_cast<std::int64_t>(delay_ms), kStage);
+        json = iclforge::sink::lyric_frame_json(
+            iclforge::sink::make_lyric_frame(std::int64_t{1}, &*parsed, stage, streaming != JNI_FALSE));
+    } else {
+        const iclforge::lyrics::Stage none = iclforge::lyrics::make_stage(nullptr, std::nullopt);
+        json = iclforge::sink::lyric_frame_json(
+            iclforge::sink::make_lyric_frame(std::nullopt, nullptr, none, streaming != JNI_FALSE));
+    }
+    jbyteArray out = env->NewByteArray(static_cast<jsize>(json.size()));
+    if (out != nullptr) {
+        env->SetByteArrayRegion(out, 0, static_cast<jsize>(json.size()),
+                                reinterpret_cast<const jbyte*>(json.data()));
+    }
+    return out;
 }
 
 }  // extern "C"

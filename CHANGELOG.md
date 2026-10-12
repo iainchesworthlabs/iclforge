@@ -72,6 +72,22 @@ The sections below contain the complete change list and fixes.
   stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
   needs a case of its own (`planning/karaoke-eac3.md`, D10).
 
+**Hearth for Android: the lyric screen**
+
+- **The app draws the lyrics** (`apps/hearth/android`, phase 2b of `planning/hearth-android.md`; S2 to
+  S8 of `planning/hearth-sink-screen.md`): the past line, the line being sung with the fill running
+  through its words and the word underlined, the next lines, a duet's two vocals with the singers'
+  names, the count-in of an instrumental gap, a line timed as a whole, plain text, "no lyrics" after a
+  one-second grace, each line in its own direction, and a sentence in place of a line no face can
+  draw. Sizes are in `u` by the panel's length rule, the colours are the family's (the sung line at
+  70% accent), the faces the shared theme's (Archivo, Noto Sans Hebrew and Arabic, staged into the
+  APK from `apps/shared/theme`, with the system's for the rest), and the D-pad's left and right nudge
+  the delay by 50 ms. `LyricViewRenderTest` draws the karaoke examples' documents through the
+  library's own frame into 1080p bitmaps on the device's text engine and probes the pixels (13
+  cases, run on a Shield); four of the pictures are in `docs/hearth/screenshots`.
+  `hearth-testserver --lyrics FILE` also takes a reference sink with `--sink`, which reports the line
+  its clock had the sound in.
+
 **Hearth for Android: the sink core follows the lyrics and hands the screen a frame**
 
 - **`Sink::lyric_frame()`** (`libs/sink`, phase 2a of `planning/hearth-android.md`): the lyric document
