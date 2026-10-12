@@ -29,6 +29,17 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**A burst rebuilt from its parts, and a null burst**
+
+- **`iec61937::burst_from_parts`, `burst_period_bytes` and `null_burst`.** A sink that bitstreams a
+  Sendspin burst chunk to a link holds `Pc`, `Pd` and the payload, not the sync words, the word swap
+  or the stuffing; `burst_from_parts` writes the burst the packers wrote (checked byte for byte over
+  the Dolby encoder's AC-3, E-AC-3 with JOC, and AC-4 fixtures at every burst type), refusing what
+  the packers refuse. `burst_period_bytes` gives its length without building it and `null_burst`
+  gives a null-data burst, which a receiver's Dolby lock survived for 6 s where PCM silence lost it
+  in half a second. Additive: three exported functions and their ABI allowlist entries
+  (planning/hearth-android.md, phase 0b).
+
 **Karaoke: a pitch library**
 
 - **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one
