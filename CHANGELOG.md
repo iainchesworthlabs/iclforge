@@ -29,24 +29,22 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
-**Hearth: what a singer's performance is scored against, and how**
+**Karaoke in E-AC-3: the Forge GUI's Karaoke flow offers it**
 
-- **Hearth's engine can place a singer's voice in the item and score it** (the microphone, scoring
-  and recording programme, M4's engine half; the Qt window and the microphone itself are later pull
-  requests). `Performance` takes two things and owns no device or thread: where in the item the heard
-  sound is at a time on the steady clock (the engine's `PlayPosition::heard`, which is what a person
-  singing along is hearing), and blocks of the microphone's samples with the time the first was
-  captured. It tracks the pitch, places each frame at the heard position at the moment the sound
-  reached the microphone less the microphone's declared delay plus an offset the person can move,
-  and scores it against a reference with `iclforge::pitch`. Nothing is scored before the first
-  position, or while the item is held; those frames are counted as unplaced, not as wrong. It says
-  how sharp or flat and how early or late the singer is.
-- **`reference_from_karaoke()` takes the reference from the karaoke stream being played.** A karaoke
-  AC-3 decoded as coded leaves the guide melody M and the vocals V1 and V2 in their channels
-  (Annex C, Table C.2.1); the first present of M, V1 and V2 is tracked, or the part the singer has
-  muted (the one they are taking over). A stream that is not karaoke, or whose part has no clear
-  pitch, is refused with the reason. On the repository's karaoke example the tune comes out of M and
-  of V1 note for note, and V2 comes out a diatonic third below.
+- **The Karaoke flow's Save step has a Format: AC-3 (the default) or E-AC-3.** Annex C is
+  AC-3's and AC-3 stays what the flow writes unless it is asked otherwise; E-AC-3 writes the
+  same parts as one independent substream flagged `bsmod` 7 with its Lo/Ro mixing group (as
+  `forge eac3-encode` does, and the command line the step shows is that one), and a note beside
+  the choice says that E-AC-3's specification gives no reproduction for it, that Hearth, forge
+  and Dolby's reference decoder apply Annex C's, and that a player that does not reproduce it
+  plays the vocals from the surrounds. The Hear step plays the stream under the same three listenings
+  and part levels. A project file that names E-AC-3 opens the flow with that format.
+- **The stream player decodes an E-AC-3 karaoke stream under the choice.** It handed the
+  decoder no choice for E-AC-3, so a karaoke stream played as coded whatever the Hear step
+  said; one independent substream with no object layer now takes the reproduction and
+  reports L, C, R and the LFE, with the coded layout named beside it, as AC-3 does
+  (`planning/karaoke-eac3.md`, E6, D7).
+
 **E-AC-3 folds a stream with no `mixmdate` at -3 dB, as Dolby's decoder does**
 
 - **The default Lo/Ro levels of an E-AC-3 stream that sends no `mixmdate` are -3 dB for the centre
@@ -3279,6 +3277,25 @@ The sections below contain the complete change list and fixes.
   back as it was before #1344, when the sink firmware stopped configuring because the sink's player
   linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
   ESP-IDF image, so nothing before the merge saw that break.
+
+**Hearth: what a singer's performance is scored against, and how**
+
+- **Hearth's engine can place a singer's voice in the item and score it** (the microphone, scoring
+  and recording programme, M4's engine half; the Qt window and the microphone itself are later pull
+  requests). `Performance` takes two things and owns no device or thread: where in the item the heard
+  sound is at a time on the steady clock (the engine's `PlayPosition::heard`, which is what a person
+  singing along is hearing), and blocks of the microphone's samples with the time the first was
+  captured. It tracks the pitch, places each frame at the heard position at the moment the sound
+  reached the microphone less the microphone's declared delay plus an offset the person can move,
+  and scores it against a reference with `iclforge::pitch`. Nothing is scored before the first
+  position, or while the item is held; those frames are counted as unplaced, not as wrong. It says
+  how sharp or flat and how early or late the singer is.
+- **`reference_from_karaoke()` takes the reference from the karaoke stream being played.** A karaoke
+  AC-3 decoded as coded leaves the guide melody M and the vocals V1 and V2 in their channels
+  (Annex C, Table C.2.1); the first present of M, V1 and V2 is tracked, or the part the singer has
+  muted (the one they are taking over). A stream that is not karaoke, or whose part has no clear
+  pitch, is refused with the reason. On the repository's karaoke example the tune comes out of M and
+  of V1 note for note, and V2 comes out a diatonic third below.
 
 ### Changed
 

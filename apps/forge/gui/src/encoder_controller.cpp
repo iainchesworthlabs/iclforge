@@ -3362,12 +3362,12 @@ QString EncoderController::effectiveLabel() const {
     if (atmos_enabled_) {
         return QStringLiteral("5.1 bed");
     }
-    // Annex C's karaoke is AC-3's (E-AC-3 and AC-4 have no such mode, and the decoder never
-    // flags one). The five channels are a backing and parts: "5.0" says a surround room.
-    if (codec_ == plan::Codec::kAc3 &&
+    // Annex C's karaoke is AC-3's and E-AC-3's (no dependent); "5.0" would say a surround room.
+    if ((codec_ == plan::Codec::kAc3 || codec_ == plan::Codec::kEac3) &&
         meta_.info.bsmod == iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke) {
         const auto cp = effectiveChannelPlan();
-        if (iclforge::ac3::meta::is_karaoke(meta_.info.bsmod, cp.bed_acmod)) {
+        if (cp.dependents.empty() &&
+            iclforge::ac3::meta::is_karaoke(meta_.info.bsmod, cp.bed_acmod)) {
             return QStringLiteral("Karaoke %1")
                 .arg(to_qstring(iclforge::ac3::analysis::layout_name(cp.bed_acmod, cp.bed_lfe)));
         }
