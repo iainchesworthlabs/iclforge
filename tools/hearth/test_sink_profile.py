@@ -181,6 +181,34 @@ class TheFile(unittest.TestCase):
                     f"the release rules publish {name} and no profile describes it",
                 )
 
+    def test_the_measure_overlay_sets_only_the_keys_it_declares(self) -> None:
+        """An image built with `measure` is the profile's, not a scratch build, because the
+        overlay moves nothing the guard holds: its fragment sets only observation keys, each of
+        them declared, and none of them a stack, a ring, a cache or a placement."""
+        spec = self.data["overlays"]["measure"]
+        self.assertEqual(spec.get("fragment"), "measure")
+        text = (sp.PROJECT / "sdkconfig.measure").read_text("utf-8")
+        keys = [
+            line.split("=", 1)[0]
+            for line in text.splitlines()
+            if line.startswith("CONFIG_") and "=" in line
+        ]
+        self.assertTrue(keys, "sdkconfig.measure sets nothing")
+        for key in keys:
+            self.assertTrue(sp._matches(key, spec["touches"]), f"{key} is not declared")
+            for word in ("STACK", "RING", "CACHE", "IN_PSRAM", "DMA", "LANE", "CORE"):
+                self.assertNotIn(word, key, f"measure may not move {key}")
+
+    def test_a_measure_image_is_the_profile_s_and_its_hash_key_may_differ_from_the_locked_value(
+        self,
+    ) -> None:
+        locked = self.data["profiles"]["p4-rev1-ac4"]["locked"]
+        self.assertEqual(locked["CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH"], "0")
+        moved = sp.touched(self.data, ("measure",))
+        self.assertTrue(sp._matches("CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH", moved))
+        names = sp.fragment_names(self.data, "p4-rev1-ac4", ("measure",))
+        self.assertEqual(names[-1], "sdkconfig.measure")
+
     def test_the_panel_s_stack_keys_are_free_and_not_unplaced_in_a_profile_without_a_screen(
         self,
     ) -> None:

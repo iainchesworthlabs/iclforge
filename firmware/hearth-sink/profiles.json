@@ -57,7 +57,8 @@
         "ICLFORGE_EXAMPLE_AC4_PCM_HASH",
         "ICLFORGE_EXAMPLE_REPORT_EVERY_FRAMES"
       ],
-      "note": "observation only: the PCM hash an AC-4 play carries and how often progress lines print; no placement, size or cache"
+      "note": "observation only: the PCM hash an AC-4 play carries; no placement, size or cache. sdkconfig.measure sets ICLFORGE_EXAMPLE_AC4_PCM_HASH and nothing else; the report cadence is declared for a scratch build to change",
+      "fragment": "measure"
     },
     "qemu-net": {
       "touches": [
