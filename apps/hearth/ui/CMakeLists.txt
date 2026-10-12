@@ -38,7 +38,7 @@
 # the binaries) is installed by both Linux legs of the workflow today; see
 # .github/workflows/_ci-linux.yml's own "Install Qt6 (Linux GUI)" step, whose
 # comment spells out the same split.
-find_package(Qt6 6.8 QUIET COMPONENTS Core Gui Qml Quick QuickControls2 LinguistTools)
+find_package(Qt6 6.8 QUIET COMPONENTS Core Gui Network Qml Quick QuickControls2 LinguistTools)
 
 # Exported so notices/hearth/notices.cmake (include()d from
 # apps/hearth/CMakeLists.txt, one directory up) can tell whether the hearth
@@ -82,6 +82,10 @@ else()
         src/network_controller.cpp
         src/network_controller.hpp
         src/qsettings_store.hpp
+        # A second launch with files hands them to the Hearth that is running (a QLocalServer,
+        # so Qt6::Network below) rather than starting another engine on the same output.
+        src/single_instance.cpp
+        src/single_instance.hpp
         # The family's own translator installer, shared rather than copied -
         # apps/crucible/CMakeLists.txt takes it from the same place, and the
         # class's own header says it exists so a second Qt app in this
@@ -116,7 +120,7 @@ else()
         # a container's own facts (container_input.hpp, "whose functions the
         # engine does not compile" - apps/hearth/engine/src/session.hpp's comment).
         iclforge::containers
-        Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+        Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick Qt6::QuickControls2)
 
     set(ICLFORGE_HEARTH_QML_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Main.qml"
