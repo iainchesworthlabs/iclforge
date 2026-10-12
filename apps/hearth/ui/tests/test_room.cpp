@@ -570,7 +570,8 @@ public:
 };
 
 std::shared_ptr<TestSinkHost> start_test_sink(const std::string& name, const std::string& directory,
-                                              bool accept_settings, std::string* error) {
+                                              bool accept_settings, std::string* error,
+                                              std::uint32_t lyrics_max_bytes) {
     auto host = std::make_shared<TestSinkHost>();
     host->name = name;
     testsink::SinkOptions options;
@@ -586,6 +587,7 @@ std::shared_ptr<TestSinkHost> start_test_sink(const std::string& name, const std
     // more page than a fast test needs to draw.
     options.layout = "5.1";
     options.accept_settings = accept_settings;
+    options.lyrics_max_bytes = lyrics_max_bytes;
     auto started = testsink::Sink::start(options, host->log);
     if (!started.has_value()) {
         if (error != nullptr) {
