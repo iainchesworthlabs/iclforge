@@ -6,8 +6,8 @@ frame_len_base: 2048 at frame rate indices 2 and 13, 1920 at 0 and 1, 1536 at 3 
 6, 1024 at 7, 768 at 8 and 9, 512 at 10, and 384 at 11 and 12, divided by the high frame rate
 mode's factor of 2 or 4, and each halved down to a sixteenth where Table 186 has the length:
 2048 to 128, 1920 to 120, 1536 to 96, 1024 to 128, 960 to 120, 768 to 96, 512 to 128 and 384 to
-96), the values the decoder otherwise computes when it builds its transforms (libs/dsp/src/tiered/fft.cpp, mdct.cpp,
-kbd.cpp and synthesis.cpp), in the order it stores them:
+96), the values the decoder otherwise computes when it builds its transforms
+(libs/dsp/src/tiered/fft.cpp, mdct.cpp, kbd.cpp and synthesis.cpp), in the order it stores them:
 
   kFftRootsN    e^(-2 pi i (p k mod n) / n) for each pass of the N/2-point FFT, {re, im};
   kPreTwiddleN  -cos(2 pi (8k + 1) / 16N) and -sin(...) for k < N/2, Pseudocode 60;
