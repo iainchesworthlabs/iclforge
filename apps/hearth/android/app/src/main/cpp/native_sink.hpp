@@ -51,6 +51,9 @@ class NativeSink {
     [[nodiscard]] SinkTotals totals() const;
     // The lines the sink has logged since the last call, oldest first.
     [[nodiscard]] std::vector<std::string> drain_log();
+    // What the lyric view draws now, as a line of JSON (iclforge/sink/lyric_frame.hpp), UTF-8: the
+    // document the sink holds for the item playing, followed on its own clock, less `delay_ms`.
+    [[nodiscard]] std::string lyric_frame_json(std::int32_t delay_ms) const;
 
    private:
     class Impl;

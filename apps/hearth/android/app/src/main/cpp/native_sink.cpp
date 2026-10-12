@@ -18,7 +18,10 @@
 #include <vector>
 
 #include "audio_link.hpp"
+#include "iclforge/lyrics/stage.hpp"
+#include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/session_driver.hpp"
+#include "iclforge/sink/lyric_frame.hpp"
 #include "iclforge/sink/passthrough.hpp"
 #include "iclforge/sink/sink.hpp"
 
@@ -208,6 +211,9 @@ std::string NativeSink::start(const std::string& state_directory, const std::str
     // starts a stream with the lead the test sink asks for (0.5 s) has its first bursts due before
     // that, and they are dropped; 0.8 s leaves the margin that the first run showed was needed.
     options.required_lead_time_ms = 800;
+    // The words of a karaoke item are held and followed on the sink's own clock, and drawn
+    // (lyric_frame()): the most a server may send one message of.
+    options.lyrics_max_bytes = sendspin::player::kMaxLyricsBytes;
 
     std::expected<std::unique_ptr<sink::Sink>, std::string> started =
         sink::Sink::start(std::move(options), impl_->outputs, impl_->log);
@@ -275,6 +281,17 @@ SinkTotals NativeSink::totals() const {
 
 std::vector<std::string> NativeSink::drain_log() {
     return impl_->log.drain();
+}
+
+std::string NativeSink::lyric_frame_json(std::int32_t delay_ms) const {
+    // One line before the current one and three after: the screen draws the first two on a phone-sized
+    // surface and all three on a TV (planning/hearth-sink-screen.md, Layout).
+    constexpr iclforge::lyrics::StageOptions kStage{.lines_before = 1, .lines_after = 3};
+    const std::lock_guard lock(impl_->mutex);
+    if (!impl_->sink) {
+        return sink::lyric_frame_json(sink::LyricFrame{});
+    }
+    return sink::lyric_frame_json(impl_->sink->lyric_frame(delay_ms, kStage));
 }
 
 }  // namespace iclforge::hearth_android

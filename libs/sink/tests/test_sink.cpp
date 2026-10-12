@@ -466,6 +466,86 @@ TEST_CASE("sink: a burst stream and its karaoke settings reach the burst output"
     CHECK(recording.started.empty());
 }
 
+TEST_CASE("sink: a lyric document and its anchors become a frame on the sink's own clock", "[sink][websocket]") {
+    const fs::path dir = scratch("lyric_frame");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.lyrics_max_bytes = ac::kMaxLyricsBytes;
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole)}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+
+    // Nothing held and nothing playing.
+    const iclforge::sink::LyricFrame idle = (*sink)->lyric_frame();
+    CHECK(idle.mode == iclforge::lyrics::StageMode::kNoLyrics);
+    CHECK(idle.item == -1);
+    CHECK_FALSE(idle.streaming);
+
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    CHECK(log.wait("burst stream AC-3 48000 Hz"));
+
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = {.item = 42,
+                       .text = "[ti:Test song]\n[00:00.00]First line\n[00:04.00]Second line\n[01:00.00]\n"};
+    REQUIRE(server.call([&] { return server.server.iclforge_command(document); }));
+    CHECK(log.wait("lyrics for item 42: held"));
+
+    // The document is held and no anchor has come due: the first lines wait, and a stream is open.
+    const iclforge::sink::LyricFrame waiting = (*sink)->lyric_frame();
+    CHECK(waiting.item == 42);
+    CHECK(waiting.streaming);
+    CHECK(waiting.title == "Test song");
+    CHECK(waiting.mode == iclforge::lyrics::StageMode::kWaiting);
+
+    // The sound is at 5 s now, by the server's clock. Once the sink's own clock has converged on the
+    // server's the frame is the second line, a little past 5 s.
+    ac::CommandMessage anchor;
+    anchor.command = ac::Command::kLyricsPosition;
+    anchor.lyrics_position = {.item = 42, .position_ms = 5000, .at_us = server.clock.now_us(), .speed = 1.0};
+    REQUIRE(server.call([&] { return server.server.iclforge_command(anchor); }));
+
+    iclforge::sink::LyricFrame frame;
+    const auto deadline = std::chrono::steady_clock::now() + 30s;
+    while (std::chrono::steady_clock::now() < deadline) {
+        frame = (*sink)->lyric_frame();
+        if (frame.mode == iclforge::lyrics::StageMode::kLine) {
+            break;
+        }
+        std::this_thread::sleep_for(50ms);
+    }
+    REQUIRE(frame.mode == iclforge::lyrics::StageMode::kLine);
+    CHECK(frame.current.text == "Second line");
+    CHECK(frame.position_ms >= 5000);
+    CHECK(frame.position_ms < 40'000);
+    REQUIRE(frame.before.size() == 1);
+    CHECK(frame.before[0].text == "First line");
+
+    // A delay of 2 s shows the lyrics later: the stage is the position less the delay.
+    const iclforge::sink::LyricFrame delayed = (*sink)->lyric_frame(2000);
+    CHECK(delayed.position_ms + 2000 - frame.position_ms < 500);
+
+    // The end of the stream is nothing playing: the document stays, the position goes.
+    REQUIRE(server.call([&] { return server.server.end_burst_stream(); }));
+    CHECK(log.wait("burst stream ended after 0 bursts"));
+    const iclforge::sink::LyricFrame ended = (*sink)->lyric_frame();
+    CHECK(ended.item == 42);
+    CHECK_FALSE(ended.streaming);
+    CHECK(ended.mode == iclforge::lyrics::StageMode::kWaiting);
+
+    // And a sink that loses its lyrics has none.
+    (*sink)->forget_lyrics();
+    CHECK((*sink)->lyric_frame().mode == iclforge::lyrics::StageMode::kNoLyrics);
+}
+
 TEST_CASE("sink: the totals are what the outputs say they counted", "[sink][websocket]") {
     const fs::path dir = scratch("totals");
     Recording recording;

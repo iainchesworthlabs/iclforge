@@ -72,6 +72,20 @@ The sections below contain the complete change list and fixes.
   stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
   needs a case of its own (`planning/karaoke-eac3.md`, D10).
 
+**Hearth for Android: the sink core follows the lyrics and hands the screen a frame**
+
+- **`Sink::lyric_frame()`** (`libs/sink`, phase 2a of `planning/hearth-android.md`): the lyric document
+  a server sends and its anchors are followed on the sink's own clock (the session's time filter gives
+  the server's for it), and what a screen draws at that moment is one value with the text in it
+  (`LyricFrame`: the mode, the current line and its words with the one being sung and how far through
+  it, the lines before and after, a duet's singers, the gap and its count-in, the line's place among
+  the lines with text, the tags), with the singer's delay applied. `lyric_frame_json()` writes it for
+  a layer with no C++ types, and the app's JNI hands it over as UTF-8 bytes. The app lists the lyric
+  commands (`lyrics_max_bytes`), so a Hearth server sends them. Nine cases hold the frame at fixed
+  positions of the karaoke examples' documents, a Hebrew line, a plain file and a gap; one more drives
+  a real server session through it. `hearth-testserver --lyrics FILE` sends a player the document and
+  the playhead's anchors, as the engine does.
+
 **Hearth for Android: a run on a real Shield and receiver, recorded**
 
 - **The pass-through path on a Shield and an Onkyo receiver** (`planning/hearth-android.md`, phase 1e):

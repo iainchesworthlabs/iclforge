@@ -3,6 +3,7 @@
 # outputs; these are the seam, with outputs that only write down what they were given.
 iclforge_add_test_binary(iclforge-sink-tests PROJECT sink SOURCES
     test_sink.cpp
+    test_lyric_frame.cpp
     test_passthrough.cpp
     test_end_to_end.cpp)
 

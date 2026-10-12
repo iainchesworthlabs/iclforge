@@ -28,6 +28,8 @@
 #include "iclforge/sendspin/state_roles.hpp"
 #include "iclforge/sendspin/stream_roles.hpp"
 #include "iclforge/sendspin/websocket.hpp"
+#include "iclforge/lyrics/stage.hpp"
+#include "iclforge/sink/lyric_frame.hpp"
 #include "iclforge/sink/store.hpp"
 
 // iclforge::sink: libs/sendspin's player half as a sink that a program runs (planning/hearth-
@@ -312,6 +314,14 @@ class Sink {
     // restarted its player, or reconnected: a test of what a server does about a member that
     // reports no lyrics (or another item's) for the item it is playing.
     void forget_lyrics();
+
+    // What a screen draws of the lyrics now (lyric_frame.hpp): the document the sink holds for the
+    // item playing, followed on the sink's own clock by the server's anchors, less `delay_ms`, the
+    // singer's nudge (positive shows the lyrics later). A sink that holds none answers
+    // StageMode::kNoLyrics, with `streaming` saying whether a stream is open. Safe to call from a
+    // thread of the program's own, as the totals are.
+    [[nodiscard]] LyricFrame lyric_frame(std::int64_t delay_ms = 0,
+                                         const lyrics::StageOptions& options = {}) const;
 
    private:
     friend class Connection;

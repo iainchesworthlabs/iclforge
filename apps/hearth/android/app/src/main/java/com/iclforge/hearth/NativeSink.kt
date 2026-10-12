@@ -65,4 +65,13 @@ object NativeSink {
 
     /** The lines the sink has logged since the last call, oldest first. */
     external fun drainLog(): Array<String>
+
+    /**
+     * What the lyric view draws now: one JSON object as UTF-8 bytes (libs/sink's
+     * `iclforge/sink/lyric_frame.hpp`, `LyricFrame`), the document the sink holds for the item playing
+     * followed on its own clock, less [delayMs], the singer's nudge. Bytes and not a String: the
+     * JVM's modified UTF-8 has no four-byte sequences, and a lyric may need them. [lyricFrame] is
+     * cheap to call every frame.
+     */
+    external fun lyricFrame(delayMs: Int): ByteArray
 }

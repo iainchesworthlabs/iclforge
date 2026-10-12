@@ -5,8 +5,10 @@ plays what Hearth sends it. The plan is [`planning/hearth-android.md`](../../../
 and the one screen design it, the desktop Hearth and the ESP32-P4X panel share is
 [`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md).
 
-**State: phase 1e** (the pass-through path held end to end on the host and on a device, and one run on a
-Shield and a receiver recorded below). The service, the advertisement, the listener, the pairing records, a plain
+**State: phase 2a** (the pass-through path held end to end on the host and on a device, one run on a
+Shield and a receiver recorded below, and the sink core following a karaoke item's lyrics on its own
+clock: `NativeSink.lyricFrame(delayMs)` hands the screen one frame of JSON, UTF-8, per call; the view
+that draws it is phase 2b). The service, the advertisement, the listener, the pairing records, a plain
 pairing screen and the pass-through output are here: an AC-3 or E-AC-3 stream a Hearth sends is
 rebuilt into the IEC 61937 bursts it came from and written to the receiver, between null bursts, in the
 slot each is due in. What it does not do yet: show the lyrics (phase 2), the common design and the
