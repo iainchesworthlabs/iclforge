@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 110> kOptionTokens{{
+constexpr std::array<OptionToken, 111> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -140,6 +140,8 @@ constexpr std::array<OptionToken, 110> kOptionTokens{{
     {"src=", "an additional input source; repeat for more than one"},
     {"lyrics=", "encode/eac3-encode/ac4-encode: a lyrics file (.lrc, .srt, .ass, .kar) to write beside "
                 "the stream as its own UTF-8 .lrc"},
+    {"lyrics-encoding=", "encode/eac3-encode/ac4-encode: the code page a lyrics= file is in when it is "
+                         "not UTF-8 or UTF-16 (windows-1252, shift-jis, gbk, big5, ...)"},
     {"map=", "where each source channel goes"},
     {"offset=", "<sourceIndex>:<seconds> leading silence for that source"},
     {"capture2=", "live: a second capture device, clock-conformed to the first"},
@@ -926,6 +928,10 @@ void print_option_blocks(std::uint32_t mask) {
         fmt::println("  lyrics=<path>     encode/eac3-encode/ac4-encode: a lyrics file (.lrc, .srt, "
                      ".ass or .kar), read and written beside the stream as <stream>.lrc in UTF-8, "
                      "where Hearth finds it; one already there is left alone");
+        fmt::println("  lyrics-encoding=<page>  the code page of a lyrics= file that is not UTF-8 or "
+                     "UTF-16 (windows-1252, windows-1251, shift-jis, gbk, big5, euc-kr, ...); the "
+                     "words are written beside the stream in UTF-8. Never guessed at: without it "
+                     "such a file is refused. A UTF-8 or UTF-16 file is read as it is");
     }
     if ((mask & topic::kTake) != 0) {
         fmt::println("");

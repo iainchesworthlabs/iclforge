@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -540,4 +541,101 @@ TEST_CASE("karaoke authoring: lyrics are copied beside the stream under its name
     CHECK(forge_gui::karaoke_copy_lyrics((std::filesystem::path(stream).parent_path() / "none.lrc").string(),
                                          stream_folder.file("second.ac3", "x")) ==
           KaraokeLyricsCopy::kUnreadable);
+}
+
+TEST_CASE("karaoke authoring: the code pages offered are the ones this system converts, each once",
+          "[forge-gui][karaoke]") {
+    const auto pages = forge_gui::karaoke_code_pages();
+    REQUIRE(pages.size() > 10);
+    std::set<std::string> names;
+    bool western = false;
+    bool japanese = false;
+    for (const auto& page : pages) {
+        CHECK_FALSE(page.name.empty());
+        CHECK_FALSE(page.group.empty());
+        CHECK_FALSE(page.title.empty());
+        CHECK(names.insert(page.name).second);
+        western = western || page.name == "windows-1252";
+        japanese = japanese || page.name == "shift-jis";
+    }
+    CHECK(western);
+    CHECK(japanese);
+}
+
+TEST_CASE("karaoke authoring: a file refused only for its encoding is the one a page is offered for",
+          "[forge-gui][karaoke]") {
+    const ScratchFolder folder;
+    // Latin-1 words, which no page was named for: some page would read it.
+    CHECK(forge_gui::karaoke_lyrics_needs_code_page(folder.file("latin1.lrc", "[00:01.00]Caf\xE9\n")));
+    // Read as it is: nothing to choose.
+    CHECK_FALSE(forge_gui::karaoke_lyrics_needs_code_page(folder.file("fine.lrc", "[00:01.00]hello\n")));
+    CHECK_FALSE(forge_gui::karaoke_lyrics_needs_code_page(
+        folder.file("utf8.lrc", "[00:01.00]Caf\xC3\xA9\n")));
+    // Words with no times are lyrics all the same, so a page is what such a file wants.
+    CHECK(forge_gui::karaoke_lyrics_needs_code_page(folder.file("untimed.lrc", "Caf\xE9, no times\n")));
+    // Refused for something no page changes: no lyrics in it, nothing in it, not there.
+    CHECK_FALSE(forge_gui::karaoke_lyrics_needs_code_page(folder.file("tag.lrc", "[ti:Caf\xE9]\n")));
+    CHECK_FALSE(forge_gui::karaoke_lyrics_needs_code_page(folder.file("empty.lrc", "")));
+    CHECK_FALSE(forge_gui::karaoke_lyrics_needs_code_page((std::filesystem::temp_directory_path() /
+                                                           "forge-gui-karaoke-no-such-file.lrc")
+                                                              .string()));
+}
+
+TEST_CASE("karaoke authoring: a file is read, previewed and copied in the page the author names",
+          "[forge-gui][karaoke]") {
+    using forge_gui::KaraokeLyricsCopy;
+    const ScratchFolder source_folder;
+    const ScratchFolder stream_folder;
+    // Two lines of Shift-JIS: the hiragana A I, then U.
+    const std::string sjis =
+        source_folder.file("kana.lrc", "[00:01.00]\x82\xA0\x82\xA2\n[00:03.00]\x82\xA4\n");
+    const std::string a_i = "\xE3\x81\x82\xE3\x81\x84";
+    const std::string u = "\xE3\x81\x86";
+
+    // Without a page it is refused, and with the right one it is not.
+    CHECK_FALSE(forge_gui::karaoke_lyrics_problem(sjis).empty());
+    CHECK(forge_gui::karaoke_lyrics_problem(sjis, "shift-jis").empty());
+    // A page chosen is a different page's reading: the problem is empty and the words differ.
+    CHECK(forge_gui::karaoke_lyrics_problem(sjis, "windows-1252").empty());
+    CHECK(forge_gui::karaoke_lyrics_preview(sjis, "windows-1252") != a_i + "\n" + u);
+
+    // The preview is the first lines, one to a line, and nothing for no page.
+    CHECK(forge_gui::karaoke_lyrics_preview(sjis, "shift-jis") == a_i + "\n" + u);
+    CHECK(forge_gui::karaoke_lyrics_preview(sjis, "shift-jis", 1) == a_i);
+    CHECK(forge_gui::karaoke_lyrics_preview(sjis, "").empty());
+
+    // A name that is no page is a problem, a preview of nothing, and an unreadable copy.
+    // Said as a page this system cannot read, and not as the file's own encoding being refused.
+    CHECK(forge_gui::karaoke_lyrics_problem(sjis, "klingon").find("cannot read") != std::string::npos);
+    CHECK(forge_gui::karaoke_lyrics_preview(sjis, "klingon").empty());
+    std::string error;
+    const std::string stream = stream_folder.file("kana.ac3", "x");
+    CHECK(forge_gui::karaoke_copy_lyrics(sjis, stream, &error, "klingon") == KaraokeLyricsCopy::kUnreadable);
+    CHECK(error.find("cannot read") != std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(std::filesystem::path(stream).replace_extension(".lrc")));
+
+    // With the page, the copy is the file's words as UTF-8 LRC.
+    CHECK(forge_gui::karaoke_copy_lyrics(sjis, stream, &error, "shift-jis") == KaraokeLyricsCopy::kCopied);
+    CHECK(read_all(std::filesystem::path(stream).replace_extension(".lrc").string()) ==
+          "[00:01.00]" + a_i + "\n[00:03.00]" + u + "\n");
+}
+
+TEST_CASE("karaoke authoring: bytes the chosen page does not have are a problem and write nothing",
+          "[forge-gui][karaoke]") {
+    using forge_gui::KaraokeLyricsCopy;
+    const ScratchFolder source_folder;
+    const ScratchFolder stream_folder;
+    // A Shift-JIS lead byte with nothing after it.
+    const std::string cut = source_folder.file("cut.lrc", "[00:01.00]ab\x82\n");
+
+    const std::string problem = forge_gui::karaoke_lyrics_problem(cut, "shift-jis");
+    CHECK_FALSE(problem.empty());
+    CHECK(problem.find("code page") != std::string::npos);
+    CHECK(forge_gui::karaoke_lyrics_preview(cut, "shift-jis").empty());
+
+    std::string error;
+    const std::string stream = stream_folder.file("cut.ac3", "x");
+    CHECK(forge_gui::karaoke_copy_lyrics(cut, stream, &error, "shift-jis") == KaraokeLyricsCopy::kUnreadable);
+    CHECK(error == problem);
+    CHECK_FALSE(std::filesystem::exists(std::filesystem::path(stream).replace_extension(".lrc")));
 }
