@@ -187,6 +187,13 @@ heard position is, and a program may not use another program (`tools/checks/proj
 editor in the Forge GUI would have the lyrics module moved into `apps/shared` first, which only a
 second user of it would justify.
 
+**Since (2026-10-12).** The aligner recipe is written and was run end to end on one song:
+`docs/karaoke/forced-alignment.md`. The lyric module did move, to `libs/lyrics` (W13a), so what a
+GUI editor would still need is the session and the dialog, not the module; the three ways of giving
+the Forge GUI a timing tool, with what each means for the lyric file it writes, are
+[E19 in the findings](karaoke-phase2-findings.md#e19-timing-the-words-in-the-forge-gui-the-options),
+and the choice is D13.
+
 ## Risks
 
 - **The same hot files as phase 1.** `encoder_controller.cpp`, the Forge GUI's `Main.qml` and its
@@ -226,6 +233,7 @@ built as answered; W12's questions are the only ones still open.
 | D10 | "Mini karaoke" is read as **MIDI karaoke** (`.kar`, lyrics as MIDI meta events) | **Confirmed: MIDI karaoke** | Another format: say which |
 | D11 | CD+G is read as an already-ripped `.cdg` file and shown as its picture; no drive ripping and no text extracted | **Approved**: a CD+G carries a 300 by 216 picture, not text | OCR of the picture for text (a model and its runtime; not planned) |
 | D12 | The lyric reader and cursor move from `apps/hearth/engine` into a library before word timing's writer and Crucible's import are built | **Approved** | Leave them in Hearth and give Crucible its own parser: two readers of one format that cannot share a test |
+| D13 | Whether the Forge GUI gets a word-timing tool, and how (added 2026-10-12) | **Open: the owner's call.** Recommended A now, B when Hearth opens a file it is handed ([E19 in the findings](karaoke-phase2-findings.md#e19-timing-the-words-in-the-forge-gui-the-options)) | A: leave it and point the GUI's Save step at Hearth (S). B: a button that opens the stream in Hearth (M). C: the session and dialog shared, the GUI timing against its own Hear step (L) |
 
 ### W11: duets
 
