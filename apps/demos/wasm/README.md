@@ -6,7 +6,7 @@ The browser demos, built with Emscripten.
 
 A app.
 
-- **Uses:** `ac3`, `ac4`, `lyrics`, `objects`
+- **Uses:** `ac3`, `ac4`, `lyrics`, `objects`, `pitch`
 - **Used by:** nothing
 - **CI lanes:** wasm
 

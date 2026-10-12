@@ -143,8 +143,10 @@ ColumnLayout {
         while (EncoderController.sourceModel.length > 0) {
             EncoderController.removeSource(0);
         }
-        // Annex C is AC-3's: E-AC-3 and AC-4 have no karaoke mode.
-        EncoderController.codecIndex = 0;
+        // The format the author chose: AC-3, which is what Annex C defines, or E-AC-3, whose
+        // specification carries the same service type and no reproduction (the decoder applies
+        // Annex C's to it, by analogy, as Dolby's does). AC-4 has no karaoke mode.
+        EncoderController.codecIndex = flow.format === "eac3" ? 1 : 0;
         EncoderController.atmosEnabled = false;
         const wanted = [];
         if (flow.inputKind === "file") {
@@ -251,6 +253,17 @@ ColumnLayout {
     // Set when the author picks a rate on the Save step, after which the flow leaves it alone.
     property bool rateChosen: false
 
+    // "ac3" (the default) or "eac3": the coded format the stream is written in, chosen on the
+    // Save step. A change loads the parts again under the new codec, as a change of input does.
+    property string format: "ac3"
+    function setFormat(value) {
+        if (value === flow.format) {
+            return;
+        }
+        flow.format = value;
+        flow.rebuild();
+    }
+
     // ---- the lyrics file that goes beside the stream --------------------------------
     // A lyrics file (.lrc, .srt, .ass or .kar), written beside the stream as its own UTF-8 `.lrc`
     // that the player finds by the stream's name (Hearth's L1). Offered from beside the first part
@@ -260,7 +273,23 @@ ColumnLayout {
     // Why the file cannot be used as lyrics (a code page is named, not guessed at), as the
     // reader says it, or empty. Asked when a file is chosen, so that it is not found out at save.
     readonly property string lyricsProblem: flow.lyricsUrl.length > 0
-                                            ? KaraokeAuthoring.lyricsProblem(flow.lyricsUrl) : ""
+                                            ? KaraokeAuthoring.lyricsProblem(flow.lyricsUrl,
+                                                                             flow.lyricsCodePage) : ""
+    // The code page the author chose for a file that is not UTF-8 or UTF-16, by name, or empty for
+    // none, in which case such a file is refused: a page is never guessed at. Forgotten when
+    // another file is chosen.
+    property string lyricsCodePage: ""
+    onLyricsUrlChanged: flow.lyricsCodePage = ""
+    // Whether the file is refused only for its encoding, which is when the picker is offered.
+    readonly property bool lyricsNeedsCodePage: flow.lyricsUrl.length > 0
+                                                && KaraokeAuthoring.lyricsNeedsCodePage(flow.lyricsUrl)
+    // What the picker lists: nothing chosen, then each page this system can convert.
+    readonly property var codePageChoices: [{ name: "", label: qsTr("Choose the code page…") }]
+                                           .concat(KaraokeAuthoring.codePages())
+    // The first lines of the file as the chosen page reads them, so that a wrong page is seen.
+    readonly property string lyricsPreview: flow.lyricsCodePage.length > 0 && flow.lyricsUrl.length > 0
+                                            ? KaraokeAuthoring.lyricsPreview(flow.lyricsUrl, flow.lyricsCodePage)
+                                            : ""
     // What became of the copy, as a sentence; empty until a stream has been saved.
     property string lyricsNote: ""
 
@@ -269,7 +298,8 @@ ColumnLayout {
         if (flow.lyricsUrl.length === 0 || EncoderController.outputIsFolder()) {
             return;
         }
-        const result = KaraokeAuthoring.copyLyrics(flow.lyricsUrl, EncoderController.outputPath);
+        const result = KaraokeAuthoring.copyLyrics(flow.lyricsUrl, EncoderController.outputPath,
+                                                   flow.lyricsCodePage);
         switch (result) {
         case "copied":
             flow.lyricsNote = qsTr("The lyrics are beside the stream, as the same name with .lrc.");
@@ -283,7 +313,8 @@ ColumnLayout {
             break;
         case "unreadable":
             flow.lyricsNote = qsTr("The lyrics file could not be read, so none was put beside the "
-                                   + "stream: %1").arg(KaraokeAuthoring.lyricsProblem(flow.lyricsUrl));
+                                   + "stream: %1").arg(KaraokeAuthoring.lyricsProblem(flow.lyricsUrl,
+                                                                                      flow.lyricsCodePage));
             break;
         default:
             flow.lyricsNote = qsTr("The lyrics could not be written beside the stream.");
@@ -318,6 +349,9 @@ ColumnLayout {
         // window applied it just before) is theirs, the previous session's offsets and trims are
         // not the project's, and its lyrics are offered afresh from beside its backing.
         flow.rateChosen = true;
+        // The window applied the project's codec first (ProjectFile.applyEncode): the format is
+        // the one it names.
+        flow.format = EncoderController.codecIndex === 1 ? "eac3" : "ac3";
         flow.lyricsChosen = false;
         flow.lyricsUrl = "";
         flow.lyricsNote = "";
@@ -425,7 +459,8 @@ ColumnLayout {
     property string previewError: ""
     property int previewContainer: 0
     readonly property url previewUrl: StandardPaths.writableLocation(StandardPaths.TempLocation)
-                                      + "/forge-karaoke-preview.ac3"
+                                      + (flow.format === "eac3" ? "/forge-karaoke-preview.ec3"
+                                                               : "/forge-karaoke-preview.ac3")
     property string listening: "aware"
     property string vocalsChoice: "both"
 
@@ -1266,11 +1301,48 @@ ColumnLayout {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: qsTr("%1 · karaoke %2 · %3 kbps").arg(qsTr("AC-3")).arg(flow.plan.mode)
+                        text: qsTr("%1 · karaoke %2 · %3 kbps")
+                                  .arg(flow.format === "eac3" ? qsTr("E-AC-3") : qsTr("AC-3"))
+                                  .arg(flow.plan.mode)
                                   .arg(EncoderController.bitrateKbps)
                         font.pixelSize: Theme.fontNormal
                         font.family: Theme.monoFamily
                         color: Theme.text
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.space3
+                        Text {
+                            Layout.preferredWidth: Math.round(110 * Theme.fontScale)
+                            text: qsTr("Format")
+                            font.pixelSize: Theme.fontNormal
+                            color: Theme.text
+                        }
+                        ComboBox {
+                            objectName: "karaokeFormat"
+                            Layout.preferredWidth: Math.round(160 * Theme.fontScale)
+                            // AC-3 is what Annex C defines and the default; E-AC-3 carries the
+                            // same service type.
+                            model: [qsTr("AC-3"), qsTr("E-AC-3")]
+                            currentIndex: flow.format === "eac3" ? 1 : 0
+                            enabled: !EncoderController.busy
+                            onActivated: (index) => flow.setFormat(index === 1 ? "eac3" : "ac3")
+                            Accessible.name: qsTr("Format")
+                        }
+                    }
+                    Text {
+                        objectName: "karaokeFormatNote"
+                        Layout.fillWidth: true
+                        visible: flow.format === "eac3"
+                        text: qsTr("E-AC-3 carries the same karaoke service type, but its specification gives "
+                                   + "no reproduction for it. Hearth, forge and Dolby's reference decoder "
+                                   + "reproduce it as Annex C does for AC-3. A player that does not "
+                                   + "reproduce it plays V1 and V2 from the surround speakers. AC-3 is "
+                                   + "the format Annex C defines.")
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        color: Theme.textMuted
                     }
 
                     RowLayout {
@@ -1373,6 +1445,56 @@ ColumnLayout {
                         wrapMode: Text.WordWrap
                         font.pixelSize: Theme.fontSmall
                         font.bold: true
+                        color: Theme.text
+                    }
+                    // A file that is not UTF-8 or UTF-16 is in some code page, and which is the
+                    // author's to say: nothing is chosen for them, and the first lines show how the
+                    // page chosen reads it.
+                    Text {
+                        objectName: "karaokeLyricsCodePageHint"
+                        Layout.fillWidth: true
+                        visible: flow.lyricsNeedsCodePage
+                        text: qsTr("Choose the code page this file was written in. Nothing is guessed: "
+                                   + "the first lines show how the page chosen reads it.")
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        color: Theme.textMuted
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: flow.lyricsNeedsCodePage
+                        spacing: Theme.space3
+                        Text {
+                            Layout.preferredWidth: Math.round(110 * Theme.fontScale)
+                            text: qsTr("Code page")
+                            font.pixelSize: Theme.fontNormal
+                            color: Theme.text
+                        }
+                        ComboBox {
+                            id: lyricsCodePageBox
+                            objectName: "karaokeLyricsCodePage"
+                            Layout.preferredWidth: Math.round(360 * Theme.fontScale)
+                            model: flow.codePageChoices
+                            textRole: "label"
+                            onActivated: (index) => flow.lyricsCodePage = flow.codePageChoices[index].name
+                            Accessible.name: qsTr("Code page")
+                            // Another file starts with no page chosen, whatever this box shows.
+                            Connections {
+                                target: flow
+                                function onLyricsUrlChanged() {
+                                    lyricsCodePageBox.currentIndex = 0;
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        objectName: "karaokeLyricsPreview"
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        text: flow.lyricsPreview.length > 0
+                              ? qsTr("It reads as:") + "\n" + flow.lyricsPreview : ""
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontNormal
                         color: Theme.text
                     }
                     Text {

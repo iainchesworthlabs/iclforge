@@ -206,8 +206,9 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
 
     // Sets whether audio Hearth decodes for this sink is sent as Opus (lossy, a twelfth of PCM's
     // bytes) rather than PCM, for a sink on a link too poor for PCM. It takes effect at the
-    // group's next play, and is kept for this run. False when the sink is not known or lists no
-    // Opus.
+    // group's next play, and is kept with the sink's pairing record (PairingStore::set_opus()) so
+    // that the next start has it, read back when the sink first says hello. False when the sink is
+    // not known or lists no Opus.
     bool set_sink_opus_fallback(const std::string& id, bool opus);
     // Starts the identify tone on `output`, moving it there if another
     // output was already sounding it, or stops it with std::nullopt - same
@@ -330,7 +331,7 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
         // after the connection ends.
         std::optional<sendspin::ClientView> known{};
         std::string client_id{};
-        // set_sink_opus_fallback().
+        // set_sink_opus_fallback(); read from the pairing store at the first hello of the run.
         bool opus_fallback = false;
 
         SinkLink link = SinkLink::kIdle;

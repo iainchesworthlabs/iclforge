@@ -981,6 +981,10 @@
             <translation>[Éncõdé nõw ~~~~]</translation>
         </message>
         <message>
+            <source>Choose the code page…</source>
+            <translation>[Chõõsé thé cõdé pàgé… ~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>The lyrics are beside the stream, as the same name with .lrc.</source>
             <translation>[Thé lyrîcs àré bésîdé thé stréàm, às thé sàmé nàmé wîth .lrc. ~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
@@ -1225,12 +1229,36 @@
             <translation>[Rését lévéls ~~~~~]</translation>
         </message>
         <message>
+            <source>E-AC-3</source>
+            <translation>[É-ÀC-3 ~~]</translation>
+        </message>
+        <message>
+            <source>Format</source>
+            <translation>[Fõrmàt ~~]</translation>
+        </message>
+        <message>
+            <source>E-AC-3 carries the same karaoke service type, but its specification gives no reproduction for it. Hearth, forge and Dolby's reference decoder reproduce it as Annex C does for AC-3. A player that does not reproduce it plays V1 and V2 from the surround speakers. AC-3 is the format Annex C defines.</source>
+            <translation>[É-ÀC-3 càrrîés thé sàmé kàràõké sérvîcé typé, bût îts spécîfîcàtîõn gîvés nõ réprõdûctîõn fõr ît. Héàrth, fõrgé ànd Dõlby's référéncé décõdér réprõdûcé ît às Ànnéx C dõés fõr ÀC-3. À plàyér thàt dõés nõt réprõdûcé ît plàys V1 ànd V2 frõm thé sûrrõûnd spéàkérs. ÀC-3 îs thé fõrmàt Ànnéx C défînés. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>Lyrics</source>
             <translation>[Lyrîcs ~~]</translation>
         </message>
         <message>
             <source>none</source>
             <translation>[nõné ~~]</translation>
+        </message>
+        <message>
+            <source>Choose the code page this file was written in. Nothing is guessed: the first lines show how the page chosen reads it.</source>
+            <translation>[Chõõsé thé cõdé pàgé thîs fîlé wàs wrîttén în. Nõthîng îs gûésséd: thé fîrst lînés shõw hõw thé pàgé chõsén réàds ît. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Code page</source>
+            <translation>[Cõdé pàgé ~~~~]</translation>
+        </message>
+        <message>
+            <source>It reads as:</source>
+            <translation>[Ît réàds às: ~~~~~]</translation>
         </message>
         <message>
             <source>Lyrics (*.lrc *.srt *.ass *.kar)</source>
@@ -1454,6 +1482,65 @@
         <message>
             <source>dialnorm — programme 2</source>
             <translation>[dîàlnõrm — prõgràmmé 2 ~~~~~~~~~]</translation>
+        </message>
+    </context>
+    <context>
+        <name>LyricsEncoding</name>
+        <message>
+            <source>Western European</source>
+            <translation>[Wéstérn Éûrõpéàn ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Central European</source>
+            <translation>[Céntràl Éûrõpéàn ~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Cyrillic</source>
+            <translation>[Cyrîllîc ~~~]</translation>
+        </message>
+        <message>
+            <source>Greek</source>
+            <translation>[Gréék ~~]</translation>
+        </message>
+        <message>
+            <source>Turkish</source>
+            <translation>[Tûrkîsh ~~~]</translation>
+        </message>
+        <message>
+            <source>Hebrew</source>
+            <translation>[Hébréw ~~]</translation>
+        </message>
+        <message>
+            <source>Arabic</source>
+            <translation>[Àràbîc ~~]</translation>
+        </message>
+        <message>
+            <source>Baltic</source>
+            <translation>[Bàltîc ~~]</translation>
+        </message>
+        <message>
+            <source>Vietnamese</source>
+            <translation>[Vîétnàmésé ~~~~]</translation>
+        </message>
+        <message>
+            <source>Thai</source>
+            <translation>[Thàî ~~]</translation>
+        </message>
+        <message>
+            <source>Japanese</source>
+            <translation>[Jàpànésé ~~~]</translation>
+        </message>
+        <message>
+            <source>Simplified Chinese</source>
+            <translation>[Sîmplîfîéd Chînésé ~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Traditional Chinese</source>
+            <translation>[Tràdîtîõnàl Chînésé ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Korean</source>
+            <translation>[Kõréàn ~~]</translation>
         </message>
     </context>
     <context>

@@ -218,17 +218,18 @@ and says so, rather than copying it.
 
 ## What the repository says that this corrects
 
-Listed so the build can change each with its cell:
+Listed so the build could change each with its cell; **every row is now corrected**, as the
+last column says:
 
 | Where | Says | Now |
 |---|---|---|
-| `apps/forge/cli/src/commands/decode.cpp`, the E-AC-3 branch | "the E-AC-3 decoder takes no karaoke flag from bsi, and its dependent-substream programmes have no karaoke layout" | The first half is true of this decoder and not of Dolby's; the second is right for a programme with a dependent substream |
-| `apps/hearth/engine/src/stream_decoder.cpp`, `report_unit` | "Karaoke is AC-3's: an E-AC-3 decoder never sets the flag" | Dolby's does |
-| `apps/forge/gui/assets/qml/KaraokeFlow.qml` | "Annex C is AC-3's: E-AC-3 and AC-4 have no karaoke mode" | The flow writes AC-3 only |
-| `apps/demos/wasm/decoder_bindings.cpp`, `is_karaoke_unit` | "...that the library does not reproduce as karaoke (Annex C is AC-3's)" | |
-| `libs/ac3/include/iclforge/ac3/decoder/output.hpp`, `OutputConfig::karaoke` | "Only the AC-3 decoder (FrameDecoder) knows a frame is karaoke, so for E-AC-3 this is never applied" | |
-| `planning/karaoke.md`, Not in v1; `docs/karaoke/index.md`, "What a karaoke stream is" | "karaoke in E-AC-3 or AC-4 (the specifications give them no mode and the decoder never sets the flag)" | E-AC-3 has the signalling; AC-4 has no karaoke value at all ([the options](karaoke-ac4-options.md)) |
-| `planning/karaoke.md`, Verification | "no other decoder reproduces karaoke" | Dolby's does, for AC-3 and for E-AC-3; this is a new oracle for the AC-3 half too |
+| `apps/forge/cli/src/commands/decode.cpp`, the E-AC-3 branch | "the E-AC-3 decoder takes no karaoke flag from bsi, and its dependent-substream programmes have no karaoke layout" | The first half is true of this decoder and not of Dolby's; the second is right for a programme with a dependent substream **Corrected**: E3, #1394. |
+| `apps/hearth/engine/src/stream_decoder.cpp`, `report_unit` | "Karaoke is AC-3's: an E-AC-3 decoder never sets the flag" | Dolby's does **Corrected**: E4, #1394. |
+| `apps/forge/gui/assets/qml/KaraokeFlow.qml` | "Annex C is AC-3's: E-AC-3 and AC-4 have no karaoke mode" | The flow writes AC-3 only **Corrected**: E6, #1427 (the flow offers E-AC-3). |
+| `apps/demos/wasm/decoder_bindings.cpp`, `is_karaoke_unit` | "...that the library does not reproduce as karaoke (Annex C is AC-3's)" | **Corrected**: E5, #1398. |
+| `libs/ac3/include/iclforge/ac3/decoder/output.hpp`, `OutputConfig::karaoke` | "Only the AC-3 decoder (FrameDecoder) knows a frame is karaoke, so for E-AC-3 this is never applied" | **Corrected**: E2, #1362. |
+| `planning/karaoke.md`, Not in v1; `docs/karaoke/index.md`, "What a karaoke stream is" | "karaoke in E-AC-3 or AC-4 (the specifications give them no mode and the decoder never sets the flag)" | E-AC-3 has the signalling; AC-4 has no karaoke value at all ([the options](karaoke-ac4-options.md)) **Corrected**: E8. |
+| `planning/karaoke.md`, Verification | "no other decoder reproduces karaoke" | Dolby's does, for AC-3 and for E-AC-3; this is a new oracle for the AC-3 half too **Corrected**: E8. |
 
 ## Reproducing this
 

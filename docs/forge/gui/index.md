@@ -146,7 +146,8 @@ Minimum size 1280×900. Two panes, divided by a vertical rule:
 
 - **Karaoke** is a fourth surface, like Guided's, for one kind of programme: four steps —
   **Parts**, **Levels**, **Hear** and **Save** — that build a karaoke AC-3 (ETSI TS 102 366 Annex
-  C) from a backing, an optional melody guide and one or two vocals, over the same draft the other
+  C), or if you choose it E-AC-3, from a backing, an optional melody guide and one or two vocals,
+  over the same draft the other
   tiers edit, and play the encoded stream back as a singer's player decodes it. See
   [Karaoke](karaoke.md).
 

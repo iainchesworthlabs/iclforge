@@ -248,6 +248,18 @@ struct DecoderConfig {
     // (iclforge/ac4/decoder/executor.hpp); null, the default, runs it all on the calling thread.
     // Not owned: it must outlive the decoder. The PCM is the same either way.
     Executor* executor = nullptr;
+    // A system that places no objects - a player that consumes decode_by_block()'s channels
+    // alone, which has no object renderer to hand them to - leaves a presentation's object audio
+    // undecoded: its A-JOC reconstruction and its direct-coded elements, which are most of what
+    // a presentation with objects costs, are not run, and DecodedFrame::objects is empty. The
+    // channels are the same bit for bit (an object's audio is not mixed into them); what changes
+    // is what a presentation of object audio alone comes to, which is nothing to play: decode()
+    // refuses it with DecodeError::kUnsupported and a reason, as it does a presentation it cannot
+    // decode. An intermediate spatial format is not an object here: the decoder renders it into
+    // the channels itself (Part 2 clause 5.10.3), so a presentation of one is decoded whole. Fixed
+    // for the decoder: a frame's object substreams hold state from the frame before, which a
+    // decoder that skipped some and not others would have to rebuild.
+    bool skip_objects = false;
 };
 
 }  // namespace iclforge::ac4

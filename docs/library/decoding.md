@@ -372,7 +372,9 @@ richer group inside `mixmdate` — separate Lt/Rt and Lo/Ro centre and surround 
 mix level. Both decoders now keep those and report them (`DecodedFrame::cmixlev`/`surmixlev`,
 `DecodedSubstream::mixing`), distinguishing "absent" from "present, and says the default";
 `iclforge::ac3::mix_levels()` turns either into the coefficients the stage needs, applying §7.8's own
-fallbacks where a field is simply not there.
+fallbacks where a field is simply not there: -4.5 dB and -6 dB for an AC-3 stream whose bsi has no
+level to read, and -3 dB and -3 dB for an E-AC-3 stream that sends no `mixmdate`, which is what
+Dolby's decoder folds such a stream at.
 
 `MixLevels::preferred` passes on `dmixmod`, the fold the content was mixed for (Table D2.2) —
 E-AC-3's `mixmdate`, or an Annex D stream's `xbsi1` (see below) — without acting on it: `target` is

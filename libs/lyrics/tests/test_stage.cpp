@@ -337,3 +337,37 @@ TEST_CASE("stage: text a font cannot draw is told from text it can", "[lyrics][s
     CHECK_FALSE(text_is_covered("a", {}));
     CHECK(text_is_covered("", {}));
 }
+
+TEST_CASE("stage: the lines of a song are the ones with text, not the ones that mark a time",
+          "[lyrics][stage][count]") {
+    using iclforge::lyrics::text_line_count;
+    using iclforge::lyrics::text_line_number;
+
+    // Six lines, one of which (2) only marks a time: five are the song's.
+    const Lyrics lyrics = song();
+    REQUIRE(lyrics.lines.size() == 6);
+    CHECK(text_line_count(lyrics) == 5);
+    CHECK(text_line_number(lyrics, 0) == 1);
+    CHECK(text_line_number(lyrics, 1) == 2);
+    CHECK(text_line_number(lyrics, 2) == 0);
+    CHECK(text_line_number(lyrics, 3) == 3);
+    CHECK(text_line_number(lyrics, 4) == 4);
+    CHECK(text_line_number(lyrics, 5) == 5);
+    // Past the end is none.
+    CHECK(text_line_number(lyrics, 6) == 0);
+
+    // A file that ends with a time and no text, as an editor writes the end of the last line: that
+    // marker is a line of the document and not of the song, which counted it before.
+    const auto ended = iclforge::lyrics::parse_lyrics(
+        "[00:02.00]Should auld acquaintance\n[00:05.00]be forgot\n[00:08.00]Line three\n"
+        "[00:11.00]Line four\n[00:14.00]\n");
+    REQUIRE(ended.has_value());
+    REQUIRE(ended->lines.size() == 5);
+    CHECK(text_line_count(*ended) == 4);
+    CHECK(text_line_number(*ended, 3) == 4);
+    CHECK(text_line_number(*ended, 4) == 0);
+
+    // Nothing held.
+    CHECK(text_line_count(Lyrics{}) == 0);
+    CHECK(text_line_number(Lyrics{}, 0) == 0);
+}
