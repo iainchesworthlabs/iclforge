@@ -68,7 +68,7 @@ track) and choose the **Karaoke** page (`Ctrl+7`).
 
 ![Hearth's Karaoke page: the stream, its reproduction, the words, and what each speaker plays](screenshots/hearth-karaoke-page.png)
 
-*A generated karaoke stream and its lyrics on a test output, paused part-way through a word.*
+*The "Auld Lang Syne" example, 1.8 s in and held there: the word being sung is part way through its fill. Taken from the running window with `hearth --smoke-shot ... --open ... --seek 1800` ([Hearth's command line](../hearth/index.md#command-line)).*
 
 **Reproduction** is the decoder's choice, kept across starts:
 
@@ -157,6 +157,10 @@ sings it, **you** when it does not, and **shared** when it is a line for both an
 two plays. A sentence under the names says the same for the whole file ("The vocal of Shantyman
 plays: you sing the lines of Crew."), which is what choosing **V1**, **V2**, **None** or **Both**
 under Capable changes.
+
+![Hearth's Karaoke page for the duet example: each line is tagged with who sings it and whether the playing vocal guides it](screenshots/hearth-karaoke-duet.png)
+
+*"Leave Her, Johnny", 6.3 s in: the crew's line, indented and tagged **guide** because both vocals play.*
 ### SubRip
 
 A `.srt` file is read as lyrics too, which is what subtitle tools and ripped karaoke subtitles write:
@@ -238,6 +242,15 @@ most are.
 The words follow the position of what is *heard*: the output device's own clock less its path's
 delay, so they stay with the sound on a Bluetooth speaker or a receiver with a long path.
 
+They are on the Karaoke page, full screen ([the singer view](#the-singer-view)), and on the Play
+page: an item with lyrics, or a CD+G picture, gets a **Lyrics** card there beside the queue (in
+a window 1,580 pixels wide or more) or at the top of the monitor column (in a narrower one). An
+item with none gets no card, so the Play page is as it was for every other stream.
+
+![Hearth's Play page for a karaoke stream: the queue, and a Lyrics card above what is playing](screenshots/hearth-play-lyrics.png)
+
+*The Play page at its default size, 1.8 s into the example.*
+
 ### A CD+G disc
 
 A **`.cdg` file with the same name** is the picture of a karaoke disc that was ripped on its own,
@@ -252,8 +265,10 @@ the stream is shown in its place, since it is what a word-by-word fill and the d
 
 What is drawn is what the disc's own player draws: the screen preset and the border preset, the
 tile blocks and their XOR form, the scrolls by a tile (the preset form fills the gap, the copy form
-brings back what left), and the 12-bit colour table of 16 colours. The smooth scrolling offsets
-within a tile and the transparent colour are read and not drawn. A packet that is not CD+G is skipped
+brings back what left), the smooth scrolling offsets within a tile (the picture is shown up to 5
+pixels left and 11 up of where its memory has it, which is how a disc scrolls a line a pixel at a
+time), the 12-bit colour table of 16 colours, and the transparent colour (drawn as the backdrop, which
+is black: there is no video here for it to show). A packet that is not CD+G is skipped
 and keeps its place in time, and a file that is not a whole number of 24-byte packets, or has no
 CD+G packet in it, is refused with the reason (playback is not affected). The packets are not checked
 for parity: a rip has already been through the drive's error correction.
@@ -266,14 +281,22 @@ times are rarely right to the frame against a particular output.
 
 ### The singer view
 
-`F11`, or **Full screen** on the Karaoke page's lyrics, opens the words alone, large, on a dark
-screen. `Esc` leaves it, and `Space` pauses.
+`F11`, or **Full screen** on the Karaoke page's lyrics or the Play page's, opens the words alone,
+large, on a dark screen. `Esc` leaves it, and `Space` pauses.
 
-![The singer view: the line being sung large, with the lines around it and the controls at the bottom](screenshots/hearth-singer-view.png)
+![The singer view: the line being sung large, the queue beside it, and the position bar and controls at the bottom](screenshots/hearth-singer-view.png)
 
-Previous, Play/Pause, Next and the **Vocals** chooser stay at the bottom, so a singer can pause,
-skip, or change which vocals play without leaving. Choosing a vocal there chooses the capable
-reproduction with it.
+A position bar, Previous, Play/Pause, Next, **Queue** and the **Vocals** chooser stay at the
+bottom, so a singer can move about in the song, pause, skip, pick the next song or change which
+vocals play without leaving. Choosing a vocal there chooses the capable reproduction with it.
+
+**Moving about.** Press the position bar, or drag along it: the words and the clock show the place
+the bar is held at, and the song moves there when you let go, whether it was playing or paused.
+`Left` and `Right` move it five seconds either way, and stop at the ends.
+
+**The queue.** The strip at the top names the song that comes next. **Queue**, or `Q`, opens the
+queue beside the words: the song that is playing is marked, and pressing another plays it from
+its start. `Q` or the button closes it again.
 
 ## Make one in the Forge GUI
 
@@ -341,9 +364,10 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
 - **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
   (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
   player do not offer them.
-- **Finding the times of a file's words.** Hearth's timing window ([Timing the
-  lyrics](../hearth/index.md#timing-the-lyrics)) takes them from your presses, and an estimate by
-  the letters of a word is only where a press starts from; nothing here aligns words to the sound.
+- **Aligning words to the sound.** Hearth's timing window ([Timing the
+  lyrics](../hearth/index.md#timing-the-lyrics)) takes word times from your presses, and an estimate
+  by the letters of a word is only where a press starts from. A forced aligner is outside software,
+  and [Timing a song with a forced aligner](forced-alignment.md) runs one and reads its result in.
 - **Reading a lyrics file in a code page.** UTF-8 and UTF-16 are read; Latin-1, Windows-1255 and the
   other 8-bit encodings are named and not guessed at. A MIDI karaoke file has no way to say its
   encoding, so its words must be UTF-8.

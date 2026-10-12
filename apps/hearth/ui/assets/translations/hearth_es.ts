@@ -1385,52 +1385,73 @@
 <context>
     <name>LyricScreen</name>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="137"/>
+        <location filename="../qml/LyricScreen.qml" line="196"/>
+        <source>Next: %1</source>
+        <translation>Siguiente: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="204"/>
         <source>Esc leaves full screen</source>
         <translation>Esc sale de la pantalla completa</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="180"/>
+        <location filename="../qml/LyricScreen.qml" line="259"/>
+        <location filename="../qml/LyricScreen.qml" line="478"/>
+        <source>Queue</source>
+        <translation>Cola</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="392"/>
+        <source>Position</source>
+        <translation>Posición</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="393"/>
+        <source>%1 of %2</source>
+        <translation>%1 de %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricScreen.qml" line="457"/>
         <source>Previous</source>
         <translation>Anterior</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="187"/>
+        <location filename="../qml/LyricScreen.qml" line="464"/>
         <source>Pause</source>
         <translation>Pausar</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="187"/>
+        <location filename="../qml/LyricScreen.qml" line="464"/>
         <source>Play</source>
         <translation>Reproducir</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="193"/>
+        <location filename="../qml/LyricScreen.qml" line="470"/>
         <source>Next</source>
         <translation>Siguiente</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="217"/>
+        <location filename="../qml/LyricScreen.qml" line="487"/>
         <source>Vocals</source>
         <translation>Voces</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="230"/>
+        <location filename="../qml/LyricScreen.qml" line="500"/>
         <source>None</source>
         <translation>Ninguno</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="231"/>
+        <location filename="../qml/LyricScreen.qml" line="501"/>
         <source>V1</source>
         <translation>V1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="232"/>
+        <location filename="../qml/LyricScreen.qml" line="502"/>
         <source>V2</source>
         <translation>V2</translation>
     </message>
     <message>
-        <location filename="../qml/LyricScreen.qml" line="233"/>
+        <location filename="../qml/LyricScreen.qml" line="503"/>
         <source>Both</source>
         <translation>Ambos</translation>
     </message>
@@ -1438,218 +1459,233 @@
 <context>
     <name>LyricTimingDialog</name>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="125"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="155"/>
         <source>Next line: %1</source>
         <translation>Siguiente línea: %1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="126"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="156"/>
         <source>Every line has a time. Go on to the words, or save.</source>
         <translation>Todas las líneas tienen tiempo. Pasa a las palabras o guarda.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="130"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="163"/>
         <source>Next word: %1</source>
         <translation>Siguiente palabra: %1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="133"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="166"/>
         <source>Stamp the lines first.</source>
         <translation>Marca primero las líneas.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="136"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="169"/>
         <source>Play to the first line, then press Space as each word starts.</source>
         <translation>Reproduce hasta la primera línea y pulsa Espacio cuando empiece cada palabra.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="137"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="170"/>
         <source>Every word in this line is pressed. Play on to the next line.</source>
         <translation>Todas las palabras de esta línea están marcadas. Sigue hasta la línea siguiente.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="168"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="236"/>
         <source>Saved as %1. A file that was there is kept once, as %1.bak.</source>
         <translation>Guardado como %1. Un archivo que ya estaba se conserva una vez, como %1.bak.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="184"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="254"/>
         <source>Choose the words to time</source>
         <translation>Elige las palabras que sincronizar</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="185"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="255"/>
         <source>Lyrics and text (*.lrc *.txt)</source>
         <translation>Letras y texto (*.lrc *.txt)</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="185"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="255"/>
         <source>All files (*)</source>
         <translation>Todos los archivos (*)</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="192"/>
-        <location filename="../qml/LyricTimingDialog.qml" line="204"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="262"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="274"/>
         <source>Time the lyrics</source>
         <translation>Sincronizar la letra</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="222"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="292"/>
         <source>There are no words to time for this item.</source>
         <translation>No hay palabras que sincronizar para este elemento.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="229"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="299"/>
         <source>Choose a text file with one line of the words to a line (an .lrc file with no times will do), saved as UTF-8 or UTF-16.</source>
         <translation>Elige un archivo de texto con una línea de palabras por línea (sirve un archivo .lrc sin tiempos), guardado como UTF-8 o UTF-16.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="237"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="307"/>
         <source>Choose a text file…</source>
         <translation>Elegir un archivo de texto…</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="260"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="330"/>
         <source>What Space stamps</source>
         <translation>Qué marca la barra espaciadora</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="262"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="332"/>
         <source>1 · Lines</source>
         <translation>1 · Líneas</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="263"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="333"/>
         <source>2 · Words</source>
         <translation>2 · Palabras</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="276"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="346"/>
         <source>Every stamped line has its words spread over it by their letters, as a guess: slanted and muted. Play, and press Space as each word starts; a pressed word turns solid.</source>
         <translation>Las palabras de cada línea marcada se reparten sobre ella según sus letras, como estimación: en cursiva y atenuadas. Reproduce y pulsa Espacio cuando empiece cada palabra; una palabra marcada se vuelve sólida.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="274"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="344"/>
         <source>Play the item and press Space as each line starts. A line can be stamped again, or nudged, afterwards.</source>
         <translation>Reproduce el elemento y pulsa Espacio cuando empiece cada línea. Después se puede volver a marcar una línea o ajustarla.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="291"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="162"/>
+        <source>Space presses the chosen word again: %1</source>
+        <translation>Espacio marca de nuevo la palabra elegida: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="358"/>
+        <source>To put one word right, choose it: the item is cued just before it. Press Space as it starts, or stamp it again, or nudge it 10 ms at a time.</source>
+        <translation>Para corregir una sola palabra, elígela: el elemento se coloca justo antes de ella. Pulsa Espacio cuando empiece, o márcala de nuevo, o ajústala de 10 ms en 10 ms.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="372"/>
         <source>Pause</source>
         <translation>Pausar</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="291"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="372"/>
         <source>Play</source>
         <translation>Reproducir</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="296"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="377"/>
         <source>Back 5 s</source>
         <translation>Retroceder 5 s</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="301"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="382"/>
         <source>Forward 5 s</source>
         <translation>Avanzar 5 s</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="316"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="397"/>
         <source>Start of line · Space</source>
         <translation>Inicio de línea · Espacio</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="317"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="398"/>
         <source>Start of word · Space</source>
         <translation>Inicio de palabra · Espacio</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="460"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="572"/>
+        <source>Chosen word: %1, in line %2, starts at %3.</source>
+        <translation>Palabra elegida: %1, en la línea %2, empieza en %3.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="589"/>
         <source>%1 of %2 lines have a time</source>
         <translation>%1 de %2 líneas tienen tiempo</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="468"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="598"/>
         <source>Stamp again</source>
         <translation>Marcar de nuevo</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="474"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="604"/>
         <source>−10 ms</source>
         <translation>−10 ms</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="480"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="610"/>
         <source>+10 ms</source>
         <translation>+10 ms</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="490"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="620"/>
         <source>Singer</source>
         <translation>Cantante</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="497"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="627"/>
         <source>Who sings the selected line</source>
         <translation>Quién canta la línea seleccionada</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="499"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="629"/>
         <source>Not marked</source>
         <translation>Sin marcar</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="502"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="632"/>
         <source>Both</source>
         <translation>Ambos</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="512"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="642"/>
         <source>Name of V1</source>
         <translation>Nombre de V1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="514"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="644"/>
         <source>Name of the first singer, saved in the file</source>
         <translation>Nombre del primer cantante, guardado en el archivo</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="521"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="651"/>
         <source>Name of V2</source>
         <translation>Nombre de V2</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="523"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="653"/>
         <source>Name of the second singer, saved in the file</source>
         <translation>Nombre del segundo cantante, guardado en el archivo</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="533"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="663"/>
         <source>Reaction time</source>
         <translation>Tiempo de reacción</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="545"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="675"/>
         <source>Reaction time in milliseconds</source>
         <translation>Tiempo de reacción en milisegundos</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="548"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="678"/>
         <source>ms taken off each press</source>
         <translation>ms que se restan a cada pulsación</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="557"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="687"/>
         <source>Save</source>
         <translation>Guardar</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="562"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="692"/>
         <source>Discard and close</source>
         <translation>Descartar y cerrar</translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="562"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="692"/>
         <source>Close</source>
         <translation>Cerrar</translation>
     </message>
@@ -3758,6 +3794,19 @@
     </message>
 </context>
 <context>
+    <name>PlayLyricsCard</name>
+    <message>
+        <location filename="../qml/PlayLyricsCard.qml" line="38"/>
+        <source>Lyrics</source>
+        <translation>Letra</translation>
+    </message>
+    <message>
+        <location filename="../qml/PlayLyricsCard.qml" line="60"/>
+        <source>Full screen · F11</source>
+        <translation>Pantalla completa · F11</translation>
+    </message>
+</context>
+<context>
     <name>PlayObjectsCard</name>
     <message>
         <location filename="../qml/PlayObjectsCard.qml" line="13"/>
@@ -3803,309 +3852,309 @@
 <context>
     <name>PlayPage</name>
     <message>
-        <location filename="../qml/PlayPage.qml" line="68"/>
+        <location filename="../qml/PlayPage.qml" line="79"/>
         <source>%1 items</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="87"/>
+        <location filename="../qml/PlayPage.qml" line="98"/>
         <source>%1 ch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="87"/>
+        <location filename="../qml/PlayPage.qml" line="98"/>
         <source> + objects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="90"/>
-        <location filename="../qml/PlayPage.qml" line="136"/>
+        <location filename="../qml/PlayPage.qml" line="101"/>
+        <location filename="../qml/PlayPage.qml" line="147"/>
         <source>%1 kHz</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="93"/>
-        <location filename="../qml/PlayPage.qml" line="139"/>
-        <location filename="../qml/PlayPage.qml" line="690"/>
+        <location filename="../qml/PlayPage.qml" line="104"/>
+        <location filename="../qml/PlayPage.qml" line="150"/>
+        <location filename="../qml/PlayPage.qml" line="719"/>
         <source>%1 kbit/s</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="113"/>
+        <location filename="../qml/PlayPage.qml" line="124"/>
         <source>AC-3</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="113"/>
+        <location filename="../qml/PlayPage.qml" line="124"/>
         <source>E-AC-3</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="113"/>
+        <location filename="../qml/PlayPage.qml" line="124"/>
         <source>AC-3 core + E-AC-3</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="114"/>
+        <location filename="../qml/PlayPage.qml" line="125"/>
         <source>AC-4</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="121"/>
+        <location filename="../qml/PlayPage.qml" line="132"/>
         <source> JOC</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="126"/>
+        <location filename="../qml/PlayPage.qml" line="137"/>
         <source> bed + %1 objects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="141"/>
+        <location filename="../qml/PlayPage.qml" line="152"/>
         <source>elementary stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="161"/>
+        <location filename="../qml/PlayPage.qml" line="172"/>
         <source>next: %1%2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="162"/>
+        <location filename="../qml/PlayPage.qml" line="173"/>
         <source>, gapless</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="187"/>
+        <location filename="../qml/PlayPage.qml" line="198"/>
         <source>Queue</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Cola</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="198"/>
+        <location filename="../qml/PlayPage.qml" line="209"/>
         <source>Add files…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="205"/>
+        <location filename="../qml/PlayPage.qml" line="216"/>
         <source>Add folder…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="311"/>
+        <location filename="../qml/PlayPage.qml" line="322"/>
         <source>playing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="311"/>
+        <location filename="../qml/PlayPage.qml" line="322"/>
         <source>not playable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="362"/>
+        <location filename="../qml/PlayPage.qml" line="373"/>
         <source>Nothing in the queue.
 Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="386"/>
+        <location filename="../qml/PlayPage.qml" line="397"/>
         <source>Drop files or folders here to add them to the queue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="410"/>
+        <location filename="../qml/PlayPage.qml" line="439"/>
         <source>Now playing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="417"/>
+        <location filename="../qml/PlayPage.qml" line="446"/>
         <source>Nothing playing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="441"/>
+        <location filename="../qml/PlayPage.qml" line="470"/>
         <source>Levels · at play time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="444"/>
+        <location filename="../qml/PlayPage.qml" line="473"/>
         <source>%1 · %2 outputs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="446"/>
+        <location filename="../qml/PlayPage.qml" line="475"/>
         <source>No output device chosen yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="451"/>
-        <location filename="../qml/PlayPage.qml" line="598"/>
-        <location filename="../qml/PlayPage.qml" line="647"/>
+        <location filename="../qml/PlayPage.qml" line="480"/>
+        <location filename="../qml/PlayPage.qml" line="627"/>
+        <location filename="../qml/PlayPage.qml" line="676"/>
         <source>Nothing playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="547"/>
+        <location filename="../qml/PlayPage.qml" line="576"/>
         <source>CLIP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="568"/>
+        <location filename="../qml/PlayPage.qml" line="597"/>
         <source>unrouted</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="572"/>
+        <location filename="../qml/PlayPage.qml" line="601"/>
         <source>%1 %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="585"/>
+        <location filename="../qml/PlayPage.qml" line="614"/>
         <source>−60 · −48 · −36 · −24 · −12 · −6 · 0 dB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="594"/>
+        <location filename="../qml/PlayPage.qml" line="623"/>
         <source>Loudness · BS.1770-4</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="597"/>
+        <location filename="../qml/PlayPage.qml" line="626"/>
         <source>Integrated since this item started</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="606"/>
+        <location filename="../qml/PlayPage.qml" line="635"/>
         <source>Scroll for this frame, objects and signal path.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="620"/>
+        <location filename="../qml/PlayPage.qml" line="649"/>
         <source>MOMENTARY</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="620"/>
-        <location filename="../qml/PlayPage.qml" line="621"/>
-        <location filename="../qml/PlayPage.qml" line="622"/>
+        <location filename="../qml/PlayPage.qml" line="649"/>
+        <location filename="../qml/PlayPage.qml" line="650"/>
+        <location filename="../qml/PlayPage.qml" line="651"/>
         <source>LUFS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="621"/>
+        <location filename="../qml/PlayPage.qml" line="650"/>
         <source>SHORT-TERM</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="622"/>
+        <location filename="../qml/PlayPage.qml" line="651"/>
         <source>INTEGRATED</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="623"/>
+        <location filename="../qml/PlayPage.qml" line="652"/>
         <source>RANGE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="623"/>
+        <location filename="../qml/PlayPage.qml" line="652"/>
         <source>LU</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="624"/>
+        <location filename="../qml/PlayPage.qml" line="653"/>
         <source>TRUE PEAK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="624"/>
+        <location filename="../qml/PlayPage.qml" line="653"/>
         <source>dBTP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="634"/>
-        <location filename="../qml/PlayPage.qml" line="659"/>
-        <location filename="../qml/PlayPage.qml" line="665"/>
-        <location filename="../qml/PlayPage.qml" line="673"/>
-        <location filename="../qml/PlayPage.qml" line="691"/>
+        <location filename="../qml/PlayPage.qml" line="663"/>
+        <location filename="../qml/PlayPage.qml" line="688"/>
+        <location filename="../qml/PlayPage.qml" line="694"/>
+        <location filename="../qml/PlayPage.qml" line="702"/>
+        <location filename="../qml/PlayPage.qml" line="720"/>
         <source>—</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="642"/>
+        <location filename="../qml/PlayPage.qml" line="671"/>
         <source>This frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="645"/>
+        <location filename="../qml/PlayPage.qml" line="674"/>
         <source>At play time · access unit %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="657"/>
+        <location filename="../qml/PlayPage.qml" line="686"/>
         <source>DIALNORM</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="659"/>
+        <location filename="../qml/PlayPage.qml" line="688"/>
         <source>−%1 dB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="662"/>
+        <location filename="../qml/PlayPage.qml" line="691"/>
         <source>COMPR</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="664"/>
+        <location filename="../qml/PlayPage.qml" line="693"/>
         <source>%1 dB</source>
         <translation type="unfinished">%1 dB</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="668"/>
+        <location filename="../qml/PlayPage.qml" line="697"/>
         <source>DYNRNG</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="670"/>
+        <location filename="../qml/PlayPage.qml" line="699"/>
         <source>%1…%2 dB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="676"/>
+        <location filename="../qml/PlayPage.qml" line="705"/>
         <source>SHORT BLOCKS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="680"/>
+        <location filename="../qml/PlayPage.qml" line="709"/>
         <source>%1 of %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 de %2</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="682"/>
+        <location filename="../qml/PlayPage.qml" line="711"/>
         <source>n/a</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="685"/>
+        <location filename="../qml/PlayPage.qml" line="714"/>
         <source>BITRATE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="739"/>
+        <location filename="../qml/PlayPage.qml" line="768"/>
         <source>Add files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="741"/>
+        <location filename="../qml/PlayPage.qml" line="770"/>
         <source>All files (*)</source>
         <translation type="unfinished">Todos los archivos (*)</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="741"/>
+        <location filename="../qml/PlayPage.qml" line="770"/>
         <source>AC-3 / E-AC-3 / AC-4 (*.ac3 *.ec3 *.ac4)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="747"/>
+        <location filename="../qml/PlayPage.qml" line="776"/>
         <source>Add folder</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4684,12 +4733,32 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <translation>Letra en pantalla completa; Esc la cierra</translation>
     </message>
     <message>
-        <location filename="../qml/ShortcutsDialog.qml" line="110"/>
+        <location filename="../qml/ShortcutsDialog.qml" line="108"/>
+        <source>SINGER VIEW</source>
+        <translation>VISTA DEL CANTANTE</translation>
+    </message>
+    <message>
+        <location filename="../qml/ShortcutsDialog.qml" line="115"/>
+        <source>Pause or play</source>
+        <translation>Pausar o reproducir</translation>
+    </message>
+    <message>
+        <location filename="../qml/ShortcutsDialog.qml" line="117"/>
+        <source>Back or forward five seconds</source>
+        <translation>Retroceder o avanzar cinco segundos</translation>
+    </message>
+    <message>
+        <location filename="../qml/ShortcutsDialog.qml" line="119"/>
+        <source>Show or hide the queue</source>
+        <translation>Mostrar u ocultar la cola</translation>
+    </message>
+    <message>
+        <location filename="../qml/ShortcutsDialog.qml" line="125"/>
         <source>About…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ShortcutsDialog.qml" line="114"/>
+        <location filename="../qml/ShortcutsDialog.qml" line="129"/>
         <source>Close</source>
         <translation type="unfinished">Cerrar</translation>
     </message>
@@ -5094,12 +5163,12 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/TransportBar.qml" line="113"/>
         <source>Position</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Posición</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="114"/>
         <source>%1 of %2</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">%1 de %2</translation>
     </message>
     <message>
         <location filename="../qml/TransportBar.qml" line="176"/>

@@ -122,8 +122,19 @@ a long path is where it is needed, because what Hearth follows is the output's o
 position, and a file's times are rarely right to the frame.
 
 **Full screen** (`F11`, or the button on the page; `Esc` leaves) is the singer view: dark, with
-larger type and more lines, and Previous, Play/Pause, Next and the vocals chooser kept at the
-bottom. `Space` pauses. Choosing a vocal there chooses the capable reproduction with it.
+larger type and more lines, and a position bar, Previous, Play/Pause, Next, **Queue** and the
+vocals chooser kept at the bottom. `Space` pauses. Choosing a vocal there chooses the capable
+reproduction with it. Press the position bar, or drag along it, to move the item: while the bar is
+held the words and the clock show the place held, and the item moves when it is let go. `Left`
+and `Right` move it five seconds either way, and stop at the ends of the item. **Queue** (or `Q`)
+opens the queue beside the words, with the item that is playing marked and a press playing that
+item; the strip at the top names the item that comes next.
+
+**On the Play page**, an item that has lyrics, or a CD+G picture, gets a **Lyrics** card with the
+same view and a **Full screen** button. It has a column of its own beside the queue when the
+window is 1,580 pixels wide or more, and is the first card of the monitor column in a narrower
+one, so that starting a song with lyrics does not move the rest of the page. An item with none
+gets no card.
 
 #### Timing the lyrics
 
@@ -138,6 +149,17 @@ are for lines and not words. It opens a window over the page, and the item plays
    muted: a guess. Play, and press `Space` as each word starts; a word that was pressed turns solid
    and keeps its time. A line's words are guessed again only where no press has set them.
 
+   **To put one word right**, choose it with a click, in either pass. It is outlined, the item is
+   cued 1.5 s before it, and the window says which word it is and when it starts. The next `Space`
+   in the words pass presses that word in place of the next guess, once, with the reaction time
+   taken off as for any press; **Stamp again** presses it at the position now, and **-10 ms** and
+   **+10 ms** move it by that, the word and not its line. Choosing the word again cues it again and
+   lets `Space` press it again; choosing its line lets the word go, and the buttons are the line's
+   again. This is how a file that came with the times of its words, from a forced aligner for one,
+   is corrected: the words of such a file are taken as given, so the words pass has none to press
+   until one is chosen. A word stays between its neighbours (stamped long after the next word, it
+   stops at the next word's time), so move the neighbour first when a word has to go past it.
+
 3. **A duet.** Choose a line and set its **Singer** (not marked, V1, V2 or both); the row shows the
    marker as it is written. The two **Name** fields are what the file calls the singers (`[v1:]`
    and `[v2:]`), kept with the file, unlike the names typed on the Karaoke page for a run. A name
@@ -150,6 +172,11 @@ does). Times are kept to a hundredth of a second, which is what the format has.
 
 An item with no words says so, and takes a text file with a line of the words to a line, saved as
 UTF-8 or UTF-16 (an `.lrc` with no times will do), and times that.
+
+A file that already has word times opens with them as given, solid and not drawn as guesses, so the
+window is where they are checked against the sound and corrected. That is how the output of a forced
+aligner is used: [Timing a song with a forced aligner](../karaoke/forced-alignment.md) makes such a
+file with outside software and brings it here.
 
 ### AC-4
 
@@ -291,6 +318,40 @@ the report at `http://127.0.0.1:<port>/diagnostics`. The endpoint listens on the
 only, and stays off when the variable is unset, does not name a port, or names one that cannot be
 bound. On Windows every note Hearth records for the report is also sent to the debugger output
 (`OutputDebugString`), where DebugView or an attached debugger shows it.
+
+### Command line
+
+`hearth` takes a few options. None is needed to use it: they open a file at start, and take
+screenshots of the window with nobody at the machine.
+
+| Option | What it does |
+|---|---|
+| `--open <file>` | Adds the file to the queue, once for each `--open`. With nothing in the queue the first file is the item that is loaded and cued (not playing), so the Play, Media and Karaoke pages show it |
+| `--seek <ms>` | Starts the first `--open` item at that position in milliseconds and holds it paused there, so a lyric view shows a word part way through (a stopped item has no position to show). It plays a moment of sound at the output it goes to, and needs an `--open` |
+| `--page <name>` | Opens on a page (`play`, `media`, `speakers`, `decoder`, `network`, `settings` or `karaoke`), or on a dialog over the Play page (`firstrun`, `shortcuts`, `about` or `licences`) |
+| `--decoder-format <eac3\|ac4>` | Which tab the Decoder page opens on |
+| `--open-output-picker` | Opens the output picker over the page |
+| `--smoke-shot <png>` | Saves the window to a PNG once it has settled, and quits, **with network discovery off**: nothing browses the network, so there is no firewall prompt and no sink from the network in the picture. This is the one to put in a script |
+| `--shot <png>` | The same capture with network discovery on, as the window runs. On Windows that asks for a Windows Firewall rule (a UAC prompt), so run it where somebody can answer it |
+
+A capture runs against a scratch settings store, so it neither reads nor changes a person's own
+queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
+asks for it. Its exit code is 0 for a picture saved, 2 when the picture could not be saved, and
+3 when an `--open` file did not load, or did not reach its `--seek` position, within fifteen seconds
+(the picture is saved all the same, for what the window said about the file). A script that
+regenerates screenshots can stop on that.
+
+```sh
+QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=C:\Windows\Fonts \
+  hearth --smoke-shot karaoke.png --page karaoke \
+         --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 5000
+```
+
+`QT_QPA_PLATFORM=offscreen` keeps a window from appearing, and `QT_QPA_FONTDIR` gives the
+offscreen platform a font directory, without which the text is drawn as boxes. The lyrics file
+beside the item is found as it is when the item is played. `ICLFORGE_GUI_LOCALE=de` (or `fr`,
+`es`, `ar`, `he`, `yi`) takes the picture in that language, for a run that leaves the person's own
+choice alone.
 
 ## ESP32 sinks
 
