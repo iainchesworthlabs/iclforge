@@ -1401,12 +1401,12 @@
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="544"/>
         <source>off</source>
-        <translation type="unfinished">אויס</translation>
+        <translation>אויס</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="546"/>
         <source>%1 dB</source>
-        <translation type="unfinished">%1 dB</translation>
+        <translation>%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="565"/>
@@ -1537,27 +1537,27 @@
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1081"/>
         <source>Melody</source>
-        <translation type="unfinished"></translation>
+        <translation>מעלאָדיע</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1095"/>
         <source>%1 level</source>
-        <translation type="unfinished"></translation>
+        <translation>%1־ניוואָ</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1108"/>
         <source>%1 level, dB</source>
-        <translation type="unfinished"></translation>
+        <translation>%1־ניוואָ, אין dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1136"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable player only.</source>
-        <translation type="unfinished"></translation>
+        <translation>דער ניוואָ פֿון יעדן טייל לויט טאַבעלע C.2.3: 0 dB איז די טאַבעלע, און דער אונטערשטער שטעל פֿון דער קאָנטראָל איז אויס. הייבט מען אויף איין טייל גענוג הויך, ווערן די אַנדערע נידעריקער, כּדי קיין הילכער זאָל נישט ווערן געטריבן איבער דער פֿולער סקאַלע. נאָר פֿאַר דער ווידערגאַבע „פֿעיִק“.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1146"/>
         <source>Reset levels</source>
-        <translation type="unfinished"></translation>
+        <translation>צוריקשטעלן די ניוואָען</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1322"/>

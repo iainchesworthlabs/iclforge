@@ -1401,12 +1401,12 @@
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="544"/>
         <source>off</source>
-        <translation type="unfinished">معطَّل</translation>
+        <translation>معطَّل</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="546"/>
         <source>%1 dB</source>
-        <translation type="unfinished">%1 dB</translation>
+        <translation>%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="565"/>
@@ -1537,27 +1537,27 @@
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1081"/>
         <source>Melody</source>
-        <translation type="unfinished"></translation>
+        <translation>اللحن</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1095"/>
         <source>%1 level</source>
-        <translation type="unfinished"></translation>
+        <translation>مستوى %1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1108"/>
         <source>%1 level, dB</source>
-        <translation type="unfinished"></translation>
+        <translation>مستوى %1، بالديسيبل</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1136"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable player only.</source>
-        <translation type="unfinished"></translation>
+        <translation>مستوى كل جزء مقابل الجدول C.2.3: القيمة 0 dB هي الجدول نفسه، وأدنى موضع في عنصر التحكم هو التعطيل. رفع جزء واحد بما يكفي يخفض بقية الأجزاء حتى لا يتجاوز أي مكبّر صوت المقياس الكامل. لوضع «قادر» فقط.</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1146"/>
         <source>Reset levels</source>
-        <translation type="unfinished"></translation>
+        <translation>إعادة تعيين المستويات</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1322"/>

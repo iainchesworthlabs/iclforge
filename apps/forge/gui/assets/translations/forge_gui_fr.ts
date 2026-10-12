@@ -1401,12 +1401,12 @@
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="544"/>
         <source>off</source>
-        <translation type="unfinished">désactivé</translation>
+        <translation>désactivé</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="546"/>
         <source>%1 dB</source>
-        <translation type="unfinished">%1 dB</translation>
+        <translation>%1 dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="565"/>
@@ -1537,27 +1537,27 @@
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1081"/>
         <source>Melody</source>
-        <translation type="unfinished"></translation>
+        <translation>Mélodie</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1095"/>
         <source>%1 level</source>
-        <translation type="unfinished"></translation>
+        <translation>Niveau de %1</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1108"/>
         <source>%1 level, dB</source>
-        <translation type="unfinished"></translation>
+        <translation>Niveau de %1, en dB</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1136"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable player only.</source>
-        <translation type="unfinished"></translation>
+        <translation>Le niveau de chaque partie par rapport au tableau C.2.3 : 0 dB est le tableau, et le bas du réglage est désactivé. Relever une partie assez loin abaisse les autres, afin qu&apos;aucune enceinte ne soit poussée au-delà de la pleine échelle. Uniquement pour la lecture « Capable ».</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1146"/>
         <source>Reset levels</source>
-        <translation type="unfinished"></translation>
+        <translation>Réinitialiser les niveaux</translation>
     </message>
     <message>
         <location filename="../qml/KaraokeFlow.qml" line="1322"/>
