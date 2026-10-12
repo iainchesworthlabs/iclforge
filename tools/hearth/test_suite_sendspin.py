@@ -94,15 +94,21 @@ class FakeProcess:
         self.killed = True
 
 
-def report(failure: str | None = None, **counters: Any) -> dict[str, Any]:
+def report(
+    failure: str | None = None, player_failure: str | None = None, **counters: Any
+) -> dict[str, Any]:
+    """The report the real server writes: a run-level failure is the top-level `result`
+    ("failed: C6 ran out of audio 1 time(s)", main.cpp finish()), and a player's own `failure`
+    is only for one that was displaced, closed or did not connect."""
     return {
         "server": {"name": ss.SERVER_NAME, "id": "SUITEID"},
+        "result": "pass" if failure is None else f"failed: {failure}",
         "programme": {"codec": "AC-3", "bursts": 938},
         "players": [
             {
                 "label": "C6",
                 "paired_by": "code",
-                "failure": failure,
+                "failure": player_failure,
                 "counters": {
                     "bursts_played": 938,
                     "underruns": 0,
@@ -289,12 +295,13 @@ class Judging(unittest.TestCase):
         code: int = 0,
         line: str | None = STREAM_LINE,
         failure: str | None = None,
+        player_failure: str | None = None,
         **rep: Any,
     ) -> ss.SendspinRun:
         board = StubBoard(log_text=(line or "") + "\n")
         return ss.run_row(
             board, SERVER, STATE, PROGRAMME, "C6",
-            popen=fake_popen(report(failure, **rep), code),
+            popen=fake_popen(report(failure, player_failure, **rep), code),
             relay_every=0.01, log_wait_s=0.0,
         )  # fmt: skip
 
@@ -334,6 +341,42 @@ class Judging(unittest.TestCase):
         # exit 3 with its failure "ran out of audio" and every burst played
         run = self.run_of(code=3, failure="C6 ran out of audio 1 time(s)")
         self.assertEqual(ss.judge(run, {"units": 938}), [])
+
+    def test_the_real_report_has_the_runs_failure_in_result_not_in_the_player(self) -> None:
+        # 2026-10-12, found by a real run on the C6: main.cpp's finish() writes the run's failure
+        # as the top-level `result`, and the player's `failure` stays null for it.
+        data = report("C6 ran out of audio 1 time(s)")
+        self.assertEqual(data["result"], "failed: C6 ran out of audio 1 time(s)")
+        self.assertIsNone(data["players"][0]["failure"])
+        run = self.run_of(code=3, failure="C6 ran out of audio 1 time(s)")
+        self.assertEqual(run.failure(), "C6 ran out of audio 1 time(s)")
+        self.assertEqual(ss.judge(run, {"units": 938}), [])
+
+    def test_a_pass_has_no_failure(self) -> None:
+        self.assertEqual(self.run_of().failure(), "")
+
+    def test_a_players_own_failure_is_never_a_glitch(self) -> None:
+        run = self.run_of(
+            code=3,
+            player_failure="was displaced by another server",
+            failure="C6 ran out of audio 1 time(s)",
+        )
+        findings = ss.judge(run, {"units": 938})
+        self.assertEqual(len(findings), 1)
+        self.assertIn("displaced", findings[0])
+
+    def test_late_chunks_the_server_names_are_a_glitch_when_every_burst_was_played(self) -> None:
+        text = "C6 did not play every burst: 2 late, 0 dropped with no room for them"
+        line = STREAM_LINE.replace("late=0", "late=2")
+        run = self.run_of(code=3, line=line, failure=text)
+        self.assertEqual(ss.judge(run, {"units": 938}), [])
+        self.assertEqual(ss.glitches(run), ["2 late chunk(s)"])
+
+    def test_an_unaccounted_burst_is_a_finding_even_when_the_count_is_right(self) -> None:
+        run = self.run_of(code=3, failure="C6 did not account for every burst sent")
+        findings = ss.judge(run, {"units": 938})
+        self.assertEqual(len(findings), 1)
+        self.assertIn("did not account for every burst", findings[0])
 
     def test_a_stream_that_stopped_short_is_a_finding_whatever_it_says(self) -> None:
         line = STREAM_LINE.replace("bursts=938", "bursts=170")

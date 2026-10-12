@@ -44,9 +44,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
-# What the server's failure text says of a stream that ended having run the board dry: a
-# glitch of a stream that played through, not a board that went away.
-RAN_OUT = re.compile(r"ran out of audio")
+# What the server's run-level result says of a stream that ended with gaps in it: a glitch of a
+# stream that played through, not a board that went away. It writes these as the report's
+# top-level `result` ("failed: C6 ran out of audio 1 time(s)"); players[0].failure is only for a
+# player that was displaced, closed or did not connect. Whether every burst was played is the
+# burst count's to say, which `judge` checks after.
+SOFT_FAILURE = re.compile(r"ran out of audio|did not play every burst|found invalid chunks")
 
 SENDSPIN_PORT = 8928
 SERVER_NAME = "ICL Forge board suite"
@@ -154,6 +157,15 @@ class SendspinRun:
     def player(self) -> dict[str, Any]:
         players = (self.report or {}).get("players") or []
         return players[0] if players else {}
+
+    def failure(self) -> str:
+        """Why the server says the run failed: the player's own failure (it was displaced, or
+        did not connect), else the run's `result` when that is not a pass."""
+        own = str(self.player().get("failure") or "")
+        if own:
+            return own
+        result = str((self.report or {}).get("result") or "")
+        return "" if result in ("", "pass") else result.removeprefix("failed: ")
 
 
 def command(
@@ -325,9 +337,16 @@ def judge(run: SendspinRun, spec: dict[str, Any]) -> list[str]:
     if run.rebooted:
         findings.append("the board rebooted during the play (its console restarted)")
     if run.exit_code not in (0, None):
-        failure = str(run.player().get("failure") or "")
-        ran_dry_only = run.exit_code == 3 and run.stream is not None and RAN_OUT.search(failure)
-        if not ran_dry_only:
+        failure = run.failure()
+        # A player's own failure is never a glitch; the run's result is one when it names only
+        # gaps in a stream the board's own totals line then confirms.
+        glitch_only = (
+            run.exit_code == 3
+            and run.stream is not None
+            and not run.player().get("failure")
+            and SOFT_FAILURE.search(failure)
+        )
+        if not glitch_only:
             why = {
                 1: "the command line or the file could not be used",
                 2: "the board did not connect, pair or take its settings",
