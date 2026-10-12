@@ -14,7 +14,7 @@
     "ac4":        {"kind": "library", "path": "libs/ac4", "may_use": ["base", "dsp", "objects", "render"], "lanes": ["core"], "purpose": "The AC-4 decoder and encoder, with the sync frames, table of contents and presentations both work through."},
     "iab":        {"kind": "library", "path": "libs/iab", "may_use": ["base"], "lanes": ["core"], "purpose": "SMPTE ST 2098-2 Immersive Audio Bitstream reading and writing, as bare bitstreams and in MXF."},
     "adm":        {"kind": "library", "path": "libs/adm", "may_use": ["iab", "objects"], "lanes": ["core"], "purpose": "ADM and BW64 reading and writing, and the mapping between ADM objects and the Atmos encoder and decoder."},
-    "capi":       {"kind": "library", "path": "libs/capi", "may_use": ["ac3", "ac4"], "lanes": ["core"], "purpose": "The C API over the AC-3 and AC-4 libraries: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23."},
+    "capi":       {"kind": "library", "path": "libs/capi", "may_use": ["ac3", "ac4", "lyrics"], "lanes": ["core"], "purpose": "The C API over the AC-3 and AC-4 libraries and the lyrics reader: plain C11, opaque handles and POD structs, for bindings and callers that cannot link C++23."},
     "audio":      {"kind": "library", "path": "libs/audio", "internal": true, "may_use": ["base", "render", "containers", "objects"], "lanes": ["core"], "exposes": ["libs/audio/src/backend/"], "purpose": "Live capture, IEC 61937 passthrough delivery, shared-mode monitor playback and the OSC object-position source: the OS-specific audio code of the project. Internal; never installed."},
     "sendspin":   {"kind": "library", "path": "libs/sendspin", "internal": true, "may_use": ["time-filter"], "lanes": ["core"], "purpose": "The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed."},
     "time-filter": {"kind": "vendored", "path": "external/time-filter", "may_use": [], "lanes": ["core"], "exposes": ["external/time-filter/"], "purpose": "The vendored clock-synchronisation filter that Sendspin keeps its players in time with."},
@@ -31,7 +31,7 @@
     "demo-android": {"kind": "app", "path": "apps/demos/android", "may_use": ["ac3", "audio", "base", "containers"], "lanes": ["android"], "purpose": "The Android (Shield) demo application."},
     "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "lyrics", "objects"], "lanes": ["wasm"], "purpose": "The browser demos, built with Emscripten."},
 
-    "python": {"kind": "binding", "path": "bindings/python", "may_use": ["ac3", "ac4", "base", "containers", "objects"], "lanes": ["python"], "purpose": "The Python binding: the iclforge wheel, built with scikit-build-core."},
+    "python": {"kind": "binding", "path": "bindings/python", "may_use": ["ac3", "ac4", "base", "containers", "lyrics", "objects"], "lanes": ["python"], "purpose": "The Python binding: the iclforge wheel, built with scikit-build-core."},
     "rust":   {"kind": "binding", "path": "bindings/rust", "may_use": ["capi"], "lanes": ["rust"], "purpose": "The Rust crates: iclforge and iclforge-sys over the C API."},
     "js":     {"kind": "binding", "path": "bindings/js", "may_use": [], "lanes": ["wasm", "npm"], "purpose": "The npm package over the WebAssembly build."},
 

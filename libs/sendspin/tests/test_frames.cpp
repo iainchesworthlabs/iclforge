@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -231,4 +232,73 @@ TEST_CASE("frames: a delivered message stays valid until the next push", "[sends
     CHECK(std::equal(result.message.begin(), result.message.end(), message.begin()));
     reassembler.reset();
     CHECK_FALSE(reassembler.in_flight());
+}
+
+// What a receive buffer keeps between messages. A board that took an 8,000-byte lyrics document
+// kept 12.7 KB of internal heap for the rest of the connection, the capacity the document grew in
+// each receive buffer. A document's buffer is released with the next message; a stream's own
+// large messages (an audio chunk up to the board's chunk limit) keep theirs, so the next chunk
+// costs no allocation.
+TEST_CASE("frames: a large document is a JSON message above the bound", "[sendspin][frames][heap]") {
+    using iclforge::sendspin::is_large_document;
+    using iclforge::sendspin::kRetainedMessageBytes;
+    // make_message(id, n) is n + 1 bytes: the ID, then the payload.
+    CHECK_FALSE(is_large_document(make_message(message_id::kJson, kRetainedMessageBytes - 1)));
+    CHECK(is_large_document(make_message(message_id::kJson, kRetainedMessageBytes)));
+    CHECK(is_large_document(make_message(message_id::kJson, 20000)));
+    CHECK_FALSE(is_large_document(make_message(message_id::kPlayerAudio, 20000)));
+    CHECK_FALSE(is_large_document(make_message(message_id::kIclforgeBurst, 20000)));
+    CHECK_FALSE(is_large_document({}));
+}
+
+TEST_CASE("frames: the buffer a large document grew is released with the next message",
+          "[sendspin][frames][heap]") {
+    using iclforge::sendspin::kRetainedMessageBytes;
+    const Dialect dialect = GENERATE(Dialect::kSpecification, Dialect::kAiosendspin911);
+    const std::vector<std::uint8_t> small = make_message(message_id::kJson, 100);
+    Reassembler reassembler(1 << 20);
+
+    SECTION("a document, then a small message") {
+        const std::vector<std::uint8_t> document = make_message(message_id::kJson, 100000);
+        CHECK(reassemble(reassembler, split(document, dialect)) == document);
+        // The span it was delivered in is the buffer, so it is held until the next message.
+        REQUIRE(reassembler.held_bytes() >= document.size());
+        const Reassembler::Result next = reassembler.push(small);
+        REQUIRE(next.error == FrameError::kNone);
+        CHECK(next.message.size() == small.size());
+        CHECK(reassembler.held_bytes() <= kRetainedMessageBytes);
+    }
+    SECTION("a document, then another") {
+        const std::vector<std::uint8_t> document = make_message(message_id::kJson, 100000);
+        CHECK(reassemble(reassembler, split(document, dialect)) == document);
+        CHECK(reassemble(reassembler, split(document, dialect)) == document);
+        REQUIRE(reassembler.push(small).error == FrameError::kNone);
+        CHECK(reassembler.held_bytes() <= kRetainedMessageBytes);
+    }
+    SECTION("a stream's large message keeps its buffer") {
+        const std::vector<std::uint8_t> chunk = make_message(message_id::kPlayerAudio, 100000);
+        CHECK(reassemble(reassembler, split(chunk, dialect)) == chunk);
+        const std::size_t held = reassembler.held_bytes();
+        REQUIRE(held >= chunk.size());
+        REQUIRE(reassembler.push(small).error == FrameError::kNone);
+        CHECK(reassembler.held_bytes() == held);
+        // The next chunk is received into the same allocation.
+        CHECK(reassemble(reassembler, split(chunk, dialect)) == chunk);
+        CHECK(reassembler.held_bytes() == held);
+    }
+    SECTION("a message abandoned in flight") {
+        const auto frames = split(make_message(message_id::kJson, 100000), dialect);
+        REQUIRE(reassembler.push(frames[0]).error == FrameError::kNone);
+        REQUIRE(reassembler.held_bytes() > kRetainedMessageBytes);
+        reassembler.reset();
+        CHECK(reassembler.held_bytes() <= kRetainedMessageBytes);
+        CHECK_FALSE(reassembler.in_flight());
+    }
+    SECTION("a message the limit refuses") {
+        Reassembler tight(70000);
+        const auto frames = split(make_message(message_id::kJson, 100000), dialect);
+        REQUIRE(tight.push(frames[0]).error == FrameError::kNone);
+        CHECK(tight.push(frames[1]).error == FrameError::kTooLarge);
+        CHECK(tight.held_bytes() <= kRetainedMessageBytes);
+    }
 }

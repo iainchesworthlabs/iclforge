@@ -66,6 +66,25 @@
 # AC-4's static library is embedded the same way, iclforge::ac4_static: the
 # inspector, the decoder and the encoder, with the tables and transforms they
 # share inside it.
+#
+# The lyrics reader (libs/lyrics, the iclforge_lyrics_* functions of iclforge.h) is COMPILED INTO
+# this library, not linked: iclforge::lyrics is an internal library that is never installed, so an
+# installed archive of this one cannot name it as a dependency, and its code is standard-library
+# only, which is what makes embedding the one translation unit that holds the parser cheap. The
+# reader's file-system half (libs/lyrics/src/files.cpp), the writer and the CD+G decoder stay out:
+# a caller of a C API reads its own bytes, and nothing here writes or draws.
+#
+# Like the AC-4 half, it is answered by one of two translation units chosen here and not by a
+# preprocessor test: the reader's header names std::filesystem::path in its file-reading signature,
+# which a macOS deployment target below 10.15 refuses to compile (what an Intel build that does not
+# set one gets), and iclforge::lyrics is left out of the minimum-footprint profiles besides. Where
+# either holds, src/lyrics_absent.cpp answers the same functions with ICLFORGE_ERROR_UNSUPPORTED.
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles(
+    "#include <filesystem>
+     int main() { const std::filesystem::path p{\"a\"}; return static_cast<int>(p.string().size()); }"
+    ICLFORGE_HAS_STD_FILESYSTEM)
+set(_capi_lyrics_dir "${CMAKE_CURRENT_SOURCE_DIR}/../lyrics")
 set(_capi_sources
     src/atmos.cpp
     src/common.cpp
@@ -77,6 +96,14 @@ set(_capi_sources
     src/loudness.cpp
     src/qc.cpp
     src/scan.cpp)
+set(_capi_lyrics FALSE)
+if(ICLFORGE_HAS_STD_FILESYSTEM AND EXISTS "${_capi_lyrics_dir}/src/lyrics.cpp"
+   AND NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
+    set(_capi_lyrics TRUE)
+    list(APPEND _capi_sources src/lyrics.cpp "${_capi_lyrics_dir}/src/lyrics.cpp")
+else()
+    list(APPEND _capi_sources src/lyrics_absent.cpp)
+endif()
 set(_capi_embeds iclforge::ac3_static)
 if(ICLFORGE_BUILD_AC4)
     list(APPEND _capi_sources src/ac4.cpp src/ac4_encoder.cpp)
@@ -92,6 +119,9 @@ iclforge_add_library(capi
     EXPORT_HEADER iclforge_c/export.h
     SOURCES ${_capi_sources}
     EMBEDS ${_capi_embeds})
+if(_capi_lyrics)
+    target_include_directories(iclforge_capi_objects PRIVATE "${_capi_lyrics_dir}/include")
+endif()
 
 # generate_export_header() emits a C++-flavoured export.h ("#ifdef __cplusplus
 # extern \"C\" {") by default only for the dllexport/dllimport attribute
