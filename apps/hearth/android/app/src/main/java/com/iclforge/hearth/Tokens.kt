@@ -3,10 +3,10 @@
 package com.iclforge.hearth
 
 /**
- * The family's tokens as planning/hearth-sink-screen.md (Tokens, Layout) states them: the Signal palette
- * in its dark mode, which a sink always draws, whatever the OS theme is, and the sizes in `u`, a 600th
- * of the view's height. The desktop's palette and the P4X panel's screen are held to the same file by
- * the same script.
+ * The family's tokens as planning/hearth-sink-screen.md (Tokens, Layout) states them: the Signal
+ * palette in its dark mode, which a sink always draws, whatever the OS theme is, and the sizes in
+ * `u`, a 600th of the view's height. The desktop's palette and the P4X panel's screen are held to
+ * the same file by the same script.
  */
 object Tokens {
     val BG: Int = 0xFF151313.toInt()
@@ -39,7 +39,7 @@ object Tokens {
     /** A duet's second vocal is indented this fraction of the width (the desktop's rule). */
     const val DUET_INDENT = 0.18f
 
-    /** Android TV's overscan margin on each side, on top of the margin (the spec's differences table). */
+    /** Android TV's overscan margin on each side, on top of the margin (the spec's table). */
     const val OVERSCAN = 0.05f
 
     /** The count-in: four dots that go out one a second. */
@@ -71,7 +71,8 @@ object Tokens {
     /**
      * The size the current line is drawn at, in u: the panel's rule by the line's length in
      * characters, not a measurement (up to 18 characters 72 u, up to 36 64 u, up to 44 56 u, up to
-     * 54 48 u, longer 40 u), then the singer's text size step (0 small, 1 medium, 2 large) one step down or up.
+     * 54 48 u, longer 40 u), then the singer's text size step (0 small, 1 medium, 2 large)
+     * one step down or up.
      */
     fun currentSizeU(characters: Int, step: Int = 1): Float {
         var index = MAX_CHARACTERS.indexOfFirst { characters <= it }
