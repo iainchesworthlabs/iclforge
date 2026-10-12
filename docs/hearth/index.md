@@ -374,8 +374,9 @@ ESP32-C6 build plays stereo only. ESP32-S3 boards and an ESP32-C6 with an ESP32-
 AC-3 and E-AC-3 in Sendspin groups on hardware, for ten minutes each without an underrun (the
 [S3 sink guide](sink-esp32-s3.md) and the [C6 sink guide](sink-esp32-c6.md) have the runs); no DAC
 was wired to the boards. Every release from the next one on publishes sink firmware for the
-ESP32-S3, the ESP32-C6, and the ESP32-P4; [Sink firmware](sink-firmware.md) covers installing it
-and updating a board over its network.
+ESP32-S3, the ESP32-C6, and the ESP32-P4 (one image for each of its two silicon generations, the
+newer with a screen); [Sink firmware](sink-firmware.md) covers installing it and updating a board
+over its network.
 
 **AC-4 on the sinks.** No ESP32 sink takes AC-4 in a Sendspin group: every `hearth_sink` build
 lists `ac3` and `eac3` as its data types and none lists `ac4`, so a group's ESP32 member gets
@@ -423,6 +424,8 @@ Raspberry Pi 4B without an underrun. See
 
 - [An ESP32-S3 sink](sink-esp32-s3.md) — build, flash, configure, and pair a board.
 - [An ESP32-C6 sink](sink-esp32-c6.md) — the stereo player on a part with no PSRAM.
+- [An ESP32-P4 sink](sink-esp32-p4.md) — the best tier, its two silicon generations and two images,
+  and the lyric screen for a board with a panel.
 - [Sink firmware](sink-firmware.md) — install a published image, update over the network, and go
   back; or [install from the browser](sink-installer.md).
 - [ESP32-S3](../platforms/bare-metal/esp32-s3.md) — decoder timing and memory measurements.

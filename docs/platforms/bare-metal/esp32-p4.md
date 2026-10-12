@@ -101,6 +101,14 @@ loop of about 160 ms a cycle, never reaching `app_main`. 187 such cycles were co
 (`CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360`) is this chip revision's ceiling, and every figure on this
 page is measured there — DFRobot's own listing for this board says "360MHz" for the same reason.
 
+**On a v3.x chip** the same firmware family has its own image (`hearth-sink-esp32p4-rev3`, built with
+`sdkconfig.p4-rev3` after `sdkconfig.p4`): revisions v3.1 to v3.99, 400 MHz, PSRAM at 200 MHz by
+ESP-IDF's default, and the I2S controller's 160 MHz PLL as its clock source, which is what the
+sixteen-slot TDM frame needs. Every figure on this page is the v1.3 board's; **none has been
+measured on a v3.x chip**, and the decoders scale with the clock almost exactly, so these are a
+floor. The image carries the lyric screen for a 7-inch panel
+([An ESP32-P4 sink](../../hearth/sink-esp32-p4.md)).
+
 ## Reading the console
 
 This board has no USB-UART bridge chip, so "attach a terminal" is not the formality it is on the

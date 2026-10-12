@@ -417,9 +417,11 @@ samples and the same lines as `forge decode` and Hearth do.
   encoding, so its words must be UTF-8.
 - **Text from a CD+G disc.** Its words are pixels, so Hearth shows the picture and cannot follow the
   words.
-- **A screen on a sink.** A board that decodes for itself is sent the lyrics and where the sound is
-  in them, follows them on its own clock and reports the line; the panel that would draw them waits
-  for a board with a display.
+- **A screen on a sink that has not been run.** A board that decodes for itself is sent the lyrics
+  and where the sound is in them, follows them on its own clock and reports the line. The P4
+  firmware also draws them, with the colour moving as the song does, on a 7-inch panel
+  ([An ESP32-P4 sink](../hearth/sink-esp32-p4.md#the-screen)): drawn and measured on a board with no
+  panel, not yet run on one, and without a microphone, scoring or recording.
 - **Karaoke in E-AC-3 or AC-4.**
 - **A microphone, scoring or recording.** A [draft plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
   sets out the requirements and the design questions and is awaiting approval; nothing of it is
