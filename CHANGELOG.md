@@ -3678,6 +3678,12 @@ The sections below contain the complete change list and fixes.
 
 **Lyrics on a board**
 
+- **The P4 panel's footer counted a line that only marks a time.** A lyric file that ends with a
+  time and no text (where an editor writes the end of the last line) or has a blank line for an
+  instrumental break holds more lines than the song has, and the footer said "Line 2 of 5" for a
+  song of four, as a real board showed on 2026-10-12. It counts and numbers the lines with text
+  (`text_line_count()` and `text_line_number()` in `iclforge::lyrics`, tested on the host).
+
 - **A board's lyric document cost ten times its text of the internal heap, and the default let it
   be sixteen kilobytes.** A parsed document is a line and a word each in many small blocks, which
   the allocator keeps in internal RAM whatever the total, and that is what Wi-Fi's receive buffers
