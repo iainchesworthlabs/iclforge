@@ -3331,7 +3331,9 @@ The sections below contain the complete change list and fixes.
   with the decoder the player already holds and no other made; a listener who chose objects
   "always" is not overruled. On an ESP32-S3 (release image, lane on, null sink, 7.1.4, over
   Sendspin) streams of 3 to 11 declared objects that took 1.07 to 2.27 of real time with 63 to
-  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun.
+  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun. On an ESP32-P4, which
+  states 12, the 14-object stream that took 0.97 with 24 underruns took 0.22, and the 11-object
+  streams, within the figure, are reconstructed at 0.85 as before.
 
 **Library internals**
 

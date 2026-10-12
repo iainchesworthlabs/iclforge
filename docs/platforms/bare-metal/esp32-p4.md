@@ -1093,6 +1093,32 @@ Fifteen objects is at the line and under-runs (24 underruns in a 20 s play); twe
 the 12-object `514-joc-dee` 0.85. The coding tools at 7.1.4 are 0.33 (none), 0.43 (all) and 0.62
 (enhanced coupling), 5.1 E-AC-3 0.18; the internal RAM left is never under 108 KB.
 
+**A stream past the objects the board states is played as its bed.** The P4 states
+`max_objects` 12 (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS`), and a stream whose first unit
+declares more - the OBA complexity index less the LFE, which is one fewer than the `forge probe`
+count above - is decoded without the object reconstruction, from its first unit
+([how the player decides](esp32-s3.md#objects)). The console says so once: `burst player: a
+stream declaring 14 objects is past the 12 this board places in real time: playing its bed`.
+Measured on the release-shape image (`sdkconfig.p4` and `sdkconfig.ac4`, decode lane on, null
+sink, 7.1.4, over Sendspin, built from #1426's head `ebcb91fb1`, board 1, 2026-10-12), the burst's
+x real time and its worst burst:
+
+| Stream | `forge probe` objects | Declared | Before | With the fallback |
+|---|---:|---:|---|---|
+| `joc15` | 15 | 14 (past 12) | 0.97, worst 2.44, 24 under | 0.22, worst 0.28 to 0.49, 0 to 5 late, 0 to 1 under |
+| `joc12` | 12 | 11 (within) | 0.85, worst 1.24 | 0.85, worst 0.99: reconstructed, as stated |
+| `514-joc-dee` | 12 | 11 (within) | 0.85, worst 1.18 | 0.85, worst 1.03: reconstructed, as stated |
+| `714-none` | channel-based | 0 | 0.33 | 0.33 |
+
+A 15-object stream at 7.1.4 now costs less than a channel-based one (a 5.1 core rendered to
+7.1.4), as on the S3. At 5.1 the objects are not rendered whatever the figure says, and the bed
+was always what played (`joc15` at 5.1: 0.19, 0 under, no fallback line). The one underrun in the
+first `joc15` play came in its first 125 chunks, with a resync, on the first play after the board
+had restarted into the image; the two plays after it had none. No stream of exactly 12 declared
+objects, the most the board still reconstructs, was to hand: at about 1.4 ms a frame an object it
+would be about 0.89, with a worst burst near `joc12`'s. A stream of 13 declared or more is played
+as its bed, as `joc15`'s 14 are.
+
 ## QEMU
 
 ESP-IDF v6.1's `qemu-system-riscv32` emulates one machine, `esp32c3`, and no other RISC-V part —
