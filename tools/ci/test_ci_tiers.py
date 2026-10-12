@@ -106,6 +106,59 @@ class WhatRunsAfterAMerge(unittest.TestCase):
                 self.assertIn("github.event_name == 'schedule'", cond)
                 self.assertIn("needs: ffmpeg-validate", job("_ci-core.yml", name))
 
+    def test_the_comparison_publisher_also_runs_after_a_failed_ffmpeg_validate(self):
+        """A gate that fails after the scoring steps must not discard what they measured.
+
+        2026-10-11: the nightly scored every AC-4 encode leg and decode stream, uploaded them,
+        and failed a coverage check three steps later. The publisher needed the whole job to
+        pass, was skipped, and the first night anything wrote the AC-4 encode series left no
+        point on it.
+        """
+        name = "persist-external-comparison-trend"
+        cond = condition("_ci-core.yml", name)
+        self.assertIn("!cancelled()", cond)
+        self.assertIn("needs.ffmpeg-validate.result == 'success'", cond)
+        self.assertIn("needs.ffmpeg-validate.result == 'failure'", cond)
+        # Skipped (tier t2) and cancelled stay out: the condition names the two results it
+        # takes rather than "anything but skipped".
+        self.assertNotIn("'cancelled'", cond)
+        self.assertNotIn("'skipped'", cond)
+        body = job("_ci-core.yml", name)
+        # The two downloads a failed run may lack are tolerated only on a run that failed: on
+        # one that passed, a missing artifact is a real fault and fails the job as it did.
+        self.assertEqual(
+            body.count("continue-on-error: ${{ needs.ffmpeg-validate.result != 'success' }}"), 2
+        )
+        # ...and what needs them runs only when they arrived, or on a run that passed.
+        self.assertIn(
+            "needs.ffmpeg-validate.result == 'success' || hashFiles('results/trend.json') != ''",
+            body,
+        )
+        self.assertIn("hashFiles('results/spectrograms/*.png') != ''", body)
+
+    def test_the_object_publisher_still_needs_a_passing_ffmpeg_validate(self):
+        """Its scores come from the job's last step: a failed run has none to publish."""
+        cond = condition("_ci-core.yml", "persist-object-quality-trend")
+        self.assertNotIn("needs.ffmpeg-validate.result", cond)
+
+    def test_the_ac4_scores_are_uploaded_even_when_the_scorer_fails_a_floor(self):
+        """Both scorers write --json-out before they exit non-zero, so a breach is a point."""
+        ffmpeg = job("_ci-core.yml", "ffmpeg-validate")
+        for scorer, upload in (
+            ("ac4-decode-score", "Upload AC-4 decode quality results"),
+            ("ac4-encode-score", "Upload AC-4 encode quality results"),
+        ):
+            with self.subTest(scorer=scorer):
+                self.assertRegex(ffmpeg, rf"(?m)^        id: {scorer}\n        run: \|")
+                step = re.search(
+                    rf"(?ms)^      - name: {re.escape(upload)}\n(.*?)(?=^      - |^      #|\Z)", ffmpeg
+                )
+                self.assertIsNotNone(step, upload)
+                self.assertIn(
+                    f"if: ${{{{ !cancelled() && steps.{scorer}.outcome != 'skipped' }}}}",
+                    step.group(1),
+                )
+
     def test_the_appimage_is_nightly_only(self):
         self.assertIn("inputs.tier != 't2'", condition("_build.yml", "linux-appimage"))
 

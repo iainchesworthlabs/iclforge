@@ -260,6 +260,29 @@
     const rate = parts.length > 1 && /^\d+$/.test(parts[parts.length - 1]) ? `${parts.pop()} kbps` : null;
     return [parts.map((p) => (has(LEG_LAYOUTS, p) ? LEG_LAYOUTS[p] : p)).join(" "), rate].filter(Boolean).join(", ");
   }
+
+  // Each series is a file of its own, written by its own job, so two cards, or two lines of one,
+  // can be from different commits: speed, memory and the gold-reference gate follow each merge,
+  // while the AC-4 decode scores, the encoders' listening scores and the tool comparison follow
+  // the nightly scoring run. `series` is newestCommitRows() of one history file and `latest` is
+  // the newest of all of them. A line from an older commit than that says which commit and day
+  // it was recorded on, so an old figure does not read as the latest one. Nothing for a series
+  // that is the newest, or one that has no commit to name.
+  function recordedNote(series, latest) {
+    if (!series || !latest || !series.commit || series.commit === latest.commit) return "";
+    const day = Number.isNaN(Date.parse(series.date)) ? "" : new Date(series.date).toISOString().slice(0, 10);
+    return ` <em>Last recorded on <code>${esc(String(series.commit).slice(0, 8))}</code>${day ? ", " + day : ""}.</em>`;
+  }
+
+  // The series whose newest commit is the most recent, by the date that commit was made.
+  function newestSeries(all) {
+    let best = null;
+    for (const s of all) {
+      if (!s || !s.commit || Number.isNaN(Date.parse(s.date))) continue;
+      if (!best || Date.parse(s.date) > Date.parse(best.date)) best = s;
+    }
+    return best;
+  }
   // <<< measurement summary
 
   function rawUrl(file) {
@@ -317,14 +340,15 @@
   const emptyTile = (title) => tile(title, "", [], NO_MEASUREMENT, NONE);
   const noLine = (codec, what) => line(codec, "&mdash;", "", what || NO_MEASUREMENT);
 
-  function speedTile(rows) {
+  function speedTile(rows, noteFor = () => "") {
     const picked = slowestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyTile("Speed");
     const timed = rows.filter((r) => isNumber(r.ms_per_frame) && r.ms_per_frame > 0);
     const lines = CODECS.map((codec) => {
       const e = picked[codec];
       return e ? line(codec, formatMultiple(e.times) + "&times;", "",
-        esc(e.words) + ", " + oneDecimal(e.ms) + " ms of a " + round1(e.budget) + " ms frame") : noLine(codec);
+        esc(e.words) + ", " + oneDecimal(e.ms) + " ms of a " + round1(e.budget) + " ms frame." +
+        noteFor(codec)) : noLine(codec);
     });
     // Real time is 1x by definition: below it the codec cannot keep up with playback. How
     // much headroom above it is "enough" is a judgement no threshold here should make.
@@ -335,7 +359,7 @@
       "1&times; is live playback.", ok ? OK : WATCH);
   }
 
-  function qualityTile(rows, ac4Rows) {
+  function qualityTile(rows, ac4Rows, noteFor = () => "") {
     const gated = tightestPerCodec(rows);
     const ac4 = ac4Quality(ac4Rows);
     if (Object.keys(gated).length === 0 && !ac4) return emptyTile("Decode accuracy");
@@ -344,12 +368,13 @@
       if (g) {
         const channel = g.channel ? ", " + esc(has(CHANNEL_NAMES, g.channel) ? CHANNEL_NAMES[g.channel] : g.channel) + " channel" : "";
         return line(codec, oneDecimal(g.value), "dB", esc(g.words) + channel + ". Floor " +
-          oneDecimal(g.floor) + " dB, scored against " + g.against + ".", g.headroom < 0);
+          oneDecimal(g.floor) + " dB, scored against " + g.against + "." + noteFor(codec), g.headroom < 0);
       }
       if (codec === "AC-4" && ac4 && ac4.snr !== null) {
         return line(codec, oneDecimal(ac4.snr), "dB", "Lowest of " + ac4.streams + " Dolby streams (<code>" +
           esc(ac4.snrLeg) + "</code>), scored against their sources. No floor yet." +
-          (ac4.mos !== null ? " MOS-LQO " + twoDecimals(ac4.mos) + "&ndash;" + twoDecimals(ac4.mosBest) + "." : ""));
+          (ac4.mos !== null ? " MOS-LQO " + twoDecimals(ac4.mos) + "&ndash;" + twoDecimals(ac4.mosBest) + "." : "") +
+          noteFor(codec));
       }
       return noLine(codec);
     });
@@ -361,7 +386,7 @@
       "reference and says nothing about perceived audio quality.", chip);
   }
 
-  function listeningTile(rows) {
+  function listeningTile(rows, noteFor = () => "") {
     const picked = listeningPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyTile("Listening quality");
     const lines = CODECS.map((codec) => {
@@ -370,7 +395,7 @@
       const range = p.low.mos_lqo === p.high.mos_lqo ? twoDecimals(p.low.mos_lqo)
         : twoDecimals(p.low.mos_lqo) + "&ndash;" + twoDecimals(p.high.mos_lqo);
       return line(codec, range, "MOS-LQO", p.count + " measurements on " + p.legs.size + " legs. Lowest: " +
-        esc(legWords(p.low.leg)) + (p.low.variant ? ", tool set " + esc(p.low.variant) : "") + ".");
+        esc(legWords(p.low.leg)) + (p.low.variant ? ", tool set " + esc(p.low.variant) : "") + "." + noteFor(codec));
     });
     // NO chip, deliberately: a low-bitrate leg is SUPPOSED to score lower, so any absolute floor
     // would flag the encoder for doing its job. A MOS change is judged on the trend pages,
@@ -379,20 +404,20 @@
       lines, "5 is indistinguishable from the original. A lower bitrate scores lower by design.", null);
   }
 
-  function allocationTile(rows) {
+  function allocationTile(rows, noteFor = () => "") {
     const picked = heaviestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyTile("Allocation per frame");
     const lines = CODECS.map((codec) => {
       const e = picked[codec];
       return e ? line(codec, round0(e.value / 1024), "KB", esc(e.words) +
-        (isNumber(e.allocs) ? ", " + round0(e.allocs) + " allocations" : "") + ".") : noLine(codec);
+        (isNumber(e.allocs) ? ", " + round0(e.allocs) + " allocations" : "") + "." + noteFor(codec)) : noLine(codec);
     });
     // NO chip: nothing gates allocator traffic, so there is no line to borrow.
     return tile("Allocation per frame", "Heaviest workload of each codec. Bytes requested from the heap per frame.",
       lines, "This counts allocator traffic, not memory in use. What stays in memory is live growth.", null);
   }
 
-  function growthTile(rows) {
+  function growthTile(rows, noteFor = () => "") {
     const picked = mostRetainingPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyTile("Live growth");
     const windows = [...new Set(Object.values(picked).filter((e) => isNumber(e.frames)).map((e) => e.frames - 1))];
@@ -400,8 +425,8 @@
     const lines = CODECS.map((codec) => {
       const e = picked[codec];
       const over = e && e.value >= MEMORY_RETENTION_WARN_BYTES;
-      return e ? line(codec, oneDecimal(e.value / 1024), "KiB", esc(e.words) + (over ? ", over the line." : "."), over)
-        : noLine(codec);
+      return e ? line(codec, oneDecimal(e.value / 1024), "KiB",
+        esc(e.words) + (over ? ", over the line." : ".") + noteFor(codec), over) : noLine(codec);
     });
     // Live bytes still held after the steady-state frames is a leak signal, and a leak is a
     // leak whatever last week's runs did: append_memory_history.py warns at 4 KiB and fails
@@ -446,14 +471,21 @@
 
     const p = newestCommitRows(perf), q = newestCommitRows(quality), a = newestCommitRows(ac4);
     const e = newestCommitRows(external), n = newestCommitRows(ac4Encode), m = newestCommitRows(memory);
+    // The newest commit of any series. A line from an older one says so (recordedNote): the
+    // series are written by different jobs on different cadences.
+    const latest = newestSeries([p, q, a, e, n, m]);
+    const since = (series) => () => recordedNote(series, latest);
     mount.innerHTML = [
-      guarded("Speed", () => speedTile(p.rows)),
-      guarded("Decode accuracy", () => qualityTile(q.rows, a.rows)),
+      guarded("Speed", () => speedTile(p.rows, since(p))),
+      // Two series: the gold-reference gate (AC-3, E-AC-3) and AC-4's decode scores.
+      guarded("Decode accuracy", () => qualityTile(q.rows, a.rows,
+        (codec) => recordedNote(codec === "AC-4" ? a : q, latest))),
       // Two series, each its own newest commit: the AC-3 and E-AC-3 tool comparison, and the
       // AC-4 encoder's own. A row says its codec, so the tile files each under its own line.
-      guarded("Listening quality", () => listeningTile(e.rows.concat(n.rows))),
-      guarded("Allocation per frame", () => allocationTile(m.rows)),
-      guarded("Live growth", () => growthTile(m.rows)),
+      guarded("Listening quality", () => listeningTile(e.rows.concat(n.rows),
+        (codec) => recordedNote(codec === "AC-4" ? n : e, latest))),
+      guarded("Allocation per frame", () => allocationTile(m.rows, since(m))),
+      guarded("Live growth", () => growthTile(m.rows, since(m))),
     ].join("");
   })();
 })();
