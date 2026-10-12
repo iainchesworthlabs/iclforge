@@ -1,13 +1,13 @@
 # The Hearth sink screen: one design for the desktop, Android and the P4X panel
 
-!!! note "Status as of 2026-10-12: a draft for the owner; the panel column is built, the Android column is proposed"
+!!! note "Status as of 2026-10-13: the panel column and the Android column are built; the open items below are the owner's and the P4X session's"
     The owner asked for a **common design across the Hearth family**: desktop Hearth (Windows,
     macOS, Linux), the Android TV app ([the plan](hearth-android.md)) and the ESP32-P4X board with
     its 7-inch panel. This is the one document. It was started by the Hearth-for-Android session;
     the panel's column is the P4X session's ("Karaoke support on P4X"), who owns what the panel
     draws and reviews this page, and whose built design this page takes as its starting point
-    (their plan, `planning/karaoke-p4x-panel.md`, and its screens, are on the branch
-    `feature/karaoke-p4x-support` and not yet on `main`). On 2026-10-12 they agreed the pins, the
+    (their plan, `planning/karaoke-p4x-panel.md`, and its screens, under
+    `firmware/hearth-sink/main/panel/lvgl/`, are on `main`). On 2026-10-12 they agreed the pins, the
     narrowed viewing distances, the script rule and 70% for the board's sung line, as marked below. Nothing here changes what the desktop
     draws today: where this page and the desktop differ, [the table below](#what-the-three-do-today)
     says which side moves.
@@ -59,10 +59,10 @@ and its element is not drawn; no platform invents one.
 | `pairing` | `unpaired` (with the code or the `SP:1` QR), `paired`, `paired and connected`, `in use by another server` | n/a | `PlayerSession` and `Arbiter` | the board |
 | `server` | The name the connected server gave itself | n/a | `PlayerSession::server_name()` | the board |
 | `group` | The group's name | the Network page | `group/update` `group_name`, which the player is handed | not drawn today |
-| `item` | `title`, `artist`, `album` | the queue | **see [D7](hearth-android.md#decisions)**: `metadata@v1`, or the document's tags | the document's `[ti:]` and `[ar:]` tags |
-| `position`, `duration` | Where the sound is | `LyricClock` | the playhead; `[length:]` or `metadata@v1` | the playhead |
+| `item` | `title`, `artist`, `album` | the queue | **built (D7)**: `metadata@v1` from the engine, and the document's tags as the fallback | the document's `[ti:]` and `[ar:]` tags |
+| `position`, `duration` | Where the sound is | `LyricClock` | the playhead; `[length:]` or `metadata@v1`. **An item with no lyric document shows no time yet** (a leftover: the progress is in `metadata@v1`) | the playhead |
 | `route` | `passthrough` (bits reach the receiver untouched), `decoded` (this sink decodes and applies), `pcm` (the server sent PCM) | the Play page | the sink core | `decoded` always |
-| `format` | What the stream is: "Dolby Digital 5.1", "Dolby Digital Plus 7.1.4 JOC", the reproduction "aware" or "capable" with its vocals | the Media page | `decoder` in the role's state (the sink parses the first syncframe) | the board's layout chip only |
+| `format` | What the stream is: "Dolby Digital 5.1", "Dolby Digital Plus 7.1.4 JOC", the reproduction "aware" or "capable" with its vocals | the Media page | the output's `DecoderReport`, which the role sends to the server; **not drawn yet** (a leftover: the status JSON does not carry it) | the board's layout chip only |
 | `levels` | volume, mute, `output_delay_ms` | n/a | the role's state | the board |
 | `lyrics` | `none`, `pending`, `plain`, `line` (timed lines), `word` (timed words), with the document and a `Stage` | `KaraokeController` | `Follower` | `Follower` and `Stage` |
 | `attention` | A reason to say aloud: the receiver does not accept the format, the stream was refused, the link is lost, `why`, `settings_error` | the log and notices | the sink core | `why` |
@@ -82,7 +82,7 @@ The numbering is the panel's (built, with pictures); S0, S10 and S11 are added.
 | # | Screen | When | Shows |
 |---|---|---|---|
 | S0 | **Starting** | The service is up and there is no network, or the output is not ready | The sink's name, "Waiting for the network" or "Waiting for the receiver", and what to check |
-| S1 | **Idle** | No stream; connected or not | The name large, the address, the network; "Paired with *server*" or "Waiting for a server"; when unpaired, the code and the QR; the layout and output |
+| S1 | **Idle** | No stream; connected or not | The name large, the address, the network; "Paired with *server*" or "Waiting for a server"; when unpaired, the code and the QR (**the QR is drawn on Android** for a dynamic code the server asks for in its QR form, as a card at the right with the token under it; a code in digits is drawn as it was, and the static code and the `SP:0` token are not drawn); the layout and output |
 | S2 | **Singing, word-timed** | Lyrics held and the current line has word times | The grid below: the past line, the current line with the fill, two to three next lines |
 | S3 | **Duet** | The document's lines carry singers | V1's lines at the start edge, V2's indented 18%, both across; a tag above each line ("Shantyman · guide", "Crew · you") |
 | S4 | **Instrumental gap** | Between lines for 4 s or more | A note and four dots that go out one a second; the next line under it |
@@ -264,8 +264,8 @@ they are checked in beside the fixture so a renderer's test and the library's ag
 | 2 | The count-in on the desktop and the TV | Owner (a change to the signed-off desktop design) |
 | 3 | SS5's sentence and the title rule: **agreed with the P4X session 2026-10-12**; the sentence is pinned in SS5 above | Settled |
 | 4 | The viewing distance the panel is designed for: **narrowed, as stated above, 2026-10-12** | Settled |
-| 5 | `route`: **the role's state has the `output` key** (D6, built); the panel's firmware can write `pcm` and draw it when it wants. `format` is still not in the state, for the panel's footer | The plan's D6; the P4X session for the firmware |
-| 6 | A request path from a sink to the server for the vocals and the reproduction | The plan's D8; a protocol PR, shared with the panel's Q6 |
+| 5 | `route`: **the role's state has the `output` key** (D6, built, #1464 and #1466; the Network page's row is #1467); the panel's firmware can write `pcm` and draw it when it wants. `format` is the decoder report the role already sends, and is not yet drawn on the TV or in the panel's footer | The plan's D6; the P4X session for the firmware |
+| 6 | A request path from a sink to the server for the vocals and the reproduction | **Built** (the plan's D8): the protocol is #1471, the TV's remote is #1475, the host's apply is #1473; the panel can send the same request and has not been asked to. "Both" asks `aware`; V1, V2 and None ask `capable` with the vocals (the owner, 2026-10-13) |
 | 7 | Where tokens live: one file generating QML, Kotlin and a C header, or this page only | **Settled** (the plan's D13): `docs/hearth/design/sink-screen-tokens.json`. The Android app's `Tokens.kt` is generated from it, and `tools/checks/sink_screen_tokens.py` holds the desktop's Signal dark palette and the panel's screen to the same values without writing to either; moving either to a generated file is its owner's |
-| 8 | Where `title` and `artist` come from for an item with no lyric document | The plan's D7 |
+| 8 | Where `title` and `artist` come from for an item with no lyric document | **Settled and built** (the plan's D7): `metadata@v1`, #1468 and #1469 |
 | 9 | Greek and Cyrillic have no face bundled with the family: Archivo does not cover them. The panel bundles Noto Sans for both; the desktop and Android rely on the system's fallback, which changes the look of a Cyrillic line | Owner; the P4X session's panel PR corrects its own rows |

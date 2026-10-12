@@ -233,6 +233,16 @@ The sections below contain the complete change list and fixes.
   bed.** `forge atmos ... sign-objects` with the owner's test key verified 750 of 750 frames and
   was reported by the Onkyo as `Dolby Atmos/DD+` (5.0.4); the same stream with its object
   container unsigned was reported as `Dolby Audio - DD+` (5.1), with no underruns in either.
+- **Phases 4 and 5 of the Android sink are planned, and the plan's status says what is built.**
+  `planning/hearth-android-phases-4-5.md` turns the two remaining phases into pull requests, tests and
+  spikes: a routing output that passes a stream through or decodes it locally (the test sink's decode
+  path extracted into `libs/sink` behind a PCM seam), the karaoke reproduction applied on the device,
+  and then `player@v1` PCM, FLAC and Opus, transport keys and a phone profile; with the risks, five
+  calls for the owner to veto and the small leftovers that come first. `planning/hearth-android.md` now
+  lists what each phase built and by which pull request, `planning/hearth-android-findings.md` F13
+  records what the build found (a receiver in standby is no route at all), and the owner's answers of
+  2026-10-13 are in: the sink stays available until the person leaves it, and "Both" asks the server
+  for `aware` while the other vocals choices ask for `capable`.
 
 **A Sendspin sink library, which Hearth's test sink is the first program of**
 
