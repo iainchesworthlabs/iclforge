@@ -272,6 +272,11 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke guide's "From a program" table has its C API, Python and Rust rows.** Each names the
+  call that reproduces a karaoke stream and the lyric reader, and links the binding's own page
+  ([C API](docs/library/c-api.md#karaoke-streams-annex-c), [Python](docs/library/python-api.md#karaoke-streams-and-lyrics),
+  [Rust](docs/library/rust-api.md#karaoke-and-lyrics)); only the C++ and WebAssembly rows were there
+  until the bindings landed.
 - **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
   `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
   part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table

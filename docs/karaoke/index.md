@@ -399,11 +399,14 @@ The reproduction and the lyric reader are in the libraries, so a program of your
 
 | You are in | The reproduction | The lyrics |
 |---|---|---|
+| C or C++ through the C API | `iclforge_decoder_create_with_karaoke()`, [C API](../library/c-api.md#karaoke-streams-annex-c) | `iclforge_lyrics_parse()` and its cursor, [C API](../library/c-api.md#lyrics) |
+| Python | `DecoderConfig(karaoke=...)`, [Python](../library/python-api.md#karaoke-streams-and-lyrics) | `iclforge.lyrics` |
+| Rust | `Decoder::with_karaoke`, [Rust](../library/rust-api.md#karaoke-and-lyrics) | `iclforge::lyrics::Lyrics` |
 | A browser or Node (WebAssembly) | `FoldOptions.karaoke`, [the npm package](../platforms/wasm.md) | `parseLyrics` in the demo's module, which the [decode demo](../wasm-demo.md)'s Words panel uses |
 | C++ | `OutputConfig::karaoke` and its levels, [Decoding](../library/decoding.md) | `iclforge::lyrics`, `libs/lyrics` |
 
-Both take the same choices (as coded, aware or capable; the vocals; the three part levels in dB
-over -24 to +12, where the bottom is off) and the same bytes of a lyrics file, and give the same
+All of them take the same choices (as coded, aware or capable; the vocals; the three part levels in
+dB over -24 to +12, where the bottom is off) and the same bytes of a lyrics file, and give the same
 samples and the same lines as `forge decode` and Hearth do.
 
 ## What it does not do
