@@ -214,19 +214,42 @@ Popup {
             Layout.fillHeight: true
             spacing: 0
 
-            LyricView {
-                id: lyrics
-                objectName: "lyricScreenView"
+            ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.leftMargin: 96
                 Layout.rightMargin: root.queueOpen ? 40 : 96
-                large: true
-                positionMs: root.shownMs
-                sungColor: root.accent
-                currentColor: root.ink
-                restColor: root.quiet
-                textColor: root.ink
+                spacing: 8
+
+                LyricView {
+                    id: lyrics
+                    objectName: "lyricScreenView"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    large: true
+                    positionMs: root.shownMs
+                    sungColor: root.accent
+                    currentColor: root.ink
+                    restColor: root.quiet
+                    textColor: root.ink
+                }
+
+                // The tune as notes and the singer's voice over them (planning/karaoke-
+                // microphone.md, M5): only with the microphone on and a tune to follow, so that a
+                // room that has not asked for it sees the words and nothing else.
+                PitchRibbon {
+                    objectName: "lyricScreenRibbon"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.round(root.height * 0.14)
+                    visible: MicrophoneController.on && MicrophoneController.referenceStatus === "ready"
+                    live: visible
+                    positionMs: root.shownMs
+                    listening: MicrophoneController.live.voiced !== true
+                    noteColor: root.accent
+                    lineColor: root.ink
+                    missColor: root.quiet
+                    nowColor: root.quiet
+                }
             }
 
             // The queue, as a list a room can read from across it: what is playing is in the

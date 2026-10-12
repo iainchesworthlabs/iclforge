@@ -333,6 +333,29 @@ It hears pitch and nothing else: not the words, not the timing, not the feeling.
 and out of time with the words scores well on it. The card also says when you are consistently
 behind or ahead of the tune, which is usually a delay in the microphone and not in you.
 
+### What you see while you sing
+
+- **The pitch ribbon**, under the pitch line on the card and under the words in the singer view
+  (`F11`): the tune as a ribbon of notes moving past a mark for *now*, and your voice as a line over
+  it. Where your voice is within the tolerance of the tune the line is thick and solid; where it is
+  not it is thin and dashed, so the difference does not depend on colour. A voice an octave away is
+  drawn on the tune's octave, as it is scored, so the line is where the notes are. When you are not
+  voiced the ribbon says **Listening…** and draws no line.
+- **A mark under each line you have sung**: three dots and a percentage, in the lyrics on the page
+  and in the singer view. Three dots is 75 % or more, two is 45 % or more, one is less. Where the
+  levels fall is presentation and not measurement: the percentage is the figure. A line the tune has
+  no notes in has **no mark**, which is not a score of zero. A line you were not voiced for (under a
+  fifth of its notes' time) says **not sung** in words and carries no number, since that is not the
+  same as singing it badly. Without your headphones answer there are no marks at all.
+- **A summary** on the card when it ends: **Last performance** gives the pitch score, how much of
+  the tune's time you were voiced for, how sharp or flat you were on average and whether you were
+  behind or ahead, and what it was compared with: the part, the tolerance, octaves ignored, and that
+  lines with no notes were not scored. It stays until you turn the microphone on again or choose
+  another song. It is shown there and kept nowhere: nothing is ranked, named or sent.
+
+A song you sang only part of scores low as a whole, because the score is over all of the tune's
+time. The marks say which lines were the ones.
+
 ### The delay
 
 A microphone's sound reaches the program a little after it was sung, and some take a tenth of a

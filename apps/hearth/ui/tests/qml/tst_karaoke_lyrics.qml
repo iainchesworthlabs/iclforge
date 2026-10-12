@@ -219,6 +219,35 @@ TestCase {
         fuzzyCompare(wordItem(view, 2).fill, 1.0, 0.001);
     }
 
+    // A line that has been sung has a place for how it was sung (planning/karaoke-microphone.md,
+    // M5). This suite never turns a microphone on, so the place is there and holds nothing: no mark
+    // appears for a singer who has not asked for one.
+    function test_aSungLineHasAPlaceForItsMarkAndItIsEmptyWithTheMicrophoneOff() {
+        const view = loaded(newView(), 6000);   // in the second line; the first is sung
+        compare(MicrophoneController.on, false);
+        tryVerify(function() { return findChild(view, "lyricPastMark") !== null; }, 5000);
+        const mark = findChild(view, "lyricPastMark");
+        compare(mark.shown, false);
+        compare(mark.visible, false);
+        compare(mark.height, 0);
+    }
+
+    // The mark asks for the line on the item's timeline: the lyrics' times with the nudge added,
+    // since a nudge shows the words later and so puts the line later in the item.
+    function test_aLineIsAskedForOnTheItemsTimelineWithTheNudgeAdded() {
+        const view = loaded(newView(), 6000);
+        tryVerify(function() { return view.lines.length >= 2; }, 5000);
+        let window = view.itemWindowOf(1);
+        compare(window.startMs, view.lines[1].startMs);
+        compare(window.endMs, view.lines[1].endMs);
+        KaraokeController.delayMs = 500;
+        window = view.itemWindowOf(1);
+        compare(window.startMs, view.lines[1].startMs + 500);
+        compare(window.endMs, view.lines[1].endMs + 500);
+        KaraokeController.delayMs = -250;
+        compare(view.itemWindowOf(1).startMs, view.lines[1].startMs - 250);
+    }
+
     // --- no file, no times, no UTF-8 --------------------------------------
 
     function test_noFileSaysWhereItLooks() {
