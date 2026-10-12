@@ -360,11 +360,21 @@ forge decode out.ac3 melody-and-v1.wav karaoke=v1
 coded, and the report says so. The library form is `OutputConfig::karaoke` and
 `OutputConfig::karaoke_vocals`; see [Decoding](../library/decoding.md).
 
+## From a program
+
+The reproduction and the lyric reader are in the libraries, so a program of your own can use them:
+
+| You are in | The reproduction | The lyrics |
+|---|---|---|
+| A browser or Node (WebAssembly) | `FoldOptions.karaoke`, [the npm package](../platforms/wasm.md) | `parseLyrics` in the demo's module, which the [decode demo](../wasm-demo.md)'s Words panel uses |
+| C++ | `OutputConfig::karaoke` and its levels, [Decoding](../library/decoding.md) | `iclforge::lyrics`, `libs/lyrics` |
+
+Both take the same choices (as coded, aware or capable; the vocals; the three part levels in dB
+over -24 to +12, where the bottom is off) and the same bytes of a lyrics file, and give the same
+samples and the same lines as `forge decode` and Hearth do.
+
 ## What it does not do
 
-- **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
-  (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
-  player do not offer them.
 - **Aligning words to the sound.** Hearth's timing window ([Timing the
   lyrics](../hearth/index.md#timing-the-lyrics)) takes word times from your presses, and an estimate
   by the letters of a word is only where a press starts from. A forced aligner is outside software,
@@ -377,7 +387,10 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
 - **A screen on a sink.** A board that decodes for itself is sent the lyrics and where the sound is
   in them, follows them on its own clock and reports the line; the panel that would draw them waits
   for a board with a display.
-- **Karaoke in E-AC-3 or AC-4**, and **a microphone, scoring or recording**.
+- **Karaoke in E-AC-3 or AC-4.**
+- **A microphone, scoring or recording.** A [draft plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
+  sets out the requirements and the design questions and is awaiting approval; nothing of it is
+  built.
 
 ## How it is checked
 
