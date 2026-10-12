@@ -203,3 +203,125 @@ test('the page offers the vocals of a karaoke stream and of no other, and decode
     await expect(page.locator('#karaokePanel')).toBeHidden();
     expect(pageErrors).toEqual([]);
 });
+
+// The words of a karaoke stream, by the library's own reader (libs/lyrics, compiled into the demo's
+// module as parseLyrics): the example's LRC, line by line and word by word, and what a position is
+// in them. The reader itself is held by libs/lyrics/tests; this holds that the page's module reaches
+// it and that what it hands back is the file's.
+const KARAOKE_LYRICS = path.resolve(
+    __dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.lrc');
+
+test('the module reads a lyrics file and says where a playing position is in it', async ({
+    page,
+}) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(String(error)));
+    await page.goto('index.html');
+
+    const bytes = Array.from(fs.readFileSync(KARAOKE_LYRICS));
+    const result = await page.evaluate(async (data) => {
+        // @ts-ignore - see the first test's own comment on window.createIclForgeModule.
+        const moduleInstance = await window.createIclForgeModule();
+        const parsed = moduleInstance.parseLyrics(Uint8Array.from(data), 16500);
+        if (!parsed.ok) return { ok: false, error: parsed.error };
+        const document = parsed.document;
+        const lyrics = document.describe();
+        const at = document.position(700, 0);
+        const nudged = document.position(700, 300);
+        const out = {
+            ok: true,
+            title: lyrics.title,
+            timed: lyrics.timed,
+            hasSingers: lyrics.hasSingers,
+            lengthMs: lyrics.lengthMs,
+            firstLine: lyrics.lines[0],
+            at,
+            nudgedPositionMs: nudged.positionMs,
+            sung: document.wordState(0, 0, 700),
+            being: document.wordState(0, 1, 700),
+            notYet: document.wordState(0, 2, 700),
+            missing: document.wordState(0, 99, 700),
+            before: document.position(-5, 0).line,
+        };
+        document.delete();
+        const refused = moduleInstance.parseLyrics(Uint8Array.from([0x5b, 0x30, 0x30, 0x3a, 0xe9]), -1);
+        out.refused = { ok: refused.ok, error: refused.error };
+        return out;
+    }, bytes);
+
+    expect(result.ok, `parse failed: ${result.error}`).toBe(true);
+    expect(result.title).toBe('Auld Lang Syne');
+    expect(result.timed).toBe(true);
+    expect(result.hasSingers).toBe(false);
+    expect(result.lengthMs).toBe(16000);
+    // Syllables are words: Should auld ac quain tance be for got,
+    expect(result.firstLine.text).toBe('Should auld acquaintance be forgot,');
+    expect(result.firstLine.startMs).toBe(0);
+    expect(result.firstLine.endMs).toBe(4000);
+    expect(result.firstLine.words.map((w) => w.startMs).slice(0, 3)).toEqual([0, 500, 1250]);
+    // 700 ms is 200 ms into "auld", which runs 500 to 1250.
+    expect(result.at.line).toBe(0);
+    expect(result.at.inLine).toBe(true);
+    expect(result.at.word).toBe(1);
+    expect(result.at.fraction).toBeCloseTo(200 / 750, 6);
+    expect(result.nudgedPositionMs).toBe(400);
+    expect([result.sung, result.being, result.notYet, result.missing]).toEqual([0, 1, 2, 2]);
+    expect(result.before).toBeNull();
+    // A file in a code page is refused with a sentence, not guessed at.
+    expect(result.refused.ok).toBe(false);
+    expect(result.refused.error.length).toBeGreaterThan(0);
+    expect(pageErrors).toEqual([]);
+});
+
+test('the page follows a lyrics file against the playing position, word by word', async ({
+    page,
+}) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(String(error)));
+    await page.goto('index.html');
+
+    await page.setInputFiles('#fileInput', KARAOKE_EXAMPLE);
+    await expect(page.locator('#status')).toContainText('Decoded auld-lang-syne.ac3');
+    await page.setInputFiles('#lyricsInput', KARAOKE_LYRICS);
+    await expect(page.locator('#lyricsStatus')).toContainText('timed by word');
+
+    // Before anything plays the position is 0: the first line is the one being sung, its first word
+    // the word, and the line after it is shown.
+    const view = page.locator('#lyricsView');
+    await expect(view.locator('.lyric.current')).toContainText('Should auld acquaintance be forgot,');
+    await expect(view.locator('.lyric.next')).toContainText('And never brought to mind?');
+    await expect(view.locator('.word.now')).toHaveText('Should ');
+
+    // A seek is only another position: 8.5 s is the third line's second word (the verse comes round).
+    await page.evaluate(() => {
+        const seek = /** @type {HTMLInputElement} */ (document.getElementById('seek'));
+        seek.value = String((8.5 / 16.0) * 1000);
+        seek.dispatchEvent(new Event('input', { bubbles: true }));
+        seek.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(view.locator('.lyric.current')).toContainText('Should auld acquaintance be forgot,');
+    await expect(view.locator('.word.now')).toHaveText('auld ');
+    await expect(view.locator('.word.sung')).toHaveText(['Should ']);
+
+    // The delay shows the words later: 8.5 s less 0.6 s is 7.9 s, which is the second line's last
+    // word, "mind?", sung from 6.5 to 8.0.
+    await page.evaluate(() => {
+        const delay = /** @type {HTMLInputElement} */ (document.getElementById('lyricsDelay'));
+        delay.value = '600';
+        delay.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await expect(page.locator('#lyricsDelayText')).toHaveText('+600 ms');
+    await expect(view.locator('.lyric.current')).toContainText('And never brought to mind?');
+    await expect(view.locator('.word.now')).toHaveText('mind?');
+
+    // A file that is not lyrics is named, and the words already on the page stay.
+    await page.setInputFiles('#lyricsInput', {
+        name: 'latin1.lrc',
+        mimeType: 'text/plain',
+        buffer: Buffer.from([0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x2e, 0x30, 0x30, 0x5d, 0xe9]),
+    });
+    await expect(page.locator('#lyricsStatus')).toContainText('latin1.lrc');
+    await expect(page.locator('#lyricsStatus')).toHaveClass(/error/);
+    await expect(view.locator('.lyric.current')).toContainText('Should auld acquaintance');
+    expect(pageErrors).toEqual([]);
+});
