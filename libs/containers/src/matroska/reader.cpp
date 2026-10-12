@@ -349,6 +349,30 @@ enum class Lacing : std::uint8_t { kNone, kXiph, kFixed, kEbml };
     return codec_id == kCodecEac3 || codec_id == kCodecAc3;
 }
 
+// How many tracks a file may have listed beside the one that is read: a hostile Tracks declares as
+// many as it likes (ReadOptions::max_tracks is the larger bound), and each is a small string.
+constexpr std::size_t kMaxSkippedTracks = 64;
+
+// TrackType 1 is video and 17 a subtitle track (the Matroska specification's values; the audio
+// value is kTrackTypeAudio).
+constexpr std::uint64_t kTrackTypeVideo = 1;
+constexpr std::uint64_t kTrackTypeSubtitle = 17;
+
+[[nodiscard]] SkippedTrack skipped_of(const ReadTrack& track, std::uint64_t track_type) {
+    SkippedTrack out;
+    out.track_number = track.track_number;
+    if (track_type == kTrackTypeAudio) {
+        out.kind = TrackKind::kAudio;
+    } else if (track_type == kTrackTypeVideo) {
+        out.kind = TrackKind::kVideo;
+    } else if (track_type == kTrackTypeSubtitle) {
+        out.kind = TrackKind::kText;
+    }
+    out.codec_id = track.codec_id;
+    out.language = track.language;
+    return out;
+}
+
 }  // namespace
 
 std::string_view describe(DemuxError error) {
@@ -389,12 +413,15 @@ struct ReaderState {
     // the entry is whole.
     ReadTrack pending;
     bool pending_is_audio = false;
+    std::uint64_t pending_track_type = 0;
     bool pending_has_number = false;
     bool in_track_entry = false;
     std::uint32_t track_entries_seen = 0;
 
     ReadTrack track;
     bool track_found = false;
+    // The tracks that were not selected, to kMaxSkippedTracks.
+    std::vector<SkippedTrack> skipped;
     // Set once a Tracks element has closed: no later one may retarget a
     // selection already made.
     bool tracks_seen = false;
@@ -438,6 +465,7 @@ void close_finished(ReaderState& s) {
             return;
         }
         if (top.id == kTrackEntry) {
+            bool selected_now = false;
             if (s.in_track_entry && !s.track_found && s.pending_has_number && s.pending_is_audio) {
                 const bool wanted = s.options.track_number != 0
                                         ? s.pending.track_number == s.options.track_number
@@ -445,7 +473,12 @@ void close_finished(ReaderState& s) {
                 if (wanted) {
                     s.track = s.pending;
                     s.track_found = true;
+                    selected_now = true;
                 }
+            }
+            if (s.in_track_entry && !selected_now && s.pending_has_number &&
+                s.skipped.size() < kMaxSkippedTracks) {
+                s.skipped.push_back(skipped_of(s.pending, s.pending_track_type));
             }
             s.in_track_entry = false;
         } else if (top.id == kTracks) {
@@ -547,6 +580,7 @@ std::expected<std::size_t, DemuxError> walk(ReaderState& s, std::span<const std:
                 }
                 s.pending = ReadTrack{};
                 s.pending_is_audio = false;
+                s.pending_track_type = 0;
                 s.pending_has_number = false;
                 s.in_track_entry = true;
             }
@@ -592,6 +626,7 @@ std::expected<std::size_t, DemuxError> walk(ReaderState& s, std::span<const std:
                     return std::unexpected(DemuxError::kMalformed);
                 }
                 s.pending_is_audio = value == kTrackTypeAudio;
+                s.pending_track_type = value;
                 break;
             }
             case kCodecId:
@@ -687,6 +722,7 @@ std::expected<Demuxed, DemuxError> demux(std::span<const std::byte> file,
         return std::unexpected(verdict.error());
     }
     out.track = s.track;
+    out.skipped = s.skipped;
     return out;
 }
 

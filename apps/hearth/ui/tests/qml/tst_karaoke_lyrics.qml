@@ -313,7 +313,9 @@ TestCase {
         HearthController.playItem(0);
         const view = named(win, "lyricsView");
         tryCompare(view, "status", "none", 10000);
-        const message = named(win, "lyricMessage");
+        // The Karaoke page's own view: the Play page carries two more (PlayLyricsCard.qml), hidden
+        // for an item with no lyrics, and the first message found in the window would be theirs.
+        const message = named(view, "lyricMessage");
         tryVerify(function() { return message.visible && message.text.indexOf("bare.lrc") >= 0; }, 5000);
     }
 
@@ -776,6 +778,8 @@ TestCase {
         const screen = findChild(win, "lyricScreen");
         win.openLyricScreen();
         tryCompare(screen, "visible", true, 5000);
+        // Opened, not only visible: a click during the popup's enter transition can miss.
+        tryCompare(screen, "opened", true, 10000);
         const choice = named(screen.contentItem, "lyricScreenShow");
         const words = named(screen.contentItem, "lyricScreenShow-words");
         const picture = named(screen.contentItem, "lyricScreenShow-picture");
@@ -787,12 +791,12 @@ TestCase {
         compare(view.showingPicture, false);
 
         mouseClick(picture);
-        compare(KaraokeController.preferPicture, true);
+        tryCompare(KaraokeController, "preferPicture", true, 5000);
         tryCompare(picture, "selected", true, 5000);
         compare(words.selected, false);
         tryCompare(view, "showingPicture", true, 5000);
         mouseClick(words);
-        compare(KaraokeController.preferPicture, false);
+        tryCompare(KaraokeController, "preferPicture", false, 5000);
         tryCompare(view, "showingPicture", false, 5000);
         win.toggleLyricScreen();
         tryCompare(screen, "visible", false, 5000);

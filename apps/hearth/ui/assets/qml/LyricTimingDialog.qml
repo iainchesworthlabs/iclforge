@@ -14,6 +14,11 @@ import Hearth
 // late and has it taken off, so that what is stored is the sound's time; the lyric view elsewhere is
 // untouched until Save, so an estimate is never shown as sung.
 //
+// A word can be chosen with a click, in either pass, and is then corrected as a line is: Stamp again
+// and the nudges are for it, and in the words pass the next Space presses it, once, in place of the
+// next guess. That is how one wrong word of a file that came with its times (from an aligner, say)
+// is put right: the words of such a file are taken as given, so the pass would skip them all.
+//
 // Nothing here keeps the words or the times: KaraokeController holds the session, and this reads
 // timingLines and sends it presses. The clock is LyricClock's, so a press is as exact as a frame
 // (a poll alone is 60 ms).
@@ -37,6 +42,15 @@ Dialog {
     property string mode: "lines"
     // The row a nudge, a stamp-again and a click on a line act on.
     property int selectedLine: -1
+    // The word of that row they act on instead, or -1 for the row itself. A click on a word chooses
+    // it; a click on the row lets it go.
+    property int selectedWord: -1
+    // Whether the next Space in the words pass is for the chosen word. A press, or a stamp again,
+    // spends it, so that the chosen word is not pressed again by a Space meant for the next one; a
+    // click on the word arms it again.
+    property bool wordArmed: false
+    // How far ahead of a chosen word the item is cued, to be listening before it comes.
+    property int wordLeadInMs: 1500
     // What the last Save said.
     property string notice: ""
     // The clock, for a test to hold still.
@@ -93,8 +107,24 @@ Dialog {
         return null;
     }
 
+    // Whether a word is chosen. The rows are replaced by every press, so the choice is checked
+    // against the words as they are now.
+    readonly property bool wordSelected: root.selectedLine >= 0
+                                         && root.selectedLine < root.rows.length
+                                         && root.selectedWord >= 0
+                                         && root.selectedWord < root.rows[root.selectedLine].words.length
+
+    // The word a press would set: the chosen one while a press is still for it, otherwise the next
+    // that no press has set.
+    function pressTarget(ms) {
+        if (root.wordSelected && root.wordArmed) {
+            return { line: root.selectedLine, word: root.selectedWord };
+        }
+        return root.wordTarget(ms);
+    }
+
     // The word a press would set, in the words pass.
-    readonly property var wordSlot: root.mode === "words" ? root.wordTarget(root.position) : null
+    readonly property var wordSlot: root.mode === "words" ? root.pressTarget(root.position) : null
     readonly property bool canTap: KaraokeController.timing
                                    && (root.mode === "lines" ? root.nextLine >= 0 : root.wordSlot !== null)
     // The row the list keeps in view: the line to be stamped, or the one being sung.
@@ -127,7 +157,10 @@ Dialog {
         }
         const slot = root.wordSlot;
         if (slot !== null && slot.line < lines.length && slot.word < lines[slot.line].words.length) {
-            return qsTr("Next word: %1").arg(lines[slot.line].words[slot.word].text);
+            const text = lines[slot.line].words[slot.word].text;
+            return root.wordSelected && root.wordArmed
+                   ? qsTr("Space presses the chosen word again: %1").arg(text)
+                   : qsTr("Next word: %1").arg(text);
         }
         if (KaraokeController.stampedLines === 0) {
             return qsTr("Stamp the lines first.");
@@ -151,15 +184,50 @@ Dialog {
             }
             return stamped;
         }
-        return KaraokeController.tapWord(root.wordSlot.line, root.wordSlot.word, ms);
+        const chosen = root.wordSelected && root.wordArmed;
+        const pressed = KaraokeController.tapWord(root.wordSlot.line, root.wordSlot.word, ms);
+        // That press was the chosen word's: the next Space is for the next word again.
+        if (pressed && chosen) {
+            root.wordArmed = false;
+        }
+        return pressed;
     }
 
     function selectLine(index) {
         root.selectedLine = index;
+        root.selectedWord = -1;
+        root.wordArmed = false;
         if (index >= 0 && index < root.rows.length && root.rows[index].stamped) {
             HearthController.seek(root.rows[index].startMs);
         }
     }
+
+    // A word is chosen as a line is, and cued a little before it, since a word is heard in an
+    // instant and a line is not: it has to be playing by the time it comes. Choosing it again cues
+    // it again.
+    function selectWord(line, word) {
+        if (line < 0 || line >= root.rows.length || word < 0 || word >= root.rows[line].words.length) {
+            return;
+        }
+        root.selectedLine = line;
+        root.selectedWord = word;
+        root.wordArmed = true;
+        HearthController.seek(Math.max(0, root.rows[line].words[word].startMs - root.wordLeadInMs));
+    }
+
+    // Stamp again, for the chosen word or else the selected line: where the position is now, less
+    // the reaction time, as a press is.
+    function stampAgain() {
+        const ms = Math.round(root.position);
+        if (root.wordSelected) {
+            root.wordArmed = false;
+            return KaraokeController.tapWord(root.selectedLine, root.selectedWord, ms);
+        }
+        return KaraokeController.restampLine(root.selectedLine, ms);
+    }
+
+    // A nudge's word: the chosen one, or -1 for the line.
+    readonly property int nudgeWord: root.wordSelected ? root.selectedWord : -1
 
     function save() {
         const problem = KaraokeController.saveTiming();
@@ -173,6 +241,8 @@ Dialog {
         root.notice = "";
         root.mode = "lines";
         root.selectedLine = -1;
+        root.selectedWord = -1;
+        root.wordArmed = false;
         KaraokeController.beginTiming();
         contentItem.forceActiveFocus();
     }
@@ -276,6 +346,17 @@ Dialog {
                       : qsTr("Every stamped line has its words spread over it by their letters, as a "
                              + "guess: slanted and muted. Play, and press Space as each word starts; "
                              + "a pressed word turns solid.")
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
+            }
+            // A word that is wrong, in a file that came with its times, is put right from here.
+            Text {
+                objectName: "timingWordHint"
+                visible: root.mode === "words"
+                Layout.fillWidth: true
+                text: qsTr("To put one word right, choose it: the item is cued just before it. Press "
+                           + "Space as it starts, or stamp it again, or nudge it 10 ms at a time.")
                 color: Theme.textMuted
                 font.pixelSize: Theme.fontSmall
                 wrapMode: Text.WordWrap
@@ -429,18 +510,50 @@ Dialog {
                                 Flow {
                                     visible: row.modelData.words.length > 0
                                     Layout.fillWidth: true
-                                    spacing: Theme.space1
+                                    spacing: 0
                                     Repeater {
                                         model: row.modelData.words
-                                        delegate: Text {
+                                        // A word is a button: a click chooses it. The box that says
+                                        // so is an outline as well as a fill, so that colour is not
+                                        // the only cue.
+                                        delegate: Item {
+                                            id: wordItem
+                                            required property int index
                                             required property var modelData
-                                            objectName: "timingWord"
-                                            text: modelData.text
-                                            // A guess is slanted and muted; a press is solid.
-                                            color: modelData.tapped ? Theme.text : Theme.textMuted
-                                            font.italic: !modelData.tapped
-                                            font.weight: modelData.tapped ? Font.DemiBold : Font.Normal
-                                            font.pixelSize: Theme.fontNormal
+                                            objectName: "timingWord-" + row.index + "-" + wordItem.index
+                                            readonly property bool chosen: row.index === root.selectedLine
+                                                                           && wordItem.index === root.selectedWord
+                                            implicitWidth: wordText.implicitWidth + Theme.space1 * 2
+                                            implicitHeight: wordText.implicitHeight + 4
+                                            Accessible.role: Accessible.Button
+                                            Accessible.name: wordItem.modelData.text
+                                            Accessible.checkable: true
+                                            Accessible.checked: wordItem.chosen
+                                            Accessible.onPressAction: root.selectWord(row.index, wordItem.index)
+
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                visible: wordItem.chosen
+                                                radius: 3
+                                                color: Theme.accent100
+                                                border.color: Theme.accent
+                                                border.width: 2
+                                            }
+                                            Text {
+                                                id: wordText
+                                                objectName: "timingWord"
+                                                anchors.centerIn: parent
+                                                text: wordItem.modelData.text
+                                                // A guess is slanted and muted; a press is solid.
+                                                color: wordItem.modelData.tapped ? Theme.text : Theme.textMuted
+                                                font.italic: !wordItem.modelData.tapped
+                                                font.weight: wordItem.modelData.tapped ? Font.DemiBold : Font.Normal
+                                                font.pixelSize: Theme.fontNormal
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: root.selectWord(row.index, wordItem.index)
+                                            }
                                         }
                                     }
                                 }
@@ -448,6 +561,22 @@ Dialog {
                         }
                     }
                 }
+            }
+
+            // Which word, and when it starts, so that a nudge of 10 ms can be told from none.
+            Text {
+                objectName: "timingChosenWord"
+                visible: root.wordSelected
+                Layout.fillWidth: true
+                text: root.wordSelected
+                      ? qsTr("Chosen word: %1, in line %2, starts at %3.")
+                            .arg(root.rows[root.selectedLine].words[root.selectedWord].text)
+                            .arg(root.selectedLine + 1)
+                            .arg(root.clockText(root.rows[root.selectedLine].words[root.selectedWord].startMs))
+                      : ""
+                color: Theme.text
+                font.pixelSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
             }
 
             // Correcting one.
@@ -462,23 +591,24 @@ Dialog {
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontSmall
                 }
+                // For the chosen word if there is one, otherwise for the selected line.
                 AppButton {
                     objectName: "timingStampAgain"
                     enabled: root.selectedLine >= 0
                     text: qsTr("Stamp again")
-                    onClicked: KaraokeController.restampLine(root.selectedLine, Math.round(root.position))
+                    onClicked: root.stampAgain()
                 }
                 AppButton {
                     objectName: "timingEarlier"
-                    enabled: root.selectedStamped
+                    enabled: root.wordSelected || root.selectedStamped
                     text: qsTr("−10 ms")
-                    onClicked: KaraokeController.nudge(root.selectedLine, -1, -10)
+                    onClicked: KaraokeController.nudge(root.selectedLine, root.nudgeWord, -10)
                 }
                 AppButton {
                     objectName: "timingLater"
-                    enabled: root.selectedStamped
+                    enabled: root.wordSelected || root.selectedStamped
                     text: qsTr("+10 ms")
-                    onClicked: KaraokeController.nudge(root.selectedLine, -1, 10)
+                    onClicked: KaraokeController.nudge(root.selectedLine, root.nudgeWord, 10)
                 }
             }
 

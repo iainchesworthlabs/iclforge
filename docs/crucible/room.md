@@ -265,8 +265,12 @@ right) or **not yet sung**.
 
 A **SubRip** `.srt`, an **Advanced SubStation Alpha** `.ass` script and a **MIDI karaoke** `.kar`
 file are imported the same way, and told apart by what is in them and not by their name, as Hearth
-does: a `.kar` carries no word of its encoding, so its words must be UTF-8. A **CD+G** `.cdg` is a
-picture with no text and is not imported here.
+does: a `.kar` carries no word of its encoding, so its words must be UTF-8.
+
+A **CD+G** `.cdg` file (the subcode of a karaoke disc, ripped on its own) is a picture and not
+text. It is imported by its extension, in any case, and drawn under the file's name as the disc
+draws it: 300 by 216 pixels, as large as fits in whole-pixel steps, against the same Start and the
+same nudge as an `.lrc`. Its words are pixels, so none are read as text, and the page says so.
 
 **Where the position comes from.** Crucible taps what an application plays and knows nothing of
 its track, so it has no way to read where a song is. The position is **start-and-nudge**:
