@@ -183,6 +183,7 @@ void KaraokeController::setReactionMs(int reaction_ms) {
 void KaraokeController::clear_lyrics() {
     state_->lyrics = Lyrics{};
     disc_.clear();
+    picture_file_name_.clear();
     status_ = QStringLiteral("none");
     file_name_.clear();
     error_text_.clear();
@@ -259,12 +260,20 @@ void KaraokeController::load(const QString& itemPath, qlonglong durationMs) {
                 status_ = QStringLiteral("error");
                 error_text_ = from_utf8(read.error());
             }
+            // A disc beside the lyrics is held too, and the singer chooses which is shown (the
+            // words are the default, because they are what a word-by-word fill and a nudge can
+            // follow). A disc that cannot be read is not an error here: the lyrics are.
+            if (const std::optional<std::filesystem::path> disc = find_cdg_file(path)) {
+                if (disc_.load(*disc)) {
+                    picture_file_name_ = from_utf8(disc->filename().string());
+                }
+            }
         } else if (const std::optional<std::filesystem::path> disc = find_cdg_file(path)) {
             // No lyrics file, and the picture of a disc: its words are pixels, so what is shown
-            // is the picture, against the position. A lyrics file beside the item wins, because
-            // it is what a word-by-word fill and a nudge can follow.
+            // is the picture, against the position.
             file_name_ = from_utf8(disc->filename().string());
             if (auto read = disc_.load(*disc)) {
+                picture_file_name_ = file_name_;
                 status_ = QStringLiteral("picture");
             } else {
                 status_ = QStringLiteral("error");
@@ -274,6 +283,15 @@ void KaraokeController::load(const QString& itemPath, qlonglong durationMs) {
     }
     emit lyricsChanged();
     emit singerNamesChanged();
+    emit pictureShownChanged();
+}
+
+void KaraokeController::setPreferPicture(bool prefer) {
+    if (prefer == prefer_picture_) {
+        return;
+    }
+    prefer_picture_ = prefer;
+    emit pictureShownChanged();
 }
 
 QImage KaraokeController::pictureFrame(qlonglong positionMs) {
