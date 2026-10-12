@@ -32,6 +32,7 @@
 #include "iclforge/audio/monitor.hpp"
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/audio/resampler.hpp"
+#include "iclforge/audio/speakers.hpp"
 #include "iclforge/audio/spatial.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "iclforge/ac3/decoder/decoder.hpp"
@@ -237,6 +238,7 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     // AC-4's sync word, 0xAC40 or 0xAC41, where A/52's is 0x0B77: its own
     // decoder, and none of the A/52 checks below.
     if (is_ac4_stream(raw)) {
+        warn_karaoke_not_ac3(meta, "AC-4");
         const auto target = monitor_target(device_index);
         if (!target.has_value()) {
             return target.error();
@@ -263,6 +265,10 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
         fmt::println(stderr, "error: {} is too short to hold a syncframe", in_path);
         return kExitInput;
     }
+    // Before any device is touched, and in decode's words: Annex C has no Lt/Rt.
+    if (refuse_karaoke_with_ltrt(meta.output)) {
+        return kExitUsage;
+    }
     // Access units for E-AC-3, and for §E2.3.1.2's legacy core too: its first
     // frame is AC-3, but FrameDecoder refuses the Annex E dependent behind it.
     // The same test 'decode' makes. A fold below is no reason to hand the
@@ -288,6 +294,9 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     std::optional<iclforge::apps::AssociatedChoice> associated;
     std::vector<std::span<const std::byte>> associated_units;
     if (access_units) {
+        // Annex C is AC-3's: the E-AC-3 decoder takes no karaoke flag from bsi,
+        // so the choice is read and not applied (decode says the same).
+        warn_karaoke_not_ac3(meta, "E-AC-3");
         auto chosen = select_programme_units(stream, meta.programme, in_path);
         if (!chosen.has_value()) {
             return chosen.error();
@@ -567,17 +576,32 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
                 return kExitInput;
             }
             if (order.empty()) {
-                if (output.target != iclforge::ac3::DownmixTarget::kAsCoded &&
-                    decoded->acmod != iclforge::ac3::Acmod::kDualMono) {
+                // Annex C's karaoke reproduction replaces the coded layout with
+                // L, C, R (and the LFE): what the sink is opened for, the order
+                // the channels are written in and the speakers it is told they
+                // are all follow the mode the stage leaves, which is the coded
+                // one for everything but a reproduced karaoke stream.
+                const bool folded = output.target != iclforge::ac3::DownmixTarget::kAsCoded &&
+                                    decoded->acmod != iclforge::ac3::Acmod::kDualMono;
+                const bool reproduced = !folded && karaoke_reproduced(output, *decoded);
+                std::uint32_t speakers = 0;
+                if (folded) {
                     order.resize(decoded->channels.size());
                     for (std::size_t i = 0; i < order.size(); ++i) {
                         order[i] = i;
                     }
+                } else if (reproduced) {
+                    order = iclforge::ac3::io::wav_channel_order(iclforge::ac3::Acmod::k3_0,
+                                                                 decoded->lfe);
+                    speakers = iclforge::audio::kSpeakerFrontLeft |
+                               iclforge::audio::kSpeakerFrontRight |
+                               iclforge::audio::kSpeakerFrontCentre |
+                               (decoded->lfe ? iclforge::audio::kSpeakerLowFrequency : 0U);
                 } else {
                     order = iclforge::ac3::io::wav_channel_order(decoded->acmod, decoded->lfe);
                 }
                 const auto started = sink.start(device_id, sample_rate_hz(decoded->sample_rate),
-                                                static_cast<std::uint16_t>(order.size()));
+                                                static_cast<std::uint16_t>(order.size()), speakers);
                 if (!started.has_value()) {
                     fmt::println(stderr, "error: {}", iclforge::audio::describe(started.error()));
                     return kExitUnavailable;
@@ -585,6 +609,20 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
                 status_println(status_stream(), "monitoring {} ({} channels, {} Hz) on \"{}\"…",
                                in_path, order.size(), sample_rate_hz(decoded->sample_rate),
                                device_name);
+                report_karaoke(status_stream(), output, *decoded, folded, reproduced, "played");
+            }
+            if (decoded->channels.size() != order.size()) {
+                // The sink was opened for the first frame's width. A stream
+                // whose layout changes after it (an acmod change, or bsmod
+                // switching a karaoke reproduction on or off) cannot be played
+                // into it: said, where the order would have indexed past the
+                // channels a narrower frame has.
+                fmt::println(stderr,
+                             "error: {}: the channel layout changes mid-stream ({} channels, "
+                             "then {})",
+                             in_path, order.size(), decoded->channels.size());
+                sink.stop();
+                return kExitInput;
             }
             if (!play(interleave_reordered(decoded->channels, order))) {
                 return kExitRuntime;
@@ -713,6 +751,8 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
     report_programme(status_stream(), *selected);
     warn_associated_not_mixed(meta, "spatial",
                               "it places one programme's objects and has no second programme to mix");
+    // spatial reads E-AC-3 (a legacy core included), and Annex C is AC-3's.
+    warn_karaoke_not_ac3(meta, "E-AC-3");
 
     std::string device_id;
     std::string device_name = "default endpoint";

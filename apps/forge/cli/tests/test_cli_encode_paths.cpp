@@ -1124,13 +1124,114 @@ TEST_CASE("decode karaoke=none|v1|v2|v1+v2 is the karaoke-capable decoder's Tabl
     CHECK_FALSE(fs::exists(refused));
 }
 
-TEST_CASE("karaoke is decode's option and AC-3's: other commands refuse it", "[cli][decode][karaoke]") {
+TEST_CASE("karaoke is the option of the commands that decode or hand a stream on, and of no other",
+          "[cli][decode][karaoke]") {
     const auto dir = scratch_dir();
     const auto log = dir / "k_other.log";
-    // monitor and play name channels by the coded layout the reproduction
-    // replaces, so the option is not theirs; an unknown option is refused.
+    // decode and monitor reproduce, and play, spdif and spatial read the choice and say they do
+    // not apply it (test_cli_live.cpp). A command that reads a stream for what it says about
+    // itself has no use for a reproduction: an unknown option is refused.
     CHECK(run_cli("levels " + quoted(write_karaoke_candidate(dir, "k_other", "bsmod=7")) +
                       " karaoke",
                   log) != 0);
     CHECK(read_log(log).find("unknown option") != std::string::npos);
+}
+
+TEST_CASE("decode karaoke-melody=, karaoke-v1= and karaoke-v2= re-level the capable decoder's parts",
+          "[cli][decode][karaoke]") {
+    // Annex C.2.3's "additional flexibility": a level for each part against Table C.2.3, in dB,
+    // from -24 (which is off) to +12, the span Hearth's sliders have. The arithmetic of the gains
+    // is held by libs/ac3's output-stage tests; these hold that the flags reach it, in the
+    // library's own units, and what the report and the refusals say.
+    const auto dir = scratch_dir();
+    const auto stream = write_karaoke_candidate(dir, "k32l", "bsmod=7");
+    const auto coded = decode_to_wav(stream, dir / "k32l_coded.wav", "");
+    REQUIRE(coded.channels.size() == 5);  // FL FR FC BL BR = L R M V1 V2
+    const std::size_t frames = coded.frame_count();
+    const auto at = [&](std::size_t channel, std::size_t i) {
+        return static_cast<double>(coded.channels[channel][i]);
+    };
+    const auto worst_against = [&](const iclforge::ac3::io::WavData& heard, std::size_t output,
+                                   std::size_t coded_channel, double scale) {
+        REQUIRE(heard.frame_count() == frames);
+        double worst = 0.0;
+        for (std::size_t i = 0; i < frames; ++i) {
+            worst = std::max(worst, std::abs(static_cast<double>(heard.channels[output][i]) -
+                                             scale * at(coded_channel, i)));
+        }
+        return worst;
+    };
+
+    // heard.channels is in the WAV's FL FR FC order: Lk, Rk, Ck. With no vocals chosen the sums are
+    // 1, 1 and the melody's gain, so a melody at or below the table is the only part that moves.
+    std::string report;
+    const auto quieter = decode_to_wav(stream, dir / "k32l_m6.wav",
+                                       "karaoke=none karaoke-melody=-6", &report);
+    INFO(report);
+    REQUIRE(quieter.channels.size() == 3);
+    CHECK(report.find("listener's vocals: no vocals, levels: melody -6.0 dB") != std::string::npos);
+    CHECK(worst_against(quieter, 0, 0, 1.0) < 1e-6);
+    CHECK(worst_against(quieter, 1, 1, 1.0) < 1e-6);
+    CHECK(worst_against(quieter, 2, 2, std::pow(10.0, -6.0 / 20.0)) < 1e-6);
+    // ... and it is a real signal that was moved, not silence agreeing with silence.
+    double loudest = 0.0;
+    for (std::size_t i = 0; i < frames; ++i) {
+        loudest = std::max(loudest, std::abs(static_cast<double>(quieter.channels[2][i])));
+    }
+    CHECK(loudest > 0.05);
+
+    // The bottom of the span is off, spelled in dB or as the word.
+    for (const char* spelling : {"karaoke-melody=-24", "karaoke-melody=off"}) {
+        CAPTURE(spelling);
+        const auto off = decode_to_wav(stream, dir / "k32l_off.wav",
+                                       std::string{"karaoke=none "} + spelling, &report);
+        REQUIRE(off.channels.size() == 3);
+        CHECK(report.find("levels: melody off") != std::string::npos);
+        CHECK(worst_against(off, 2, 2, 0.0) < 1e-9);
+        CHECK(worst_against(off, 0, 0, 1.0) < 1e-6);
+    }
+
+    // A vocal is re-levelled on its own, in the stereo reproduction as in the 3/0 one: V1 off is
+    // what `karaoke=none` hears of it.
+    const auto v1_off = decode_to_wav(stream, dir / "k32l_v1off.wav",
+                                      "channels=2 karaoke=v1 karaoke-v1=off", &report);
+    const auto none = decode_to_wav(stream, dir / "k32l_none.wav", "channels=2 karaoke=none");
+    INFO(report);
+    CHECK(report.find("levels: V1 off") != std::string::npos);
+    REQUIRE(v1_off.channels.size() == 2);
+    REQUIRE(none.channels.size() == 2);
+    for (std::size_t c = 0; c < 2; ++c) {
+        for (std::size_t i = 0; i < frames; ++i) {
+            REQUIRE(std::abs(v1_off.channels[c][i] - none.channels[c][i]) < 1e-6F);
+        }
+    }
+
+    // The default is the table, bit for bit: 0 dB given is the choice without it.
+    const auto plain = decode_to_wav(stream, dir / "k32l_plain.wav", "karaoke=v1+v2");
+    const auto zero = decode_to_wav(stream, dir / "k32l_zero.wav",
+                                    "karaoke=v1+v2 karaoke-melody=0 karaoke-v1=0 karaoke-v2=0",
+                                    &report);
+    CHECK(report.find("levels:") == std::string::npos);
+    REQUIRE(plain.channels.size() == zero.channels.size());
+    CHECK(plain.channels == zero.channels);
+
+    // Refused, with the reason, and nothing written: a level that moves nothing, a value outside
+    // the span, and words that are not a level.
+    const auto refuse = [&](const std::string& options, const std::string& reason) {
+        CAPTURE(options);
+        const auto refused = dir / "k32l_refused.wav";
+        const auto log = dir / "k32l_refused.log";
+        fs::remove(refused);
+        CHECK(run_cli("decode " + quoted(stream) + " " + quoted(refused) + " " + options, log) == 1);
+        CHECK(read_log(log).find(reason) != std::string::npos);
+        CHECK_FALSE(fs::exists(refused));
+    };
+    refuse("karaoke karaoke-melody=-6", "move the parts of the karaoke-capable decoder");
+    refuse("karaoke-v2=-6", "move the parts of the karaoke-capable decoder");
+    refuse("karaoke=v1 karaoke-melody=13", "karaoke-melody is a level in dB from -24");
+    refuse("karaoke=v1 karaoke-v1=-25", "karaoke-v1 is a level in dB from -24");
+    refuse("karaoke=v1 karaoke-v2=loud", "karaoke-v2 is a level in dB from -24");
+    // The reproduction may come after the level it names, as every option may.
+    const auto after = decode_to_wav(stream, dir / "k32l_after.wav", "karaoke-melody=-6 karaoke=none");
+    CHECK(worst_against(after, 2, 2, std::pow(10.0, -6.0 / 20.0)) < 1e-6);
 }

@@ -104,6 +104,27 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **`forge decode` and `forge monitor` re-level the karaoke-capable decoder's parts.**
+  `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
+  flexibility" in the units, the span and the defaults of Hearth's sliders and the wire's
+  `karaoke_*_db` keys: each part against Table C.2.3, 0 dB the table bit for bit, up to 12 dB
+  louder, and -24 or `off` at the bottom. A part raised far enough lowers the others, as the
+  library's gains do. They are the capable decoder's alone: a level with `karaoke` bare, `off` or
+  absent is refused, as is a value outside the span, and the report names the parts that moved
+  (`levels: melody -6.0 dB, V1 off`) (planning/karaoke-phase2.md, W10).
+- **`forge monitor` plays a karaoke stream's reproduction, and `play`, `spdif` and `spatial` read
+  the choice.** `karaoke` and `karaoke=none|v1|v2|v1+v2` were `decode`'s alone; every other command
+  refused them as unknown options. `monitor` now applies them to an AC-3 stream and lays the
+  reproduction out as the 3/0 mode it is (L, R, C and the LFE in a device's order, with the
+  speakers named to the output) where it laid the coded 3/2 layout out before, folds to the output's
+  width as it always has (the 2/0 reproduction is what plays on a stereo endpoint), refuses
+  `downmix=ltrt` as `decode` does, and says which reproduction was played. `play` applies it where it
+  decodes (its PCM fallback). `spdif`, `play`'s bitstream legs and `spatial` hand a stream on or
+  place its objects without decoding, so they accept the choice and warn that it is not applied (a
+  receiver reproduces the stream); E-AC-3 and AC-4 streams warn that karaoke is AC-3's. `monitor`
+  also stops with "the channel layout changes mid-stream" where a stream's layout changes after
+  the output was opened, in place of reading past the narrower frame (planning/karaoke-phase2.md,
+  W5 and W10).
 - **A sink that decodes a karaoke stream itself applies the part levels.** The Sendspin
   extension's decoder settings take three more keys, `karaoke_melody_db`, `karaoke_vocal1_db` and
   `karaoke_vocal2_db` (-24.0, which is off, to 12.0 dB against Table C.2.3), which a sink lists

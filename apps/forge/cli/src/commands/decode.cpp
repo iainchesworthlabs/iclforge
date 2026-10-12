@@ -108,31 +108,6 @@ bool folding(const forge_cli::Options& meta, iclforge::ac3::Acmod acmod) {
            acmod != iclforge::ac3::Acmod::kDualMono;
 }
 
-// Whether the output stage is going to leave this frame as Annex C's karaoke
-// 3/0 reproduction - L, C, R and the LFE, in place of the coded layout - which
-// is what the sink is then opened for, as it is for a fold. The stage is the
-// one that decides (a frame that is not karaoke, an acmod with nothing to
-// reproduce, and a stereo or mono target all leave the layout alone), so this
-// asks it by its own channel count rather than restating its rules.
-bool karaoke_reproduced(const forge_cli::Options& meta, const iclforge::ac3::DecodedFrame& frame) {
-    const bool karaoke = iclforge::ac3::meta::is_karaoke(
-        static_cast<iclforge::ac3::meta::BitstreamMode>(frame.bsmod), frame.acmod);
-    return meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
-           iclforge::ac3::output_channel_count(meta.output, frame.acmod, frame.lfe, karaoke) !=
-               iclforge::ac3::output_channel_count(meta.output, frame.acmod, frame.lfe, false);
-}
-
-// What the listener's choice of vocals is called in the report.
-std::string_view vocals_name(iclforge::ac3::KaraokeVocals vocals) {
-    switch (vocals) {
-        case iclforge::ac3::KaraokeVocals::kNone: return "no vocals";
-        case iclforge::ac3::KaraokeVocals::kV1: return "V1";
-        case iclforge::ac3::KaraokeVocals::kV2: return "V2";
-        case iclforge::ac3::KaraokeVocals::kBoth: return "V1 and V2";
-    }
-    return "no vocals";
-}
-
 // The one-line name for whatever the fold produced, for the status report.
 std::string_view fold_name(iclforge::ac3::DownmixTarget target) {
     switch (target) {
@@ -1482,13 +1457,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
                      joined(requested.ac4_decode_tokens),
                      requested.ac4_decode_tokens.size() == 1 ? "is" : "are");
     }
-    if (requested.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff &&
-        requested.output.target == iclforge::ac3::DownmixTarget::kLtRt) {
-        // Annex C defines a 2/0 reproduction as Lo/Ro and a 3/0 one; there is
-        // no Lt/Rt karaoke. Said rather than quietly taking the one or the other.
-        fmt::println(stderr,
-                     "error: karaoke reproduces through the 3/0 or the Lo/Ro downmix (Annex C); "
-                     "it defines no Lt/Rt - drop karaoke or use downmix=loro");
+    if (refuse_karaoke_with_ltrt(requested.output)) {
         return kExitUsage;
     }
     // downmix=auto becomes a concrete fold here, once, from what the stream
@@ -1619,7 +1588,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
             // Annex C's karaoke 3/0 reproduction replaces the coded layout
             // with L, C, R (and the LFE): written channels that are a 3/0
             // layout, named and ordered as one whatever the stream coded.
-            const bool reproduced = !folded && karaoke_reproduced(meta, *decoded);
+            const bool reproduced = !folded && karaoke_reproduced(meta.output, *decoded);
             const auto written = reproduced ? iclforge::ac3::Acmod::k3_0 : decoded->acmod;
             // Which speaker each WAV position is, for three channels or more
             // (see the E-AC-3 path's note); dual mono has no speakers to name.
@@ -1694,7 +1663,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
     // and this report must not land in the middle of them.
     const auto status = status_stream(out_path);
     const bool folded = folding(meta, first.acmod);
-    const bool reproduced = !folded && karaoke_reproduced(meta, first);
+    const bool reproduced = !folded && karaoke_reproduced(meta.output, first);
     status_println(
         status, "decoded {} frames -> {} ({}, {} Hz)", frames->size(), out_path,
         folded
@@ -1707,46 +1676,7 @@ int run_decode(std::string_view in_path, std::string_view out_path,
                                                                      first.lfe))
                   : std::string{iclforge::ac3::analysis::layout_name(first.acmod, first.lfe)},
         sample_rate_hz(first.sample_rate));
-    if (meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff) {
-        const bool karaoke_stream = iclforge::ac3::meta::is_karaoke(
-            static_cast<iclforge::ac3::meta::BitstreamMode>(first.bsmod), first.acmod);
-        const bool capable =
-            meta.output.karaoke == iclforge::ac3::KaraokeReproduction::kCapable;
-        if (reproduced && capable) {
-            status_println(status,
-                           "  karaoke (Annex C.2.3.2, Table C.2.3): melody M to the centre, "
-                           "listener's vocals: {}",
-                           vocals_name(meta.output.karaoke_vocals));
-        } else if (reproduced) {
-            const auto levels = iclforge::ac3::mix_levels(first.acmod, first.cmixlev,
-                                                          first.surmixlev, first.alternate_bsi);
-            status_println(status,
-                           "  karaoke (Annex C.2.3.1): melody M to the centre, the vocals at the "
-                           "stream's surround level ({:.1f} dB)",
-                           iclforge::ac3::meta::to_db(meta.output.mix_override.loro_slev.value_or(
-                               levels.loro_slev)));
-        } else if (!karaoke_stream) {
-            status_println(status,
-                           "note: karaoke applies to a stream with bsmod 7 above 1/0 (Annex C.2.1); "
-                           "this one is bsmod {} at {}, and was decoded as coded",
-                           first.bsmod,
-                           iclforge::ac3::analysis::layout_name(first.acmod, first.lfe));
-        } else if (folded && capable && first.acmod != iclforge::ac3::Acmod::k2_0) {
-            status_println(status,
-                           "  karaoke (Annex C.2.3.2, Table C.2.3): 2/0 reproduction, melody M at "
-                           "clev, listener's vocals: {}",
-                           vocals_name(meta.output.karaoke_vocals));
-        } else if (folded) {
-            status_println(status,
-                           "note: karaoke at a stereo or mono target is Annex C's 2/0 "
-                           "reproduction, which is this Lo/Ro downmix");
-        } else {
-            status_println(status,
-                           "note: a karaoke stream at {} is already what Annex C's reproduction "
-                           "gives; decoded as coded",
-                           iclforge::ac3::analysis::layout_name(first.acmod, first.lfe));
-        }
-    }
+    report_karaoke(status, meta.output, first, folded, reproduced, "decoded");
     status_println(status, "metadata: dialnorm {} (dialogue at -{} dBFS){}", first.dialnorm,
                    first.dialnorm, dialnorm_note(meta, first.dialnorm));
     if (first.dialnorm2.has_value()) {
