@@ -262,6 +262,15 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
+  `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
+  part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table
+  C.2.3 (the span and defaults of Hearth's sliders), and a decoded frame says `bsmod`, `is_karaoke`,
+  `output_acmod`, `output_lfe` and `karaoke_reproduced`, with `channel_labels` for the channels that
+  are there. `iclforge.lyrics` reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke files into
+  lines of timed words with their singers (`parse`, `read`, `find_file`) and gives the cursor
+  (`Lyrics.position`, `word_state`): the reader Hearth uses, bound as it is (planning/karaoke-phase2.md,
+  W5).
 - **`forge decode` and `forge monitor` re-level the karaoke-capable decoder's parts.**
   `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
   flexibility" in the units, the span and the defaults of Hearth's sliders and the wire's
