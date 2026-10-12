@@ -70,6 +70,7 @@ class StandIn:
         self.location = ""
         self.frames = 0
         self.status_extra: dict = {}
+        self.layout = "2.0"
         self.restarts = 0
         self.log = bytearray(
             b"boot line\n"
@@ -105,6 +106,7 @@ class StandIn:
                         "frames": stand_in.frames,
                         "finished": stand_in.state == "finished",
                         "failed": stand_in.state == "failed",
+                        "layout": stand_in.layout,
                         "network": {"kind": "wifi", "ssid": SECRET, "address": "192.168.1.9"},
                         **stand_in.status_extra,
                     }
@@ -262,6 +264,12 @@ class Suite(unittest.TestCase):
             # the compare's boot ratchet reads.
             for key in ("internal_free", "largest"):
                 self.assertIsInstance(record["boot"].get(key), int, f"{path.name}: boot {key}")
+
+    def test_a_pin_layout_belongs_to_a_stream_that_has_a_pin(self) -> None:
+        for name, spec in self.suite["streams"].items():
+            if "pin_layout" in spec:
+                self.assertIn("pin", spec, name)
+                self.assertEqual(spec["codec"], "AC-4", name)
 
     def test_a_profile_s_own_tolerance_names_only_figures_the_suite_holds(self) -> None:
         allowed = {
@@ -543,6 +551,105 @@ class Boot(unittest.TestCase):
         self.assertEqual(record["board"], "S3b")
         self.assertEqual(record["boot"]["largest"], 31744)
         self.assertEqual(record["plays"]["ac3-2.0"]["decoder_permille_samples"], [223, 223, 223])
+
+
+class FoldedPin(unittest.TestCase):
+    """A pin is the host's hash of a stream in its own layout: a fold is not it."""
+
+    ROW: ClassVar[dict] = {
+        "id": "ac4-51-music",
+        "stream": "ac4-51-music",
+        "stream_spec": {
+            "codec": "AC-4",
+            "units": 3,
+            "pin": "ac4_51_music",
+            "pin_layout": "5.1",
+        },
+    }
+    PINS: ClassVar[dict[str, str]] = {"ac4_51_music": "6d36d7d2e8a070e9"}
+
+    def judge(self, layout: str, pcm_hash: str) -> bs.PlayResult:
+        result = bs.PlayResult(id="ac4-51-music", stream="ac4-51-music", expect="pass")
+        result.state = "finished"
+        result.lines = bs.parse_play_lines(
+            [
+                "sink.writes=24 sink.underruns=0 sink.dry_ms=0 sink.min_headroom_ms=5 "
+                "sink.dma_ms=64",
+                "stream.units=3 stream.held=0 stream.resync_bytes=0 stream.sink=i2s_wide "
+                "stream.decode_stack_free=17020 stream.audio_ms=128 stream.wall_ms=17",
+                f"ac4.lap=1 frames=3 decoder_permille=604 worst_frame_us=33624 pcm_hash={pcm_hash}",
+                "result=pass",
+            ]
+        )
+        bs._judge(
+            result, {"state": "finished", "layout": layout}, self.ROW["stream_spec"], self.PINS
+        )
+        return result
+
+    def test_the_stream_folded_to_2_0_is_not_held_to_the_5_1_pin(self) -> None:
+        result = self.judge("2.0", "7162259f3e596916")
+        self.assertEqual(result.findings, [])
+        self.assertTrue(result.folded)
+        self.assertEqual(result.figures()["layout"], "2.0")
+        self.assertEqual(result.figures()["pcm_hash"], "7162259f3e596916")
+
+    def test_the_stream_played_in_its_own_layout_is_held_to_the_pin(self) -> None:
+        self.assertEqual(self.judge("5.1", "6d36d7d2e8a070e9").findings, [])
+        wrong = self.judge("5.1", "7162259f3e596916")
+        self.assertTrue(any("is not the host's" in f for f in wrong.findings))
+        self.assertFalse(wrong.folded)
+
+    def test_a_fold_with_no_hash_at_all_is_still_a_finding(self) -> None:
+        result = self.judge("2.0", "0000000000000000")
+        self.assertTrue(any("no PCM hash" in f for f in result.findings))
+
+    def test_a_row_with_no_pin_layout_is_held_to_its_pin_whatever_the_layout(self) -> None:
+        spec = {"codec": "AC-4", "pin": "ac4_51_music"}
+        result = bs.PlayResult(id="x", stream="x", expect="pass")
+        result.state = "finished"
+        result.lines = bs.parse_play_lines(
+            ["ac4.lap=1 frames=3 decoder_permille=1 pcm_hash=7162259f3e596916", "result=pass"]
+        )
+        bs._judge(result, {"state": "finished", "layout": "2.0"}, spec, self.PINS)
+        self.assertTrue(any("is not the host's" in f for f in result.findings))
+
+    def test_the_folded_row_s_own_hash_is_what_the_baseline_holds_it_to(self) -> None:
+        base = {
+            "profile": "p4-rev1-ac4",
+            "plays": {
+                "ac4-51-music": {
+                    "state": "finished",
+                    "units": 3,
+                    "pcm_hash": "7162259f3e596916",
+                    "layout": "2.0",
+                }
+            },
+        }
+        same = {
+            "profile": "p4-rev1-ac4",
+            "plays": {
+                "ac4-51-music": {
+                    "state": "finished",
+                    "units": 3,
+                    "pcm_hash": "7162259f3e596916",
+                    "layout": "2.0",
+                }
+            },
+        }
+        moved = {
+            "profile": "p4-rev1-ac4",
+            "plays": {
+                "ac4-51-music": {
+                    "state": "finished",
+                    "units": 3,
+                    "pcm_hash": "0123456789abcdef",
+                    "layout": "2.0",
+                }
+            },
+        }
+        self.assertEqual(bs.compare(same, base, {})[0], [])
+        regressions, _ = bs.compare(moved, base, {})
+        self.assertTrue(any("PCM hash" in line for line in regressions))
 
 
 class LogPaging(unittest.TestCase):

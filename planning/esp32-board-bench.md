@@ -106,14 +106,15 @@ not something it ran.
   `board_suite.py run --restart` refuses them unless told `--reset-by esptool` (a watchdog
   reset through the serial port) or `--accept-restart-fault`.
   Seen on P4a on 2026-10-12, for the report's sake: an OTA from 3556 to the identity image
-  restarted cleanly, twelve resets (one `bench_flash.py reset`, eight in the record run and
-  three in the compare run) all came back on Wi-Fi with the C6 identified, the first timed at
-  16 s, and the rollback back to 3556, which the identity image restarted, left it with no
-  answer for 90 s. The board's own record says
+  restarted cleanly, twenty-nine resets (twelve in the p4-rev1 session: one `bench_flash.py
+  reset`, eight in the record run and three in the compare run; seventeen in the p4-rev1-ac4
+  one) all came back on Wi-Fi with the C6 identified, the first timed at 16 s, and the
+  rollback back to 3556, which the identity image restarted, left it with no answer for 90 s. The board's own record says
   an earlier 3556 trial was rolled back for restarting "before it had proved itself", so a
   dead-link trial that is then reset can be sent to the other slot: `flash --otadata-only`
   (the build's `otadata` alone, then a watchdog reset) boots the first slot as valid with
-  nothing on trial, and is how P4a was put back on the 3556 it was found on.
+  nothing on trial, and is how P4a was put back on the 3556 it was found on, in both sessions,
+  with no fault (a restore by rollback is a restart by the image that is running).
 - **esptool exits 1 after a watchdog reset that worked**: the USB-Serial/JTAG port of a P4
   re-enumerates, pySerial complains, and the write had been verified and the board reset.
   `flash` reads that as a verified write (`Hash of data verified`, `Hard resetting`, and no

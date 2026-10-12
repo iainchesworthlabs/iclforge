@@ -97,6 +97,7 @@ STATUS_FIELDS = (
     "worst_frame_us",
     "ring_low",
     "resync_bytes",
+    "layout",
 )
 
 CHECKLIST = (
@@ -348,11 +349,16 @@ class PlayResult:
     samples: list[int] = field(default_factory=list)
     rebooted: bool = False
     findings: list[str] = field(default_factory=list)
+    folded: bool = False
+    layout: str | None = None
 
     def figures(self) -> dict[str, Any]:
         out: dict[str, Any] = {"state": self.state, "frames": self.frames}
         if self.why:
             out["why"] = self.why
+        if self.folded:
+            # the hash is of what the decoder folded the stream to, held to the baseline's own
+            out["layout"] = self.layout
         if len(self.samples) > 1:
             out["decoder_permille_samples"] = list(self.samples)
         for name, value in (
@@ -625,6 +631,13 @@ def _judge(
     if pin:
         expected = pins.get(pin)
         got = lines.ac4_pcm_hash
+        # The pin is the host's hash of the stream in its own layout. A play on another layout
+        # (a 5.1 stream folded to the 2.0 an I2S sink with two outputs is given, which a sink
+        # that cannot open six cannot be asked otherwise) is not that PCM: no host oracle, and
+        # the hash is the row's own, held to the baseline's.
+        played = str(status.get("layout") or "")
+        pin_layout = spec.get("pin_layout")
+        folded = bool(pin_layout and played and played != pin_layout)
         if expected is None:
             result.findings.append(f"no pin named {pin} in {PINS.name}")
         elif got is None or set(got) == {"0"}:
@@ -632,6 +645,9 @@ def _judge(
                 "no PCM hash on the AC-4 line: the image was built without "
                 "CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1 (the `measure` overlay)"
             )
+        elif folded:
+            result.folded = True
+            result.layout = played
         elif got.lower() != expected.lower():
             result.findings.append(f"PCM hash {got} is not the host's {expected} ({pin})")
         if lines.ac4_decoder_permille is not None:

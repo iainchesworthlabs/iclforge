@@ -42,7 +42,8 @@
       "codec": "AC-4",
       "units": 3,
       "pin": "ac4_51_music",
-      "what": "AC-4 5.1 from DEE, 192 kbit/s, three frames"
+      "pin_layout": "5.1",
+      "what": "AC-4 5.1 from DEE, 192 kbit/s, three frames; on a sink of two outputs the decoder folds it to 2.0, which the 5.1 pin is not, and the row is held to its own hash"
     },
     "ac4-20-companding": {
       "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-48-3frames.ac4",
@@ -97,6 +98,12 @@
       ]
     },
     "p4-rev1-ac4": {
+      "tolerance": {
+        "relative": 0.12,
+        "largest_block_bytes": 8192,
+        "internal_free_bytes": 4096,
+        "note": "Measured on P4a with the measure image (2026-10-12). The AC-4 rows are three or four frames long, so a play is noisy by about 6% of itself: ac4-20-music read 220 to 253 permille in five plays, ac4-20-acpl 280 to 302 (a median of two 297 against a recorded 281) and ac4-20-companding 268 to 303, against the S3's AC-3 at 122 to 124. 12% is twice that and still calls a fifth more decoder time a regression. The largest boot block was 217,088 or 221,184 (two steps allowed), and free RAM at boot 289,271 to 289,891 on fifteen of seventeen boots and 286,331 on two: 4,096 under the recorded worst of eight keeps that lower mode inside."
+      },
       "plays": [
         {"id": "ac3-2.0", "stream": "ac3-2.0"},
         {"id": "eac3-2.0", "stream": "eac3-2.0"},
