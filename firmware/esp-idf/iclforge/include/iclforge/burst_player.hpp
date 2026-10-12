@@ -94,6 +94,14 @@ struct BurstPlayerConfig {
     // default, and every board with room to decode whatever `outputs.count`
     // does not already turn away.
     std::size_t max_coded_channels = 0;
+    // The most objects an E-AC-3 stream may declare for the board to place them in real time, which
+    // the support object states as max_objects (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS), and
+    // nothing for a board that states none. A stream that declares more (iclforge/object_limit.hpp:
+    // its complexity index less the LFE) is played as its bed, from its first unit and without the
+    // object reconstruction's allocations: the objects past what the board keeps up with would
+    // have chunks come late, which is worse than a bed on time. A listener who chose objects
+    // "always" is not overruled.
+    std::optional<std::uint8_t> max_objects{};
 
     BaseType_t core = 1;
     UBaseType_t priority = 6;

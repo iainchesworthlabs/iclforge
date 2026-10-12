@@ -13,7 +13,8 @@
     "objects": ["objects"],
     "pitch": ["pitch"],
     "render": ["render", "spatial"],
-    "sendspin": ["sendspin"]
+    "sendspin": ["sendspin"],
+    "sink": ["sink"]
   },
   "debts": [
     {
