@@ -706,6 +706,12 @@ TestCase {
         // The same five channels with another service are a 5.0 again.
         EncoderController.bsmodIndex = 0;
         compare(EncoderController.planLabel, "5.0");
+        // And in E-AC-3, which carries the same service type, they are named the same way.
+        EncoderController.bsmodIndex = 7;
+        ctx.flow.setFormat("eac3");
+        tryCompare(EncoderController, "codecIndex", 1, 5000);
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        compare(EncoderController.planLabel, "Karaoke 3/2");
     }
 
     function test_theRateStartsAtTheModesAndTheAuthorsChoiceIsKept() {
