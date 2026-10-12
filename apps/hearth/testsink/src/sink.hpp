@@ -67,6 +67,10 @@ class Sink {
     void send_controller_command(const sendspin::controller::CommandMessage& command) {
         core_->send_controller_command(command);
     }
+    // The sink loses the lyrics it holds and says so on every connection, as a board does that
+    // restarted its player, or reconnected: a test of what a server does about a member that
+    // reports no lyrics (or another item's) for the item it is playing.
+    void forget_lyrics() { core_->forget_lyrics(); }
 
    private:
     class FileOutputs;

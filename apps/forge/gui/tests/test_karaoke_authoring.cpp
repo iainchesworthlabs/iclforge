@@ -453,6 +453,66 @@ TEST_CASE("karaoke authoring: the lyrics beside a file are the .lrc of its name,
     CHECK(forge_gui::karaoke_lyrics_beside(upper.file("Song.wav", "x")) == loud);
 }
 
+TEST_CASE("karaoke authoring: a SubRip, ASS or MIDI karaoke file of its name is offered when there is no .lrc",
+          "[forge-gui][karaoke]") {
+    const ScratchFolder folder;
+    const std::string song = folder.file("song.wav", "x");
+    const std::string srt = folder.file("song.srt", "1\n00:00:01,000 --> 00:00:03,000\nhello\n");
+    CHECK(forge_gui::karaoke_lyrics_beside(song) == srt);
+    // The same order Hearth reads them in: an .lrc beats an .srt, which beats an .ass and a .kar.
+    const std::string lrc = folder.file("song.lrc", "[00:01.00]hello\n");
+    CHECK(forge_gui::karaoke_lyrics_beside(song) == lrc);
+
+    const ScratchFolder other;
+    const std::string ass = other.file("Words.ASS", "[Events]\n");
+    CHECK(forge_gui::karaoke_lyrics_beside(other.file("Words.wav", "x")) == ass);
+    const ScratchFolder midi;
+    const std::string kar = midi.file("tune.kar", "MThd");
+    CHECK(forge_gui::karaoke_lyrics_beside(midi.file("tune.wav", "x")) == kar);
+}
+
+TEST_CASE("karaoke authoring: a SubRip file is written beside the stream as UTF-8 LRC, gap marked",
+          "[forge-gui][karaoke]") {
+    using forge_gui::KaraokeLyricsCopy;
+    const ScratchFolder source_folder;
+    const ScratchFolder stream_folder;
+    const std::string srt = source_folder.file(
+        "words.srt",
+        "1\n00:00:01,000 --> 00:00:03,000\nShould auld acquaintance\n\n"
+        "2\n00:00:05,000 --> 00:00:07,000\nBe forgot\n");
+    const std::string stream = stream_folder.file("song.ac3", "x");
+
+    std::string error;
+    CHECK(forge_gui::karaoke_copy_lyrics(srt, stream, &error) == KaraokeLyricsCopy::kCopied);
+    CHECK(error.empty());
+    // What Hearth reads and sends to every sink: one format, with the silence between the cues
+    // marked as a time with no text.
+    CHECK(read_all((std::filesystem::path(stream).parent_path() / "song.lrc").string()) ==
+          "[00:01.00]Should auld acquaintance\n[00:03.00]\n[00:05.00]Be forgot\n");
+}
+
+TEST_CASE("karaoke authoring: a file in a code page is said so, when chosen and when copied",
+          "[forge-gui][karaoke]") {
+    using forge_gui::KaraokeLyricsCopy;
+    const ScratchFolder source_folder;
+    const ScratchFolder stream_folder;
+    // Latin-1: an e acute that is one byte, which is not UTF-8.
+    const std::string latin1 = source_folder.file("cafe.lrc", "[00:01.00]Caf\xE9\n");
+
+    const std::string problem = forge_gui::karaoke_lyrics_problem(latin1);
+    CHECK_FALSE(problem.empty());
+    CHECK(problem.find("UTF-8") != std::string::npos);
+    // A file that reads has no problem.
+    CHECK(forge_gui::karaoke_lyrics_problem(source_folder.file("fine.lrc", "[00:01.00]hello\n")).empty());
+
+    std::string error;
+    const std::string stream = stream_folder.file("cafe.ac3", "x");
+    CHECK(forge_gui::karaoke_copy_lyrics(latin1, stream, &error) == KaraokeLyricsCopy::kUnreadable);
+    CHECK(error == problem);
+    // Nothing was written beside the stream.
+    CHECK_FALSE(std::filesystem::exists(std::filesystem::path(stream).replace_extension(".lrc")));
+}
+
 TEST_CASE("karaoke authoring: lyrics are copied beside the stream under its name, and never over another",
           "[forge-gui][karaoke]") {
     using forge_gui::KaraokeLyricsCopy;
@@ -465,12 +525,13 @@ TEST_CASE("karaoke authoring: lyrics are copied beside the stream under its name
     CHECK(forge_gui::karaoke_copy_lyrics(lyrics, stream) == KaraokeLyricsCopy::kCopied);
     const std::string beside = forge_gui::karaoke_lyrics_beside(stream);
     REQUIRE_FALSE(beside.empty());
-    CHECK(read_all(beside) == "[00:01.00]hello");
+    // As UTF-8 LRC, which is what the library writes: one line to a line, a newline at its end.
+    CHECK(read_all(beside) == "[00:01.00]hello\n");
 
     // A lyrics file already there is left as it was, not replaced by this one.
     const std::string other = source_folder.file("other words.lrc", "[00:01.00]different");
     CHECK(forge_gui::karaoke_copy_lyrics(other, stream) == KaraokeLyricsCopy::kExists);
-    CHECK(read_all(beside) == "[00:01.00]hello");
+    CHECK(read_all(beside) == "[00:01.00]hello\n");
 
     // The file offered is the one already there: nothing to do, and nothing wrong.
     CHECK(forge_gui::karaoke_copy_lyrics(beside, stream) == KaraokeLyricsCopy::kAlreadyThere);

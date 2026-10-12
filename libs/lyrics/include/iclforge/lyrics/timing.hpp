@@ -44,7 +44,20 @@ namespace iclforge::lyrics {
 // resolution. The times are written as they are held: an `[offset:]` is never written, because the
 // reader applied it. A line whose text begins `[` followed by something shaped like a time would be
 // read back as a time, which LRC has no way to escape; nothing is done about it here.
-[[nodiscard]] std::string write_lrc(const Lyrics& lyrics);
+//
+// What a file's lines end at is not written by default: an LRC line ends where the next begins, which
+// is what the reader gives a line it has no end for. A SubRip cue or an ASS event has an end of its
+// own, and there is nothing sung between it and the next line; `mark_gaps` writes that.
+struct LrcWriteOptions {
+    // Where a timed line ends before the next one starts, write a timed line with no text at its end,
+    // as an LRC file marks an instrumental gap, so that a reader of the file knows the line is over.
+    // A line that ends where the next begins (every line of a plain LRC file) gets none, nor does
+    // one whose end is not a hundredth of a second past its start. The last line's end is not
+    // written: a reader decides that from the item's length.
+    bool mark_gaps = false;
+};
+
+[[nodiscard]] std::string write_lrc(const Lyrics& lyrics, const LrcWriteOptions& options = {});
 
 // A line's words with times spread across the line's span in proportion to their letters: what a
 // person starts from and corrects, and never what is shown as sung. Empty for a line with no text.

@@ -186,6 +186,15 @@ struct SinkFacts {
     // intended_settings: there is no "identify state" on the wire to read
     // back either.
     std::optional<std::int32_t> identify_slot{};
+
+    // --- the lyrics the sink holds (W7d) -----------------------------------
+    // Set while the sink reports lyrics (iclforge_state->lyrics) for the item this computer last
+    // gave the sink's group a document for: how many lines that document has, and the text of the
+    // line the sink has the sound in (empty before the first line, and for a file with no times).
+    // The sink reports only the item and the line's index; both are this computer's own reading of
+    // the document it sent, which the sink parses with the same reader.
+    std::optional<std::size_t> lyrics_lines{};
+    std::string lyrics_line_text{};
 };
 
 // One row of NetworkSinkList.qml's `sinks` model.

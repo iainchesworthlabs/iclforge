@@ -2885,6 +2885,20 @@ bool parse_options(std::span<char*> tokens, Options& out, std::string_view comma
             out.p.mixdepth.blkmixcfginfo = words;
             continue;
         }
+        if (key == "lyrics") {
+            if (command != "encode" && command != "eac3-encode" && command != "ac4-encode") {
+                fmt::println(stderr,
+                             "error: lyrics= goes with encode, eac3-encode and ac4-encode: it puts "
+                             "a lyrics file beside the stream they write");
+                return false;
+            }
+            if (value.empty()) {
+                fmt::println(stderr, "error: lyrics= needs a file path");
+                return false;
+            }
+            out.lyrics_path = std::string{value};
+            continue;
+        }
         if (key == "src") {
             if (value.empty()) {
                 fmt::println(stderr, "error: src= needs a file path");
@@ -3579,6 +3593,26 @@ void warn_karaoke_not_spatial(const Options& meta) {
     fmt::println(stderr,
                  "warning: karaoke is ignored by spatial: it places an E-AC-3 stream's objects and "
                  "has no karaoke bed ('forge decode' and 'forge monitor' reproduce it)");
+}
+
+void warn_karaoke_service_layout(const iclforge::ac3::plan::Metadata& meta,
+                                 iclforge::ac3::Acmod acmod, std::string_view whose) {
+    if (!meta.infomdat ||
+        meta.info.bsmod != iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke) {
+        return;
+    }
+    if (acmod == iclforge::ac3::Acmod::k1_0) {
+        fmt::println(stderr,
+                     "warning: {}bsmod 7 on a mono stream is Table 5.7's voice-over service, not "
+                     "karaoke: there are no vocals to reproduce",
+                     whose);
+    } else if (acmod == iclforge::ac3::Acmod::kDualMono) {
+        fmt::println(stderr,
+                     "warning: {}bsmod 7 is not defined for 1+1: Annex A (Table A5.2) and Annex G "
+                     "(Table G.2) prohibit a karaoke service on mono and on 1+1, so a receiver "
+                     "may not take it as one; the stream is written as asked",
+                     whose);
+    }
 }
 
 bool refuse_karaoke_with_ltrt(const iclforge::ac3::OutputConfig& output) {
