@@ -554,7 +554,7 @@ async function loadLyrics(file) {
 }
 
 // The fold's own options, with the karaoke reproduction the page asks for. It only changes a
-// stream that is karaoke (an AC-3 stream flagged bsmod 7): any other decodes as it did. At the
+// stream that is karaoke (an AC-3 or E-AC-3 stream flagged bsmod 7): any other decodes as it did. At the
 // stereo fold the stream's own mix is already Annex C's 2/0 reproduction, so the choices are the
 // capable decoder's: which vocals are heard.
 const KARAOKE_CHOICES = {

@@ -543,13 +543,15 @@ ScrollView {
                         Text {
                             objectName: "lyricsFile"
                             Layout.fillWidth: true
-                            text: KaraokeController.fileName.length > 0
-                                  ? KaraokeController.fileName
-                                    + (KaraokeController.status === "timed"
-                                       ? (KaraokeController.wordTimed ? qsTr(", word-timed")
-                                                                       : qsTr(", line-timed"))
-                                       : "")
-                                  : ""
+                            text: KaraokeController.showingPicture
+                                  ? KaraokeController.pictureFileName
+                                  : (KaraokeController.fileName.length > 0
+                                     ? KaraokeController.fileName
+                                       + (KaraokeController.status === "timed"
+                                          ? (KaraokeController.wordTimed ? qsTr(", word-timed")
+                                                                          : qsTr(", line-timed"))
+                                          : "")
+                                     : "")
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSmall
                             elide: Text.ElideMiddle
@@ -570,6 +572,32 @@ ScrollView {
                     // Stamps the words of the item as it plays (planning/karaoke-phase2.md, W6).
                     LyricTimingDialog { id: timingDialog }
 
+                    // A lyrics file and a CD+G disc both beside the item: which one is shown. The
+                    // words are the default; the choice holds until Hearth is closed.
+                    RowLayout {
+                        objectName: "lyricsShowRow"
+                        Layout.fillWidth: true
+                        visible: KaraokeController.hasPicture && KaraokeController.status !== "picture"
+                        spacing: Theme.gap
+                        Text {
+                            text: qsTr("Show")
+                            color: Theme.text
+                            font.pixelSize: Theme.fontNormal
+                            elide: Text.ElideRight
+                            Layout.preferredWidth: Math.round(108 * Theme.fontScale)
+                        }
+                        SegmentedControl {
+                            objectName: "lyricsShowChoice"
+                            accessibleName: qsTr("Show")
+                            currentValue: KaraokeController.preferPicture ? "picture" : "words"
+                            model: [
+                                { value: "words", label: qsTr("Words") },
+                                { value: "picture", label: qsTr("Picture") }
+                            ]
+                            onSelected: function(value) { KaraokeController.preferPicture = (value === "picture"); }
+                        }
+                    }
+
                     LyricView {
                         id: lyricView
                         objectName: "lyricsView"
@@ -582,15 +610,19 @@ ScrollView {
                         objectName: "lyricsNote"
                         Layout.fillWidth: true
                         visible: text.length > 0
-                        text: KaraokeController.status === "plain"
-                              ? qsTr("These lyrics have no times, so they are shown whole and not followed.")
-                              : (KaraokeController.status === "picture"
-                                 ? qsTr("This is the picture of a CD+G disc. Its words are part of the "
-                                        + "picture, so there is no text to follow.")
-                                 : (KaraokeController.status === "timed" && !KaraokeController.wordTimed
-                                    ? qsTr("This file times lines, not words: a whole line is emphasised "
-                                           + "as it is sung.")
-                                    : ""))
+                        text: KaraokeController.status === "picture"
+                              ? qsTr("This is the picture of a CD+G disc. Its words are part of the "
+                                     + "picture, so there is no text to follow.")
+                              : (KaraokeController.showingPicture
+                                 ? qsTr("This is the picture of the CD+G disc beside the lyrics. Its "
+                                        + "words are part of the picture; choose Words to follow the "
+                                        + "lyrics file.")
+                                 : (KaraokeController.status === "plain"
+                                    ? qsTr("These lyrics have no times, so they are shown whole and not followed.")
+                                    : (KaraokeController.status === "timed" && !KaraokeController.wordTimed
+                                       ? qsTr("This file times lines, not words: a whole line is "
+                                              + "emphasised as it is sung.")
+                                       : "")))
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
                         wrapMode: Text.WordWrap
