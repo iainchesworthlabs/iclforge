@@ -1016,6 +1016,43 @@ TEST_CASE("media_info_to_map: a karaoke programme names its coding mode and its 
     CHECK(others[2].toMap().value(QStringLiteral("karaokeParts")).toList().size() == 2);
 }
 
+TEST_CASE("media_info_to_map: an E-AC-3 karaoke programme is karaoke to the decoder only as one "
+          "independent substream with no objects",
+          "[hearth][hearth-controller][karaoke]") {
+    // The decoder reproduces a flagged programme when it is one independent substream and carries no
+    // object layer (ac3::is_karaoke_programme, planning/karaoke-eac3.md, D3); the page needs to know the
+    // difference between that and a programme that is only flagged.
+    iclforge::hearth::MediaInfo info;
+    MediaProgramme alone;
+    alone.acmod = iclforge::ac3::Acmod::k3_2;
+    alone.bsmod = 7;
+    alone.substreams_per_unit = 1;
+    MediaProgramme with_dependent = alone;
+    with_dependent.substreams_per_unit = 2;
+    MediaProgramme with_objects = alone;
+    with_objects.complexity_index = 11;
+    MediaProgramme main_service = alone;
+    main_service.bsmod = 0;
+    info.programmes = {alone, with_dependent, with_objects, main_service};
+    const QVariantList rows =
+        iclforge::hearth::ui::media_info_to_map(info).value(QStringLiteral("programmes")).toList();
+    REQUIRE(rows.size() == 4);
+    const auto flag = [&rows](qsizetype i, const char* key) {
+        return rows[i].toMap().value(QString::fromLatin1(key)).toBool();
+    };
+    CHECK(flag(0, "karaokeFlagged"));
+    CHECK(flag(0, "karaoke"));
+    // Flagged and not reproduced: a dependent substream, then an object layer.
+    CHECK(flag(1, "karaokeFlagged"));
+    CHECK_FALSE(flag(1, "karaoke"));
+    CHECK(rows[1].toMap().value(QStringLiteral("karaokeParts")).toList().isEmpty());
+    CHECK(flag(2, "karaokeFlagged"));
+    CHECK_FALSE(flag(2, "karaoke"));
+    // Not flagged at all.
+    CHECK_FALSE(flag(3, "karaokeFlagged"));
+    CHECK_FALSE(flag(3, "karaoke"));
+}
+
 // ---- the Network page's lyrics row (W7d) ----------------------------------------------------------
 
 TEST_CASE("sink_lyrics_text: a sink says whether it takes lyrics, holds none, or which line it is on",
