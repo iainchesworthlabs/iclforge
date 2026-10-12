@@ -9,21 +9,26 @@ Run: python3 -m unittest discover -s tools/hearth -p 'test_*.py'
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import http.server
 import io
 import json
+import os
 import sys
 import tempfile
 import threading
 import unittest
 from pathlib import Path
 from typing import ClassVar
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import bench
 import board_suite as bs
 import sink_profile
+from test_bench import temp_bench
 
 SECRET = "TheHomeNetwork-5GHz"
 
@@ -615,6 +620,77 @@ class Compare(unittest.TestCase):
         run = {"profile": "c6-16mb", "plays": {}}
         regressions, _ = bs.compare(run, self.figures(), self.TOLERANCE)
         self.assertEqual(len(regressions), 2)
+
+
+class BenchBoards(unittest.TestCase):
+    """--board against the bench's table: the lock and the address are the board's own."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        path = temp_bench(Path(self.tmp.name))
+        patch = mock.patch.dict(os.environ, {bench.ENVIRONMENT: str(path)})
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    @staticmethod
+    def args(**more: object) -> argparse.Namespace:
+        base = {
+            "board": "",
+            "host": None,
+            "lock": None,
+            "restart": False,
+            "accept_restart_fault": False,
+        }
+        return argparse.Namespace(**{**base, **more})
+
+    def test_a_board_of_the_bench_gives_the_address_and_the_lock(self) -> None:
+        args = self.args(board="S3b")
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "192.168.1.45")
+        self.assertEqual(Path(args.lock).name, "s3-board-45.lock")
+        self.assertEqual(Path(args.lock).parent, Path(self.tmp.name) / "locks")
+
+    def test_an_address_that_is_not_the_board_s_is_refused(self) -> None:
+        with self.assertRaises(bs.SuiteError) as raised:
+            bs.resolve_board(self.args(board="S3b", host="192.168.1.156"))
+        self.assertIn("192.168.1.45", str(raised.exception))
+
+    def test_another_board_s_lock_is_refused(self) -> None:
+        with self.assertRaises(bs.SuiteError) as raised:
+            bs.resolve_board(self.args(board="S3b", lock="D:/ac3bld/s3-board-156.lock"))
+        self.assertIn("s3-board-45.lock", str(raised.exception))
+
+    def test_the_board_s_own_address_and_lock_given_by_hand_are_accepted(self) -> None:
+        args = self.args(board="C6", host="192.168.1.117", lock="D:/ac3bld/c6-board.lock")
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "192.168.1.117")
+        self.assertEqual(args.lock, "D:/ac3bld/c6-board.lock")
+
+    def test_a_p4_is_not_restarted_unless_the_run_accepts_the_fault(self) -> None:
+        for name in ("P4a", "P4b"):
+            with self.assertRaises(bs.SuiteError) as raised:
+                bs.resolve_board(self.args(board=name, restart=True))
+            self.assertIn("C6 link", str(raised.exception))
+        accepted = self.args(board="P4a", restart=True, accept_restart_fault=True)
+        bs.resolve_board(accepted)
+        self.assertEqual(accepted.host, "192.168.1.99")
+
+    def test_an_s3_is_restarted_without_a_word(self) -> None:
+        args = self.args(board="S3a", restart=True)
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "192.168.1.156")
+
+    def test_a_label_that_is_not_on_the_bench_is_only_a_label(self) -> None:
+        args = self.args(board="the stand-in", host="127.0.0.1", lock="x.lock")
+        bs.resolve_board(args)
+        self.assertEqual((args.host, args.lock), ("127.0.0.1", "x.lock"))
+
+    def test_no_board_leaves_the_arguments_as_they_were(self) -> None:
+        args = self.args(host="127.0.0.1")
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "127.0.0.1")
+        self.assertIsNone(args.lock)
 
 
 class CommandLine(unittest.TestCase):

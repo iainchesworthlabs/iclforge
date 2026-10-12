@@ -361,12 +361,17 @@ from `firmware/hearth-sink/suite.json` and writes baselines under
 session scratchpads:
 
 ```
-board_suite.py run --profile s3-n16r8 --host 192.168.1.45 --lock D:/ac3bld/s3-board-45.lock \
-                   --session <id> [--repeat 3] [--record | --compare baselines/s3-n16r8.json]
+board_suite.py run --profile s3-n16r8 --board S3b --session <id> [--repeat 3] [--restart] \
+                   [--record | --compare baselines/s3-n16r8.json]
 board_suite.py plan --profile s3-n16r8
 board_suite.py compare --run board-run.json --baseline baselines/s3-n16r8.json
 board_suite.py lock take|release|show --file <lock> --session <id>
 ```
+
+`--board` names a row of [`bench.json`](../tools/hearth/bench.json), which gives `--host` and the
+lock, and refuses an address or a lock that is not that board's; `--restart` is refused on a P4
+(see [the board bench](esp32-board-bench.md)). Without `--board`, `--host` and `--lock` are
+given by hand as before.
 
 It does, in this order, and stops at the first refusal:
 
@@ -484,7 +489,8 @@ Wi-Fi values, which are credentials and stay out of the profile.
 ## Order of work
 
 Each is a small PR. The suite and the baselines need board time, and a board is booked through its
-lock file in `D:/ac3bld` before anything is run on it, and restored and released after.
+lock file in `D:/ac3bld` before anything is run on it, and restored and released after
+([the rule](esp32-board-bench.md#the-rule)).
 
 | # | PR | Needs a board | Notes |
 |---|---|---|---|
@@ -497,7 +503,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
 | 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)); `c6-16mb`, `p4-rev1`, `p4-rev1-ac4` and `s3-n16r8-ac4` each need their board and, for AC-4, the `measure` image. `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
-| 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | |
+| 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
 PR 3 follows 2. PR 2 adds `p4-rev3` once #1400 is on main, since its fragments are not.
 

@@ -2,8 +2,8 @@
 """The board suite: play a profile's fixed list on a booked board and hold it to a baseline.
 
     python tools/hearth/board_suite.py plan   --profile s3-n16r8
-    python tools/hearth/board_suite.py run    --profile s3-n16r8 --host 192.168.1.45 \\
-        --lock D:/ac3bld/s3-board-45.lock --session 16d036 --purpose baseline [--record]
+    python tools/hearth/board_suite.py run    --profile s3-n16r8 --board S3b \\
+        --session 16d036 --purpose baseline [--restart] [--record]
     python tools/hearth/board_suite.py compare --run board-run.json \\
         --baseline baselines/s3-n16r8.json
     python tools/hearth/board_suite.py lock   take|release|show --file LOCK --session ID
@@ -11,11 +11,12 @@
 What it does (planning/esp32-platform-profiles.md, "The board suite"), and stops at the first
 refusal:
 
-1. **Booking.** `run` takes the lock file itself, atomically, and refuses with no `--lock` and
+1. **Booking.** `run` takes the lock file itself, atomically, and refuses with no lock and
    `--session`, or when the file exists: the rule is that a board nobody has booked is not one
-   to run on. It prints what a script cannot check (the other locks, the other sessions, a
-   running idf.py or esptool) as a checklist first, and releases the lock when it ends, whatever
-   happened, if it took it.
+   to run on (planning/esp32-board-bench.md). `--board` names a board of bench.json, which gives
+   the address and the lock and refuses a pair that is not its own. It prints what a script
+   cannot check (the other sessions, a running idf.py or esptool) as a checklist first, and
+   releases the lock when it ends, whatever happened, if it took it.
 2. **Identity.** GET /hardware must say the profile and the hash of its current definition
    (`sink_profile.py identity`), and GET /status `stopped`. A board running another profile, an
    older definition or an image built with neither is refused: its figures are not this
@@ -48,7 +49,6 @@ import datetime
 import http.client
 import http.server
 import json
-import os
 import re
 import socket
 import socketserver
@@ -63,6 +63,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import bench
 import sink_profile
 
 REPO = Path(__file__).resolve().parents[2]
@@ -92,76 +93,58 @@ STATUS_FIELDS = (
 
 CHECKLIST = (
     "the suite cannot see another session. Before it runs, by hand:",
-    "  - read all five lock files (D:/ac3bld: p4-board, p4-board2, s3-board-156, s3-board-45,",
-    "    c6-board; .lock)",
+    "  - read all five lock files (python tools/hearth/bench.py status)",
     "  - ListAgents: is a peer building or testing near this board?",
     "  - no idf.py, esptool, ota.py or capture of this board is running",
     "  - the board's /status is stopped (the suite checks that one)",
 )
 
-
-class SuiteError(Exception):
-    """Why the suite will not run or cannot read what it was given; main() prints it."""
+# The booking is the bench's (bench.py): the suite and the flash tool take the same lines.
+SuiteError = bench.BenchError
 
 
 # --- booking --------------------------------------------------------------------------
 
 
-def _stamp(moment: datetime.datetime) -> str:
-    return moment.strftime("%Y-%m-%dT%H:%MZ")
-
-
 def take_lock(path: Path, session: str, purpose: str, minutes: int) -> str:
     """The booking line, written atomically: a lock that exists is not taken over."""
-    now = datetime.datetime.now(datetime.timezone.utc)
-    end = now + datetime.timedelta(minutes=minutes)
-    line = (
-        f"session={session} (board suite) | purpose={purpose} | start={_stamp(now)} | "
-        f"expected_end={_stamp(end)}"
-    )
-    try:
-        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError as error:
-        try:
-            held = path.read_text("utf-8", "replace").strip()
-        except OSError:
-            held = "(unreadable)"
-        raise SuiteError(f"{path} is booked: {held}") from error
-    except OSError as error:
-        raise SuiteError(f"{path} cannot be created: {error}") from error
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write(line + "\n")
-    return line
+    return bench.take_lock(path, session, purpose, minutes, "board suite")
 
 
 def hold_lock(path: Path, session: str, purpose: str, minutes: int) -> tuple[str, bool]:
     """The booking for a run: the lock taken, or, where the file is already this session's (it
     booked the board to do something first, such as put an image on it), that line, which the
     run then leaves for its owner to release. Returns the line and whether the run took it."""
-    try:
-        return take_lock(path, session, purpose, minutes), True
-    except SuiteError:
-        try:
-            held = path.read_text("utf-8", "replace").strip()
-        except OSError:
-            held = ""
-        if f"session={session} " in held or f"session={session}|" in held:
-            return held, False
-        raise
+    return bench.hold_lock(path, session, purpose, minutes, "board suite")
 
 
-def release_lock(path: Path, session: str) -> str:
-    """Removes the lock only if it is this session's."""
+release_lock = bench.release_lock
+
+
+def resolve_board(args: argparse.Namespace) -> None:
+    """Fills --host and --lock from the bench's row for --board, and refuses a pair that
+    disagrees with it: a lock that is not the board's is the mistake the rule exists for. A
+    --board that is not on the bench is only a label for the record."""
+    if not args.board:
+        return
     try:
-        held = path.read_text("utf-8", "replace")
-    except FileNotFoundError:
-        return "no lock file"
-    except OSError as error:
-        raise SuiteError(f"{path} cannot be read: {error}") from error
-    if f"session={session} " not in held and f"session={session}|" not in held:
-        raise SuiteError(f"{path} is not this session's, and is left alone: {held.strip()}")
-    path.unlink()
-    return "released"
+        row = bench.load().boards.get(args.board)
+    except bench.BenchError:
+        row = None
+    if row is None:
+        return
+    if args.host and args.host != row.host:
+        raise SuiteError(f"--board {row.name} is at {row.host}, not {args.host}")
+    if args.lock and Path(args.lock).name != row.lock.name:
+        raise SuiteError(f"--board {row.name} is guarded by {row.lock.name}, not {args.lock}")
+    if args.restart and row.restart_kills_c6_link and not args.accept_restart_fault:
+        raise SuiteError(
+            f"{row.name}: a restart can leave a P4 with no Wi-Fi (its C6 link), and --restart "
+            "restarts it; leave the boot line to a run after a power cycle, or pass "
+            "--accept-restart-fault (planning/esp32-board-bench.md has the recovery)"
+        )
+    args.host = args.host or row.host
+    args.lock = args.lock or str(row.lock)
 
 
 # --- the board ------------------------------------------------------------------------
@@ -752,6 +735,9 @@ def _print_results(results: list[PlayResult]) -> None:
 def cmd_run(args: argparse.Namespace) -> int:
     suite = load_suite()
     plan(suite, args.profile, args.only)  # a profile with no list is refused before a lock is taken
+    resolve_board(args)
+    if not args.host:
+        raise SuiteError("--host, or a --board that is on the bench, is required")
     if not args.lock or not args.session:
         raise SuiteError(
             "refused: --lock and --session are required. A board is booked through its lock file "
@@ -837,17 +823,27 @@ def main(argv: list[str] | None = None) -> int:
 
     run = commands.add_parser("run", help="play a profile's list on a booked board")
     run.add_argument("--profile", required=True)
-    run.add_argument("--host", required=True, help="the board's address")
+    run.add_argument("--host", help="the board's address (the bench's, with --board)")
     run.add_argument("--port", type=int, default=80)
     run.add_argument("--lock", help="the board's lock file: taken, and released at the end")
     run.add_argument("--session", help="your session id, as the lock line carries it")
     run.add_argument("--purpose", default="")
-    run.add_argument("--board", default="", help="a label for the board, kept in the record")
+    run.add_argument(
+        "--board",
+        default="",
+        help="a board of tools/hearth/bench.json, which gives --host and --lock and refuses a "
+        "pair that is not its own; any other text is a label kept in the record",
+    )
     run.add_argument(
         "--restart",
         action="store_true",
         help="POST /restart first, so that the boot line is in the log "
-        "(not for a P4: its restart kills the C6 link)",
+        "(refused for a P4 of the bench: its restart can kill the C6 link)",
+    )
+    run.add_argument(
+        "--accept-restart-fault",
+        action="store_true",
+        help="restart a P4 anyway, ready to put it back by hand",
     )
     run.add_argument("--minutes", type=int, default=30)
     run.add_argument("--only", action="append", help="a play id; may be repeated")
