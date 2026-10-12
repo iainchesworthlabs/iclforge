@@ -308,6 +308,8 @@ struct ServerState {
 
 struct ClientCommand {
     std::optional<controller::CommandMessage> controller = std::nullopt;
+    // _iclforge_player@v1's request, for the singer's karaoke choice (D8).
+    std::optional<player::Request> iclforge = std::nullopt;
 };
 
 [[nodiscard]] std::string write_client_command(const ClientCommand& command);

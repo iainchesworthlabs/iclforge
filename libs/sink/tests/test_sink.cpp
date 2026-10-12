@@ -69,6 +69,18 @@ class Lines final : public iclforge::sink::Log {
         });
     }
 
+    // The pairing code of the last "PAIRING CODE " line, as the sink shows it (digits and a dash).
+    [[nodiscard]] std::optional<std::string> code() {
+        const std::lock_guard lock(mutex_);
+        for (auto it = lines_.rbegin(); it != lines_.rend(); ++it) {
+            const std::size_t at = it->find("PAIRING CODE ");
+            if (at != std::string::npos) {
+                return it->substr(at + 13);
+            }
+        }
+        return std::nullopt;
+    }
+
    private:
     std::mutex mutex_;
     std::condition_variable changed_;
@@ -101,6 +113,9 @@ struct Recording {
         std::array<double, 3> levels{};
     };
     std::vector<Karaoke> karaoke;
+    // What the burst output answers to start(), and what it says its streams do (D6).
+    bool burst_takes = true;
+    std::optional<ac::Output> burst_output;
     // What the output says it has counted, as the program's would.
     std::uint32_t streams = 0;
     std::uint32_t burst_streams = 0;
@@ -149,7 +164,7 @@ class FakeBursts final : public iclforge::sink::BurstStreamOutput {
         const std::lock_guard lock(recording_->mutex);
         recording_->burst_started.push_back(stream);
         ++recording_->burst_streams;
-        return true;
+        return recording_->burst_takes;
     }
     void clear() override {}
     void end() override {
@@ -173,6 +188,10 @@ class FakeBursts final : public iclforge::sink::BurstStreamOutput {
     }
     [[nodiscard]] const fs::path& file() const override { return file_; }
     [[nodiscard]] const std::optional<ac::DecoderReport>& decoder() const override { return decoder_; }
+    [[nodiscard]] std::optional<ac::Output> output() const override {
+        const std::lock_guard lock(recording_->mutex);
+        return recording_->burst_output;
+    }
 
    private:
     Recording* recording_;
@@ -211,12 +230,23 @@ class Keys final : public hs::ServerKeyring {
 class Events final : public iclforge::sendspin::ServerListener {
    public:
     void on_hello(const m::ClientHello& /*hello*/) override { update([&] { ++hellos; }); }
-    void on_state(const m::ClientState& state) override { update([&] { available = state.available; }); }
+    void on_state(const m::ClientState& state) override {
+        update([&] {
+            available = state.available;
+            if (state.iclforge) {
+                ++iclforge_states;
+                iclforge_output = state.iclforge->output;
+            }
+        });
+    }
     void on_goodbye(m::GoodbyeReason /*reason*/) override {}
     void on_leave() override {}
     void on_pairing_held_back(const std::optional<std::string>& /*message*/) override {}
-    void on_pairing_code_wanted() override {}
-    bool on_paired(const Key32& /*client_key*/, const Key32& /*psk*/) override { return true; }
+    void on_pairing_code_wanted() override { update([&] { code_wanted = true; }); }
+    bool on_paired(const Key32& /*client_key*/, const Key32& /*psk*/) override {
+        update([&] { paired = true; });
+        return true;
+    }
     void on_pairing_ended(std::optional<iclforge::sendspin::pairing_messages::AbortReason> /*reason*/) override {}
 
     template <class Predicate>
@@ -225,8 +255,22 @@ class Events final : public iclforge::sendspin::ServerListener {
         return changed_.wait_for(lock, timeout, std::forward<Predicate>(predicate));
     }
 
+    // The extension role's client/state messages so far, and the `output` of the last.
+    struct Extension {
+        int states = 0;
+        std::optional<ac::Output> output;
+    };
+    [[nodiscard]] Extension extension() {
+        const std::lock_guard lock(mutex_);
+        return {.states = iclforge_states, .output = iclforge_output};
+    }
+
     int hellos = 0;
     bool available = false;
+    bool code_wanted = false;
+    bool paired = false;
+    int iclforge_states = 0;
+    std::optional<ac::Output> iclforge_output;
 
    private:
     template <class Update>
@@ -283,6 +327,15 @@ struct Dialled {
         return call([&] {
             return server.activate(
                 {.activities = {m::Activity::kPlayback}, .active_roles = std::move(roles), .pairing = std::nullopt});
+        });
+    }
+
+    bool pair(m::PairMethod method, std::optional<m::CodeFormat> format, std::int32_t pin_length) {
+        return call([&] {
+            return server.activate({.activities = {m::Activity::kPairing},
+                                    .active_roles = std::vector<std::string>{},
+                                    .pairing = m::PairingActivation{
+                                        .method = method, .format = format, .pin_length = pin_length, .languages = {}}});
         });
     }
 };
@@ -440,6 +493,274 @@ TEST_CASE("sink: a burst stream and its karaoke settings reach the burst output"
     CHECK(recording.started.empty());
 }
 
+namespace {
+
+// What the sink said of how a burst stream leaves it: in the extension role's state the server read
+// and in its own status, once the stream had started, and in the state once it had ended.
+struct OutputSeen {
+    std::optional<ac::Output> state_during;
+    std::optional<ac::Output> status_during;
+    std::optional<ac::Output> state_after;
+    bool status_streaming = false;
+};
+
+OutputSeen watch_output(std::string_view leaf, std::optional<ac::Output> says, bool takes) {
+    const fs::path dir = scratch(leaf);
+    Recording recording;
+    recording.burst_output = says;
+    recording.burst_takes = takes;
+    FakeOutputs outputs(recording);
+    Lines log;
+    auto sink = iclforge::sink::Sink::start(options_in(dir), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole)}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+
+    // Every set_iclforge_state sends a client/state, so each change below is one more message.
+    OutputSeen seen;
+    int states = server.events.extension().states;
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    REQUIRE(server.events.wait([&] { return server.events.iclforge_states > states; }));
+    const Events::Extension during = server.events.extension();
+    seen.state_during = during.output;
+    states = during.states;
+    const iclforge::sink::Sink::Status status = (*sink)->status();
+    REQUIRE(status.connections.size() == 1);
+    seen.status_during = status.connections[0].output;
+    seen.status_streaming = status.connections[0].streaming;
+
+    REQUIRE(server.call([&] { return server.server.end_burst_stream(); }));
+    REQUIRE(server.events.wait([&] { return server.events.iclforge_states > states; }));
+    seen.state_after = server.events.extension().output;
+    return seen;
+}
+
+}  // namespace
+
+TEST_CASE("sink: the role's state says how a stream the output took leaves the sink", "[sink][websocket]") {
+    // An output that hands the bits on says so while the stream is open, to the server and in the
+    // sink's own status, and the key goes with the stream.
+    const OutputSeen passed = watch_output("output_passthrough", ac::Output::kPassthrough, true);
+    CHECK(passed.state_during == ac::Output::kPassthrough);
+    CHECK(passed.status_during == ac::Output::kPassthrough);
+    CHECK(passed.status_streaming);
+    CHECK_FALSE(passed.state_after.has_value());
+
+    // One that decodes says pcm.
+    const OutputSeen decoded = watch_output("output_pcm", ac::Output::kPcm, true);
+    CHECK(decoded.state_during == ac::Output::kPcm);
+    CHECK(decoded.status_during == ac::Output::kPcm);
+    CHECK_FALSE(decoded.state_after.has_value());
+
+    // A stream the output did not take leaves the sink by no way it can name: nothing is said, though
+    // the stream is open and the output would pass a stream it took.
+    const OutputSeen refused = watch_output("output_refused", ac::Output::kPassthrough, false);
+    CHECK_FALSE(refused.state_during.has_value());
+    CHECK_FALSE(refused.status_during.has_value());
+    CHECK(refused.status_streaming);
+
+    // An output that does not say, as one from before the key, is not known.
+    const OutputSeen silent = watch_output("output_silent", std::nullopt, true);
+    CHECK_FALSE(silent.state_during.has_value());
+    CHECK_FALSE(silent.status_during.has_value());
+}
+
+TEST_CASE("sink: a lyric document and its anchors become a frame on the sink's own clock", "[sink][websocket]") {
+    const fs::path dir = scratch("lyric_frame");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.lyrics_max_bytes = ac::kMaxLyricsBytes;
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole)}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+
+    // Nothing held and nothing playing.
+    const iclforge::sink::LyricFrame idle = (*sink)->lyric_frame();
+    CHECK(idle.mode == iclforge::lyrics::StageMode::kNoLyrics);
+    CHECK(idle.item == -1);
+    CHECK_FALSE(idle.streaming);
+
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    CHECK(log.wait("burst stream AC-3 48000 Hz"));
+
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = {.item = 42,
+                       .text = "[ti:Test song]\n[00:00.00]First line\n[00:04.00]Second line\n[01:00.00]\n"};
+    REQUIRE(server.call([&] { return server.server.iclforge_command(document); }));
+    CHECK(log.wait("lyrics for item 42: held"));
+
+    // The document is held and no anchor has come due: the first lines wait, and a stream is open.
+    const iclforge::sink::LyricFrame waiting = (*sink)->lyric_frame();
+    CHECK(waiting.item == 42);
+    CHECK(waiting.streaming);
+    CHECK(waiting.title == "Test song");
+    CHECK(waiting.mode == iclforge::lyrics::StageMode::kWaiting);
+
+    // The sound is at 5 s now, by the server's clock. Once the sink's own clock has converged on the
+    // server's the frame is the second line, a little past 5 s.
+    ac::CommandMessage anchor;
+    anchor.command = ac::Command::kLyricsPosition;
+    anchor.lyrics_position = {.item = 42, .position_ms = 5000, .at_us = server.clock.now_us(), .speed = 1.0};
+    REQUIRE(server.call([&] { return server.server.iclforge_command(anchor); }));
+
+    iclforge::sink::LyricFrame frame;
+    const auto deadline = std::chrono::steady_clock::now() + 30s;
+    while (std::chrono::steady_clock::now() < deadline) {
+        frame = (*sink)->lyric_frame();
+        if (frame.mode == iclforge::lyrics::StageMode::kLine) {
+            break;
+        }
+        std::this_thread::sleep_for(50ms);
+    }
+    REQUIRE(frame.mode == iclforge::lyrics::StageMode::kLine);
+    CHECK(frame.current.text == "Second line");
+    CHECK(frame.position_ms >= 5000);
+    CHECK(frame.position_ms < 40'000);
+    REQUIRE(frame.before.size() == 1);
+    CHECK(frame.before[0].text == "First line");
+
+    // A delay of 2 s shows the lyrics later: the stage is the position less the delay.
+    const iclforge::sink::LyricFrame delayed = (*sink)->lyric_frame(2000);
+    CHECK(delayed.position_ms + 2000 - frame.position_ms < 500);
+
+    // The end of the stream is nothing playing: the document stays, the position goes.
+    REQUIRE(server.call([&] { return server.server.end_burst_stream(); }));
+    CHECK(log.wait("burst stream ended after 0 bursts"));
+    const iclforge::sink::LyricFrame ended = (*sink)->lyric_frame();
+    CHECK(ended.item == 42);
+    CHECK_FALSE(ended.streaming);
+    CHECK(ended.mode == iclforge::lyrics::StageMode::kWaiting);
+
+    // And a sink that loses its lyrics has none.
+    (*sink)->forget_lyrics();
+    CHECK((*sink)->lyric_frame().mode == iclforge::lyrics::StageMode::kNoLyrics);
+}
+
+TEST_CASE("sink: what the server says is playing names an item with no lyrics, and the document's tags are the fallback",
+          "[sink][websocket]") {
+    const fs::path dir = scratch("now_playing");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.lyrics_max_bytes = ac::kMaxLyricsBytes;
+    options.other_roles = {"metadata@v1"};
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole), "metadata@v1"}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    CHECK(log.wait("burst stream AC-3 48000 Hz"));
+
+    // Nothing said and no document: the item has no name.
+    iclforge::sink::LyricFrame frame = (*sink)->lyric_frame();
+    CHECK(frame.mode == iclforge::lyrics::StageMode::kNoLyrics);
+    CHECK(frame.streaming);
+    CHECK(frame.title.empty());
+
+    // The server says what is playing: the frame names the item, though it holds no lyrics.
+    iclforge::sendspin::metadata::State playing;
+    playing.title = "Spring";
+    playing.artist = "Hearth";
+    playing.album = "Seasons";
+    REQUIRE(server.call([&] { return server.server.send_state({.metadata = playing}); }));
+    REQUIRE(log.wait("metadata \"Spring\""));
+    frame = (*sink)->lyric_frame();
+    CHECK(frame.mode == iclforge::lyrics::StageMode::kNoLyrics);
+    CHECK(frame.item == -1);
+    CHECK(frame.streaming);
+    CHECK(frame.title == "Spring");
+    CHECK(frame.artist == "Hearth");
+    CHECK(frame.album == "Seasons");
+
+    // A document with its own title: what the server says comes first, and the other fields the
+    // document has and the server leaves out are the document's.
+    iclforge::sendspin::metadata::State titled;
+    titled.title = "Spring (server)";
+    REQUIRE(server.call([&] { return server.server.send_state({.metadata = titled}); }));
+    REQUIRE(log.wait("metadata \"Spring (server)\""));
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = {.item = 5,
+                       .text = "[ti:Test song]" "\n" "[ar:The document]" "\n"
+                               "[00:00.00]First line" "\n" "[00:04.00]Second" "\n"};
+    REQUIRE(server.call([&] { return server.server.iclforge_command(document); }));
+    CHECK(log.wait("lyrics for item 5: held"));
+    frame = (*sink)->lyric_frame();
+    CHECK(frame.item == 5);
+    CHECK(frame.title == "Spring (server)");
+    CHECK(frame.artist == "The document");
+
+    // The server clears it: the document's tags are what is left.
+    REQUIRE(server.call([&] { return server.server.send_state({.metadata = std::optional<iclforge::sendspin::metadata::State>{}}); }));
+    REQUIRE(log.wait("metadata cleared"));
+    frame = (*sink)->lyric_frame();
+    CHECK(frame.title == "Test song");
+    CHECK(frame.artist == "The document");
+    CHECK(frame.album.empty());
+}
+
+TEST_CASE("sink: the status says who is connected, for what, and the code a server asked by",
+          "[sink][websocket]") {
+    const fs::path dir = scratch("status");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.code_method = iclforge::sink::CodeMethod::kDynamic;
+    options.unpaired_access = false;
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sink::Sink::Status idle = (*sink)->status();
+    CHECK(idle.connections.empty());
+    CHECK_FALSE(idle.pairing_code.has_value());
+    CHECK(idle.paired_servers == 0);
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    // A server that asks to pair by a code: the sink shows one, and says so in its status.
+    REQUIRE(server.pair(m::PairMethod::kDynamicCode, m::CodeFormat::kDigits, 6));
+    REQUIRE(log.wait("PAIRING CODE"));
+    iclforge::sink::Sink::Status pairing = (*sink)->status();
+    REQUIRE(pairing.connections.size() == 1);
+    CHECK(pairing.connections[0].server_name == "Test server");
+    CHECK(pairing.connections[0].activity == iclforge::sink::Sink::Status::Activity::kPairing);
+    REQUIRE(pairing.pairing_code.has_value());
+    CHECK(pairing.pairing_code->size() == 7);  // "123-456"
+    CHECK((*pairing.pairing_code)[3] == '-');
+
+    // Typed there, it pairs: the code goes from the status and the record is counted.
+    std::string shown = *pairing.pairing_code;
+    std::erase(shown, '-');
+    REQUIRE(server.events.wait([&] { return server.events.code_wanted; }));
+    REQUIRE(server.call(
+        [&] { return server.server.enter_code(iclforge::sendspin::pairing_flow::Code{shown}); }));
+    REQUIRE(log.wait("paired with server "));
+    const iclforge::sink::Sink::Status paired = (*sink)->status();
+    CHECK_FALSE(paired.pairing_code.has_value());
+    CHECK(paired.paired_servers == 1);
+}
+
 TEST_CASE("sink: the totals are what the outputs say they counted", "[sink][websocket]") {
     const fs::path dir = scratch("totals");
     Recording recording;
@@ -484,6 +805,33 @@ TEST_CASE("sink: the totals are what the outputs say they counted", "[sink][webs
     CHECK(closed.streams == 1);
     CHECK(closed.chunks == 4);
     CHECK(closed.frames == 4 * 480);
+}
+
+TEST_CASE("sink: a server pairs by the dynamic code the sink shows, and is then admitted", "[sink][websocket]") {
+    const fs::path dir = scratch("pairing");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.unpaired_access = false;
+    options.code_method = iclforge::sink::CodeMethod::kDynamic;
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.pair(m::PairMethod::kDynamicCode, m::CodeFormat::kDigits, 6));
+    REQUIRE(server.events.wait([&] { return server.events.code_wanted; }));
+    REQUIRE(log.wait("PAIRING CODE "));
+    std::string shown = log.code().value_or("");
+    std::erase(shown, '-');
+    REQUIRE(shown.size() == 6);
+
+    // The code the sink shows is the one that pairs: a round with it ends in a record on both sides.
+    REQUIRE(server.call(
+        [&] { return server.server.enter_code(iclforge::sendspin::pairing_flow::Code{shown}); }));
+    CHECK(log.wait("paired with server "));
+    CHECK(server.events.wait([&] { return server.events.paired; }));
 }
 
 TEST_CASE("sink: the store keeps the identity, the pairing PSK and the records between runs", "[sink][store]") {

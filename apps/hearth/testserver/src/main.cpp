@@ -96,6 +96,10 @@ _iclforge_player@v1, and writes a report of what each said about it.
                        played takes --pcm
   --tone-bits N        the tone's depth, 16 or 24 (default 24); a player is
                        sent the first format it lists, rescaled
+  --lyrics FILE        also send each player that takes lyrics (_iclforge_player@v1
+                       lists the lyrics command) this .lrc document for the
+                       programme, and the playhead as anchors every two seconds and
+                       at each pass, as Hearth's engine sends them
   --seconds N          play the file over and over for at least N seconds
                        (default: once through)
   --stall-after N      N seconds into the play, send nothing for --stall-ms, then
@@ -933,6 +937,8 @@ void write_report(std::ostream& out, const std::string& server_name, const std::
 int main(int argc, char** argv) {
     std::vector<PlayerSpec> players;
     fs::path programme;
+    // --lyrics: the document sent each player that takes one, as item 1.
+    std::optional<fs::path> lyrics_path;
     bool tone = false;
     std::int32_t tone_bits = 24;
     std::optional<long> seconds;
@@ -978,6 +984,14 @@ int main(int argc, char** argv) {
         }
         if (argument == "--tone") {
             tone = true;
+            continue;
+        }
+        if (argument == "--lyrics") {
+            if (i + 1 >= arguments.size()) {
+                std::cerr << "--lyrics needs a file\n";
+                return kExitUsage;
+            }
+            lyrics_path = fs::path(std::string(arguments[++i]));
             continue;
         }
         if (i + 1 >= arguments.size()) {
@@ -1200,6 +1214,11 @@ int main(int argc, char** argv) {
         options.advertise = false;
         options.codecs = {m::Codec::kPcm};
         options.layout = sink_layout;
+        if (lyrics_path) {
+            // The reference sink takes the document and the anchors too, so that the chain from them
+            // to a sink's own clock is run here and reported at the end.
+            options.lyrics_max_bytes = ac::kMaxLyricsBytes;
+        }
         auto started = testsink::Sink::start(options, sink_log);
         if (!started) {
             std::cerr << "hearth-testserver: the test sink: " << started.error() << "\n";
@@ -1303,6 +1322,56 @@ int main(int argc, char** argv) {
     if (!group->start(group_programme)) {
         return finish(kExitSetup, "failed: the group did not start", std::nullopt, 0, 0.0);
     }
+    // The words of the programme, as item 1, to each player whose state lists the lyrics command; the
+    // anchors that move the playhead follow with the bursts below.
+    constexpr std::int64_t kLyricsItem = 1;
+    bool lyrics_sent = false;
+    if (lyrics_path) {
+        std::optional<std::vector<std::byte>> document = read_file(*lyrics_path);
+        if (!document) {
+            return finish(kExitUsage, "cannot read " + lyrics_path->string(), std::nullopt, 0, 0.0);
+        }
+        ac::CommandMessage command;
+        command.command = ac::Command::kLyrics;
+        command.lyrics.item = kLyricsItem;
+        command.lyrics.text.assign(reinterpret_cast<const char*>(document->data()), document->size());
+        for (const PlayerRun& run : runs) {
+            if (run.spec.hold) {
+                continue;
+            }
+            if ((*host)->iclforge_command(run.client_id, command)) {
+                lyrics_sent = true;
+                note(run.spec.label + ": " + std::to_string(command.lyrics.text.size()) + " bytes of lyrics sent");
+            } else {
+                note(run.spec.label + ": does not take lyrics");
+            }
+        }
+    }
+    // An anchor says where in the document the sound is at a time on the server's clock: sent every 64
+    // bursts (two seconds) and at each pass of the programme, as the engine sends them.
+    constexpr std::int64_t kAnchorEveryBursts = 64;
+    const auto send_anchor = [&](std::int64_t frame, std::int64_t frames) {
+        const std::optional<std::int64_t> start = group->start_time();
+        if (!lyrics_sent || !start || pass_samples == 0) {
+            return;
+        }
+        const std::int64_t in_pass = frame % static_cast<std::int64_t>(pass_samples);
+        const bool pass_start = in_pass < frames;
+        if (!pass_start && frames > 0 && (frame / frames) % kAnchorEveryBursts != 0) {
+            return;
+        }
+        ac::CommandMessage anchor;
+        anchor.command = ac::Command::kLyricsPosition;
+        anchor.lyrics_position = {.item = kLyricsItem,
+                                  .position_ms = in_pass * 1000 / static_cast<std::int64_t>(kSampleRate),
+                                  .at_us = *start + frame * 1'000'000 / static_cast<std::int64_t>(kSampleRate),
+                                  .speed = 1.0};
+        for (const PlayerRun& run : runs) {
+            if (!run.spec.hold) {
+                (void)(*host)->iclforge_command(run.client_id, anchor);
+            }
+        }
+    };
     const double programme_seconds = tone
                                          ? static_cast<double>(*seconds)
                                          : static_cast<double>(pass_samples) * passes / kSampleRate;
@@ -1351,6 +1420,11 @@ int main(int argc, char** argv) {
         ac4_source.emplace(*ac4_programme, passes);
     }
     std::uint64_t sent = 0;
+    // The reference sink's view of the lyrics, sampled with the players' checks: the last line it had
+    // the sound in, where, and how many samples were on a line at all.
+    std::string reference_line;
+    std::int64_t reference_position_ms = 0;
+    std::uint64_t reference_frames = 0;
     // The programme frame after the last burst sent.
     std::int64_t end_frame = 0;
     std::string failure;
@@ -1436,6 +1510,7 @@ int main(int argc, char** argv) {
             } else if (group->push_burst(*burst)) {
                 ++sent;
                 end_frame = burst->frame + burst->frames;
+                send_anchor(burst->frame, burst->frames);
                 burst.reset();
             } else {
                 std::this_thread::sleep_for(5ms);
@@ -1444,6 +1519,14 @@ int main(int argc, char** argv) {
         if (SteadyClock::now() >= next_check) {
             next_check = SteadyClock::now() + 250ms;
             check_players();
+            if (sink && lyrics_sent) {
+                const auto frame = sink->lyric_frame();
+                if (frame.mode == iclforge::lyrics::StageMode::kLine) {
+                    reference_line = frame.current.text;
+                    reference_position_ms = frame.position_ms;
+                    ++reference_frames;
+                }
+            }
             if (SteadyClock::now() >= play_deadline) {
                 failure = "the play took too long: the group stopped taking bursts";
             }
@@ -1465,6 +1548,10 @@ int main(int argc, char** argv) {
         }
     }
     group->stop();
+    if (sink && lyrics_sent) {
+        note("reference sink: " + std::to_string(reference_frames) + " lyric frame(s) on a line, the last at " +
+             std::to_string(reference_position_ms) + " ms: \"" + reference_line + "\"");
+    }
 
     // Every player has played every burst, or has stopped counting.
     if (failure.empty()) {

@@ -313,10 +313,17 @@ if(NOT ICLFORGE_BUILD_AC4 AND (ICLFORGE_BUILD_CLI OR ICLFORGE_BUILD_GUI OR ICLFO
         "ICLFORGE_BUILD_GUI and ICLFORGE_BUILD_TESTS to all be OFF too - they all link iclforge::ac4 "
         "unconditionally.")
 endif()
+# Hearth's applications (apps/hearth), as distinct from the libraries under them. ON, with
+# ICLFORGE_BUILD_HEARTH, is every build that is not a board's or an Android app's. OFF leaves
+# libs/sendspin and libs/sink to a program that links them through a wrapper of its own: Hearth for
+# Android's (apps/hearth/android/app/src/main/cpp/CMakeLists.txt), whose top-level project is the
+# wrapper, so that CMAKE_SOURCE_DIR - which the applications' notices and packaging read as the
+# repository root - is not.
+option(ICLFORGE_BUILD_HEARTH_APPS "Build Hearth's applications (apps/hearth) when ICLFORGE_BUILD_HEARTH is ON; OFF builds libs/sendspin and libs/sink alone" ON)
 # Hearth's applications, which a board's build leaves out: a board takes libs/sendspin's player
 # half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY, set by firmware/esp-idf/iclforge/CMakeLists.txt, with the
 # minimum-footprint profile and no AC-4), and the two guards below are about the applications.
-if(ICLFORGE_BUILD_HEARTH AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
+if(ICLFORGE_BUILD_HEARTH AND ICLFORGE_BUILD_HEARTH_APPS AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
     set(_ac3_hearth_apps ON)
 else()
     set(_ac3_hearth_apps OFF)
@@ -626,7 +633,7 @@ endif()
 # Hearth's applications, the test sink so far (planning/hearth-reference-player.md). Not in a
 # board's build, which takes libs/sendspin's player half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY,
 # set by firmware/esp-idf/iclforge/CMakeLists.txt) and has no iclforge::ac3 for the applications to link.
-if(ICLFORGE_BUILD_HEARTH AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
+if(ICLFORGE_BUILD_HEARTH AND ICLFORGE_BUILD_HEARTH_APPS AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
     add_subdirectory(apps/hearth)
 endif()
 
@@ -667,7 +674,7 @@ if(ICLFORGE_BUILD_TESTS)
     add_subdirectory(apps/shared/preferences/tests)
     add_subdirectory(apps/shared/project/tests)
     add_subdirectory(apps/forge/gui/tests)
-    if(ICLFORGE_BUILD_HEARTH)
+    if(ICLFORGE_BUILD_HEARTH AND ICLFORGE_BUILD_HEARTH_APPS)
         add_subdirectory(apps/hearth/engine/tests)
     endif()
     add_subdirectory(apps/crucible/engine/tests)

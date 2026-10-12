@@ -1,0 +1,92 @@
+package com.iclforge.hearth
+
+import android.util.Log
+
+/**
+ * The JNI surface `iclforge_hearth_jni.so` exposes: the app's one Sendspin sink, which
+ * native_sink.cpp owns. Kotlin does not touch a Sendspin byte; it starts and stops the sink, reads
+ * what it has to show, and advertises the port it listens on (SinkAdvertiser).
+ *
+ * The native symbol names are this package and class mangled by the JNI rules, so the declarations
+ * here and `jni_entry.cpp` have to agree; tools/checks/check_android_jni.py holds them to it.
+ */
+object NativeSink {
+    private const val TAG = "HearthSink"
+
+    /**
+     * Whether `iclforge_hearth_jni` loaded. Every `external fun` below throws
+     * [UnsatisfiedLinkError] when it is false. The load is caught here, not left to throw out of the
+     * static initializer: a throwing initializer marks the class erroneous for the life of the
+     * process, and the next touch raises NoClassDefFoundError instead of the error the callers are
+     * written to catch.
+     */
+    @JvmStatic
+    val available: Boolean = try {
+        System.loadLibrary("iclforge_hearth_jni")
+        true
+    } catch (t: Throwable) {
+        Log.e(TAG, "System.loadLibrary(iclforge_hearth_jni) failed", t)
+        false
+    }
+
+    /** Smoke test: proves the native link worked. */
+    external fun nativeVersionString(): String
+
+    /**
+     * Starts the sink listening on [port] (0 for any), its identity and pairing records in
+     * [stateDirectory]. The empty string on success, else why it did not start.
+     */
+    external fun start(stateDirectory: String, name: String, port: Int): String
+
+    external fun stop()
+
+    /**
+     * Hands the process's [PassthroughBridge] to the audio backend. Before a stream starts; safe to
+     * call again.
+     */
+    external fun registerPassthroughBridge(bridge: Any)
+
+    /** Another source holds the device (audio focus was lost), or has given it back. */
+    external fun setExternalSource(external: Boolean)
+
+    /** Whether a stream is open on the device. */
+    external fun streaming(): Boolean
+
+    external fun running(): Boolean
+
+    /** The port the sink listens on, 0 when it is not running. */
+    external fun port(): Int
+
+    /** The sink's identity as a server sees it (base64url), empty when it is not running. */
+    external fun clientId(): String
+
+    /** Connections, streams, chunks, frames, burst streams, bursts, burst frames. */
+    external fun totals(): LongArray
+
+    /** The lines the sink has logged since the last call, oldest first. */
+    external fun drainLog(): Array<String>
+
+    /**
+     * What the lyric view draws now: one JSON object as UTF-8 bytes (libs/sink's
+     * `iclforge/sink/lyric_frame.hpp`, `LyricFrame`), the document the sink holds for the item playing
+     * followed on its own clock, less [delayMs], the singer's nudge. Bytes and not a String: the
+     * JVM's modified UTF-8 has no four-byte sequences, and a lyric may need them. [lyricFrame] is
+     * cheap to call every frame.
+     */
+    external fun lyricFrame(delayMs: Int): ByteArray
+
+    /**
+     * Asks the server to play the vocals the remote chose: 0 none, 1 vocal 1, 2 vocal 2, 3 both (the
+     * request path of planning/hearth-android.md, D8). Advice, and it has no answer: this sink hands the
+     * receiver the coded bits, so it plays every vocal whatever the server decides, and what the server
+     * does shows in what its decoding members play.
+     */
+    external fun requestVocals(vocals: Int)
+
+    /**
+     * What the idle, starting and attention screens say of the sink: one JSON object as UTF-8 bytes
+     * (`connections`, each with `address`, `server_name`, `activity` and `streaming`; `pairing_code`;
+     * `paired_servers`). Read with [SinkStatus.parse].
+     */
+    external fun statusJson(): ByteArray
+}

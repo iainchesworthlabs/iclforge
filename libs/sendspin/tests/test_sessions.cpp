@@ -246,6 +246,11 @@ struct ServerEvents final : ServerListener {
         const iclforge::sendspin::controller::CommandMessage& command) override {
         controller_commands.push_back(command);
     }
+    // _iclforge_player@v1's requests, as the server hands them on (cut to the keys listed).
+    std::vector<iclforge::sendspin::player::Request> iclforge_requests;
+    void on_iclforge_request(const iclforge::sendspin::player::Request& request) override {
+        iclforge_requests.push_back(request);
+    }
     void on_source_stream_start(const m::ClientStreamStart& start) override { source_starts.push_back(start); }
     void on_source_audio(std::int64_t timestamp_us, std::span<const std::uint8_t> frame) override {
         source_audio.emplace_back(timestamp_us, std::vector<std::uint8_t>(frame.begin(), frame.end()));
@@ -1128,6 +1133,54 @@ TEST_CASE("sessions: _iclforge_player@v1's commands and settings", "[sendspin][s
     rig.run_for(50'000);
     CHECK(rig.player_events.iclforge_commands.size() == 2);
     CHECK(refusal(rig.server.iclforge_command(settings)) == Refusal::kCommandNotListed);
+}
+
+TEST_CASE("sessions: a sink asks for the karaoke choice and the server hears the keys it listed",
+          "[sendspin][sessions][iclforge]") {
+    PlayerConfig config = extension_config();
+    config.iclforge_support->requests = {"karaoke_vocals", "karaoke_vocal1_db"};
+    Rig rig(config, 0, hs::sentinel_choice(), {});
+    REQUIRE(rig.run_until([&] { return !rig.server_events.hellos.empty(); }, 1'000'000));
+    ac::Request ask;
+    ask.decoder.karaoke_vocals = ac::KaraokeVocals::kV1;
+    // Nothing goes before the role is active.
+    rig.from_player(rig.player.send_iclforge_request(ask));
+    rig.run_for(50'000);
+    CHECK(rig.server_events.iclforge_requests.empty());
+
+    rig.send(rig.server.activate(extension_playback()));
+    REQUIRE(rig.run_until([&] { return rig.available(); }, 5'000'000));
+
+    // What the sink lists goes, and what it does not is cut by the sink before it is sent.
+    ask.decoder.karaoke = ac::Karaoke::kCapable;
+    ask.decoder.karaoke_vocal1_db = -6.0;
+    ask.decoder.karaoke_vocal2_db = -3.0;
+    rig.from_player(rig.player.send_iclforge_request(ask));
+    REQUIRE(rig.run_until([&] { return rig.server_events.iclforge_requests.size() == 1; }, 100'000));
+    const ac::Request& heard = rig.server_events.iclforge_requests[0];
+    CHECK(heard.decoder.karaoke_vocals == ac::KaraokeVocals::kV1);
+    CHECK(heard.decoder.karaoke_vocal1_db == -6.0);
+    CHECK_FALSE(heard.decoder.karaoke.has_value());
+    CHECK_FALSE(heard.decoder.karaoke_vocal2_db.has_value());
+
+    // A request of keys it did not list is not sent at all.
+    ac::Request unlisted;
+    unlisted.decoder.karaoke = ac::Karaoke::kOff;
+    rig.from_player(rig.player.send_iclforge_request(unlisted));
+    rig.run_for(50'000);
+    CHECK(rig.server_events.iclforge_requests.size() == 1);
+}
+
+TEST_CASE("sessions: a sink that lists no requests sends none", "[sendspin][sessions][iclforge]") {
+    Rig rig(extension_config(), 0, hs::sentinel_choice(), {});
+    REQUIRE(rig.run_until([&] { return !rig.server_events.hellos.empty(); }, 1'000'000));
+    rig.send(rig.server.activate(extension_playback()));
+    REQUIRE(rig.run_until([&] { return rig.available(); }, 5'000'000));
+    ac::Request ask;
+    ask.decoder.karaoke_vocals = ac::KaraokeVocals::kV2;
+    rig.from_player(rig.player.send_iclforge_request(ask));
+    rig.run_for(50'000);
+    CHECK(rig.server_events.iclforge_requests.empty());
 }
 
 namespace {

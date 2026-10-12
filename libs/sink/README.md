@@ -6,8 +6,8 @@ A Sendspin sink a program runs: it listens and advertises, pairs, admits servers
 
 A library, internal to the repository.
 
-- **Uses:** `lyrics`, `sendspin`
-- **Used by:** `hearth`
+- **Uses:** `ac3`, `containers`, `lyrics`, `sendspin`
+- **Used by:** `hearth`, `hearth-android`
 - **CI lanes:** core
 - **CMake target:** `iclforge::sink`
 

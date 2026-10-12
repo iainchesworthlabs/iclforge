@@ -51,6 +51,11 @@ constexpr std::array<Named<DataType>, 3> kDataTypes{{
     {DataType::kAc4, "ac4"},
 }};
 
+constexpr std::array<Named<Output>, 2> kOutputs{{
+    {Output::kPassthrough, "passthrough"},
+    {Output::kPcm, "pcm"},
+}};
+
 constexpr std::array<Named<Command>, 7> kCommands{{
     {Command::kVolume, "volume"},
     {Command::kMute, "mute"},
@@ -212,6 +217,10 @@ std::string_view data_type_name(DataType type) {
     return name_of(kDataTypes, type);
 }
 
+std::string_view output_name(Output output) {
+    return name_of(kOutputs, output);
+}
+
 BurstDataType burst_data_type(DataType type) {
     switch (type) {
         case DataType::kAc3:
@@ -303,6 +312,13 @@ void write_support(json::Writer& w, const Support& support) {
         w.key("karaoke_codecs").begin_array();
         for (const DataType type : support.karaoke_codecs) {
             w.string(data_type_name(type));
+        }
+        w.end_array();
+    }
+    if (!support.requests.empty()) {
+        w.key("requests").begin_array();
+        for (const std::string& key : support.requests) {
+            w.string(key);
         }
         w.end_array();
     }
@@ -482,6 +498,23 @@ std::optional<Support> read_support(json::Value value) {
             }
         }
     }
+    // The keys the sink may ask a server to change: a name that is not requestable is skipped, as
+    // an unknown data type is, and an element that is not a string refuses the array.
+    if (const json::Value requests = value["requests"]; requests.exists()) {
+        if (!requests.is_array()) {
+            return std::nullopt;
+        }
+        for (const json::Value element : requests.elements()) {
+            const std::optional<std::string> key = element.as_string();
+            if (!element.is_string() || !key) {
+                return std::nullopt;
+            }
+            if (std::ranges::find(kRequestableKeys, std::string_view{*key}) != kRequestableKeys.end() &&
+                std::ranges::find(support.requests, *key) == support.requests.end()) {
+                support.requests.push_back(*key);
+            }
+        }
+    }
     return support;
 }
 
@@ -553,6 +586,9 @@ void write_state(json::Writer& w, const State& state) {
             .member("item", state.lyrics->item)
             .member("line", state.lyrics->line)
             .end_object();
+    }
+    if (state.output) {
+        w.member("output", name_of(kOutputs, *state.output));
     }
     w.end_object();
 }
@@ -664,6 +700,13 @@ std::optional<State> read_state(json::Value value) {
             return std::nullopt;
         }
         state.lyrics = LyricsReport{.item = *item, .line = *line};
+    }
+    if (const json::Value output = value["output"]; output.exists()) {
+        if (!output.is_string()) {
+            return std::nullopt;
+        }
+        // A name this reader does not know is a later revision's: it reads as the sink not saying.
+        state.output = value_of(kOutputs, output);
     }
     return state;
 }
@@ -1014,6 +1057,96 @@ std::expected<CommandMessage, CommandFailure> read_command(json::Value value) {
         }
     }
     return command;
+}
+
+void write_request(json::Writer& w, const Request& request) {
+    const DecoderSettings& decoder = request.decoder;
+    w.begin_object().member("command", "decoder").key("decoder").begin_object();
+    if (decoder.karaoke) {
+        w.member("karaoke", name_of(kKaraokes, *decoder.karaoke));
+    }
+    if (decoder.karaoke_vocals) {
+        w.member("karaoke_vocals", name_of(kKaraokeVocals, *decoder.karaoke_vocals));
+    }
+    if (decoder.karaoke_melody_db) {
+        w.key("karaoke_melody_db").number(*decoder.karaoke_melody_db, 1);
+    }
+    if (decoder.karaoke_vocal1_db) {
+        w.key("karaoke_vocal1_db").number(*decoder.karaoke_vocal1_db, 1);
+    }
+    if (decoder.karaoke_vocal2_db) {
+        w.key("karaoke_vocal2_db").number(*decoder.karaoke_vocal2_db, 1);
+    }
+    w.end_object().end_object();
+}
+
+std::optional<Request> read_request(json::Value value) {
+    if (!value.is_object() || !value["command"].equals("decoder")) {
+        return std::nullopt;
+    }
+    const json::Value decoder = value["decoder"];
+    if (!decoder.is_object()) {
+        return std::nullopt;
+    }
+    Request request;
+    DecoderSettings& out = request.decoder;
+    bool any = false;
+    // A key that is present and wrong refuses the whole request, as a settings object is refused
+    // whole: half of what a sink asked for is not what it asked for.
+    if (const json::Value field = decoder["karaoke"]; field.exists()) {
+        out.karaoke = value_of(kKaraokes, field);
+        if (!out.karaoke) {
+            return std::nullopt;
+        }
+        any = true;
+    }
+    if (const json::Value field = decoder["karaoke_vocals"]; field.exists()) {
+        out.karaoke_vocals = value_of(kKaraokeVocals, field);
+        if (!out.karaoke_vocals) {
+            return std::nullopt;
+        }
+        any = true;
+    }
+    const auto level = [&](std::string_view key, std::optional<double>& target) {
+        const json::Value field = decoder[key];
+        if (!field.exists()) {
+            return true;
+        }
+        target = read_number(field);
+        any = true;
+        return target && *target >= kKaraokeLevelMinDb && *target <= kKaraokeLevelMaxDb;
+    };
+    if (!level("karaoke_melody_db", out.karaoke_melody_db) || !level("karaoke_vocal1_db", out.karaoke_vocal1_db) ||
+        !level("karaoke_vocal2_db", out.karaoke_vocal2_db)) {
+        return std::nullopt;
+    }
+    if (!any) {
+        return std::nullopt;
+    }
+    return request;
+}
+
+std::optional<Request> accept_request(const Request& request, const Support& support) {
+    const auto lists = [&](std::string_view key) {
+        return std::ranges::find(support.requests, key) != support.requests.end();
+    };
+    Request out;
+    bool any = false;
+    const auto keep = [&](std::string_view key, const auto& from, auto& into) {
+        if (from && lists(key)) {
+            into = from;
+            any = true;
+        }
+    };
+    keep("karaoke", request.decoder.karaoke, out.decoder.karaoke);
+    keep("karaoke_vocals", request.decoder.karaoke_vocals, out.decoder.karaoke_vocals);
+    keep("karaoke_melody_db", request.decoder.karaoke_melody_db, out.decoder.karaoke_melody_db);
+    keep("karaoke_vocal1_db", request.decoder.karaoke_vocal1_db, out.decoder.karaoke_vocal1_db);
+    keep("karaoke_vocal2_db", request.decoder.karaoke_vocal2_db, out.decoder.karaoke_vocal2_db);
+    if (!any) {
+        return std::nullopt;
+    }
+    return out;
 }
 
 std::optional<std::string> check_settings(const Settings& settings, const Support& support) {

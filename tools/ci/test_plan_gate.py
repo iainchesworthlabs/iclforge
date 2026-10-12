@@ -277,6 +277,7 @@ class ProjectTable(unittest.TestCase):
             not_built,
             {
                 "demo-android",
+                "hearth-android",
                 "demo-wasm",
                 "python",
                 "rust",

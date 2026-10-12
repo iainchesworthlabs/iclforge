@@ -1007,6 +1007,10 @@ std::string write_client_command(const ClientCommand& command) {
             w.key("controller");
             controller::write_command(w, *command.controller);
         }
+        if (command.iclforge) {
+            w.key(player::kObjectKey);
+            player::write_request(w, *command.iclforge);
+        }
     });
 }
 
@@ -1015,6 +1019,12 @@ std::expected<ClientCommand, MessageError> read_client_command(json::Value paylo
     if (const json::Value object = payload["controller"]; object.exists()) {
         command.controller = controller::read_command(object);
         if (!command.controller) {
+            return malformed();
+        }
+    }
+    if (const json::Value object = payload[player::kObjectKey]; object.exists()) {
+        command.iclforge = player::read_request(object);
+        if (!command.iclforge) {
             return malformed();
         }
     }
