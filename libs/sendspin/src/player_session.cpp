@@ -36,7 +36,6 @@ namespace m = messages;
 using handshake::PskCategory;
 
 constexpr std::string_view kPlayerRole = "player@v1";
-constexpr std::size_t kMaxTokens = 4096;
 
 [[nodiscard]] std::string_view text_of(std::span<const std::uint8_t> bytes) {
     return {static_cast<const char*>(static_cast<const void*>(bytes.data())), bytes.size()};
@@ -319,7 +318,7 @@ SessionOutput PlayerSession::on_json_message(std::string_view text, std::int64_t
                                              bool& rehandshake) {
     json::TokenStorage tokens;
     json::Document document;
-    if (!document.parse(text, tokens, kMaxTokens)) {
+    if (!document.parse(text, tokens, config_.max_json_tokens)) {
         return {};
     }
     const std::optional<m::Envelope> envelope = m::read_envelope(document);

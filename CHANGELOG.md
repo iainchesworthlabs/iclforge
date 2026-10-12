@@ -3149,6 +3149,17 @@ The sections below contain the complete change list and fixes.
   no heap, against 32 KB reserved first. A text of 2,000 one-digit values still needs 32 KB of
   tokens, which only the token cap bounds. A re-handshake is entered after the message's tokens
   are released, so its X25519 does not sit on top of them.
+- **A sink's session takes at most 8 KB of tokens for a message, where a host's takes 64 KB.**
+  `PlayerConfig::max_json_tokens` (4,096 by default, so a host reads what it did) bounds the one
+  block a session takes for a message of more than 64 values, and Hearth's sink sets
+  `kSinkMaxJsonTokens`, 512. The largest message a server legitimately sends is 98 tokens
+  (`server/state` with metadata, controller and color, as Music Assistant sends it;
+  `stream/start` with every role is 88 and a settings command for sixteen outputs and every
+  decoder key 89); only `languages` has no bound, and a hundred of them make `server/activate`
+  126. A lyric document is one string, one token, whatever its bytes. No message comes within
+  twice the cap, and a valid 4 KB text of 2,000 one-digit values, which needed one 32 KB block,
+  is refused at its 513th token with no block taken. A message over the cap is dropped as a
+  malformed one is.
 
 **Object signing**
 
