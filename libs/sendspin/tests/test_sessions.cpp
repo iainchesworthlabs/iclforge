@@ -1956,3 +1956,44 @@ TEST_CASE("sessions: a sink's cap takes stream/start with every role", "[sendspi
     REQUIRE(server.events.starts.size() == 1);
     CHECK(server.events.starts[0].format == kPcm);
 }
+
+// A board's transport keeps one buffer for incoming frames, and the capacity a lyrics document
+// grew in it stays taken from internal heap. The session says when a frame carried a document, so
+// the transport can release that buffer, where a stream's chunk is kept for the next chunk.
+TEST_CASE("sessions: a player says when a frame carried a large document", "[sendspin][sessions][heap]") {
+    LegacyServer server;
+    REQUIRE(server.player.phase() == PlayerSession::Phase::kActive);
+    const auto receive = [&](std::span<const std::uint8_t> message) {
+        std::vector<std::vector<std::uint8_t>> sealed;
+        REQUIRE(server.channel->seal(message, sealed));
+        REQUIRE(sealed.size() == 1);
+        return server.player.receive(
+            Frame{.kind = iclforge::sendspin::transport::FrameKind::kBinary, .bytes = std::move(sealed[0])});
+    };
+    const auto json = [](std::string_view text) {
+        std::vector<std::uint8_t> message{iclforge::sendspin::message_id::kJson};
+        message.insert(message.end(), text.begin(), text.end());
+        return message;
+    };
+
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = ac::LyricsDocument{.item = 1, .text = std::string(8000, 'l')};
+    m::ServerCommand lyrics;
+    lyrics.iclforge = document;
+    const std::string text = m::write_server_command(lyrics, iclforge::sendspin::Dialect::kAiosendspin911);
+    REQUIRE(text.size() > iclforge::sendspin::kRetainedMessageBytes);
+    CHECK(receive(json(text)).large_document);
+    CHECK(server.player.phase() == PlayerSession::Phase::kActive);
+
+    // A message that is not a document is not reported, whatever its size: a control message, and
+    // a chunk of audio far over the bound.
+    CHECK_FALSE(receive(json(stream_start_of(19))).large_document);
+    const std::size_t header =
+        iclforge::sendspin::audio_chunk_header_bytes(iclforge::sendspin::Dialect::kAiosendspin911);
+    std::vector<std::uint8_t> chunk(header + 20000, 0x11);
+    REQUIRE(iclforge::sendspin::write_player_chunk_header(chunk, 1'000'000, 0,
+                                                          iclforge::sendspin::Dialect::kAiosendspin911));
+    CHECK_FALSE(receive(chunk).large_document);
+    CHECK(server.player.phase() == PlayerSession::Phase::kActive);
+}
