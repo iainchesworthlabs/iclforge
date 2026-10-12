@@ -572,6 +572,14 @@ if(ICLFORGE_BUILD_HEARTH)
     add_subdirectory(libs/sendspin)
 endif()
 
+# iclforge::sink (planning/hearth-android.md, D3): the sink a program runs, over libs/sendspin's player
+# half, which was hearth-testsink's. It listens and advertises, so a board's build (the player half
+# alone, which brings its own WebSocket and mDNS) and a fuzz build (the core alone) leave it out.
+# EXCLUDE_FROM_ALL, like iclforge::lyrics: it is built when a program or its tests link it.
+if(ICLFORGE_BUILD_HEARTH AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY AND NOT ICLFORGE_SENDSPIN_CORE_ONLY)
+    add_subdirectory(libs/sink EXCLUDE_FROM_ALL)
+endif()
+
 # install()/find_package(iclforge) support for iclforge::ac3, iclforge::containers,
 # iclforge::containers - after every add_subdirectory() call above (needs their targets to
 # exist), before include(Packaging) (CPack's library component packages exactly what gets
@@ -651,7 +659,7 @@ if(ICLFORGE_BUILD_TESTS)
         add_subdirectory(apps/hearth/engine/tests)
     endif()
     add_subdirectory(apps/crucible/engine/tests)
-    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics pitch ac3 containers audio ac4 iab adm capi sendspin)
+    foreach(_iclforge_lib IN ITEMS base dsp objects render device lyrics pitch ac3 containers audio ac4 iab adm capi sendspin sink)
         set(_iclforge_lib_target "iclforge::${_iclforge_lib}")
         if(_iclforge_lib STREQUAL "capi")
             set(_iclforge_lib_target "iclforge::c")
