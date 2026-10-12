@@ -29,6 +29,16 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke: a plan for a microphone, scoring and recording**
+
+- **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
+  and `planning/karaoke-microphone-findings.md`). Phase 1 left the microphone, scoring and recording
+  out; this is the plan for them: who sings with what, the latency budget (a voice mixed into a
+  Sendspin group comes out of a sink at least 400 ms late, so the voice is mixed where the microphone
+  is), a pitch score and the references that exist for one, a recording of the dry voice, the
+  decisions with a recommendation each, and a build plan by platform. Nothing is built and no
+  microphone was opened.
+
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
 - **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
