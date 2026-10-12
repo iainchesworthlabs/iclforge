@@ -3,6 +3,7 @@ iclforge_add_test_binary(iclforge-lyrics-tests PROJECT lyrics SOURCES
     test_cdg.cpp
     test_follower.cpp
     test_lyrics.cpp
+    test_midi_melody.cpp
     test_playhead.cpp
     test_stage.cpp
     test_timing.cpp)

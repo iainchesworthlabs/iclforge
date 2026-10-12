@@ -404,6 +404,18 @@ The sections below contain the complete change list and fixes.
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
 
+**Karaoke: the melody of a MIDI karaoke file**
+
+- **`iclforge::lyrics::read_midi_melody()` reads the notes of a `.kar` and says which track is the
+  tune** (the microphone, scoring and recording programme, M3). The words' reader has always skipped
+  every note; this reads them, and uses the words only to choose. A file does not say which track is
+  the melody, so the track and channel whose note starts coincide with the most syllable starts wins
+  (percussion excluded, and at an equal match the one with fewer notes, which is the lead line and
+  not a chord track), the share of syllables it matches is returned, and a file with no words, or
+  whose best track matches under half of them, is refused with the reason instead of guessed at.
+  Tempo changes, running status and a note-on of velocity 0 are read. It is the reference a singer's
+  pitch will be scored against; nothing links it yet.
+
 **Karaoke in E-AC-3: the boards reproduce it themselves**
 
 - **A Hearth sink board lists the codecs it reproduces karaoke for.** Its support object now
@@ -1149,6 +1161,29 @@ The sections below contain the complete change list and fixes.
   padded and trimmed.
 - **The Mix Presentation's rendering config follows v2.0.** `rendering_config_extension_size` now counts
   the `num_parameters` field after it, as v2.0 defines; readers of the earlier syntax skip it.
+
+**Browser: a microphone and a pitch score in the decode demo**
+
+- **A karaoke stream in the WebAssembly decode demo gains a Microphone card** (the microphone,
+  scoring and recording programme, M7). The page's tune is the guide melody's channel as coded,
+  read by the library's pitch tracker compiled into the demo's module (`pitch_bindings.cpp`:
+  `PitchTracker`, `ReferenceBuilder`, `ReferenceContour`, `PitchScorer`; the module grew by about
+  26 KB); the microphone is the browser's, with its own echo cancellation, through an
+  `AudioWorklet`; the score is `libs/pitch`'s, the library Hearth's microphone is built on. The
+  card shows a level meter, the pitch you are singing and how sharp or flat of the tune, a ribbon
+  of the tune's notes with your voice over it, a pitch score so far with how early or late you are,
+  and a summary when it is turned off.
+- **What it promises is checked.** The microphone is off until the button is pressed (the page asks
+  the browser for none before); the score is shown only when the person says they wear headphones,
+  and no summary is made without it; nothing is sent; closing it ends every track. A new
+  `microphone` Playwright project (5 tests, Chromium's fake device, no real microphone) holds those
+  and the arithmetic: the tracker at 44.1, 48 and 96 kHz, a contour read in slices, octaves folded,
+  a voice placed at where the sound it sang along to was (with the microphone's and the output's
+  latency and the person's timing), a dropped stretch of quanta, nothing scored while paused. Thirteen
+  mutants of `mic.js` were applied and all killed.
+- **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
+  microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
+  into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
 
 **ADM / BW64: rendering constraints, a sample-format option, and what the bridge drops**
 
@@ -3648,6 +3683,13 @@ The sections below contain the complete change list and fixes.
   360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun. On an ESP32-P4, which
   states 12, the 14-object stream that took 0.97 with 24 underruns took 0.22, and the 11-object
   streams, within the figure, are reconstructed at 0.85 as before.
+- **The AC-4 decoder can leave object audio undecoded** (`DecoderConfig::skip_objects`): for a
+  player that places no objects and takes `decode_by_block()`'s channels alone, which until now
+  paid to reconstruct A-JOC's objects and threw them away. The channels of a presentation that has
+  them are the same bit for bit in full and core decoding; an intermediate spatial format is still
+  rendered; a presentation of objects alone is refused with a reason. Held by a 5.1 bed beside A-JOC
+  and direct-coded objects (the decoder's own test streams gain a `channels` option), and on the
+  host, in a Debug build, it halves a frame's time (54 to 29 ms with four objects).
 - **An AC-4 item declares its objects to a group** (`ItemFacts::objects`, `objects_alone`;
   `Session::open()`), so that a sink's stated AC-4 object limit (`max_objects`) is honoured. They
   were left at 0, so no AC-4 stream was ever held to a limit. The count is what the decoder makes
@@ -3657,6 +3699,16 @@ The sections below contain the complete change list and fixes.
   its layout or objects setting say (folded to a width it lists, where it lists none as wide), and
   nothing, with the reason, where PCM is not possible. One with channels besides is played as its
   bed, as an E-AC-3 stream is.
+- **A board can decode AC-4 from a Sendspin group** (`Ac4Stream`, `firmware/esp-idf/iclforge/src/
+  ac4_stream.hpp`; the burst player takes a stream of data type `ac4` a sync frame a chunk): an
+  image with `CONFIG_ICLFORGE_AC4` lists `ac4` where `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4` is 1
+  (the ESP32-P4's default), with `max_coded_channels` 6 and `max_objects` 0, and a server sends
+  anything past either as PCM decoded on its side. Measured on a P4 over Sendspin: 2.0 at 0.18 to
+  0.33 of real time and 5.1 at 0.51 to 0.73, each output's level the host decoder's to 0.01 dB. A
+  player's timeline is anchored again by the chunk after one the decoder waited an I-frame
+  through, which the first board run showed it had not been (every frame after a late first chunk
+  was dropped). `hearth-testserver` plays an `.ac4` file; `libs/device`'s `ac4_sync_frame.hpp` is
+  the raw frame of a sync frame without a list, tested on the host.
 
 **Library internals**
 
