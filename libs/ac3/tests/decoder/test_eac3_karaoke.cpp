@@ -370,6 +370,28 @@ TEST_CASE("E-AC-3 karaoke: only a programme the stream calls karaoke is reproduc
     }
 }
 
+TEST_CASE("E-AC-3 fold: a stream with no mixmdate folds at -3 dB, centre and surrounds, as Dolby's does",
+          "[eac3][decoder][fold]") {
+    // Not karaoke (bsmod 0) and no mixing group: the ordinary Lo/Ro fold of a 3/2 programme.
+    // Annex E has no cmixlev or surmixlev to read, and Dolby's decoder folds it at -3 dB and -3 dB
+    // (planning/karaoke-eac3.md, D10): the centre and each surround reach their side at 0.7071 of
+    // the front channel's gain, where AC-3's -4.5 and -6 dB defaults would give 0.5957 and 0.5.
+    const ac3::eac3::AccessUnitConfig config{
+        .independent = karaoke_bed(ac3::Acmod::k3_2, false, std::nullopt,
+                                   ac3::meta::BitstreamMode::kCompleteMain)};
+    const auto units = encode_units(config, tones_for(config, kBedHz), kFrames);
+
+    ac3::OutputConfig fold;
+    fold.target = ac3::DownmixTarget::kLoRo;
+    const Heard heard = decode_all(units, fold);
+    REQUIRE(heard.channels.size() == 2);
+    const double l = level_at(heard.channels[0], kHzL);
+    CHECK(l > 0.05);
+    // kBedHz is L, C, R, Ls, Rs: the tones at kHzM and kHzV1 are the centre and the left surround.
+    CHECK(level_at(heard.channels[0], kHzM) / l == Catch::Approx(kMinus3dB).margin(0.02));
+    CHECK(level_at(heard.channels[0], kHzV1) / l == Catch::Approx(kMinus3dB).margin(0.02));
+}
+
 TEST_CASE("E-AC-3 karaoke: a dependent substream or an object layer is decoded as coded (D3)",
           "[eac3][decoder][karaoke]") {
     // A 7.1 programme: a karaoke-flagged 5.1 bed and the rear pair in a dependent substream. The
