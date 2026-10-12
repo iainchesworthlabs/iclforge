@@ -113,6 +113,14 @@ The sections below contain the complete change list and fixes.
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
   `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The lyric library reads a code page when a program supplies the conversion.**
+  `iclforge::lyrics::TextEncoding` carries a decoder callback (the library holds no table of any
+  page, as it is linked into firmware), and every reader (`parse_lyrics`, `parse_subrip`,
+  `parse_ass`, `parse_midi_karaoke`, `parse_timed_text`, `read_lyrics`, `place_lyrics_beside`) takes
+  one as its last argument. It is asked only for text that is not UTF-8 and has no UTF-16 mark, a
+  MIDI file's title, artist and syllables one at a time and never its other `@` lines; a file that
+  is UTF-8 or UTF-16 is read as it was whatever is given, and without a decoder a code page is still
+  refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
   name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
   dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
