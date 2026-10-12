@@ -99,6 +99,11 @@ struct Options {
     // `lyrics_position` commands (W7d, planning/karaoke-phase2.md); 0 lists neither, as a board
     // from before them, or one with no heap to spare. What it receives is kept (Sink::roles()).
     std::uint32_t lyrics_max_bytes = 0;
+    // The decoder keys the sink may ask a server to change (the extension role's support `requests`:
+    // any of sendspin::player::kRequestableKeys), for a sink whose screen or remote chooses the
+    // singer's karaoke choice (D8, planning/hearth-android.md). Empty lists none, and request()
+    // then sends nothing.
+    std::vector<std::string> requests;
     // What the extension role's streams are rendered to, as its support and state objects say it:
     // the layout in the layout grammar (state.layout), the number of outputs (support.outputs.count)
     // and the crossover's range in Hz (support.management.crossover_hz). The sink does not render:
@@ -281,6 +286,10 @@ class Sink {
     [[nodiscard]] Roles roles() const;
     // A controller@v1 command, sent on every connection where the role is active.
     void send_controller_command(const sendspin::controller::CommandMessage& command);
+    // Asks the server of every connection where the role is active to change the singer's karaoke
+    // choice, as the sink's screen or remote chose it. Cut to Options::requests, and advice: the
+    // server decides, and what it did comes back as the settings the sink is sent.
+    void send_request(const sendspin::player::Request& request);
     // The sink loses the lyrics it holds and says so on every connection, as a board does that
     // restarted its player, or reconnected: a test of what a server does about a member that
     // reports no lyrics (or another item's) for the item it is playing.

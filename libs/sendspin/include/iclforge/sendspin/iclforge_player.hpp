@@ -143,6 +143,11 @@ struct Support {
     // played as coded by the sink's own decoder, so a server that wants the reproduction sends it
     // PCM it has decoded itself, and a group hears one reproduction.
     std::vector<DataType> karaoke_codecs;
+    // The decoder keys the sink may ask a server to change with a request (kRequestableKeys, a
+    // subset of them), which are the singer's karaoke choices and are the server's to hold. Empty
+    // when it asks for none, as a sink from before the key; a server then ignores any request from
+    // it. A server only acts on a key the sink listed here (planning/hearth-android.md, D8).
+    std::vector<std::string> requests;
 
     [[nodiscard]] bool reproduces_karaoke(DataType type) const {
         if (karaoke_codecs.empty()) {
@@ -330,6 +335,30 @@ struct LyricsAnchor {
     std::int64_t at_us = 0;
     double speed = 1.0;
 };
+
+// --- A sink's request, in client/command --------------------------------------------------------
+
+// The decoder keys a sink may ask for: the singer's karaoke choices, the reproduction, which vocals
+// the capable one plays, and the three levels. The names are the settings command's (DecoderSettings).
+inline constexpr std::array<std::string_view, 5> kRequestableKeys{
+    "karaoke", "karaoke_vocals", "karaoke_melody_db", "karaoke_vocal1_db", "karaoke_vocal2_db",
+};
+
+// What a sink asks of the server's karaoke choice: any of the keys above, and only those. The
+// server holds the choice (the singer's, on its Karaoke page) and applies a request as it would
+// the singer's change, so that every member and every screen move together; a request is advice
+// and not a command, and the sink learns what the server did from the settings it is sent.
+struct Request {
+    DecoderSettings decoder;
+};
+
+// `client/command`'s object `_iclforge_player`: {"command": "decoder", "decoder": {...}}.
+void write_request(json::Writer& w, const Request& request);
+// Nothing when `command` is not "decoder", no requestable key is present, or one holds a value out
+// of range. A key that is not requestable is ignored, as every unknown key is (E14).
+[[nodiscard]] std::optional<Request> read_request(json::Value value);
+// The request cut to the keys `support` lists: what a server acts on. Nothing when none is left.
+[[nodiscard]] std::optional<Request> accept_request(const Request& request, const Support& support);
 
 struct CommandMessage {
     Command command = Command::kVolume;

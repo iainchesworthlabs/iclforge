@@ -151,6 +151,12 @@ class ServerHostEvents {
     // mute itself.
     virtual void on_controller_command(const std::string& /*group_id*/, const std::string& /*client_id*/,
                                        const controller::CommandMessage& /*command*/) {}
+    // _iclforge_player@v1: a member's request for the singer's karaoke choice (D8), cut to the keys
+    // its support object listed. `group_id` is the group the client is in, empty for one that is in
+    // none. The singer's choice is the host's to hold: it applies a request as it would the
+    // singer's own change, or ignores it.
+    virtual void on_sink_request(const std::string& /*group_id*/, const std::string& /*client_id*/,
+                                 const player::Request& /*request*/) {}
     // source@v1: a client's input stream began or changed format, one chunk captured from
     // `timestamp_us` on the server clock, and its end.
     virtual void on_source_stream_start(const std::string& /*client_id*/, const messages::ClientStreamStart& /*start*/) {}

@@ -659,6 +659,7 @@ void Sink::accept(std::unique_ptr<sendspin::transport::Connection> transport) {
             support.max_objects.fill(options_.max_objects);
         }
         support.lyrics_max_bytes = options_.lyrics_max_bytes;
+        support.requests = options_.requests;
         config.iclforge_support = std::move(support);
         // What the sink's streams are rendered to, as its own page would say.
         config.iclforge_state.layout = options_.layout;
@@ -866,6 +867,12 @@ Sink::Roles Sink::roles() const {
 void Sink::send_controller_command(const sendspin::controller::CommandMessage& command) {
     for_each_connection([&](Connection& connection) {
         connection.driver().call([&] { return connection.session().send_command(command); });
+    });
+}
+
+void Sink::send_request(const sendspin::player::Request& request) {
+    for_each_connection([&](Connection& connection) {
+        connection.driver().call([&] { return connection.session().send_iclforge_request(request); });
     });
 }
 

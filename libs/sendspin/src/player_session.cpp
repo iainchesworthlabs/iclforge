@@ -1000,6 +1000,21 @@ SessionOutput PlayerSession::send_command(const controller::CommandMessage& comm
     return out;
 }
 
+SessionOutput PlayerSession::send_iclforge_request(const player::Request& request) {
+    SessionOutput out;
+    if (!iclforge_active() || pairing() || !config_.iclforge_support) {
+        return out;
+    }
+    const std::optional<player::Request> cut = player::accept_request(request, *config_.iclforge_support);
+    if (!cut) {
+        return out;
+    }
+    m::ClientCommand message;
+    message.iclforge = *cut;
+    seal(m::write_client_command(message), out);
+    return out;
+}
+
 SessionOutput PlayerSession::start_source_stream(const m::ClientStreamStart& start) {
     SessionOutput out;
     if (!role_active(source::kRole) || !source_started_ || external_source_ || !clock_.converged()) {
