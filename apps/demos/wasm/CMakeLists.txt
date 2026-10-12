@@ -22,8 +22,13 @@
 # an Embind function and class, so that the page shows the words of a karaoke stream with the C++
 # reader and not a second one in JavaScript. It is in this module and not a module of its own
 # because the page already loads this one.
-add_executable(iclforge_wasm_decode decoder_bindings.cpp lyrics_bindings.cpp)
-target_link_libraries(iclforge_wasm_decode PRIVATE iclforge::ac3 iclforge::lyrics iclforge::warnings)
+#
+# pitch_bindings.cpp is the same for a singer's voice (libs/pitch, the tracker, reference melody and
+# scorer Hearth uses; planning/karaoke-microphone.md, M7): the page's microphone card follows a
+# microphone with the library's arithmetic and not a second implementation in JavaScript.
+add_executable(iclforge_wasm_decode decoder_bindings.cpp lyrics_bindings.cpp pitch_bindings.cpp)
+target_link_libraries(iclforge_wasm_decode PRIVATE iclforge::ac3 iclforge::lyrics iclforge::pitch
+                      iclforge::warnings)
 
 # --bind: Embind, the JS<->C++ binding generator decoder_bindings.cpp's
 # EMSCRIPTEN_BINDINGS macro uses. MODULARIZE+EXPORT_NAME: the loader becomes a
@@ -66,6 +71,7 @@ add_custom_command(TARGET iclforge_wasm_decode POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/index.html"
         "${CMAKE_CURRENT_SOURCE_DIR}/demo.js"
+        "${CMAKE_CURRENT_SOURCE_DIR}/mic.js"
         "${CMAKE_CURRENT_SOURCE_DIR}/favicon.svg"
         "${CMAKE_CURRENT_SOURCE_DIR}/favicon-32.png"
         "${CMAKE_BINARY_DIR}/bin/wasm_decode_demo"

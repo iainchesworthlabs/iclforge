@@ -297,6 +297,15 @@ spatial format, into `channels`: 7.X.4 as coded and the `downmix` layout otherwi
 of objects alone has no channels besides; `decode_by_block()` hands over channels only, so a player
 of objects takes them from `decode()`.
 
+A player that places no objects sets `DecoderConfig::skip_objects`, and the decoder then leaves a
+presentation's object audio undecoded: its A-JOC reconstruction and its direct-coded elements are not
+run, `DecodedFrame::objects` is empty, and the channels of a presentation that has them are the same
+bit for bit (an object's audio is not mixed into them). An intermediate spatial format is not skipped,
+since the decoder renders it into the channels itself. A presentation of objects alone has nothing
+else to play, so `decode()` refuses it with `DecodeError::kUnsupported` and says why. On the host, in
+a Debug build, a 5.1 bed with an A-JOC substream of five downmix signals took 54, 60 and 84 ms a frame
+with 4, 8 and 16 objects, and 29, 28 and 43 ms with the objects skipped.
+
 `forge decode` renders a presentation with objects to speakers through the layout renderer Hearth
 plays E-AC-3's objects with (`iclforge::render::LayoutRenderer`, by way of
 `apps/shared/media/src/ac4_object_render.hpp`): each object panned from its position at its gain, moving to
