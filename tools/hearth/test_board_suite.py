@@ -257,16 +257,22 @@ class Suite(unittest.TestCase):
                     row.get("via", "play"), ("play", "sendspin"), f"{profile}/{row['id']}"
                 )
 
-    def test_a_sendspin_row_s_stream_states_how_many_bursts_it_is(self) -> None:
-        # The bursts the board played are held to it, as a /play's units are.
+    def test_a_sendspin_row_s_stream_says_how_many_bursts_it_is_or_how_long_it_loops(self) -> None:
+        # The bursts the board accounted for are held to it, as a /play's units are: a file
+        # states its count, and a short one that the server plays over and over says for how
+        # long (the server's report then says how many it sent) and what its burst period is.
         for profile, spec in self.suite["profiles"].items():
             for row in spec["plays"]:
-                if row.get("via") == "sendspin":
-                    stream = self.suite["streams"][row["stream"]]
+                if row.get("via") != "sendspin":
+                    continue
+                stream = self.suite["streams"][row["stream"]]
+                where = f"{profile}/{row['id']}"
+                if stream.get("sendspin_seconds"):
+                    self.assertIsInstance(stream["sendspin_seconds"], int, where)
+                    self.assertIsInstance(stream.get("period_us"), int, where)
+                else:
                     self.assertIsInstance(
-                        stream.get("sendspin_units", stream.get("units")),
-                        int,
-                        f"{profile}/{row['id']}",
+                        stream.get("sendspin_units", stream.get("units")), int, where
                     )
 
     def test_a_committed_baseline_is_for_a_profile_and_holds_exactly_its_rows(self) -> None:
