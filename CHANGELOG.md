@@ -274,6 +274,13 @@ The sections below contain the complete change list and fixes.
   dropped, and with no sung line the file's commonest style is read. Lines in one style at one time
   are all read. The reader no longer shows a doubled line or an interleaved translation for such a
   script (planning/karaoke-formats-options.md, D14).
+- **A script made with Aegisub's karaoke templater reads as its lyrics, not as its effects.** The
+  templater keeps the timed karaoke as a `Comment:` with the Effect `karaoke` and writes
+  one `Dialogue:` with the Effect `fx` for each syllable or decoration, so the reader showed the
+  effects and skipped the lyrics. A line whose Effect has `karaoke` in it is now read as sung,
+  comment or not, the `fx` lines are not read, and the templater's own `template`, `code` and
+  `mixin` comments never are. A script without such a line reads as before. Built to the
+  templater's own source and manual, not yet to a real exported script.
 
 **Forge writes the lyrics beside the stream it encodes**
 
