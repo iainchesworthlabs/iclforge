@@ -221,12 +221,16 @@ class SecondApp(Fixture):
 
     SECOND = "apps/hearth/android/app"
 
+    @staticmethod
+    def hearth(text: str) -> str:
+        return text.replace("com.example.shield", "com.example.hearth")
+
     def setUp(self) -> None:
         super().setUp()
-        self.put(f"{self.SECOND}/build.gradle.kts", GRADLE.replace("com.example.shield", "com.example.hearth"))
+        self.put(f"{self.SECOND}/build.gradle.kts", self.hearth(GRADLE))
         self.put(
             f"{self.SECOND}/src/main/java/com/example/hearth/NativeBridge.kt",
-            BRIDGE.replace("com.example.shield", "com.example.hearth").replace("example_jni", "hearth_jni"),
+            self.hearth(BRIDGE).replace("example_jni", "hearth_jni"),
         )
         self.put(
             f"{self.SECOND}/src/main/cpp/jni.cpp",
@@ -250,18 +254,24 @@ class SecondApp(Fixture):
         # the second app's native code defines the FIRST app's package: wrong for the second
         self.put(f"{self.SECOND}/src/main/cpp/jni.cpp", NATIVE)
         messages = self.all_messages()
-        self.assertTrue(any("is not in package com.example.hearth" in m for m in messages), messages)
+        wrong = "is not in package com.example.hearth"
+        self.assertTrue(any(wrong in m for m in messages), messages)
 
     def test_a_backend_that_exports_a_package_named_function_is_every_apps_problem(self) -> None:
-        # the arrangement this check was written against: libs/audio defined the registration under
-        # the first app's package, so a second app that links it carried a name in no package of its own
+        # the arrangement this check was written against: libs/audio defined the registration
+        # under the first app's package, so a second app that links it carried a name in no
+        # package of its own
         self.put(
             "libs/audio/src/backend/android/passthrough.cpp",
             'extern "C" JNIEXPORT void JNICALL\n'
-            "Java_com_example_shield_NativeBridge_registerPassthroughBridge(JNIEnv*, jclass, jobject) {}\n",
+            "Java_com_example_shield_NativeBridge_registerPassthroughBridge"
+            "(JNIEnv*, jclass, jobject) {}\n",
         )
         messages = self.all_messages()
-        self.assertTrue(any("com.example.hearth" in m and "registerPassthroughBridge" in m for m in messages), messages)
+        self.assertTrue(
+            any("com.example.hearth" in m and "registerPassthroughBridge" in m for m in messages),
+            messages,
+        )
 
 
 class TheTree(unittest.TestCase):

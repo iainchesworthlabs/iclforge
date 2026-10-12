@@ -115,7 +115,7 @@ def kotlin_sources(root: Path, app: str = APP) -> list[Path]:
 
 
 def check(root: Path, app: str = APP) -> list[Problem]:
-    """What disagrees in one app: `app` is its directory under the root, holding build.gradle.kts."""
+    """What disagrees in one app: `app` is its directory under the root (build.gradle.kts)."""
     problems: list[Problem] = []
     gradle = root / app / "build.gradle.kts"
     names = gradle_names(read(gradle)) if gradle.is_file() else {}
@@ -287,7 +287,10 @@ def main(argv: list[str] | None = None) -> int:
         print(problem)
     if problems:
         return 1
-    print(f"android jni: {len(APPS)} app(s) agree at every end (package, native names, library, class paths)")
+    print(
+        f"android jni: {len(APPS)} app(s) agree at every end "
+        "(package, native names, library, class paths)"
+    )
     return 0
 
 
