@@ -41,6 +41,17 @@ The sections below contain the complete change list and fixes.
   ("E-AC-3 karaoke, aware."). Five strings are new or changed, translated in the six catalogues
   (`planning/karaoke-eac3.md`, E4c).
 
+**Audio: when a packet was captured**
+
+- **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
+  programme, M2). `Capture::stamps()` is a second lock-free ring of `CaptureStamp`s (the packet's
+  first frame in the stream, and its time in nanoseconds on `std::chrono::steady_clock`'s clock);
+  `CaptureTimeline` fits a line through the last 64 and gives the time of any frame, the frame at a
+  time, and the device's measured rate; `Capture::start()` takes `CaptureOptions` with a requested
+  packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
+  `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
+  consumer must treat as "no time", and a caller that does not use any of it sees no change.
+
 **Karaoke: a plan for a microphone, scoring and recording**
 
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
@@ -274,6 +285,15 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
+  `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
+  part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table
+  C.2.3 (the span and defaults of Hearth's sliders), and a decoded frame says `bsmod`, `is_karaoke`,
+  `output_acmod`, `output_lfe` and `karaoke_reproduced`, with `channel_labels` for the channels that
+  are there. `iclforge.lyrics` reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke files into
+  lines of timed words with their singers (`parse`, `read`, `find_file`) and gives the cursor
+  (`Lyrics.position`, `word_state`): the reader Hearth uses, bound as it is (planning/karaoke-phase2.md,
+  W5).
 - **`forge decode` and `forge monitor` re-level the karaoke-capable decoder's parts.**
   `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
   flexibility" in the units, the span and the defaults of Hearth's sliders and the wire's

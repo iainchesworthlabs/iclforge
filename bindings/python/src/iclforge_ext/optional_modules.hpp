@@ -2,13 +2,13 @@
 
 #include <pybind11/pybind11.h>
 
-// The extension's three optional submodules, behind declarations so the one
+// The extension's four optional submodules, behind declarations so the one
 // PYBIND11_MODULE body can register them without knowing whether they have
 // anything to register.
 //
-// `ac3.signing`, `ac3.containers` and `ac3.ac4` exist only when the configure
+// `ac3.signing`, `ac3.containers`, `ac3.ac4` and `ac3.lyrics` exist only when the configure
 // that built this extension also built the libraries behind them - iclforge::ac3::signing,
-// the matroska/mp4/mpegts trio, and iclforge::ac4 (see
+// the matroska/mp4/mpegts trio, iclforge::ac4 and iclforge::lyrics (see
 // bindings/python/CMakeLists.txt, and the options' comments in the root CMakeLists.txt).
 // A trimmed developer build - codec only - still produces a working extension
 // without them; the wheel build (bindings/python/pyproject.toml) turns every one of
@@ -40,5 +40,9 @@ void register_containers(pybind11::module_& m);
 // Adds the `ac4` submodule to `m`, or does nothing in a build with no
 // iclforge::ac4 behind it.
 void register_ac4(pybind11::module_& m);
+
+// Adds the `lyrics` submodule to `m`, or does nothing in a build with no
+// iclforge::lyrics behind it (the minimum-footprint profiles leave it out).
+void register_lyrics(pybind11::module_& m);
 
 }  // namespace iclforge::python
