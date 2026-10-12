@@ -223,6 +223,12 @@ The sections below contain the complete change list and fixes.
   code pages are not guessed at). A file is recognised by its `MThd` header, and Hearth finds
   `name.kar` beside an item when there is no `.lrc`, `.srt` or `.ass`
   (planning/karaoke-phase2.md, W13e).
+- **A MIDI karaoke file counted in SMPTE frames is read.** The reader refused a file whose time
+  division is SMPTE (a frame rate and the ticks in a frame, where the other files count ticks in a
+  quarter note). It now reads the four rates the format defines, 24, 25, 29.97 and 30 frames a
+  second: a tick is a fixed length of time, rounded to the nearest millisecond, and the file's tempo
+  events, which name a quarter note, move nothing. Any other rate is refused with the reason, and a
+  frame of no ticks is a damaged file (planning/karaoke-phase2.md, W13e).
 - **Advanced SubStation Alpha scripts are lyrics, with word times.** The lyric reader takes a
   `.ass` script's `Dialogue:` events as lines (each from its start to its end) and its karaoke tags
   (`\k`, `\kf`, `\K`, `\ko`) as syllable times, so the fill moves by syllable; other override
