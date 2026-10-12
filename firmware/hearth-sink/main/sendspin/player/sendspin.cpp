@@ -64,6 +64,11 @@ constexpr bool kDecodeStackInPsram = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STA
 constexpr std::size_t kServerStackBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES;
 constexpr int kMaxDelayMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS;
 constexpr std::size_t kMaxCodedChannels = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS;
+// Whether the board lists AC-4 (where it decodes it, which needs CONFIG_ICLFORGE_AC4), and the most
+// channels of it a frame may decode to.
+constexpr bool kListAc4 = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4 != 0;
+constexpr std::size_t kAc4MaxCodedChannels =
+    CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS;
 // The objects of an E-AC-3 stream the board places in real time; -1 states none.
 constexpr int kMaxObjects = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS;
 // The most bytes of lyric document the board holds for the item playing (0 = takes none: the commands
@@ -188,6 +193,13 @@ bool g_board_changed = false;
 [[nodiscard]] ac::Support support(const iclforge::BurstPlayer& player) {
     ac::Support s;
     s.data_types = {ac::DataType::kAc3, ac::DataType::kEac3};
+    // The codecs the board reproduces karaoke for are those it decodes of Annex C's: AC-3 and
+    // E-AC-3, which is what a server reads it as, whatever else is listed after them.
+    const std::vector<ac::DataType> karaoke_codecs = s.data_types;
+    const bool ac4 = kListAc4 && iclforge::BurstPlayer::decodes_ac4();
+    if (ac4) {
+        s.data_types.push_back(ac::DataType::kAc4);
+    }
     s.sample_rates = {static_cast<std::int32_t>(kSampleRate)};
     s.outputs.count = sink_slots();
     s.outputs.bit_depth = sink_slot_bits();
@@ -215,9 +227,12 @@ bool g_board_changed = false;
     // The widest syncframe the player decodes (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS):
     // past it a syncframe is refused, so a server is told the figure rather than finding out a
     // burst at a time. 0 in the build states nothing.
-    if (kMaxCodedChannels != 0) {
-        for (const ac::DataType type : s.data_types) {
-            s.max_coded_channels[static_cast<std::size_t>(type)] = static_cast<std::uint8_t>(kMaxCodedChannels);
+    for (const ac::DataType type : s.data_types) {
+        const std::size_t limit = type == ac::DataType::kAc4 && kAc4MaxCodedChannels != 0
+                                      ? kAc4MaxCodedChannels
+                                      : kMaxCodedChannels;
+        if (limit != 0) {
+            s.max_coded_channels[static_cast<std::size_t>(type)] = static_cast<std::uint8_t>(limit);
         }
     }
     // How many objects it places (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS), for the E-AC-3
@@ -228,13 +243,19 @@ bool g_board_changed = false;
         s.max_objects[static_cast<std::size_t>(ac::DataType::kEac3)] =
             static_cast<std::uint8_t>(kMaxObjects);
     }
+    // The decoder hands the player an AC-4 presentation's channels alone (ac4_stream.hpp), so the
+    // board places none of its objects: a server sends a presentation that has them as PCM it
+    // decodes itself, and a presentation of objects alone is never sent as it is.
+    if (ac4) {
+        s.max_objects[static_cast<std::size_t>(ac::DataType::kAc4)] = 0;
+    }
     s.lyrics_max_bytes = kLyricsMaxBytes;
     // The codecs it reproduces karaoke for when told to (the `karaoke` setting): every one it
     // decodes. burst_player.cpp lays a karaoke AC-3 syncframe and an E-AC-3 programme of one
     // independent substream out from the reproduction alike, so a server sends either as it is
     // (planning/karaoke-eac3.md, D6); a board that said nothing here would be taken for AC-3's
     // alone.
-    s.karaoke_codecs = s.data_types;
+    s.karaoke_codecs = karaoke_codecs;
     return s;
 }
 
@@ -668,6 +689,7 @@ void start_player(const iclforge::render::OutputLayout& layout) {
                                                static_cast<std::size_t>(std::max(sink_max_slots(), 1)));
     config.max_delay_ms = static_cast<double>(kMaxDelayMs);
     config.max_coded_channels = kMaxCodedChannels;
+    config.max_ac4_channels = kAc4MaxCodedChannels;
     // A stream declaring more objects than the board states it places is played as its bed
     // (iclforge/object_limit.hpp): the figure the support object carries is the one it keeps to.
     if (kMaxObjects >= 0) {

@@ -87,6 +87,7 @@ if(NOT BUILD_SHARED_LIBS)
         decoder/test_presentation.cpp
         decoder/test_presentations.cpp
         decoder/test_reconstruct_exact.cpp
+        decoder/test_skip_objects.cpp
         decoder/test_renderer.cpp
         decoder/test_ssf.cpp
         encoder/test_acpl.cpp

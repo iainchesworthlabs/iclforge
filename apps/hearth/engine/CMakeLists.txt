@@ -18,9 +18,11 @@ add_library(hearth_engine STATIC
     src/output_decision.cpp
     src/output_selector.cpp
     src/passthrough_sink.cpp
+    src/performance.cpp
     src/play_meters.cpp
     src/player.cpp
     src/queue.cpp
+    src/reference_melody.cpp
     src/session.cpp
     src/settings_model.cpp
     src/sink_form.cpp
@@ -88,7 +90,7 @@ target_include_directories(hearth_engine PUBLIC "${PROJECT_SOURCE_DIR}/apps/shar
 # network output plays through (src/network_group_sink.hpp). iclforge::ac3 asks
 # whether frames carry an authenticity tag.
 target_link_libraries(hearth_engine PUBLIC iclforge::audio iclforge::ac3 iclforge::ac4 iclforge::sendspin
-                                          iclforge::lyrics)
+                                          iclforge::lyrics iclforge::pitch)
 # iclforge::coverage (coverage floors, tools/checks/coverage_report.sh's "apps/hearth" row) instruments
 # this target's OWN sources - apps/forge/cli/src's own comment on its matching link explains why the
 # instrumented EXECUTABLE that eventually links this library is not enough on its own: --coverage
