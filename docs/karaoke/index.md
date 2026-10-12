@@ -275,6 +275,54 @@ Previous, Play/Pause, Next and the **Vocals** chooser stay at the bottom, so a s
 skip, or change which vocals play without leaving. Choosing a vocal there chooses the capable
 reproduction with it.
 
+## Sing into a microphone
+
+The Karaoke page has a **Microphone** card. It shows you how close your pitch is to the tune while
+you sing, and nothing more: it records nothing, and nothing leaves your computer.
+
+- **It is off until you turn it on.** Choosing an input does not open it, and neither does having
+  used it last time. It closes when you turn it off, when you leave the page, and when the item
+  ends or is changed. While it is on the card shows **Microphone on**, and the operating system
+  shows its own sign as well.
+- **Choose the input** from the list, or take the computer's default. **Refresh** looks again after
+  you plug one in.
+- **Say whether you are wearing headphones.** Through open speakers the microphone hears the
+  backing as well as you, and a pitch score reads as nearly perfect for no singing at all, so the
+  score is shown only when you have said you are wearing headphones.
+- **The level** shows what the microphone hears. **Too loud** means a sample reached full scale.
+  If nothing arrives the card says the microphone may be muted or the wrong input is chosen.
+
+### What it scores against
+
+The card names the part it is scoring you against. A karaoke stream carries its tune in its own
+channels, so the **melody guide (M)** is used when the stream has one. If you have taken a vocal away
+(Capable, with the vocals you chose), the vocal you took away is the one you are replacing, and that
+is the one used. A stream with no clear tune in the part, a stream that is not karaoke, and the
+other formats, have **no melody to score against**, and the card says so; it still shows the pitch
+you are singing and how sharp or flat it is.
+
+### What the score is
+
+**The share of the tune's time during which your pitch was within a semitone of it, in any octave.**
+It hears pitch and nothing else: not the words, not the timing, not the feeling. A singer on pitch
+and out of time with the words scores well on it. The card also says when you are consistently
+behind or ahead of the tune, which is usually a delay in the microphone and not in you.
+
+### The delay
+
+A microphone's sound reaches the program a little after it was sung, and some take a tenth of a
+second or more (a webcam's microphone measured about 130 ms through the whole path, in the Windows
+shared mode that Hearth uses). The **Microphone delay** slider is how long, and **Move your timing**
+is for the rest: raise the delay if you are told you are behind the tune and are not.
+
+### What it does not do
+
+- It does not record, and it does not play your voice back to you. A microphone through the
+  operating system's own audio path adds a tenth of a second on common equipment, which is too late
+  to sing along with; use your headset's own monitoring if it has one.
+- It does not send your voice to other speakers or other devices.
+- It cannot tell a singer from a loud speaker, which is why the headphones answer matters.
+
 ## Make one in the Forge GUI
 
 Choose **Karaoke** in the Controls switch. Four steps build the stream from the recordings it is

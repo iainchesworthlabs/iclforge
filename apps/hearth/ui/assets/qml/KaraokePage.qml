@@ -665,8 +665,17 @@ ScrollView {
                 Layout.alignment: Qt.AlignTop
                 spacing: Theme.gap * 2
 
+                // A singer's microphone and a pitch score against the tune (planning/karaoke-
+                // microphone.md, M4). Off until it is turned on, and closed when this page is left.
+                MicrophoneCard {
+                    objectName: "microphoneCard"
+                    reproduction: root.reproduction
+                    vocals: root.vocals
+                    active: root.visible && root.isKaraoke
+                }
+
                 Card {
-                    ordinal: "04"
+                    ordinal: "05"
                     title: qsTr("The stream")
                     framed: true
 
@@ -703,7 +712,7 @@ ScrollView {
                 }
 
                 Card {
-                    ordinal: "05"
+                    ordinal: "06"
                     title: qsTr("What plays")
                     framed: true
 
@@ -749,7 +758,7 @@ ScrollView {
                 }
 
                 Card {
-                    ordinal: "06"
+                    ordinal: "07"
                     title: qsTr("Signal path")
                     framed: true
 

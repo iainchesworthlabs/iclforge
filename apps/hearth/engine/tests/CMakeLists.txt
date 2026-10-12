@@ -19,6 +19,7 @@ iclforge_add_test_binary(iclforge-hearth-tests PROJECT hearth SOURCES
     test_karaoke_example.cpp
     test_media_info.cpp
     test_media_info_json.cpp
+    test_microphone_session.cpp
     test_network_view.cpp
     test_output_decision.cpp
     test_output_selector.cpp
@@ -90,8 +91,11 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
         add_executable(hearth_controller_tests
             ../../ui/tests/test_hearth_controller.cpp
             ../../ui/tests/test_karaoke_controller.cpp
+            ../../ui/tests/test_microphone_controller.cpp
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/karaoke_controller.cpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/karaoke_controller.hpp"
+            "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/microphone_controller.cpp"
+            "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/microphone_controller.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/hearth_controller.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.cpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/item_loader.hpp"
@@ -113,7 +117,8 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
             "${CMAKE_SOURCE_DIR}/apps/shared/media/src")
         # A DEE AC-4 stream, for media_ac4_to_map()'s case.
         target_compile_definitions(hearth_controller_tests PRIVATE
-            "ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR=\"${CMAKE_SOURCE_DIR}/testdata/external-baseline\"")
+            "ICLFORGE_GOLDEN_EXTERNAL_BASELINE_DIR=\"${CMAKE_SOURCE_DIR}/testdata/external-baseline\""
+            "ICLFORGE_KARAOKE_EXAMPLE_DIR=\"${CMAKE_SOURCE_DIR}/examples/karaoke/auld-lang-syne\"")
         target_link_libraries(hearth_controller_tests PRIVATE
             hearth_engine
             iclforge::containers

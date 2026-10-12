@@ -81,6 +81,8 @@ else()
         src/item_loader.hpp
         src/karaoke_controller.cpp
         src/karaoke_controller.hpp
+        src/microphone_controller.cpp
+        src/microphone_controller.hpp
         src/network_controller.cpp
         src/network_controller.hpp
         src/qsettings_store.hpp
@@ -127,6 +129,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricScreen.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricTimingDialog.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LyricView.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/MicrophoneCard.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Network.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkSinkList.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkPairing.qml"

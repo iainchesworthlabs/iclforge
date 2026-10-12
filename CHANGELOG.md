@@ -29,6 +29,25 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth: a microphone and a pitch score on the Karaoke page**
+
+- **A singer can turn a microphone on and see how close their pitch is to the tune** (the
+  microphone, scoring and recording programme, M4). The Karaoke page gains a **Microphone** card: an
+  input to choose, "I am wearing headphones", a level meter, a **Microphone on** indicator, the part
+  the singer is being scored against (the melody guide M, or the vocal they have taken away), the
+  pitch they are singing and how many cents sharp or flat of the tune, a pitch score so far, and
+  two sliders for the microphone's delay and the singer's own timing. **It is off until it is turned
+  on**: a kept choice of input opens nothing, and it closes when the page is left, when the item
+  ends or changes, and when the device goes away or stops delivering (which it names). **Nothing is
+  recorded and nothing leaves the machine.** The score is shown only when the person has said they
+  wear headphones, because through open speakers the microphone hears the backing and the score
+  reads as nearly perfect for no singing.
+- **`MicrophoneSession` and `MicrophoneInput` in the engine** (Qt-free, so every CI leg tests
+  them with a scripted input): the input seam over `iclforge::audio::Capture` and `CaptureTimeline`,
+  the meter, a stall and a gone device, and a `Performance` against the reference once one has
+  been read. The reference is read on a worker thread and cancelled when the item changes.
+  Hearth's user guide has a section on it.
+
 **Hearth: what a singer's performance is scored against, and how**
 
 - **Hearth's engine can place a singer's voice in the item and score it** (the microphone, scoring
