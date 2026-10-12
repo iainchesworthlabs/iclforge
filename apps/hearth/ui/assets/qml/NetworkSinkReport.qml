@@ -19,6 +19,7 @@ ColumnLayout {
     readonly property var rows: [
         { label: qsTr("Settings"), value: root.report.settingsText ?? "" },
         { label: qsTr("Stream"), value: root.report.streamText ?? "" },
+        { label: qsTr("Output"), value: root.report.outputText ?? "" },
         { label: qsTr("Objects"), value: root.report.objectsText ?? "" },
         { label: qsTr("Dialogue"), value: root.report.dialogueText ?? "" },
         { label: qsTr("Lyrics"), value: root.report.lyricsText ?? "" },
