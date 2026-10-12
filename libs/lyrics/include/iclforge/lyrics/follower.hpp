@@ -8,6 +8,7 @@
 
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/playhead.hpp"
+#include "iclforge/lyrics/stage.hpp"
 
 // What a sink with no lyric file of its own holds to follow a song's words (planning/karaoke-phase2.md,
 // W7d): the item's document, as the server sent it, and a playhead moved by the server's anchors. It
@@ -79,6 +80,14 @@ public:
             return std::nullopt;
         }
         return lyric_position(*lyrics_, *position);
+    }
+
+    // What a screen draws at `now_us`: the line, the word and the rows around them (stage.hpp).
+    // `delay_ms` is the singer's nudge, positive showing the lyrics later. A sink that holds no
+    // lyrics answers StageMode::kNoLyrics; one that has not had an anchor come due, kWaiting.
+    [[nodiscard]] Stage stage(std::int64_t now_us, std::int64_t delay_ms = 0,
+                              const StageOptions& options = {}) const {
+        return make_stage(lyrics(), playhead_.position_ms(now_us), delay_ms, options);
     }
 
     // What a sink reports: -1 before the first line (and for a file with no times), else the line's

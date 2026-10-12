@@ -83,6 +83,11 @@ target_link_libraries(iclforge_audio PRIVATE iclforge::warnings iclforge::covera
 # rather than left to look misfiled.
 target_sources(iclforge_audio PRIVATE src/live_positions.cpp)
 
+# udp_sender.cpp: the sending half of the same socket layer (src/net/), published in
+# include/iclforge/audio/udp_sender.hpp for a program that has something to say over OSC and no
+# reason to carry a second socket implementation (Crucible's lyric events).
+target_sources(iclforge_audio PRIVATE src/udp_sender.cpp)
+
 # ---------------------------------------------------------------------------
 # The backend tree.
 #
