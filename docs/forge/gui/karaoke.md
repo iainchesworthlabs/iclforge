@@ -67,8 +67,15 @@ you hear is the encoded stream, not your source files. Choose how it is played:
   **V1**, **V2** or **Both**. A single vocal sits in the centre with the melody; **Both** is V1 on
   the left and V2 on the right.
 
-A **What plays** table says which parts reach which speaker under the choice made. If a part
-sounds wrong, go back to Levels.
+Under **Capable**, a slider for each part (**Melody**, **Vocal 1**, **Vocal 2**) sets its level
+against Table C.2.3 (Annex C.2.3's "additional flexibility"): 0 dB is the table as it stands, up to
+12 dB louder, and the bottom of the control is **off**. They are the span and units of Hearth's
+sliders and of `forge decode karaoke-melody=`. Raising one part far enough lowers the others, so that
+no speaker is driven past full scale. A part the stream does not have has no level, and **Reset
+levels** puts all three back. Moving one decodes the stream again, as choosing the vocals does.
+
+A **What plays** table says which parts reach which speaker under the choice made (a part pulled
+to off is left out of it). If a part sounds wrong, go back to Levels.
 
 **4 · Save.** Choose the file type (the raw `.ac3` stream, or Matroska, MP4 or MPEG-TS, as the
 Format tab offers) and the bit rate, see the equivalent `forge encode …` command, and encode. The
@@ -109,11 +116,10 @@ reproductions.
 [Open stream](open-stream.md) decodes a karaoke stream **as coded** unless told otherwise, which
 is what the player has always done. Its summary line says `karaoke 3/1`, and the player reports
 that the stream is karaoke and which layout it codes; the Karaoke flow's Hear step is what sets
-the reproduction and the vocals.
+the reproduction, the vocals and the part levels.
 
 ## What it does not do
 
-- **Annex C's optional re-levelling** of M, V1 and V2: the library offers none.
 - **Timing or editing lyrics.** Hearth reads `.lrc` files beside a stream; nothing here makes or
   times one, it only puts one you have beside the stream.
 - **E-AC-3 or AC-4.** Their specifications give a karaoke stream no mode.
