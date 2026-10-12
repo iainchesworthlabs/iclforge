@@ -7,8 +7,10 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "platform/process.hpp"
@@ -727,6 +729,12 @@ std::string midi_words_track(const std::string& events) {
     return midi_track(midi_meta(0, 0x03, "Words") + events);
 }
 
+// A SMPTE time division: the frame rate negated (two's complement) in the high byte, and the ticks in a
+// frame in the low one.
+int smpte_division(int frames_per_second, int ticks_per_frame) {
+    return ((256 - frames_per_second) << 8) | ticks_per_frame;
+}
+
 }  // namespace
 
 TEST_CASE("midi karaoke: syllables are words with their ticks in milliseconds, and a slash begins a line",
@@ -784,6 +792,104 @@ TEST_CASE("midi karaoke: a tempo change moves every later tick", "[lyrics][midi]
     CHECK(line.words[2].start_ms == 3000);
 }
 
+TEST_CASE("midi karaoke: a SMPTE time division gives every tick a fixed length, whatever the tempo",
+          "[lyrics][midi][smpte]") {
+    // 25 frames a second and 40 ticks a frame: 1000 ticks a second, so a tick is a millisecond, as
+    // with division 500 and the default tempo in the first case, and the same words give the same
+    // times. A tempo event names a quarter note, which SMPTE time has none of: it moves nothing.
+    const std::string conductor = midi_track(midi_tempo(0, 250000) + midi_tempo(1500, 1000000));
+    const std::string words = midi_words_track(
+        midi_text(1000, "Oh") + midi_text(300, " the") + midi_text(300, " times") + midi_text(400, "/Are") +
+        midi_text(300, " hard"));
+    const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({conductor, words}, smpte_division(25, 40)));
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->timed);
+    REQUIRE(lyrics->lines.size() == 2);
+    const auto& first = lyrics->lines[0];
+    CHECK(first.text == "Oh the times");
+    CHECK(first.start_ms == 1000);
+    CHECK(first.end_ms == 2000);
+    REQUIRE(first.words.size() == 3);
+    CHECK(first.words[0].end_ms == 1300);
+    CHECK(first.words[1].end_ms == 1600);
+    CHECK(first.words[2].start_ms == 1600);
+    const auto& second = lyrics->lines[1];
+    CHECK(second.start_ms == 2000);
+    REQUIRE(second.words.size() == 2);
+    CHECK(second.words[1].start_ms == 2300);
+}
+
+TEST_CASE("midi karaoke: each SMPTE frame rate is its own number of ticks a second", "[lyrics][midi][smpte]") {
+    // One syllable at a tick, and the line it starts is the time of that tick.
+    const auto start_of = [](int division, std::uint32_t tick) {
+        const std::string words = midi_words_track(midi_text(tick, "Sing"));
+        const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({words}, division));
+        REQUIRE(lyrics.has_value());
+        REQUIRE(lyrics->lines.size() == 1);
+        return lyrics->lines[0].start_ms;
+    };
+    // 24 a second and 10 ticks a frame: 240 ticks a second.
+    CHECK(start_of(smpte_division(24, 10), 240) == 1000);
+    CHECK(start_of(smpte_division(24, 10), 600) == 2500);
+    // 25 and 4: 100 ticks a second.
+    CHECK(start_of(smpte_division(25, 4), 100) == 1000);
+    // 30 and 80: 2400 a second.
+    CHECK(start_of(smpte_division(30, 80), 2400) == 1000);
+    CHECK(start_of(smpte_division(30, 80), 12000) == 5000);
+    // "29" is the 29.97 frames a second of NTSC, 30000 over 1001, and not 30: 100 ticks a frame is
+    // 2997.003 ticks a second, so 3000 ticks are a thousandth of a second MORE than a second, and
+    // 30000 are 10.01 seconds, where 30 frames a second would have them at exactly 1 and 10.
+    CHECK(start_of(smpte_division(29, 100), 3000) == 1001);
+    CHECK(start_of(smpte_division(29, 100), 30000) == 10010);
+    CHECK(start_of(smpte_division(30, 100), 30000) == 10000);
+    // The frame size is the low byte whole: 255 ticks a frame at 25 is 6375 ticks a second.
+    CHECK(start_of(smpte_division(25, 255), 6375) == 1000);
+}
+
+TEST_CASE("midi karaoke: a SMPTE tick is rounded to the nearest millisecond", "[lyrics][midi][smpte]") {
+    const auto start_of = [](std::uint32_t tick) {
+        const std::string words = midi_words_track(midi_text(tick, "Sing"));
+        const auto lyrics =
+            iclforge::lyrics::parse_midi_karaoke(midi_file({words}, smpte_division(25, 3)));
+        REQUIRE(lyrics.has_value());
+        return lyrics->lines[0].start_ms;
+    };
+    // 75 ticks a second, so a tick is 13.33 milliseconds: 13.33, 26.67, 40, 66.67, 1000.
+    CHECK(start_of(1) == 13);
+    CHECK(start_of(2) == 27);
+    CHECK(start_of(3) == 40);
+    CHECK(start_of(5) == 67);
+    CHECK(start_of(75) == 1000);
+}
+
+TEST_CASE("midi karaoke: a SMPTE time far into a file is not wrapped by a 32-bit count", "[lyrics][midi][smpte]") {
+    // The largest delta a variable-length quantity holds, 0x0FFFFFFF ticks, at 24 ticks a second:
+    // 11,184,810.625 seconds, which is past what 32 bits of milliseconds hold.
+    const std::string words = midi_words_track(midi_text(0x0FFFFFFFU, "Late"));
+    const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({words}, smpte_division(24, 1)));
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->lines[0].start_ms == 11184810625LL);
+}
+
+TEST_CASE("midi karaoke: a SMPTE rate that is not defined, and a frame of no ticks, say why", "[lyrics][midi][smpte]") {
+    const std::string words = midi_words_track(midi_text(0, "Hello"));
+    // 32 frames a second is none of the four.
+    const auto unknown = iclforge::lyrics::parse_midi_karaoke(midi_file({words}, smpte_division(32, 40)));
+    REQUIRE_FALSE(unknown.has_value());
+    CHECK(unknown.error().find("SMPTE") != std::string::npos);
+    CHECK(unknown.error().find("29.97") != std::string::npos);
+    // So is 23, and so is 60.
+    CHECK_FALSE(iclforge::lyrics::parse_midi_karaoke(midi_file({words}, smpte_division(23, 40))).has_value());
+    CHECK_FALSE(iclforge::lyrics::parse_midi_karaoke(midi_file({words}, smpte_division(60, 40))).has_value());
+    // A frame of no ticks has no length: the file is damaged, not "at an unknown rate".
+    const auto empty_frame = iclforge::lyrics::parse_midi_karaoke(midi_file({words}, smpte_division(25, 0)));
+    REQUIRE_FALSE(empty_frame.has_value());
+    CHECK(empty_frame.error() == "The MIDI file is damaged.");
+    // A frame of no ticks at a rate that is not one is damaged too, and no division by it is done.
+    CHECK(iclforge::lyrics::parse_midi_karaoke(midi_file({words}, smpte_division(32, 0))).error() ==
+          "The MIDI file is damaged.");
+}
+
 TEST_CASE("midi karaoke: the words are the Words track's, else the Lyric events, else the Text events",
           "[lyrics][midi]") {
     // Lyric events (type 5) beat Text events (type 1) when there is no Words track.
@@ -837,12 +943,8 @@ TEST_CASE("midi karaoke: a backslash and a line end begin lines too, and the mus
 TEST_CASE("midi karaoke: what cannot be read says why", "[lyrics][midi]") {
     CHECK(iclforge::lyrics::parse_midi_karaoke("[00:01.00]Not MIDI").error() == "The file is not a MIDI file.");
 
-    // SMPTE time, no words, and a file cut short.
+    // No words, and a file cut short. (SMPTE time is read: see the cases above.)
     const std::string words = midi_words_track(midi_text(0, "Hello"));
-    std::string smpte = midi_file({words});
-    smpte[12] = static_cast<char>(0xE7);
-    CHECK(iclforge::lyrics::parse_midi_karaoke(smpte).error() ==
-          "The MIDI file counts time in SMPTE frames, which is not read.");
     CHECK(iclforge::lyrics::parse_midi_karaoke(midi_file({midi_track(midi_text(0, "@TTitle only"))})).error() ==
           "The MIDI file has no words in it.");
     const std::string whole = midi_file({words});
@@ -862,6 +964,44 @@ TEST_CASE("midi karaoke: what cannot be read says why", "[lyrics][midi]") {
     const auto fine = iclforge::lyrics::parse_midi_karaoke(midi_file({utf8}));
     REQUIRE(fine.has_value());
     CHECK(fine->lines[0].words.size() == 2);
+}
+
+TEST_CASE("midi karaoke: words in the common code pages are refused by name, not read as other text",
+          "[lyrics][midi][encoding]") {
+    // What a karaoke file written before UTF-8 was usual holds: the reader checks every syllable as
+    // UTF-8 and refuses the file at the first that is not (planning/karaoke-phase2.md, D8). Each of
+    // these is the first syllable of a file whose other syllables are plain.
+    const auto bytes = [](std::initializer_list<int> values) {
+        std::string out;
+        for (const int value : values) {
+            out += midi_byte(value);
+        }
+        return out;
+    };
+    const std::vector<std::pair<const char*, std::string>> syllables = {
+        // Windows-1252: a curly quote and an e with an acute, in a word.
+        {"windows-1252", "Caf" + bytes({0xE9}) + " " + bytes({0x93}) + "late" + bytes({0x94})},
+        // Latin-1: a Spanish ene and a German sharp s.
+        {"latin-1", "Ma" + bytes({0xF1}) + "ana, Stra" + bytes({0xDF}) + "e"},
+        // Shift-JIS: "arigatou" in hiragana.
+        {"shift-jis", bytes({0x82, 0xA0, 0x82, 0xE8, 0x82, 0xAA, 0x82, 0xC6, 0x82, 0xA4})},
+        // EUC-JP: the same word.
+        {"euc-jp", bytes({0xA4, 0xA2, 0xA4, 0xEA, 0xA4, 0xAC, 0xA4, 0xC8, 0xA4, 0xA6})},
+        // GBK: "ni hao".
+        {"gbk", bytes({0xC4, 0xE3, 0xBA, 0xC3})},
+        // Windows-1251: Russian "privet".
+        {"windows-1251", bytes({0xCF, 0xF0, 0xE8, 0xE2, 0xE5, 0xF2})},
+        // Windows-1255: Hebrew "shalom".
+        {"windows-1255", bytes({0xF9, 0xEC, 0xE5, 0xED})},
+    };
+    for (const auto& [name, text] : syllables) {
+        CAPTURE(name);
+        const std::string words = midi_words_track(midi_text(0, "Plain") + midi_text(100, " " + text) +
+                                                   midi_text(100, " words"));
+        const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({words}));
+        REQUIRE_FALSE(lyrics.has_value());
+        CHECK(lyrics.error().find("not UTF-8") != std::string::npos);
+    }
 }
 
 TEST_CASE("midi karaoke: a file is read as MIDI by its header, and a .kar is found beside an item",
