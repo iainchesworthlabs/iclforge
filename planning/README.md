@@ -55,7 +55,7 @@ the `AC3FORGE_` variables. The family is ICL Forge now, and its programs are `fo
 
 ---
 
-| [karaoke-eac3.md](karaoke-eac3.md) | Karaoke in E-AC-3 (part one, to AC-3's parity) and in AC-4 (part two, options only): the plan, its work items E0 to E9 and decisions D1 to D9. Evidence: [karaoke-eac3-findings.md](karaoke-eac3-findings.md); what exists and who has each gap: [karaoke-support-matrix.md](karaoke-support-matrix.md); AC-4: [karaoke-ac4-options.md](karaoke-ac4-options.md) | As of 2026-10-12: the evidence step and the matrix are done, the decisions are with the owner, nothing is built |
+| [karaoke-eac3.md](karaoke-eac3.md) | Karaoke in E-AC-3 (part one, to AC-3's parity) and in AC-4 (part two, options only): the plan, its work items E0 to E9 and decisions D1 to D9. Evidence: [karaoke-eac3-findings.md](karaoke-eac3-findings.md); what exists and who has each gap: [karaoke-support-matrix.md](karaoke-support-matrix.md); AC-4: [karaoke-ac4-options.md](karaoke-ac4-options.md) | As of 2026-10-12: the evidence step and the matrix are done, D1 to D9 approved as recommended, the build starts at E1 and E2 |
 ## Design records (Hearth UI and karaoke)
 
 | Page | What it is | State |

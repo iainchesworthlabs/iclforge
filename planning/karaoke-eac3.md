@@ -1,6 +1,6 @@
 # Karaoke in E-AC-3 and AC-4
 
-!!! note "Status as of 2026-10-12: the evidence step is done and the decisions are with the owner; nothing is built"
+!!! note "Status as of 2026-10-12: the evidence step is done and D1 to D9 are approved as recommended; the build starts at E1"
     The owner took "karaoke in E-AC-3 or AC-4" off the not-planned list on 2026-10-12. This page is
     the plan: **part one** is E-AC-3, built to AC-3's parity once the decisions below are answered;
     **part two** is AC-4, which is a plan and an options document only, and stays one until part
@@ -13,8 +13,8 @@
     |---|---|---|
     | 0 | The evidence: what E-AC-3 and AC-4 define, what real decoders do | Done 2026-10-12 ([findings](karaoke-eac3-findings.md)) |
     | 1 | The support matrix, AC-3 beside E-AC-3, gaps assigned | Done 2026-10-12 ([matrix](karaoke-support-matrix.md)) |
-    | 2 | Decisions D1 to D9 | **With the owner** ([below](#decisions)) |
-    | 3 | Part one: E1 to E9, one small pull request each | Waits for step 2 |
+    | 2 | Decisions D1 to D9 | **Approved as recommended, 2026-10-12** ([below](#decisions)) |
+    | 3 | Part one: E1 to E9, one small pull request each | Started 2026-10-12 with E1 and E2; the state of each is in [the table](#work-items) |
     | 4 | Part two: the AC-4 options and their decisions | Written ([options](karaoke-ac4-options.md)); no build |
 
 ## What this is
@@ -77,9 +77,9 @@ with its tests, **L** two to four stacked. "Needs" is what the item cannot start
 
 ## Decisions
 
-Put to the owner on 2026-10-12 with the answer the plan assumes. Each is a thing the
-specification leaves to us or a choice the evidence offers; none changes a phase 1 or phase 2
-requirement without saying which.
+Put to the owner on 2026-10-12 with the answer the plan assumes, and **approved as recommended,
+all nine, the same day**. Each is a thing the specification leaves to us or a choice the evidence
+offers; none changes a phase 1 or phase 2 requirement without saying which.
 
 | # | Decision | Recommended | Alternatives | Cost |
 |---|---|---|---|---|
