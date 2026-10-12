@@ -61,6 +61,36 @@ Nothing in them needs an HDMI route or a receiver. The debug build carries `x86_
 for the emulator CI runs them on; a run on one device builds one ABI with
 `-Pandroid.injected.build.abi=arm64-v8a`.
 
+## The status screens (phase 3c)
+
+When there are no words to show the app's screen is one of three
+([`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md), S0, S1 and S10), chosen
+by `StatusScreens.choose()` from what the app knows:
+
+| Screen | When | Says |
+|---|---|---|
+| **S10 attention** | the sink did not start; the receiver would not take a stream (`isDirectPlaybackSupported` false at an open); the link dropped under a stream (`ERROR_DEAD_OBJECT`) and has not opened again within 20 s | one sentence of what happened and what to do; over a lyric it is a banner at the foot and the line being sung stays above it, dimmed |
+| **S0 starting** | the sink is not up, or the box has no address (waiting for the network); or the HDMI route takes neither burst form (waiting for the receiver) | the name, what it waits for, and what to check |
+| **S1 idle** | otherwise | the name large, the address, the port and the kind of network; "Paired with *server*", or "Waiting for a server" and how to choose this sink; and **the code a server asked to pair by, large, in the accent**; the formats the route takes ("Passes through Dolby Digital · Dolby Digital Plus") |
+
+What they read: the core's `Sink::status()` (who is connected and for what, the pairing code, the number
+of paired servers; `NativeSink.statusJson()`), the active network's address and kind
+(`ConnectivityManager`), the route (`AudioTrack.isDirectPlaybackSupported`, quietly, twice a second) and
+`LinkHealth`, which the pass-through bridge writes when a link is refused or lost. The pairing code
+comes from the core and no longer from reading the log. **Quit** is the screen's one control, with the
+family's focus ring, and the D-pad's centre presses it; the foot also carries a small muted note
+(the advertiser's trouble, when it has one). Not here: the QR code the spec names beside the code (a
+QR encoder is a dependency of its own), and the layout line (a pass-through sink has none).
+
+![The idle screen: the sink's name, its address, the code a server asked for in the accent, and Quit](../../../docs/hearth/screenshots/android-status-idle-code.png)
+![The starting screen: the name and what it is waiting for](../../../docs/hearth/screenshots/android-status-starting.png)
+![An attention banner over the dimmed lyric](../../../docs/hearth/screenshots/android-status-attention.png)
+
+`StatusScreenTest` holds the choice (a table of what outranks what), the news's twenty seconds and the
+open that undoes it, the native status as the JNI writes it (read by the parser), and each screen drawn at
+1080p and probed (the code is the accent, the sentence is a banner over a dimmed lyric, Quit has the ring
+and the centre presses it).
+
 ## The lyric screen (phase 2)
 
 When a document is held or a stream is playing, the app's one screen is the lyric view

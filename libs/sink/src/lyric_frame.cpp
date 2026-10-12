@@ -154,6 +154,12 @@ LyricFrame make_lyric_frame(std::optional<std::int64_t> item, const lyrics::Lyri
     return frame;
 }
 
+std::string json_quote(std::string_view text) {
+    std::string out;
+    put_string(out, text);
+    return out;
+}
+
 std::string lyric_frame_json(const LyricFrame& frame) {
     std::string out = "{";
     put_key(out, "item");

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "iclforge/lyrics/lyrics.hpp"
@@ -92,6 +93,10 @@ inline constexpr lyrics::StageOptions kScreenStageOptions{.lines_before = 1, .li
 // make_stage() answered for the same document. `streaming` is whether a stream is playing.
 [[nodiscard]] LyricFrame make_lyric_frame(std::optional<std::int64_t> item, const lyrics::Lyrics* lyrics,
                                           const lyrics::Stage& stage, bool streaming);
+
+// `text` as a JSON string with its quotes, escaped to the letter of RFC 8259 and left in UTF-8: for the
+// other values the app hands across JNI as JSON (the sink's status).
+[[nodiscard]] std::string json_quote(std::string_view text);
 
 // The frame as one line of JSON for a layer that has no C++ types (the Android app's JNI): the same
 // fields, in the same names, with the rows as arrays of objects. Strings are escaped to the letter

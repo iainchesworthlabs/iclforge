@@ -54,6 +54,9 @@ class NativeSink {
     // What the lyric view draws now, as a line of JSON (iclforge/sink/lyric_frame.hpp), UTF-8: the
     // document the sink holds for the item playing, followed on its own clock, less `delay_ms`.
     [[nodiscard]] std::string lyric_frame_json(std::int32_t delay_ms) const;
+    // What the idle, starting and attention screens say of the sink, as a line of JSON, UTF-8: who is
+    // connected and for what, the code a server asked to pair by, and how many servers are paired.
+    [[nodiscard]] std::string status_json() const;
 
    private:
     class Impl;

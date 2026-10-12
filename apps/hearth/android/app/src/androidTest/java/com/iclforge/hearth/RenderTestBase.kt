@@ -78,6 +78,21 @@ abstract class RenderTestBase {
         graceElapsed: Boolean = true,
     ): Bitmap = draw(name, frame, delayMs, step, graceElapsed).bitmap
 
+    /** Any view laid out at 1080p and drawn to a bitmap, written to `lyric-renders/` as [name].png. */
+    protected fun drawView(view: View, name: String): Bitmap {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+        )
+        view.layout(0, 0, width, height)
+        view.draw(Canvas(bitmap))
+        val directory = File(target.getExternalFilesDir(null), "lyric-renders")
+        directory.mkdirs()
+        FileOutputStream(File(directory, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return bitmap
+    }
+
     // --- probes ------------------------------------------------------------------------------
 
     protected fun close(a: Int, b: Int, tolerance: Int = 24): Boolean {

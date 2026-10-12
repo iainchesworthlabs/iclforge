@@ -61,6 +61,7 @@ class SinkService : Service() {
             // Before any server dials: the route is asked for when one does.
             val created = PassthroughBridge()
             bridge = created
+            route = created
             NativeSink.registerPassthroughBridge(created)
         }
     }
@@ -84,6 +85,7 @@ class SinkService : Service() {
         handler.removeCallbacks(watch)
         releaseFocus()
         stopSink()
+        route = null
         super.onDestroy()
     }
 
@@ -165,6 +167,7 @@ class SinkService : Service() {
         }
         val state = File(filesDir, "sink-state").absolutePath
         val name = sinkName()
+        displayName = name
         // The Sendspin client port when it is free, any port when it is not: what is advertised is
         // the port the sink actually has.
         var error = NativeSink.start(state, name, DEFAULT_PORT)
@@ -222,6 +225,16 @@ class SinkService : Service() {
         /** The running service's advertiser, for the screen; null when none. */
         @Volatile
         var advertiserState: SinkAdvertiser? = null
+            private set
+
+        /** The service's pass-through bridge, which the idle screen asks whether the route is there. */
+        @Volatile
+        var route: PassthroughBridge? = null
+            private set
+
+        /** What servers show this sink as, once it has one. */
+        @Volatile
+        var displayName: String? = null
             private set
 
         fun start(context: Context) {

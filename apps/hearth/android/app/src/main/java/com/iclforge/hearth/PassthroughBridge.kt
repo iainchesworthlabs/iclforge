@@ -4,6 +4,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import java.nio.ByteBuffer
 
@@ -63,6 +64,7 @@ class PassthroughBridge {
         val format = iec61937Format(carrierRateHz)
         if (!AudioTrack.isDirectPlaybackSupported(format, ATTRIBUTES)) {
             Log.w(TAG, "open: isDirectPlaybackSupported=false for carrier=$carrierRateHz eac3=$eac3")
+            LinkHealth.refused(SystemClock.uptimeMillis())
             return@synchronized false
         }
         val bufferBytes = (if (eac3) EAC3_BURST_BYTES else AC3_BURST_BYTES) * BUFFER_BURSTS
@@ -76,11 +78,37 @@ class PassthroughBridge {
             track.play()
             audioTrack = track
             Log.i(TAG, "open: AudioTrack opened, carrier=$carrierRateHz eac3=$eac3 buffer=$bufferBytes")
+            LinkHealth.opened(SystemClock.uptimeMillis())
             true
         } catch (e: Exception) {
             Log.e(TAG, "open: AudioTrack.Builder().build()/play() threw", e)
+            LinkHealth.refused(SystemClock.uptimeMillis())
             false
         }
+    }
+
+    /**
+     * Whether the route takes either burst form now, without logging: what the starting screen asks
+     * twice a second, to say "waiting for the receiver" while a display's sleep or a receiver's
+     * standby has taken the HDMI route (planning/hearth-android-findings.md, F12).
+     */
+    fun routeAvailable(): Boolean {
+        if (Build.VERSION.SDK_INT < 29) return false
+        return AudioTrack.isDirectPlaybackSupported(iec61937Format(48000), ATTRIBUTES) ||
+            AudioTrack.isDirectPlaybackSupported(iec61937Format(192000), ATTRIBUTES)
+    }
+
+    /** The burst forms the route takes now, as the names a person knows them by, none when it takes none. */
+    fun formatNames(): List<String> {
+        if (Build.VERSION.SDK_INT < 29) return emptyList()
+        val names = ArrayList<String>()
+        if (AudioTrack.isDirectPlaybackSupported(iec61937Format(48000), ATTRIBUTES)) {
+            names += "Dolby Digital"
+        }
+        if (AudioTrack.isDirectPlaybackSupported(iec61937Format(192000), ATTRIBUTES)) {
+            names += "Dolby Digital Plus"
+        }
+        return names
     }
 
     /**
@@ -91,7 +119,12 @@ class PassthroughBridge {
         val track = audioTrack ?: return@synchronized AudioTrack.ERROR_INVALID_OPERATION
         buffer.position(0)
         buffer.limit(sizeBytes)
-        track.write(buffer, sizeBytes, AudioTrack.WRITE_NON_BLOCKING)
+        val written = track.write(buffer, sizeBytes, AudioTrack.WRITE_NON_BLOCKING)
+        if (written == AudioTrack.ERROR_DEAD_OBJECT) {
+            // The route went away under the stream (a display's sleep, a receiver's standby, a cable).
+            LinkHealth.lost(SystemClock.uptimeMillis())
+        }
+        written
     }
 
     /** Carrier frames the track has played since it opened or was flushed (unsigned 32-bit), or -1. */

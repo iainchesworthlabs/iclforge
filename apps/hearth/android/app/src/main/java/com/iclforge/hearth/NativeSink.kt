@@ -74,4 +74,11 @@ object NativeSink {
      * cheap to call every frame.
      */
     external fun lyricFrame(delayMs: Int): ByteArray
+
+    /**
+     * What the idle, starting and attention screens say of the sink: one JSON object as UTF-8 bytes
+     * (`connections`, each with `address`, `server_name`, `activity` and `streaming`; `pairing_code`;
+     * `paired_servers`). Read with [SinkStatus.parse].
+     */
+    external fun statusJson(): ByteArray
 }

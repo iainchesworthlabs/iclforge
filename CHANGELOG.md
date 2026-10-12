@@ -72,6 +72,18 @@ The sections below contain the complete change list and fixes.
   stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
   needs a case of its own (`planning/karaoke-eac3.md`, D10).
 
+**Hearth for Android: the starting, idle and attention screens**
+
+- **S0, S1 and S10 of `planning/hearth-sink-screen.md`** (phase 3c of `planning/hearth-android.md`): the
+  plain screen of the skeleton is replaced by the family's. The idle screen has the sink's name large, its
+  address and network, who it is paired with or waiting for, **the pairing code large in the accent**, and
+  the formats the route takes; the starting screen says it waits for the network or for the receiver and
+  what to check; the attention screen says in one sentence that the sink did not start, that the receiver
+  would not take the stream, or that the link dropped (a banner at the foot over a dimmed lyric). The core
+  gains **`Sink::status()`** (who is connected and for what, the code asked, the paired servers), so the
+  code no longer comes from reading the log; the bridge reports a refused or lost link; the choice of
+  screen is a function held by a table of cases, and each screen is drawn and probed on a Shield.
+
 **Hearth for Android: the controls sheet and a focus walk**
 
 - **The lyric screen's controls** (phase 3b of `planning/hearth-android.md`; S9 of

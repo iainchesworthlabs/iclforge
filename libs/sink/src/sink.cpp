@@ -173,6 +173,11 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                                        : Arbiter::rank_of(activate.activities) == Arbiter::Rank::kPairing ? "pairing"
                                                                                                            : "nothing";
         log(std::string(verdict.admit ? "activated for " : "refused, another server holds the sink: ") + activities);
+        if (verdict.admit) {
+            activity_ = Arbiter::rank_of(activate.activities) == Arbiter::Rank::kPlayback ? Sink::Status::Activity::kPlayback
+                        : Arbiter::rank_of(activate.activities) == Arbiter::Rank::kPairing ? Sink::Status::Activity::kPairing
+                                                                                            : Sink::Status::Activity::kNothing;
+        }
         return verdict.admit;
     }
 
@@ -235,7 +240,10 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         log("unpaired by server " + short_key(server_key));
     }
 
-    void on_pairing_code(const flow::Code& code) override { log("PAIRING CODE " + code_text(code)); }
+    void on_pairing_code(const flow::Code& code) override {
+        pairing_code_ = code_text(code);
+        log("PAIRING CODE " + *pairing_code_);
+    }
 
     void on_pairing_held_back() override {
         log("pairing waits for the operator: type 'window' to open the static code's window, or 'reset' at the "
@@ -243,11 +251,13 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     }
 
     void on_paired(const Key32& server_key, const Key32& long_term_psk) override {
+        pairing_code_.reset();
         const bool stored = sink_->store_->add_record(server_key, long_term_psk);
         log("paired with server " + short_key(server_key) + (stored ? "" : " (the record could not be saved)"));
     }
 
     void on_pairing_ended(std::optional<pm::AbortReason> reason) override {
+        pairing_code_.reset();
         log("pairing " + std::string(abort_text(reason)));
     }
 
@@ -463,6 +473,22 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         sink_->roles_.visualizer.reset();
     }
 
+    // This connection as a screen says it, read under the session's lock.
+    [[nodiscard]] Sink::Status::Peer peer_status() {
+        return driver().inspect([&] {
+            Sink::Status::Peer peer;
+            peer.id = id_;
+            peer.address = peer_;
+            peer.server_name = session_->server_name();
+            peer.activity = activity_;
+            peer.streaming = streaming_;
+            return peer;
+        });
+    }
+    [[nodiscard]] std::optional<std::string> pairing_code() {
+        return driver().inspect([&] { return pairing_code_; });
+    }
+
     // Whether this connection holds a lyric document, held or not (the item is known).
     [[nodiscard]] bool has_lyric_item() {
         return driver().inspect([&] { return follower_.item().has_value(); });
@@ -532,6 +558,9 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     iclforge::lyrics::Follower follower_;
     // A stream is open: what the screen's "no lyrics" and its idle screen are told apart by.
     bool streaming_ = false;
+    // What this connection was admitted for, and the code its server asked to pair by.
+    Sink::Status::Activity activity_ = Sink::Status::Activity::kNothing;
+    std::optional<std::string> pairing_code_;
     std::unique_ptr<StreamOutput> output_;
     std::unique_ptr<BurstStreamOutput> bursts_;
     // The decoder report last sent.
@@ -919,6 +948,29 @@ void Sink::send_controller_command(const sendspin::controller::CommandMessage& c
     for_each_connection([&](Connection& connection) {
         connection.driver().call([&] { return connection.session().send_command(command); });
     });
+}
+
+Sink::Status Sink::status() const {
+    std::vector<std::shared_ptr<Connection>> all;
+    {
+        const std::lock_guard lock(connections_mutex_);
+        for (const auto& [id, connection] : connections_) {
+            all.push_back(connection);
+        }
+    }
+    Status out;
+    for (const std::shared_ptr<Connection>& connection : all) {
+        out.connections.push_back(connection->peer_status());
+        if (!out.pairing_code) {
+            out.pairing_code = connection->pairing_code();
+        }
+    }
+    {
+        // The records are added from a session's callback, under the sessions' shared lock.
+        const std::lock_guard lock(*session_lock_);
+        out.paired_servers = store_->records();
+    }
+    return out;
 }
 
 LyricFrame Sink::lyric_frame(std::int64_t delay_ms, const iclforge::lyrics::StageOptions& options) const {

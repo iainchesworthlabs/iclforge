@@ -160,6 +160,17 @@ JNIEXPORT jbyteArray JNICALL Java_com_iclforge_hearth_NativeSink_lyricFrame(JNIE
     return out;
 }
 
+// The sink's status as UTF-8 bytes of one JSON object (a server's name may need four-byte sequences).
+JNIEXPORT jbyteArray JNICALL Java_com_iclforge_hearth_NativeSink_statusJson(JNIEnv* env, jobject /*self*/) {
+    const std::string json = sink().status_json();
+    jbyteArray out = env->NewByteArray(static_cast<jsize>(json.size()));
+    if (out != nullptr) {
+        env->SetByteArrayRegion(out, 0, static_cast<jsize>(json.size()),
+                                reinterpret_cast<const jbyte*>(json.data()));
+    }
+    return out;
+}
+
 // The lines logged since the last call.
 JNIEXPORT jobjectArray JNICALL Java_com_iclforge_hearth_NativeSink_drainLog(JNIEnv* env, jobject /*self*/) {
     const std::vector<std::string> lines = sink().drain_log();

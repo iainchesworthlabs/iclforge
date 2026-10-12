@@ -1,49 +1,33 @@
 package com.iclforge.hearth
 
 import android.app.Activity
-import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.TypedValue
-import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.TextView
 import kotlin.math.max
 
 /**
- * The app's one screen. It is the plain screen of phase 1b (what the sink is called, whether it is
- * listening and advertised, and the pairing code a server asked for, as large as the screen can make
- * it) until lyrics are held or a stream is playing, and then the lyric view (planning/hearth-sink-
- * screen.md, S2 to S8), which takes the whole surface. It reads the native sink by polling, as
- * Hearth's own live view does: the sink calls no one back.
+ * The app's one screen (planning/hearth-sink-screen.md). It is the lyric view (S2 to S8, which takes
+ * the whole surface) while lyrics are held or a stream is playing, and otherwise the status screen:
+ * starting (S0: waiting for the network or the receiver), idle (S1: the name, the address, who it is
+ * paired with or waiting for, the code a server asked to pair by) or attention (S10: the sink did not
+ * start, the receiver would not take a stream, the link dropped). It reads the native sink by polling,
+ * as Hearth's own live view does: the sink calls no one back.
  *
  * Opening it starts the service (SinkService), and leaving it does not stop it.
  */
 class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
-    private lateinit var heading: TextView
-    private lateinit var status: TextView
-    private lateinit var code: TextView
-    private lateinit var hint: TextView
-    private lateinit var activity: TextView
-    private lateinit var quit: Button
-    private lateinit var plain: LinearLayout
+    private lateinit var statusView: StatusView
     private lateinit var lyrics: LyricView
-
-    /** The pairing code the sink is showing, or null while no server has asked to pair. */
-    private var pairingCode: String? = null
-    private val recent = ArrayDeque<String>()
 
     private val refresh = object : Runnable {
         override fun run() {
-            update()
+            updateStatus()
             handler.postDelayed(this, POLL_MS)
         }
     }
@@ -63,12 +47,21 @@ class MainActivity : Activity() {
             }
             lyrics.show(frame)
             val showing = lyrics.active
+            val attention = statusView.content.choice.kind == StatusScreens.Kind.ATTENTION
+            // The lyric stays up, dimmed, under an attention sentence; any other status screen is for
+            // when there are no words to show.
             lyrics.visibility = if (showing) View.VISIBLE else View.GONE
-            plain.visibility = if (showing) View.GONE else View.VISIBLE
-            if (showing && !lyrics.hasFocus()) {
-                lyrics.requestFocus()
+            lyrics.alpha = if (showing && attention) DIMMED_BEHIND_ATTENTION else 1f
+            statusView.overLyrics = showing
+            statusView.visibility = if (!showing || attention) View.VISIBLE else View.GONE
+            val focusTarget: View = if (showing && !attention) lyrics else statusView
+            if (!focusTarget.hasFocus()) {
+                focusTarget.requestFocus()
             }
-            guard(showing, if (showing) frame else listOf(status.text.toString(), code.text.toString(), hint.text.toString()))
+            if (focusTarget === lyrics) {
+                statusView.alpha = 1f
+            }
+            guard(focusTarget, if (showing) frame else statusView.content)
             handler.postDelayed(this, 1000L / Tokens.framesPerSecond(frame))
         }
     }
@@ -82,22 +75,28 @@ class MainActivity : Activity() {
      * Notes whether what is on the screen has changed, and once it has held still for the quiet period
      * dims it and moves it a few u a minute. A key or a touch is a change.
      */
-    private fun guard(lyricsShown: Boolean, shown: Any) {
+    private fun guard(target: View, shown: Any) {
         val now = SystemClock.uptimeMillis()
         if (shown != lastShown) {
             lastShown = shown
             quietSince = now
         }
         val quiet = now - quietSince
-        val (target, other) = if (lyricsShown) lyrics to plain else plain to lyrics
         val u = max(1, target.height) / 600f
         val (x, y) = IdleGuard.offsetU(quiet)
+        for (view in listOf<View>(lyrics, statusView)) {
+            if (view !== target) {
+                view.translationX = 0f
+                view.translationY = 0f
+            }
+        }
+        if (target === statusView) {
+            // Over a dimmed lyric the status screen is the sentence; otherwise it is the whole screen.
+            lyrics.translationX = 0f
+        }
         target.alpha = IdleGuard.alpha(quiet)
         target.translationX = x * u
         target.translationY = y * u
-        other.alpha = 1f
-        other.translationX = 0f
-        other.translationY = 0f
     }
 
     override fun onUserInteraction() {
@@ -113,6 +112,10 @@ class MainActivity : Activity() {
         lyrics.textStep = prefs.getInt(KEY_TEXT_STEP, 1)
         lyrics.onDelayChanged = { prefs.edit().putInt(KEY_DELAY_MS, it).apply() }
         lyrics.onTextStepChanged = { prefs.edit().putInt(KEY_TEXT_STEP, it).apply() }
+        statusView.onQuit = {
+            SinkService.quit(this)
+            finish()
+        }
         // A TV box that lets its display sleep loses its HDMI audio route with it, and a bitstream with
         // it (planning/hearth-android-findings.md, F12). While this screen is the one shown, the
         // display stays on; what keeps it on once the person leaves is the next phase's (spike S3).
@@ -132,90 +135,45 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
-    private fun text(size: Float, color: Int, bold: Boolean = false, mono: Boolean = false): TextView =
-        TextView(this).apply {
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, size)
-            setTextColor(color)
-            typeface = if (mono) Typeface.MONOSPACE else if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-        }
-
     private fun build(): FrameLayout {
-        plain = buildPlain()
+        statusView = StatusView(this)
         lyrics = LyricView(this).apply { visibility = View.GONE }
         return FrameLayout(this).apply {
             setBackgroundColor(Tokens.BG)
-            addView(plain, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             addView(lyrics, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            addView(statusView, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
     }
 
-    private fun buildPlain(): LinearLayout {
-        val pad = (48 * resources.displayMetrics.density).toInt()
-        heading = text(32f, Color.WHITE, bold = true).apply { setText(R.string.app_name) }
-        status = text(20f, MUTED)
-        code = text(96f, ACCENT, mono = true).apply { gravity = Gravity.CENTER }
-        hint = text(22f, Color.WHITE).apply { gravity = Gravity.CENTER }
-        activity = text(14f, MUTED, mono = true)
-        quit = Button(this).apply {
-            setText(R.string.quit)
-            setOnClickListener {
-                SinkService.quit(this@MainActivity)
-                finish()
-            }
-        }
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(BACKGROUND)
-            setPadding(pad, pad / 2, pad, pad / 2)
-        }
-        val weighted = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-        root.addView(heading)
-        root.addView(status)
-        root.addView(code, weighted)
-        root.addView(hint)
-        root.addView(activity)
-        root.addView(quit)
-        return root
-    }
-
-    private fun update() {
-        if (!NativeSink.available) {
-            status.text = getString(R.string.native_failed)
-            return
-        }
-        for (line in NativeSink.drainLog()) {
-            read(line)
-        }
-        val failure = SinkService.lastError
-        val advertiser = SinkService.advertiserState
-        status.text = when {
-            failure != null -> getString(R.string.not_started, failure)
-            !NativeSink.running() -> getString(R.string.starting)
-            advertiser?.failure != null -> advertiser.failure
-            advertiser?.registeredName != null ->
-                getString(R.string.listening, advertiser.registeredName, NativeSink.port())
-            else -> getString(R.string.listening_unadvertised, NativeSink.port())
-        }
-        val shown = pairingCode
-        code.text = shown ?: ""
-        hint.text = getString(if (shown != null) R.string.enter_code else R.string.waiting)
-        val totals = NativeSink.totals()
-        activity.text = getString(R.string.activity, totals[0], totals[1], totals[2], totals[5]) +
-            "\n" + recent.joinToString("\n")
-    }
-
-    /** Keeps the last few lines for the screen and the code the sink is showing. */
-    private fun read(line: String) {
-        recent.addLast(line)
-        while (recent.size > RECENT_LINES) {
-            recent.removeFirst()
-        }
-        val shown = PAIRING_CODE.find(line)
-        if (shown != null) {
-            pairingCode = shown.groupValues[1]
-        } else if (ENDS_PAIRING.containsMatchIn(line)) {
-            pairingCode = null
-        }
+    /** Reads what the sink, the network and the route say, and chooses and fills the status screen. */
+    private fun updateStatus() {
+        val native = NativeSink.available
+        val running = native && NativeSink.running()
+        val status = if (running) SinkStatus.parse(NativeSink.statusJson()) else SinkStatus.EMPTY
+        val network = NetworkInfo.current(this)
+        val route = SinkService.route
+        val formats = if (native && route != null) route.formatNames() else emptyList()
+        val streaming = running && NativeSink.streaming()
+        val startError = SinkService.lastError ?: if (!native) getString(R.string.native_failed) else null
+        val choice = StatusScreens.choose(
+            StatusScreens.Inputs(
+                running = running,
+                startError = startError,
+                address = network?.address,
+                routeReady = formats.isNotEmpty(),
+                linkNews = LinkHealth.news(SystemClock.uptimeMillis()),
+                streaming = streaming,
+            ),
+        )
+        val port = if (running) NativeSink.port() else 0
+        val where = network?.let { listOfNotNull(it.address, if (port != 0) "port $port" else null, it.kind) }
+            ?.joinToString(" · ")
+        val name = SinkService.advertiserState?.registeredName ?: SinkService.displayName ?: getString(R.string.app_name)
+        val note = SinkService.advertiserState?.failure
+        statusView.content = StatusView.Content(
+            choice = choice, name = name, where = where, status = status, formats = formats,
+            error = startError, note = note,
+        )
     }
 
     private companion object {
@@ -223,14 +181,8 @@ class MainActivity : Activity() {
         const val KEY_DELAY_MS = "lyric_delay_ms"
         const val KEY_TEXT_STEP = "text_step"
         const val POLL_MS = 500L
-        const val RECENT_LINES = 8
-        val BACKGROUND = Color.rgb(8, 9, 11)
-        val MUTED = Color.rgb(160, 160, 168)
-        val ACCENT = Color.rgb(255, 176, 64)
 
-        // The sink's own lines are "[connection] PAIRING CODE 123-456", and "pairing timed out",
-        // "paired with server ...", "closed" when that attempt or connection is over.
-        val PAIRING_CODE = Regex("""^\[\d+] PAIRING CODE (.+)$""")
-        val ENDS_PAIRING = Regex("""^\[\d+] (pairing |paired with |closed)""")
+        /** How much of the lyric shows behind an attention sentence (S10). */
+        const val DIMMED_BEHIND_ATTENTION = 0.35f
     }
 }

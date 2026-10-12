@@ -546,6 +546,48 @@ TEST_CASE("sink: a lyric document and its anchors become a frame on the sink's o
     CHECK((*sink)->lyric_frame().mode == iclforge::lyrics::StageMode::kNoLyrics);
 }
 
+TEST_CASE("sink: the status says who is connected, for what, and the code a server asked by",
+          "[sink][websocket]") {
+    const fs::path dir = scratch("status");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.code_method = iclforge::sink::CodeMethod::kDynamic;
+    options.unpaired_access = false;
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sink::Sink::Status idle = (*sink)->status();
+    CHECK(idle.connections.empty());
+    CHECK_FALSE(idle.pairing_code.has_value());
+    CHECK(idle.paired_servers == 0);
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    // A server that asks to pair by a code: the sink shows one, and says so in its status.
+    REQUIRE(server.pair(m::PairMethod::kDynamicCode, m::CodeFormat::kDigits, 6));
+    REQUIRE(log.wait("PAIRING CODE"));
+    iclforge::sink::Sink::Status pairing = (*sink)->status();
+    REQUIRE(pairing.connections.size() == 1);
+    CHECK(pairing.connections[0].server_name == "Test server");
+    CHECK(pairing.connections[0].activity == iclforge::sink::Sink::Status::Activity::kPairing);
+    REQUIRE(pairing.pairing_code.has_value());
+    CHECK(pairing.pairing_code->size() == 7);  // "123-456"
+    CHECK((*pairing.pairing_code)[3] == '-');
+
+    // Typed there, it pairs: the code goes from the status and the record is counted.
+    std::string shown = *pairing.pairing_code;
+    std::erase(shown, '-');
+    REQUIRE(server.events.wait([&] { return server.events.code_wanted; }));
+    REQUIRE(server.call(
+        [&] { return server.server.enter_code(iclforge::sendspin::pairing_flow::Code{shown}); }));
+    REQUIRE(log.wait("paired with server "));
+    const iclforge::sink::Sink::Status paired = (*sink)->status();
+    CHECK_FALSE(paired.pairing_code.has_value());
+    CHECK(paired.paired_servers == 1);
+}
+
 TEST_CASE("sink: the totals are what the outputs say they counted", "[sink][websocket]") {
     const fs::path dir = scratch("totals");
     Recording recording;

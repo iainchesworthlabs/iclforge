@@ -292,6 +292,27 @@ class Sink {
     };
     [[nodiscard]] Totals totals() const;
 
+    // What a screen says of the sink (planning/hearth-sink-screen.md, the model): who is connected and
+    // what each is doing here, the code a server asked to pair by that has not yet been typed there,
+    // and how many servers this sink holds a pairing record for.
+    struct Status {
+        enum class Activity : std::uint8_t { kNothing, kPairing, kPlayback };
+        struct Peer {
+            std::uint64_t id = 0;
+            // The peer's address, as the transport saw it.
+            std::string address;
+            // What the server called itself; empty until it has said.
+            std::string server_name;
+            Activity activity = Activity::kNothing;
+            // A stream is open on this connection.
+            bool streaming = false;
+        };
+        std::vector<Peer> connections;
+        std::optional<std::string> pairing_code;
+        std::size_t paired_servers = 0;
+    };
+    [[nodiscard]] Status status() const;
+
     // What the other roles have received, over every connection: the server/state messages and the
     // latest state of each state role, none once cleared; the last image on each artwork channel,
     // empty once cleared; and the visualizer streams and frames.

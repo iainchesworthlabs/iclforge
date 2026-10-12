@@ -4,6 +4,8 @@
     <!-- The sink listens for Hearth's WebSocket and answers it: sockets are kernel-enforced through
          the inet group, so without this the listener fails at runtime, not at build time. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The idle screen says what address the box has: the active network's link properties. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- NsdManager advertises _sendspin._tcp through the platform's mDNS responder, which needs the
          Wi-Fi state, and it receives multicast only with the multicast lock the service will hold
