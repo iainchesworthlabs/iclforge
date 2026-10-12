@@ -148,6 +148,12 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
     const iclforge::containers::mp4::ReadTrack& track = demuxed.track;
     ContainerFacts facts;
     facts.kind = ContainerKind::kMp4;
+    for (const auto& other : demuxed.skipped) {
+        facts.other_tracks.push_back(OtherTrack{.id = other.track_id,
+                                                .kind = std::string{describe(other.kind)},
+                                                .codec_id = other.codec_id,
+                                                .language = other.language});
+    }
     facts.codec_id = track.codec_id;
     facts.track = track.track_id;
     facts.language = track.language;
@@ -186,6 +192,12 @@ constexpr std::size_t kContainerSniffBytes = 64 * 1024;
 [[nodiscard]] ContainerFacts facts_of(const iclforge::containers::matroska::Demuxed& demuxed) {
     ContainerFacts facts;
     facts.kind = ContainerKind::kMatroska;
+    for (const auto& other : demuxed.skipped) {
+        facts.other_tracks.push_back(OtherTrack{.id = other.track_number,
+                                                .kind = std::string{describe(other.kind)},
+                                                .codec_id = other.codec_id,
+                                                .language = other.language});
+    }
     facts.codec_id = demuxed.track.codec_id;
     facts.track = demuxed.track.track_number;
     facts.language = demuxed.track.language;

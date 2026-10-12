@@ -83,6 +83,19 @@ struct CodecBox {
     std::size_t bytes = 0;
 };
 
+// A track the file declares and the reader did not read: a picture, a subtitle track, a second
+// audio track. What its container says of it and nothing of its content, so that a person can be
+// told what else a file carries (a karaoke video's picture, a text track that holds its words).
+struct OtherTrack {
+    // MP4's track_ID or Matroska's TrackNumber.
+    std::uint64_t id = 0;
+    // "audio", "video", "text" or "other".
+    std::string kind{};
+    // MP4's first sample entry ("avc1", "tx3g", "wvtt") or Matroska's CodecID ("S_TEXT/UTF8").
+    std::string codec_id{};
+    std::string language{};
+};
+
 // What a container declared about the track it gave up, for whoever shows the
 // file. A bare elementary stream has kind kUnknown and nothing else set.
 struct ContainerFacts {
@@ -108,6 +121,9 @@ struct ContainerFacts {
     std::uint32_t movie_timescale = 0;
     std::size_t edits = 0;
     std::optional<CodecBox> codec_box = std::nullopt;
+    // MP4 and Matroska: the tracks the file declares besides the one above, in file order, up to
+    // 64. Empty for a file with none, and for MPEG-TS, whose other streams are not listed.
+    std::vector<OtherTrack> other_tracks{};
     // MPEG-TS: the programme, its PMT's PID, the stream_type, how the PMT
     // named the codec ("atsc_stream_type", "dvb_descriptor",
     // "registration_descriptor" or "dvb_extension_descriptor") and the
