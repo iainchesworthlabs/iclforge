@@ -1890,6 +1890,14 @@
         "Desktop and ESP32"
       ],
       [
+        "E-AC-3 karaoke (Annex C, by analogy)",
+        "Public API: `Eac3Decoder` takes `OutputConfig::karaoke` and `karaoke_vocals`; `is_karaoke_programme()`",
+        "Encode `bsmod=voiceover` (the Lo/Ro mixing group is written); probe; decode and monitor as for AC-3, `karaoke` or `karaoke=none|v1|v2|v1+v2`",
+        "The Karaoke flow's Format choice writes it, and the Hear step and the stream player play it under each reproduction",
+        "No",
+        "Desktop: the Karaoke page as for AC-3; a board that lists `eac3` reproduces it itself, any other is sent PCM"
+      ],
+      [
         "AC-3 karaoke (Annex C)",
         "Public API: `OutputConfig::karaoke` and `karaoke_vocals`, `output_mode()`",
         "Encode `bsmod=voiceover` at 3/0 to 3/2; probe; decode as an aware decoder (`karaoke`) or a capable one (`karaoke=none|v1|v2|v1+v2`)",

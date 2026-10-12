@@ -26,7 +26,7 @@ The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 | **Decoder** | The decoder's controls on an AC-3 and E-AC-3 tab and an AC-4 tab. The page turns to the tab of the item that is playing, and a change reaches that item at its next access unit or frame |
 | **Network** | The Sendspin players found on the network, pairing, groups and their volumes, and each paired Hearth sink's own settings and firmware |
 | **Settings** | Playback, the network name and discovery, pairing records, appearance, language and diagnostics |
-| **Karaoke** | What a karaoke AC-3 stream is (its coding mode and which of the melody and the vocals it carries), the reproduction chosen for it, which part each speaker carries, and the lyrics. See [Karaoke](#karaoke) |
+| **Karaoke** | What a karaoke AC-3 or E-AC-3 stream is (its coding mode and which of the melody and the vocals it carries), the reproduction chosen for it, which part each speaker carries, and the lyrics. See [Karaoke](#karaoke) |
 
 The header says where playback goes. Clicking it, or **Choose…** in the signal path, opens the
 output picker: this computer's outputs for decoded audio, the outputs that take AC-3 and E-AC-3 as
@@ -42,10 +42,10 @@ Music Assistant itself has not been tested.
 The [Karaoke guide](../karaoke/index.md) covers the page, the lyrics and the singer view; this
 section is the short form.
 
-A karaoke AC-3 stream (`bsmod` 7 with a layout wider than mono; ETSI TS 102 366 Annex C) codes L and
-R, a guide melody M where a centre would be, and one or two vocals V1 and V2 where the surrounds
-would be. Played as coded, the vocals come from the surround speakers. The Karaoke page chooses
-how the decoder reproduces it:
+A karaoke AC-3 stream (`bsmod` 7 with a layout wider than mono; ETSI TS 102 366 Annex C), or an
+E-AC-3 one flagged the same way, codes L and R, a guide melody M where a centre would be, and one
+or two vocals V1 and V2 where the surrounds would be. Played as coded, the vocals come from the
+surround speakers. The Karaoke page chooses how the decoder reproduces it:
 
 - **As coded** plays the channels as the stream codes them.
 - **Aware** (the default) reproduces L, C and R, with the vocals at the level the programme set
@@ -54,12 +54,14 @@ how the decoder reproduces it:
   the melody in the centre; a pair goes to the left and the right. It also takes a **level** for
   the melody and for each vocal, from 24 dB below the table (off) to 12 dB above it.
 
-The page says in words when the choice cannot apply: a stream that is not karaoke (E-AC-3 and
-AC-4 have no karaoke mode), a bitstream output, where the receiver decodes the stream and the
-reproduction is its to make, and a stereo fold of Lt/Rt, for which Annex C defines no reproduction.
-The choice and the levels are kept across starts, the only decoder settings that are. The Decoder
-page shows the choice in one line with a button to the page. No outside decoder reproduces karaoke, so what is checked is
-Annex C's own tables.
+The page says in words when the choice cannot apply: a stream that is not karaoke (an ordinary
+programme, an AC-4 stream, which has no karaoke mode, or an E-AC-3 stream flagged karaoke whose
+programme has a dependent substream or an object layer, which plays as coded), a bitstream
+output, where the receiver decodes the stream and the reproduction is its to make, and a stereo
+fold of Lt/Rt, for which Annex C defines no reproduction. The choice and the levels are kept across
+starts, the only decoder settings that are. The Decoder page shows the choice in one line with a
+button to the page. What is checked is Annex C's own tables and, for AC-3 and E-AC-3, Dolby's
+reference decoder, which reproduces both ([how it is checked](../karaoke/index.md#how-it-is-checked)).
 
 **To a network group**, the reproduction is the same on every member. A sink that lists the
 `karaoke` setting (and `karaoke_vocals`, for Capable) is sent the stream as it is, and is told the
@@ -258,6 +260,13 @@ here" choice, PCM or Opus: Opus is lossy and a twelfth of PCM's bytes, so it rid
 link, and it applies the next time the group plays. The choice is kept for that board, so a
 restart of Hearth does not undo it, and it goes with the board's pairing if that is forgotten. A
 board lists Opus only where its firmware decodes it, which the C6's does.
+
+A member that states how many objects it places (`max_objects`, per data type) is sent an item
+that has more as PCM decoded here, with the objects placed at the layout it takes. Hearth reads an
+AC-4 presentation's count from its first I-frame, the LFE not counted. An AC-4 presentation of
+objects alone has no channels for the member to fall back to, so its limit holds whatever the
+member's layout or objects setting say; one with channels besides is played by a member that places
+fewer as its bed, as an E-AC-3 stream is.
 
 ### Languages
 

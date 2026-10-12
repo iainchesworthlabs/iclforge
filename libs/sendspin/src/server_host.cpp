@@ -68,6 +68,11 @@ constexpr std::int64_t kLongestUnit = 150'000;
 constexpr std::int64_t kShallowBuffer = 1'000'000;
 constexpr std::int64_t kShortUnit = 10'000;
 constexpr std::chrono::seconds kRedialAfter{10};
+// The longest a group holds the start of its timeline for a member the host has moved onto
+// player@v1 (ServerHost::use_pcm()) that is still moving: a few milliseconds on a loopback, and
+// more to a board over Wi-Fi. One that has not moved by then is left behind, as a member that is
+// not there is, and plays from the frame the group has reached when it does.
+constexpr std::int64_t kSettleWait = 1'000'000;
 
 [[nodiscard]] bool contains(const std::vector<std::string>& roles, std::string_view role) {
     return std::find(roles.begin(), roles.end(), role) != roles.end();
@@ -995,6 +1000,8 @@ struct Group::State {
     std::int64_t sample_rate = 0;
     bool buffered = false;
     std::optional<std::int64_t> start_time;
+    // When the timeline stops waiting for a member that is still moving, set when it first does.
+    std::optional<std::int64_t> settle_until;
     std::int64_t lead = 0;
     std::int64_t frames_pushed = 0;
 
@@ -1493,8 +1500,46 @@ struct Group::State {
         host->log(client.name + " joined group " + name);
     }
 
-    // Starts every member whose client can play, and the timeline once one has: the time now, or
-    // nothing while no member plays.
+    // Whether a member the host asked to move onto player@v1 (use_pcm()) is still moving: on the
+    // extension role it is leaving, or on player@v1 without the state it owes before a stream
+    // (ServerSession::start_stream()). Such a member is not started, and one that is started after
+    // the timeline has begun is sent the programme from the frame the group has reached, and is
+    // never sent what went before: so the timeline waits for it, for no longer than kSettleWait
+    // from the first time it does.
+    [[nodiscard]] bool settling(std::int64_t now) {
+        bool moving = false;
+        for (const Member& member : members) {
+            if (member.started || held.contains(member.client_id)) {
+                continue;
+            }
+            const std::shared_ptr<HostConnection> connection = host->find(member.client_id);
+            if (!connection) {
+                continue;
+            }
+            const ClientView client = connection->view();
+            bool asked = false;
+            {
+                const std::lock_guard lock(host->mutex);
+                asked = host->pcm_clients.contains(client.client_key);
+            }
+            if (asked && client.playing && client.player_support &&
+                contains(client.supported_roles, kPlayerRole) && (client.bursts || !client.player_state)) {
+                moving = true;
+                break;
+            }
+        }
+        if (!moving) {
+            return false;
+        }
+        if (!settle_until) {
+            settle_until = now + kSettleWait;
+        }
+        return now < *settle_until;
+    }
+
+    // Starts every member whose client can play, and the timeline once one has and none that the
+    // host has moved is still moving: the time now, or nothing while no member plays or one is
+    // about to.
     [[nodiscard]] std::optional<std::int64_t> begin() {
         for (Member& member : members) {
             if (!member.started) {
@@ -1506,6 +1551,9 @@ struct Group::State {
         }
         const std::int64_t now = host->clock.now_us();
         if (!start_time) {
+            if (settling(now)) {
+                return std::nullopt;
+            }
             // One timeline for every member, as far ahead as the member that needs the most lead.
             for (const Member& member : members) {
                 lead = std::max(lead, member.lead);
@@ -1825,6 +1873,7 @@ bool Group::start(const Programme& programme) {
     state_->sample_rate = pcm ? pcm->sample_rate : bursts->sample_rate;
     state_->buffered = programme.buffered;
     state_->start_time.reset();
+    state_->settle_until.reset();
     state_->lead = 0;
     state_->frames_pushed = 0;
     for (State::Member& member : state_->members) {
