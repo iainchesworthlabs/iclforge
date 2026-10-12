@@ -101,6 +101,7 @@ bool Ac4Stream::open(const Config& config) {
     iclforge::ac4::DecoderConfig decoder_config;
     decoder_config.output.downmix = ac4bridge::target(config.fold);
     decoder_config.executor = config.executor;
+    decoder_config.skip_objects = config.skip_objects;
     im.config = config;
     im.decoder.emplace(decoder_config);
     return true;
