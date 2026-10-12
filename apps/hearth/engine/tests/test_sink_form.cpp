@@ -665,6 +665,68 @@ TEST_CASE("sink form: where no PCM can be sent, the stream plays as coded and th
     CHECK(mentions(off.reason, "played as coded"));
 }
 
+// ---- the codec (planning/karaoke-eac3.md, D6) ----------------------------------------------------
+//
+// A sink that takes the karaoke keys has a path for the codecs it lists: AC-3's alone when it
+// lists none, as a board from before E-AC-3's reproduction does. An E-AC-3 karaoke stream sent
+// to such a board would be heard as coded beside a member that reproduces it, so it is decoded
+// here and sent as PCM.
+
+namespace {
+
+StreamNeeds eac3_karaoke_stream(sp::Karaoke reproduction) {
+    StreamNeeds needs = karaoke_stream(reproduction);
+    needs.stream = BitstreamFormat::kEac3;
+    return needs;
+}
+
+}  // namespace
+
+TEST_CASE("sink form: an E-AC-3 karaoke stream goes as it is only to a sink that lists E-AC-3",
+          "[hearth][sink_form][karaoke]") {
+    // A board that reproduces karaoke and says nothing of codecs: AC-3's alone.
+    const SinkFacts before = karaoke_sink({"karaoke", "karaoke_vocals"}, {2, 6});
+    const auto sent_pcm = choose_sink_form(eac3_karaoke_stream(sp::Karaoke::kAware), before);
+    REQUIRE(sent_pcm.form == SinkForm::kPcm);
+    CHECK(mentions(sent_pcm.reason, "reproduces karaoke for AC-3, not for E-AC-3"));
+    CHECK(mentions(sent_pcm.reason, "decoded here"));
+    // Its AC-3 path is what it has: an AC-3 karaoke stream still goes as it is.
+    CHECK(choose_sink_form(karaoke_stream(sp::Karaoke::kAware), before).form == SinkForm::kCoded);
+
+    // The same board once its firmware lists E-AC-3.
+    SinkFacts newer = karaoke_sink({"karaoke", "karaoke_vocals"}, {2, 6});
+    newer.iclforge_support->karaoke_codecs = {sp::DataType::kAc3, sp::DataType::kEac3};
+    for (const sp::Karaoke reproduction : {sp::Karaoke::kAware, sp::Karaoke::kCapable}) {
+        const auto coded = choose_sink_form(eac3_karaoke_stream(reproduction), newer);
+        REQUIRE(coded.form == SinkForm::kCoded);
+        CHECK(mentions(coded.reason, "reproduces the karaoke"));
+    }
+    CHECK(choose_sink_form(karaoke_stream(sp::Karaoke::kAware), newer).form == SinkForm::kCoded);
+
+    // A list that names E-AC-3 and not AC-3 is what it says.
+    SinkFacts eac3_only = karaoke_sink({"karaoke"}, {2, 6});
+    eac3_only.iclforge_support->karaoke_codecs = {sp::DataType::kEac3};
+    CHECK(choose_sink_form(eac3_karaoke_stream(sp::Karaoke::kAware), eac3_only).form ==
+          SinkForm::kCoded);
+    const auto ac3_refused = choose_sink_form(karaoke_stream(sp::Karaoke::kAware), eac3_only);
+    REQUIRE(ac3_refused.form == SinkForm::kPcm);
+    CHECK(mentions(ac3_refused.reason, "reproduces karaoke for E-AC-3, not for AC-3"));
+
+    // An E-AC-3 stream the singer wants as coded asks nothing of the codec list.
+    StreamNeeds as_coded = eac3_karaoke_stream(sp::Karaoke::kAware);
+    as_coded.karaoke.reset();
+    CHECK(choose_sink_form(as_coded, before).form == SinkForm::kCoded);
+}
+
+TEST_CASE("sink form: where an E-AC-3 karaoke stream cannot be sent PCM, it plays as coded and says so",
+          "[hearth][sink_form][karaoke]") {
+    const SinkFacts no_pcm = karaoke_sink({"karaoke", "karaoke_vocals"}, {});
+    const auto choice = choose_sink_form(eac3_karaoke_stream(sp::Karaoke::kAware), no_pcm);
+    REQUIRE(choice.form == SinkForm::kCoded);
+    CHECK(mentions(choice.reason, "played as coded"));
+    CHECK(mentions(choice.reason, "not for E-AC-3"));
+}
+
 // ---- the part levels (planning/karaoke-phase2.md, W10c) -----------------------------------------
 //
 // A level that moves the melody or a vocal is for the sink to apply, or for this app to apply in

@@ -71,6 +71,11 @@ things. Where such a sink takes no PCM either, the stream plays as coded on it a
 page says so. The Karaoke page's choice reaches a sink as settings, which replace that sink's
 settings whole: what the sink's own page set is not kept.
 
+A sink also says which codecs it reproduces karaoke for (`karaoke_codecs` in its support
+object), and one that says nothing reproduces AC-3's alone. An E-AC-3 karaoke stream is
+therefore decoded here and sent as PCM, with the reproduction applied, to a sink that does not
+list `eac3`, and goes as it is to one that does.
+
 The levels of the melody and the vocals (Capable only) travel the same way, as `karaoke_melody_db`,
 `karaoke_vocal1_db` and `karaoke_vocal2_db`, and only the ones that change what is heard: a level
 of 0 dB is left out, and so is the level of a vocal the Vocals choice leaves out. A sink that has

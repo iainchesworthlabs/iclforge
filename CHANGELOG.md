@@ -54,6 +54,24 @@ The sections below contain the complete change list and fixes.
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
 
+**Karaoke in E-AC-3: Hearth reproduces it, and a sink says which codecs it reproduces it for**
+
+- **Hearth plays an E-AC-3 karaoke stream reproduced.** Its engine took the coded bed for the
+  layout of every E-AC-3 unit, so once the decoder gave a karaoke programme as L, C, R and the
+  LFE (Hearth's setting is aware by default) the renderer would have been handed four channels
+  for a five-channel bed. A programme that is one independent substream is laid out from
+  `ac3::output_mode()` as an AC-3 syncframe is, in the stream player, the test sink and the
+  firmware's burst player; the unit report says it is karaoke and whether it was reproduced;
+  and a unit that transient pre-noise processing held back to the end of the stream is laid
+  out the same way as the rest. A programme with a dependent substream is played as coded.
+- **A sink states the codecs it reproduces karaoke for.** The support object gains
+  `karaoke_codecs`, an optional array of data type names; a sink that lists none, which is every
+  board and sink from before the key, reproduces AC-3's alone. Hearth sends an E-AC-3 karaoke
+  stream as it is only to a sink that lists `eac3` there (and takes the `karaoke` setting, and the
+  rest of what an AC-3 one needs), and decodes it for any other with the reproduction applied, so
+  a group still plays one reproduction. No board lists it yet, so every board is sent PCM for
+  such a stream (`planning/karaoke-eac3.md`, E4a, D6; `planning/hearth-sendspin-extension.md`).
+
 **Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
 
 - **`iclforge/base/karaoke.hpp`.** `KaraokeReproduction` (off, aware, capable), `KaraokeVocals`

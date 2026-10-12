@@ -135,6 +135,26 @@ struct Support {
     // 1 to kMaxLyricsBytes; 0 when it does not say, which is a sink that takes no lyrics. A sink
     // that states one lists the `lyrics` and `lyrics_position` commands too.
     std::uint32_t lyrics_max_bytes = 0;
+    // The data types the sink reproduces karaoke for when it is told to (the `karaoke` decoder
+    // setting), which a server reads before it sends such a stream as it is. Empty when it says
+    // none: a sink from before the key reproduces AC-3's karaoke and nothing else, the codec its
+    // path was written for, so empty reads as {kAc3} (planning/karaoke-eac3.md, D6). A sink that
+    // reproduces an E-AC-3 stream's lists kEac3. A karaoke stream of a type that is not listed is
+    // played as coded by the sink's own decoder, so a server that wants the reproduction sends it
+    // PCM it has decoded itself, and a group hears one reproduction.
+    std::vector<DataType> karaoke_codecs;
+
+    [[nodiscard]] bool reproduces_karaoke(DataType type) const {
+        if (karaoke_codecs.empty()) {
+            return type == DataType::kAc3;
+        }
+        for (const DataType listed : karaoke_codecs) {
+            if (listed == type) {
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 void write_support(json::Writer& w, const Support& support);
