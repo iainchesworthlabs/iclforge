@@ -82,6 +82,9 @@
 //       fun pause(): Boolean
 //       fun resume(): Boolean
 //       fun flush(): Boolean
+//       // AudioTrack.getUnderrunCount(): the times the track ran dry, which stats() adds to the
+//       // writes that failed (a write the track took does not show a starvation after it).
+//       fun underrunCount(): Int
 //   }
 //
 // The app registers one bridge instance for the process's lifetime, and tells the backend the
@@ -131,6 +134,7 @@ jmethodID g_mid_head_position = nullptr;  // long playbackHeadPosition()
 jmethodID g_mid_pause = nullptr;          // boolean pause()
 jmethodID g_mid_resume = nullptr;         // boolean resume()
 jmethodID g_mid_flush = nullptr;          // boolean flush()
+jmethodID g_mid_underrun_count = nullptr;  // int underrunCount()
 
 // The IEC 61937 carrier's frame: two channels of 16 bits.
 constexpr std::size_t kLinkFrameBytes = 4;
@@ -356,9 +360,26 @@ bool PassthroughSink::running() const {
 }
 
 PassthroughStats PassthroughSink::stats() const {
-    return {.bursts_submitted = impl_->submitted.load(std::memory_order_relaxed),
-            .bursts_rendered = impl_->rendered.load(std::memory_order_relaxed),
-            .underruns = impl_->underruns.load(std::memory_order_relaxed)};
+    PassthroughStats stats{.bursts_submitted = impl_->submitted.load(std::memory_order_relaxed),
+                           .bursts_rendered = impl_->rendered.load(std::memory_order_relaxed),
+                           .underruns = impl_->underruns.load(std::memory_order_relaxed)};
+    // The device's own count of the times it ran dry (AudioTrack.getUnderrunCount()), which a write
+    // that was accepted cannot show: the burst was taken, and the track still starved before the
+    // next. Added to the writes that failed, which is what `underruns` has always counted here.
+    if (running() && bridge_ready()) {
+        if (JNIEnv* env = jni_env(); env != nullptr) {
+            std::lock_guard lock(g_bridge_mutex);
+            if (g_mid_underrun_count != nullptr) {
+                const jint dry = env->CallIntMethod(g_bridge, g_mid_underrun_count);
+                if (env->ExceptionCheck() != 0) {
+                    env->ExceptionClear();
+                } else if (dry > 0) {
+                    stats.underruns += static_cast<std::uint64_t>(dry);
+                }
+            }
+        }
+    }
+    return stats;
 }
 
 std::optional<MonitorPosition> PassthroughSink::position() const {
@@ -747,6 +768,7 @@ void register_passthrough_bridge(JNIEnv* env, jobject bridge) {
     g_mid_pause = optional_method("pause", "()Z");
     g_mid_resume = optional_method("resume", "()Z");
     g_mid_flush = optional_method("flush", "()Z");
+    g_mid_underrun_count = optional_method("underrunCount", "()I");
 
     g_bridge = env->NewGlobalRef(bridge);
     env->DeleteLocalRef(local_class);

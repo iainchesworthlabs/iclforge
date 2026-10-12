@@ -568,6 +568,145 @@ std::expected<std::vector<std::byte>, WrapError> wrap_ac4_stream(
     return carrier;
 }
 
+namespace {
+
+// The data type Pc's bits 0 to 6 name, among the ones this project carries.
+[[nodiscard]] std::optional<BurstDataType> data_type_of(std::uint16_t pc) {
+    switch (pc & 0x7FU) {
+        case static_cast<unsigned>(BurstDataType::kAc3):
+            return BurstDataType::kAc3;
+        case static_cast<unsigned>(BurstDataType::kEac3):
+            return BurstDataType::kEac3;
+        case static_cast<unsigned>(BurstDataType::kAc4):
+            return BurstDataType::kAc4;
+        case static_cast<unsigned>(BurstDataType::kAc4Hbr4):
+            return BurstDataType::kAc4Hbr4;
+        case static_cast<unsigned>(BurstDataType::kAc4Hbr16):
+            return BurstDataType::kAc4Hbr16;
+        case static_cast<unsigned>(BurstDataType::kAc4Ld):
+            return BurstDataType::kAc4Ld;
+        default:
+            return std::nullopt;
+    }
+}
+
+// AC-4 HBR16's longest repetition period: 32,768 IEC 60958 frames of four bytes.
+constexpr std::size_t kLongestBurstBytes = 32768 * 4;
+// Pa, Pb, Pc and Pd.
+constexpr std::size_t kPartsPreambleBytes = 8;
+
+}  // namespace
+
+std::optional<std::size_t> burst_period_bytes(std::uint16_t pc, int sequence_index) {
+    const std::optional<BurstDataType> type = data_type_of(pc);
+    if (!type) {
+        return std::nullopt;
+    }
+    if (*type == BurstDataType::kAc3) {
+        return kBurstBytes;
+    }
+    if (*type == BurstDataType::kEac3) {
+        return kEac3BurstBytes;
+    }
+    if (sequence_index < 0 || sequence_index > 4) {
+        return std::nullopt;
+    }
+    const std::optional<Ac4BurstTiming> timing =
+        ac4_burst_timing_for_code(*type, static_cast<int>((pc >> 8U) & 0xFU));
+    if (!timing) {
+        return std::nullopt;
+    }
+    // Four bytes to an IEC 60958 frame: two subframes of 16 bits.
+    return static_cast<std::size_t>(timing->periods[static_cast<std::size_t>(sequence_index)]) * 4;
+}
+
+std::expected<std::vector<std::byte>, WrapError> burst_from_parts(std::uint16_t pc, std::uint16_t pd,
+                                                                  std::span<const std::byte> payload,
+                                                                  int sequence_index) {
+    const std::optional<BurstDataType> type = data_type_of(pc);
+    if (!type) {
+        return std::unexpected(WrapError::kNotAFrame);
+    }
+
+    // The payload's length, from Pd in the unit its data type uses.
+    std::size_t length = 0;
+    switch (*type) {
+        case BurstDataType::kAc3:
+        case BurstDataType::kAc4:
+        case BurstDataType::kAc4Ld:
+            if (pd % 8 != 0) {
+                return std::unexpected(WrapError::kNotAFrame);
+            }
+            length = static_cast<std::size_t>(pd) / 8;
+            break;
+        case BurstDataType::kEac3:
+        case BurstDataType::kAc4Hbr4:
+            length = pd;
+            break;
+        case BurstDataType::kAc4Hbr16:
+            length = static_cast<std::size_t>(pd) * 8;
+            break;
+    }
+    if (payload.size() != length) {
+        return std::unexpected(WrapError::kNotAFrame);
+    }
+
+    // The syncword the frame opens with, as the packers require of what they are given.
+    if (is_ac4(*type)) {
+        const bool sync = payload.size() >= 4 && std::to_integer<std::uint8_t>(payload[0]) == 0xAC &&
+                          (std::to_integer<std::uint8_t>(payload[1]) == 0x40 ||
+                           std::to_integer<std::uint8_t>(payload[1]) == 0x41);
+        if (!sync) {
+            return std::unexpected(WrapError::kNotAFrame);
+        }
+    } else if (payload.size() < 6 || (payload.size() & 1) != 0 ||
+               std::to_integer<std::uint8_t>(payload[0]) != 0x0B ||
+               std::to_integer<std::uint8_t>(payload[1]) != 0x77) {
+        return std::unexpected(WrapError::kNotAFrame);
+    }
+
+    const std::optional<std::size_t> period = burst_period_bytes(pc, sequence_index);
+    if (!period) {
+        return std::unexpected(WrapError::kUnsupportedRate);
+    }
+    if (payload.size() + kPartsPreambleBytes > *period) {
+        return std::unexpected(WrapError::kFrameTooLarge);
+    }
+    if (is_ac4(*type)) {
+        const std::optional<Ac4BurstTiming> timing =
+            ac4_burst_timing_for_code(*type, static_cast<int>((pc >> 8U) & 0xFU));
+        if (timing && pd > timing->max_length[static_cast<std::size_t>(sequence_index)]) {
+            return std::unexpected(WrapError::kFrameTooLarge);
+        }
+    }
+
+    std::vector<std::byte> burst;
+    burst.reserve(*period);
+    put_word_le(burst, 0xF872);  // Pa
+    put_word_le(burst, 0x4E1F);  // Pb
+    put_word_le(burst, pc);
+    put_word_le(burst, pd);
+    pack_payload_words(burst, payload, *period);
+    return burst;
+}
+
+std::expected<std::vector<std::byte>, WrapError> null_burst(std::size_t period_bytes) {
+    if (period_bytes < kPartsPreambleBytes || period_bytes % 4 != 0) {
+        return std::unexpected(WrapError::kNotAFrame);
+    }
+    if (period_bytes > kLongestBurstBytes) {
+        return std::unexpected(WrapError::kFrameTooLarge);
+    }
+    std::vector<std::byte> burst;
+    burst.reserve(period_bytes);
+    put_word_le(burst, 0xF872);  // Pa
+    put_word_le(burst, 0x4E1F);  // Pb
+    put_word_le(burst, 0x0000);  // Pc: data type 0, null data
+    put_word_le(burst, 0x0000);  // Pd
+    burst.resize(period_bytes, std::byte{0});
+    return burst;
+}
+
 // ---------------------------------------------------------------------------
 // De-framing.
 // ---------------------------------------------------------------------------

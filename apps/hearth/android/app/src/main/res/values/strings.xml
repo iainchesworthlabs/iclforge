@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hearth</string>
+    <string name="channel_name">Sink</string>
+    <string name="notification_text">Ready to play from Hearth</string>
+    <string name="quit">Quit</string>
+    <string name="starting">Starting…</string>
+    <string name="native_failed">The native library did not load - see logcat</string>
+    <string name="not_started">The sink did not start: %1$s</string>
+    <string name="listening">Listening as \"%1$s\" on port %2$d</string>
+    <string name="listening_unadvertised">Listening on port %1$d (not advertised yet)</string>
+    <string name="waiting">Waiting for Hearth. Choose this sink there, and its pairing code appears here.</string>
+    <string name="enter_code">Enter this code in Hearth</string>
+    <string name="activity">%1$d connection(s) · %2$d stream(s) · %3$d chunk(s) · %4$d burst(s)</string>
+    <!-- The lyric screen (planning/hearth-sink-screen.md, S2 to S8). -->
+    <string name="no_lyrics">No lyrics for this item</string>
+    <string name="no_lyrics_hint">The server sent none with it.</string>
+    <string name="waiting_for_song">Waiting for the song</string>
+    <string name="instrumental">Instrumental</string>
+    <string name="line_of">Line %1$d of %2$d</string>
+    <string name="not_timed">Not timed</string>
+    <string name="delay_ms">Delay %1$s ms</string>
+    <!-- The footer's route chip (D6): how the stream leaves this sink. -->
+    <string name="route_passthrough">Passing through</string>
+    <string name="route_pcm">Decoded here</string>
+    <!-- The controls sheet's vocals row (D8): asked of the server, which decides. -->
+    <string name="sheet_vocals">Vocals</string>
+    <string name="vocals_both">Both</string>
+    <string name="vocals_v1">V1</string>
+    <string name="vocals_v2">V2</string>
+    <string name="vocals_none">None</string>
+    <string name="sheet_vocals_note">Goes to the server.\nTV plays as coded.</string>
+    <!-- The starting, idle and attention screens (S0, S1, S10). -->
+    <string name="starting_network">Waiting for the network</string>
+    <string name="starting_network_hint">Check that the box is connected to your network.</string>
+    <string name="starting_receiver">Waiting for the receiver</string>
+    <string name="starting_receiver_hint">Turn the receiver on and check that the box\'s HDMI output goes to it.</string>
+    <string name="paired_with">Paired with %1$s</string>
+    <string name="a_server">a server</string>
+    <string name="waiting_server">Waiting for a server</string>
+    <string name="waiting_server_hint">Choose this sink in Hearth.</string>
+    <string name="unpaired_hint">Not paired yet. Choose this sink in Hearth and a code appears here.</string>
+    <string name="passes_through">Passes through %1$s</string>
+    <string name="attention">Attention</string>
+    <string name="attention_not_started_hint">Quit and open Hearth again. If it keeps happening, restart the box.</string>
+    <string name="attention_refused">The receiver did not accept this stream.</string>
+    <string name="attention_refused_hint">Check that the receiver is on and that its input takes this box\'s HDMI output. The box\'s audio output must be set to pass through.</string>
+    <string name="attention_lost">The link to the receiver dropped.</string>
+    <string name="attention_lost_hint">It comes back by itself when the receiver or the TV does. Check the HDMI cable if it does not.</string>
+    <!-- The controls sheet (S9). -->
+    <string name="sheet_delay">Lyric delay</string>
+    <string name="sheet_size">Text size</string>
+    <string name="ms_value">%1$s ms</string>
+    <string name="sheet_minus">−</string>
+    <string name="sheet_plus">+</string>
+    <string name="size_small">S</string>
+    <string name="size_medium">M</string>
+    <string name="size_large">L</string>
+    <!-- SS5: a line the screen's faces cannot draw is said, not drawn as boxes. -->
+    <string name="script_undrawable">This line is in a script this screen cannot show.</string>
+</resources>

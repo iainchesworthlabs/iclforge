@@ -7,7 +7,7 @@ The Sendspin protocol: the server half Hearth's engine uses and the player half 
 A library, internal to the repository.
 
 - **Uses:** `time-filter`
-- **Used by:** `esp-idf`, `hearth`, `hearth-sink`, `sink`
+- **Used by:** `esp-idf`, `hearth`, `hearth-android`, `hearth-sink`, `sink`
 - **CI lanes:** core
 - **CMake target:** `iclforge::sendspin`
 

@@ -380,6 +380,13 @@ SessionOutput ServerSession::on_json(std::string_view text, std::int64_t arrival
     }
     if (type == "client/command") {
         const auto command = m::read_client_command(payload);
+        if (command && command->iclforge && iclforge_active() && hello_ && hello_->iclforge_support) {
+            // A sink's request: only the keys it listed, and only while it plays the role.
+            if (const std::optional<player::Request> accepted =
+                    player::accept_request(*command->iclforge, *hello_->iclforge_support)) {
+                listener_->on_iclforge_request(*accepted);
+            }
+        }
         if (!command || !command->controller || !role_active(controller::kRole) || !controller_state_) {
             return {};
         }
