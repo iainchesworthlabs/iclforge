@@ -122,6 +122,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Main.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/OutputPicker.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlayPage.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlayLyricsCard.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlayObjectsCard.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlaySignalPathCard.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Media.qml"

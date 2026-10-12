@@ -151,6 +151,36 @@ struct ReadTrack {
     std::vector<EditListEntry> edits;
 };
 
+// What a track the reader did not select is, by the handler its mdia declares: "soun" is audio,
+// "vide" is video, "text", "sbtl", "subt" and "clcp" are text, and any other handler is other.
+enum class TrackKind : std::uint8_t { kAudio, kVideo, kText, kOther };
+
+[[nodiscard]] constexpr std::string_view describe(TrackKind kind) {
+    switch (kind) {
+        case TrackKind::kAudio:
+            return "audio";
+        case TrackKind::kVideo:
+            return "video";
+        case TrackKind::kText:
+            return "text";
+        case TrackKind::kOther:
+            break;
+    }
+    return "other";
+}
+
+// A track the walk saw and did not read: what a file holds besides the audio it gave up. The
+// reader reads no sample of one; this is what its boxes say, for a caller that wants to tell a
+// person what else the file carries (a picture, a subtitle track).
+struct SkippedTrack {
+    std::uint32_t track_id = 0;
+    TrackKind kind = TrackKind::kOther;
+    // The first sample entry's four characters ("avc1", "mp4a", "tx3g", "wvtt"), with any byte
+    // that is not printable ASCII shown as '?'; empty when the track has no sample entry.
+    std::string codec_id;
+    std::string language{"und"};
+};
+
 // Bounds on what the reader will do for one file - defences against a
 // hostile container, not tuning knobs.
 struct ReadOptions {
@@ -183,6 +213,8 @@ struct Demuxed {
     // Views into the buffer passed to demux(), which must outlive this. In
     // decode order, which for audio is also presentation order.
     std::vector<std::span<const std::byte>> samples;
+    // The other tracks the file declares, in file order, up to 64: none of their samples are read.
+    std::vector<SkippedTrack> skipped;
 };
 
 // Reads a complete MP4 held in one buffer. Samples come back as views into

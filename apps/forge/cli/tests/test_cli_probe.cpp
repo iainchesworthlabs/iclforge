@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <iterator>
 #include <span>
 #include <string>
@@ -996,4 +997,119 @@ TEST_CASE("probe reports a hand-built AC-4 stream's Obj substream and its bed/dy
     // The LFE on top of n_objects_code's two (libs/ac4/ERRATA.md,
     // "n_objects_code and the LFE").
     CHECK(table.find("object, 3 object(s) (dynamic)") != std::string::npos);
+}
+
+// ---- the tracks of a container that probe does not read -------------------------------------
+
+namespace {
+
+// One EBML element with an eight-byte size: as much Matroska as the reader's Tracks and one cluster
+// need, built here and not with the project's writer, which has one audio track.
+std::vector<unsigned char> ebml_element(std::uint32_t id, const std::vector<unsigned char>& body) {
+    std::vector<unsigned char> out;
+    const int width = id <= 0xFF ? 1 : id <= 0xFFFF ? 2 : id <= 0xFFFFFF ? 3 : 4;
+    for (int i = width - 1; i >= 0; --i) {
+        out.push_back(static_cast<unsigned char>((id >> (8 * i)) & 0xFFU));
+    }
+    out.push_back(0x01);
+    for (int i = 6; i >= 0; --i) {
+        out.push_back(
+            static_cast<unsigned char>((static_cast<std::uint64_t>(body.size()) >> (8 * i)) & 0xFFU));
+    }
+    out.insert(out.end(), body.begin(), body.end());
+    return out;
+}
+
+std::vector<unsigned char> ebml_cat(std::initializer_list<std::vector<unsigned char>> parts) {
+    std::vector<unsigned char> out;
+    for (const auto& part : parts) {
+        out.insert(out.end(), part.begin(), part.end());
+    }
+    return out;
+}
+
+std::vector<unsigned char> ebml_uint(std::uint32_t id, unsigned char value) {
+    return ebml_element(id, {value});
+}
+
+std::vector<unsigned char> ebml_text(std::uint32_t id, std::string_view text) {
+    return ebml_element(id, std::vector<unsigned char>(text.begin(), text.end()));
+}
+
+std::vector<unsigned char> ebml_track(unsigned char number, unsigned char type, std::string_view codec,
+                                      std::string_view language, bool audio) {
+    auto entry = ebml_cat({ebml_uint(0xD7, number), ebml_uint(0x83, type), ebml_text(0x86, codec),
+                           ebml_text(0x22B59C, language)});
+    if (audio) {
+        // SamplingFrequency as a 32-bit float (48000), and six channels.
+        const auto rate = ebml_element(0xB5, {0x47, 0x3B, 0x80, 0x00});
+        const auto master = ebml_element(0xE1, ebml_cat({rate, ebml_uint(0x9F, 6)}));
+        entry.insert(entry.end(), master.begin(), master.end());
+    }
+    return ebml_element(0xAE, entry);
+}
+
+}  // namespace
+
+TEST_CASE("probe lists the tracks of a Matroska karaoke video that it does not read",
+          "[cli][probe][container]") {
+    // The shape of a karaoke video rip: a picture, an AAC track, the AC-3 audio forge reads, and a
+    // text and a bitmap subtitle track. The audio is one block holding a real AC-3 stream.
+    const auto audio_path = make_ac3("other_tracks_audio.ac3", "1 448 1000 50 51");
+    std::ifstream in{audio_path, std::ios::binary};
+    const std::vector<unsigned char> audio{std::istreambuf_iterator<char>{in},
+                                           std::istreambuf_iterator<char>{}};
+    REQUIRE_FALSE(audio.empty());
+
+    const auto tracks = ebml_cat({ebml_track(1, 1, "V_MPEG4/ISO/AVC", "eng", false),
+                                  ebml_track(2, 2, "A_AAC", "eng", true),
+                                  ebml_track(3, 2, "A_AC3", "eng", true),
+                                  ebml_track(4, 17, "S_TEXT/UTF8", "fra", false),
+                                  ebml_track(5, 17, "S_VOBSUB", "jpn", false)});
+    std::vector<unsigned char> block{0x83, 0x00, 0x00, 0x80};  // track 3, timestamp 0, keyframe
+    block.insert(block.end(), audio.begin(), audio.end());
+    const auto cluster = ebml_cat({ebml_uint(0xE7, 0), ebml_element(0xA3, block)});
+    const auto segment =
+        ebml_cat({ebml_element(0x1654AE6B, tracks), ebml_element(0x1F43B675, cluster)});
+    const auto file = ebml_cat({ebml_element(0x1A45DFA3, ebml_text(0x4282, "matroska")),
+                                ebml_element(0x18538067, segment)});
+    const auto path = scratch_dir() / "karaoke_video.mkv";
+    {
+        std::ofstream out{path, std::ios::binary};
+        out.write(reinterpret_cast<const char*>(file.data()),
+                  static_cast<std::streamsize>(file.size()));
+    }
+
+    SECTION("the table says what else the file holds, after the container line") {
+        const auto log = scratch_dir() / "other_tracks.txt";
+        REQUIRE(run_cli("probe \"" + path.string() + "\"", log) == 0);
+        const auto table = read_log(log);
+        INFO(table);
+        CHECK(table.find("Matroska, track 3, 'A_AC3'") != std::string::npos);
+        const auto at = table.find("other tracks");
+        REQUIRE(at != std::string::npos);
+        const auto line = table.substr(at, table.find('\n', at) - at);
+        CHECK(line.find("video track 1 'V_MPEG4/ISO/AVC' (eng)") != std::string::npos);
+        CHECK(line.find("audio track 2 'A_AAC' (eng)") != std::string::npos);
+        CHECK(line.find("text track 4 'S_TEXT/UTF8' (fra)") != std::string::npos);
+        CHECK(line.find("text track 5 'S_VOBSUB' (jpn)") != std::string::npos);
+        // The track that is read is not among them.
+        CHECK(line.find("'A_AC3'") == std::string::npos);
+    }
+
+    SECTION("the JSON has them as container.other_tracks, with the documented members") {
+        const auto log = scratch_dir() / "other_tracks.json";
+        REQUIRE(run_cli("probe \"" + path.string() + "\" json=1", log) == 0);
+        const auto document = read_log(log);
+        INFO(document);
+        // The array's text, whitespace stripped, so that the indentation is not what is checked.
+        const std::string array = json_array(document, "other_tracks");
+        CHECK(array.find("{\"track\":1,\"kind\":\"video\",\"codec_id\":\"V_MPEG4/ISO/AVC\","
+                         "\"language\":\"eng\"}") != std::string::npos);
+        CHECK(array.find("{\"track\":4,\"kind\":\"text\",\"codec_id\":\"S_TEXT/UTF8\","
+                         "\"language\":\"fra\"}") != std::string::npos);
+        // The track that is read is the container's own `track`, not an entry here.
+        CHECK(array.find("\"track\":3") == std::string::npos);
+        CHECK(json_field(document, "track") == "3");
+    }
 }
