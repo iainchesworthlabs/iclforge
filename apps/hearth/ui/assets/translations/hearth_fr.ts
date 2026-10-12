@@ -3426,26 +3426,31 @@
     </message>
     <message>
         <location filename="../qml/NetworkSinkReport.qml" line="24"/>
+        <source>Lyrics</source>
+        <translation type="unfinished">Paroles</translation>
+    </message>
+    <message>
+        <location filename="../qml/NetworkSinkReport.qml" line="25"/>
         <source>Played</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkReport.qml" line="25"/>
+        <location filename="../qml/NetworkSinkReport.qml" line="26"/>
         <source>Problems</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkReport.qml" line="34"/>
+        <location filename="../qml/NetworkSinkReport.qml" line="35"/>
         <source>What the sink reports</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkReport.qml" line="66"/>
+        <location filename="../qml/NetworkSinkReport.qml" line="67"/>
         <source>—</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/NetworkSinkReport.qml" line="79"/>
+        <location filename="../qml/NetworkSinkReport.qml" line="80"/>
         <source>From the sink&apos;s own state messages, which it sends whenever something changes.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4331,96 +4336,96 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="340"/>
+        <location filename="../../src/network_controller.cpp" line="341"/>
         <source>not sent: the sink refused the settings.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="341"/>
+        <location filename="../../src/network_controller.cpp" line="342"/>
         <source>not sent: the sink does not take settings from Hearth.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="343"/>
+        <location filename="../../src/network_controller.cpp" line="344"/>
         <source>The sink does not take settings from Hearth.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="347"/>
+        <location filename="../../src/network_controller.cpp" line="348"/>
         <source>revision %1 sent, not reported yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="349"/>
+        <location filename="../../src/network_controller.cpp" line="350"/>
         <source>revision %1 refused: %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="353"/>
+        <location filename="../../src/network_controller.cpp" line="354"/>
         <source>revision %1 · applied</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="355"/>
+        <location filename="../../src/network_controller.cpp" line="356"/>
         <source>revision %1 sent · sink on %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="360"/>
+        <location filename="../../src/network_controller.cpp" line="361"/>
         <source>Nothing playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="361"/>
-        <location filename="../../src/network_controller.cpp" line="374"/>
+        <location filename="../../src/network_controller.cpp" line="362"/>
+        <location filename="../../src/network_controller.cpp" line="375"/>
         <source>none</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="362"/>
-        <location filename="../../src/network_controller.cpp" line="403"/>
-        <location filename="../../src/network_controller.cpp" line="409"/>
+        <location filename="../../src/network_controller.cpp" line="363"/>
+        <location filename="../../src/network_controller.cpp" line="405"/>
         <location filename="../../src/network_controller.cpp" line="411"/>
+        <location filename="../../src/network_controller.cpp" line="413"/>
         <source>not reported</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="367"/>
+        <location filename="../../src/network_controller.cpp" line="368"/>
         <source>%1 · %2%3 · %4 substream%5</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="375"/>
+        <location filename="../../src/network_controller.cpp" line="376"/>
         <source>%1 carried · %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="376"/>
+        <location filename="../../src/network_controller.cpp" line="377"/>
         <source>placed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="377"/>
+        <location filename="../../src/network_controller.cpp" line="378"/>
         <source>not placed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="378"/>
+        <location filename="../../src/network_controller.cpp" line="379"/>
         <source>dialnorm %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="385"/>
+        <location filename="../../src/network_controller.cpp" line="387"/>
         <source>%1 bursts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="386"/>
+        <location filename="../../src/network_controller.cpp" line="388"/>
         <source>%1 underruns · %2 late · %3 dropped · %4 invalid</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="402"/>
+        <location filename="../../src/network_controller.cpp" line="404"/>
         <source>%1-bit · %2 slots</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5254,12 +5259,12 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::NetworkController</name>
     <message>
-        <location filename="../../src/network_controller.cpp" line="920"/>
+        <location filename="../../src/network_controller.cpp" line="922"/>
         <source>it could not be read: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/network_controller.cpp" line="923"/>
+        <location filename="../../src/network_controller.cpp" line="925"/>
         <source>it is %1 bytes, more than any sink&apos;s app slot holds</source>
         <translation type="unfinished"></translation>
     </message>

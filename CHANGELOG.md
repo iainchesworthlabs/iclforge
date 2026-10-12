@@ -104,6 +104,12 @@ The sections below contain the complete change list and fixes.
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
   `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
+  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
+  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
+  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
+  is named on the row when it is chosen, and none is written. The row's strings are translated in
+  the six catalogues.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
@@ -129,6 +135,40 @@ The sections below contain the complete change list and fixes.
   same lossless rewrite `strip_objects` does, so the bed is bit-identical and the result plays in
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
+
+**Karaoke in E-AC-3: the boards reproduce it themselves**
+
+- **A Hearth sink board lists the codecs it reproduces karaoke for.** Its support object now
+  states `karaoke_codecs`, every codec it decodes (AC-3 and E-AC-3), so Hearth sends an E-AC-3
+  karaoke stream to it as it is, with the choice of reproduction, and not as PCM decoded on the
+  host. Checked on a real ESP32-S3 over Wi-Fi: the board's output levels follow the same
+  programme decoded on the host to within 0.25 dB, for as coded, aware, and capable with a
+  vocal, with none, and with the melody and a vocal moved (the live case, `network sinks live:
+  an E-AC-3 karaoke stream is reproduced by the board that decodes it`, beside the AC-3 one it
+  now shares its body with). The P4 and the C6 carry the same line and were not run
+  (`planning/karaoke-eac3.md`, E4b, D6).
+
+**Karaoke in E-AC-3: authoring writes the levels, and the WebAssembly decoder reproduces it**
+
+- **An E-AC-3 stream flagged karaoke carries its Lo/Ro mixing group.** `eac3-encode` with `bsmod=7`
+  above 1/0 (and `plan::eac3_config()` for the Forge GUI and the library) writes `mixmdate` whether
+  or not `mixmeta` is given: Annex E has no `cmixlev` or `surmixlev` in `bsi`, the group is where
+  a decoder reads the levels of Annex C's reproduction, and a stream without one is reproduced at
+  the decoder's own default (-3 dB in Dolby's) and not at the level the author set. Its
+  `lorocmixlev` and `lorosurmixlev` come from `cmixlev=` and `surmixlev=` (-4.5 and -6 dB by
+  default, the level an AC-3 karaoke stream is made at); an explicit `lorosurmixlev` still wins.
+  A 2/0 stream has no such level and gets none (`planning/karaoke-eac3.md`, E5, D4).
+- **`encode` and `eac3-encode` say what `bsmod=7` is on mono and on 1+1.** Table 5.7 gives mono's
+  code 7 the meaning of a voice-over, and Annex A (Table A5.2) and Annex G (Table G.2) prohibit a
+  karaoke service on 1+1; both encoders accepted it silently. The stream is still written as
+  asked, with a warning (for an extra programme, naming which).
+- **The WebAssembly decoder reproduces an E-AC-3 karaoke stream.** `PushDecoder` read karaoke from
+  an AC-3 syncframe only; an E-AC-3 syncframe that is one independent substream with no object
+  layer and `bsmod` 7 above 1/0 is karaoke too, and `karaoke`/`karaokeVocals` apply to its side
+  fold as they do to AC-3's. The JavaScript package's documentation says so.
+- **`verify_karaoke_oracle.py`'s E-AC-3 cases** say what they are now that `bsmod=7` alone writes
+  the group, and one at a -3 dB surround level takes the place of the no-`mixmdate` stream the
+  command line can no longer write (the decoder's default for one is held by the library's tests).
 
 **Karaoke in E-AC-3: Hearth reproduces it, and a sink says which codecs it reproduces it for**
 
@@ -505,6 +545,12 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **The Network page says whether a board holds lyrics and which line it is on.** The sink report
+  has a Lyrics row: "not offered" for a board that lists no lyric commands, "none held", "held,
+  before the first line", or "line 3 of 12" with the line's text. The board reports the item and
+  the line's index; Hearth keeps the lines of the document it sent the group and reads the index
+  against them. Run against real boards, a line change follows the one before at the file's
+  spacing to the polling's resolution (S3a and P4a, a line every 3 s).
 - **The singer view moves about and shows the queue, and the Play page shows the lyrics.** The
   full-screen view's position bar is pressed or dragged to move the item (the words and the clock
   show the place held, and the item moves when it is let go, playing or paused), `Left` and
@@ -3404,6 +3450,41 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**Lyrics on a board**
+
+- **A board's lyric document cost ten times its text of the internal heap, and the default let it
+  be sixteen kilobytes.** A parsed document is a line and a word each in many small blocks, which
+  the allocator keeps in internal RAM whatever the total, and that is what Wi-Fi's receive buffers
+  and the decoder come out of. Measured on boards with a stream playing, word-timed lines took
+  about ten times their text at the peak: an S3 playing 5.1 was left 27 KB at its least with a
+  64-byte document, 7.8 KB with 2,000 bytes and 0.4 KB with 4,000; a P4 was left 66 KB with
+  16,000 bytes and once dropped the play; a C6's Wi-Fi receive buffers failed to allocate at 2,000.
+  A board with PSRAM now reads and holds the document there (`PsramScope`, with a replacement
+  `operator new` that takes PSRAM first for the one task that has it open): on the P4 a 16,000-byte
+  document costs 49 KB at the peak, not 157 KB, and on the S3 2,000 bytes cost 7.4 KB and 1.0 KB
+  once held. A board takes a document only while three times its size (twelve times of internal
+  RAM, where PSRAM has no room) and 8 KB of internal heap are free, and holds none, and says why,
+  otherwise; an S3 playing 5.1 E-AC-3 has a few hundred bytes to spare and takes none. The
+  defaults are what each part spares: none without PSRAM, 2,048 bytes on an S3, 16,384 on a P4.
+- **A document was sent to a board three times at the start of an item.** The first anchor follows
+  the document at once, the board's report of the item takes a round trip, and a member that does
+  not report the item is sent the document again. A document just sent is now given two seconds to
+  be reported, and an item a board was told has none (a document too big for it) is not sent
+  again. Recovery itself, a board that restarted mid-item being sent the document with the next
+  anchor, had no test: it has a unit test with a board that loses its document and a live case
+  that restarts a real one (S3: back holding the item 7 s after the restart).
+
+**Hearth: a member that comes back to a playing group**
+
+- **A member rejoining a group that was playing could stop the engine for good.** The group logs
+  from inside its own lock when a member starts, and the Network page's poll reads the group's
+  facts from inside `NetworkSinks`' lock; the host's trail was guarded by that lock, so the two
+  were taken in opposite orders and the engine, the poll and the host's own thread waited on each
+  other. It showed when a board was restarted in the middle of an item (the live case that does
+  it hung on its first run), and could on any rejoin while the page was open. The trail has a
+  mutex of its own, nothing is taken inside it, and a test makes a member leave and come back
+  sixty times while a thread polls.
 
 **Sendspin: a sink's heap per message**
 

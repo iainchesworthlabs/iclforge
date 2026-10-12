@@ -61,6 +61,7 @@
 // addFolder() reference has to resolve at link time even though no test
 // here calls them.
 #include "hearth_controller.cpp"
+#include "sink_lyrics_text.hpp"
 
 #include "iclforge/ac3/analysis/levels.hpp"
 #include "iclforge/audio/passthrough.hpp"
@@ -1050,4 +1051,37 @@ TEST_CASE("media_info_to_map: an E-AC-3 karaoke programme is karaoke to the deco
     // Not flagged at all.
     CHECK_FALSE(flag(3, "karaokeFlagged"));
     CHECK_FALSE(flag(3, "karaoke"));
+}
+
+// ---- the Network page's lyrics row (W7d) ----------------------------------------------------------
+
+TEST_CASE("sink_lyrics_text: a sink says whether it takes lyrics, holds none, or which line it is on",
+          "[hearth][network][lyrics]") {
+    namespace sp = iclforge::sendspin::player;
+    iclforge::hearth::SinkFacts facts;
+
+    // A sink that states no size lists no lyric commands.
+    facts.iclforge_support = sp::Support{};
+    CHECK(iclforge::hearth::ui::sink_lyrics_text(facts).toStdString() == "not offered");
+
+    // One that does, and has been sent nothing.
+    facts.iclforge_support->lyrics_max_bytes = 4096;
+    facts.iclforge_state = sp::State{};
+    CHECK(iclforge::hearth::ui::sink_lyrics_text(facts).toStdString() == "none held");
+
+    // It holds the item's, and its clock has the sound before the first line.
+    facts.iclforge_state->lyrics = sp::LyricsReport{.item = 7, .line = -1};
+    CHECK(iclforge::hearth::ui::sink_lyrics_text(facts).toStdString() == "held · before the first line");
+
+    // On a line, with the host's reading of the document: its count and the line's text.
+    facts.iclforge_state->lyrics = sp::LyricsReport{.item = 7, .line = 2};
+    facts.lyrics_lines = 12;
+    facts.lyrics_line_text = "Should auld acquaintance";
+    CHECK(iclforge::hearth::ui::sink_lyrics_text(facts).toStdString() ==
+          "line 3 of 12 · Should auld acquaintance");
+
+    // The text is not known (a document the host did not send, or a line past it): the line only.
+    facts.lyrics_lines.reset();
+    facts.lyrics_line_text.clear();
+    CHECK(iclforge::hearth::ui::sink_lyrics_text(facts).toStdString() == "line 3");
 }

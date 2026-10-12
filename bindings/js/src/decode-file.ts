@@ -31,7 +31,7 @@ export interface DecodedProgram {
   /** 0, 1 or 2 channels depending on whether `fold` was requested - the real iclforge::ac3::OutputStage fold, never a hand-rolled one. */
   fold: Float32Array[];
   durationSeconds: number;
-  /** Whether the stream is Annex C karaoke type (an AC-3 stream flagged bsmod 7 above 1/0), whatever reproduction was asked for. */
+  /** Whether the stream is Annex C karaoke type (an AC-3 stream, or an E-AC-3 programme of one independent substream, flagged bsmod 7 above 1/0), whatever reproduction was asked for. */
   karaoke: boolean;
   objectCount: number;
   objectLabels: string[];
