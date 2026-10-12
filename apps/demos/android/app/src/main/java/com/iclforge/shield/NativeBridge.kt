@@ -4,14 +4,15 @@ package com.iclforge.shield
  * The JNI surface `iclforge_jni.so` exposes to Kotlin, and the registration
  * call that goes the other way.
  *
- * `registerPassthroughBridge` is declared here now (implemented in
- * libs/audio/src/backend/android/passthrough.cpp) even though
- * [PassthroughBridge] itself does not exist yet - the native symbol name is
- * part of the JNI contract fixed by mangling
+ * `registerPassthroughBridge` is implemented in this app's own
+ * app/src/main/cpp/jni_entry.cpp, which hands the bridge to
+ * iclforge::audio's passthrough backend
+ * (libs/audio/src/backend/android/passthrough_bridge.hpp). The native symbol
+ * name is part of the JNI contract fixed by mangling
  * (`Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge`), so the
  * Kotlin-side declaration and the native `extern "C"` definition have to
- * agree on the package/class name from the start, not be introduced
- * together later.
+ * agree on the package/class name; the backend itself names no package, so
+ * another app can link it.
  */
 object NativeBridge {
     const val RECORD_IDLE = 0

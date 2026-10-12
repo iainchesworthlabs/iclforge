@@ -733,6 +733,28 @@ adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
 build, also drop a `signing.key` asset into `app/src/main/assets/` as described in
 [Object signing](#object-signing).
 
+### The native libraries Hearth for Android links
+
+The Shield app's Gradle wrapper has no vcpkg, so it leaves `ICLFORGE_BUILD_HEARTH` off and cannot
+build `libs/sendspin`. A CMake preset does, under the same NDK:
+
+```bash
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
+cmake --preset config-android-arm64
+cmake --build --preset build-android-arm64
+```
+
+It builds `libs/lyrics` and `libs/sendspin` for `arm64-v8a` with the `hearth` feature's five
+packages (cpp-httplib, mbedTLS, libFLAC, Opus, mdns) from vcpkg's `arm64-android` triplet, and
+links the two test binaries (`iclforge-lyrics-tests`, `iclforge-sendspin-tests`). The first
+configure builds the ports and takes the time that takes; with them cached it took 16 seconds here,
+and the build 82. The binaries are arm64, so they are linked and not run by the build: Catch2's test
+discovery runs when `ctest` does (`CMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST`). Pushed to a
+Shield with `adb`, the lyrics suite (83 cases) and the sendspin suite (243) passed on 2026-10-12; the
+one case that reads a fixture by the build host's absolute path needs that file put at that path
+relative to the working directory. This is the groundwork of [Hearth for Android](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-android.md),
+not a second app.
+
 ## Release / CI
 
 The app builds alongside the desktop packages rather than only ever being hand-built locally:

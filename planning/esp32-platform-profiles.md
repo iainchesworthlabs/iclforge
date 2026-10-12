@@ -476,7 +476,7 @@ on the high one is run again. Making the line wait for the idle task is a firmwa
 made here.
 
 **Recorded (PR 7, `s3-n16r8`):** S3b, not S3a (S3a was booked by another session; the S3a run is
-the cross-check and is not done), the identity image `v0.10.0-beta.1-4175-g79d2e7618-`, profile
+the cross-check, recorded below under "Cross-checked on S3a"), the identity image `v0.10.0-beta.1-4175-g79d2e7618-`, profile
 hash `c4b8d369cf36`, five plays a row after a restart: AC-3 2.0 124 permille and E-AC-3 2.0 88, 938
 frames each, no underruns, 0 ms dry, queue headroom 5 ms, decode stack 18,256 and 18,068 bytes
 free; boot line `internal_free=86223 largest=31744 headroom=23552 verdict=ok`. A second run of
@@ -580,6 +580,17 @@ their locked values still equal the Kconfig's defaults (and the P4 builds of PR 
 and a hash that is not: it says which hash the baseline was recorded under when the run's
 differs (a one-line note), and the PR that changes a locked default carries the re-record.
 
+**Cross-checked on S3a (`s3-n16r8`, after PR 12).** The plain image
+`v0.10.0-beta.1-4460-g12c4fdaaf` (hash `0fb46709d4bb`) on S3a, against the S3b baseline above, by
+the baseline's own method (five plays a row, the worst of eight restarts): **holds with no
+finding.** AC-3 2.0 at 124 permille against 123 (S3a's five plays 122 to 125, S3b's 122 to 124) and
+E-AC-3 2.0 at 87 against 87 (87 to 88 against 86 to 88); the decode stack's free bytes are identical
+(18,256 and 18,064); boot free RAM at its worst 85,811 against 85,755. **Both boards show the
+same second mode** in boot free RAM, 102,655 on two of S3a's eight boots and 102,503 on two of
+S3b's, so it is the firmware's (the Sendspin start task's stack freed before the line is printed),
+not a board's. With the AC-4 image's cross-check in PR 12, both S3 profiles have been run on both
+boards, and the two agree to within the rows' own noise. S3a was put back on its 4065 and released.
+
 **Re-recorded (the two AC-4 profiles, the 40 KB decode stack).** #1446 gave the burst player's
 decode task 40,960 bytes where the decoder is, and the two AC-4 profiles locked 32,768
 (`ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES`). The lock commit moves the value, which is a
@@ -679,7 +690,7 @@ Still open:
 1. **The recording board for each profile.** Proposed: S3a for both S3 profiles with S3b as the
    cross-check, C6 `.117` for `c6-16mb`, P4a `.99` for both P4 profiles (P4b needs a USB flash
    after any OTA). Done so: S3a for `s3-n16r8-ac4` with the S3b cross-check, S3b for
-   `s3-n16r8` (its S3a cross-check is not run), the C6 and P4a for theirs.
+   `s3-n16r8` (cross-checked on S3a), the C6 and P4a for theirs.
 2. **The tolerance:** now measured, not proposed: the larger of 5% and 5 permille over the
    median, for the decoder's time per frame; 0 underruns; the stack's margin within 512 bytes of
    the baseline's (see the ratchet above). Say if looser or tighter.
