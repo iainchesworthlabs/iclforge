@@ -1438,218 +1438,233 @@
 <context>
     <name>LyricTimingDialog</name>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="125"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="155"/>
         <source>Next line: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="126"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="156"/>
         <source>Every line has a time. Go on to the words, or save.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="130"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="163"/>
         <source>Next word: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="133"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="166"/>
         <source>Stamp the lines first.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="136"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="169"/>
         <source>Play to the first line, then press Space as each word starts.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="137"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="170"/>
         <source>Every word in this line is pressed. Play on to the next line.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="168"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="236"/>
         <source>Saved as %1. A file that was there is kept once, as %1.bak.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="184"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="254"/>
         <source>Choose the words to time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="185"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="255"/>
         <source>Lyrics and text (*.lrc *.txt)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="185"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="255"/>
         <source>All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="192"/>
-        <location filename="../qml/LyricTimingDialog.qml" line="204"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="262"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="274"/>
         <source>Time the lyrics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="222"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="292"/>
         <source>There are no words to time for this item.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="229"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="299"/>
         <source>Choose a text file with one line of the words to a line (an .lrc file with no times will do), saved as UTF-8 or UTF-16.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="237"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="307"/>
         <source>Choose a text file…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="260"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="330"/>
         <source>What Space stamps</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="262"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="332"/>
         <source>1 · Lines</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="263"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="333"/>
         <source>2 · Words</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="276"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="346"/>
         <source>Every stamped line has its words spread over it by their letters, as a guess: slanted and muted. Play, and press Space as each word starts; a pressed word turns solid.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="274"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="344"/>
         <source>Play the item and press Space as each line starts. A line can be stamped again, or nudged, afterwards.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="291"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="162"/>
+        <source>Space presses the chosen word again: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="358"/>
+        <source>To put one word right, choose it: the item is cued just before it. Press Space as it starts, or stamp it again, or nudge it 10 ms at a time.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="372"/>
         <source>Pause</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="291"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="372"/>
         <source>Play</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="296"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="377"/>
         <source>Back 5 s</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="301"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="382"/>
         <source>Forward 5 s</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="316"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="397"/>
         <source>Start of line · Space</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="317"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="398"/>
         <source>Start of word · Space</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="460"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="572"/>
+        <source>Chosen word: %1, in line %2, starts at %3.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricTimingDialog.qml" line="589"/>
         <source>%1 of %2 lines have a time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="468"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="598"/>
         <source>Stamp again</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="474"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="604"/>
         <source>−10 ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="480"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="610"/>
         <source>+10 ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="490"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="620"/>
         <source>Singer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="497"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="627"/>
         <source>Who sings the selected line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="499"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="629"/>
         <source>Not marked</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="502"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="632"/>
         <source>Both</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="512"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="642"/>
         <source>Name of V1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="514"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="644"/>
         <source>Name of the first singer, saved in the file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="521"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="651"/>
         <source>Name of V2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="523"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="653"/>
         <source>Name of the second singer, saved in the file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="533"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="663"/>
         <source>Reaction time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="545"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="675"/>
         <source>Reaction time in milliseconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="548"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="678"/>
         <source>ms taken off each press</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="557"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="687"/>
         <source>Save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="562"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="692"/>
         <source>Discard and close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LyricTimingDialog.qml" line="562"/>
+        <location filename="../qml/LyricTimingDialog.qml" line="692"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
