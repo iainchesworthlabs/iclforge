@@ -77,6 +77,7 @@ TestCase {
         StreamPlayerController.pause();
         StreamPlayerController.karaokeReproduction = "asCoded";
         StreamPlayerController.karaokeVocals = "both";
+        StreamPlayerController.resetKaraokeLevels();
         while (EncoderController.sourceModel.length > 0) {
             EncoderController.removeSource(0);
         }
@@ -410,6 +411,90 @@ TestCase {
         tryVerify(() => StreamPlayerController.channelMeta.length === 3, 30000);
         compare(findByName(ctx.win, "karaokePlays-C").text, "M + V1");
         compare(findByName(ctx.win, "karaokePlays-L").text, "L");
+    }
+
+    // The decoded stream the player holds, as a WAV, and the peak of one of its channels: what the
+    // reproduction actually put there, not only that the page says so.
+    function exportedPeak(name, channel) {
+        const out = audioFixtures.folder().toString() + "/" + name;
+        StreamPlayerController.exportDecodedWav(out);
+        tryVerify(() => !StreamPlayerController.exporting, 30000);
+        return audioFixtures.channelPeak(out, channel);
+    }
+
+    function test_thePartLevelsAreTheCapablePlayersAndTakeAPartOutOfTheSums() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        press(ctx, "karaokeNextButton");   // Levels
+        press(ctx, "karaokeNextButton");   // Hear: the stream is built
+        tryCompare(ctx.flow, "currentStepKey", "hear", 5000);
+        tryCompare(ctx.flow, "previewState", "ready", 60000);
+
+        // The levels are the capable player's: closed under the aware one, open under capable.
+        const levels = findByName(ctx.win, "karaokePartLevels");
+        tryCompare(StreamPlayerController, "karaokeReproduction", "aware", 5000);
+        compare(levels.enabled, false);
+        mouseClick(findByName(findByName(ctx.win, "karaokeListening"), "seg-capable"));
+        tryCompare(StreamPlayerController, "karaokeReproduction", "capable", 5000);
+        compare(levels.enabled, true);
+        mouseClick(findByName(findByName(ctx.win, "karaokeVocals"), "seg-none"));
+        tryCompare(StreamPlayerController, "karaokeVocals", "none", 5000);
+        tryVerify(() => !StreamPlayerController.busy && StreamPlayerController.channelMeta.length === 3, 30000);
+
+        // At the table's own levels the centre is the melody, and it is a real signal.
+        compare(findByName(ctx.win, "karaokePlays-C").text, "M");
+        compare(findByName(ctx.win, "karaokeLevelText-M").text, "0 dB");
+        const at_table = exportedPeak("kl-table.wav", 2);
+        verify(at_table > 0.01, "the melody is heard: " + at_table);
+
+        // The melody 6 dB down: the centre is that fraction of it, exactly - no vocals are
+        // chosen, so nothing else is scaled - and the page still says what plays.
+        StreamPlayerController.karaokeMelodyDb = -6;
+        tryVerify(() => !StreamPlayerController.busy && StreamPlayerController.hasResult, 30000);
+        compare(findByName(ctx.win, "karaokeLevelText-M").text, "-6 dB");
+        const six_down = exportedPeak("kl-six.wav", 2);
+        fuzzyCompare(six_down, at_table * Math.pow(10, -6 / 20), 1e-4);
+        compare(findByName(ctx.win, "karaokePlays-C").text, "M");
+
+        // All the way down is off: nothing in the centre, and the page takes it out of what plays.
+        StreamPlayerController.karaokeMelodyDb = -24;
+        tryVerify(() => !StreamPlayerController.busy && StreamPlayerController.hasResult, 30000);
+        compare(findByName(ctx.win, "karaokeLevelText-M").text, "off");
+        compare(findByName(ctx.win, "karaokePlays-C").text, "silent");
+        compare(exportedPeak("kl-off.wav", 2), 0.0);
+        verify(exportedPeak("kl-off-left.wav", 0) > 0.01, "the backing is still heard");
+
+        // A level is held to the library's span, and Reset puts all three back.
+        StreamPlayerController.karaokeVocal1Db = 40;
+        compare(StreamPlayerController.karaokeVocal1Db, 12);
+        compare(findByName(ctx.win, "karaokeLevelText-V1").text, "+12 dB");
+        StreamPlayerController.karaokeVocal2Db = -100;
+        compare(StreamPlayerController.karaokeVocal2Db, -24);
+        verify(ctx.flow.levelsMoved);
+        mouseClick(findByName(ctx.win, "karaokeResetLevels"));
+        compare(StreamPlayerController.karaokeMelodyDb, 0);
+        compare(StreamPlayerController.karaokeVocal1Db, 0);
+        compare(StreamPlayerController.karaokeVocal2Db, 0);
+        tryVerify(() => !StreamPlayerController.busy && StreamPlayerController.hasResult, 30000);
+        compare(findByName(ctx.win, "karaokePlays-C").text, "M");
+        verify(exportedPeak("kl-reset.wav", 2) > 0.01);
+    }
+
+    function test_aStreamWithNoVocal2HasNoLevelForIt() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        press(ctx, "karaokeNextButton");
+        press(ctx, "karaokeNextButton");
+        tryCompare(ctx.flow, "currentStepKey", "hear", 5000);
+        tryCompare(ctx.flow, "previewState", "ready", 60000);
+        // The levels are the capable player's; a part the stream does not have has none.
+        mouseClick(findByName(findByName(ctx.win, "karaokeListening"), "seg-capable"));
+        tryCompare(StreamPlayerController, "karaokeReproduction", "capable", 5000);
+        tryCompare(findByName(ctx.win, "karaokeLevel-M"), "enabled", true, 5000);
+        compare(findByName(ctx.win, "karaokeLevel-V1").enabled, true);
+        compare(findByName(ctx.win, "karaokeLevel-V2").enabled, false);
     }
 
     // ---- Save -----------------------------------------------------------------------

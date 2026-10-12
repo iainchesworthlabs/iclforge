@@ -104,6 +104,21 @@ Dialog {
             Action { text: qsTr("Lyrics in full screen; Esc leaves it") }
         }
 
+        // The singer view's own keys (LyricScreen.qml), which only act while it is open.
+        Kicker { text: qsTr("SINGER VIEW") }
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 2
+            columnSpacing: Theme.space4
+            rowSpacing: Theme.space1
+            Key { text: "Space" }
+            Action { text: qsTr("Pause or play") }
+            Key { text: "Left, Right" }
+            Action { text: qsTr("Back or forward five seconds") }
+            Key { text: "Q" }
+            Action { text: qsTr("Show or hide the queue") }
+        }
+
         RowLayout {
             Layout.topMargin: Theme.space3
             Item { Layout.fillWidth: true }

@@ -1,6 +1,6 @@
 # Karaoke, phase 2: findings
 
-!!! note "Status as of 2026-10-11: read from the code on `main` at `c6aef2b00`; nothing here is built"
+!!! note "Status as of 2026-10-12: read from the code on `main` at `c6aef2b00` on 2026-10-11; what it recommends is built, apart from W12's panel"
     The research behind [the phase 2 plan](karaoke-phase2.md): [word timing](#w3-word-timing-the-shapes)
     (W3), [lyrics for a network group](#w4-lyrics-for-a-network-group) (W4) and
     [Android and a browser page](#w5-android-and-a-browser-page) (W5). Each ends in a
@@ -10,6 +10,7 @@
     Where a claim was measured it says so; the rest is read from the source and says that, so a
     later reader can tell which to trust and which to run. The sizes are the plan's: **S** is one
     small pull request, **M** one of a few hundred lines with its tests, **L** two to four stacked.
+    The last section was added on 2026-10-12, after the builds, and records what a board showed.
 
 ## W3: word timing, the shapes
 
@@ -266,6 +267,41 @@ there is one and from start-and-nudge where there is not, and nothing derived fr
 events could drive beyond a strip (an OSC message a visual rig reads, say) is the owner's call; the
 library's cue type is the same either way.
 
+### The media-session back ends, as found
+
+Read on 2026-10-12 for the position source D9 chose, from each platform's own documentation; the
+sources are linked in the table, and a row says where a fact is **not** from one. The first
+question, which application a session belongs to, has a different answer on each platform, and is
+the thing a back end has to get right.
+
+| | Windows | Linux | macOS |
+|---|---|---|---|
+| Interface | `Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager`: `GetSessions()`, and for each session `GetTimelineProperties()`, `GetPlaybackInfo()` and `TryGetMediaPropertiesAsync()` ([session](https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssession)) | MPRIS 2, `org.mpris.MediaPlayer2.Player`, on the D-Bus session bus ([Player](http://specifications.freedesktop.org/mpris/latest/Player_Interface.html)) | The now-playing information of `MediaRemote.framework`: a **private** framework, so nothing here is from Apple's documentation |
+| The position | `Position`, "current as of `LastUpdatedTime`" (a UTC time), beside `StartTime`, `EndTime`, `MinSeekTime` and `MaxSeekTime` ([timeline](https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssessiontimelineproperties)); a reader carries it forward at the playback rate while playing | `Position`, a signed 64-bit count of **microseconds**, read-only; "The `PropertiesChanged` signal is **not** emitted when this property changes", so it is asked for, and a jump is announced by `Seeked` ([Player](http://specifications.freedesktop.org/mpris/latest/Player_Interface.html)) | An elapsed time with the time stamp it was true at and a rate (names from general knowledge of the framework; **not verified**) |
+| Playing or paused | `GetPlaybackInfo()`'s playback status and rate | `PlaybackStatus`: `Playing`, `Paused` or `Stopped`; `Rate`, a multiplier that is never 0 | The rate: 0 is paused (general knowledge; **not verified**) |
+| Which application | `SourceAppUserModelId` **only**: no process id ([session](https://learn.microsoft.com/en-us/uwp/api/windows.media.control.globalsystemmediatransportcontrolssession)). A desktop program's is usually its executable's name (`Spotify.exe`); a packaged one is `<family>!<application>`; a browser can be neither (general knowledge) | The bus name, `org.mpris.MediaPlayer2.<name>`, with `.instance<pid>` added by a second instance of one player ([spec](http://specifications.freedesktop.org/mpris/latest/)); `Identity` (a friendly name) and `DesktopEntry` (a `.desktop` file's basename) ([root](http://specifications.freedesktop.org/mpris/latest/Media_Player.html)); the bus daemon says which process owns a name (general knowledge) | The client's process and bundle (general knowledge; **not verified**) |
+| The track | `TryGetMediaPropertiesAsync()`: title and artist | `Metadata`: `mpris:trackid` (required whenever a track is current), `mpris:length`, `xesam:title`, `xesam:artist` | A title and a duration in the same dictionary (**not verified**) |
+| Permission and floor | Windows 10, version 1809; the page lists an app capability, `globalMediaControl`, for packaged applications | None on a desktop session bus; a sandboxed program may need a permission to talk to the names (general knowledge, **not verified**) | Developers report that macOS 15.4 and later withholds it from programs Apple has not entitled ([an adapter project's account](https://github.com/ungive/mediaremote-adapter), [a Keyboard Maestro thread](https://forum.keyboardmaestro.com/t/beware-upgrading-to-macos-15-4-if-you-need-now-playing-data/40285)); Apple has said nothing that was found |
+
+What that does to the design, which is why the reader is a seam and not one function:
+
+- **A session is matched to an application by name, not by process.** Windows gives no process id,
+  so the executable's name (the room already has the image path) is compared to the session's
+  identifier; Linux can use the process id as well. A browser's session on Windows may be named by
+  neither, so a person can **choose** among the sessions that are playing when none matched.
+- **The position is a read, not an event, on Linux**, and an event on Windows that a poll gives
+  just as well; both are carried forward at the rate between reads. A read every half second is
+  enough to follow a seek within a line.
+- **A track's identity is needed**: a session's position starts at 0 for the next track, which
+  would otherwise be followed against the last track's lyrics. Title, artist and length are the
+  three that every platform above gives.
+- **macOS is the weak one.** The only reader named for it is private and, by developers' accounts,
+  gated since 15.4; a Crucible built there returns nothing and says so, and the strip keeps Start
+  and the nudge. Whether to read it at all, to use a documented route for particular players
+  (AppleScript to Music and Spotify, which asks the person for permission), or to leave macOS to
+  Start and the nudge is the owner's call; the code that exists reads the private framework only,
+  and no Mac has executed it.
+
 ### Where the module lives
 
 A **library under `libs/`**. `apps/shared` would reach Hearth, Crucible and the Forge programs and
@@ -412,3 +448,27 @@ as it is.
 | Android | Not a slice: a player app first |
 | W13 | The lyric module to a `lyrics` library under `libs` first (S to M), before W6's writer; Crucible has no position source, so its import needs one (D9); CD+G is a picture, not text; "mini karaoke" read as MIDI karaoke (D10) |
 | E19 (D13) | The Forge GUI's timing tool: A leave it and point at Hearth (**S**), B open the stream in Hearth from the GUI (**M**, needs Hearth to take a file argument, which it does not), C share the session and dialog (**L**, and the GUI's position is not delay-corrected); the lyric file is unchanged under A and B, and under C the GUI becomes a writer of `.lrc` ([above](#e19-timing-the-words-in-the-forge-gui-the-options)) |
+
+## What the build found on an S3 board
+
+Found on 2026-10-12, while building W7d (the lyrics to a board, #1340) and then running its tree
+and `main`'s on a real ESP32-S3 by OTA. Nothing above predicted these; each is a fact about the
+internal RAM an S3 has left once Wi-Fi is up, or about a build that nothing in the pull-request
+gate runs.
+
+| What was tried | Why it matters | Result |
+|---|---|---|
+| W7d's tree, which links the lyric library | The Sendspin decode task takes a 32,768-byte stack from internal RAM (`ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES`); with Wi-Fi up the largest internal block is 31,744 bytes, so the stack fitted only by what was allocated before it. Linking the lyric library alone added 320 bytes of `.bss`, the locale objects that `<fstream>` and `<filesystem>` pull in | The player did not start, and the OTA rolled the image back after its 300 s trial |
+| `main`'s S3 release image shape, `sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast` (the step "Build the S3 board's Sendspin player and package its image" of `build-esp32s3`, `.github/workflows/_build.yml`), before #1340 | CI builds and packages this image and never runs it | It built and did not start its Sendspin player on a board, for the same reason |
+| `main` at #1340, same shape | #1336 made the root `CMakeLists.txt` add `libs/lyrics` only when neither minimum-footprint profile is on, because the ESP-IDF component's archive does not stage it; #1340 made the sink's player link `iclforge::lyrics`; a sink build is a minimum-footprint build | The sink firmware did not configure (`Target "__idf_iclforge" links to: iclforge::lyrics but the target was not found`, `firmware/esp-idf/iclforge/CMakeLists.txt`). The PR Gate builds no ESP32 sink image, so neither pull request saw it |
+| `main` with #1344, same shape | #1344 adds `libs/lyrics` also when `ICLFORGE_SENDSPIN_PLAYER_ONLY` is set, which the component sets for a sink and a packed archive never has | It builds and starts its player on an S3 board (flashed by OTA on trial) |
+
+**The stack's fix** is in the tree since #1340: `BurstPlayerConfig::stack_in_psram` and the Kconfig
+symbol `ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM` (`firmware/hearth-sink/main/Kconfig.projbuild`),
+which defaults to 1 for an ESP32-S3 with PSRAM, so the stack no longer depends on what was
+allocated before it. The Kconfig symbol was new: a build directory configured before it existed
+keeps its `sdkconfig`, and the symbol appears only once that file is deleted.
+
+**What to re-check.** An S3 measurement made with the Sendspin player in an image of the shape above,
+built from a tree before #1340, was not made with the player running. An image built from a tree
+with `stack_in_psram` was.

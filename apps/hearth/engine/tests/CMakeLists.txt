@@ -89,9 +89,11 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     find_package(Qt6 6.8 QUIET COMPONENTS Core Gui Qml)
     if(Qt6_FOUND)
         add_executable(hearth_controller_tests
+            ../../ui/tests/test_command_line.cpp
             ../../ui/tests/test_hearth_controller.cpp
             ../../ui/tests/test_karaoke_controller.cpp
             ../../ui/tests/test_microphone_controller.cpp
+            "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/command_line.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/karaoke_controller.cpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/karaoke_controller.hpp"
             "${CMAKE_SOURCE_DIR}/apps/hearth/ui/src/microphone_controller.cpp"

@@ -33,6 +33,15 @@ TestCase {
         for (const app of [7, 8, 9]) {
             CrucibleLyrics.clear(app);
         }
+        // No session of an earlier case is left for the next to be matched with.
+        CrucibleLyrics.applySessionList([], 0);
+        // And the events out are off again, with the destination they were given.
+        CrucibleLyrics.oscEnabled = false;
+        CrucibleLyrics.oscHost = "127.0.0.1";
+        CrucibleLyrics.oscPort = 9000;
+        CrucibleLyrics.oscLines = true;
+        CrucibleLyrics.oscWords = true;
+        CrucibleLyrics.oscPosition = false;
     }
 
     // --- the controller, on a clock of the test's own ------------------------------
@@ -333,5 +342,389 @@ TestCase {
         strip.app = { app: 8 };
         tryCompare(strip, "fileName", "b.lrc", 5000);
         compare(strip.lines.length, 1);
+    }
+
+    // --- the position from a media session (planning/karaoke-phase2.md, D9) ------------------------
+    // The reader is switched off in this suite (qml_test_main.cpp), so a machine's own music does
+    // not move a case; what the system would have read is given to the controller as a script, at
+    // the time of the case's own choosing.
+
+    // One session as the script says it: the position is as of the `now` it is applied at.
+    function session(id, name, title, positionMs, playback) {
+        return {
+            id: id, name: name, executable: id.toLowerCase().replace(/\.exe$/, ""),
+            title: title, artist: "Anon", durationMs: 180000, hasPosition: true,
+            positionMs: positionMs, rate: 1.0, playback: playback || "playing"
+        };
+    }
+
+    function importForSpotify(app) {
+        verify(CrucibleLyrics.importText(app, "song.lrc", song, 12000));
+        CrucibleLyrics.setApplication(app, "Spotify", "C:\\Users\\a\\AppData\\Roaming\\Spotify\\Spotify.exe", "");
+    }
+
+    function test_aMediaSessionIsThePositionWhenTheApplicationPublishesOne() {
+        importForSpotify(7);
+        // Read, and nothing playing: waiting for one, and not started.
+        CrucibleLyrics.applySessionList([], 100000);
+        compare(CrucibleLyrics.positionSource(7), "session");
+        compare(CrucibleLyrics.sessionState(7), "waiting");
+        compare(CrucibleLyrics.running(7), false);
+        compare(CrucibleLyrics.positionMs(7, 100000), -1);
+
+        // It publishes: followed with no press of Start, from the player's own position, carried
+        // forward at its rate until the next read.
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 2250)], 100000);
+        compare(CrucibleLyrics.sessionState(7), "following");
+        compare(CrucibleLyrics.sessionLabel(7), "Spotify");
+        compare(CrucibleLyrics.sessionTrack(7), "Auld Lang Syne - Anon");
+        compare(CrucibleLyrics.running(7), true);
+        compare(CrucibleLyrics.positionMs(7, 100000), 2250);
+        compare(CrucibleLyrics.positionMs(7, 101000), 3250);
+        // 2.25 s in is the third word of the first line.
+        const at = CrucibleLyrics.cursor(7, 100000);
+        compare(at.line, 0);
+        compare(at.word, 2);
+        // The nudge is still on top of whichever origin.
+        CrucibleLyrics.setNudgeMs(7, 1000);
+        compare(CrucibleLyrics.cursor(7, 100000).positionMs, 1250);
+        CrucibleLyrics.setNudgeMs(7, 0);
+
+        // A pause in the player holds the words where they were: what a clock cannot see.
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 4000, "paused")], 102000);
+        compare(CrucibleLyrics.positionMs(7, 107000), 4000);
+        compare(CrucibleLyrics.running(7), true);
+        // And a seek in it is followed: 8.5 s is in the last line.
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 8500)], 108000);
+        compare(CrucibleLyrics.positionMs(7, 108000), 8500);
+        compare(CrucibleLyrics.cursor(7, 108000).line, 2);
+    }
+
+    function test_theSessionOfAnotherApplicationIsOfferedAndNotFollowedUnlessChosen() {
+        importForSpotify(7);
+        CrucibleLyrics.applySessionList([session("chrome.exe", "Chrome", "Another Song", 1000)], 50000);
+        compare(CrucibleLyrics.sessionState(7), "waiting");
+        compare(CrucibleLyrics.running(7), false);
+        const choices = CrucibleLyrics.sessions(7);
+        compare(choices.length, 1);
+        compare(choices[0].id, "chrome.exe");
+        compare(choices[0].matched, false);
+
+        // Chosen by a person, it is the one followed, and held while it is there.
+        CrucibleLyrics.useSession(7, "chrome.exe");
+        compare(CrucibleLyrics.sessionState(7), "following");
+        compare(CrucibleLyrics.sessionLabel(7), "Chrome");
+        compare(CrucibleLyrics.sessions(7)[0].matched, true);
+    }
+
+    function test_aSessionThatGoesAwayIsCarriedOnByHandFromWhereItWas() {
+        importForSpotify(7);
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 2000)], 10000);
+        compare(CrucibleLyrics.sessionState(7), "following");
+        // The player quits 3 s later: the words do not jump or stop, they go on by the clock.
+        CrucibleLyrics.applySessionList([], 13000);
+        compare(CrucibleLyrics.sessionState(7), "lost");
+        compare(CrucibleLyrics.positionSource(7), "hand");
+        compare(CrucibleLyrics.running(7), true);
+        compare(CrucibleLyrics.positionMs(7, 13000), 5000);
+        compare(CrucibleLyrics.positionMs(7, 14000), 6000);
+
+        // A session that was paused when it went has no time to carry on with: held, stopped.
+        importForSpotify(8);
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 2000, "paused")], 20000);
+        compare(CrucibleLyrics.sessionState(8), "following");
+        CrucibleLyrics.applySessionList([], 25000);
+        compare(CrucibleLyrics.sessionState(8), "lost");
+        compare(CrucibleLyrics.running(8), false);
+    }
+
+    function test_aNewTrackIsNotFollowedAgainstTheLyricsOfTheLast() {
+        importForSpotify(7);
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 2000)], 10000);
+        compare(CrucibleLyrics.sessionState(7), "following");
+        // The same track a read later is the same track.
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 3000)], 11000);
+        compare(CrucibleLyrics.sessionState(7), "following");
+        // Another title: the lyrics are for the last, and are not followed against this.
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Another Song", 500)], 12000);
+        compare(CrucibleLyrics.sessionState(7), "changed");
+        compare(CrucibleLyrics.running(7), false);
+        compare(CrucibleLyrics.positionMs(7, 12000), -1);
+        compare(CrucibleLyrics.sessionTrack(7), "Another Song - Anon");
+        // Following it anyway binds the lyrics to this track.
+        CrucibleLyrics.useSession(7);
+        compare(CrucibleLyrics.sessionState(7), "following");
+        compare(CrucibleLyrics.positionMs(7, 12000), 500);
+    }
+
+    function test_startIsByHandAndLetsGoOfTheSessionUntilItIsFollowedAgain() {
+        importForSpotify(7);
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 2000)], 10000);
+        CrucibleLyrics.startAt(7, 30000);
+        compare(CrucibleLyrics.positionSource(7), "hand");
+        compare(CrucibleLyrics.sessionState(7), "hand");
+        compare(CrucibleLyrics.positionMs(7, 31500), 1500);
+        // A later read does not take it back.
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 9000)], 31000);
+        compare(CrucibleLyrics.positionMs(7, 31500), 1500);
+        // Stop stops it, and it stays stopped through the next read.
+        CrucibleLyrics.stop(7);
+        compare(CrucibleLyrics.running(7), false);
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 9500)], 32000);
+        compare(CrucibleLyrics.running(7), false);
+        // The session again.
+        CrucibleLyrics.useSession(7);
+        compare(CrucibleLyrics.sessionState(7), "following");
+        compare(CrucibleLyrics.positionMs(7, 32000), 9500);
+    }
+
+    function test_aSessionThatPublishesNoPositionCannotBeFollowed() {
+        importForSpotify(7);
+        const stream = session("Spotify.exe", "Spotify", "Radio", 0);
+        stream.hasPosition = false;
+        CrucibleLyrics.applySessionList([stream], 10000);
+        compare(CrucibleLyrics.sessionState(7), "no-timeline");
+        compare(CrucibleLyrics.running(7), false);
+        compare(CrucibleLyrics.positionMs(7, 10000), -1);
+    }
+
+    function test_theStripSaysWhereThePositionComesFromAndOffersWhatIsPlaying() {
+        const strip = newStrip({ app: 7, name: "Spotify", imagePath: "C:\\x\\Spotify.exe", appId: "" });
+        verify(CrucibleLyrics.importText(7, "song.lrc", song, 12000));
+        CrucibleLyrics.applySessionList([session("chrome.exe", "Chrome", "Another Song", 1000)], 10000);
+        tryCompare(strip, "sessionState", "waiting", 5000);
+        // Nothing matched; one is playing: it is offered as a button.
+        tryVerify(function() { return findChild(strip, "lyricsSessions").visible; }, 5000);
+        const offered = findChild(strip, "lyricsSession");
+        verify(offered !== null);
+        compare(offered.text, "Chrome \u00b7 Another Song");
+
+        // Spotify starts: matched by its executable, followed with no press, and the strip says so.
+        CrucibleLyrics.applySessionList([session("Spotify.exe", "Spotify", "Auld Lang Syne", 2250)], CrucibleLyrics.nowMs());
+        tryCompare(strip, "following", true, 5000);
+        compare(strip.sessionState, "following");
+        compare(findChild(strip, "lyricsHint").text,
+                qsTr("Following %1: %2").arg("Spotify").arg("Auld Lang Syne - Anon"));
+        compare(findChild(strip, "lyricsSessions").visible, false);
+        compare(findChild(strip, "lyricsUseSession").visible, false);
+
+        // Start is by hand, and the strip offers the session back.
+        findChild(strip, "lyricsStart").clicked();
+        tryCompare(strip, "positionSource", "hand", 5000);
+        compare(findChild(strip, "lyricsUseSession").visible, true);
+        findChild(strip, "lyricsUseSession").clicked();
+        tryCompare(strip, "positionSource", "session", 5000);
+    }
+
+    // --- events out over OSC (planning/karaoke-phase2.md, D9's alternative) ----------------------
+
+    function test_theEventsOutAreOffUntilTurnedOnAndAnAddressThatIsNotIpv4IsSaid() {
+        compare(CrucibleLyrics.oscEnabled, false);
+        compare(CrucibleLyrics.oscHost, "127.0.0.1");
+        compare(CrucibleLyrics.oscPort, 9000);
+        compare(CrucibleLyrics.oscLines, true);
+        compare(CrucibleLyrics.oscWords, true);
+        compare(CrucibleLyrics.oscPosition, false);
+        compare(CrucibleLyrics.oscProblem, "");
+
+        // A name is not resolved (nothing here may block on DNS), and says so; "localhost" is this machine.
+        CrucibleLyrics.oscHost = "example.com";
+        verify(CrucibleLyrics.oscProblem.length > 0);
+        CrucibleLyrics.oscHost = "300.1.1.1";
+        verify(CrucibleLyrics.oscProblem.length > 0);
+        CrucibleLyrics.oscHost = "localhost";
+        compare(CrucibleLyrics.oscProblem, "");
+        CrucibleLyrics.oscHost = "192.168.1.20";
+        compare(CrucibleLyrics.oscProblem, "");
+
+        // A port is held to 1 to 65535.
+        CrucibleLyrics.oscPort = 70000;
+        compare(CrucibleLyrics.oscPort, 65535);
+        CrucibleLyrics.oscPort = 0;
+        compare(CrucibleLyrics.oscPort, 1);
+    }
+
+    function test_whatTheEventsWouldSayIsReadableWithoutASocket() {
+        importForSpotify(7);
+        CrucibleLyrics.startAt(7, 10000);
+        // 1.25 s in: the first line, at its first word.
+        const first = CrucibleLyrics.oscMessagesAt(11250);
+        compare(first[0], "/crucible/lyrics/state Spotify following");
+        verify(first[1].indexOf("/crucible/lyrics/line Spotify 0 Should auld acquaintance 1000 ") === 0, first[1]);
+        verify(first[2].indexOf("/crucible/lyrics/word Spotify 0 0 Should 1000 1500") === 0, first[2]);
+        // The same moment says nothing again; 1.6 s in is the second word.
+        compare(CrucibleLyrics.oscMessagesAt(11260).length, 0);
+        const next = CrucibleLyrics.oscMessagesAt(11600);
+        compare(next.length, 1);
+        verify(next[0].indexOf("/crucible/lyrics/word Spotify 0 1 auld 1500 2000") === 0, next[0]);
+    }
+
+    function test_theLyricEventsArriveOverUdpAtTheDestinationChosen() {
+        const port = TestServices.oscListen();
+        verify(port > 0, "no loopback port could be had");
+        CrucibleLyrics.oscHost = "127.0.0.1";
+        CrucibleLyrics.oscPort = port;
+        CrucibleLyrics.oscEnabled = true;
+        importForSpotify(7);
+        // The song began 1.25 s ago.
+        CrucibleLyrics.startAt(7, CrucibleLyrics.nowMs() - 1250);
+        tryVerify(function() { return TestServices.oscReceived().length >= 4; }, 5000);
+        const got = TestServices.oscReceived();
+        compare(got[0], "/crucible/lyrics/state Spotify following");
+        verify(got[1].indexOf("/crucible/lyrics/line Spotify 0 Should auld acquaintance 1000 ") === 0, got[1]);
+        verify(got[2].indexOf("/crucible/lyrics/word Spotify 0 0 Should 1000 1500") === 0, got[2]);
+        // The next word follows on the song's own time, a quarter of a second later.
+        verify(got[3].indexOf("/crucible/lyrics/word Spotify 0 1 auld 1500 2000") === 0, got[3]);
+
+        // Stop says stopped; clearing the lyrics says cleared.
+        CrucibleLyrics.stop(7);
+        tryVerify(function() {
+            return TestServices.oscReceived().indexOf("/crucible/lyrics/state Spotify stopped") >= 0;
+        }, 5000);
+        CrucibleLyrics.clear(7);
+        tryVerify(function() {
+            return TestServices.oscReceived().indexOf("/crucible/lyrics/state Spotify cleared") >= 0;
+        }, 5000);
+    }
+
+    function test_nothingIsSentWhileTheEventsAreOff() {
+        const port = TestServices.oscListen();
+        verify(port > 0);
+        CrucibleLyrics.oscHost = "127.0.0.1";
+        CrucibleLyrics.oscPort = port;
+        importForSpotify(7);
+        CrucibleLyrics.startAt(7, CrucibleLyrics.nowMs() - 1250);
+        // A moment for what would have been sent to have been; the socket stays empty.
+        wait(300);
+        compare(TestServices.oscReceived().length, 0);
+    }
+
+    // --- the picture of a CD+G disc (planning/karaoke-phase2.md, W13f and D11) -----------------
+
+    // One 24-byte CD+G packet appended to `bytes`: command 9, the instruction, two parity bytes,
+    // sixteen data bytes, four parity bytes.
+    function addCdgPacket(bytes, instruction, data) {
+        const packet = new Array(24).fill(0);
+        packet[0] = 9;
+        packet[1] = instruction;
+        for (let i = 0; i < data.length; ++i) {
+            packet[4 + i] = data[i];
+        }
+        for (const value of packet) {
+            bytes.push(value);
+        }
+    }
+
+    // Colour 1 is red and colour 2 green; the picture is red from the first packets and green from
+    // the packet at one second (300 packets in, applied by 1004 ms).
+    function cdgDiscBytes() {
+        const colours = new Array(16).fill(0);
+        colours[2] = 0x3C;
+        colours[4] = 0x03;
+        colours[5] = 0x30;
+        const bytes = [];
+        addCdgPacket(bytes, 30, colours);
+        addCdgPacket(bytes, 1, [1]);
+        for (let i = 2; i < 300; ++i) {
+            addCdgPacket(bytes, 0, []);
+        }
+        addCdgPacket(bytes, 1, [2]);
+        return bytes;
+    }
+
+    function test_aCdgFileIsImportedAsAPictureWithNoLinesToFollow() {
+        const path = TestServices.writeBinaryFile("disc.cdg", cdgDiscBytes());
+        verify(path.length > 0, "the CD+G file could not be written");
+        verify(CrucibleLyrics.importFile(7, path), CrucibleLyrics.errorText(7));
+        compare(CrucibleLyrics.status(7), "picture");
+        compare(CrucibleLyrics.fileName(7), "disc.cdg");
+        compare(CrucibleLyrics.errorText(7), "");
+        // Its words are pixels: no text is extracted, and the cursor has nothing to say.
+        compare(CrucibleLyrics.lines(7).length, 0);
+        compare(CrucibleLyrics.cursor(7, 5000).line, -1);
+        // A disc is started and followed like a file with times.
+        compare(CrucibleLyrics.running(7), false);
+        CrucibleLyrics.startAt(7, 10000);
+        compare(CrucibleLyrics.running(7), true);
+        compare(CrucibleLyrics.positionMs(7, 15000), 5000);
+        // Another application has no disc.
+        compare(CrucibleLyrics.status(8), "none");
+    }
+
+    function test_aCdgFileInAnyCaseIsADiscAndOneThatIsNotCdgSaysWhy() {
+        const shout = TestServices.writeBinaryFile("SHOUT.CDG", cdgDiscBytes());
+        verify(CrucibleLyrics.importFile(7, shout), CrucibleLyrics.errorText(7));
+        compare(CrucibleLyrics.status(7), "picture");
+
+        // 25 bytes is not a whole number of 24-byte packets.
+        const bad = TestServices.writeBinaryFile("bad.cdg", new Array(25).fill(120));
+        compare(CrucibleLyrics.importFile(8, bad), false);
+        compare(CrucibleLyrics.status(8), "error");
+        compare(CrucibleLyrics.fileName(8), "bad.cdg");
+        verify(CrucibleLyrics.errorText(8).length > 0);
+        // And an error is not started.
+        CrucibleLyrics.startAt(8, 1000);
+        compare(CrucibleLyrics.running(8), false);
+    }
+
+    function test_theStripDrawsTheDiscsPictureAtThePositionAndTheNudgeMovesIt() {
+        const path = TestServices.writeBinaryFile("disc.cdg", cdgDiscBytes());
+        verify(path.length > 0);
+        const strip = newStrip({ app: 7 });
+        const picture = findChild(strip, "lyricPicture");
+        verify(picture !== null);
+        compare(picture.visible, false);
+
+        verify(CrucibleLyrics.importFile(7, path), CrucibleLyrics.errorText(7));
+        tryCompare(strip, "status", "picture", 5000);
+        compare(findChild(strip, "lyricsFile").text,
+                qsTr("%1 · a CD+G picture: its words are pixels, so none are read").arg("disc.cdg"));
+        // The same Start, Stop and nudge a file with times has, and no words' stage.
+        compare(findChild(strip, "lyricsStart").visible, true);
+        compare(findChild(strip, "lyricsLater").visible, true);
+        compare(findChild(strip, "lyricStage").visible, false);
+        tryVerify(function() { return picture.visible && picture.ready; }, 5000);
+
+        // Not started is the first picture, a black screen. The strip is 320 wide, so the 300 by
+        // 216 picture is drawn once over, centred.
+        waitForRendering(picture);
+        // The layout has given it its size by the time a frame has been drawn.
+        verify(picture.width > 0 && picture.height > 0, "the picture has no size");
+        const mid = Math.round(picture.width / 2);
+        const row = Math.round(picture.height / 2);
+        let image = grabImage(picture);
+        compare(image.red(mid, row), 0);
+        compare(image.green(mid, row), 0);
+
+        // A nudge of -0.5 s shows the picture that is 0.5 s further on, which is red; of -1.1 s,
+        // past the packet at one second, green. The position is not running, so nothing but the
+        // nudge decides which.
+        CrucibleLyrics.setNudgeMs(7, -500);
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(mid, row), 255);
+        compare(image.green(mid, row), 0);
+        CrucibleLyrics.setNudgeMs(7, -1100);
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(mid, row), 0);
+        compare(image.green(mid, row), 255);
+
+        // Started long ago, with no nudge, it is past the end: the last picture, green; and going
+        // back is back (a nudge of +59 s of a song begun a minute ago is 1 s in).
+        CrucibleLyrics.setNudgeMs(7, 0);
+        CrucibleLyrics.startAt(7, CrucibleLyrics.nowMs() - 60000);
+        tryCompare(strip, "following", true, 5000);
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.green(mid, row), 255);
+
+        // Stop keeps the disc; Clear drops it and the picture goes.
+        findChild(strip, "lyricsStop").clicked();
+        tryCompare(strip, "following", false, 5000);
+        compare(strip.status, "picture");
+        findChild(strip, "lyricsClear").clicked();
+        tryCompare(strip, "status", "none", 5000);
+        tryCompare(picture, "visible", false, 5000);
     }
 }
