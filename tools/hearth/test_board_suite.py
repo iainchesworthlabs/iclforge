@@ -64,7 +64,14 @@ class StandIn:
         self.location = ""
         self.frames = 0
         self.status_extra: dict = {}
-        self.log = bytearray(b"boot line\nbudget: when=boot net=1 verdict=ok\n")
+        self.restarts = 0
+        self.log = bytearray(
+            b"boot line\n"
+            b"budget: when=boot net=1 internal_free=86231 largest=31744 ask_ring=0 "
+            b"ask_decode_stack=0 ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 "
+            b"headroom=23552 floor=0 verdict=ok\n"
+        )
+        self.boot_log = bytes(self.log)
         self.plays: list[str] = []
         stand_in = self
 
@@ -108,6 +115,11 @@ class StandIn:
                 if self.path == "/play":
                     stand_in.play(body)
                     self._send(202, b"accepted\n")
+                elif self.path == "/restart":
+                    stand_in.restarts += 1
+                    stand_in.state = "stopped"
+                    stand_in.log = bytearray(stand_in.boot_log)
+                    self._send(200, b"restarting\n")
                 else:
                     stand_in.state = "stopped"
                     self._send(200, b"stopped\n")
@@ -152,7 +164,8 @@ class StandIn:
             lines.append(
                 f"stream.units={behaviour.units} stream.held=0 "
                 f"stream.resync_bytes={behaviour.resync} stream.sink=i2s "
-                f"stream.decode_stack_free={behaviour.stack_free} stream.audio_ms=30016"
+                f"stream.decode_stack_free={behaviour.stack_free} stream.audio_ms=30016 "
+                "stream.wall_ms=30130"
             )
             if behaviour.pcm_hash is not None:
                 lines.append(
@@ -206,6 +219,26 @@ class Suite(unittest.TestCase):
         for profile in ("c6-16mb", "c6-4mb"):
             for row in self.suite["profiles"][profile]["plays"]:
                 self.assertEqual(row.get("expect"), "refused-memory", f"{profile}/{row['id']}")
+
+    def test_a_committed_baseline_is_for_a_profile_and_holds_exactly_its_rows(self) -> None:
+        for path in sorted(bs.BASELINES.glob("*.json")):
+            record = json.loads(path.read_text("utf-8"))
+            profile = record["profile"]
+            self.assertEqual(path.stem, profile, path.name)
+            self.assertIn(profile, self.suite["profiles"], path.name)
+            rows = {row["id"]: row for row in self.suite["profiles"][profile]["plays"]}
+            self.assertEqual(set(record["plays"]), set(rows), path.name)
+            self.assertEqual(record["findings"], {}, path.name)
+            self.assertRegex(record["profile_hash"], r"^[0-9a-f]{12}$", path.name)
+            self.assertTrue(record["version"], path.name)
+            for row_id, figures in record["plays"].items():
+                if rows[row_id].get("expect") is None:
+                    self.assertEqual(figures["state"], "finished", f"{path.name}/{row_id}")
+                    self.assertEqual(figures["underruns"], 0, f"{path.name}/{row_id}")
+            # --record refuses a run whose log holds no boot line, so a baseline has the figures
+            # the compare's boot ratchet reads.
+            for key in ("internal_free", "largest"):
+                self.assertIsInstance(record["boot"].get(key), int, f"{path.name}: boot {key}")
 
     def test_plan_for_an_unknown_profile_is_refused(self) -> None:
         with self.assertRaises(bs.SuiteError):
@@ -265,7 +298,7 @@ class Reading(unittest.TestCase):
             "sink.writes=5628 sink.underruns=1 sink.dry_ms=88 sink.min_headroom_ms=0 "
             "sink.dma_ms=64",
             "stream.units=938 stream.held=0 stream.resync_bytes=0 stream.sink=i2s "
-            "stream.decode_stack_free=18260 stream.audio_ms=30016",
+            "stream.decode_stack_free=18260 stream.audio_ms=30016 stream.wall_ms=30130",
             "result=pass",
         ]
         found = bs.parse_play_lines(lines)
@@ -414,6 +447,60 @@ class Run(unittest.TestCase):
         self.assertEqual(len(set(stand_in.plays)), 6, "each play has a location of its own")
 
 
+class Boot(unittest.TestCase):
+    def test_the_last_budget_line_of_the_log_is_the_boot_figure(self) -> None:
+        stand_in = StandIn("s3-n16r8", standard())
+        try:
+            boot = bs.boot_budget(bs.Board("127.0.0.1", stand_in.port))
+        finally:
+            stand_in.close()
+        self.assertEqual(
+            boot,
+            {
+                "when": "boot",
+                "net": 1,
+                "internal_free": 86231,
+                "largest": 31744,
+                "ask_total": 8192,
+                "ask_biggest": 8192,
+                "headroom": 23552,
+                "verdict": "ok",
+                "floor": 0,
+            },
+        )
+
+    def test_a_log_that_has_rotated_the_line_out_gives_nothing(self) -> None:
+        stand_in = StandIn("s3-n16r8", standard())
+        try:
+            stand_in.log = bytearray(b"sendspin: [1] connected\n")
+            self.assertEqual(bs.boot_budget(bs.Board("127.0.0.1", stand_in.port)), {})
+        finally:
+            stand_in.close()
+
+    def test_a_run_records_the_boot_line_and_the_samples_of_a_repeated_row(self) -> None:
+        stand_in = StandIn("s3-n16r8", standard())
+        try:
+            board = bs.Board("127.0.0.1", stand_in.port, 5.0)
+            boot = bs.boot_budget(board)
+            results = bs.run_suite(
+                board,
+                "s3-n16r8",
+                bs.load_suite(),
+                "http://127.0.0.1:1",
+                {},
+                repeat=3,
+                sleep=0.01,
+                timeout=5.0,
+            )
+            hardware = board.hardware()
+        finally:
+            stand_in.close()
+        record = bs.run_record("s3-n16r8", hardware, results, boot, "S3b")
+        self.assertEqual(record["board"], "S3b")
+        self.assertEqual(record["boot"]["largest"], 31744)
+        self.assertEqual(record["plays"]["ac3-2.0"]["decoder_permille_samples"], [223, 223, 223])
+
+
 class Identity(unittest.TestCase):
     def setUp(self) -> None:
         self.opened: list[StandIn] = []
@@ -497,6 +584,32 @@ class Compare(unittest.TestCase):
         run = self.figures(underruns=1, units=900)
         regressions, _ = bs.compare(run, self.figures(), self.TOLERANCE)
         self.assertEqual(len(regressions), 2)
+
+    def test_the_boot_line_is_ratcheted_against_erosion(self) -> None:
+        tolerance = {**self.TOLERANCE, "largest_block_bytes": 1024, "internal_free_bytes": 4096}
+        base = {
+            **self.figures(),
+            "boot": {"largest": 31744, "internal_free": 86231, "verdict": "ok"},
+        }
+        same = {
+            **self.figures(),
+            "boot": {"largest": 31744, "internal_free": 86000, "verdict": "ok"},
+        }
+        self.assertEqual(bs.compare(same, base, tolerance), ([], []))
+        eroded = {
+            **self.figures(),
+            "boot": {"largest": 30000, "internal_free": 70000, "verdict": "ok"},
+        }
+        regressions, _ = bs.compare(eroded, base, tolerance)
+        self.assertEqual(len(regressions), 2)
+        self.assertIn("largest internal block is 30,000", regressions[0])
+        short = {
+            **self.figures(),
+            "boot": {"largest": 31744, "internal_free": 86231, "verdict": "short-block"},
+        }
+        self.assertIn("verdict short-block", bs.compare(short, base, tolerance)[0][0])
+        none = self.figures()
+        self.assertIn("no budget line", bs.compare(none, base, tolerance)[0][0])
 
     def test_a_missing_play_or_another_profile_is_a_regression(self) -> None:
         run = {"profile": "c6-16mb", "plays": {}}
@@ -641,6 +754,37 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("not recorded", out)
         self.assertFalse((bs.BASELINES / "s3-n16r8.json").exists())
+
+    def test_restart_puts_the_boot_line_back_in_the_log_before_a_recording(self) -> None:
+        # A board that has played has rotated its boot lines out of a small log.
+        self.stand_in.log = bytearray(b"sendspin: [1] connected\n")
+        code, out, _ = self.run_cli(
+            *self.run_args("--lock", str(self.lock), "--session", "16d036", "--record")
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("not recorded: the log holds no boot budget line", out)
+        self.assertFalse((bs.BASELINES / "s3-n16r8.json").exists())
+        self.assertEqual(self.stand_in.restarts, 0)
+        code, out, _ = self.run_cli(
+            *self.run_args("--lock", str(self.lock), "--session", "16d036", "--record", "--restart")
+        )
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stand_in.restarts, 1)
+        baseline = json.loads((bs.BASELINES / "s3-n16r8.json").read_text("utf-8"))
+        self.assertEqual(baseline["boot"]["largest"], 31744)
+
+    def test_a_line_read_half_printed_is_not_a_figure(self) -> None:
+        found = bs.parse_play_lines(
+            [
+                "sink.writes=5628 sink.underruns=0 sink.dry_ms=0 sink.min_headroom_ms=5 "
+                "sink.dma_ms=64",
+                "sink.writes=5628 sink.underruns=3 sink.dry_",
+                "stream.units=938 stream.held=0 stream.resync_bytes=0 stream.sink=i2s "
+                "stream.decode_stack_free=18260 stream.audio_ms=30016 stream.wall_ms=30130",
+                "stream.units=1 stream.held=0 stream.resy",
+            ]
+        )
+        self.assertEqual((found.underruns, found.units, found.decode_stack_free), (0, 938, 18260))
 
     def test_plan_prints_the_rows(self) -> None:
         code, out, _ = self.run_cli("plan", "--profile", "c6-16mb")

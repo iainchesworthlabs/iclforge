@@ -209,6 +209,20 @@ class Board:
     def play(self, url: str) -> int:
         return self._request("POST", "/play", url.encode("utf-8"))[0]
 
+    def restart(self, wait: float = 120.0, sleep: float = 2.0) -> None:
+        """POST /restart, then wait for the board to answer again and to be stopped."""
+        self._request("POST", "/restart")
+        time.sleep(sleep)
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            try:
+                if self.json("/status").get("state") == "stopped":
+                    return
+            except SuiteError:
+                pass
+            time.sleep(sleep)
+        raise SuiteError(f"{self.host} did not come back from its restart in {wait:.0f} s")
+
     def stop(self) -> None:
         with contextlib.suppress(SuiteError):
             self._request("POST", "/stop")
@@ -260,12 +274,12 @@ def parse_play_lines(lines: list[str]) -> PlayLines:
             found.verdict = line.partition("=")[2].strip()
         elif "could not allocate" in line:
             found.failed_allocations += 1
-        elif line.startswith("sink.writes="):
+        elif line.startswith("sink.writes=") and "sink.dma_ms=" in line:
             values = fields(line)
             found.underruns = _int(values.get("sink.underruns"))
             found.dry_ms = _int(values.get("sink.dry_ms"))
             found.min_headroom_ms = _int(values.get("sink.min_headroom_ms"))
-        elif line.startswith("stream.units="):
+        elif line.startswith("stream.units=") and "stream.wall_ms=" in line:
             values = fields(line)
             found.units = _int(values.get("stream.units"))
             found.resync_bytes = _int(values.get("stream.resync_bytes"))
@@ -316,6 +330,7 @@ class PlayResult:
     frames: int | None = None
     decoder_permille: int | None = None
     lines: PlayLines = field(default_factory=PlayLines)
+    samples: list[int] = field(default_factory=list)
     rebooted: bool = False
     findings: list[str] = field(default_factory=list)
 
@@ -323,6 +338,8 @@ class PlayResult:
         out: dict[str, Any] = {"state": self.state, "frames": self.frames}
         if self.why:
             out["why"] = self.why
+        if len(self.samples) > 1:
+            out["decoder_permille_samples"] = list(self.samples)
         for name, value in (
             ("decoder_permille", self.decoder_permille),
             ("units", self.lines.units),
@@ -413,6 +430,31 @@ def check_identity(board: Board, profile: str, profiles: Path | None = None) -> 
             f"the file's definition is {wanted}: it was built from another one"
         )
     return hardware
+
+
+def boot_budget(board: Board) -> dict[str, Any]:
+    """The last `budget:` line of the board's console, as its fields, or {} where the log no
+    longer holds one (a board that has played has rotated its boot lines out of a small log: the
+    C6's holds 2 KB, and its suite reads its serial console for this instead)."""
+    text, _ = board.log(None)
+    found: dict[str, str] = {}
+    for line in text.splitlines():
+        if line.strip().startswith("budget: when="):
+            found = fields(line.strip().partition("budget:")[2])
+    keep = ("when", "net", "internal_free", "largest", "ask_total", "ask_biggest", "headroom")
+    boot: dict[str, Any] = {key: _number(found[key]) for key in keep if key in found}
+    if "verdict" in found:
+        boot["verdict"] = found["verdict"]
+    if "floor" in found:
+        boot["floor"] = _number(found["floor"])
+    return boot
+
+
+def _number(text: str) -> Any:
+    try:
+        return int(text)
+    except ValueError:
+        return text
 
 
 def run_play(
@@ -566,6 +608,7 @@ def _median(runs: list[PlayResult]) -> PlayResult:
     times = [run.decoder_permille for run in runs if run.decoder_permille is not None]
     if times:
         chosen.decoder_permille = int(statistics.median(times))
+        chosen.samples = list(times)
     stacks = [r.lines.decode_stack_free for r in runs if r.lines.decode_stack_free is not None]
     if stacks:
         chosen.lines.decode_stack_free = min(stacks)
@@ -586,7 +629,11 @@ def _median(runs: list[PlayResult]) -> PlayResult:
 
 
 def run_record(
-    profile: str, hardware: dict[str, Any], results: list[PlayResult], boot: dict[str, str] | None
+    profile: str,
+    hardware: dict[str, Any],
+    results: list[PlayResult],
+    boot: dict[str, Any] | None,
+    board: str = "",
 ) -> dict[str, Any]:
     return {
         "format": FORMAT,
@@ -594,6 +641,7 @@ def run_record(
         "profile_hash": hardware.get("profile_hash"),
         "version": hardware.get("version"),
         "chip": hardware.get("chip"),
+        "board": board,
         "recorded": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
         "boot": boot or {},
         "plays": {r.id: r.figures() for r in results},
@@ -615,6 +663,30 @@ def compare(
     absolute = int(tolerance.get("absolute_permille", 20))
     stack_slack = int(tolerance.get("stack_free_bytes", 512))
     headroom_slack = int(tolerance.get("headroom_ms", 2))
+    # The boot line: what a play would ask of internal RAM, and what is left to meet it with.
+    base_boot, now_boot = baseline.get("boot") or {}, run.get("boot") or {}
+    if base_boot and not now_boot:
+        regressions.append("boot: the run has no budget line, the baseline has one")
+    elif base_boot:
+        if now_boot.get("verdict") != base_boot.get("verdict"):
+            regressions.append(
+                f"boot: verdict {now_boot.get('verdict')}, "
+                f"the baseline's {base_boot.get('verdict')}"
+            )
+        for key, slack_key, label in (
+            ("largest", "largest_block_bytes", "largest internal block"),
+            ("internal_free", "internal_free_bytes", "internal RAM free"),
+        ):
+            base_value, now_value = base_boot.get(key), now_boot.get(key)
+            slack = int(tolerance.get(slack_key, 0))
+            if (
+                isinstance(base_value, int)
+                and isinstance(now_value, int)
+                and now_value < base_value - slack
+            ):
+                regressions.append(
+                    f"boot: {label} is {now_value:,} bytes, the baseline's {base_value:,}"
+                )
     for play, base in baseline.get("plays", {}).items():
         now = run.get("plays", {}).get(play)
         if now is None:
@@ -694,6 +766,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     server = None
     try:
         board = Board(args.host, args.port, args.timeout)
+        if args.restart:
+            print(f"{args.host}: restarting, so that its boot line is the log's first")
+            board.restart()
         hardware = check_identity(board, args.profile, args.profiles)
         before = board.status()
         if before.get("state") != "stopped":
@@ -702,6 +777,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"{args.host}: {hardware.get('chip')} {hardware.get('version')}, "
             f"profile {args.profile} at {hardware.get('profile_hash')}"
         )
+        boot = boot_budget(board)
         address = args.serve_host or lan_address_for(args.host)
         server = serve_fixtures(REPO, address)
         base_url = f"http://{address}:{server.server_address[1]}"
@@ -717,8 +793,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             args.play_timeout,
         )
         board.stop()
-        boot = None
-        record = run_record(args.profile, hardware, results, boot)
+        record = run_record(args.profile, hardware, results, boot, args.board)
         _print_results(results)
         problems = [f for r in results for f in r.findings]
         if args.out != "-":
@@ -733,7 +808,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             for line in improvements:
                 print(f"improved: {line}")
         if args.record:
-            if problems or regressions:
+            if not boot:
+                print("not recorded: the log holds no boot budget line; run with --restart")
+            elif problems or regressions:
                 print("not recorded: the run has findings")
             else:
                 target = BASELINES / f"{args.profile}.json"
@@ -765,6 +842,13 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--lock", help="the board's lock file: taken, and released at the end")
     run.add_argument("--session", help="your session id, as the lock line carries it")
     run.add_argument("--purpose", default="")
+    run.add_argument("--board", default="", help="a label for the board, kept in the record")
+    run.add_argument(
+        "--restart",
+        action="store_true",
+        help="POST /restart first, so that the boot line is in the log "
+        "(not for a P4: its restart kills the C6 link)",
+    )
     run.add_argument("--minutes", type=int, default=30)
     run.add_argument("--only", action="append", help="a play id; may be repeated")
     run.add_argument("--repeat", type=int, default=1, help="plays of each row; the median is held")

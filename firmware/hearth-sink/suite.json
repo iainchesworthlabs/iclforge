@@ -4,10 +4,12 @@
   "frame_us": 32000,
   "tolerance": {
     "relative": 0.05,
-    "absolute_permille": 20,
+    "absolute_permille": 5,
     "stack_free_bytes": 512,
     "headroom_ms": 2,
-    "note": "A decoder time per frame may be at most the baseline's plus the larger of 5% of it and 20 permille of a frame; the decode stack's free margin may be at most 512 bytes under the baseline's; the sink queue's least headroom at most 2 ms under. A proposal until the first recording runs take each row five times and the spread is written here."
+    "largest_block_bytes": 1024,
+    "internal_free_bytes": 2048,
+    "note": "From ten plays a row on S3b (the s3-n16r8 image, 2026-10-12): the decoder 122 to 124 permille of a frame for AC-3 2.0 and 87 to 90 for E-AC-3 2.0, the decode stack 18,076 to 18,256 bytes free, the queue 5 ms, the boot largest block 31,744 and free RAM 86,231 to 86,235. A decoder time may be at most the baseline's plus the larger of 5% of it and 5 permille of a frame; the decode stack's free margin at most 512 bytes under the baseline's; the queue's least headroom at most 2 ms under; the boot largest internal block at most 1,024 bytes under and the boot free RAM at most 2,048 under. S3a is the cross-check, not yet run."
   },
   "streams": {
     "ac3-2.0": {

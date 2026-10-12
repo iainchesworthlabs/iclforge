@@ -395,7 +395,7 @@ It does, in this order, and stops at the first refusal:
    date). `--record` writes `baselines/<profile>.json` from a clean run; `--compare` holds a run to
    a baseline with the tolerance in `suite.json` and prints an improvement as "re-baseline".
 
-Tests (`test_board_suite.py`, 46) run it against a stand-in board that answers with what the real
+Tests (`test_board_suite.py`, 53) run it against a stand-in board that answers with what the real
 boards printed on 2026-10-12, and hold the file to the tree (every stream is in the repository,
 every AC-4 row names a pin the host holds, every profile has a list).
 
@@ -403,8 +403,10 @@ every AC-4 row names a pin the host holds, every profile has a list).
 no underruns, the decode stack 18,256 and 18,064 bytes free, the queue's least headroom 5 ms, and
 the decoder at **123 and 88 permille of a frame** where `realtime_permille` read 981 for both.
 
-Not in PR 6, and said so: the boot `budget:` line is not read into the run (S3's `/log` may have
-rotated it out and the C6's is 2 KB: PR 7 reads it from the console where it has to); the 5.1 and
+Not in PR 6, and said so: the boot `budget:` line was not read into the run (S3's `/log` may have
+rotated it out and the C6's is 2 KB). PR 7 reads it: `--restart` restarts the board so that the boot
+line is the log's first, the suite parses it, and `--record` refuses a baseline when the log holds
+none; the C6's 2 KB log is read from the serial console where it has to be. The 5.1 and
 wider rows (`demo.ec3` with objects) wait for the baselines; the AC-4 rows need an image built with
 `CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` (the `measure` overlay) and say so when the hash is not on
 the line; and a Sendspin play list for the C6 needs a server on the bench.
@@ -424,13 +426,35 @@ S3's plays held `sink.min_headroom_ms` at 5 ms of a 64 ms queue (0 on the one pl
 underran, with `sink.dry_ms` at 88), and that figure, with `sink.dry_ms`, is the other number a
 baseline records.
 
-**Tolerance, and the ratchet.** The decoder's time per frame may be at most 5% and 20 permille
-above the baseline's median of three plays, whichever is more. The 5% and the 20 are a proposal,
-not a measurement of the spread: the first recording runs (PR 7) take each row five times and the
-tolerance is set from what they show, then written into the profile. A figure better than the
-baseline by more than the tolerance is reported, and the PR that made the speed-up changes the
-baseline in the same commit, so the next regression is measured from the new floor. A baseline
-only changes in a PR that edits the profile or the code and carries a board run.
+**Tolerance, and the ratchet.** The decoder's time per frame may be at most the larger of 5% and
+5 permille of a frame above the baseline's median. The 20 permille this page proposed was a guess;
+PR 7 measured the spread, ten plays a row on S3b (the `s3-n16r8` image, 2026-10-12): AC-3 2.0
+122 to 124 permille, E-AC-3 2.0 87 to 90. With the spread that narrow, 20 permille would have let
+a 23% slowdown of the E-AC-3 decoder through; 5 holds it to under 6%. The
+other figures are held one way only, each against the baseline less its margin: the decode stack's
+free bytes 512 (the spread was 180), the queue's least headroom 2 ms (it read 5 every play), and at
+boot the largest internal block 1,024 and the free internal RAM 2,048. The values are in
+`suite.json`, with this paragraph's numbers beside them. A figure better than the baseline by more
+than the tolerance is reported, and the PR that made the speed-up changes the baseline in the same
+commit, so the next regression is measured from the new floor. A baseline only changes in a PR
+that edits the profile or the code and carries a board run.
+
+**The boot line's free RAM is read twice over, and the baseline sits at the common value.** The
+Sendspin player starts on a 16 KiB task stack of its own (`sendspin-keys`) that goes when the work
+is done, and `report_budget("boot")` runs just after: it read 85,923 to 86,235 bytes free on eight
+of nine boots on S3b and 102,539 on the ninth, the idle task having freed that stack first. The
+largest block (31,744) and the headroom (23,552) did not move. Because the ratchet is one-way, the
+high reading can only look like an improvement; a baseline recorded on it would fail every ordinary
+boot with a figure 16 KB under it, so `s3-n16r8`'s is the common value, and a re-record that lands
+on the high one is run again. Making the line wait for the idle task is a firmware change and not
+made here.
+
+**Recorded (PR 7, `s3-n16r8`):** S3b, not S3a (S3a was booked by another session; the S3a run is
+the cross-check and is not done), the identity image `v0.10.0-beta.1-4175-g79d2e7618-`, profile
+hash `c4b8d369cf36`, five plays a row after a restart: AC-3 2.0 124 permille and E-AC-3 2.0 88, 938
+frames each, no underruns, 0 ms dry, queue headroom 5 ms, decode stack 18,256 and 18,068 bytes
+free; boot line `internal_free=86223 largest=31744 headroom=23552 verdict=ok`. A second run of
+two plays a row after another restart held to it with no finding.
 
 ## Changing a profile
 
@@ -472,7 +496,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
 | 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
-| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
+| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)); `c6-16mb`, `p4-rev1`, `p4-rev1-ac4` and `s3-n16r8-ac4` each need their board and, for AC-4, the `measure` image. `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | |
 
 PR 3 follows 2. PR 2 adds `p4-rev3` once #1400 is on main, since its fragments are not.
@@ -487,8 +511,9 @@ Still open:
 1. **The recording board for each profile.** Proposed: S3a for both S3 profiles with S3b as the
    cross-check, C6 `.117` for `c6-16mb`, P4a `.99` for both P4 profiles (P4b needs a USB flash
    after any OTA).
-2. **The tolerance:** 5% and 20 permille over a median of three, for the decoder's time per
-   frame; 0 underruns; the stack margin the baseline's. Say if looser or tighter.
+2. **The tolerance:** now measured, not proposed: the larger of 5% and 5 permille over the
+   median, for the decoder's time per frame; 0 underruns; the stack's margin within 512 bytes of
+   the baseline's (see the ratchet above). Say if looser or tighter.
 3. **QEMU is not the heap authority.** The twin runs the release shape but not Wi-Fi, so a heap
    number from it is a smoke floor. The board suite owns the budget. Confirm that is acceptable.
 4. **An HTTP play on the C6.** Left refused. The alternative is giving the Sendspin player's ring
