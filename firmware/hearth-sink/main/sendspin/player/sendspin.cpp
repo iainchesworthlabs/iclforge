@@ -63,6 +63,8 @@ constexpr bool kDecodeStackInPsram = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STA
 constexpr std::size_t kServerStackBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES;
 constexpr int kMaxDelayMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS;
 constexpr std::size_t kMaxCodedChannels = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS;
+// The objects of an E-AC-3 stream the board places in real time; -1 states none.
+constexpr int kMaxObjects = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS;
 // The most bytes of lyric document the board holds for the item playing (0 = takes none: the commands
 // are not listed, so a server sends none).
 constexpr std::uint32_t kLyricsMaxBytes = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES;
@@ -208,6 +210,14 @@ bool g_board_changed = false;
         for (const ac::DataType type : s.data_types) {
             s.max_coded_channels[static_cast<std::size_t>(type)] = static_cast<std::uint8_t>(kMaxCodedChannels);
         }
+    }
+    // How many objects it places (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS), for the E-AC-3
+    // type where the build lists it: a server then renders a stream with more of them itself,
+    // rather than finding that this board played its bed.
+    if (kMaxObjects >= 0 &&
+        std::ranges::find(s.data_types, ac::DataType::kEac3) != s.data_types.end()) {
+        s.max_objects[static_cast<std::size_t>(ac::DataType::kEac3)] =
+            static_cast<std::uint8_t>(kMaxObjects);
     }
     s.lyrics_max_bytes = kLyricsMaxBytes;
     return s;
