@@ -3406,11 +3406,15 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
             const auto index = static_cast<std::size_t>(s);
             const bool dither_eligible = s < nfchans && dithflag[static_cast<std::size_t>(s)];
             const int stream_norm = norm[index];
+            // The stream's spectrum looked up once: BlockSpectra maps the coupling stream to its
+            // slot, and that is a select per access in a per-bin loop (about 1.3% of an E-AC-3
+            // frame on an ESP32-C6 when it was written the other way).
+            auto& spectrum = coeffs[index];
             for (int bin = begin; bin < endmant[index]; ++bin) {
                 const int bap_value = bap[index][static_cast<std::size_t>(bin)];
                 const int exp = exps[index][static_cast<std::size_t>(bin)];
                 if (bap_value == 0) {
-                    coeffs[index][static_cast<std::size_t>(bin)] =
+                    spectrum[static_cast<std::size_t>(bin)] =
                         dither_eligible
                             ? impl_->dither_.next_as<Scalar>() *
                                   exponent_scale<Scalar>(exp - stream_norm)
@@ -3418,7 +3422,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                     continue;
                 }
                 const auto code = mantissa_reader.read(r, bap_value);
-                coeffs[index][static_cast<std::size_t>(bin)] =
+                spectrum[static_cast<std::size_t>(bin)] =
                     dequantize_mantissa_as<Scalar>(code, bap_value) *
                     exponent_scale<Scalar>(exp - stream_norm);
             }
@@ -3440,6 +3444,11 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
             // only in a six-block syncframe, so there are six tails.
             assert(tails.size() == static_cast<std::size_t>(kBlocksPerFrame));
             const int end = endmant[us];
+            // Its spectrum in each of the six blocks, looked up once (see read_stream).
+            std::array<std::array<internal::decode_scalar_t, 256>*, kBlocksPerFrame> spectra{};
+            for (std::size_t j = 0; j < kBlocksPerFrame; ++j) {
+                spectra[j] = &tails[j].coeffs[us];
+            }
             // The stream's frame exponent (block_norm.hpp): its six blocks
             // are dequantised here at once, and their reconstructed peaks
             // are all known before any is stored, so the exponent is exact -
@@ -3558,14 +3567,14 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                     // Unscaled for now; the frame's exponent is applied below
                     // once every bin's peak is known.
                     for (std::size_t j = 0; j < kBlocksPerFrame; ++j) {
-                        tails[j].coeffs[us][ubin] = blocks[j];
+                        (*spectra[j])[ubin] = blocks[j];
                     }
                     const int effective = internal::aht_effective_exponent(blocks, exp);
                     effective_exps[ubin] = effective;
                     smallest_effective = std::min(smallest_effective, effective);
                 } else {
                     for (std::size_t j = 0; j < kBlocksPerFrame; ++j) {
-                        tails[j].coeffs[us][ubin] = blocks[j] * exponent_scale<Scalar>(exp);
+                        (*spectra[j])[ubin] = blocks[j] * exponent_scale<Scalar>(exp);
                     }
                 }
             }
@@ -3576,7 +3585,7 @@ std::expected<std::optional<DecodedSubstream>, DecodeError> Eac3Decoder::decode_
                     const auto ubin = static_cast<std::size_t>(bin);
                     const int shift = aht_norm - exps[us][ubin];
                     for (std::size_t j = 0; j < kBlocksPerFrame; ++j) {
-                        auto& value = tails[j].coeffs[us][ubin];
+                        auto& value = (*spectra[j])[ubin];
                         value = iclforge::internal::scalar_ldexp(value, shift);
                     }
                 }
