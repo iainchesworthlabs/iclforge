@@ -33,6 +33,7 @@ it directly. Four tiers, assigned per header below:
 | `iclforge/ac3/core/types.hpp`, `tables.hpp` | Public — `SampleRate`, `Acmod` and the frame constants appear directly in public function signatures everywhere, and `silent_frame.hpp` sizes a syncframe by Table 5.18. |
 | `iclforge/ac3/core/eac3_tables.hpp` | Public — `chanmap` and `ChannelPlan` are likewise part of `plan.hpp`'s own public surface. |
 | `iclforge/base/layout.hpp`, `downmix_target.hpp` | Public — `Location`, `Layout` and `DownmixTarget` appear in public signatures (`plan.hpp`, the output stage, the renderer) and keep the tier of the headers they left. |
+| `iclforge/base/karaoke.hpp` | Public — `KaraokeReproduction` and `KaraokeVocals` are fields of `OutputConfig`, and the level span and its conversion are the one the settings and the wire share. Header-only: it exports no symbol. |
 | `iclforge/base/bitreader.hpp`, `bitwriter.hpp` | Internal — bitstream I/O primitives, never called directly by a caller using the encoder/decoder API. |
 | `iclforge/ac3/core/mdct.hpp`, `window.hpp` | Internal — transform internals. |
 | `iclforge/ac3/core/bitalloc.hpp`, `exponents.hpp`, `mantissas.hpp` | Internal — §7.1–7.3 coding internals shared by encoder and decoder. |

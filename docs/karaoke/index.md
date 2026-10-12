@@ -68,7 +68,7 @@ track) and choose the **Karaoke** page (`Ctrl+7`).
 
 ![Hearth's Karaoke page: the stream, its reproduction, the words, and what each speaker plays](screenshots/hearth-karaoke-page.png)
 
-*A generated karaoke stream and its lyrics on a test output, paused part-way through a word.*
+*The "Auld Lang Syne" example, 1.8 s in and held there: the word being sung is part way through its fill. Taken from the running window with `hearth --smoke-shot ... --open ... --seek 1800` ([Hearth's command line](../hearth/index.md#command-line)).*
 
 **Reproduction** is the decoder's choice, kept across starts:
 
@@ -157,6 +157,10 @@ sings it, **you** when it does not, and **shared** when it is a line for both an
 two plays. A sentence under the names says the same for the whole file ("The vocal of Shantyman
 plays: you sing the lines of Crew."), which is what choosing **V1**, **V2**, **None** or **Both**
 under Capable changes.
+
+![Hearth's Karaoke page for the duet example: each line is tagged with who sings it and whether the playing vocal guides it](screenshots/hearth-karaoke-duet.png)
+
+*"Leave Her, Johnny", 6.3 s in: the crew's line, indented and tagged **guide** because both vocals play.*
 ### SubRip
 
 A `.srt` file is read as lyrics too, which is what subtitle tools and ripped karaoke subtitles write:
@@ -223,7 +227,8 @@ A file with no words, that is cut short, or that counts SMPTE frames at some oth
 MIDI file carries **no word of its encoding**, and what is read is UTF-8 only: Latin-1 and the other code pages
 are not guessed at, so a Western karaoke file with accented letters saved in Latin-1 (and Hebrew in
 Windows-1255) is refused with the reason, as an LRC file in a code page is. Plain ASCII is UTF-8, and
-most are.
+most are. Only the title, the artist and the words are checked: the other `@` lines are not shown,
+so a copyright or key line in a code page does not refuse a file whose words are fine.
 
 ### What is shown
 
@@ -237,6 +242,15 @@ most are.
 
 The words follow the position of what is *heard*: the output device's own clock less its path's
 delay, so they stay with the sound on a Bluetooth speaker or a receiver with a long path.
+
+They are on the Karaoke page, full screen ([the singer view](#the-singer-view)), and on the Play
+page: an item with lyrics, or a CD+G picture, gets a **Lyrics** card there beside the queue (in
+a window 1,580 pixels wide or more) or at the top of the monitor column (in a narrower one). An
+item with none gets no card, so the Play page is as it was for every other stream.
+
+![Hearth's Play page for a karaoke stream: the queue, and a Lyrics card above what is playing](screenshots/hearth-play-lyrics.png)
+
+*The Play page at its default size, 1.8 s into the example.*
 
 ### A CD+G disc
 
@@ -268,14 +282,22 @@ times are rarely right to the frame against a particular output.
 
 ### The singer view
 
-`F11`, or **Full screen** on the Karaoke page's lyrics, opens the words alone, large, on a dark
-screen. `Esc` leaves it, and `Space` pauses.
+`F11`, or **Full screen** on the Karaoke page's lyrics or the Play page's, opens the words alone,
+large, on a dark screen. `Esc` leaves it, and `Space` pauses.
 
-![The singer view: the line being sung large, with the lines around it and the controls at the bottom](screenshots/hearth-singer-view.png)
+![The singer view: the line being sung large, the queue beside it, and the position bar and controls at the bottom](screenshots/hearth-singer-view.png)
 
-Previous, Play/Pause, Next and the **Vocals** chooser stay at the bottom, so a singer can pause,
-skip, or change which vocals play without leaving. Choosing a vocal there chooses the capable
-reproduction with it.
+A position bar, Previous, Play/Pause, Next, **Queue** and the **Vocals** chooser stay at the
+bottom, so a singer can move about in the song, pause, skip, pick the next song or change which
+vocals play without leaving. Choosing a vocal there chooses the capable reproduction with it.
+
+**Moving about.** Press the position bar, or drag along it: the words and the clock show the place
+the bar is held at, and the song moves there when you let go, whether it was playing or paused.
+`Left` and `Right` move it five seconds either way, and stop at the ends.
+
+**The queue.** The strip at the top names the song that comes next. **Queue**, or `Q`, opens the
+queue beside the words: the song that is playing is marked, and pressing another plays it from
+its start. `Q` or the button closes it again.
 
 ## Make one in the Forge GUI
 
@@ -338,6 +360,19 @@ forge decode out.ac3 melody-and-v1.wav karaoke=v1
 coded, and the report says so. The library form is `OutputConfig::karaoke` and
 `OutputConfig::karaoke_vocals`; see [Decoding](../library/decoding.md).
 
+## From a program
+
+The reproduction and the lyric reader are in the libraries, so a program of your own can use them:
+
+| You are in | The reproduction | The lyrics |
+|---|---|---|
+| A browser or Node (WebAssembly) | `FoldOptions.karaoke`, [the npm package](../platforms/wasm.md) | `parseLyrics` in the demo's module, which the [decode demo](../wasm-demo.md)'s Words panel uses |
+| C++ | `OutputConfig::karaoke` and its levels, [Decoding](../library/decoding.md) | `iclforge::lyrics`, `libs/lyrics` |
+
+Both take the same choices (as coded, aware or capable; the vocals; the three part levels in dB
+over -24 to +12, where the bottom is off) and the same bytes of a lyrics file, and give the same
+samples and the same lines as `forge decode` and Hearth do.
+
 ## What it does not do
 
 - **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
@@ -357,7 +392,10 @@ coded, and the report says so. The library form is `OutputConfig::karaoke` and
   firmware also draws them, with the colour moving as the song does, on a 7-inch panel
   ([An ESP32-P4 sink](../hearth/sink-esp32-p4.md#the-screen)): drawn and measured on a board with no
   panel, not yet run on one, and without a microphone, scoring or recording.
-- **Karaoke in E-AC-3 or AC-4**, and **a microphone, scoring or recording**.
+- **Karaoke in E-AC-3 or AC-4.**
+- **A microphone, scoring or recording.** A [draft plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
+  sets out the requirements and the design questions and is awaiting approval; nothing of it is
+  built.
 
 ## How it is checked
 

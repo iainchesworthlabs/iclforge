@@ -90,7 +90,7 @@ on the Effect column, not styling.
 
 **Recommendation.** A until a real duet script is in hand, then B with its "mark nothing unless
 clear" rule and B2's single-style choice; leave C, D and E. Positions earn their cost only with a
-screen, and the screen is parked with W12.
+screen, and the P4 panel (W12) draws lines and words only.
 
 ## D16: legacy code pages
 
