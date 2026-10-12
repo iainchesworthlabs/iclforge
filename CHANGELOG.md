@@ -738,9 +738,16 @@ The sections below contain the complete change list and fixes.
   back and starts. It waits, cued, on a first run (the "Before you play anything" dialog comes first) and
   with `--seek`, `--shot` or `--smoke-shot`; `--` ends the options, and `--open <file>` is the
   same file named as an option. The item to start is chosen on the engine thread
-  (`Engine::add_and_play()`), so the saved queue that is restored at start cannot move it. A
-  second double-click still starts a second Hearth beside the first
+  (`Engine::add_and_play()`), so the saved queue that is restored at start cannot move it
   ([Hearth's command line](docs/hearth/index.md#command-line)).
+- **A second launch hands its files to the running Hearth.** A second double-click on a stream
+  used to start a second Hearth with its own engine and output, and since a launch plays, two
+  played over each other. A launch that would play files now offers them (and its `--page`) to a
+  Hearth already running under the same account over a local socket that only that account can
+  open; the running one queues them, plays the first, comes forward and switches page, and the
+  second process ends before it has a window. A launch with no file, with `--seek`, or a capture
+  runs on its own, and a Hearth that does not answer is not waited for. Hearth now links Qt
+  Network for it (`QLocalServer`).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
