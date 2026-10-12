@@ -69,6 +69,8 @@ constexpr std::size_t kMaxCodedChannels = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_C
 constexpr bool kListAc4 = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4 != 0;
 constexpr std::size_t kAc4MaxCodedChannels =
     CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS;
+// The most frames a second of an AC-4 stream the board keeps up with (0 = no limit).
+constexpr std::uint32_t kAc4MaxFrameRate = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE;
 // The objects of an E-AC-3 stream the board places in real time; -1 states none.
 constexpr int kMaxObjects = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS;
 // The most bytes of lyric document the board holds for the item playing (0 = takes none: the commands
@@ -234,6 +236,13 @@ bool g_board_changed = false;
         if (limit != 0) {
             s.max_coded_channels[static_cast<std::size_t>(type)] = static_cast<std::uint8_t>(limit);
         }
+    }
+    // The frames a second of AC-4 it keeps up with, where it lists AC-4 and the build says: a
+    // server sends a faster stream another way, as it does one with more channels.
+    if (kAc4MaxFrameRate != 0 &&
+        std::ranges::find(s.data_types, ac::DataType::kAc4) != s.data_types.end()) {
+        s.max_frame_rate[static_cast<std::size_t>(ac::DataType::kAc4)] =
+            static_cast<std::uint16_t>(kAc4MaxFrameRate);
     }
     // How many objects it places (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS), for the E-AC-3
     // type where the build lists it: a server then renders a stream with more of them itself,
@@ -690,6 +699,7 @@ void start_player(const iclforge::render::OutputLayout& layout) {
     config.max_delay_ms = static_cast<double>(kMaxDelayMs);
     config.max_coded_channels = kMaxCodedChannels;
     config.max_ac4_channels = kAc4MaxCodedChannels;
+    config.max_ac4_frame_rate = kAc4MaxFrameRate;
     // A stream declaring more objects than the board states it places is played as its bed
     // (iclforge/object_limit.hpp): the figure the support object carries is the one it keeps to.
     if (kMaxObjects >= 0) {

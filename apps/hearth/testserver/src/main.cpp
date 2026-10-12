@@ -648,6 +648,15 @@ class Ac4BurstSource {
             note(run.spec.label + ": states a chunk limit of " +
                  std::to_string(now->iclforge_support->max_chunk_bytes) + " bytes and layout " +
                  now->iclforge_state->layout.value_or("(none)"));
+            // And what it lists of each data type: its widest frame and fastest rate, 0 for none.
+            for (const ac::DataType type : now->iclforge_support->data_types) {
+                note(run.spec.label + ": lists " + std::string(ac::data_type_name(type)) +
+                     ", up to " +
+                     std::to_string(now->iclforge_support->max_coded_channels_of(type)) +
+                     " channels and " +
+                     std::to_string(now->iclforge_support->max_frame_rate_of(type)) +
+                     " frames a second (0 states none)");
+            }
         }
         if (run.spec.pcm && !asked_for_pcm && now &&
             now->psk == ss::handshake::PskCategory::kLongTerm && now->available) {

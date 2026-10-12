@@ -29,6 +29,18 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth tells a group's members what is playing**
+
+- **The engine sets `metadata@v1` for a group.** A member that lists the role gets the item's title
+  when it starts and its position as the lyrics' anchors give it (a pause is speed 0, a seek moves
+  it, with the item's length), and nothing once the output closes. The title is the lyrics file's
+  `[ti:]` when the item has one, and otherwise the name the queue shows; the artist and the album come
+  from the lyrics file only, since nothing in the tree reads a tag from an AC-3, E-AC-3, AC-4 or MP4
+  file, and are left out when it has none. A sink that does not list the role is sent nothing.
+  Music Assistant's players and Hearth for Android's screen can use it; Hearth itself did not send it
+  before. Held by a case on a real group with a member that lists the role and one that does not, and
+  by an engine case that plays an item through to its end.
+
 **Hearth: a microphone and a pitch score on the Karaoke page**
 
 - **A singer can turn a microphone on and see how close their pitch is to the tune** (the
@@ -1136,6 +1148,30 @@ The sections below contain the complete change list and fixes.
 - **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
   microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
   into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
+
+**Hearth: a singer sees the tune as a ribbon, how each line went, and a summary**
+
+- **A pitch ribbon: the tune as notes and the singer's voice as a line over them** (the microphone,
+  scoring and recording programme, M5). On the Microphone card and under the words in the singer
+  view (`F11`), while the microphone is on and there is a tune: the reference's notes move past a
+  mark for *now*, and the voice is drawn over them, thick and solid where it is within the tolerance
+  and thin and dashed where it is not (a second cue beside colour). A voice an octave away is drawn
+  on the tune's octave, as it is scored. Where nothing is voiced it says **Listening…**.
+- **A mark under each line that has been sung**: three dots and a percentage, in the Karaoke page's
+  lyrics and in the singer view. A line the tune has no notes in has no mark (not a zero); a line
+  the singer was voiced for under a fifth of its notes' time for says **not sung** and carries no
+  number; and without the headphones answer there are none. The line's own times take the lyric
+  delay, so a nudged line is still scored where it is sung.
+- **A summary when it ends**: **Last performance** on the card, kept when the microphone is turned
+  off, the song ends or the device goes, with the pitch score, how much of the tune's time the singer
+  was voiced for, the average sharp or flat, early or late, and the basis (the part, the tolerance,
+  octaves ignored, what was not scored). Cleared by the next start or another song, shown nowhere
+  else and never ranked, named or sent. Not made when the headphones answer is missing.
+- **Engine and controller:** `Performance` keeps its last 30 s of placed frames as a bounded trace;
+  `MicrophoneSession` answers a line's counts, the trace and the reference; `MicrophoneController`
+  gains `ribbon()`, `lineResult()`, `summary` and `scoreRevision`. Two new QML pictures, `LineMark`
+  and `PitchRibbon`, are handed their data, so they are tested without a microphone. Hearth's user
+  guide says what is shown.
 
 **ADM / BW64: rendering constraints, a sample-format option, and what the bridge drops**
 
@@ -3661,6 +3697,24 @@ The sections below contain the complete change list and fixes.
   through, which the first board run showed it had not been (every frame after a late first chunk
   was dropped). `hearth-testserver` plays an `.ac4` file; `libs/device`'s `ac4_sync_frame.hpp` is
   the raw frame of a sync frame without a list, tested on the host.
+- **An ESP32-S3 with the AC-4 decoder lists `ac4` at 2 channels and 25 frames a second**
+  (`CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4` defaults to 1 with `ESP32S3_DATA_CACHE_64KB`, and the new
+  `..._AC4_MAX_FRAME_RATE` is 25 there): the support object gains `max_frame_rate`, per data type,
+  which a sink states and a server compares with the item's frame rate
+  (`ItemFacts::frame_rate`, from the samples and frames of the stream; `StreamNeeds::frame_rate`).
+  A faster stream is sent as PCM, and a frame of one that reaches the board is refused. Over
+  Sendspin on an S3 every 2.0 stream at 23.44, 24 and 25 frames a second took 0.48 to 0.80 of its
+  frame with no underruns, and 29.97 took 0.99 (39 underruns in one play, none in another): the
+  frame-rate converter costs a frame the same at 24 as at 29.97, so the limit is a rate and not a
+  codec tool. The release image has no decoder, and an S3 without the cache does not list AC-4.
+- **The board's AC-4 decoder does not reconstruct objects it would throw away**
+  (`Ac4Stream::Config::skip_objects`, on, through `DecoderConfig::skip_objects`): a 5.1 bed beside
+  A-JOC or direct-coded objects plays as the bed. On a P4 over Sendspin a bed with 16 A-JOC objects
+  took 2.51 of real time and now takes 0.59, with 4 objects 1.26 and now 0.58, with direct-coded
+  objects 1.00 and now 0.56; the bed's level is the host decoder's to 0.01 dB, and the least
+  internal RAM free over a play rose from 1.0 to 9.6 KB (4 objects: 2.7 to 18 KB). A presentation of
+  objects alone is refused with a reason where it was decoded and dropped (1.62 of real time, 186
+  chunks late).
 
 **Library internals**
 
@@ -4790,6 +4844,14 @@ The sections below contain the complete change list and fixes.
 
 **Build system**
 
+- **A tests-only configure failed with `Target "iclforge-forge-gui-tests" links to:
+  iclforge::app_text_encoding but the target was not found`.** The code-page library was added
+  only for `ICLFORGE_BUILD_CLI` or `ICLFORGE_BUILD_GUI`, and the GUI's Qt-free test binary, which
+  links it, is added whenever `ICLFORGE_BUILD_TESTS` is on, so
+  `-DICLFORGE_BUILD_TESTS=ON -DICLFORGE_BUILD_CLI=OFF -DICLFORGE_BUILD_GUI=OFF` (with Hearth, as a
+  Hearth-only developer configures) stopped the configure. The CI presets build the command line
+  and did not show it. The library is now added when the tests are on, so its own tests run in
+  such a build too.
 - **`libac3forge_c.so` exported the codec it embeds, and the `BUILD_SHARED_LIBS=ON` test pass ran
   on that copy instead of `libac3forge.so`.** On Linux the C library exported the C++ symbols of
   the static codec inside it (346 of the 562 lines in its ABI allowlist, beside its 216 C

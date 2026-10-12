@@ -116,6 +116,9 @@ struct StreamNeeds {
     // ItemFacts::objects_alone: the programme decodes to its objects and nothing else, so a sink
     // that places fewer than it has plays no bed - it plays nothing.
     bool objects_alone = false;
+    // ItemFacts::frame_rate: the frames a second the programme is coded at, which a sink's
+    // stated limit (`max_frame_rate`) is compared with; 0 where it is not known, and not compared.
+    double frame_rate = 0.0;
     // Set for a karaoke AC-3 stream whose reproduction is wanted (ItemFacts::karaoke with a
     // reproduction other than "as coded"), which a sink must be told for itself or be sent PCM
     // that has it applied. Unset for every other stream, and for a karaoke one played as coded.

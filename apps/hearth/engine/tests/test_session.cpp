@@ -1,3 +1,4 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -373,6 +374,40 @@ TEST_CASE("session: an E-AC-3 karaoke programme of one independent substream is 
     CHECK_FALSE(opens_as_karaoke(eac3_stream(BitstreamMode::kCompleteMain, Acmod::k3_2, true, false)));
     CHECK_FALSE(opens_as_karaoke(eac3_stream(karaoke, Acmod::k1_0, false, false)));
     CHECK_FALSE(opens_as_karaoke(eac3_stream(karaoke, Acmod::k3_2, true, true)));
+}
+
+// The frames a second an item is coded at, which a sink's stated limit is compared with: the
+// samples it codes over its frame count, at the stream's sample rate.
+TEST_CASE("session: an item says the frames a second it is coded at", "[hearth][session]") {
+    const auto frame_rate_of = [](std::vector<std::byte> stream) {
+        const ItemLoader loader =
+            [&stream](const std::string&) -> std::expected<LoadedItem, std::string> {
+            return LoadedItem{.bytes = stream};
+        };
+        auto session = Session::open("item", loader);
+        REQUIRE(session.has_value());
+        return session->facts().frame_rate;
+    };
+
+    // E-AC-3 at six blocks a unit: 48 000 / 1 536.
+    CHECK(frame_rate_of(joined(held_back_frames())) == Catch::Approx(31.25).epsilon(0.001));
+
+    // AC-3 is 1 536 samples a frame too.
+    iclforge::ac3::EncoderConfig config;
+    config.bitrate_kbps = 448;
+    config.acmod = iclforge::ac3::Acmod::k3_2;
+    config.lfe = true;
+    iclforge::ac3::FrameEncoder encoder{config};
+    const auto channels = static_cast<std::size_t>(encoder.channel_count());
+    std::vector<std::byte> ac3;
+    for (int f = 0; f < 4; ++f) {
+        const std::vector<float> samples(iclforge::ac3::kSamplesPerFrame, 0.1F);
+        const std::vector<std::span<const float>> views(channels, samples);
+        const auto frame = encoder.encode_frame(views);
+        REQUIRE(frame.has_value());
+        ac3.insert(ac3.end(), frame->begin(), frame->end());
+    }
+    CHECK(frame_rate_of(std::move(ac3)) == Catch::Approx(31.25).epsilon(0.001));
 }
 
 TEST_CASE("session: an AC-3 karaoke stream is karaoke, as it was", "[hearth][session][karaoke]") {
