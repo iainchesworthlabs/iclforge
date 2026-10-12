@@ -4,9 +4,10 @@
     python tools/hearth/bench_flash.py build  PROFILE --tag TAG [--worktree DIR]
                                               [--overlay NAME ...] [--wifi] [--no-verify]
     python tools/hearth/bench_flash.py flash  BOARD --build-dir DIR --session ID
-                                              [--app-only] [--erase]
+                                              [--app-only | --otadata-only] [--erase]
     python tools/hearth/bench_flash.py verify BOARD --build-dir DIR [--profile PROFILE]
     python tools/hearth/bench_flash.py ota    BOARD --build-dir DIR --session ID [--force]
+    python tools/hearth/bench_flash.py reset  BOARD --session ID
 
 It replaces the scripts that lived in D:\\ac3bld\\esp-reflash (planning/esp32-board-bench.md),
 and what they took from a hand-kept list of fragments it takes from the profile:
@@ -19,10 +20,17 @@ and what they took from a hand-kept list of fragments it takes from the profile:
   writes nothing unless its last three octets are the bench's for that board, then writes with
   esptool. `--app-only` writes the app and otadata and leaves the bootloader, the table and NVS
   (the P4b's recovery); a board whose row says `after_flash: watchdog-reset` is started that way.
+  `--otadata-only` writes the build's `otadata` and nothing else: the board boots its first
+  app slot as valid, with nothing on trial, which is how a board that a rollback left on a
+  trial it cannot prove (a P4 whose restart lost its C6 link) is put back on the image it
+  was found on without the bootloader rolling it back.
   `--erase` wipes the flash first, and the board's pairing and stored network with it.
 - **verify** compares what GET /hardware says (project, version, profile, hash) with the build.
 - **ota** is `ota.py push` with the board's lock and address taken from the table, and refused for
   a board whose row says it takes no OTA.
+- **reset** is a system reset by esptool's watchdog reset after the MAC check, and waits for the
+  board: what brings back a P4 whose restart left its C6 link dead, and a way to boot one that
+  does not start that fault (planning/esp32-board-bench.md).
 
 Nothing prints or writes a network value: the logs go through bench.mask_text.
 """
@@ -260,12 +268,12 @@ def esptool(board: bench.Board, *tail: str, baud: int | None = None) -> list[str
     return [*head, *tail]
 
 
-def flash_plan(build: Path, app_only: bool) -> list[str]:
+def flash_plan(build: Path, app_only: bool, otadata_only: bool = False) -> list[str]:
     """The esptool arguments after `write-flash`, from the build's own files: all of it as
     `@flash_args` (which also writes the audio sample and the storage image), or, for
     `app_only`, the `app` and `otadata` sections of flasher_args.json and nothing else, so that
     the bootloader, the partition table, NVS and storage stay as the board has them."""
-    if not app_only:
+    if not (app_only or otadata_only):
         if not (build / "flash_args").is_file():
             raise BenchError(f"{build / 'flash_args'} is not there: is it a finished build?")
         return ["@flash_args"]
@@ -273,9 +281,14 @@ def flash_plan(build: Path, app_only: bool) -> list[str]:
         info = json.loads((build / "flasher_args.json").read_text("utf-8"))
     except (OSError, ValueError) as error:
         raise BenchError(f"{build / 'flasher_args.json'}: {error}") from error
-    if "app" not in info:
-        raise BenchError(f"{build / 'flasher_args.json'} has no app section to write")
-    sections = [info[name] for name in ("otadata", "app") if name in info]
+    if otadata_only:
+        if "otadata" not in info:
+            raise BenchError(f"{build / 'flasher_args.json'} has no otadata section to write")
+        sections = [info["otadata"]]
+    else:
+        if "app" not in info:
+            raise BenchError(f"{build / 'flasher_args.json'} has no app section to write")
+        sections = [info[name] for name in ("otadata", "app") if name in info]
     settings = info.get("flash_settings", {})
     args: list[str] = []
     for key, option in (
@@ -290,6 +303,18 @@ def flash_plan(build: Path, app_only: bool) -> list[str]:
     return args
 
 
+def write_verified_then_port_left(text: str) -> bool:
+    """esptool wrote, read the flash back and matched it, and reset the chip, and then exited 1
+    because the serial port went with the board: the USB-Serial/JTAG port of a P4 re-enumerates
+    at a watchdog reset and pySerial says so. That is a verified write, not a failed one."""
+    return (
+        "Hash of data verified" in text
+        and "Hard resetting" in text
+        and ("serial exception" in text.lower() or "Cannot configure port" in text)
+        and "fatal error" not in text.lower()
+    )
+
+
 def wait_for_board(
     host: str, probe: Prober, seconds: float = 120.0, sleep: float = 3.0
 ) -> dict[str, Any] | None:
@@ -300,6 +325,54 @@ def wait_for_board(
             return hardware
         time.sleep(sleep)
     return None
+
+
+def reset_board(
+    table: Bench,
+    board: bench.Board,
+    run: Runner,
+    probe: Prober = probe_hardware,
+    wait: float = 90.0,
+) -> dict[str, Any] | None:
+    """A system reset of the board by esptool's watchdog reset, then /hardware once it answers
+    (None when it does not within `wait` seconds). A watchdog reset, where `esp_restart` is a CPU
+    reset: it is what brought back a P4 whose restart had left its C6 link dead
+    (planning/esp32-board-bench.md). The chip's MAC is read first and a board that is not the
+    row's is an error, though the reset by then has been sent to whatever is on the port."""
+    code, text = run(
+        esptool(board, "--before", "default-reset", "--after", "watchdog-reset", "read-mac"),
+        None,
+        idf=True,
+    )
+    mac = read_mac(text)
+    if mac is None:
+        raise BenchError(
+            f"{board.port}: no MAC read (esptool exit {code}); the board was not reset"
+        )
+    if mac_tail(mac) != board.mac_tail:
+        raise BenchError(f"{board.port} is not {board.name}: its MAC differs")
+    return wait_for_board(board.host, probe, wait)
+
+
+def cmd_reset(
+    table: Bench,
+    args: argparse.Namespace,
+    run: Runner,
+    out: Callable[[str], None],
+    probe: Prober = probe_hardware,
+    wait: float = 90.0,
+) -> int:
+    board = table.board(args.board)
+    out(f"{board.name}: {bench.require_lock(board, args.session)}")
+    hardware = reset_board(table, board, run, probe, wait)
+    if hardware is None:
+        out(f"{board.name}: did not answer on {board.host} within {wait:.0f} s of the reset")
+        return 1
+    out(
+        f"{board.name}: reset; answers with version {hardware.get('version')}"
+        f" (profile {hardware.get('profile')})"
+    )
+    return 0
 
 
 def cmd_flash(
@@ -313,7 +386,11 @@ def cmd_flash(
     board = table.board(args.board)
     out(f"{board.name}: {bench.require_lock(board, args.session)}")
     build = Path(args.build_dir)
-    plan = flash_plan(build, args.app_only)
+    if args.otadata_only and (args.app_only or args.erase):
+        raise BenchError(
+            "--otadata-only is the otadata and nothing else: not with --app-only or --erase"
+        )
+    plan = flash_plan(build, args.app_only, args.otadata_only)
     # The chip is left as the bench's row starts it: running its app, or, for a board whose
     # resets land in the ROM's download mode, started by a watchdog reset.
     code, text = run(
@@ -358,7 +435,9 @@ def cmd_flash(
     log.write_text(bench.mask_text("\n".join(lines), values), "utf-8")
     out(f"{board.name}: esptool exit {code} in {time.monotonic() - started:.0f} s; log {log}")
     if code != 0:
-        return 1
+        if not write_verified_then_port_left(text):
+            return 1
+        out(f"{board.name}: the write was verified and the board reset; the port left with it")
     hardware = wait_for_board(board.host, probe, wait)
     if hardware is None:
         out(f"{board.name}: did not answer on {board.host} within {wait:.0f} s")
@@ -457,6 +536,7 @@ def build_parser() -> argparse.ArgumentParser:
     flash.add_argument("--build-dir", required=True)
     flash.add_argument("--session", required=True)
     flash.add_argument("--app-only", action="store_true")
+    flash.add_argument("--otadata-only", action="store_true")
     flash.add_argument("--erase", action="store_true")
 
     verify = sub.add_parser("verify", help="what a board says against what was built")
@@ -469,6 +549,10 @@ def build_parser() -> argparse.ArgumentParser:
     ota.add_argument("--build-dir", required=True)
     ota.add_argument("--session", required=True)
     ota.add_argument("--force", action="store_true")
+
+    reset = sub.add_parser("reset", help="a system reset by esptool's watchdog reset")
+    reset.add_argument("board")
+    reset.add_argument("--session", required=True)
     return parser
 
 
@@ -489,6 +573,8 @@ def main(
             return cmd_flash(chosen, args, runner, out, probe)
         if args.command == "verify":
             return cmd_verify(chosen, args, runner, out, probe)
+        if args.command == "reset":
+            return cmd_reset(chosen, args, runner, out, probe)
         return cmd_ota(chosen, args, runner, out)
     except (BenchError, sink_profile.ProfileError) as error:
         print(f"bench_flash: {error}", file=sys.stderr)

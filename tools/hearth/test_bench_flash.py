@@ -212,6 +212,28 @@ class Plan(Fixture):
         for unwanted in ("bootloader", "partition", "0x830000", "storage"):
             self.assertNotIn(unwanted, " ".join(plan))
 
+    def test_otadata_only_is_the_otadata_and_not_the_app_or_the_rest(self) -> None:
+        plan = bf.flash_plan(self.build, app_only=False, otadata_only=True)
+        self.assertEqual(
+            plan,
+            [
+                "--flash-mode",
+                "dio",
+                "--flash-freq",
+                "80m",
+                "--flash-size",
+                "16MB",
+                "0x10000",
+                "ota_data_initial.bin",
+            ],
+        )
+
+    def test_a_build_with_no_otadata_section_is_refused_for_otadata_only(self) -> None:
+        broken = {k: v for k, v in FLASHER_ARGS.items() if k != "otadata"}
+        (self.build / "flasher_args.json").write_text(json.dumps(broken), "utf-8")
+        with self.assertRaises(bench.BenchError):
+            bf.flash_plan(self.build, app_only=False, otadata_only=True)
+
     def test_a_build_with_no_app_section_is_refused(self) -> None:
         broken = {k: v for k, v in FLASHER_ARGS.items() if k != "app"}
         (self.build / "flasher_args.json").write_text(json.dumps(broken), "utf-8")
@@ -230,6 +252,7 @@ class Flash(Fixture):
             "build_dir": str(self.build),
             "session": "16d036",
             "app_only": False,
+            "otadata_only": False,
             "erase": False,
         }
         return namespace(**{**base, **more})
@@ -302,6 +325,25 @@ class Flash(Fixture):
         self.assertIn("0x10000 ota_data_initial.bin 0x20000 iclforge_hearth_sink.bin", joined)
         self.assertNotIn("@flash_args", joined)
 
+    def test_otadata_only_writes_that_one_file_by_watchdog_reset_on_a_p4(self) -> None:
+        self.book("P4a")
+        run = Recorder({"read-mac": (0, "MAC:                30:ed:a0:ea:6d:66\n")})
+        code = self.flash(run, self.args(board="P4a", otadata_only=True))
+        self.assertEqual(code, 0)
+        (written,) = run.commands("write-flash")
+        joined = " ".join(written)
+        self.assertIn("--after watchdog-reset write-flash", joined)
+        self.assertTrue(joined.endswith("0x10000 ota_data_initial.bin"), joined)
+        self.assertNotIn("iclforge_hearth_sink.bin", joined)
+
+    def test_otadata_only_is_not_combined_with_the_app_or_an_erase(self) -> None:
+        self.book("P4a")
+        for extra in ({"app_only": True}, {"erase": True}):
+            run = Recorder({"read-mac": (0, "MAC:                30:ed:a0:ea:6d:66\n")})
+            with self.assertRaises(bench.BenchError):
+                self.flash(run, self.args(board="P4a", otadata_only=True, **extra))
+            self.assertEqual(run.commands("write-flash"), [])
+
     def test_erase_comes_before_the_write_and_says_what_it_takes(self) -> None:
         self.book("S3b")
         run = Recorder({"read-mac": (0, S3_MAC_OUTPUT)})
@@ -320,6 +362,33 @@ class Flash(Fixture):
         with self.assertRaises(bench.BenchError):
             self.flash(run, self.args(erase=True))
         self.assertEqual(run.commands("write-flash"), [])
+
+    def test_a_verified_write_whose_port_left_with_the_reset_is_not_a_failed_one(self) -> None:
+        self.book("P4a")
+        left = (
+            "Wrote 8192 bytes (31 compressed) at 0x00010000 in 0.1 seconds\n"
+            "Hash of data verified.\n\nHard resetting with a watchdog...\n\n"
+            "ERROR: A serial exception error occurred: Cannot configure port, something went "
+            "wrong. Original message: OSError(22, 'The I/O operation has been aborted')\n"
+        )
+        run = Recorder(
+            {"read-mac": (0, "MAC:                30:ed:a0:ea:6d:66\n"), "write-flash": (1, left)}
+        )
+        self.assertEqual(self.flash(run, self.args(board="P4a", otadata_only=True)), 0)
+        self.assertTrue(any("port left with it" in line for line in self.output))
+
+    def test_the_same_exit_without_a_verified_write_is_a_failure(self) -> None:
+        self.book("P4a")
+        run = Recorder(
+            {
+                "read-mac": (0, "MAC:                30:ed:a0:ea:6d:66\n"),
+                "write-flash": (
+                    1,
+                    "Hard resetting with a watchdog...\nERROR: A serial exception error occurred\n",
+                ),
+            }
+        )
+        self.assertEqual(self.flash(run, self.args(board="P4a", otadata_only=True)), 1)
 
     def test_a_failed_write_is_a_failure_and_a_silent_board_is_one_too(self) -> None:
         self.book("S3b")
@@ -522,6 +591,57 @@ class Ota(Fixture):
             pushed[-5:], ["--build-dir", str(self.build), "--host", "192.168.1.45", "--force"]
         )
         self.assertNotIn(SSID, "\n".join(self.output))
+
+
+class Reset(Fixture):
+    def args(self, board: str = "P4a") -> argparse.Namespace:
+        return namespace(board=board, session="16d036")
+
+    def test_a_board_nobody_has_booked_is_not_reset(self) -> None:
+        run = Recorder()
+        with self.assertRaises(bench.BenchError):
+            bf.cmd_reset(self.table, self.args(), run, self.out)
+        self.assertEqual(run.calls, [])
+
+    def test_the_reset_is_a_watchdog_reset_in_the_idf_environment_and_waits_for_the_board(
+        self,
+    ) -> None:
+        self.book("P4a")
+        run = Recorder({"read-mac": (0, "MAC:                30:ed:a0:ea:6d:66\n")})
+        answers = iter([None, None, {"version": "v1", "profile": "p4-rev1"}])
+        code = bf.cmd_reset(
+            self.table, self.args(), run, self.out, lambda host: next(answers), wait=30.0
+        )
+        self.assertEqual(code, 0)
+        (reset,) = run.commands("read-mac")
+        self.assertIn("--chip esp32p4 --port COM10", " ".join(reset))
+        self.assertIn("--before default-reset --after watchdog-reset read-mac", " ".join(reset))
+        self.assertEqual(run.idf_flags("read-mac"), [True])
+        self.assertTrue(any("version v1 (profile p4-rev1)" in line for line in self.output))
+
+    def test_a_board_that_does_not_come_back_is_a_failure(self) -> None:
+        self.book("P4a")
+        run = Recorder({"read-mac": (0, "MAC:                30:ed:a0:ea:6d:66\n")})
+        code = bf.cmd_reset(self.table, self.args(), run, self.out, lambda host: None, wait=0.0)
+        self.assertEqual(code, 1)
+        self.assertTrue(any("did not answer" in line for line in self.output))
+
+    def test_the_wrong_chip_on_the_port_is_an_error(self) -> None:
+        self.book("P4a")
+        run = Recorder({"read-mac": (0, S3_MAC_OUTPUT)})
+        with self.assertRaises(bench.BenchError) as raised:
+            bf.cmd_reset(self.table, self.args(), run, self.out, lambda host: {}, wait=0.0)
+        self.assertIn("is not P4a", str(raised.exception))
+
+    def test_no_mac_read_is_not_a_reset(self) -> None:
+        self.book("P4a")
+        run = Recorder({"read-mac": (2, "Failed to connect")})
+        with self.assertRaises(bench.BenchError):
+            bf.cmd_reset(self.table, self.args(), run, self.out, lambda host: {}, wait=0.0)
+
+    def test_it_needs_a_session(self) -> None:
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            bf.build_parser().parse_args(["reset", "P4a"])
 
 
 class CommandLine(Fixture):

@@ -116,6 +116,8 @@ class Table(unittest.TestCase):
         self.assertFalse(self.table.board("P4b").ota)
         self.assertTrue(self.table.board("P4a").ota)
         self.assertEqual(self.table.board("P4b").after_flash, "watchdog-reset")
+        # P4a's restart lost the C6 link on 2026-10-12, and a watchdog reset brought it back
+        self.assertEqual(self.table.board("P4a").after_flash, "watchdog-reset")
 
     def test_the_process_page_has_a_row_for_every_board_as_the_file_has_it(self) -> None:
         page = (bench.HERE.parents[1] / "planning" / "esp32-board-bench.md").read_text("utf-8")

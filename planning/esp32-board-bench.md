@@ -103,7 +103,26 @@ not something it ran.
   `esptool --before default-reset --after watchdog-reset read-mac`, with no USB flash; the image
   that is **running** when an update arrives does the restart, so a board still on an older image
   can fault once more. The table marks both P4s (`restart_kills_c6_link`), and
-  `board_suite.py run --restart` refuses them unless told `--accept-restart-fault`.
+  `board_suite.py run --restart` refuses them unless told `--reset-by esptool` (a watchdog
+  reset through the serial port) or `--accept-restart-fault`.
+  Seen on P4a on 2026-10-12, for the report's sake: an OTA from 3556 to the identity image
+  restarted cleanly, twelve resets (one `bench_flash.py reset`, eight in the record run and
+  three in the compare run) all came back on Wi-Fi with the C6 identified, the first timed at
+  16 s, and the rollback back to 3556, which the identity image restarted, left it with no
+  answer for 90 s. The board's own record says
+  an earlier 3556 trial was rolled back for restarting "before it had proved itself", so a
+  dead-link trial that is then reset can be sent to the other slot: `flash --otadata-only`
+  (the build's `otadata` alone, then a watchdog reset) boots the first slot as valid with
+  nothing on trial, and is how P4a was put back on the 3556 it was found on.
+- **esptool exits 1 after a watchdog reset that worked**: the USB-Serial/JTAG port of a P4
+  re-enumerates, pySerial complains, and the write had been verified and the board reset.
+  `flash` reads that as a verified write (`Hash of data verified`, `Hard resetting`, and no
+  fatal error) and anything else with exit 1 as a failure.
+- **`GET /log` answers 4 KB at a time** (`kLogReplyBytes`) out of a 16 KB ring: a client
+  follows `X-Log-Next`. A read that takes the first reply as the whole log sees the first 4 KB
+  of the ring, which on a P4 ends before the boot `budget:` line (its boot is noisy with
+  esp_hosted lines) and, as a mark, sits in the middle of the ring. `board_suite.py` reads to
+  the end since PR 10.
 - **P4b's RTS and hard resets land in the ROM's download mode** (the old script's note), so it is
   started with `--after watchdog-reset` (`after_flash` in its row) and put back by `flash
   --app-only`, which writes the `app` and `otadata` sections of `flasher_args.json` and nothing
@@ -137,10 +156,11 @@ not something it ran.
 | `bench.py lock take\|show\|release` | one board's lock | no |
 | `bench.py log`, `snapshot`, `console`, `scrub` | what a board says, masked; the serial console (needs `pyserial`) | no |
 | `bench_flash.py build PROFILE --tag T [--wifi]` | the profile's build, sized and held to it, as CI does it | no |
-| `bench_flash.py flash BOARD --build-dir D --session ID [--app-only] [--erase]` | esptool, after the lock and a MAC check | yes |
+| `bench_flash.py flash BOARD --build-dir D --session ID [--app-only \| --otadata-only] [--erase]` | esptool, after the lock and a MAC check | yes |
 | `bench_flash.py verify BOARD --build-dir D [--profile P]` | what the board says against the build | no |
 | `bench_flash.py ota BOARD --build-dir D --session ID` | `ota.py push`, with the board's address and lock | yes |
-| `board_suite.py run --board B ...` | the play list, held to the baseline | plays |
+| `bench_flash.py reset BOARD --session ID` | a system reset by esptool's watchdog reset after the MAC check, then waits for the board | resets it |
+| `board_suite.py run --board B ...` | the play list, held to the baseline; `--restart --reset-by esptool --boots N` boots a P4 by watchdog reset | plays |
 
 `flash` reads the MAC of the chip on the port first and writes **nothing** unless its last three
 octets are the table's (`mac_tail`): a port that moved to another board when a cable was changed

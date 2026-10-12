@@ -19,6 +19,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import urllib.request
 from pathlib import Path
 from typing import ClassVar
 from unittest import mock
@@ -110,8 +111,14 @@ class StandIn:
                     self._send(200, json.dumps(body).encode())
                 elif path == "/log":
                     start = int(query.partition("=")[2]) if query.startswith("from=") else 0
-                    data = bytes(stand_in.log[start:]) if start <= len(stand_in.log) else b""
-                    self._send(200, data, {"X-Log-Next": str(len(stand_in.log))})
+                    # a reply is at most 4 KB, as the board's is (kLogReplyBytes)
+                    data = (
+                        bytes(stand_in.log[start : start + 4096])
+                        if start <= len(stand_in.log)
+                        else b""
+                    )
+                    nxt = start + len(data) if start <= len(stand_in.log) else len(stand_in.log)
+                    self._send(200, data, {"X-Log-Next": str(nxt)})
                 else:
                     self._send(404, b"")
 
@@ -538,6 +545,76 @@ class Boot(unittest.TestCase):
         self.assertEqual(record["plays"]["ac3-2.0"]["decoder_permille_samples"], [223, 223, 223])
 
 
+class LogPaging(unittest.TestCase):
+    """GET /log answers 4 KB at a time; a read follows X-Log-Next to the end."""
+
+    def test_a_whole_log_read_follows_the_pages_and_ends_at_the_real_end(self) -> None:
+        noisy = b"".join(b"hosted: line %05d of the boot\n" % n for n in range(400))  # ~12.8 KB
+        stand_in = StandIn("p4-rev1", standard())
+        try:
+            stand_in.log = bytearray(noisy + budget_log(292211, 221184))
+            board = bs.Board("127.0.0.1", stand_in.port)
+            text, following = board.log(None)
+            boot = bs.boot_budget(board)
+        finally:
+            stand_in.close()
+        self.assertEqual(len(text.encode()), len(noisy) + len(budget_log(292211, 221184)))
+        self.assertEqual(following, len(noisy) + len(budget_log(292211, 221184)))
+        self.assertEqual((boot["internal_free"], boot["largest"]), (292211, 221184))
+
+    def test_a_read_from_a_mark_follows_the_pages_too(self) -> None:
+        stand_in = StandIn("p4-rev1", standard())
+        try:
+            stand_in.log = bytearray(b"x" * 10000)
+            board = bs.Board("127.0.0.1", stand_in.port)
+            text, following = board.log(1000)
+        finally:
+            stand_in.close()
+        self.assertEqual((len(text), following), (9000, 10000))
+
+    def test_a_log_that_is_shorter_than_the_mark_is_returned_for_the_caller_to_read_as_a_restart(
+        self,
+    ) -> None:
+        stand_in = StandIn("p4-rev1", standard())
+        try:
+            stand_in.log = bytearray(b"ESP-ROM:esp32p4\n")
+            board = bs.Board("127.0.0.1", stand_in.port)
+            text, following = board.log(20000)
+        finally:
+            stand_in.close()
+        self.assertEqual((text, following), ("", 16))
+
+    def test_a_run_whose_log_is_longer_than_a_page_is_marked_at_its_end(self) -> None:
+        # The first read of a whole log used to mark the end of its first 4 KB, and the play
+        # then read the rest of the old log, with its old result= line, as its own.
+        stand_in = StandIn("s3-n16r8", standard())
+        try:
+            stand_in.log = bytearray(
+                b"".join(
+                    b"old play: sink.writes=1 sink.underruns=9 sink.dry_ms=9 "
+                    b"sink.min_headroom_ms=0 sink.dma_ms=1\n"
+                    b"result=fail\n"
+                    for _ in range(200)
+                )
+            )
+            board = bs.Board("127.0.0.1", stand_in.port, 5.0)
+            results = bs.run_suite(
+                board,
+                "s3-n16r8",
+                bs.load_suite(),
+                "http://127.0.0.1:1",
+                {},
+                repeat=1,
+                sleep=0.01,
+                timeout=5.0,
+            )
+        finally:
+            stand_in.close()
+        for result in results:
+            self.assertEqual(result.findings, [], result.id)
+            self.assertEqual(result.lines.underruns, 0, result.id)
+
+
 class Identity(unittest.TestCase):
     def setUp(self) -> None:
         self.opened: list[StandIn] = []
@@ -673,6 +750,7 @@ class BenchBoards(unittest.TestCase):
             "lock": None,
             "restart": False,
             "accept_restart_fault": False,
+            "reset_by": "http",
         }
         return argparse.Namespace(**{**base, **more})
 
@@ -708,6 +786,11 @@ class BenchBoards(unittest.TestCase):
         bs.resolve_board(accepted)
         self.assertEqual(accepted.host, "192.168.1.99")
 
+    def test_a_p4_may_be_reset_by_esptool_where_its_http_restart_is_refused(self) -> None:
+        args = self.args(board="P4a", restart=True, reset_by="esptool")
+        bs.resolve_board(args)
+        self.assertEqual(args.host, "192.168.1.99")
+
     def test_an_s3_is_restarted_without_a_word(self) -> None:
         args = self.args(board="S3a", restart=True)
         bs.resolve_board(args)
@@ -723,6 +806,125 @@ class BenchBoards(unittest.TestCase):
         bs.resolve_board(args)
         self.assertEqual(args.host, "127.0.0.1")
         self.assertIsNone(args.lock)
+
+
+class ResetBy(unittest.TestCase):
+    """--reset-by esptool: a P4's boots, taken by a watchdog reset and not by POST /restart."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        path = temp_bench(self.root)
+        data = json.loads(path.read_text("utf-8"))
+        data["boards"]["P4a"]["host"] = "127.0.0.1"  # the stand-in
+        path.write_text(json.dumps(data), "utf-8")
+        patch = mock.patch.dict(os.environ, {bench.ENVIRONMENT: str(path)})
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.stand_in = StandIn("p4-rev1", standard())
+        self.addCleanup(self.stand_in.close)
+        self.saved = bs.BASELINES
+        bs.BASELINES = self.root / "baselines"
+        self.addCleanup(setattr, bs, "BASELINES", self.saved)
+        self.lock = self.root / "locks" / "p4-board.lock"
+        self.out = self.root / "run.json"
+        self.resets: list[str] = []
+
+    def reset_through_the_stand_in(self, table, board, run, probe=None, wait=90.0):
+        """What esptool's reset does to the board, as the stand-in's restart."""
+        self.resets.append(board.name)
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{self.stand_in.port}/restart", method="POST", data=b""
+        )
+        urllib.request.urlopen(request, timeout=5).read()
+        return {"version": "v0.10.0-beta.1-4175-g79d2e7618-"}
+
+    def run_cli(self, *extra: str) -> tuple[int, str, str]:
+        argv = [
+            "run",
+            "--profile",
+            "p4-rev1",
+            "--board",
+            "P4a",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(self.stand_in.port),
+            "--lock",
+            str(self.lock),
+            "--session",
+            "16d036",
+            "--serve-host",
+            "127.0.0.1",
+            "--out",
+            str(self.out),
+            "--play-timeout",
+            "10",
+            *extra,
+        ]
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = bs.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_the_boots_are_taken_by_the_reset_and_the_worst_is_held(self) -> None:
+        self.stand_in.boot_logs = [budget_log(112500, 96256), budget_log(108988, 94208)]
+        with mock.patch.object(bs.bench_flash, "reset_board", self.reset_through_the_stand_in):
+            code, out, err = self.run_cli("--restart", "--reset-by", "esptool", "--boots", "2")
+        self.assertEqual((code, err), (0, ""), out)
+        self.assertEqual(self.resets, ["P4a", "P4a"])
+        record = json.loads(self.out.read_text("utf-8"))
+        self.assertEqual(
+            (record["boot"]["internal_free"], record["boot"]["largest"]), (108988, 94208)
+        )
+
+    def test_the_http_restart_of_a_p4_is_still_refused_before_anything_is_sent(self) -> None:
+        with mock.patch.object(bs.bench_flash, "reset_board", self.reset_through_the_stand_in):
+            code, _, err = self.run_cli("--restart")
+        self.assertEqual(code, 2)
+        self.assertIn("--reset-by esptool", err)
+        self.assertEqual((self.resets, self.stand_in.restarts), ([], 0))
+        self.assertFalse(self.lock.exists())
+
+    def test_esptool_is_a_way_to_restart_and_so_needs_restart(self) -> None:
+        code, _, err = self.run_cli("--reset-by", "esptool")
+        self.assertEqual(code, 2)
+        self.assertIn("needs --restart", err)
+
+    def test_it_needs_the_board_to_be_one_of_the_bench(self) -> None:
+        args = [
+            "run",
+            "--profile",
+            "p4-rev1",
+            "--board",
+            "a stand-in",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(self.stand_in.port),
+            "--lock",
+            str(self.lock),
+            "--session",
+            "16d036",
+            "--restart",
+            "--reset-by",
+            "esptool",
+        ]
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = bs.main(args)
+        self.assertEqual(code, 2)
+        self.assertIn("board of bench.json", err.getvalue())
+
+    def test_a_board_that_does_not_answer_after_the_reset_is_an_error_and_the_lock_goes(
+        self,
+    ) -> None:
+        with mock.patch.object(bs.bench_flash, "reset_board", lambda *a, **k: None):
+            code, _, err = self.run_cli("--restart", "--reset-by", "esptool")
+        self.assertEqual(code, 2)
+        self.assertIn("did not answer after the reset", err)
+        self.assertFalse(self.lock.exists())
 
 
 class WorstBoot(unittest.TestCase):

@@ -66,6 +66,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import bench
+import bench_flash
 import sink_profile
 
 REPO = Path(__file__).resolve().parents[2]
@@ -75,6 +76,11 @@ BASELINES = PROJECT / "baselines"
 PINS = REPO / "testdata" / "ac4-probe-pcm-hashes.json"
 
 FORMAT = 1
+
+# The most a board's GET /log answers with in one reply (firmware/esp-idf/iclforge/src/
+# control.cpp, kLogReplyBytes), and how many replies one read follows (a 256 KB ring).
+LOG_REPLY_BYTES = 4096
+MAX_LOG_PAGES = 64
 
 # The fields of GET /status the suite reads, by name. The network object is never one.
 STATUS_FIELDS = (
@@ -139,11 +145,16 @@ def resolve_board(args: argparse.Namespace) -> None:
         raise SuiteError(f"--board {row.name} is at {row.host}, not {args.host}")
     if args.lock and Path(args.lock).name != row.lock.name:
         raise SuiteError(f"--board {row.name} is guarded by {row.lock.name}, not {args.lock}")
-    if args.restart and row.restart_kills_c6_link and not args.accept_restart_fault:
+    if (
+        args.restart
+        and row.restart_kills_c6_link
+        and args.reset_by != "esptool"
+        and not args.accept_restart_fault
+    ):
         raise SuiteError(
             f"{row.name}: a restart can leave a P4 with no Wi-Fi (its C6 link), and --restart "
-            "restarts it; leave the boot line to a run after a power cycle, or pass "
-            "--accept-restart-fault (planning/esp32-board-bench.md has the recovery)"
+            "restarts it by POST /restart; restart it with --reset-by esptool (a watchdog reset), "
+            "or pass --accept-restart-fault (planning/esp32-board-bench.md has the recovery)"
         )
     args.host = args.host or row.host
     args.lock = args.lock or str(row.lock)
@@ -198,6 +209,10 @@ class Board:
         """POST /restart, then wait for the board to answer again and to be stopped."""
         self._request("POST", "/restart")
         time.sleep(sleep)
+        self.wait_stopped(wait, sleep)
+
+    def wait_stopped(self, wait: float = 120.0, sleep: float = 2.0) -> None:
+        """Wait for the board to answer and to be stopped."""
         deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
             try:
@@ -213,13 +228,28 @@ class Board:
             self._request("POST", "/stop")
 
     def log(self, start: int | None) -> tuple[str, int | None]:
-        """The console lines after byte `start` (all of them for None), and the offset after."""
-        path = "/log" if start is None else f"/log?from={start}"
-        status, headers, data = self._request("GET", path)
-        if status != 200:
-            raise SuiteError(f"{self.host}: GET {path} answered {status}")
-        following = headers.get("x-log-next", "")
-        return data.decode("utf-8", "replace"), int(following) if following.isdigit() else None
+        """The console lines after byte `start` (all the ring holds for None) to the end of the
+        log, and the offset after. One reply is at most LOG_REPLY_BYTES (control.cpp's
+        kLogReplyBytes): a client follows X-Log-Next for the rest, and a whole-log read that did
+        not left its mark in the middle of a 16 KB ring and the P4's boot line, past the first
+        4 KB of a noisy boot, unread."""
+        data = b""
+        cursor = start
+        following_number: int | None = None
+        for _ in range(MAX_LOG_PAGES):
+            path = "/log" if cursor is None else f"/log?from={cursor}"
+            status, headers, page = self._request("GET", path)
+            if status != 200:
+                raise SuiteError(f"{self.host}: GET {path} answered {status}")
+            following = headers.get("x-log-next", "")
+            following_number = int(following) if following.isdigit() else None
+            data += page
+            if following_number is None or len(page) < LOG_REPLY_BYTES:
+                break
+            if cursor is not None and following_number <= cursor:
+                break  # the log is shorter than where it was: the caller reads that as a restart
+            cursor = following_number
+        return data.decode("utf-8", "replace"), following_number
 
 
 # --- reading a play -------------------------------------------------------------------
@@ -433,6 +463,30 @@ def boot_budget(board: Board) -> dict[str, Any]:
     if "floor" in found:
         boot["floor"] = _number(found["floor"])
     return boot
+
+
+def boot_budget_wait(board: Board, seconds: float = 12.0, sleep: float = 0.5) -> dict[str, Any]:
+    """boot_budget after a restart, which can answer before the line has been printed."""
+    deadline = time.monotonic() + seconds
+    while True:
+        boot = boot_budget(board)
+        if boot or time.monotonic() >= deadline:
+            return boot
+        time.sleep(sleep)
+
+
+def restart_board(args: argparse.Namespace, board: Board) -> None:
+    """One restart of the board, by the method the run asked for: POST /restart, or a system
+    reset by esptool's watchdog reset, which does not start the fault a P4's restart can."""
+    if args.reset_by != "esptool":
+        board.restart()
+        return
+    table = bench.load()
+    row = table.boards[args.board]
+    hardware = bench_flash.reset_board(table, row, bench_flash.make_runner(table))
+    if hardware is None:
+        raise SuiteError(f"{row.name} did not answer after the reset")
+    board.wait_stopped()
 
 
 def worst_boot(samples: list[dict[str, Any]]) -> dict[str, Any]:
@@ -776,6 +830,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     suite = load_suite()
     plan(suite, args.profile, args.only)  # a profile with no list is refused before a lock is taken
     resolve_board(args)
+    if args.reset_by == "esptool":
+        if not args.restart:
+            raise SuiteError("--reset-by esptool is the way --restart restarts: it needs --restart")
+        if args.board not in bench.load().boards:
+            raise SuiteError("--reset-by esptool needs --board to be a board of bench.json")
     if args.boots < 1:
         raise SuiteError("--boots is at least 1")
     if args.boots > 1 and not args.restart:
@@ -803,9 +862,9 @@ def cmd_run(args: argparse.Namespace) -> int:
                     f"{args.host}: restarting ({number} of {args.boots}), so that its boot line "
                     "is the log's first"
                 )
-                board.restart()
+                restart_board(args, board)
                 if number < args.boots:
-                    boots.append(boot_budget(board))
+                    boots.append(boot_budget_wait(board))
         hardware = check_identity(board, args.profile, args.profiles)
         before = board.status()
         if before.get("state") != "stopped":
@@ -814,7 +873,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"{args.host}: {hardware.get('chip')} {hardware.get('version')}, "
             f"profile {args.profile} at {hardware.get('profile_hash')}"
         )
-        boots.append(boot_budget(board))
+        boots.append(boot_budget_wait(board) if args.restart else boot_budget(board))
         boot = worst_boot(boots)
         if len(boots) > 1:
             print(f"boot: the worst of {len(boots)}: {boot}")
@@ -895,6 +954,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="POST /restart first, so that the boot line is in the log "
         "(refused for a P4 of the bench: its restart can kill the C6 link)",
+    )
+    run.add_argument(
+        "--reset-by",
+        choices=("http", "esptool"),
+        default="http",
+        help="how --restart restarts: POST /restart, or esptool's watchdog reset through the "
+        "board's serial port (what a P4 needs, whose restart can leave its C6 link dead)",
     )
     run.add_argument(
         "--boots",

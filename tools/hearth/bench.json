@@ -35,7 +35,8 @@
       "port": "COM10",
       "lock": "p4-board.lock",
       "mac_tail": "ea6d66",
-      "restart_kills_c6_link": true
+      "restart_kills_c6_link": true,
+      "after_flash": "watchdog-reset"
     },
     "P4b": {
       "chip": "esp32p4",

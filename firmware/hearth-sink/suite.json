@@ -87,6 +87,10 @@
       ]
     },
     "p4-rev1": {
+      "tolerance": {
+        "largest_block_bytes": 8192,
+        "note": "The P4's largest internal block at boot steps by 4 KB: on the ten boots read one by one (the OTA's, a reset's and the record's eight, P4a, 2026-10-12) it was 221,184 on eight and 217,088 on two; free RAM read 291,875 to 292,211. Two 4 KB steps is the allowance (twice the one seen) and free RAM keeps the suite's 2,048. The S3's 1,024 would fail one boot in five."
+      },
       "plays": [
         {"id": "ac3-2.0", "stream": "ac3-2.0"},
         {"id": "eac3-2.0", "stream": "eac3-2.0"}
