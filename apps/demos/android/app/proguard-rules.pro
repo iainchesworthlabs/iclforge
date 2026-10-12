@@ -25,7 +25,7 @@
 #    whatever instance Kotlin passed to registerPassthroughBridge(bridge:
 #    Any) and calls env->GetObjectClass(bridge) +
 #    env->GetMethodID(class, "<name>", "<signature>") for each method below
-#    (passthrough.cpp's registerPassthroughBridge()). Because the Kotlin
+#    (passthrough.cpp's register_passthrough_bridge()). Because the Kotlin
 #    parameter is typed `Any`, R8 cannot trace that call to
 #    PassthroughBridge's methods - and `open`/`submit` specifically are
 #    never called from Kotlin/Java at all, only from native - so without

@@ -1,11 +1,8 @@
-// This app's own native entry points. Everything platform-specific that
-// iclforge::audio needs from JNI (the PassthroughBridge plumbing, and JNI_OnLoad
-// itself) lives in that library's own
-// libs/audio/src/backend/android/passthrough.cpp, not here - see that
-// file's header comment for why JNI_OnLoad belongs there (capturing the
-// JavaVM is iclforge::audio's own concern) rather than being duplicated in this
-// translation unit, which would be an ODR violation at link time (a shared
-// object may define JNI_OnLoad exactly once).
+// This app's own native entry points. The two things iclforge::audio's passthrough backend needs
+// from JNI (the process's JavaVM, and the Kotlin PassthroughBridge) are handed to it from here, as
+// plain C++ calls (libs/audio/src/backend/android/passthrough_bridge.hpp): JNI_OnLoad, which a
+// shared object defines exactly once, and the native method whose name is this app's Java
+// package. The backend names no package, so another app can link it.
 //
 // Two smoke-test entry points, checkable from Kotlin/logcat with
 // progressively more of the pipeline exercised, matching
@@ -32,9 +29,25 @@
 #include "iclforge/audio/audio_backend.hpp"
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/ac3/version.hpp"
+#include "android/passthrough_bridge.hpp"
 
 namespace {
 constexpr char kLogTag[] = "iclforge.shield";
+}
+
+// The process's JavaVM, for the backend to attach its threads with. A shared object defines this
+// once: here, and not in libs/audio.
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
+    iclforge::audio::android::set_java_vm(vm);
+    __android_log_print(ANDROID_LOG_INFO, kLogTag, "JNI_OnLoad: iclforge_jni loaded, JavaVM captured");
+    return JNI_VERSION_1_6;
+}
+
+// Called once from Kotlin (NativeBridge.registerPassthroughBridge) after System.loadLibrary, before
+// any PassthroughSink::start(). Safe to call again (an Activity recreated).
+extern "C" JNIEXPORT void JNICALL Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge(
+    JNIEnv* env, jclass /*clazz*/, jobject bridge) {
+    iclforge::audio::android::register_passthrough_bridge(env, bridge);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
