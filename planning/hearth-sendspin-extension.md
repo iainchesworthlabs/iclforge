@@ -332,6 +332,7 @@ the rest are this role's.
 | `why?` | string | A short sentence when the sink stopped playing for a reason of its own; absent otherwise |
 | `layout?` | string | The layout in force, in the grammar `layout_grammar` names, as the sink's page or the last settings made it; absent when the sink does not say. A server that renders for the sink reads it here, and not from what it last sent, since the page can change it |
 | `lyrics?` | object | `{item, line}`: the item number of the document the sink holds, and the line its own clock has the sound in (-1 before the first line, and for a document with no times); absent while it holds none. Sent when a document is taken and when the line changes, which is a few times a minute |
+| `output?` | string | How the stream the sink has leaves it: `"passthrough"`, the coded bits go on to a receiver as they came (IEC 61937); `"pcm"`, the sink decoded the stream and plays the samples. Present while a stream is open; absent with none, and for a sink that does not say, which a server reads as not known. A sink that can do either, as Hearth for Android does, says which it is doing, so a server's page can show it. A value a reader does not know is read as absent. An added optional key, so no version change ([Versions](#versions)) |
 
 The sink sends `client/state` whenever a field other than `levels` changes, and while a stream
 plays it also sends one at most ten times a second with fresh `levels`. `levels` are measured on

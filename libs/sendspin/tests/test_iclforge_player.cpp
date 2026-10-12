@@ -433,6 +433,63 @@ TEST_CASE("iclforge_player: the layout a sink states", "[sendspin][iclforge]") {
     CHECK_FALSE(with_layout("null"));
 }
 
+TEST_CASE("iclforge_player: how a sink's stream leaves it", "[sendspin][iclforge]") {
+    ac::State state;
+    state.supported_commands = {ac::Command::kVolume};
+    // A sink from before the key, or one with no stream, says nothing: the key is not written.
+    CHECK(written(state, ac::write_state).find("\"output\"") == std::string::npos);
+
+    const auto round_trip = [&](ac::Output output, std::string_view name) {
+        state.output = output;
+        const std::string text = written(state, ac::write_state);
+        CHECK(text.ends_with(R"(,"output":")" + std::string(name) + R"("})"));
+        const std::optional<ac::State> read = ac::read_state(Parsed(text).root());
+        REQUIRE(read.has_value());
+        REQUIRE(read->output.has_value());
+        CHECK(*read->output == output);
+        CHECK(ac::output_name(output) == name);
+    };
+    round_trip(ac::Output::kPassthrough, "passthrough");
+    round_trip(ac::Output::kPcm, "pcm");
+
+    // The key sits beside the others and does not disturb them.
+    state.layout = "5.1";
+    state.lyrics = ac::LyricsReport{.item = 4, .line = 2};
+    state.output = ac::Output::kPassthrough;
+    const std::optional<ac::State> both = ac::read_state(Parsed(written(state, ac::write_state)).root());
+    REQUIRE(both.has_value());
+    CHECK(both->layout == "5.1");
+    CHECK(both->lyrics == ac::LyricsReport{.item = 4, .line = 2});
+    CHECK(both->output == ac::Output::kPassthrough);
+
+    // Absent reads as "not said", which is neither value.
+    state.output.reset();
+    const std::optional<ac::State> silent =
+        ac::read_state(Parsed(written(state, ac::write_state)).root());
+    REQUIRE(silent.has_value());
+    CHECK_FALSE(silent->output.has_value());
+
+    const auto with_output = [&](const std::string& value) {
+        ac::State quiet;
+        quiet.supported_commands = {ac::Command::kVolume};
+        std::string source = written(quiet, ac::write_state);
+        source.pop_back();
+        return ac::read_state(Parsed(source + R"(,"output":)" + value + "}").root());
+    };
+    const std::optional<ac::State> named = with_output(R"("passthrough")");
+    REQUIRE(named.has_value());
+    CHECK(named->output == ac::Output::kPassthrough);
+    // A value a later revision adds is read as the sink not saying, and the state is still read.
+    const std::optional<ac::State> later = with_output(R"("decoded")");
+    REQUIRE(later.has_value());
+    CHECK_FALSE(later->output.has_value());
+    CHECK(later->supported_commands.size() == 1);
+    // A value of the wrong type is a malformed state, as for every other key.
+    CHECK_FALSE(with_output("7"));
+    CHECK_FALSE(with_output("null"));
+    CHECK_FALSE(with_output("true"));
+}
+
 TEST_CASE("iclforge_player: the stream/start object", "[sendspin][iclforge]") {
     const std::string text =
         written(ac::StreamStart{.data_type = ac::DataType::kEac3, .sample_rate = 48000}, ac::write_stream_start);
