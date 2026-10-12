@@ -423,9 +423,11 @@ TestCase {
 
         // Not started is the first picture, a black screen. The strip is 320 wide, so the 300 by
         // 216 picture is drawn once over, centred.
+        waitForRendering(picture);
+        // The layout has given it its size by the time a frame has been drawn.
+        verify(picture.width > 0 && picture.height > 0, "the picture has no size");
         const mid = Math.round(picture.width / 2);
         const row = Math.round(picture.height / 2);
-        waitForRendering(picture);
         let image = grabImage(picture);
         compare(image.red(mid, row), 0);
         compare(image.green(mid, row), 0);
