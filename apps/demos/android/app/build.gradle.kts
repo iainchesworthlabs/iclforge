@@ -275,7 +275,7 @@ configurations.all {
             "commons-io:commons-io:2.22.0",
             // The lint tool's own copies (androidLintTool). All four are build-time only, not in
             // the APK, and each was reported by OSV-Scanner with the fixed version below.
-            "org.apache.commons:commons-lang3:3.18.0",       // GHSA-j288-q9x7-2f5v
+            "org.apache.commons:commons-lang3:3.21.0",       // GHSA-j288-q9x7-2f5v
             "org.apache.httpcomponents:httpclient:4.5.14",   // GHSA-7r82-7xv7-xcpj
             // One release of all three so the set stays matched; 1.85 is the highest fix of
             // GHSA-9pwp-9qqc-pr26, GHSA-qp49-qgx5-5m26 and GHSA-c3fc-8qff-9hwx (bcprov) and

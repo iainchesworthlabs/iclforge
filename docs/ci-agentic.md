@@ -187,6 +187,14 @@ the first leaves out is found within a day.
 | Core jobs | ADM module, Hearth Sendspin, the performance trend | coverage, ABI gate, FFmpeg Validate and the two trend publishers that read it |
 | Other jobs | the lane's own build, when the lane's own tree changed | Linux AppImage, and each satellite (Android, WASM, ESP-IDF, Rust, wheels, npm) whatever changed |
 
+The two trend publishers that read FFmpeg Validate differ in what they need of it.
+`persist-external-comparison-trend`, which carries the AC-4 decode and encode series, also runs
+after an FFmpeg Validate that failed and publishes what that run uploaded: the scoring steps come
+before several gates, and a gate that fails after them leaves what they measured as it was.
+The AC-4 scores are uploaded after a scorer that failed a floor as well, because a breach
+is a point on the trend like any other. The object-reconstruction publisher needs a run that
+passed: its scores come from the job's last step, so a run that failed has none.
+
 The run after a merge also picks its lanes from what changed. It lists the files merged since
 `verified` (the range a failure is blamed on) and runs the lanes they touch, so a batch of
 documentation or a Python-only change builds little or nothing. A satellite lane runs only when a
