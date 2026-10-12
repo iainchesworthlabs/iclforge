@@ -11,6 +11,7 @@
 #include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -1407,3 +1408,173 @@ TEST_CASE("place_lyrics_beside says why a file is not lyrics, and writes nothing
     CHECK_FALSE(fs::exists(folder.path() / "song.lrc.part"));
 }
 
+// ---- a code page, read with a decoder the program supplies ---------------------------------------
+
+namespace {
+
+// Latin-1: each byte is the code point of that number. `context` counts the calls when given.
+bool latin1_decoder(void* context, std::string_view bytes, std::string& utf8) {
+    if (context != nullptr) {
+        ++*static_cast<int*>(context);
+    }
+    for (const char c : bytes) {
+        const auto byte = static_cast<unsigned char>(c);
+        if (byte < 0x80) {
+            utf8.push_back(c);
+        } else {
+            utf8.push_back(static_cast<char>(0xC0U | (byte >> 6U)));
+            utf8.push_back(static_cast<char>(0x80U | (byte & 0x3FU)));
+        }
+    }
+    return true;
+}
+
+// A code page that does not have the bytes it is given.
+bool refusing_decoder(void*, std::string_view, std::string&) { return false; }
+
+// A decoder that says it converted and hands back something that is not UTF-8.
+bool broken_decoder(void*, std::string_view, std::string& utf8) {
+    utf8 = std::string(1, static_cast<char>(0xFF));
+    return true;
+}
+
+}  // namespace
+
+TEST_CASE("encoding: a file in a code page is read with the decoder the program gave, and only then",
+          "[lyrics][encoding]") {
+    const std::string latin1 = "[ti:Caf\xE9]\n[00:01.00]Caf\xE9 au lait\n";
+    int calls = 0;
+    const iclforge::lyrics::TextEncoding encoding{.decoder = latin1_decoder, .context = &calls};
+
+    // Without a decoder it is refused with the reason, as before: a code page is never guessed at.
+    const auto refused = iclforge::lyrics::parse_lyrics(latin1);
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error() == "The lyrics file is not UTF-8 or UTF-16.");
+
+    const auto read = iclforge::lyrics::parse_lyrics(latin1, std::nullopt, encoding);
+    REQUIRE(read.has_value());
+    CHECK(calls == 1);
+    CHECK(read->title == "Caf\xC3\xA9");
+    REQUIRE(read->lines.size() == 1);
+    // The e acute is U+00E9, which is C3 A9 in UTF-8, not the one byte E9 the file held.
+    CHECK(read->lines[0].text == "Caf\xC3\xA9 au lait");
+}
+
+TEST_CASE("encoding: a file that is UTF-8 or UTF-16 is read as it always was, whatever decoder is given",
+          "[lyrics][encoding]") {
+    int calls = 0;
+    const iclforge::lyrics::TextEncoding encoding{.decoder = latin1_decoder, .context = &calls};
+
+    const auto utf8 = iclforge::lyrics::parse_lyrics("[00:01.00]Caf\xC3\xA9\n", std::nullopt, encoding);
+    REQUIRE(utf8.has_value());
+    CHECK(utf8->lines[0].text == "Caf\xC3\xA9");
+
+    // With a byte-order mark, in either order.
+    const std::string utf8_mark = "\xEF\xBB\xBF[00:01.00]Caf\xC3\xA9\n";
+    CHECK(iclforge::lyrics::parse_lyrics(utf8_mark, std::nullopt, encoding)->lines[0].text == "Caf\xC3\xA9");
+    std::string utf16 = "\xFF\xFE";
+    for (const char c : std::string{"[00:01.00]Hi\n"}) {
+        utf16.push_back(c);
+        utf16.push_back('\0');
+    }
+    CHECK(iclforge::lyrics::parse_lyrics(utf16, std::nullopt, encoding)->lines[0].text == "Hi");
+
+    // The decoder was never asked.
+    CHECK(calls == 0);
+}
+
+TEST_CASE("encoding: a decoder that cannot read the bytes, or hands back what is not UTF-8, is an error",
+          "[lyrics][encoding]") {
+    const std::string latin1 = "[00:01.00]Caf\xE9\n";
+    const auto refusing = iclforge::lyrics::parse_lyrics(
+        latin1, std::nullopt, iclforge::lyrics::TextEncoding{.decoder = refusing_decoder});
+    REQUIRE_FALSE(refusing.has_value());
+    CHECK(refusing.error() == "The lyrics file is not valid in the code page it was read as.");
+
+    const auto broken = iclforge::lyrics::parse_lyrics(
+        latin1, std::nullopt, iclforge::lyrics::TextEncoding{.decoder = broken_decoder});
+    REQUIRE_FALSE(broken.has_value());
+    CHECK(broken.error() == "The lyrics file is not valid in the code page it was read as.");
+}
+
+TEST_CASE("encoding: SubRip, ASS and whatever parse_timed_text is given are read in the code page too",
+          "[lyrics][encoding]") {
+    const iclforge::lyrics::TextEncoding encoding{.decoder = latin1_decoder};
+    const std::string srt = "1\n00:00:01,000 --> 00:00:03,000\nCaf\xE9\n";
+    const auto subrip = iclforge::lyrics::parse_subrip(srt, std::nullopt, encoding);
+    REQUIRE(subrip.has_value());
+    CHECK(subrip->lines[0].text == "Caf\xC3\xA9");
+
+    const std::string ass =
+        "[Script Info]\nScriptType: v4.00+\n\n[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\k100}Caf{\\k100}\xE9\n";
+    const auto script = iclforge::lyrics::parse_ass(ass, std::nullopt, encoding);
+    REQUIRE(script.has_value());
+    CHECK(script->lines[0].text == "Caf\xC3\xA9");
+
+    // Whichever it is, told by what it holds after it has been decoded.
+    const auto told_srt = iclforge::lyrics::parse_timed_text(srt, std::nullopt, encoding);
+    REQUIRE(told_srt.has_value());
+    CHECK(told_srt->lines[0].text == "Caf\xC3\xA9");
+    const auto told_ass = iclforge::lyrics::parse_timed_text(ass, std::nullopt, encoding);
+    REQUIRE(told_ass.has_value());
+    CHECK(told_ass->lines[0].word_timed());
+    CHECK_FALSE(iclforge::lyrics::parse_timed_text(srt).has_value());
+}
+
+TEST_CASE("encoding: a MIDI karaoke file's syllables, title and artist are read in the code page, and the other @ lines are not",
+          "[lyrics][midi][encoding]") {
+    int calls = 0;
+    const iclforge::lyrics::TextEncoding encoding{.decoder = latin1_decoder, .context = &calls};
+    const std::string e_acute = midi_byte(0xE9);
+    const std::string words = midi_words_track(
+        midi_text(0, "@TCaf" + e_acute) + midi_text(0, "@TD" + e_acute + "j" + e_acute) +
+        midi_text(0, "@I" + midi_byte(0xA9) + " 1985") + midi_text(100, "Caf" + e_acute) +
+        midi_text(100, " au") + midi_text(100, " lait"));
+
+    // Refused without it, as before.
+    CHECK_FALSE(iclforge::lyrics::parse_midi_karaoke(midi_file({words})).has_value());
+
+    const auto lyrics = iclforge::lyrics::parse_midi_karaoke(midi_file({words}), std::nullopt, encoding);
+    REQUIRE(lyrics.has_value());
+    CHECK(lyrics->title == "Caf\xC3\xA9");
+    CHECK(lyrics->artist == "D\xC3\xA9j\xC3\xA9");
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "Caf\xC3\xA9 au lait");
+    // The copyright line is never shown and was never asked of the decoder: two names and one syllable
+    // are the bytes that were not UTF-8.
+    CHECK(calls == 3);
+
+    // And told by its header, with the decoder carried through, when it is given as any lyrics file.
+    const auto told = iclforge::lyrics::parse_timed_text(midi_file({words}), std::nullopt, encoding);
+    REQUIRE(told.has_value());
+    CHECK(told->lines[0].text == "Caf\xC3\xA9 au lait");
+
+    // A syllable the page does not have is an error naming the page, not a word of another script.
+    const auto refused = iclforge::lyrics::parse_midi_karaoke(
+        midi_file({words}), std::nullopt, iclforge::lyrics::TextEncoding{.decoder = refusing_decoder});
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error() == "The words of the MIDI file are not valid in the code page they were read as.");
+}
+
+TEST_CASE("encoding: read_lyrics and place_lyrics_beside take the decoder, and write UTF-8", "[lyrics][encoding]") {
+    const Folder folder;
+    const fs::path lrc = folder.write("cafe.lrc", "[00:01.00]Caf\xE9\n");
+    const iclforge::lyrics::TextEncoding encoding{.decoder = latin1_decoder};
+
+    CHECK_FALSE(iclforge::lyrics::read_lyrics(lrc).has_value());
+    const auto read = iclforge::lyrics::read_lyrics(lrc, std::nullopt, encoding);
+    REQUIRE(read.has_value());
+    CHECK(read->lines[0].text == "Caf\xC3\xA9");
+
+    const fs::path stream = folder.path() / "song.ac3";
+    const auto unplaced = iclforge::lyrics::place_lyrics_beside(lrc, stream);
+    CHECK(unplaced.status == iclforge::lyrics::PlacementStatus::kUnreadable);
+    CHECK_FALSE(fs::exists(folder.path() / "song.lrc"));
+
+    const auto placed = iclforge::lyrics::place_lyrics_beside(lrc, stream, std::nullopt, encoding);
+    REQUIRE(placed.status == iclforge::lyrics::PlacementStatus::kWritten);
+    // What a player reads: UTF-8, the e acute as C3 A9.
+    CHECK(read_text_file(placed.path) == "[00:01.00]Caf\xC3\xA9\n");
+}
