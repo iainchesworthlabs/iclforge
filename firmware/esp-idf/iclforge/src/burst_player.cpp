@@ -43,6 +43,7 @@
 #include "opus_stream.hpp"
 
 #include "iclforge/access_units.hpp"
+#include "iclforge/object_limit.hpp"
 #include "iclforge/pcm_unpack.hpp"
 
 namespace iclforge {
@@ -200,6 +201,12 @@ struct BurstPlayer::Impl {
     Stream stream = Stream::kIdle;
     ac::DataType data_type = ac::DataType::kEac3;
     m::AudioFormat pcm_format;
+    // The stream playing declares more objects than config.max_objects: it is played as its bed,
+    // and the console said so once.
+    bool bed_only = false;
+    bool bed_only_noted = false;
+    // The listener chose objects "always": a stream is not held to config.max_objects.
+    bool objects_always = false;
     // The decoder of an Opus stream, open from its start to its end, and the packet's samples.
     std::unique_ptr<OpusStream> opus;
     std::array<std::int16_t, OpusStream::kMaxFrames * 2> opus_pcm{};
@@ -350,6 +357,7 @@ struct BurstPlayer::Impl {
                    std::span<const double> trims, std::span<const double> delays) {
         layout = new_layout;
         serving = iclforge::ac3::render::serve(layout, fold, objects);
+        objects_always = objects == iclforge::ac3::render::ObjectsPolicy::kAlways;
         decoder_config = decoder;
         iclforge::ac3::render::configure_decoder(serving, decoder_config);
         decoder_config.executor = lane.has_value() ? &*lane : nullptr;
@@ -563,6 +571,8 @@ struct BurstPlayer::Impl {
         dropped_chunks.store(0);
         invalid_chunks.store(0);
         channels_refused_warned = false;
+        bed_only = false;
+        bed_only_noted = false;
         decode_us_total = 0;
         sink_us_total = 0;
         timed_bursts = 0;
@@ -929,12 +939,18 @@ struct BurstPlayer::Impl {
             // The bed is the layout the decoder's channels are in, which for an AC-3 syncframe is
             // the coded one except under Annex C's reproduction: a karaoke stream comes out as L,
             // C, R and the LFE, three or four channels for the four to six coded, and laid out
-            // from the coded acmod its vocals would sit where the surrounds were. (A fold has no
-            // bed: the renderer takes its channels as they come.)
+            // from the coded acmod its vocals would sit where the surrounds were. An E-AC-3
+            // programme of one independent substream is reproduced the same way
+            // (iclforge::ac3::is_karaoke_programme), so a unit that is one syncframe asks the
+            // same question. (A fold has no bed: the renderer takes its channels as they come.)
             iclforge::ac3::eac3::chanmap::Layout unit_bed = *bed;
-            if (header->kind == iclforge::ac3::io::StreamKind::kAc3 && header->bytes == unit.size()) {
-                const bool karaoke = iclforge::ac3::meta::is_karaoke(
-                    static_cast<iclforge::ac3::meta::BitstreamMode>(header->bsmod), header->acmod);
+            if (header->bytes == unit.size()) {
+                const auto bsmod = static_cast<iclforge::ac3::meta::BitstreamMode>(header->bsmod);
+                const bool karaoke =
+                    header->kind == iclforge::ac3::io::StreamKind::kAc3
+                        ? iclforge::ac3::meta::is_karaoke(bsmod, header->acmod)
+                        : iclforge::ac3::is_karaoke_programme(
+                              bsmod, header->acmod, 1, header->oba_complexity_index.has_value());
                 const iclforge::ac3::OutputMode mode =
                     iclforge::ac3::output_mode(decoder_config.output, header->acmod, header->lfe, karaoke);
                 if (mode.acmod != header->acmod) {
@@ -972,6 +988,20 @@ struct BurstPlayer::Impl {
             ac3_decoder.reset();
             eac3_decoder.emplace(decoder_config);
         }
+        // A stream that declares more objects than this board places in real time is played as
+        // its bed, decided from the header before the object reconstruction allocates anything.
+        // Set on the decoder this stream uses, which may be one kept from an earlier stream.
+        bed_only = serving.reconstruct && !objects_always &&
+                   iclforge::objects_past_limit(header->oba_complexity_index, config.max_objects);
+        if (bed_only && !bed_only_noted) {
+            bed_only_noted = true;
+            std::printf(
+                "burst player: a stream declaring %d objects is past the %u this board places in "
+                "real time: playing its bed\n",
+                iclforge::declared_objects(header->oba_complexity_index),
+                static_cast<unsigned>(config.max_objects.value_or(0)));
+        }
+        eac3_decoder->set_skip_object_reconstruction(!serving.reconstruct || bed_only);
         const auto decoded = eac3_decoder->decode_access_unit_by_block(unit, deliver_block);
         if (!decoded) {
             restart_after_error();
@@ -987,13 +1017,14 @@ struct BurstPlayer::Impl {
         const std::int32_t objects =
             au.object_metadata ? static_cast<std::int32_t>(iclforge::objects::oba::describe_objects(*au.object_metadata).size()) : 0;
         have_decoder_report = true;
-        decoder_report = ac::DecoderReport{.data_type = data_type,
-                                           .acmod = static_cast<std::int32_t>(au.acmod),
-                                           .lfe = au.layout.index_of(Location::kLfe) >= 0,
-                                           .substreams = au.substream_count,
-                                           .objects = objects,
-                                           .objects_placed = objects > 0 && serving.reconstruct,
-                                           .dialnorm = -static_cast<double>(au.dialnorm)};
+        decoder_report =
+            ac::DecoderReport{.data_type = data_type,
+                              .acmod = static_cast<std::int32_t>(au.acmod),
+                              .lfe = au.layout.index_of(Location::kLfe) >= 0,
+                              .substreams = au.substream_count,
+                              .objects = objects,
+                              .objects_placed = objects > 0 && serving.reconstruct && !bed_only,
+                              .dialnorm = -static_cast<double>(au.dialnorm)};
     }
 
     // A unit that does not decode: the decoders start again, and the next

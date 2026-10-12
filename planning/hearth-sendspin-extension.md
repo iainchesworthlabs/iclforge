@@ -307,8 +307,9 @@ is what a chunk carries, what the sink reports, and the settings the server can 
 | `buffer_capacity` | integer | Maximum bytes of burst chunks held and not yet played, counting each chunk's whole plaintext message |
 | `max_chunk_bytes?` | integer | 1 to 1,048,576: the most bytes one chunk to the sink may be, counted as `buffer_capacity` counts a chunk (the whole plaintext message, header included, the encryption's tag not). It bounds a burst chunk and a `player@v1` PCM chunk alike, so a server that plays this sink PCM sizes its units to it; absent when the sink does not say, and a server then sends what its codec allows |
 | `max_coded_channels?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 1 to 64: the most channels, full-bandwidth and LFE, the sink decodes of a stream of that type. A syncframe wider than it is refused, so a server sends such a stream another way. A type the object does not name has no stated limit, which is not a limit of none; absent when the sink states none for any type. A name a reader does not know is skipped |
-| `max_objects?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 0 to 255: the most objects the sink reconstructs and places of a stream of that type in real time. `0` is a statement and not an absence: the sink decodes the stream's bed and does not reconstruct its objects. A stream with more objects than the limit is decoded as its bed by the sink, never reconstructed past it, so a server that wants the objects placed sends it PCM it renders itself. A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
+| `max_objects?` | object | Per data type name (`"ac3"`, `"eac3"`, `"ac4"`), 0 to 255: the most objects the sink reconstructs and places of a stream of that type in real time. `0` is a statement and not an absence: the sink decodes the stream's bed and does not reconstruct its objects. A stream with more objects than the limit is decoded as its bed by the sink, never reconstructed past it, so a server that wants the objects placed sends it PCM it renders itself. A sink counts what a stream declares from its first unit, before it decodes: the OBA complexity index of the addbsi less the LFE, which is also the figure a server falls back to; a listener who chose objects `always` is not overruled A type the object does not name states none; absent when the sink states none for any type. A name a reader does not know is skipped |
 | `lyrics?` | object | `max_bytes`: 1 to 60,000, the most bytes of lyric document (an LRC text in UTF-8) the sink holds for the item playing. Absent when the sink holds none. A sink that states it lists `lyrics` and `lyrics_position` in `supported_commands` ([Lyrics](#lyrics)) |
+| `karaoke_codecs?` | string[] | Data type names (`"ac3"`, `"eac3"`, `"ac4"`): the codecs the sink reproduces karaoke for when it is told to, which is the `karaoke` decoder setting. Absent, or empty, for a sink that states none, and a server then reads it as `["ac3"]`: the codec every sink's karaoke path was written for. A sink that reproduces an E-AC-3 stream's lists `"eac3"`. A karaoke stream of a type the sink does not list is played as coded by its own decoder, so a server that wants the reproduction sends it PCM it has decoded itself. A name a reader does not know is skipped |
 
 ### State object
 
@@ -451,7 +452,7 @@ ignored, per [E14](#encryption); a known key with an invalid value refuses the w
 | `programme` | integer or `null` | `DecoderConfig::programme` |
 | `objects` | `"auto"`, `"always"`, `"never"` | `ac3::render::ObjectsPolicy` |
 | `concealment` | `"none"`, `"repeat_fade"`, `"mute"` | `DecoderConfig::concealment` |
-| `karaoke` | `"off"`, `"aware"`, `"capable"` | `OutputConfig::karaoke` (`KaraokeReproduction::kOff`, `kAware`, `kCapable`): Annex C's reproduction of an AC-3 stream flagged bsmod 7. A reproduced frame is L, C, R and the LFE, not the coded layout, so a sink lays its speakers out from `ac3::output_mode()` and not from the coded `acmod` |
+| `karaoke` | `"off"`, `"aware"`, `"capable"` | `OutputConfig::karaoke` (`KaraokeReproduction::kOff`, `kAware`, `kCapable`): Annex C's reproduction of a stream flagged bsmod 7 of a codec the sink lists in `karaoke_codecs` (AC-3 alone when it lists none; an E-AC-3 programme of one independent substream with no object layer, `ac3::is_karaoke_programme()`). A reproduced frame is L, C, R and the LFE, not the coded layout, so a sink lays its speakers out from `ac3::output_mode()` and not from the coded `acmod` |
 | `karaoke_vocals` | `"none"`, `"v1"`, `"v2"`, `"both"` | `OutputConfig::karaoke_vocals`: which vocals the `"capable"` reproduction plays; read and ignored by the other two |
 | `karaoke_melody_db`, `karaoke_vocal1_db`, `karaoke_vocal2_db` | -24.0 to 12.0 (dB) | `OutputConfig::karaoke_melody_gain`, `karaoke_vocal1_gain` and `karaoke_vocal2_gain`, through `ac3::karaoke_gain_from_db`: the level of the melody and of each vocal against Annex C's Table C.2.3 (Annex C.2.3's "additional flexibility"). Read by the `"capable"` reproduction alone. -24.0 is off, and 0 or the key left out is the table. A server sends a level only when it is not 0 dB and the sink lists the key; a sink that does not list it is sent PCM decoded by the server |
 
@@ -491,15 +492,23 @@ line.
 
 **What the server sends, and when.** The document at the start of each item, to every member that
 holds lyrics, and again to one whose state does not report that item (one that joined while it
-played, or came back). An anchor when the sound's speed changes, when the position jumps or drifts
+played, or came back, or restarted), but not within two seconds of sending it, which is a round
+trip and the sink's polling, and not an item the sink was told has none. An anchor when the sound's speed changes, when the position jumps or drifts
 more than 150 ms from what the last anchor predicts, and at least every five seconds. The speed is
 the one measured from the position the server hears, not the transport's: a pause takes the length
 of the members' buffer to be heard, and the position stops by itself when it is.
 
 **What the sink does.** A `stream/clear` drops the position and keeps the document; `stream/end`
 drops both. The sink reports `lyrics` in its state when it takes a document and whenever the line
-changes. It keeps what it holds in the space `max_bytes` states: a parsed document is lines and
-words, about three times its text.
+changes. It keeps what it holds in the space `max_bytes` states, and a parsed document is lines
+and words: measured on boards with Wi-Fi up, word-timed lines cost about ten times their text of
+heap at the peak, while the document is read, and six times once held (plain lines about half
+that), in many small blocks. Held in internal RAM that is what the Wi-Fi receive buffers and the
+decoder come out of (an S3 playing a 5.1 stream was left 27 KB at its least with a 64-byte
+document, 7.8 KB with 2,000 bytes and 0.4 KB with 4,000; a P4 223 KB, 182 KB with 4,000 bytes and
+66 KB with 16,000; an S3 playing E-AC-3 has a few hundred bytes to spare before any), so a sink
+with PSRAM reads and holds the document there, and takes it only while twelve times its size and a
+reserve are free, otherwise holding none, which it reports as it does an item with none.
 
 ### Errors and limits
 
@@ -516,8 +525,8 @@ words, about three times its text.
 The role is `v1` as defined here. Adding a value to `data_types` (AC-4 was added this way, by D11
 of [the AC-4 plan](ac4.md#d11-ac-4-over-iec-61937)) or a key to `decoder` settings does not change
 the version, because a server only sends what a sink listed. The same holds for an optional key in
-the support object or the state object: `max_chunk_bytes`, `max_coded_channels`, `max_objects` and
-`layout` were added so, each absent from a sink that does not say, and a reader that does not know a key ignores it.
+the support object or the state object: `max_chunk_bytes`, `max_coded_channels`, `max_objects`,
+`karaoke_codecs` and `layout` were added so, each absent from a sink that does not say, and a reader that does not know a key ignores it.
 Anything that changes a field's meaning or the chunk layout is `_ac3forge_player@v2`, and a sink may
 list both.
 

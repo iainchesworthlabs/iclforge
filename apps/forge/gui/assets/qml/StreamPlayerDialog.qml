@@ -262,6 +262,45 @@ Dialog {
                     }
                 }
 
+                // ---- the picture of a CD+G disc ---------------------------
+                // A `name.cdg` beside the stream, drawn against what is heard (the transport's
+                // position less what the output has not yet played), the way Hearth's lyric view
+                // draws it. Its words are part of the picture: nothing is read from it as text.
+                CdgPicture {
+                    objectName: "spCdgPicture"
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 600
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredHeight: Math.round(width * 216 / 300)
+                    visible: StreamPlayerController.hasPicture
+                    source: StreamPlayerController
+                    positionMs: StreamPlayerController.pictureSeconds * 1000
+                    Accessible.role: Accessible.Graphic
+                    Accessible.name: qsTr("CD+G picture")
+                    Accessible.description: StreamPlayerController.pictureFileName
+                }
+                Text {
+                    objectName: "spPictureCaption"
+                    Layout.fillWidth: true
+                    visible: StreamPlayerController.hasPicture
+                    wrapMode: Text.WordWrap
+                    text: qsTr("The picture of the karaoke disc in %1 beside the stream. Its words are part of the picture.")
+                              .arg(StreamPlayerController.pictureFileName)
+                    font.pixelSize: Theme.fontSmall
+                    color: Theme.neutral700
+                }
+                Text {
+                    objectName: "spPictureError"
+                    Layout.fillWidth: true
+                    visible: StreamPlayerController.pictureError.length > 0
+                    wrapMode: Text.WordWrap
+                    text: qsTr("The picture in %1 could not be shown: %2")
+                              .arg(StreamPlayerController.pictureFileName)
+                              .arg(StreamPlayerController.pictureError)
+                    color: Theme.bad
+                    font.pixelSize: Theme.fontSmall
+                }
+
                 // ---- export -------------------------------------------------
                 RowLayout {
                     Layout.fillWidth: true

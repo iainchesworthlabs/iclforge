@@ -46,6 +46,9 @@ pub enum Error {
     Ac4EncodeInvalidConfig,
     /// `iclforge::ac4::EncodeError` (a channel count/length mismatch, or a non-finite sample).
     Ac4EncodeInvalidInput,
+    /// `iclforge_lyrics_parse()` refused bytes that are not lyrics. [`crate::lyrics::Lyrics::parse`]
+    /// returns the reason with it, as [`crate::lyrics::LyricsError::Unreadable`].
+    LyricsUnreadable,
     /// A raw `iclforge_status_t` value this crate doesn't recognize. `iclforge_status_message`
     /// still gives a human-readable string for it (`"unknown status"` for a value the C library
     /// itself doesn't recognize either — see `libs/capi/src/common.cpp`'s own fallback), so
@@ -119,6 +122,7 @@ impl Error {
             s if s == iclforge_status_ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT => {
                 Error::Ac4EncodeInvalidInput
             }
+            s if s == iclforge_status_ICLFORGE_ERROR_LYRICS_UNREADABLE => Error::LyricsUnreadable,
             // `as u32`, not a plain move: bindgen types C enums i32 on MSVC and u32 on the
             // Unix targets, so the raw discriminant's own type is platform-dependent - found
             // by this crate's first Windows build. The stored value is the same bit pattern
@@ -177,6 +181,7 @@ impl Error {
                 iclforge_status_ICLFORGE_ERROR_AC4_ENCODE_INVALID_CONFIG
             }
             Error::Ac4EncodeInvalidInput => iclforge_status_ICLFORGE_ERROR_AC4_ENCODE_INVALID_INPUT,
+            Error::LyricsUnreadable => iclforge_status_ICLFORGE_ERROR_LYRICS_UNREADABLE,
             // The mirror of from_status's cast, same platform reasoning.
             #[allow(clippy::unnecessary_cast)]
             Error::Other(raw) => raw as _,

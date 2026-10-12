@@ -481,6 +481,35 @@ Popup {
                 }
 
                 Item { Layout.fillWidth: true }
+                // A lyrics file and a CD+G disc both beside the item: the words or the picture,
+                // as on the Karaoke page (KaraokeController.preferPicture, for this run of the app).
+                Text {
+                    visible: showChooser.visible
+                    text: qsTr("Show")
+                    color: root.quiet
+                    font.pixelSize: Math.round(12 * Theme.fontScale)
+                    font.capitalization: Font.AllUppercase
+                    font.letterSpacing: 0.7
+                }
+                Row {
+                    id: showChooser
+                    objectName: "lyricScreenShow"
+                    visible: KaraokeController.hasPicture && KaraokeController.status !== "picture"
+                    spacing: 0
+                    Repeater {
+                        model: [
+                            { value: "words", label: qsTr("Words") },
+                            { value: "picture", label: qsTr("Picture") }
+                        ]
+                        delegate: BarButton {
+                            required property var modelData
+                            objectName: "lyricScreenShow-" + modelData.value
+                            text: modelData.label
+                            selected: KaraokeController.preferPicture === (modelData.value === "picture")
+                            onClicked: KaraokeController.preferPicture = (modelData.value === "picture")
+                        }
+                    }
+                }
 
                 Text {
                     visible: root.isKaraoke

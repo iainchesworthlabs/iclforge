@@ -35,6 +35,14 @@ Once a file decodes, the dialog fills with:
 - **Levels and soundfield** — the same [`ChannelMeter`](loading-a-source.md#02-levels) rows and
   loudspeaker-ring soundfield view the workbench's own encode side draws, reading live from this
   decode instead.
+- **A karaoke disc's picture** — when a `name.cdg` of the stream's name (in any case; the other
+  half of an "MP3+G" pair) is beside the stream, its picture is drawn under the transport, with the
+  proportions of the disc's 300 by 216 and as large as fits in whole steps, as
+  [Hearth](../../karaoke/index.md#a-cdg-disc) draws it. It follows the position of what is
+  **heard**: the transport's position less what the output has been handed and not yet played, so
+  a pause and a seek are exact and a seek back replays the disc from its start. The words of a
+  disc are part of its picture, so nothing is read from it as text. A file of that name that is
+  not CD+G says why under the transport, and the stream plays on.
 
 For an Atmos-mode stream, playback is the **5.1 bed only** — like `forge monitor`, this plays
 what a legacy decoder hears, not unmixed objects. Use **Export objects…** below, or

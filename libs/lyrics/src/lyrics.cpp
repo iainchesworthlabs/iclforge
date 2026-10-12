@@ -383,9 +383,21 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
     }
 }
 
+// Bytes in a code page as the UTF-8 the program's decoder says they are, or nothing where it says the
+// page does not have them (or hands back something that is not UTF-8, which is no better).
+[[nodiscard]] std::optional<std::string> decode_legacy(const TextEncoding& encoding, std::string_view bytes) {
+    std::string utf8;
+    if (encoding.decoder == nullptr || !encoding.decoder(encoding.context, bytes, utf8) || !valid_utf8(utf8)) {
+        return std::nullopt;
+    }
+    return utf8;
+}
+
 // The bytes of a file as the UTF-8 they say: UTF-16 with a byte-order mark converted, a UTF-8 mark
-// dropped, anything else that is not UTF-8 refused with the reason, for both readers.
-[[nodiscard]] std::expected<std::string, std::string> decode_text(std::string_view text) {
+// dropped, anything else that is not UTF-8 read with the program's decoder where it gave one and
+// refused with the reason where it did not, for both readers.
+[[nodiscard]] std::expected<std::string, std::string> decode_text(std::string_view text,
+                                                                  const TextEncoding& encoding = {}) {
     // UTF-32 would begin with the same two bytes as UTF-16's little-endian mark,
     // then two zero bytes; no lyrics file starts with a NUL character.
     if (text.starts_with(std::string_view{"\xFF\xFE\x00\x00", 4}) ||
@@ -406,7 +418,15 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
         text.remove_prefix(3);
     }
     if (!valid_utf8(text)) {
-        return std::unexpected(std::string{"The lyrics file is not UTF-8 or UTF-16."});
+        if (encoding.decoder == nullptr) {
+            return std::unexpected(std::string{"The lyrics file is not UTF-8 or UTF-16."});
+        }
+        auto legacy = decode_legacy(encoding, text);
+        if (!legacy) {
+            return std::unexpected(std::string{"The lyrics file is not valid in the code page it was read as."});
+        }
+        converted = std::move(*legacy);
+        text = converted;
     }
     if (trim(text).empty()) {
         return std::unexpected(std::string{"The lyrics file is empty."});
@@ -818,8 +838,9 @@ struct AssText {
 }  // namespace
 
 std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
-                                                std::optional<std::int64_t> duration_ms) {
-    const auto decoded = decode_text(text);
+                                                std::optional<std::int64_t> duration_ms,
+                                                const TextEncoding& encoding) {
+    const auto decoded = decode_text(text, encoding);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }
@@ -991,8 +1012,9 @@ std::expected<Lyrics, std::string> parse_lyrics(std::string_view text,
 }
 
 std::expected<Lyrics, std::string> parse_subrip(std::string_view text,
-                                                std::optional<std::int64_t> duration_ms) {
-    const auto decoded = decode_text(text);
+                                                std::optional<std::int64_t> duration_ms,
+                                                const TextEncoding& encoding) {
+    const auto decoded = decode_text(text, encoding);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }
@@ -1069,8 +1091,9 @@ std::expected<Lyrics, std::string> parse_subrip(std::string_view text,
 }
 
 std::expected<Lyrics, std::string> parse_ass(std::string_view text,
-                                             std::optional<std::int64_t> duration_ms) {
-    const auto decoded = decode_text(text);
+                                             std::optional<std::int64_t> duration_ms,
+                                             const TextEncoding& encoding) {
+    const auto decoded = decode_text(text, encoding);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }
@@ -1221,7 +1244,8 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
 }
 
 std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
-                                                      std::optional<std::int64_t> duration_ms) {
+                                                      std::optional<std::int64_t> duration_ms,
+                                                      const TextEncoding& encoding) {
     const std::string damaged = "The MIDI file is damaged.";
     if (!bytes.starts_with("MThd")) {
         return std::unexpected(std::string{"The file is not a MIDI file."});
@@ -1392,9 +1416,20 @@ std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
         if (header && !kept_header) {
             continue;
         }
+        // A syllable that is not UTF-8 is read in the code page the program gave, where it gave one.
+        std::string decoded;
         if (!valid_utf8(event.text)) {
-            return std::unexpected(std::string{"The words of the MIDI file are not UTF-8: they are probably in a "
-                                               "code page, which is not read. Save them as UTF-8."});
+            if (encoding.decoder == nullptr) {
+                return std::unexpected(std::string{"The words of the MIDI file are not UTF-8: they are probably in a "
+                                                   "code page, which is not read. Save them as UTF-8."});
+            }
+            auto legacy = decode_legacy(encoding, event.text);
+            if (!legacy) {
+                return std::unexpected(
+                    std::string{"The words of the MIDI file are not valid in the code page they were read as."});
+            }
+            decoded = std::move(*legacy);
+            text = decoded;
         }
         if (kept_header) {
             const std::string value{trim(text.substr(2))};
@@ -1490,12 +1525,13 @@ std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
 }
 
 std::expected<Lyrics, std::string> parse_timed_text(std::string_view text,
-                                                    std::optional<std::int64_t> duration_ms) {
+                                                    std::optional<std::int64_t> duration_ms,
+                                                    const TextEncoding& encoding) {
     // A MIDI file is bytes, not text: it is known by its header before anything decodes it.
     if (text.starts_with("MThd")) {
-        return parse_midi_karaoke(text, duration_ms);
+        return parse_midi_karaoke(text, duration_ms, encoding);
     }
-    const auto decoded = decode_text(text);
+    const auto decoded = decode_text(text, encoding);
     if (!decoded) {
         return std::unexpected(decoded.error());
     }

@@ -12,6 +12,7 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/sendspin/codec.hpp"
 #include "iclforge/sendspin/messages.hpp"
+#include "iclforge/sink/sink.hpp"
 
 // A test sink's output for player@v1: each stream decoded (PCM, FLAC or Opus) to a float WAV file
 // in the output directory, with a play-time log beside it. The log's lines are
@@ -23,11 +24,11 @@
 
 namespace iclforge::hearth::testsink {
 
-class WavOutput {
+class WavOutput final : public sink::StreamOutput {
    public:
     // `prefix` starts every file's name.
     WavOutput(std::filesystem::path directory, std::string prefix);
-    ~WavOutput();
+    ~WavOutput() override;
     WavOutput(const WavOutput&) = delete;
     WavOutput& operator=(const WavOutput&) = delete;
     WavOutput(WavOutput&&) = delete;
@@ -35,18 +36,19 @@ class WavOutput {
 
     // A stream began, or changed format: a new decoder and file. False for a stream this output
     // cannot decode, whose audio is then counted and dropped.
-    bool start(const sendspin::messages::PlayerStream& stream);
-    void clear();
-    void end();
+    bool start(const sendspin::messages::PlayerStream& stream) override;
+    void clear() override;
+    void end() override;
     // One chunk to be played from `local_time`.
-    void write(std::span<const std::uint8_t> frame, std::int64_t local_time);
+    void write(std::span<const std::uint8_t> frame, std::int64_t local_time) override;
 
     [[nodiscard]] std::uint64_t chunks() const { return chunks_; }
     [[nodiscard]] std::uint64_t frames() const { return frames_; }
     [[nodiscard]] std::uint64_t undecodable() const { return undecodable_; }
     [[nodiscard]] std::uint32_t streams() const { return streams_; }
     // The file the current or last stream went to; empty without a directory.
-    [[nodiscard]] const std::filesystem::path& file() const { return file_; }
+    [[nodiscard]] const std::filesystem::path& file() const override { return file_; }
+    [[nodiscard]] sink::OutputCounts counts() const override { return {streams_, chunks_, frames_}; }
 
    private:
     std::filesystem::path directory_;

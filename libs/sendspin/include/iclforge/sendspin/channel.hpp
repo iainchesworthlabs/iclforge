@@ -58,10 +58,17 @@ class Channel {
         // A whole message, ID first; empty while more fragments are needed. Valid until the
         // next open().
         std::span<const std::uint8_t> message;
+        // `message` is a JSON document above kRetainedMessageBytes (frames.hpp). The channel
+        // releases what it held for it when the next message arrives; a transport that keeps a
+        // buffer per connection for the ciphertext may release its own now.
+        bool large_document = false;
     };
 
     [[nodiscard]] Opened open(std::span<const std::uint8_t> ciphertext);
     [[nodiscard]] FrameError reassembler_error() const { return frame_error_; }
+    // The bytes the channel holds between messages to receive into: the capacity of its two
+    // receive buffers.
+    [[nodiscard]] std::size_t held_bytes() const { return plaintext_.capacity() + reassembler_.held_bytes(); }
 
     // Switches both directions to a re-handshake's keys. The sides switch at the same point
     // in the exchange: the client once it has sent Noise message 2, the server once it has
@@ -77,6 +84,9 @@ class Channel {
     FrameError frame_error_ = FrameError::kNone;
     std::vector<std::uint8_t> frame_;
     std::vector<std::uint8_t> plaintext_;
+    // The last message delivered was a large document: plaintext_ is released, not cleared, by
+    // the next open().
+    bool release_plaintext_ = false;
 };
 
 }  // namespace iclforge::sendspin

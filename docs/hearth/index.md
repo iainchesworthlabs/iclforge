@@ -71,6 +71,11 @@ things. Where such a sink takes no PCM either, the stream plays as coded on it a
 page says so. The Karaoke page's choice reaches a sink as settings, which replace that sink's
 settings whole: what the sink's own page set is not kept.
 
+A sink also says which codecs it reproduces karaoke for (`karaoke_codecs` in its support
+object), and one that says nothing reproduces AC-3's alone. An E-AC-3 karaoke stream is
+therefore decoded here and sent as PCM, with the reproduction applied, to a sink that does not
+list `eac3`, and goes as it is to one that does.
+
 The levels of the melody and the vocals (Capable only) travel the same way, as `karaoke_melody_db`,
 `karaoke_vocal1_db` and `karaoke_vocal2_db`, and only the ones that change what is heard: a level
 of 0 dB is left out, and so is the level of a vocal the Vocals choice leaves out. A sink that has
@@ -99,7 +104,9 @@ words:
 With no lyrics file, a `name.cdg` beside the stream, the picture of a karaoke disc ripped on its
 own, is shown instead: its words are part of the picture, so nothing in it is read as text, and
 it moves with the same position and the same lyric delay (see [A CD+G
-disc](../karaoke/index.md#a-cdg-disc)).
+disc](../karaoke/index.md#a-cdg-disc)). With both beside the stream the words are shown, and a
+**Show** choice (Words or Picture) on the Lyrics card and on the singer view's bar shows the disc
+instead, until Hearth is closed.
 
 The format is LRC: `[mm:ss.xx]` for a line, the enhanced `<mm:ss.xx>` tag before a word, and
 `[offset:]`, `[ti:]`, `[ar:]`, `[al:]`, `[by:]` and `[length:]`. The text is UTF-8, with or
@@ -251,6 +258,60 @@ here" choice, PCM or Opus: Opus is lossy and a twelfth of PCM's bytes, so it rid
 link, and it applies the next time the group plays. A board lists Opus only where its firmware
 decodes it, which the C6's does.
 
+### Languages
+
+The window ships in English and in German, Spanish, French, Arabic, Hebrew and Yiddish, chosen in
+Settings. A language switches the layout direction (Arabic, Hebrew and Yiddish read right to
+left) and the typeface for every page; **the words are translated for the Karaoke page, the lyric
+views and the singer view, the timing window, the lyric delay and the shortcuts that go with them,
+and are English elsewhere**, apart from the fourteen strings another page shares with those
+(Play, Pause, Close, Decoder and the like), which take the same rendering as a suggestion
+(below). The catalogues are
+`apps/hearth/ui/assets/translations/hearth_<code>.ts`; every string of the window is in them,
+and a string with no translation shows in English.
+
+![Hearth's Karaoke page in German](screenshots/karaoke-de.png)
+
+*The Karaoke page in German, with the duet example 6.3 s in (`ICLFORGE_GUI_LOCALE=de`). The words of the lyrics are the file's own; the header's other pages and the stream's file name are not translated.*
+
+![Hearth's Karaoke page in Arabic, mirrored](screenshots/karaoke-ar.png)
+
+*The same page in Arabic: the layout mirrors, and the bundled Noto Sans Arabic face is used.*
+
+**The translations are machine-made and no speaker of any of the six has read them.** Settings
+says so under the language chooser, as the Forge GUI and Crucible do under theirs. They reuse the
+renderings those apps already have for the words they share (Aware, Capable, Vocals, Melody
+guide, Lyrics and the rest of the Forge GUI's Karaoke flow), so one term reads one way in all
+three, and they take their address forms: *Sie* in German, *tú* in Spanish, *vous* in French, the
+masculine singular imperative in Arabic, the plural in Hebrew and *איר* in Yiddish. The terms a
+review by a speaker has to settle:
+
+| Term | de | es | fr | ar | he | yi |
+|---|---|---|---|---|---|---|
+| lyrics | Liedtext | letra | paroles | الكلمات | מילות השיר | ווערטער |
+| vocals | Gesang | voces | voix | الأصوات الغنائية | שירה | געזאַנג |
+| melody guide | Leitmelodie | melodía guía | mélodie guide | اللحن الإرشادي | מנגינת הנחיה | גיד־מעלאָדיע |
+| aware, capable | Karaoke-fähig, Karaoke-tauglich | consciente, capaz | aware, capable | واعٍ، قادر | מודע, בעל יכולת | באַוווּסט, פֿעיִק |
+| time the lyrics | synchronisieren | sincronizar | synchroniser | مزامنة | סנכרון | סינכראָניזירן |
+| stamp (a line's time) | setzen | marcar | horodater | حدّد الزمن | קבעו | שטעלט |
+| singer | Stimme | cantante | chanteur | المغنّي | זמר | זינגער |
+| queue | Warteschlange | cola | file d'attente | قائمة الانتظار | תור | ריי |
+| speakers (surround) | Surround-Lautsprecher | altavoces envolventes | haut-parleurs surround | مكبرات الصوت المحيطية | רמקולים היקפיים | סראַונד־הילכערס |
+
+The open points: the German *fähig* and *tauglich* are the Forge GUI's choice for aware and
+capable and may read the wrong way round to a German speaker; *aware* stays English in French there,
+as it does here; Yiddish has two words for a loudspeaker in the family's catalogues, and the one
+here (*הילכערס*) is Crucible's; "stamp" is a verb for giving a line its time, which no language
+has one word for.
+
+**Adding a string.** `hearth_lupdate` (the CI step "Check the Hearth translations are up to date"
+runs the same target) adds it to the six catalogues as an empty `type="unfinished"` entry, and
+copies the rendering of an identical source string in another page into it, also as `unfinished`:
+a suggestion, which the window shows until a person confirms or replaces it. Fill it in Qt
+Linguist or by hand, and remove the `type` attribute once the entry has a rendering you are
+willing to ship. Run `hearth_lupdate` once more after filling by hand: it adds the suggestions
+the new renderings make, and the committed files are what a further run leaves unchanged.
+
 ### Diagnostics
 
 Settings > Diagnostics has three buttons that produce the same text report of what Hearth has
@@ -267,18 +328,24 @@ bound. On Windows every note Hearth records for the report is also sent to the d
 
 ### Command line
 
-`hearth` takes a few options. None is needed to use it: they open a file at start, and take
-screenshots of the window with nobody at the machine.
+`hearth` takes the files to open, and a few options. None is needed to use it: they open a file
+at start, and take screenshots of the window with nobody at the machine.
 
 | Option | What it does |
 |---|---|
-| `--open <file>` | Adds the file to the queue, once for each `--open`. With nothing in the queue the first file is the item that is loaded and cued (not playing), so the Play, Media and Karaoke pages show it |
-| `--seek <ms>` | Starts the first `--open` item at that position in milliseconds and holds it paused there, so a lyric view shows a word part way through (a stopped item has no position to show). It plays a moment of sound at the output it goes to, and needs an `--open` |
+| `<file>` | Opens the file, as `hearth song.ac3`, as Windows runs `hearth.exe "%1"` for a double-clicked `.ac3` or `.ec3`, and as the Linux launcher runs `hearth %F`: it is added behind the queue the window brings back, and it starts. Several files are queued in the order given and the first starts. It waits, cued and not started, on a first run (the dialog that says where the sound goes comes first), and with `--seek`, `--shot` or `--smoke-shot` |
+| `--` | Ends the options: everything after it is a file, so `hearth -- --page` opens a file called `--page` |
+| `--open <file>` | A file named as an option, once for each `--open`, in the order given with any others: it cannot be read as anything else, so it is the form to write in a script. It queues and plays as a file on its own does; a capture or `--seek` cues the first file instead (loaded, not playing), so the Play, Media and Karaoke pages show it |
+| `--seek <ms>` | Starts the first file at that position in milliseconds and holds it paused there, so a lyric view shows a word part way through (a stopped item has no position to show). It plays a moment of sound at the output it goes to, and needs a file |
 | `--page <name>` | Opens on a page (`play`, `media`, `speakers`, `decoder`, `network`, `settings` or `karaoke`), or on a dialog over the Play page (`firstrun`, `shortcuts`, `about` or `licences`) |
 | `--decoder-format <eac3\|ac4>` | Which tab the Decoder page opens on |
 | `--open-output-picker` | Opens the output picker over the page |
 | `--smoke-shot <png>` | Saves the window to a PNG once it has settled, and quits, **with network discovery off**: nothing browses the network, so there is no firewall prompt and no sink from the network in the picture. This is the one to put in a script |
 | `--shot <png>` | The same capture with network discovery on, as the window runs. On Windows that asks for a Windows Firewall rule (a UAC prompt), so run it where somebody can answer it |
+
+On Windows the installer registers `.ac3` and `.ec3` to open in Hearth, so a double-click is a
+launch with that file. Nothing hands the file to a Hearth that is already running: a second
+double-click starts a second Hearth beside the first, with its own engine and its own output.
 
 A capture runs against a scratch settings store, so it neither reads nor changes a person's own
 queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
@@ -307,8 +374,9 @@ ESP32-C6 build plays stereo only. ESP32-S3 boards and an ESP32-C6 with an ESP32-
 AC-3 and E-AC-3 in Sendspin groups on hardware, for ten minutes each without an underrun (the
 [S3 sink guide](sink-esp32-s3.md) and the [C6 sink guide](sink-esp32-c6.md) have the runs); no DAC
 was wired to the boards. Every release from the next one on publishes sink firmware for the
-ESP32-S3, the ESP32-C6, and the ESP32-P4; [Sink firmware](sink-firmware.md) covers installing it
-and updating a board over its network.
+ESP32-S3, the ESP32-C6, and the ESP32-P4 (one image for each of its two silicon generations, the
+newer with a screen); [Sink firmware](sink-firmware.md) covers installing it and updating a board
+over its network.
 
 **AC-4 on the sinks.** No ESP32 sink takes AC-4 in a Sendspin group: every `hearth_sink` build
 lists `ac3` and `eac3` as its data types and none lists `ac4`, so a group's ESP32 member gets
@@ -356,6 +424,8 @@ Raspberry Pi 4B without an underrun. See
 
 - [An ESP32-S3 sink](sink-esp32-s3.md) — build, flash, configure, and pair a board.
 - [An ESP32-C6 sink](sink-esp32-c6.md) — the stereo player on a part with no PSRAM.
+- [An ESP32-P4 sink](sink-esp32-p4.md) — the best tier, its two silicon generations and two images,
+  and the lyric screen for a board with a panel.
 - [Sink firmware](sink-firmware.md) — install a published image, update over the network, and go
   back; or [install from the browser](sink-installer.md).
 - [ESP32-S3](../platforms/bare-metal/esp32-s3.md) — decoder timing and memory measurements.

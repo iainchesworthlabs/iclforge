@@ -162,6 +162,21 @@ void Engine::add(std::vector<QueueItem> items) {
     });
 }
 
+void Engine::add_and_play(std::vector<QueueItem> items) {
+    post([this, items = std::move(items)](Player& player) {
+        if (items.empty()) {
+            return std::string{};
+        }
+        const std::size_t first = player.queue().size();
+        note(fmt::format("add {} {} to a queue of {}", items.size(), items_word(items.size()), first));
+        for (const QueueItem& item : items) {
+            player.add(item);
+        }
+        note(fmt::format("play {}", named(player, first)));
+        return transport_said(player.play_item(first));
+    });
+}
+
 void Engine::insert(std::size_t index, QueueItem item) {
     post([this, index, item = std::move(item)](Player& player) {
         const std::size_t at = std::min(index, player.queue().size());
