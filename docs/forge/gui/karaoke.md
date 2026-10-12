@@ -4,8 +4,9 @@
 stream in Hearth, its lyrics, and the command line as well.*
 
 **Karaoke** is the fourth entry of the **Controls** switch, beside Guided, Advanced and Expert. It
-builds a karaoke AC-3 stream — ETSI TS 102 366 Annex C — from the recordings a backing track is
-made of, and lets you hear it the way a singer's player will decode it before you save it.
+builds a karaoke AC-3 stream — ETSI TS 102 366 Annex C — or, if you choose it, a karaoke E-AC-3
+one, from the recordings a backing track is made of, and lets you hear it the way a singer's
+player will decode it before you save it.
 
 Like [Guided](index.md#guided-advanced-expert), it is a wrapper over the **same** draft the other
 tiers edit: the parts are loaded as [sources](source-assignment.md), the coding mode is the bed,
@@ -28,6 +29,13 @@ channels are not speakers but **parts** (Annex C, Table C.2.1):
 L and R are the backing music; **M** is a guide melody where a centre would be; **V1** and **V2**
 are one or two vocals where the surrounds would be. A player that does not know about karaoke
 plays them where they are coded, so the vocals come from the rear speakers.
+
+An E-AC-3 stream carries the same service type (`bsmod` 7 above 1/0, one independent substream,
+no object layer) with the parts in the same places, but ETSI TS 102 366 defines no
+reproduction for it: Annex C is AC-3's. A decoder that applies Annex C's tables to it does so by
+analogy, as Hearth, forge and Dolby's reference decoder do; a decoder that does not reproduce it
+plays the vocals from the surrounds, as a plain surround player plays an AC-3 one. AC-3 is the
+format Annex C defines and the one the flow writes unless you choose another.
 
 ## The four steps
 
@@ -77,10 +85,12 @@ levels** puts all three back. Moving one decodes the stream again, as choosing t
 A **What plays** table says which parts reach which speaker under the choice made (a part pulled
 to off is left out of it). If a part sounds wrong, go back to Levels.
 
-**4 · Save.** Choose the file type (the raw `.ac3` stream, or Matroska, MP4 or MPEG-TS, as the
-Format tab offers) and the bit rate, see the equivalent `forge encode …` command, and encode. The
+**4 · Save.** Choose the **format** (AC-3, the default, or E-AC-3), the file type (the raw
+`.ac3` or `.ec3` stream, or Matroska, MP4 or MPEG-TS, as the Format tab offers) and the bit
+rate, see the equivalent `forge encode …` (or `forge eac3-encode …`) command, and encode. The
 save picker and the run strip are the ones Guided uses; the stream built for Hear is not a run, and
-only what you save is.
+only what you save is. Choosing the format loads the parts again under it, and Hear then plays
+the stream in that format under the same three listenings and part levels.
 
 The bit rate starts where the mode's width wants it (384 kbps for 3/2, 320 for 3/1 and 2/2, 256 for
 3/0 and 2/1) and stays where you set it. A **Lyrics** row names the lyrics file that goes beside
@@ -89,9 +99,14 @@ the stream: one of the backing's name beside it is offered (an `.lrc`, else an `
 `.lrc`, where Hearth looks for lyrics. Whatever the file's format, what is written is UTF-8 LRC,
 with a duet's singers, the word times the file has, and the silence between a subtitle file's cues
 marked, which is the one format Hearth reads and sends to a network sink. A file in a code page
-(Latin-1, Shift-JIS, Windows-1255) is named on the row when it is chosen, and none is written; the
-stream is saved as usual. A lyrics file already there is left as it is. `forge encode` does the
-same with `lyrics=`.
+(Latin-1, Shift-JIS, Windows-1255) is named on the row when it is chosen, with a **Code page** list
+under it: choose the page the file was written in, and the first lines are shown as that page reads
+them, so a wrong choice is seen before anything is written. Nothing is chosen for you and nothing is
+guessed; with no page chosen none is written, and the stream is saved as usual. The pages are
+Windows 1250 to 1258 and 874, ISO 8859-1, -2 and -15, DOS 437 and 850, KOI8-R and -U, Shift-JIS,
+EUC-JP, GBK, GB18030, Big5 and EUC-KR, converted by the operating system. A lyrics file already
+there is left as it is. `forge encode` does the same with `lyrics=` and, for a code page,
+[`lyrics-encoding=`](../cli/commands.md#lyrics-beside-the-stream-lyrics).
 
 The start offsets and trims you set on the parts stay when you add, replace or remove a part.
 
@@ -128,4 +143,4 @@ the reproduction, the vocals and the part levels.
 - **Timing or editing lyrics.** Nothing here makes or times a lyrics file; it puts one you have
   beside the stream, in the one format Hearth reads. Styling and positions in an ASS script are
   not carried.
-- **E-AC-3 or AC-4.** Their specifications give a karaoke stream no mode.
+- **AC-4.** Its specification gives a karaoke stream no mode, and the flow does not offer it.

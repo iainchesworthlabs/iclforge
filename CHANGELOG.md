@@ -29,6 +29,49 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: the documentation says what the decoder does**
+
+- **The user guide, Hearth's page and the plan stop saying "E-AC-3 has no karaoke mode, this is
+  AC-3 only".** The Karaoke guide has an "E-AC-3 and AC-4" section: E-AC-3 carries the service
+  type and is reproduced by analogy with Annex C, as Dolby's decoder does, for a programme of one
+  independent substream with no object layer, at the stream's Lo/Ro mixing group; AC-4 has no
+  karaoke mode. It gives the `forge eac3-encode` and `forge decode` lines (run, not written from
+  memory), says which Hearth sinks reproduce an E-AC-3 stream themselves, and says what
+  is not known (a TV or a receiver). "How it is checked" names Dolby's decoder and
+  `tools/checks/verify_karaoke_oracle.py`, and not "no outside decoder".
+- **The support catalogue has an E-AC-3 karaoke row**, so the generated application-capabilities
+  table lists it, and the karaoke support matrix, the programme plan, the findings' correction
+  list, the phase 1 plan and the ROADMAP row say which cells are built, in review, or open
+  (`planning/karaoke-eac3.md`, E8).
+
+**Karaoke in E-AC-3: the Forge GUI's Karaoke flow offers it**
+
+- **The Karaoke flow's Save step has a Format: AC-3 (the default) or E-AC-3.** Annex C is
+  AC-3's and AC-3 stays what the flow writes unless it is asked otherwise; E-AC-3 writes the
+  same parts as one independent substream flagged `bsmod` 7 with its Lo/Ro mixing group (as
+  `forge eac3-encode` does, and the command line the step shows is that one), and a note beside
+  the choice says that E-AC-3's specification gives no reproduction for it, that Hearth, forge
+  and Dolby's reference decoder apply Annex C's, and that a player that does not reproduce it
+  plays the vocals from the surrounds. The Hear step plays the stream under the same three listenings
+  and part levels. A project file that names E-AC-3 opens the flow with that format.
+- **The stream player decodes an E-AC-3 karaoke stream under the choice.** It handed the
+  decoder no choice for E-AC-3, so a karaoke stream played as coded whatever the Hear step
+  said; one independent substream with no object layer now takes the reproduction and
+  reports L, C, R and the LFE, with the coded layout named beside it, as AC-3 does
+  (`planning/karaoke-eac3.md`, E6, D7).
+
+**E-AC-3 folds a stream with no `mixmdate` at -3 dB, as Dolby's decoder does**
+
+- **The default Lo/Ro levels of an E-AC-3 stream that sends no `mixmdate` are -3 dB for the centre
+  and -3 dB for the surrounds.** They were AC-3's -4.5 and -6 dB, which stand in for a bsi that
+  has no level to read; an E-AC-3 bsi has none to fall back on, and Dolby's decoder, measured,
+  folds such a stream at -3 and -3. A stereo or mono fold of such a stream (the CLI, Hearth, the
+  Forge GUI, the sinks and the WebAssembly decoder all read it through
+  `iclforge::ac3::mix_levels()`) is 1.5 dB louder in the centre and 3 dB louder in the
+  surrounds against its own front channels; a stream that carries `mixmdate`, and every AC-3
+  stream, is unchanged. The E-AC-3 karaoke reproduction already took these levels, and no longer
+  needs a case of its own (`planning/karaoke-eac3.md`, D10).
+
 **Hearth for Android: a run on a real Shield and receiver, recorded**
 
 - **The pass-through path on a Shield and an Onkyo receiver** (`planning/hearth-android.md`, phase 1e):
@@ -72,7 +115,10 @@ The sections below contain the complete change list and fixes.
   microphone is), a pitch score and the references that exist for one, a recording of the dry voice, the
   decisions with a recommendation each (approved by the owner as recommended), and a build plan by
   platform. A voice through one Windows 11 workstation's own shared-mode path was measured at about
-  130 ms, so a monitor is offered with its measured latency and not promised.
+  130 ms, so a monitor is offered with its measured latency and not promised. The plan's build table
+  says what is built: the pitch library, capture times, the melody reader, the microphone card, takes,
+  the pitch ribbon with per-line marks and the browser demo's microphone card (M1 to M7), and what is not
+  (the bleed check, the board).
 
 **The Android audio backend names no Java package**
 
@@ -149,6 +195,24 @@ The sections below contain the complete change list and fixes.
   not measured, and `planning/hearth-sink-screen.md` is the one design (model, screens, layout in
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
+- **The first spikes were run on a Shield.** `planning/hearth-android-findings.md` F12 records them:
+  `libs/lyrics` and `libs/sendspin` (with cpp-httplib, mbedTLS, libFLAC, Opus and mdns from vcpkg)
+  build for `arm64-android` under NDK r26 and their 83 and 243 test cases pass on the Shield; an
+  `ENCODING_IEC61937` track on the Shield reports its position in steps of about 20 ms, needs 8
+  bursts queued to start and 4 to hold, and drifted -0.3 ppm against `CLOCK_MONOTONIC` over 10
+  minutes with no underruns; the Shield's HDMI audio route disappears when its display sleeps.
+- **A receiver loses its Dolby lock in half a second of PCM silence and keeps it through null
+  bursts.** Read over the Onkyo's network port while the Shield streamed: silence of 1, 3 or 6 s
+  dropped the lock after about 0.5 s and the receiver took about 0.8 s to return once the bursts
+  resumed; null bursts for 1, 3 or 6 s never dropped it; a cold lock took 1.0 to 1.4 s. The plan's
+  decisions D1 to D14 are accepted as recommended.
+- **Dolby JOC streams lock the receiver as Atmos through the Shield's IEC 61937 route.** The three
+  encoder fixtures (5.1.4, 7.1.4, 9.1.6), wrapped into E-AC-3 bursts at the 192 kHz carrier, were
+  reported by the Onkyo as `Dolby Atmos/DD+` after about 2.1 s, with no underruns.
+- **A stream this project signs locks as Atmos, and the same stream unsigned falls back to the
+  bed.** `forge atmos ... sign-objects` with the owner's test key verified 750 of 750 frames and
+  was reported by the Onkyo as `Dolby Atmos/DD+` (5.0.4); the same stream with its object
+  container unsigned was reported as `Dolby Audio - DD+` (5.1), with no underruns in either.
 
 **A Sendspin sink library, which Hearth's test sink is the first program of**
 
@@ -285,7 +349,13 @@ The sections below contain the complete change list and fixes.
   refusal now says what to name, and bytes the page does not have refuse the file. The conversion is
   the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
   it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
-  GUI's picker will link as well.
+  GUI's picker links as well.
+- **The Forge GUI's Lyrics row offers a code page for a file that is not UTF-8 or UTF-16.** A
+  **Code page** list appears under the problem line, with no page chosen and none guessed; the
+  page chosen reads the file, the first lines are shown as it reads them, and the stream is saved
+  with the words beside it as UTF-8 LRC (the same conversion as `lyrics-encoding=`). Choosing
+  another file forgets the page. The page names' language groups are translated in the six
+  catalogues.
 
   refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
@@ -3351,6 +3421,25 @@ The sections below contain the complete change list and fixes.
   linked `iclforge::lyrics`, and show that the check fails on it: the pull-request gate builds no
   ESP-IDF image, so nothing before the merge saw that break.
 
+**Hearth: what a singer's performance is scored against, and how**
+
+- **Hearth's engine can place a singer's voice in the item and score it** (the microphone, scoring
+  and recording programme, M4's engine half; the Qt window and the microphone itself are later pull
+  requests). `Performance` takes two things and owns no device or thread: where in the item the heard
+  sound is at a time on the steady clock (the engine's `PlayPosition::heard`, which is what a person
+  singing along is hearing), and blocks of the microphone's samples with the time the first was
+  captured. It tracks the pitch, places each frame at the heard position at the moment the sound
+  reached the microphone less the microphone's declared delay plus an offset the person can move,
+  and scores it against a reference with `iclforge::pitch`. Nothing is scored before the first
+  position, or while the item is held; those frames are counted as unplaced, not as wrong. It says
+  how sharp or flat and how early or late the singer is.
+- **`reference_from_karaoke()` takes the reference from the karaoke stream being played.** A karaoke
+  AC-3 decoded as coded leaves the guide melody M and the vocals V1 and V2 in their channels
+  (Annex C, Table C.2.1); the first present of M, V1 and V2 is tracked, or the part the singer has
+  muted (the one they are taking over). A stream that is not karaoke, or whose part has no clear
+  pitch, is refused with the reason. On the repository's karaoke example the tune comes out of M and
+  of V1 note for note, and V2 comes out a diatonic third below.
+
 ### Changed
 
 **Shared code**
@@ -3531,8 +3620,10 @@ The sections below contain the complete change list and fixes.
   (`NetworkSinks::set_sink_opus_fallback`, the Decoder tab's "Audio decoded here" choice, and
   `choose_sink_form`'s `PcmCodec`): for a board on a link too poor for PCM, audio Hearth decodes
   for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
-  sink, applies at the group's next play, and is kept for the run. The group editor says which a
-  member is sent.
+  sink, applies at the group's next play, and is kept with the sink's pairing record
+  (`PairingStore::set_opus()`, `pairing/N/opus` in the settings, written only for a sink set to
+  Opus): it is read back at the sink's first hello of a run, so a restart of Hearth does not undo
+  it, and forgetting the pairing forgets the choice. The group editor says which a member is sent.
 - **The Sendspin player plays a stream's bed when it declares more objects than the board says it
   places** (`BurstPlayerConfig::max_objects`, `iclforge/object_limit.hpp`,
   `Eac3Decoder::set_skip_object_reconstruction()`): the decision is made from the first unit's
@@ -3543,6 +3634,15 @@ The sections below contain the complete change list and fixes.
   360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun. On an ESP32-P4, which
   states 12, the 14-object stream that took 0.97 with 24 underruns took 0.22, and the 11-object
   streams, within the figure, are reconstructed at 0.85 as before.
+- **An AC-4 item declares its objects to a group** (`ItemFacts::objects`, `objects_alone`;
+  `Session::open()`), so that a sink's stated AC-4 object limit (`max_objects`) is honoured. They
+  were left at 0, so no AC-4 stream was ever held to a limit. The count is what the decoder makes
+  of the chosen presentation's first I-frame, less the LFE, and it is read only for a stream whose
+  table of contents lists an object substream. A presentation of objects alone decodes to no
+  channels, so a sink that places fewer has no bed to play: it is sent PCM decoded here whatever
+  its layout or objects setting say (folded to a width it lists, where it lists none as wide), and
+  nothing, with the reason, where PCM is not possible. One with channels besides is played as its
+  bed, as an E-AC-3 stream is.
 
 **Library internals**
 
@@ -3748,6 +3848,12 @@ The sections below contain the complete change list and fixes.
 ### Fixed
 
 **Lyrics on a board**
+
+- **The P4 panel's footer counted a line that only marks a time.** A lyric file that ends with a
+  time and no text (where an editor writes the end of the last line) or has a blank line for an
+  instrumental break holds more lines than the song has, and the footer said "Line 2 of 5" for a
+  song of four, as a real board showed on 2026-10-12. It counts and numbers the lines with text
+  (`text_line_count()` and `text_line_number()` in `iclforge::lyrics`, tested on the host).
 
 - **A board's lyric document cost ten times its text of the internal heap, and the default let it
   be sixteen kilobytes.** A parsed document is a line and a word each in many small blocks, which
@@ -4903,6 +5009,25 @@ The sections below contain the complete change list and fixes.
   19% less, the QMF synthesis and inverse transform stages that took 1.4 to 10 times as long in some plays no longer
   do, and no `float` PCM hash moves (56 plays and cuts compared, the probe's six fixtures at their pins).
   [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md#the-low-power-sram) has the measurements.
+
+**Sendspin: a group's timeline and a board that is moving**
+
+- **A board the host moved onto `player@v1` as an item started could miss the start of it, and was
+  never sent what it missed.** The group planner asks for the move (`ServerHost::use_pcm()`),
+  which takes a round trip on the live connection, and `Group` began its timeline as soon as one
+  member could play: a member that was ready after that was started at the frame the group had
+  reached. On a loopback the move takes a few milliseconds and the engine's first PCM block goes
+  in about as soon (3 to 4 ms after the plan in the runs measured); with the machine busy the
+  board joined 24 to 244 ms after the first block and held 4,864 or 29,184 frames fewer than the
+  item, and Hearth's karaoke group tests that wait for a board's frames failed when their 60 s
+  wait expired: 3 rounds in 40 with 64 busy processes, none in 80 with the change. The group
+  now holds the start of its timeline while a member the host asked to
+  move is still moving (on the extension role, or on `player@v1` without the state it owes
+  before a stream), for at most a second, so every member is sent the programme from its first
+  frame; a member that has not moved by then is left behind as before. `group: a programme waits
+  for a sink the host has just moved to PCM` fails without the change, the moved sink holding
+  9,600 of 14,400 frames each of three times. The karaoke group cases' waits for a board's
+  totals now report what each board holds and what both sides logged when they expire.
 
 ## [0.10.0-beta.1] - 2026-09-01
 

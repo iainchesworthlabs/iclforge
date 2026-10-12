@@ -536,9 +536,14 @@ TEST_CASE("mix_levels resolves both generations' downmix syntax", "[decoder][out
     // An absent lfemixlevcod is a decision, not a missing default.
     mix.lfemixlevcod = std::nullopt;
     CHECK_FALSE(iclforge::ac3::mix_levels(std::optional{mix}).lfe_mix_level_db.has_value());
-    // No mixmdate at all falls back on the AC-3 defaults rather than zero.
-    CHECK(iclforge::ac3::mix_levels(std::optional<iclforge::ac3::meta::MixMetadata>{}).loro_clev ==
-          iclforge::ac3::meta::level::kMinus4_5dB);
+    // No mixmdate at all falls back on -3 dB for the centre and -3 dB for the surrounds, which is what
+    // Dolby's decoder folds such a stream at (measured, planning/karaoke-eac3-findings.md), and not on
+    // AC-3's -4.5 and -6 dB, nor on zero (planning/karaoke-eac3.md, D10). Lt/Rt keeps -3 dB.
+    const auto none = iclforge::ac3::mix_levels(std::optional<iclforge::ac3::meta::MixMetadata>{});
+    CHECK(none.loro_clev == iclforge::ac3::meta::level::kMinus3dB);
+    CHECK(none.loro_slev == iclforge::ac3::meta::level::kMinus3dB);
+    CHECK(none.ltrt_clev == iclforge::ac3::meta::level::kMinus3dB);
+    CHECK(none.ltrt_slev == iclforge::ac3::meta::level::kMinus3dB);
 
     // Table D2.2's reserved '11' is passed on as sent, not folded into '00'.
     mix.dmixmod = iclforge::ac3::meta::DownmixMode::kReserved;
