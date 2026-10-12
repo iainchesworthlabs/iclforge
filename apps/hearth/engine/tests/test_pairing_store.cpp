@@ -234,6 +234,74 @@ TEST_CASE("pairing store: a client's name reaches its record", "[hearth][pairing
     CHECK(store.records()[1].name == "hearth-testsink-1");
 }
 
+TEST_CASE("pairing store: the Opus choice is kept with the record, and goes with it",
+          "[hearth][pairing-store]") {
+    MemorySettingsStore settings;
+    {
+        PairingStore store{settings, today};
+        // Nothing chosen is PCM, and a choice for a client with no record is held for the one its
+        // pairing makes.
+        CHECK_FALSE(store.opus(key(1)));
+        store.set_opus(key(1), true);
+        CHECK(store.opus(key(1)));
+        CHECK_FALSE(settings.synced().contains("pairing/1/opus"));
+        REQUIRE(store.store_record(key(1), key(101)));
+        REQUIRE(store.store_record(key(2), key(102)));
+        CHECK(store.opus(key(1)));
+        CHECK_FALSE(store.opus(key(2)));
+        CHECK(settings.synced().at("pairing/1/opus") == "true");
+        // Only a choice is written: the record that has none has no key.
+        CHECK_FALSE(settings.synced().contains("pairing/2/opus"));
+
+        // A client that pairs again keeps what was chosen for it.
+        REQUIRE(store.store_record(key(1), key(111)));
+        CHECK(store.opus(key(1)));
+    }
+    // The next start has it.
+    MemorySettingsStore reopened{settings.synced()};
+    {
+        PairingStore again{reopened, today};
+        CHECK(again.opus(key(1)));
+        CHECK_FALSE(again.opus(key(2)));
+
+        // Set back to PCM, it is no longer written.
+        again.set_opus(key(1), false);
+        CHECK_FALSE(again.opus(key(1)));
+        for (const auto& entry : reopened.synced()) {
+            INFO(entry.first);
+            CHECK_FALSE(entry.first.ends_with("/opus"));
+        }
+        again.set_opus(key(2), true);
+        CHECK(again.opus(key(2)));
+        // Forgotten with the record: pairing again starts from PCM.
+        again.forget(key(2));
+        CHECK_FALSE(again.opus(key(2)));
+        REQUIRE(again.store_record(key(2), key(122)));
+        CHECK_FALSE(again.opus(key(2)));
+    }
+}
+
+TEST_CASE("pairing store: a damaged Opus value is PCM, and a failed write stands for the run",
+          "[hearth][pairing-store]") {
+    const std::string good_client(64, 'a');
+    const std::string good_psk(64, '1');
+    MemorySettingsStore settings{{{"pairing/size", "1"},
+                                  {"pairing/1/client", good_client},
+                                  {"pairing/1/psk", good_psk},
+                                  {"pairing/1/opus", "yes"}}};
+    PairingStore store{settings, today};
+    Key32 client{};
+    client.fill(0xAA);
+    REQUIRE(store.paired(client));
+    CHECK_FALSE(store.opus(client));
+
+    settings.set_sync_fails(true);
+    store.set_opus(client, true);
+    CHECK(store.opus(client));
+    // What a start would read is what was written before.
+    CHECK(settings.synced().at("pairing/1/opus") == "yes");
+}
+
 TEST_CASE("pairing store: sessions look keys up while the window pairs and forgets",
           "[hearth][pairing-store][concurrency]") {
     MemorySettingsStore settings;

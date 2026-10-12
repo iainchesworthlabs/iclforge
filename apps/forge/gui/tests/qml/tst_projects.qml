@@ -934,6 +934,43 @@ TestCase {
                "forge project wrote a different stream than the window: " + line);
     }
 
+    // A project that names E-AC-3 opens the Karaoke flow with that format (the flow's Save
+    // step shows it), and the window and `forge project` write the same E-AC-3 stream.
+    function test_aProjectOfNamedPartsInEac3OpensTheFlowAsEac3AndIsOneStreamInTheWindowAndInForge() {
+        if (!cliRunner.available()) {
+            skip("this build has no forge to run");
+        }
+        const file = writeProject("kp-parts-only-eac3.forgeproj", {
+            format: "iclforge-project",
+            version: 1,
+            flow: "karaoke",
+            sources: [
+                { path: ProjectFile.localPath(backing), part: "backing" },
+                { path: ProjectFile.localPath(melody), part: "melody" },
+                { path: ProjectFile.localPath(lead), part: "vocal1" }
+            ],
+            encode: { codec: "eac3", bitrateKbps: 192 }
+        });
+        const win = openWindow();
+        verify(win.openProjectFile(file));
+        const flow = findByName(win, "karaokeFlow");
+        compare(flow.plan.mode, "3/1");
+        compare(flow.format, "eac3");
+        compare(EncoderController.codecIndex, 1);
+        compare(EncoderController.bsmodIndex, 7);
+
+        const fromWindow = Qt.resolvedUrl("_test_output/tst_projects_parts_only_eac3.ec3");
+        EncoderController.encodeTo(fromWindow);
+        tryCompare(EncoderController, "busy", false, 120000);
+        verify(cliRunner.size(fromWindow) > 0, "the window wrote nothing");
+
+        const line = "forge project " + ProjectFile.localPath(file) + " "
+                     + ProjectFile.localPath(inTheFolder("from-forge-parts-only.ec3"));
+        compare(cliRunner.run(line, audioFixtures.folder()), 0, line);
+        verify(cliRunner.sameBytes(fromWindow, inTheFolder("from-forge-parts-only.ec3")),
+               "forge project wrote a different stream than the window: " + line);
+    }
+
     // ---- the example ----------------------------------------------------------
     function test_theExampleProjectOpensAndTheWindowEncodesItsStream() {
         const win = openWindow();
