@@ -24,6 +24,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "ci"))
 
 import check_firmware_package as release_rules  # noqa: E402
+import kconfig_scan  # noqa: E402
 import sink_profile as sp  # noqa: E402
 
 REPO = HERE.parents[1]
@@ -800,6 +801,168 @@ class CommandLine(unittest.TestCase):
             )
             self.assertEqual(code, 1)
             self.assertIn("::error title=profile a, locked::", out)
+
+
+class KconfigChange(unittest.TestCase):
+    """`check-change`: what a pull request adds to, or takes from, the Kconfig, held to the
+    profiles with no ESP-IDF (planning/esp32-platform-profiles.md, 'Where each check runs')."""
+
+    KCONFIG = """
+config ICLFORGE_SENDSPIN
+    bool "Sendspin"
+    default y
+
+config ICLFORGE_EXAMPLE_NEW_RING_BYTES
+    int "A ring"
+    default 4096
+    help
+        Text that mentions config SOMETHING_ELSE and default 1 in its help,
+        which is not a declaration.
+
+config ICLFORGE_EXAMPLE_NEW_SWITCH
+    bool "A switch"
+    default n
+
+menu "Sendspin"
+    depends on ICLFORGE_SENDSPIN
+
+config ICLFORGE_EXAMPLE_NEW_S3_STACK_BYTES
+    int "A stack on the S3 only"
+    depends on IDF_TARGET_ESP32S3
+    default 8192
+
+config ICLFORGE_EXAMPLE_NEW_UNKNOWN_STACK_BYTES
+    int "A stack under a symbol the profile does not state"
+    depends on SOME_IDF_SYMBOL
+    default 8192
+
+endmenu
+"""
+
+    def data(self) -> dict:
+        def profile(target: str, **locked: str) -> dict:
+            return {"target": target, "fragments": ["a"], "locked": dict(locked)}
+
+        return {
+            "format": 1,
+            "watch": ["ICLFORGE_EXAMPLE_*"],
+            "free": {"ICLFORGE_EXAMPLE_FREE_*": "named"},
+            "profiles": {
+                "s3": profile("esp32s3", CONFIG_ICLFORGE_SENDSPIN="y"),
+                "c6": profile("esp32c6", CONFIG_ICLFORGE_SENDSPIN="y"),
+            },
+        }
+
+    def run_check(self, data: dict, head: str, base: str | None = "") -> list[sp.Finding]:
+        path = sp.KCONFIG_FILES[0]
+        return sp.check_change(data, {path: head}, None if base is None else {path: base})
+
+    def test_the_scanner_reads_declarations_and_steps_over_help(self) -> None:
+        found = kconfig_scan.scan(self.KCONFIG)
+        self.assertEqual(
+            sorted(found),
+            [
+                "ICLFORGE_EXAMPLE_NEW_RING_BYTES",
+                "ICLFORGE_EXAMPLE_NEW_S3_STACK_BYTES",
+                "ICLFORGE_EXAMPLE_NEW_SWITCH",
+                "ICLFORGE_EXAMPLE_NEW_UNKNOWN_STACK_BYTES",
+                "ICLFORGE_SENDSPIN",
+            ],
+        )
+        ring = found["ICLFORGE_EXAMPLE_NEW_RING_BYTES"]
+        self.assertEqual((ring.type, ring.defaults, ring.conditional), ("int", ["4096"], False))
+        self.assertTrue(found["ICLFORGE_EXAMPLE_NEW_SWITCH"].plain_n)
+        s3 = found["ICLFORGE_EXAMPLE_NEW_S3_STACK_BYTES"]
+        self.assertEqual(s3.depends, ["IDF_TARGET_ESP32S3"])
+        self.assertEqual(s3.enclosing, ["menu ICLFORGE_SENDSPIN"])
+
+    def test_the_conditions_are_three_valued(self) -> None:
+        data = self.data()
+        data["profiles"]["s3"]["locked"]["CONFIG_FEATURE"] = "n"
+        check = sp.evaluate
+        self.assertIs(check(data, "s3", "IDF_TARGET_ESP32S3"), True)
+        self.assertIs(check(data, "c6", "IDF_TARGET_ESP32S3"), False)
+        self.assertIs(check(data, "s3", "ICLFORGE_SENDSPIN && IDF_TARGET_ESP32S3"), True)
+        self.assertIs(check(data, "s3", "!FEATURE"), True)
+        self.assertIs(check(data, "s3", "(FEATURE || IDF_TARGET_ESP32S3) && !FEATURE"), True)
+        # a symbol the profile does not state is unknown, and False && unknown is False
+        self.assertIsNone(check(data, "s3", "SOME_IDF_SYMBOL"))
+        self.assertIs(check(data, "c6", "IDF_TARGET_ESP32S3 && SOME_IDF_SYMBOL"), False)
+        self.assertIsNone(check(data, "s3", "SOME_IDF_SYMBOL = 3"))
+
+    def test_a_new_int_key_nobody_placed_is_reported_for_every_profile_it_is_in(self) -> None:
+        found = self.run_check(self.data(), self.KCONFIG)
+        text = " | ".join(f.message for f in found)
+        self.assertIn("CONFIG_ICLFORGE_EXAMPLE_NEW_RING_BYTES is new", text)
+        self.assertIn("in c6, s3", text)
+        # on the S3 only: the C6's target is not it
+        self.assertRegex(text, r"CONFIG_ICLFORGE_EXAMPLE_NEW_S3_STACK_BYTES is new .* in s3,")
+        self.assertNotIn(
+            "NEW_S3_STACK_BYTES is new and the guard watches it, and it is in c6", text
+        )
+        # a bool off by default, and a key whose condition the profile does not state, are the
+        # configured build's to judge
+        self.assertNotIn("NEW_SWITCH", text)
+        self.assertNotIn("NEW_UNKNOWN_STACK_BYTES", text)
+
+    def test_a_key_locked_in_a_profile_or_named_free_is_placed(self) -> None:
+        data = self.data()
+        for ident in data["profiles"]:
+            data["profiles"][ident]["locked"]["CONFIG_ICLFORGE_EXAMPLE_NEW_RING_BYTES"] = "4096"
+        data["profiles"]["s3"]["locked"]["CONFIG_ICLFORGE_EXAMPLE_NEW_S3_STACK_BYTES"] = "8192"
+        self.assertEqual(self.run_check(data, self.KCONFIG), [])
+        data = self.data()
+        data["free"]["ICLFORGE_EXAMPLE_NEW_*"] = "not a placement"
+        self.assertEqual(self.run_check(data, self.KCONFIG), [])
+
+    def test_only_what_the_change_adds_is_reported_with_a_base(self) -> None:
+        # the same file at the base: nothing is new
+        self.assertEqual(self.run_check(self.data(), self.KCONFIG, base=self.KCONFIG), [])
+        # one key more than the base
+        more = self.KCONFIG + "\nconfig ICLFORGE_EXAMPLE_ONE_MORE_BYTES\n    int\n    default 1\n"
+        found = self.run_check(self.data(), more, base=self.KCONFIG)
+        self.assertEqual(len(found), 1)
+        self.assertIn("ICLFORGE_EXAMPLE_ONE_MORE_BYTES", found[0].message)
+
+    def test_a_key_the_guard_does_not_watch_is_not_its_business(self) -> None:
+        text = (
+            "config ICLFORGE_SENDSPIN\n    bool\n    default y\n\n"
+            "config SOME_OTHER_THING\n    int\n    default 1\n"
+        )
+        self.assertEqual(self.run_check(self.data(), text), [])
+
+    def test_a_lock_on_a_key_no_kconfig_declares_is_reported(self) -> None:
+        data = self.data()
+        data["profiles"]["s3"]["locked"]["CONFIG_ICLFORGE_EXAMPLE_GONE_BYTES"] = "4096"
+        data["profiles"]["s3"]["locked"]["CONFIG_ICLFORGE_EXAMPLE_OFF_BYTES"] = "n"
+        data["profiles"]["s3"]["locked"]["CONFIG_SPIRAM"] = "y"  # ESP-IDF's, not ours
+        text = (
+            "config ICLFORGE_SENDSPIN\n    bool\n    default y\n\n"
+            "config ICLFORGE_EXAMPLE_KEPT_BYTES\n    int\n    default 1\n"
+        )
+        data["profiles"]["s3"]["locked"]["CONFIG_ICLFORGE_EXAMPLE_KEPT_BYTES"] = "1"
+        data["profiles"]["c6"]["locked"]["CONFIG_ICLFORGE_EXAMPLE_KEPT_BYTES"] = "1"
+        found = self.run_check(data, text)
+        self.assertEqual(len(found), 1, [f.message for f in found])
+        self.assertIn("profile s3 locks CONFIG_ICLFORGE_EXAMPLE_GONE_BYTES=4096", found[0].message)
+
+    def test_the_tree_as_it_is_holds_to_its_profiles(self) -> None:
+        head = {path: (REPO / path).read_text("utf-8") for path in sp.KCONFIG_FILES}
+        found = sp.check_change(sp.load(), head, None)
+        self.assertEqual([f.message for f in found], [])
+
+    def test_the_command_reads_the_tree_and_says_so(self) -> None:
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = sp.main(["check-change", "--all"])
+        self.assertEqual((code, err.getvalue()), (0, ""), out.getvalue())
+        self.assertIn("placed in the profiles", out.getvalue())
+
+    def test_the_command_needs_a_base_or_all(self) -> None:
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = sp.main(["check-change"])
+        self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":

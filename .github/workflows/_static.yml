@@ -211,6 +211,21 @@ jobs:
         shell: bash
         run: python3 tools/hearth/sink_profile.py check-docs
 
+      # What the change does to the Kconfig that a profile has not heard of: a key it adds that the
+      # guard watches, that is in a profile's configuration (as far as the profile's locked values
+      # and target say) and that the profile neither locks nor frees, which the first configured
+      # build on main would otherwise report as `[unplaced]` after the merge (#1446 and #1459 each
+      # arrived that way); and a lock on a key no Kconfig of the build declares. A key whose
+      # presence the profile does not decide is the configured build's to judge
+      # (planning/esp32-platform-profiles.md, "Where each check runs"). Needs the base commit,
+      # which the full-history checkout above has; a push has no base and is not checked.
+      - name: ESP32 sink profiles against the Kconfig
+        if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: python3 tools/hearth/sink_profile.py check-change --base "$BASE_SHA"
+
       # The projects of the tree (libraries, programs, bindings, firmware, examples) form a
       # graph with no cycle that runs one way, and nothing but the habit of the people editing it
       # keeps it so. tools/checks/projects.json lists each project, its kind and the projects it

@@ -7,6 +7,7 @@
     python tools/hearth/sink_profile.py snapshot s3-n16r8 --build-dir BUILD [--write]
     python tools/hearth/sink_profile.py image hearth-sink-esp32s3
     python tools/hearth/sink_profile.py table [PROFILE ...]
+    python tools/hearth/sink_profile.py check-change --base REF [--all]
 
 A profile is one board's build: the fragments of firmware/hearth-sink in the
 order they are given to ESP-IDF, the values of the keys that decide whether a
@@ -41,6 +42,7 @@ import fnmatch
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +50,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import kconfig_scan
 from package_firmware import TARGETS
 
 REPO = Path(__file__).resolve().parents[2]
@@ -71,6 +74,196 @@ class ProfileError(Exception):
 class Finding:
     rule: str
     message: str
+
+
+# --- a change to the Kconfig, held to the profiles ------------------------------------
+
+# The files that declare the keys a hearth_sink build configures. The probes' and examples' own
+# Kconfig files are other projects and are not profiles.
+KCONFIG_FILES = (
+    "firmware/hearth-sink/main/Kconfig.projbuild",
+    "firmware/esp-idf/iclforge/Kconfig",
+)
+
+_TOKEN = re.compile(r'"[^"]*"|[A-Za-z0-9_]+|&&|\|\||!=|=|!|\(|\)')
+
+
+def _value_of(data: dict[str, Any], ident: str, name: str) -> bool | None:
+    """Whether a symbol is on in a profile, from what the profile locks and its target; None where
+    that is not known (a symbol ESP-IDF or the build decides)."""
+    spec = profile(data, ident)
+    if name.startswith("IDF_TARGET_"):
+        return name == "IDF_TARGET_" + str(spec.get("target", "")).upper()
+    value = spec.get("locked", {}).get("CONFIG_" + name)
+    if value == "y":
+        return True
+    if value == "n":
+        return False
+    return None
+
+
+def evaluate(data: dict[str, Any], ident: str, expression: str) -> bool | None:
+    """A Kconfig condition (`A && !B || C`, symbols and parentheses) in a profile, three-valued:
+    True, False, or None when a symbol in it is not known. Anything it cannot read is None."""
+    tokens = _TOKEN.findall(expression)
+    position = 0
+
+    def peek() -> str | None:
+        return tokens[position] if position < len(tokens) else None
+
+    def take() -> str | None:
+        nonlocal position
+        token = peek()
+        position += 1
+        return token
+
+    def disjunction() -> bool | None:
+        left = conjunction()
+        while peek() == "||":
+            take()
+            right = conjunction()
+            if left is True or right is True:
+                left = True
+            elif left is None or right is None:
+                left = None
+            else:
+                left = False
+        return left
+
+    def conjunction() -> bool | None:
+        left = unary()
+        while peek() == "&&":
+            take()
+            right = unary()
+            if left is False or right is False:
+                left = False
+            elif left is None or right is None:
+                left = None
+            else:
+                left = True
+        return left
+
+    def unary() -> bool | None:
+        if peek() == "!":
+            take()
+            inner = unary()
+            return None if inner is None else not inner
+        return primary()
+
+    def primary() -> bool | None:
+        token = take()
+        if token is None:
+            return None
+        if token == "(":
+            inner = disjunction()
+            if peek() == ")":
+                take()
+            return inner
+        if token == "y":
+            return True
+        if token == "n":
+            return False
+        if token.startswith('"'):
+            return None
+        if peek() in ("=", "!="):  # a comparison: not evaluated
+            take()
+            take()
+            return None
+        return _value_of(data, ident, token)
+
+    return disjunction()
+
+
+def _present_in(data: dict[str, Any], ident: str, symbol: kconfig_scan.Symbol) -> bool:
+    """Whether the symbol is in a configured build of the profile, as far as it can be told: its
+    conditions all hold, and it is not a bool that is off unless something turns it on. Where a
+    condition cannot be evaluated the answer is no: the build's own guard decides those."""
+    conditions = [*symbol.depends, *(c.split(None, 1)[1] for c in symbol.enclosing if " " in c)]
+    for condition in conditions:
+        if evaluate(data, ident, condition) is not True:
+            return False
+    if symbol.type in ("bool", "tristate"):
+        # off unless something turns it on, or on only under a condition the profile may not
+        # meet: only a plain `default y` is decided here
+        return any(default.strip() == "y" for default in symbol.defaults)
+    return True
+
+
+def kconfig_symbols(texts: dict[str, str]) -> dict[str, tuple[str, kconfig_scan.Symbol]]:
+    """{name: (file, Symbol)} over the files given as {path: text}."""
+    found: dict[str, tuple[str, kconfig_scan.Symbol]] = {}
+    for path, text in texts.items():
+        for name, symbol in kconfig_scan.scan(text).items():
+            found[name] = (path, symbol)
+    return found
+
+
+def check_change(
+    data: dict[str, Any],
+    head: dict[str, str],
+    base: dict[str, str] | None,
+) -> list[Finding]:
+    """What the Kconfig says that the profiles do not, at the pull request.
+
+    * a symbol the head declares and the base did not (every one, with no base), that the guard
+      watches and that is present in a profile which neither locks nor frees it: the first build
+      after the merge reports it `[unplaced]`;
+    * a key a profile locks (`CONFIG_ICLFORGE_*`, not `n`) that no Kconfig of the build declares:
+      the guard says `<absent>` for it, which is a removal or a typo.
+
+    A symbol whose presence cannot be told from the profile's locked values and target is not
+    reported: the configured build's own guard decides those (planning/esp32-platform-profiles.md,
+    'Where each check runs')."""
+    findings: list[Finding] = []
+    now = kconfig_symbols(head)
+    before = set(kconfig_symbols(base)) if base is not None else set()
+    for name in sorted(set(now) - before):
+        path, symbol = now[name]
+        key = "CONFIG_" + name
+        if not is_watched(data, key) or is_free(data, key):
+            continue
+        absent_in = [
+            ident
+            for ident, spec in sorted(data.get("profiles", {}).items())
+            if key not in spec.get("locked", {}) and _present_in(data, ident, symbol)
+        ]
+        if absent_in:
+            findings.append(
+                Finding(
+                    "kconfig",
+                    f"{path}: {key} is new and the guard watches it, and it is in "
+                    f"{', '.join(absent_in)}, which neither lock nor free it: lock its value in "
+                    "profiles.json (the hash moves: baselines are re-recorded or accepted, "
+                    "planning/esp32-platform-profiles.md 'Changing a profile'), or name it in "
+                    "`free`",
+                )
+            )
+    for ident, spec in sorted(data.get("profiles", {}).items()):
+        for key, value in sorted(spec.get("locked", {}).items()):
+            name = _bare(key)
+            if name.startswith("ICLFORGE_") and name not in now and value != "n":
+                findings.append(
+                    Finding(
+                        "kconfig",
+                        f"profile {ident} locks {key}={value} and no Kconfig of the build declares "
+                        f"it (read: {', '.join(KCONFIG_FILES)}): a removed key's lock goes with "
+                        "it, and a misspelt one is never held",
+                    )
+                )
+    return findings
+
+
+def _git_text(root: Path, ref: str, path: str) -> str | None:
+    """`path` as it is at `ref`, or None where it did not exist."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "show", f"{ref}:{path}"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    return result.stdout if result.returncode == 0 else None
 
 
 # --- the file -------------------------------------------------------------------------
@@ -619,6 +812,16 @@ def main(argv: list[str] | None = None) -> int:
     rule = commands.add_parser("image", help="the rule for a published image, as JSON")
     rule.add_argument("name")
 
+    change = commands.add_parser(
+        "check-change",
+        help="hold the Kconfig keys a change adds or removes to the profiles (no ESP-IDF)",
+    )
+    change.add_argument("--base", help="the commit the change is made on (git ref)")
+    change.add_argument(
+        "--all", action="store_true", help="every key, as if no base: a lint of the tree"
+    )
+    change.add_argument("--root", type=Path, default=REPO)
+
     tab = commands.add_parser("table", help="a markdown table of profiles")
     tab.add_argument("idents", nargs="*", metavar="PROFILE")
 
@@ -655,6 +858,27 @@ def main(argv: list[str] | None = None) -> int:
             if findings:
                 return 1
             print("check-docs: every fragment list the tree spells is a profile's or a listed one")
+        elif args.command == "check-change":
+            if not args.base and not args.all:
+                raise ProfileError("check-change needs --base REF, or --all")
+            head = {}
+            for path in KCONFIG_FILES:
+                try:
+                    head[path] = (args.root / path).read_text("utf-8", "replace")
+                except OSError as error:
+                    raise ProfileError(f"{path} cannot be read: {error}") from error
+            base = None
+            if args.base and not args.all:
+                base = {}
+                for path in KCONFIG_FILES:
+                    text = _git_text(args.root, args.base, path)
+                    if text is not None:
+                        base[path] = text
+            findings = check_change(data, head, base)
+            _report(findings, "kconfig", False)
+            if findings:
+                return 1
+            print("check-change: the keys the Kconfig adds are placed in the profiles")
         elif args.command == "snapshot":
             final = read_final(args.build_dir)
             asked = requested(data, args.profile)
