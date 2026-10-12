@@ -33,7 +33,9 @@ refusal:
    left, the sink queue's least headroom. On an I2S sink `realtime_permille` is not one of them:
    it includes the wait for the DAC and reads 981 to 992 for any stereo play.
 6. **Baseline.** `--record` writes baselines/<profile>.json from a clean run; `--compare` holds a
-   run to it with the suite's tolerance and prints an improvement as "re-baseline".
+   run to it with the suite's tolerance, the profile's own over it, and prints an improvement
+   as "re-baseline". A board's boot figures vary from boot to boot: `--restart --boots N`
+   restarts N times and holds the worst.
 
 Nothing the board says about its network is read or kept: /status carries the SSID and this
 takes the fields it wants by name.
@@ -418,7 +420,7 @@ def check_identity(board: Board, profile: str, profiles: Path | None = None) -> 
 def boot_budget(board: Board) -> dict[str, Any]:
     """The last `budget:` line of the board's console, as its fields, or {} where the log no
     longer holds one (a board that has played has rotated its boot lines out of a small log: the
-    C6's holds 2 KB, and its suite reads its serial console for this instead)."""
+    C6's holds 2 KB, which a restart a moment before still has it in)."""
     text, _ = board.log(None)
     found: dict[str, str] = {}
     for line in text.splitlines():
@@ -431,6 +433,35 @@ def boot_budget(board: Board) -> dict[str, Any]:
     if "floor" in found:
         boot["floor"] = _number(found["floor"])
     return boot
+
+
+def worst_boot(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    """The boot that left the least: the smallest largest block, then the least free RAM, of the
+    samples that have a budget line. A board's boot figures are not one number: the S3's free RAM
+    reads 16 KB higher when the idle task has freed the player's start stack first, and the C6's
+    largest block was 96,256 bytes on fourteen of seventeen boots and 94,208, 92,160 and 88,064
+    on the others. A baseline of the worst of N boots is the floor the board is known to start
+    from, and a run that starts higher than it is not a regression."""
+    usable = [sample for sample in samples if sample]
+    if not usable:
+        return {}
+    return min(
+        usable,
+        key=lambda sample: (
+            sample.get("largest", sys.maxsize),
+            sample.get("internal_free", sys.maxsize),
+        ),
+    )
+
+
+def tolerance_for(suite: dict[str, Any], profile: str | None) -> dict[str, Any]:
+    """The suite's tolerance, with the profile's own on top of it: a profile whose boot figures
+    jitter by more than the S3's does (the C6's largest block, by 8 KB) says so in its row, with
+    the spread it was measured from."""
+    merged = dict(suite.get("tolerance", {}))
+    own = (suite.get("profiles", {}).get(profile or "") or {}).get("tolerance", {})
+    merged.update({key: value for key, value in own.items() if key != "note"})
+    return merged
 
 
 def _number(text: str) -> Any:
@@ -617,8 +648,9 @@ def run_record(
     results: list[PlayResult],
     boot: dict[str, Any] | None,
     board: str = "",
+    boots: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    return {
+    record = {
         "format": FORMAT,
         "profile": profile,
         "profile_hash": hardware.get("profile_hash"),
@@ -630,6 +662,14 @@ def run_record(
         "plays": {r.id: r.figures() for r in results},
         "findings": {r.id: r.findings for r in results if r.findings},
     }
+    samples = [b for b in (boots or []) if b]
+    if len(samples) > 1:
+        # `boot` is the worst of these; they are kept so that the spread can be read
+        record["boot_samples"] = {
+            "internal_free": [b.get("internal_free") for b in samples],
+            "largest": [b.get("largest") for b in samples],
+        }
+    return record
 
 
 def compare(
@@ -736,6 +776,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     suite = load_suite()
     plan(suite, args.profile, args.only)  # a profile with no list is refused before a lock is taken
     resolve_board(args)
+    if args.boots < 1:
+        raise SuiteError("--boots is at least 1")
+    if args.boots > 1 and not args.restart:
+        raise SuiteError("--boots restarts the board that many times: it needs --restart")
     if not args.host:
         raise SuiteError("--host, or a --board that is on the bench, is required")
     if not args.lock or not args.session:
@@ -752,9 +796,16 @@ def cmd_run(args: argparse.Namespace) -> int:
     server = None
     try:
         board = Board(args.host, args.port, args.timeout)
+        boots: list[dict[str, Any]] = []
         if args.restart:
-            print(f"{args.host}: restarting, so that its boot line is the log's first")
-            board.restart()
+            for number in range(1, args.boots + 1):
+                print(
+                    f"{args.host}: restarting ({number} of {args.boots}), so that its boot line "
+                    "is the log's first"
+                )
+                board.restart()
+                if number < args.boots:
+                    boots.append(boot_budget(board))
         hardware = check_identity(board, args.profile, args.profiles)
         before = board.status()
         if before.get("state") != "stopped":
@@ -763,7 +814,10 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"{args.host}: {hardware.get('chip')} {hardware.get('version')}, "
             f"profile {args.profile} at {hardware.get('profile_hash')}"
         )
-        boot = boot_budget(board)
+        boots.append(boot_budget(board))
+        boot = worst_boot(boots)
+        if len(boots) > 1:
+            print(f"boot: the worst of {len(boots)}: {boot}")
         address = args.serve_host or lan_address_for(args.host)
         server = serve_fixtures(REPO, address)
         base_url = f"http://{address}:{server.server_address[1]}"
@@ -779,7 +833,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             args.play_timeout,
         )
         board.stop()
-        record = run_record(args.profile, hardware, results, boot, args.board)
+        record = run_record(args.profile, hardware, results, boot, args.board, boots)
         _print_results(results)
         problems = [f for r in results for f in r.findings]
         if args.out != "-":
@@ -788,7 +842,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         regressions: list[str] = []
         if args.compare:
             baseline = json.loads(Path(args.compare).read_text("utf-8"))
-            regressions, improvements = compare(record, baseline, suite.get("tolerance", {}))
+            regressions, improvements = compare(
+                record, baseline, tolerance_for(suite, args.profile)
+            )
             for line in regressions:
                 print(f"regression: {line}")
             for line in improvements:
@@ -841,6 +897,13 @@ def main(argv: list[str] | None = None) -> int:
         "(refused for a P4 of the bench: its restart can kill the C6 link)",
     )
     run.add_argument(
+        "--boots",
+        type=int,
+        default=1,
+        help="with --restart, restart this many times and hold the worst boot line "
+        "(a board's boot figures vary from boot to boot)",
+    )
+    run.add_argument(
         "--accept-restart-fault",
         action="store_true",
         help="restart a P4 anyway, ready to put it back by hand",
@@ -884,10 +947,11 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_run(args)
         if args.command == "compare":
             suite = load_suite()
+            recorded = json.loads(args.run.read_text("utf-8"))
             regressions, improvements = compare(
-                json.loads(args.run.read_text("utf-8")),
+                recorded,
                 json.loads(args.baseline.read_text("utf-8")),
-                suite.get("tolerance", {}),
+                tolerance_for(suite, recorded.get("profile")),
             )
             for line in regressions:
                 print(f"regression: {line}")

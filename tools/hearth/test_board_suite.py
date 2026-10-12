@@ -77,6 +77,7 @@ class StandIn:
             b"headroom=23552 floor=0 verdict=ok\n"
         )
         self.boot_log = bytes(self.log)
+        self.boot_logs: list[bytes] | None = None  # one per restart, in turn
         self.plays: list[str] = []
         stand_in = self
 
@@ -123,7 +124,9 @@ class StandIn:
                 elif self.path == "/restart":
                     stand_in.restarts += 1
                     stand_in.state = "stopped"
-                    stand_in.log = bytearray(stand_in.boot_log)
+                    cycle = stand_in.boot_logs
+                    boot = cycle[(stand_in.restarts - 1) % len(cycle)] if cycle else None
+                    stand_in.log = bytearray(boot or stand_in.boot_log)
                     self._send(200, b"restarting\n")
                 else:
                     stand_in.state = "stopped"
@@ -185,6 +188,14 @@ class StandIn:
         self.server.server_close()
 
 
+def budget_log(free: int, largest: int, verdict: str = "ok", floor: int = 0) -> bytes:
+    return (
+        f"boot line\nbudget: when=boot net=1 internal_free={free} largest={largest} ask_ring=0 "
+        "ask_decode_stack=0 ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 "
+        f"headroom={largest - 8192} floor={floor} verdict={verdict}\n"
+    ).encode()
+
+
 def standard(**overrides) -> dict[str, Behaviour]:
     return {
         "ffmpeg.ac3": Behaviour(**overrides),
@@ -244,6 +255,27 @@ class Suite(unittest.TestCase):
             # the compare's boot ratchet reads.
             for key in ("internal_free", "largest"):
                 self.assertIsInstance(record["boot"].get(key), int, f"{path.name}: boot {key}")
+
+    def test_a_profile_s_own_tolerance_names_only_figures_the_suite_holds(self) -> None:
+        allowed = {
+            "relative",
+            "absolute_permille",
+            "stack_free_bytes",
+            "headroom_ms",
+            "largest_block_bytes",
+            "internal_free_bytes",
+            "note",
+        }
+        for profile, spec in self.suite["profiles"].items():
+            self.assertLessEqual(set(spec.get("tolerance", {})), allowed, profile)
+
+    def test_the_c6_has_room_for_its_measured_boot_jitter_and_the_s3_keeps_its_own(self) -> None:
+        c6 = bs.tolerance_for(self.suite, "c6-16mb")
+        s3 = bs.tolerance_for(self.suite, "s3-n16r8")
+        # 96,256 to 88,064 was seen: 8,192 bytes
+        self.assertGreaterEqual(c6["largest_block_bytes"], 8192)
+        self.assertEqual(s3["largest_block_bytes"], 1024)
+        self.assertEqual(c6["absolute_permille"], s3["absolute_permille"])
 
     def test_plan_for_an_unknown_profile_is_refused(self) -> None:
         with self.assertRaises(bs.SuiteError):
@@ -693,6 +725,71 @@ class BenchBoards(unittest.TestCase):
         self.assertIsNone(args.lock)
 
 
+class WorstBoot(unittest.TestCase):
+    def test_it_is_the_boot_with_the_smallest_largest_block(self) -> None:
+        samples = [
+            {"largest": 96256, "internal_free": 112000},
+            {"largest": 88064, "internal_free": 112600},
+            {"largest": 94208, "internal_free": 108988},
+        ]
+        self.assertEqual(bs.worst_boot(samples)["largest"], 88064)
+
+    def test_a_tie_goes_to_the_least_free_ram(self) -> None:
+        samples = [
+            {"largest": 31744, "internal_free": 102539},
+            {"largest": 31744, "internal_free": 85923},
+            {"largest": 31744, "internal_free": 86231},
+        ]
+        self.assertEqual(bs.worst_boot(samples)["internal_free"], 85923)
+
+    def test_a_boot_with_no_line_is_not_a_boot(self) -> None:
+        self.assertEqual(bs.worst_boot([{}, {"largest": 1, "internal_free": 2}, {}])["largest"], 1)
+        self.assertEqual(bs.worst_boot([{}, {}]), {})
+        self.assertEqual(bs.worst_boot([]), {})
+
+
+class Tolerance(unittest.TestCase):
+    SUITE: ClassVar[dict] = {
+        "tolerance": {"relative": 0.05, "largest_block_bytes": 1024, "note": "the suite's"},
+        "profiles": {
+            "wide": {"tolerance": {"largest_block_bytes": 12288, "note": "why"}},
+            "plain": {},
+        },
+    }
+
+    def test_a_profile_s_own_values_go_over_the_suite_s_and_its_note_is_not_one(self) -> None:
+        wide = bs.tolerance_for(self.SUITE, "wide")
+        self.assertEqual(wide["largest_block_bytes"], 12288)
+        self.assertEqual(wide["relative"], 0.05)
+        self.assertEqual(wide["note"], "the suite's")
+
+    def test_a_profile_with_none_or_no_row_has_the_suite_s(self) -> None:
+        for profile in ("plain", "absent", None):
+            self.assertEqual(bs.tolerance_for(self.SUITE, profile)["largest_block_bytes"], 1024)
+
+    def test_a_c6_boot_one_step_below_the_common_mode_is_not_a_regression_on_the_c6(self) -> None:
+        baseline = {
+            "profile": "c6-16mb",
+            "boot": {"largest": 96256, "internal_free": 112500, "verdict": "below-floor"},
+            "plays": {},
+        }
+        run = {
+            "profile": "c6-16mb",
+            "boot": {"largest": 88064, "internal_free": 112500, "verdict": "below-floor"},
+            "plays": {},
+        }
+        suite = bs.load_suite()
+        regressions, _ = bs.compare(run, baseline, bs.tolerance_for(suite, "c6-16mb"))
+        self.assertEqual(regressions, [])
+        # the S3's 1,024 bytes would call the same boot a regression
+        regressions, _ = bs.compare(run, baseline, bs.tolerance_for(suite, "s3-n16r8"))
+        self.assertTrue(any("largest internal block" in line for line in regressions))
+        # and a loss the C6's allowance does not cover still is one
+        run["boot"]["largest"] = 65536
+        regressions, _ = bs.compare(run, baseline, bs.tolerance_for(suite, "c6-16mb"))
+        self.assertTrue(any("largest internal block" in line for line in regressions))
+
+
 class CommandLine(unittest.TestCase):
     def setUp(self) -> None:
         self.dir = tempfile.TemporaryDirectory()
@@ -848,6 +945,66 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(self.stand_in.restarts, 1)
         baseline = json.loads((bs.BASELINES / "s3-n16r8.json").read_text("utf-8"))
         self.assertEqual(baseline["boot"]["largest"], 31744)
+
+    def test_boots_restarts_that_many_times_and_the_record_holds_the_worst(self) -> None:
+        self.stand_in.boot_logs = [
+            budget_log(86231, 31744),
+            budget_log(102539, 31744),
+            budget_log(85923, 31744),
+        ]
+        code, out, _ = self.run_cli(
+            *self.run_args(
+                "--lock", str(self.lock), "--session", "16d036", "--restart", "--boots", "3"
+            )
+        )
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stand_in.restarts, 3)
+        self.assertIn("restarting (3 of 3)", out)
+        record = json.loads(self.out.read_text("utf-8"))
+        self.assertEqual(record["boot"]["internal_free"], 85923)
+        self.assertEqual(
+            record["boot_samples"],
+            {"internal_free": [86231, 102539, 85923], "largest": [31744, 31744, 31744]},
+        )
+
+    def test_the_worst_boot_is_the_one_a_baseline_records(self) -> None:
+        self.stand_in.boot_logs = [budget_log(112500, 96256), budget_log(108988, 94208)]
+        code, out, _ = self.run_cli(
+            *self.run_args(
+                "--lock",
+                str(self.lock),
+                "--session",
+                "16d036",
+                "--restart",
+                "--boots",
+                "2",
+                "--record",
+            )
+        )
+        self.assertEqual(code, 0, out)
+        baseline = json.loads((bs.BASELINES / "s3-n16r8.json").read_text("utf-8"))
+        self.assertEqual(
+            (baseline["boot"]["internal_free"], baseline["boot"]["largest"]), (108988, 94208)
+        )
+
+    def test_one_boot_has_no_samples_to_keep(self) -> None:
+        code, out, _ = self.run_cli(
+            *self.run_args("--lock", str(self.lock), "--session", "16d036", "--restart")
+        )
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("boot_samples", json.loads(self.out.read_text("utf-8")))
+
+    def test_boots_without_restart_or_below_one_is_refused_before_the_board_is_touched(
+        self,
+    ) -> None:
+        for extra in (("--boots", "3"), ("--restart", "--boots", "0")):
+            code, _, err = self.run_cli(
+                *self.run_args("--lock", str(self.lock), "--session", "16d036", *extra)
+            )
+            self.assertEqual(code, 2, extra)
+            self.assertIn("--boots", err)
+        self.assertEqual((self.stand_in.restarts, self.stand_in.plays), (0, []))
+        self.assertFalse(self.lock.exists())
 
     def test_a_line_read_half_printed_is_not_a_figure(self) -> None:
         found = bs.parse_play_lines(

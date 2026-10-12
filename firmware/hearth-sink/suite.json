@@ -70,6 +70,11 @@
     },
     "c6-16mb": {
       "note": "The C6 refuses an HTTP play on purpose (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES, #1395): its rows are that refusal, clean, with no reboot. Its audio path is Sendspin, which needs a server on the bench and is not in this list yet.",
+      "tolerance": {
+        "largest_block_bytes": 12288,
+                "note": "The C6's boot figures are not one number: on 27 boots of the c6-16mb image (the C6, 2026-10-12) the largest internal block was 96,256 on twenty-one, 94,208 on four, 92,160 on one and 88,064 on one, against the S3's 31,744 on every boot, so the S3's 1,024 bytes would fail one boot in five; free RAM read 108,988 on one boot and 112,204 to 113,128 on the rest. The baseline is the worst of eight boots (--boots 8). Three 4 KB steps is the allowance on the largest block (twice the 8,192 seen); free RAM keeps the suite's 2,048 below that worst boot.",
+        "internal_free_bytes": 2048
+      },
       "plays": [
         {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"},
         {"id": "eac3-2.0-refused", "stream": "eac3-2.0", "expect": "refused-memory"}

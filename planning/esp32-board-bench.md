@@ -22,7 +22,7 @@ tools are.
 |---|---|---|---|---|---|
 | S3a | ESP32-S3 N16R8 | 192.168.1.156 | COM15 | `s3-board-156.lock` | |
 | S3b | ESP32-S3 N16R8 | 192.168.1.45 | COM16 | `s3-board-45.lock` | |
-| C6 | ESP32-C6 16 MB | 192.168.1.117 | COM9 | `c6-board.lock` | `/log` holds 2 KB: read the serial console |
+| C6 | ESP32-C6 16 MB | 192.168.1.117 | COM9 | `c6-board.lock` | `/log` holds 2 KB: a restart a moment before still has the boot line in it |
 | P4a | ESP32-P4 rev v1.x | 192.168.1.99 | COM10 | `p4-board.lock` | a restart can leave it with no Wi-Fi |
 | P4b | ESP32-P4 rev v1.x | 192.168.1.76 | COM13 | `p4-board2.lock` | no OTA: USB flash, app and otadata only |
 
@@ -110,13 +110,16 @@ not something it ran.
   else: not the bootloader, the table, NVS, or the audio sample and storage image, which a
   build's `flash_files` also lists.
 - **A board that has played has rotated its boot line out of `GET /log`** (S3), and the C6's log
-  is 2 KB. A baseline's boot figures need `board_suite.py run --restart`, and the C6's come from
-  the serial console (`bench.py console C6 --reset`).
+  is 2 KB. A baseline's boot figures need `board_suite.py run --restart`, which the C6's 2 KB
+  log still holds the line after (27 boots), and `--boots N` where the figures vary from boot to
+  boot, as the C6's largest block does (88,064 to 96,256). `bench.py console C6 --reset` is the
+  serial console's, for a boot that crashed.
 - **`GET /hardware` is built once**, when the control surface starts: a notice added at boot cannot
   be there.
 - **The boot line's free internal RAM is read twice over**: the Sendspin player's 16 KiB start
   task stack goes either side of the line, so S3b read 85.9 to 86.2 KB on eight boots and 102.5 KB
-  on the ninth ([the board suite](esp32-platform-profiles.md#3-the-board-suite)).
+  on the ninth; `--boots N` records the worst of N
+  ([the board suite](esp32-platform-profiles.md#3-the-board-suite)).
 - **ESP-IDF's export refuses a Git Bash shell** ("MSys/Mingw is not supported"), and under
   Windows PowerShell 5.1 on the bench machine its execution policy stops the script from loading
   at all. The tools run it with the MSYS variables removed, under `pwsh` where it is installed,

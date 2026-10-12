@@ -361,7 +361,7 @@ from `firmware/hearth-sink/suite.json` and writes baselines under
 session scratchpads:
 
 ```
-board_suite.py run --profile s3-n16r8 --board S3b --session <id> [--repeat 3] [--restart] \
+board_suite.py run --profile s3-n16r8 --board S3b --session <id> [--repeat 3] [--restart [--boots 8]] \
                    [--record | --compare baselines/s3-n16r8.json]
 board_suite.py plan --profile s3-n16r8
 board_suite.py compare --run board-run.json --baseline baselines/s3-n16r8.json
@@ -400,7 +400,7 @@ It does, in this order, and stops at the first refusal:
    date). `--record` writes `baselines/<profile>.json` from a clean run; `--compare` holds a run to
    a baseline with the tolerance in `suite.json` and prints an improvement as "re-baseline".
 
-Tests (`test_board_suite.py`, 53) run it against a stand-in board that answers with what the real
+Tests (`test_board_suite.py`, 73) run it against a stand-in board that answers with what the real
 boards printed on 2026-10-12, and hold the file to the tree (every stream is in the repository,
 every AC-4 row names a pin the host holds, every profile has a list).
 
@@ -411,7 +411,8 @@ the decoder at **123 and 88 permille of a frame** where `realtime_permille` read
 Not in PR 6, and said so: the boot `budget:` line was not read into the run (S3's `/log` may have
 rotated it out and the C6's is 2 KB). PR 7 reads it: `--restart` restarts the board so that the boot
 line is the log's first, the suite parses it, and `--record` refuses a baseline when the log holds
-none; the C6's 2 KB log is read from the serial console where it has to be. The 5.1 and
+none; the C6's 2 KB log still holds the line a moment after a restart (27 boots, PR 9), so
+its serial console is not needed for it. The 5.1 and
 wider rows (`demo.ec3` with objects) wait for the baselines; the AC-4 rows need an image built with
 `CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` (the `measure` overlay) and say so when the hash is not on
 the line; and a Sendspin play list for the C6 needs a server on the bench.
@@ -461,6 +462,25 @@ frames each, no underruns, 0 ms dry, queue headroom 5 ms, decode stack 18,256 an
 free; boot line `internal_free=86223 largest=31744 headroom=23552 verdict=ok`. A second run of
 two plays a row after another restart held to it with no finding.
 
+**A board's boot figures are not one number (PR 9).** The S3's free RAM has two modes, above;
+the C6's largest internal block at boot was 96,256 bytes on 21 of 27 boots and 94,208 on four,
+92,160 on one and 88,064 on one, with free RAM at 108,988 on one boot and 112,204 to 113,128
+on the rest. A baseline taken from one boot would fail one boot in five of the next runs, so
+`board_suite.py run --restart --boots N` restarts N times and holds **the worst boot** (the
+smallest largest block, then the least free RAM), keeps every sample in the record
+(`boot_samples`), and a run that starts higher than the baseline is not a regression. A profile
+whose figures jitter by more than the S3's carries its own tolerance in `suite.json`, with the
+spread it came from: the C6's largest block is allowed 12,288 bytes (three 4 KB steps, where
+8,192 was seen) and keeps the suite's 2,048 for free RAM, which is held below the worst boot.
+
+**Recorded (PR 9, `c6-16mb`):** the C6 (`.117`), the
+identity image `v0.10.0-beta.1-4175-g79d2e7618-`, profile hash `c256f286a410`, five refused
+plays a row after eight restarts. Both rows are state `failed`, `why: memory`, no frames and no
+reboot; the boot line is the worst of the eight: `internal_free=108988 largest=94208
+headroom=61440 floor=134008 verdict=below-floor`. A run of two refusals a row after the worst
+of three more boots (112,172 free, 96,256 largest) held to it with no finding. Not in it: a
+Sendspin play, which needs a server on the bench, and the C6's `4mb` twin, which has no board.
+
 ## Changing a profile
 
 A change to a profile, a fragment it names, or a locked key's Kconfig default is one PR that:
@@ -502,7 +522,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
 | 5 | The QEMU twin of `s3-n16r8` | no | **Built**: see [the twin](#2-a-qemu-twin-of-the-release-shape). The spike found PSRAM execution runs under QEMU and the twin catches the stack's placement, not the heap's symptom |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | **Built**: see [the suite](#3-the-board-suite); run on S3b |
-| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)); `c6-16mb`, `p4-rev1`, `p4-rev1-ac4` and `s3-n16r8-ac4` each need their board and, for AC-4, the `measure` image. `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
+| 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots); `p4-rev1`, `p4-rev1-ac4` and `s3-n16r8-ac4` each need their board and, for AC-4, the `measure` image. `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
 PR 3 follows 2. PR 2 adds `p4-rev3` once #1400 is on main, since its fragments are not.
