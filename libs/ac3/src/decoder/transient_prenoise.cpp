@@ -22,35 +22,6 @@ namespace {
 // be the one place its PCM could differ between two machines.
 using Scalar = internal::decode_scalar_t;
 
-// A raised-cosine (Hann-shaped) cross-fade, the family the spec's own text
-// names as giving good results (§3.7.2: "standard Hanning windows"). fade_in
-// runs 0 -> 1, fade_out is its complement 1 -> 0, both length N - computed in
-// double and narrowed once to the scalar, as output.cpp narrows its taps.
-template <std::size_t N>
-struct CrossFade {
-    std::array<Scalar, N> fade_in{};
-    std::array<Scalar, N> fade_out{};
-    CrossFade() {
-        constexpr double kPi = std::numbers::pi;
-        for (std::size_t n = 0; n < N; ++n) {
-            const double in =
-                0.5 * (1.0 - std::cos(kPi * static_cast<double>(n) / static_cast<double>(N - 1)));
-            fade_in[n] = static_cast<Scalar>(in);
-            fade_out[n] = static_cast<Scalar>(1.0 - in);
-        }
-    }
-};
-
-const CrossFade<static_cast<std::size_t>(kTransientPrenoiseTC1)>& tc1_windows() {
-    static const CrossFade<static_cast<std::size_t>(kTransientPrenoiseTC1)> w;
-    return w;
-}
-
-const CrossFade<static_cast<std::size_t>(kTransientPrenoiseTC2)>& tc2_windows() {
-    static const CrossFade<static_cast<std::size_t>(kTransientPrenoiseTC2)> w;
-    return w;
-}
-
 // One cross-faded sample: the decoded sample and the synthesized one, each
 // under its own gain.
 float blend(float decoded, Scalar decoded_gain, float synthesized, Scalar synthesized_gain) {
@@ -85,6 +56,25 @@ Derived derive(int transloc, int translen) {
 
 }  // namespace
 
+// A raised-cosine (Hann-shaped) cross-fade, the family the spec's own text
+// names as giving good results (§3.7.2: "standard Hanning windows"). fade_in
+// runs 0 -> 1, fade_out is its complement 1 -> 0, both length N - computed in
+// double and narrowed once to the scalar, as output.cpp narrows its taps.
+internal::TransientPrenoiseWindows::TransientPrenoiseWindows() {
+    const auto fill = [](auto& fade_in, auto& fade_out) {
+        constexpr double kPi = std::numbers::pi;
+        const std::size_t n_samples = fade_in.size();
+        for (std::size_t n = 0; n < n_samples; ++n) {
+            const double in = 0.5 * (1.0 - std::cos(kPi * static_cast<double>(n) /
+                                                    static_cast<double>(n_samples - 1)));
+            fade_in[n] = static_cast<Scalar>(in);
+            fade_out[n] = static_cast<Scalar>(1.0 - in);
+        }
+    };
+    fill(tc1_in, tc1_out);
+    fill(tc2_in, tc2_out);
+}
+
 TransientPrenoiseRange transient_prenoise_range(int transloc, int translen) {
     const auto d = derive(transloc, translen);
     // The write region ends exactly at transloc (the correction stops right
@@ -96,12 +86,18 @@ TransientPrenoiseRange transient_prenoise_range(int transloc, int translen) {
 }
 
 void apply_transient_prenoise(std::span<float> pcm, int transloc, int translen) {
+    // The cross-fades once for the process, as they always were for this entry point: it has
+    // callers that correct a frame at a time, and building them is 384 cosines. The decoder
+    // does not come through here - it keeps its own in the identity's hold-back - so a
+    // minimum-footprint image, which never references this function, carries no copy.
+    static const internal::TransientPrenoiseWindows windows;
     std::vector<float> synthesis(static_cast<std::size_t>(internal::kTransientPrenoiseMaxSynthesis));
-    internal::apply_transient_prenoise(pcm, transloc, translen, synthesis);
+    internal::apply_transient_prenoise(pcm, transloc, translen, synthesis, windows);
 }
 
 void internal::apply_transient_prenoise(std::span<float> pcm, int transloc, int translen,
-                                        std::span<float> synthesis) {
+                                        std::span<float> synthesis,
+                                        const TransientPrenoiseWindows& windows) {
     constexpr int kTC1 = kTransientPrenoiseTC1;
     constexpr int kTC2 = kTransientPrenoiseTC2;
     const auto d = derive(transloc, translen);
@@ -117,15 +113,12 @@ void internal::apply_transient_prenoise(std::span<float> pcm, int transloc, int 
         synthesis[static_cast<std::size_t>(samp)] = pcm[static_cast<std::size_t>(synth_start + samp)];
     }
 
-    const auto& w1 = tc1_windows();
-    const auto& w2 = tc2_windows();
-
     // Region 1 [0, TC1): cross-fade OUT of the original decoded pre-noise
     // and IN to the synthesis buffer.
     for (int samp = 0; samp < kTC1; ++samp) {
         const auto at = static_cast<std::size_t>(start_samp + samp);
         const auto j = static_cast<std::size_t>(samp);
-        pcm[at] = blend(pcm[at], w1.fade_out[j], synthesis[j], w1.fade_in[j]);
+        pcm[at] = blend(pcm[at], windows.tc1_out[j], synthesis[j], windows.tc1_in[j]);
     }
     // Region 2 [TC1, tot_corr_len - TC2): straight overwrite - this is the
     // heart of the pre-noise removal, the part neither cross-fade softens. A
@@ -139,8 +132,8 @@ void internal::apply_transient_prenoise(std::span<float> pcm, int transloc, int 
     for (int samp = tot_corr_len - kTC2; samp < tot_corr_len; ++samp) {
         const auto j = static_cast<std::size_t>(samp - (tot_corr_len - kTC2));
         const auto at = static_cast<std::size_t>(start_samp + samp);
-        pcm[at] = blend(pcm[at], w2.fade_in[j], synthesis[static_cast<std::size_t>(samp)],
-                        w2.fade_out[j]);
+        pcm[at] = blend(pcm[at], windows.tc2_in[j], synthesis[static_cast<std::size_t>(samp)],
+                        windows.tc2_out[j]);
     }
 }
 

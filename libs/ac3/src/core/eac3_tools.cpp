@@ -511,14 +511,25 @@ int quantize_ecplchaos(double chaos) {
 namespace {
 
 // y[m] = cos(2*pi*(N/4 + 0.5)/N*(m + 0.5)), N = 512, m = 0..255 (§3.5.5.4).
+//
+// The three formulas below are each stated once and read twice: by the double tables
+// that follow them (the encoder's and a double decoder's) and by the narrowed copies
+// EcplTables keeps (the decoder's own, float32 and Q7.24). The narrowed copies used
+// to be taken FROM the double tables, which held 10,240 bytes of .bss in every image
+// whose decoder never takes the double form, only to be read once when the scratch
+// was made; evaluating the same expression where it is needed gives the same double,
+// so the same float or Q7.24 raw value, and leaves the image without them.
+double ecpl_y_at(std::size_t m) {
+    constexpr double kPi = std::numbers::pi;
+    constexpr double kN = 512.0;
+    return std::cos(2.0 * kPi * (kN / 4.0 + 0.5) / kN * (static_cast<double>(m) + 0.5));
+}
+
 struct EcplYTable {
     std::array<double, 256> value{};
     EcplYTable() {
-        constexpr double kPi = std::numbers::pi;
-        constexpr double kN = 512.0;
-        for (int m = 0; m < 256; ++m) {
-            value[static_cast<std::size_t>(m)] =
-                std::cos(2.0 * kPi * (kN / 4.0 + 0.5) / kN * (static_cast<double>(m) + 0.5));
+        for (std::size_t m = 0; m < 256; ++m) {
+            value[m] = ecpl_y_at(m);
         }
     }
 };
@@ -534,15 +545,22 @@ const EcplYTable& ecpl_y() {
 // depends only on i, never on the PCM being windowed, so it's the same
 // fixed pair of arrays on every call: tabulated once here instead of
 // std::cos/std::sin (x4 per sample) inside the 256-iteration loop.
+double xcos3_angle(std::size_t i) {
+    constexpr double kPi = std::numbers::pi;
+    return kPi * static_cast<double>(i) / 512.0;
+}
+
+double xcos3_at(std::size_t i) { return std::cos(xcos3_angle(i)); }
+
+double xsin3_at(std::size_t i) { return -std::sin(xcos3_angle(i)); }
+
 struct Xcos3Table {
     std::array<double, 512> cos{};
     std::array<double, 512> sin{};
     Xcos3Table() {
-        constexpr double kPi = std::numbers::pi;
-        for (int i = 0; i < 512; ++i) {
-            const double angle = kPi * static_cast<double>(i) / 512.0;
-            cos[static_cast<std::size_t>(i)] = std::cos(angle);
-            sin[static_cast<std::size_t>(i)] = -std::sin(angle);
+        for (std::size_t i = 0; i < 512; ++i) {
+            cos[i] = xcos3_at(i);
+            sin[i] = xsin3_at(i);
         }
     }
 };
@@ -580,15 +598,13 @@ struct EcplTables<float> {
     std::array<float, 256> y{};
 
     EcplTables() {
-        const auto& xcos3 = xcos3_table();
         for (std::size_t i = 0; i < 512; ++i) {
             window[i] = static_cast<float>(kAnalysisWindow[i]);
-            cos3[i] = static_cast<float>(xcos3.cos[i]);
-            sin3[i] = static_cast<float>(xcos3.sin[i]);
+            cos3[i] = static_cast<float>(xcos3_at(i));
+            sin3[i] = static_cast<float>(xsin3_at(i));
         }
-        const auto& y_table = ecpl_y().value;
         for (std::size_t m = 0; m < 256; ++m) {
-            y[m] = static_cast<float>(y_table[m]);
+            y[m] = static_cast<float>(ecpl_y_at(m));
         }
     }
 };
@@ -602,17 +618,22 @@ struct EcplTables<iclforge::internal::Fixed32> {
     std::array<iclforge::internal::Fixed32, 512> cos3{};
     std::array<iclforge::internal::Fixed32, 512> sin3{};
     std::array<iclforge::internal::Fixed32, 256> y{};
+    // The 512-point transform's own twiddles (dft512_fixed below): 5,536 bytes that were a
+    // static of that function, in .bss from the image's first byte for a transform only an
+    // enhanced coupling stream runs. A block of their own rather than a member, so the
+    // scratch's allocation is the 23,552 bytes it always was and not 29,088 of them: the
+    // heap a part has to find them in is the one WiFi has cut up.
+    std::unique_ptr<const iclforge::dsp::fft::StockhamTables<512, iclforge::internal::Fixed32>>
+        fft{std::make_unique<const iclforge::dsp::fft::StockhamTables<512, iclforge::internal::Fixed32>>()};
 
     EcplTables() {
-        const auto& xcos3 = xcos3_table();
         for (std::size_t i = 0; i < 512; ++i) {
             window[i] = iclforge::internal::Fixed32{kAnalysisWindow[i]};
-            cos3[i] = iclforge::internal::Fixed32{xcos3.cos[i]};
-            sin3[i] = iclforge::internal::Fixed32{xcos3.sin[i]};
+            cos3[i] = iclforge::internal::Fixed32{xcos3_at(i)};
+            sin3[i] = iclforge::internal::Fixed32{xsin3_at(i)};
         }
-        const auto& y_table = ecpl_y().value;
         for (std::size_t m = 0; m < 256; ++m) {
-            y[m] = iclforge::internal::Fixed32{y_table[m]};
+            y[m] = iclforge::internal::Fixed32{ecpl_y_at(m)};
         }
     }
 };
@@ -870,11 +891,11 @@ using iclforge::internal::Fixed32;
 // The ceiling is 2^28 of raw, sixteen in value: a radix-4 stage multiplies by
 // at most four, so a stage entered at sixteen leaves at sixty-four and the
 // format holds a hundred and twenty-eight.
-[[nodiscard]] int dft512_fixed(std::span<const Fixed32, 512> real_in,
+[[nodiscard]] int dft512_fixed(const iclforge::dsp::fft::StockhamTables<512, Fixed32>& tables,
+                               std::span<const Fixed32, 512> real_in,
                                std::span<const Fixed32, 512> imag_in,
                                std::span<Fixed32, 512> real_out,
                                std::span<Fixed32, 512> imag_out) {
-    static const iclforge::dsp::fft::StockhamTables<512, Fixed32> tables;
     for (std::size_t n = 0; n < 512; ++n) {
         real_out[n] = real_in[n];
         imag_out[n] = imag_in[n];
@@ -995,7 +1016,7 @@ void ecpl_channel_spectrum_fixed(std::span<const Fixed32, 256> prev_mant, int pr
     // case, an audio block's bins being nothing like uniform - has room left
     // over; recovering it here, once over the 256 bins anything downstream
     // reads, is a pass and a shift for whatever it comes to.
-    norm += dft512_fixed(s.pcm_real, s.pcm_imag, s.zr, s.zi);
+    norm += dft512_fixed(*s.fft, s.pcm_real, s.pcm_imag, s.zr, s.zi);
     std::int64_t peak = 0;
     for (std::size_t k = 0; k < 256; ++k) {
         const auto re = static_cast<std::int64_t>(s.zr[k].raw);

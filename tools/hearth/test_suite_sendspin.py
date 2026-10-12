@@ -555,14 +555,16 @@ class InTheSuite(unittest.TestCase):
             popen=popen, relay_every=0.01, log_wait_s=0.0,
         )  # fmt: skip
 
-    def test_the_c6_s_list_plays_ac3_over_sendspin_and_says_why_e_ac3_is_not_there(self) -> None:
+    def test_the_c6_s_list_plays_ac3_and_then_e_ac3_over_sendspin(self) -> None:
+        ids = [r["id"] for r in bs.plan(self.suite, "c6-16mb")]
         rows = {r["id"]: r.get("via", "play") for r in bs.plan(self.suite, "c6-16mb")}
         self.assertEqual(rows["ac3-2.0-sendspin"], "sendspin")
+        self.assertEqual(rows["eac3-2.0-sendspin"], "sendspin")
         self.assertEqual(rows["ac3-2.0-refused"], "play")
-        # It does not play it reliably yet, and the list says so rather than hold a row that
-        # fails or a baseline that was recorded on a lucky boot.
-        self.assertNotIn("eac3-2.0-sendspin", rows)
-        self.assertIn("E-AC-3", self.suite["profiles"]["c6-16mb"]["note"])
+        # As a user plays them: the E-AC-3 stream after the AC-3 one, in the same boot, which is
+        # where its Wi-Fi receive buffers used to fail to allocate (planning/esp32-platform-
+        # profiles.md, 'Sendspin rows').
+        self.assertLess(ids.index("ac3-2.0-sendspin"), ids.index("eac3-2.0-sendspin"))
 
     def test_a_row_without_the_test_server_is_refused_with_how_to_get_one(self) -> None:
         result, _ = bs.run_sendspin_play(StubBoard(), self.row(), self.suite, None, None)  # type: ignore[arg-type]

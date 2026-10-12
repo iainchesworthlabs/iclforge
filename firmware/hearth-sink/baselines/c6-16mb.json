@@ -1,21 +1,21 @@
 {
   "format": 1,
   "profile": "c6-16mb",
-  "profile_hash": "ebc59bd7d7f8",
-  "version": "v0.10.0-beta.1-4520-g26274cd77-",
+  "profile_hash": "cc71ee4908ff",
+  "version": "v0.10.0-beta.1-4569-g9643eba39-",
   "chip": "ESP32-C6",
   "board": "C6",
-  "recorded": "2026-10-12T13:11Z",
+  "recorded": "2026-10-12T13:48Z",
   "boot": {
     "when": "boot",
     "net": 1,
-    "internal_free": 108792,
-    "largest": 88064,
+    "internal_free": 134196,
+    "largest": 116736,
     "ask_total": 73728,
     "ask_biggest": 32768,
-    "headroom": 55296,
+    "headroom": 83968,
     "verdict": "below-floor",
-    "floor": 134008
+    "floor": 160796
   },
   "plays": {
     "ac3-2.0-refused": {
@@ -32,50 +32,76 @@
       "state": "finished",
       "frames": 938,
       "decoder_permille_samples": [
-        663,
-        650,
-        651,
-        665,
-        661
+        653,
+        656,
+        659,
+        659,
+        658
       ],
-      "decoder_permille": 661,
+      "decoder_permille": 658,
       "units": 938,
-      "decode_stack_free": 11120,
+      "decode_stack_free": 11128,
       "via": "sendspin",
       "plays": 5,
       "glitched_plays": 0,
-      "burst_us": 21154,
+      "burst_us": 21045,
       "late": 0,
       "dropped": 0,
       "invalid": 0,
       "resyncs": 0,
-      "worst_error_us": -685,
-      "play_heap_free": 27968,
+      "worst_error_us": -612,
+      "play_heap_free": 53536,
       "ring_high": 36900,
       "stream_underruns": 0
+    },
+    "eac3-2.0-sendspin": {
+      "state": "finished",
+      "frames": 938,
+      "decoder_permille_samples": [
+        745,
+        741,
+        743,
+        742,
+        748
+      ],
+      "decoder_permille": 743,
+      "units": 938,
+      "decode_stack_free": 10888,
+      "via": "sendspin",
+      "plays": 5,
+      "glitched_plays": 1,
+      "burst_us": 23770,
+      "late": 0,
+      "dropped": 0,
+      "invalid": 0,
+      "resyncs": 2,
+      "worst_error_us": 480,
+      "play_heap_free": 6836,
+      "ring_high": 25288,
+      "stream_underruns": 2
     }
   },
   "findings": {},
   "boot_samples": {
     "internal_free": [
-      112448,
-      112108,
-      112460,
-      112100,
-      112216,
-      108792,
-      112556,
-      112428
+      134196,
+      140276,
+      136628,
+      136768,
+      139944,
+      136636,
+      140428,
+      140384
     ],
     "largest": [
-      90112,
-      90112,
-      90112,
-      92160,
-      92160,
-      88064,
-      96256,
-      96256
+      116736,
+      124928,
+      120832,
+      118784,
+      124928,
+      120832,
+      124928,
+      122880
     ]
   }
 }

@@ -84,16 +84,18 @@
       ]
     },
     "c6-16mb": {
-      "note": "The C6 refuses an HTTP play on purpose (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES, #1395): its /play rows are that refusal, clean, with no reboot. Its audio path is Sendspin, so the rows with via sendspin play the same two streams the way the product does: the repository's hearth-testserver pairs the board and sends them as bursts, and the board's sendspin.stream= line is read (tools/hearth/suite_sendspin.py). The AC-3 stream is the one row: the E-AC-3 stream is not in the list because the C6 does not play it reliably yet (planning/esp32-platform-profiles.md, 'Sendspin rows'): from a fresh boot it plays with 916 to 4,496 bytes of internal heap spare, and after an AC-3 stream in the same boot its Wi-Fi receive buffers fail to allocate and it ends late. The row to add when that is fixed is {\"id\": \"eac3-2.0-sendspin\", \"stream\": \"eac3-2.0\", \"via\": \"sendspin\"}, with a play_heap_free_bytes tolerance.",
+      "note": "The C6 refuses an HTTP play on purpose (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES, #1395): its /play rows are that refusal, clean, with no reboot. Its audio path is Sendspin, so the rows with via sendspin play the same two streams the way the product does: the repository's hearth-testserver pairs the board and sends them as bursts, and the board's sendspin.stream= line is read (tools/hearth/suite_sendspin.py). Both streams are rows, the AC-3 one first and the E-AC-3 one after it, as a user plays them. The E-AC-3 stream used to play with 916 to 4,496 bytes of internal heap spare and, after an AC-3 stream in the same boot, failed to allocate its Wi-Fi receive buffers and ended late (planning/esp32-platform-profiles.md, 'Sendspin rows'): the decoder's feature tables were 27,776 bytes of static RAM, and with them out of it the same plays leave 18,936 to 30,920 bytes at their least (6,836 once in 5, 26,788 the least of 3), against the AC-3 stream's 48,148 to 85,100.",
       "tolerance": {
         "largest_block_bytes": 12288,
-                "note": "The C6's boot figures are not one number: on 27 boots of the c6-16mb image (the C6, 2026-10-12) the largest internal block was 96,256 on twenty-one, 94,208 on four, 92,160 on one and 88,064 on one, against the S3's 31,744 on every boot, so the S3's 1,024 bytes would fail one boot in five; free RAM read 108,988 on one boot and 112,204 to 113,128 on the rest. The baseline is the worst of eight boots (--boots 8). Three 4 KB steps is the allowance on the largest block (twice the 8,192 seen); free RAM keeps the suite's 2,048 below that worst boot.",
-        "internal_free_bytes": 2048
+                "note": "The C6's boot figures are not one number: on 27 boots of the c6-16mb image (the C6, 2026-10-12) the largest internal block was 96,256 on twenty-one, 94,208 on four, 92,160 on one and 88,064 on one, against the S3's 31,744 on every boot, so the S3's 1,024 bytes would fail one boot in five; free RAM read 108,988 on one boot and 112,204 to 113,128 on the rest. With the decoder's feature tables out of static RAM (27,776 bytes, the image's DIRAM 144,139 to 116,307) the eight boots of the record read the largest block at 116,736 to 124,928 and free RAM at 134,196 to 140,428: the same spread of 8,192, 28 KB higher. The baseline is the worst of eight boots (--boots 8). Three 4 KB steps is the allowance on the largest block (twice the 8,192 seen); free RAM keeps the suite's 2,048 below that worst boot. The E-AC-3 row's least heap while it played is not one number either: 6,836 as the least of five plays, 18,936 to 30,920 on six single plays after AC-3 streams in the same boot, 26,788 as the least of three. 3,072 bytes under the baseline is the allowance: the failure this row is for left 916 to 4,496, and a play that took the room back would read there. The AC-3 row's reads 48,148 to 85,100 and has none.",
+        "internal_free_bytes": 2048,
+        "play_heap_free_bytes": {"eac3-2.0-sendspin": 3072}
       },
       "plays": [
         {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"},
         {"id": "eac3-2.0-refused", "stream": "eac3-2.0", "expect": "refused-memory"},
-        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"}
+        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"},
+        {"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"}
       ]
     },
     "c6-4mb": {
