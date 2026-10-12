@@ -3544,6 +3544,16 @@ The sections below contain the complete change list and fixes.
   twice the cap, and a valid 4 KB text of 2,000 one-digit values, which needed one 32 KB block,
   is refused at its 513th token with no block taken. A message over the cap is dropped as a
   malformed one is.
+- **A lyrics document left its receive buffers taken from a board's heap.** A session received
+  each frame into a buffer that kept the capacity of the largest message it had held, and a board's
+  WebSocket layer kept another for the ciphertext. An 8,000-byte lyrics document (one string token,
+  inside the cap) left 12.7 KB of an ESP32-S3's internal heap taken for the rest of the connection
+  (30.0 KB free during play down to 17.3 KB, Wi-Fi up). A JSON document above
+  `kRetainedMessageBytes` (4 KB) now has its buffers released: the channel's frame buffer and the
+  reassembler's with the next message, and the board's frame buffer when the session reports the
+  document (`SessionOutput::large_document`). A stream's chunks are binary and keep their buffer,
+  so an E-AC-3 chunk of up to 25 KB is still received into one allocation, as are the small
+  control messages between them.
 
 **Object signing**
 
