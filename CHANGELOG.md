@@ -29,6 +29,18 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth for Android: the plan**
+
+- **A plan, its findings and one screen design for Hearth's three surfaces.** `planning/hearth-android.md`
+  sets out a Sendspin sink app for Android TV that passes the coded stream through to the receiver as
+  the Shield demo does and shows the karaoke lyrics: the requirements, the component boundaries, the
+  project rules, fourteen decisions with a recommendation and a cost each, a phased plan with sizes,
+  the spikes that need a Shield and a receiver, and the questions for the owner.
+  `planning/hearth-android-findings.md` keeps what was read from the code apart from what is
+  not measured, and `planning/hearth-sink-screen.md` is the one design (model, screens, layout in
+  units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
+  are held to. Nothing is built.
+
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
 - **The desktop player plays AC-3, E-AC-3 and AC-4 from a container.** `hearth`'s file loader read
