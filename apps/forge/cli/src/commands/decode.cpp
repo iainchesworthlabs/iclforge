@@ -861,11 +861,6 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         status_println(status_stream(out_path), "  programme {} of {} ({})", *programme,
                        ids->size(), format_programme_ids(*ids));
     }
-    if (meta.output.karaoke != iclforge::ac3::KaraokeReproduction::kOff) {
-        // Annex C is AC-3's: the E-AC-3 decoder takes no karaoke flag from
-        // bsi, and its dependent-substream programmes have no karaoke layout.
-        fmt::println(stderr, "warning: the stream is E-AC-3: karaoke is AC-3's (Annex C), and ignored");
-    }
     std::vector<std::span<const std::byte>> associated_units;
     if (associated.has_value()) {
         const auto own = iclforge::ac3::split_access_units(stream, associated->id);
@@ -922,8 +917,12 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         // dual mono it takes the identity permutation rather than the
         // rendered layout's.
         if (unit.acmod != iclforge::ac3::Acmod::kDualMono && !folding(meta, unit.acmod)) {
-            const auto placed = std::span{unit.layout.items}.first(
-                static_cast<std::size_t>(unit.layout.count));
+            // Annex C's reproduction replaces the coded layout with L, C, R and the LFE, and
+            // DecodedAccessUnit::layout still names the bed, as it does under a fold: the
+            // permutation and the mask are those of the layout the channels are in.
+            const auto channels_layout = reproduced_layout(meta.output, unit);
+            const auto placed = std::span{channels_layout.items}.first(
+                static_cast<std::size_t>(channels_layout.count));
             order = plan::wav_order(placed);
             std::vector<iclforge::ac3::eac3::chanmap::Location> in_wav_order;
             in_wav_order.reserve(order.size());
@@ -1391,11 +1390,13 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
     // The same WAV speaker order the encode side reads a file in, so a stream
     // decoded here and re-encoded lands every channel back where it started -
     // recomputed here only for the speaker-name report; the sink applied it.
+    const bool karaoke_applied = karaoke_reproduced(meta.output, first);
+    const auto heard_layout = reproduced_layout(meta.output, first);
     const auto map = plan::wav_order(
-        std::span{first.layout.items}.first(static_cast<std::size_t>(first.layout.count)));
+        std::span{heard_layout.items}.first(static_cast<std::size_t>(heard_layout.count)));
     std::string speakers;
     for (const auto index : map) {
-        speakers += iclforge::ac3::eac3::chanmap::name(first.layout[static_cast<int>(index)]);
+        speakers += iclforge::ac3::eac3::chanmap::name(heard_layout[static_cast<int>(index)]);
         speakers += ' ';
     }
     status_println(status, "decoded {} E-AC-3 access units ({} substreams each) -> {}",
@@ -1411,6 +1412,10 @@ int run_decode_eac3(std::span<const std::byte> stream, std::string_view out_path
         status_println(status, "  {} channels, {} Hz: {}", map.size(),
                        sample_rate_hz(first.sample_rate), speakers);
     }
+    // The reproduction (applied to E-AC-3 as Dolby's decoder does: planning/karaoke-eac3.md) or
+    // why there was none, in the words an AC-3 stream gets.
+    report_karaoke(status, meta.output, first, folding(meta, first.acmod), karaoke_applied,
+                   "decoded");
     print_drc_summary(status, dynrng_min_db, dynrng_max_db, compr_min_db, compr_max_db,
                       compr_frames, meta);
     if (first.info.has_value()) {

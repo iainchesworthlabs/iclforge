@@ -1711,12 +1711,8 @@ int run_spdif(std::string_view in_path, std::string_view out_path, const Options
         return kExitInput;
     }
     const bool eac3 = *bsid > 8;
-    if (eac3) {
-        warn_karaoke_not_ac3(meta, "E-AC-3");
-    } else {
-        warn_karaoke_not_applied(meta, "spdif",
-                                 "it wraps the coded stream in IEC 61937 bursts without decoding it");
-    }
+    warn_karaoke_not_applied(meta, "spdif",
+                             "it wraps the coded stream in IEC 61937 bursts without decoding it");
 
     // One programme goes into the carrier, never the stream's programmes one
     // burst each - the choice 'play' makes for the same receiver, so the WAV

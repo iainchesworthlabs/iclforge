@@ -294,9 +294,9 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
     std::optional<iclforge::apps::AssociatedChoice> associated;
     std::vector<std::span<const std::byte>> associated_units;
     if (access_units) {
-        // Annex C is AC-3's: the E-AC-3 decoder takes no karaoke flag from bsi,
-        // so the choice is read and not applied (decode says the same).
-        warn_karaoke_not_ac3(meta, "E-AC-3");
+        // The E-AC-3 decoder reproduces a karaoke programme as AC-3's does where the programme is
+        // one independent substream (planning/karaoke-eac3.md); `decode` reports it in the same
+        // words, from the first unit played below.
         auto chosen = select_programme_units(stream, meta.programme, in_path);
         if (!chosen.has_value()) {
             return chosen.error();
@@ -441,9 +441,12 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
                         order[i] = i;
                     }
                 } else {
-                    order = plan::monitor_order(std::span{out.layout.items}.first(
-                                                    static_cast<std::size_t>(out.layout.count)),
-                                                out.channels.size());
+                    // Annex C's reproduction leaves L, C, R and the LFE in the first slots, and
+                    // `layout` still names the coded bed (as it does under a fold).
+                    const auto heard = reproduced_layout(output, out);
+                    order = plan::monitor_order(
+                        std::span{heard.items}.first(static_cast<std::size_t>(heard.count)),
+                        out.channels.size());
                 }
                 const auto started = sink.start(device_id, sample_rate_hz(out.sample_rate),
                                                 static_cast<std::uint16_t>(order.size()));
@@ -454,6 +457,8 @@ int run_monitor(std::string_view in_path, int device_index, const Options& meta)
                 status_println(status_stream(), "monitoring {} ({} channels, {} Hz) on \"{}\"…",
                                in_path, order.size(), sample_rate_hz(out.sample_rate),
                                device_name);
+                report_karaoke(status_stream(), output, out, folded, karaoke_reproduced(output, out),
+                               "played");
                 if (mix.has_value()) {
                     status_println(status_stream(), "  mixing {} into programme {}",
                                    describe_associated(mix->choice()), mix->main_programme());
@@ -751,8 +756,8 @@ int run_spatial(std::string_view in_path, int device_index, const Options& meta)
     report_programme(status_stream(), *selected);
     warn_associated_not_mixed(meta, "spatial",
                               "it places one programme's objects and has no second programme to mix");
-    // spatial reads E-AC-3 (a legacy core included), and Annex C is AC-3's.
-    warn_karaoke_not_ac3(meta, "E-AC-3");
+    // spatial places an E-AC-3 stream's objects and decodes no karaoke bed.
+    warn_karaoke_not_spatial(meta);
 
     std::string device_id;
     std::string device_name = "default endpoint";

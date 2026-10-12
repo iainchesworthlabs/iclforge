@@ -627,7 +627,7 @@ matrix comes from the stream's own `cmixlev`/`surmixlev` or `mixmdate` levels, a
 normalisation means the fold can never be louder than the loudest coded sample. `mix-lfe` folds
 the LFE in as well — §7.8 makes that optional and this decoder drops it by default.
 
-`karaoke` (or `karaoke=on`) decodes an AC-3 **karaoke** stream - `bsmod` 7 with an `acmod` above
+`karaoke` (or `karaoke=on`) decodes an AC-3 or E-AC-3 **karaoke** stream - `bsmod` 7 with an `acmod` above
 1/0 (Annex C, informative) - the way a karaoke-aware decoder with three outputs does. Such a
 stream carries L and R (the music), a guide melody M where a centre would be, and one or two
 vocal channels V1 and V2 where the surrounds would be (3/0 is L M R, 2/1 is L R V1, 3/1 is
@@ -640,8 +640,21 @@ and a 2/0 one has nothing but L and R, so both decode as coded. At `channels=2` 
 the stereo or mono fold *is* Annex C's 2/0 reproduction - "any AC-3 decoder will produce the
 appropriate output if it is set to perform an Lo, Ro 2-channel downmix" - so `karaoke` changes
 nothing there, and `downmix=ltrt` is refused, since Annex C has no Lt/Rt. A stream that is not
-karaoke is decoded as coded and the report says so; E-AC-3 and AC-4 streams warn and ignore the
-option. `monitor` takes it too and plays the same reproduction on the output (see below).
+karaoke is decoded as coded and the report says so; an AC-4 stream warns and ignores the option.
+`monitor` takes it too and plays the same reproduction on the output (see below).
+
+An **E-AC-3** karaoke stream is reproduced the same way. A/52 carries its signalling field for
+field - `bsmod` in `infomdate` (Table E1.2), read as Table 5.7 reads it - and defines no
+reproduction for it; Dolby's decoder applies Annex C's to an E-AC-3 stream as it does to an AC-3
+one, and this decoder does what it does, for a programme that is **one independent substream**
+with no object layer. The vocals sit at the stream's Lo/Ro surround level, `lorosurmixlev` of
+`mixmdate` (an E-AC-3 `bsi` has no `surmixlev`), and the melody at `lorocmixlev` in the 2/0 form;
+where the stream sends no `mixmdate` both are -3 dB, which is what Dolby's decoder used. A
+programme with a dependent substream (Annex E gives a dependent's channel map no vocal), or with
+an object layer, is decoded as coded and the report says why. This reproduction is this
+project's by analogy with Annex C and by that decoder; a player built on FFmpeg flags the stream
+as karaoke and plays the vocals from the surround channels, as it does an AC-3 one
+(`planning/karaoke-eac3-findings.md` has the clauses and the measurements).
 
 `karaoke=none|v1|v2|v1+v2` is the karaoke-*capable* decoder (C.2.3.2, Table C.2.3): the same
 reproduction with the listener choosing which vocals are heard rather than the stream's own
@@ -684,8 +697,8 @@ The report says which. `downmix=ltrt` is refused with `karaoke` here as it is by
 `play` applies the choice where it decodes, which is its PCM fallback for an output that takes no
 bitstream. Its bitstream legs, and `spdif`, hand the coded stream on without decoding it, so a
 receiver reproduces it (as coded unless it is karaoke-capable): they accept `karaoke` and say, on
-stderr, that it is not applied. `spatial` places an E-AC-3 stream's objects and says that
-karaoke is AC-3's.
+stderr, that it is not applied. `spatial` places an E-AC-3 stream's objects, has no karaoke bed to
+reproduce, and says so.
 
 `downmix=auto` lets the stream choose between the two stereo folds, the third option A/52
 §D3.1.1 describes. The stream's preference is its `dmixmod` (Table D2.2): in AC-3's Annex D

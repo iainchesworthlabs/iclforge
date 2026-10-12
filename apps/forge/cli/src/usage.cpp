@@ -52,7 +52,7 @@ constexpr std::array<OptionToken, 109> kOptionTokens{{
     {"gate-objects", "play objects only where the EMDF signature verifies, the bed elsewhere"},
     {"mix-lfe", "decode/monitor: fold the LFE into the §7.8 output-stage downmix too"},
     {"mix-lfe=", "decode/monitor: on, or off to keep the LFE out of a downmix, as AC-4's is not by default"},
-    {"karaoke", "decode/monitor: an AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R; "
+    {"karaoke", "decode/monitor: an AC-3 or E-AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R; "
                 "play, spdif and spatial hand the stream on and say it is not applied"},
     {"karaoke=", "decode/monitor: on or aware; none, v1, v2 or v1+v2 for the karaoke-capable decoder's vocals; off (the default)"},
     {"karaoke-melody=", "decode/monitor: the capable decoder's guide melody level against Table C.2.3, -24 (off) to 12 dB (default 0)"},
@@ -456,7 +456,8 @@ void print_decode_topic() {
     fmt::println("       command; monitor also folds on its own initiative when the output");
     fmt::println("       endpoint renders fewer channels than the programme.");
     fmt::println("");
-    fmt::println("decode and monitor take karaoke (or karaoke=on) for an AC-3 karaoke stream,");
+    fmt::println("decode and monitor take karaoke (or karaoke=on) for an AC-3 or E-AC-3 karaoke");
+    fmt::println("       stream,");
     fmt::println("       bsmod 7 with an acmod above 1/0 (Annex C): it writes what a");
     fmt::println("       karaoke-aware multi-channel decoder reproduces - L, C, R (and the LFE) -");
     fmt::println("       with the guide melody M in the centre and the vocals V1, V2 mixed at");
@@ -476,11 +477,17 @@ void print_decode_topic() {
     fmt::println("       Raising a part far enough lowers the others, so that no output's sum");
     fmt::println("       passes 1. They need a choice of vocals: with karaoke bare or off they");
     fmt::println("       move nothing, and are refused.");
+    fmt::println("       An E-AC-3 stream is reproduced the same way when it is one independent");
+    fmt::println("       substream: A/52 gives E-AC-3 the signalling and no reproduction, and");
+    fmt::println("       Dolby's decoder applies Annex C's to it, so this one does, at the stream's");
+    fmt::println("       Lo/Ro levels (mixmdate's, -3 dB where it sends none). One with a dependent");
+    fmt::println("       substream or an object layer is decoded as coded, and the report says so.");
     fmt::println("       monitor plays the same reproduction on its output (L, C, R when the");
     fmt::println("       device is wide enough, the 2/0 form when it folds); play does where it");
-    fmt::println("       decodes, which is its PCM fallback. spdif, play's bitstream legs and");
-    fmt::println("       spatial hand the coded stream on and say karaoke is not applied: a");
-    fmt::println("       receiver reproduces it, as coded unless it is karaoke-capable.");
+    fmt::println("       decodes, which is its PCM fallback. spdif and play's bitstream legs hand");
+    fmt::println("       the coded stream on and say karaoke is not applied: a receiver");
+    fmt::println("       reproduces it, as coded unless it is karaoke-capable. spatial places an");
+    fmt::println("       E-AC-3 stream's objects, has no karaoke bed, and says so.");
 }
 
 void print_ac4_decode_topic() {

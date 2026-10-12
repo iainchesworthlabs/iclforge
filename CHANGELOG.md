@@ -74,6 +74,18 @@ The sections below contain the complete change list and fixes.
   reproduction; `ac3::output_mode()` says what it is. The CLI, Hearth, the GUI, the WebAssembly
   glue and the firmware read it in the pull requests that follow
   (`planning/karaoke-eac3.md`, E2, D1 to D3).
+- **`forge decode` and `forge monitor` reproduce an E-AC-3 karaoke stream.** `karaoke` and
+  `karaoke=none|v1|v2|v1+v2` (and the levels) take effect on an E-AC-3 programme that is one
+  independent substream, writing L, C, R and the LFE with the mask FL FR FC LFE, and saying which
+  reproduction and which level the report used; they warned "karaoke is AC-3's, and ignored"
+  before. A programme with a dependent substream is decoded as coded and the report says why.
+  `spdif` and `play` say what they say for AC-3 (a receiver reproduces it), and `spatial` says it
+  places objects and has no karaoke bed. The held-back last unit of a reproduced stream is written
+  at the same channel count as the rest.
+- **`forge transcode` carries the service type.** A karaoke, voice-over or associated-service stream
+  transcoded between AC-3 and E-AC-3 used to come out `bsmod` 0, "complete main", with the vocals
+  still in the surrounds and no flag; it keeps its `bsmod` (E-AC-3 writes it in the informational
+  group), and `bsmod=` still names another one (`planning/karaoke-eac3.md`, E3).
 
 **E-AC-3: an associated service mixed into the main**
 
