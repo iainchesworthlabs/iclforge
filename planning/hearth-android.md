@@ -241,7 +241,7 @@ an Onkyo TX-RZ740 on HDMI. The questions below ask what is there now.
 
 | Who | About | State |
 |---|---|---|
-| "Karaoke support on P4X" (dab81f) | One screen spec; the panel column; `Stage`; the request path | Agreed 2026-10-12: one document ([hearth-sink-screen.md](hearth-sink-screen.md)), written here, reviewed by them. Their `Stage` (W12a) and plan are on their branch; asked to push the library part |
+| "Karaoke support on P4X" (dab81f) | One screen spec; the panel column; `Stage`; the request path | Agreed 2026-10-12: one document ([hearth-sink-screen.md](hearth-sink-screen.md)), written here, reviewed by them; they accept the pins, 70% for the board's sung line, the narrowed viewing distances and the unshowable-script sentence. Their `Stage` (W12a, one commit on their branch, 13 host cases) waits for the owner's go-ahead to become a PR; they will say the number. Their role-state keys wait for D6 |
 | "Karaoke lyrics verification and testing" (8996e5) | The Network page's view of a board's lyric support and line; whether an Android sink's `lyrics` state shows there | Asked |
 | "Crucible media session and CD+G" (a533fc) | Does a sink get a CD+G picture; the shared `CdgPicture` project's shape | Asked: options in [findings F10](hearth-android-findings.md#f10-cdg-and-a-sink) |
 | "Karaoke microphone, scoring and recording programme" (532be3) | A phone as the singer's microphone is an Android app of its own with a sink's discovery; the two share `NsdManager` and the pairing | Noted to them |

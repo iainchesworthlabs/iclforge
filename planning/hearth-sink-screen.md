@@ -7,7 +7,8 @@
     the panel's column is the P4X session's ("Karaoke support on P4X"), who owns what the panel
     draws and reviews this page, and whose built design this page takes as its starting point
     (their plan, `planning/karaoke-p4x-panel.md`, and its screens, are on the branch
-    `feature/karaoke-p4x-support` and not yet on `main`). Nothing here changes what the desktop
+    `feature/karaoke-p4x-support` and not yet on `main`). On 2026-10-12 they agreed the pins, the
+    narrowed viewing distances, the script rule and 70% for the board's sung line, as marked below. Nothing here changes what the desktop
     draws today: where this page and the desktop differ, [the table below](#what-the-three-do-today)
     says which side moves.
 
@@ -114,8 +115,9 @@ that fit a row is the same on every surface**, which is why the length rule belo
 600└──────────────────────────────────────────────────────────────┘
 ```
 
-The current line's size is chosen by its length in characters, the panel's rule, which this page
-adopts for all three: **up to 18 characters 72u, up to 36 64u, up to 44 56u, up to 54 48u, longer
+The current line's size is chosen by its length in characters, the panel's rule (the heuristic of
+`current_size()` in its `lyric_screen.cpp`, not a measurement per line), which this page adopts
+for all three: **up to 18 characters 72u, up to 36 64u, up to 44 56u, up to 54 48u, longer
 40u, and at most two rows**. The line is never scrolled; a word wider than the stage is cut at the
 margin and the footer says so. Context lines are 36u (past) and 40u (next); header and footer
 text 24u; **the smallest touch or focus target is 72u** (the panel's 72 px; the TV's D-pad focus
@@ -182,7 +184,7 @@ Each is a rule every renderer keeps and each has a fixture ([conformance](#confo
 | SS2 | **Colour is never the only cue.** The word being sung is underlined; a duet's singer is told by name and by side; the line the singer sings is said as "you", the guide as "guide" |
 | SS3 | **No word times are invented.** A line-timed file shows whole lines; a plain file is shown whole and not followed |
 | SS4 | **Direction belongs to the line.** The base direction is the line's first strong letter, not the UI language; word order, alignment and the fill's direction follow it; a duet's indent is from the line's start edge |
-| SS5 | **A script a surface cannot draw is said, not drawn as boxes.** A line it cannot draw is replaced by the sentence "This screen cannot show this script" and the title and the clock go on |
+| SS5 | **A script a surface cannot draw is said, not drawn as boxes.** A line it cannot draw is replaced by the sentence **"This line is in a script this screen cannot show."**; a title in such a script gets the same sentence or nothing; the sink's name, the footer and the clock always show. Detection is a code-point class test beside the library's right-to-left test (the P4X session builds it) |
 | SS6 | **The clock is the sink's own,** the playhead from the server's anchors, with the person's **lyric delay** (−1,000 to +1,000 ms in 50 ms steps, kept per sink, drawn in the footer when not 0) |
 | SS7 | **A karaoke choice the sink cannot apply is shown as not applied.** On a passed-through stream the vocals chip reads "as coded", not "V1" |
 | SS8 | **Text size is the person's.** S, M and L scale every `u` size; nothing is a literal pixel size |
@@ -222,9 +224,11 @@ Scripts, by tier, so SS5 has something to test against:
 Two things the angular figures say. On a TV, `u` can be **smaller** and still read: the length rule
 is in characters, so the stage could hold more context lines (the table's "+ 1 more on a TV"). On
 the panel the **current line is readable at 2 m only just, and the context lines are not** by the
-usual 0.25° rule of thumb for text of a reading size; its own plan says "arm's length to about
-two metres". That is a statement about the screen's use that the panel's owner should confirm or
-narrow, not a defect in the layout.
+usual 0.25° rule of thumb for text of a reading size; its own plan said "arm's length to about
+two metres". The P4X session agreed on 2026-10-12 to narrow it, from its own arithmetic (a 9.7 mm
+em, 0.28° at 2 m): **the current line to about 2 m, the context lines to about 1 m, the header and
+footer within arm's length.** That is a statement about the screen's use, not a defect in the
+layout.
 
 ## Conformance
 
@@ -250,11 +254,11 @@ they are checked in beside the fixture so a renderer's test and the library's ag
 
 | # | Item | Whose |
 |---|---|---|
-| 1 | The sung line's opacity: 55% (today, 2.61:1) or 70% (3.51:1) | Owner; the P4X session |
+| 1 | The sung line's opacity: 55% (today, 2.61:1) or 70% (3.51:1). **The P4X session accepts 70% for the board (one number in `lyric_screen.cpp`)**; the desktop's `0.55` and the TV's choice are the owner's | Owner |
 | 2 | The count-in on the desktop and the TV | Owner (a change to the signed-off desktop design) |
-| 3 | SS5's sentence, and whether the panel shows a title for a line it cannot draw | P4X session |
-| 4 | The viewing distance the panel is designed for | P4X session |
-| 5 | `format` and `route` in the role's state, for the panel's footer | The plan's D6; P4X session |
+| 3 | SS5's sentence and the title rule: **agreed with the P4X session 2026-10-12**; the sentence is pinned in SS5 above | Settled |
+| 4 | The viewing distance the panel is designed for: **narrowed, as stated above, 2026-10-12** | Settled |
+| 5 | `format` and `route` in the role's state, for the panel's footer. The P4X session will draw them when they exist on `main` | The plan's D6 |
 | 6 | A request path from a sink to the server for the vocals and the reproduction | The plan's D8; a protocol PR, shared with the panel's Q6 |
 | 7 | Where tokens live: one file generating QML, Kotlin and a C header, or this page only | The plan's D13 |
 | 8 | Where `title` and `artist` come from for an item with no lyric document | The plan's D7 |
