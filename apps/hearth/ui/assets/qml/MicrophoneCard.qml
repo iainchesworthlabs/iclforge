@@ -435,9 +435,69 @@ Card {
         objectName: "microphoneScoreNote"
         Layout.fillWidth: true
         visible: root.on && MicrophoneController.referenceStatus === "ready"
-        text: qsTr("It counts how much of the tune's time your pitch was within a semitone of it, "
+        text: qsTr("It counts how much of the tune's time your pitch was within %1 cents of it, "
                    + "in any octave. It hears pitch only, not timing, words or feeling.")
+              .arg(MicrophoneController.toleranceCents)
         color: Theme.textMuted
+        font.pixelSize: Theme.fontSmall
+        wrapMode: Text.WordWrap
+    }
+
+    // --- how strictly, and against whose key ---------------------------------------------------
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: Theme.gap
+        Text {
+            text: qsTr("How close counts")
+            color: Theme.text
+            font.pixelSize: Theme.fontNormal
+            Layout.preferredWidth: root.labelWidth
+        }
+        AppComboBox {
+            id: toleranceBox
+            objectName: "microphoneTolerance"
+            Layout.fillWidth: true
+            model: [
+                { cents: 50, name: qsTr("Close: within half a semitone (50 cents)") },
+                { cents: 100, name: qsTr("A semitone (100 cents)") },
+                { cents: 200, name: qsTr("Loose: within a whole tone (200 cents)") }
+            ]
+            textRole: "name"
+            valueRole: "cents"
+            Accessible.name: qsTr("How close your pitch must be to the tune to count")
+            function sync() {
+                const index = indexOfValue(MicrophoneController.toleranceCents);
+                currentIndex = index >= 0 ? index : 1;
+            }
+            Component.onCompleted: sync()
+            onActivated: MicrophoneController.toleranceCents = currentValue
+            Connections {
+                target: MicrophoneController
+                function onToleranceChanged() { toleranceBox.sync(); }
+            }
+        }
+    }
+    AppCheckBox {
+        objectName: "microphoneOwnKey"
+        Layout.fillWidth: true
+        text: qsTr("Score against my key")
+        note: qsTr("If you sing the whole song a little sharp or flat of the tune, judge the shape of "
+                   + "your melody instead: your own key is taken from your first sung notes and "
+                   + "allowed for. It is off each time Hearth starts, and the card says when it is "
+                   + "in use.")
+        checked: MicrophoneController.ownKey
+        onToggled: function(on) { MicrophoneController.ownKey = on; }
+    }
+    Text {
+        objectName: "microphoneOwnKeyInUse"
+        Layout.fillWidth: true
+        visible: MicrophoneController.ownKey
+        text: MicrophoneController.keyShiftCents === 0
+              ? qsTr("Waiting for a few sung notes to find your key.")
+              : qsTr("Scored against your key: you are about %1 cents %2 the tune's, and that is allowed for.")
+                    .arg(Math.round(Math.abs(MicrophoneController.keyShiftCents)))
+                    .arg(MicrophoneController.keyShiftCents > 0 ? qsTr("sharp of") : qsTr("flat of"))
+        color: Theme.text
         font.pixelSize: Theme.fontSmall
         wrapMode: Text.WordWrap
     }
@@ -487,9 +547,15 @@ Card {
         Text {
             objectName: "microphoneSummaryBasis"
             Layout.fillWidth: true
-            text: qsTr("Compared with %1, within %2 cents, in any octave. Lines the tune has no notes "
-                       + "in were not scored. It is shown here and kept nowhere.")
-                  .arg(root.lastPerformance.reference ?? "").arg(Math.round(root.lastPerformance.toleranceCents ?? 100))
+            text: qsTr("Compared with %1, within %2 cents, in any octave%3. Lines the tune has no "
+                       + "notes in were not scored. It is shown here and kept nowhere.")
+                  .arg(root.lastPerformance.reference ?? "")
+                  .arg(Math.round(root.lastPerformance.toleranceCents ?? 100))
+                  .arg(root.lastPerformance.ownKey === true
+                       ? qsTr(", against your own key (about %1 cents %2 the tune's)")
+                             .arg(Math.round(Math.abs(root.lastPerformance.keyShiftCents ?? 0)))
+                             .arg((root.lastPerformance.keyShiftCents ?? 0) > 0 ? qsTr("sharp of") : qsTr("flat of"))
+                       : "")
             color: Theme.textMuted
             font.pixelSize: Theme.fontSmall
             wrapMode: Text.WordWrap

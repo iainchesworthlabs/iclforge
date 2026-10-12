@@ -2848,62 +2848,124 @@
     </message>
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="438"/>
-        <source>It counts how much of the tune&apos;s time your pitch was within a semitone of it, in any octave. It hears pitch only, not timing, words or feeling.</source>
+        <source>It counts how much of the tune&apos;s time your pitch was within %1 cents of it, in any octave. It hears pitch only, not timing, words or feeling.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="455"/>
-        <source>Last performance</source>
+        <location filename="../qml/MicrophoneCard.qml" line="451"/>
+        <source>How close counts</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="461"/>
+        <source>Close: within half a semitone (50 cents)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="462"/>
+        <source>A semitone (100 cents)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="463"/>
+        <source>Loose: within a whole tone (200 cents)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="467"/>
+        <source>How close your pitch must be to the tune to count</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="483"/>
+        <source>Score against my key</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="484"/>
+        <source>If you sing the whole song a little sharp or flat of the tune, judge the shape of your melody instead: your own key is taken from your first sung notes and allowed for. It is off each time Hearth starts, and the card says when it is in use.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="496"/>
+        <source>Waiting for a few sung notes to find your key.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="497"/>
+        <source>Scored against your key: you are about %1 cents %2 the tune&apos;s, and that is allowed for.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="499"/>
+        <location filename="../qml/MicrophoneCard.qml" line="557"/>
+        <source>sharp of</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="499"/>
+        <location filename="../qml/MicrophoneCard.qml" line="557"/>
+        <source>flat of</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="550"/>
+        <source>Compared with %1, within %2 cents, in any octave%3. Lines the tune has no notes in were not scored. It is shown here and kept nowhere.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="555"/>
+        <source>, against your own key (about %1 cents %2 the tune&apos;s)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="515"/>
+        <source>Last performance</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/MicrophoneCard.qml" line="523"/>
         <source>Pitch score: %1 %</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="472"/>
+        <location filename="../qml/MicrophoneCard.qml" line="532"/>
         <source>You sang for %1 % of the tune&apos;s voiced time.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="475"/>
+        <location filename="../qml/MicrophoneCard.qml" line="535"/>
         <source>On average you were %1.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="490"/>
-        <source>Compared with %1, within %2 cents, in any octave. Lines the tune has no notes in were not scored. It is shown here and kept nowhere.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MicrophoneCard.qml" line="504"/>
+        <location filename="../qml/MicrophoneCard.qml" line="570"/>
         <source>Microphone delay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="519"/>
+        <location filename="../qml/MicrophoneCard.qml" line="585"/>
         <source>Microphone delay, milliseconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="528"/>
-        <location filename="../qml/MicrophoneCard.qml" line="563"/>
+        <location filename="../qml/MicrophoneCard.qml" line="594"/>
+        <location filename="../qml/MicrophoneCard.qml" line="629"/>
         <source>%1 ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="539"/>
+        <location filename="../qml/MicrophoneCard.qml" line="605"/>
         <source>Move your timing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="554"/>
+        <location filename="../qml/MicrophoneCard.qml" line="620"/>
         <source>Move your timing, milliseconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="572"/>
+        <location filename="../qml/MicrophoneCard.qml" line="638"/>
         <source>A microphone&apos;s sound reaches the program a little after it was sung, and some take a tenth of a second or more. If you are told you are behind the tune when you are not, raise the delay.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5574,27 +5636,27 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::MicrophoneController</name>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="318"/>
+        <location filename="../../src/microphone_controller.cpp" line="393"/>
         <source>Turn the microphone on first.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="484"/>
+        <location filename="../../src/microphone_controller.cpp" line="560"/>
         <source>Nothing is playing.</source>
         <translation type="unfinished">Rien n&apos;est en cours de lecture.</translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="491"/>
+        <location filename="../../src/microphone_controller.cpp" line="567"/>
         <source>Reading the melody…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="567"/>
+        <location filename="../../src/microphone_controller.cpp" line="648"/>
         <source>The microphone went away. Plug it in again and turn it back on.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="571"/>
+        <location filename="../../src/microphone_controller.cpp" line="652"/>
         <source>The microphone stopped delivering audio. It may have been disconnected.</source>
         <translation type="unfinished"></translation>
     </message>
