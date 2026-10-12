@@ -446,19 +446,11 @@ std::vector<std::vector<std::byte>> karaoke_units(int frames) {
     return reported[reported.size() / 2];
 }
 
-}  // namespace
-
-TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that decodes it",
-          "[.][hearth-network-live]") {
-    const std::optional<std::string> named = environment("ICLFORGE_HEARTH_LIVE_KARAOKE_SINK");
-    if (!named) {
-        SKIP("ICLFORGE_HEARTH_LIVE_KARAOKE_SINK names no sink");
-    }
-    const std::string id = *named;
-    const int seconds = environment("ICLFORGE_HEARTH_LIVE_SECONDS")
-                            ? std::atoi(environment("ICLFORGE_HEARTH_LIVE_SECONDS")->c_str())
-                            : 10;
-    REQUIRE(seconds > 0);
+// The body of both karaoke cases below: the programme `make_units` makes, of the codec `type`, played to
+// the sink named `id` for `seconds` once per reproduction.
+void live_karaoke(const std::string& id, int seconds,
+                  const std::function<std::vector<std::vector<std::byte>>(int)>& make_units,
+                  iclforge::sendspin::player::DataType type) {
 
     iclforge::hearth::MemorySettingsStore settings;
     iclforge::hearth::PairingStore store{settings, [] { return std::string("live"); }};
@@ -525,6 +517,10 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
     }
     const std::size_t outputs = static_cast<std::size_t>(support_facts.iclforge_support->outputs.count);
     REQUIRE(outputs >= 3);
+    // The board says it reproduces karaoke for this codec: a sink that lists none is taken for
+    // AC-3's alone (planning/karaoke-eac3.md, D6), and one that lists the codec is sent the stream
+    // as it is, which is what this case is about.
+    REQUIRE(support_facts.iclforge_support->reproduces_karaoke(type));
 
     // A 3.0 layout, so that the board does not fold and lays out from the reproduction.
     const auto layout = iclforge::render::OutputLayout::parse("3.0");
@@ -548,7 +544,7 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
     sinks.add_group_member(group_id, id);
 
     const int frames = seconds * 48000 / 1536;
-    const std::vector<std::vector<std::byte>> units = karaoke_units(frames);
+    const std::vector<std::vector<std::byte>> units = make_units(frames);
     std::vector<std::byte> programme;
     for (const auto& unit : units) {
         programme.insert(programme.end(), unit.begin(), unit.end());
@@ -695,6 +691,72 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
         moved = std::max(moved, std::abs(board_results[0][slot] - board_results[1][slot]));
     }
     CHECK(moved > 1.0);
+}
+
+// An E-AC-3 programme of the same five tones and LFE: one independent substream flagged karaoke,
+// which a board that lists `eac3` among its karaoke codecs reproduces itself
+// (planning/karaoke-eac3.md, E4b).
+std::vector<std::vector<std::byte>> eac3_karaoke_units(int frames) {
+    iclforge::ac3::eac3::FrameConfig bed;
+    bed.sample_rate = iclforge::ac3::SampleRate::k48000;
+    bed.bitrate_kbps = 448;
+    bed.acmod = iclforge::ac3::Acmod::k3_2;
+    bed.lfe = true;
+    bed.info = iclforge::ac3::meta::BsiInfo{.bsmod = iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke};
+    iclforge::ac3::eac3::AccessUnitConfig config;
+    config.independent = bed;
+    iclforge::ac3::eac3::AccessUnitEncoder encoder{config};
+    constexpr std::array<double, 6> kHz = {440.0, 800.0, 620.0, 1030.0, 1270.0, 90.0};
+    constexpr std::array<double, 6> kLevel = {0.20, 0.10, 0.20, 0.25, 0.15, 0.10};
+    std::vector<std::vector<std::byte>> units;
+    for (int f = 0; f < frames; ++f) {
+        std::vector<std::vector<float>> by_channel;
+        for (int channel = 0; channel < encoder.channel_count(); ++channel) {
+            std::vector<float> samples(iclforge::ac3::kSamplesPerFrame);
+            for (std::size_t n = 0; n < samples.size(); ++n) {
+                const double t = static_cast<double>(n + (static_cast<std::size_t>(f) * 1536)) / 48000.0;
+                samples[n] = static_cast<float>(
+                    kLevel[static_cast<std::size_t>(channel)] *
+                    std::sin(2.0 * std::numbers::pi * kHz[static_cast<std::size_t>(channel)] * t));
+            }
+            by_channel.push_back(std::move(samples));
+        }
+        const std::vector<std::span<const float>> views(by_channel.begin(), by_channel.end());
+        const auto unit = encoder.encode_access_unit(views);
+        REQUIRE(unit.has_value());
+        units.emplace_back(unit->bytes.begin(), unit->bytes.end());
+    }
+    return units;
+}
+
+[[nodiscard]] int live_seconds() {
+    return environment("ICLFORGE_HEARTH_LIVE_SECONDS")
+               ? std::atoi(environment("ICLFORGE_HEARTH_LIVE_SECONDS")->c_str())
+               : 10;
+}
+
+}  // namespace
+
+TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that decodes it",
+          "[.][hearth-network-live]") {
+    const std::optional<std::string> named = environment("ICLFORGE_HEARTH_LIVE_KARAOKE_SINK");
+    if (!named) {
+        SKIP("ICLFORGE_HEARTH_LIVE_KARAOKE_SINK names no sink");
+    }
+    const int seconds = live_seconds();
+    REQUIRE(seconds > 0);
+    live_karaoke(*named, seconds, karaoke_units, iclforge::sendspin::player::DataType::kAc3);
+}
+
+TEST_CASE("network sinks live: an E-AC-3 karaoke stream is reproduced by the board that decodes it",
+          "[.][hearth-network-live]") {
+    const std::optional<std::string> named = environment("ICLFORGE_HEARTH_LIVE_KARAOKE_SINK");
+    if (!named) {
+        SKIP("ICLFORGE_HEARTH_LIVE_KARAOKE_SINK names no sink");
+    }
+    const int seconds = live_seconds();
+    REQUIRE(seconds > 0);
+    live_karaoke(*named, seconds, eac3_karaoke_units, iclforge::sendspin::player::DataType::kEac3);
 }
 
 // ---- the lyrics of an item on a board that holds them --------------------------------------------

@@ -220,6 +220,12 @@ bool g_board_changed = false;
             static_cast<std::uint8_t>(kMaxObjects);
     }
     s.lyrics_max_bytes = kLyricsMaxBytes;
+    // The codecs it reproduces karaoke for when told to (the `karaoke` setting): every one it
+    // decodes. burst_player.cpp lays a karaoke AC-3 syncframe and an E-AC-3 programme of one
+    // independent substream out from the reproduction alike, so a server sends either as it is
+    // (planning/karaoke-eac3.md, D6); a board that said nothing here would be taken for AC-3's
+    // alone.
+    s.karaoke_codecs = s.data_types;
     return s;
 }
 
