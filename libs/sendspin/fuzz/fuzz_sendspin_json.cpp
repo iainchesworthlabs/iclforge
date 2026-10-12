@@ -22,10 +22,14 @@
 
 namespace {
 
+using iclforge::sendspin::json::count_tokens;
 using iclforge::sendspin::json::Document;
 using iclforge::sendspin::json::Error;
 using iclforge::sendspin::json::Limits;
+using iclforge::sendspin::json::ParseResult;
 using iclforge::sendspin::json::Token;
+using iclforge::sendspin::json::TokenCount;
+using iclforge::sendspin::json::TokenStorage;
 using iclforge::sendspin::json::Type;
 using iclforge::sendspin::json::Value;
 using iclforge::sendspin::json::Writer;
@@ -94,9 +98,52 @@ void write_value(Value value, Writer& out) {
     }
 }
 
+constexpr Limits kLimits{.max_depth = 32, .max_members = 256};
+
+// The two ways of sizing a parse against the one that reads into fixed storage: a
+// TokenStorage and count_tokens() must give the verdict, and the tokens, the fixed parse
+// gives. The one exception is a text with a repeated key and a later fault too: only the
+// tokens show the repeat, so count_tokens() can report the later fault first. It is
+// refused either way.
+void check_sizing(std::string_view text, const Document& fixed, const ParseResult& want) {
+    TokenStorage storage;
+    Document stored;
+    const ParseResult got = stored.parse(text, storage, 1024, kLimits);
+    const TokenCount counted = count_tokens(text, 1024, kLimits);
+    if (want.error == Error::kDuplicateKey) {
+        // count_tokens() may well find the text sound: it cannot see the repeat.
+        if (got || !stored.empty()) {
+            std::abort();
+        }
+        return;
+    }
+    if (got.error != want.error || got.offset != want.offset ||
+        counted.result.error != want.error || counted.result.offset != want.offset) {
+        std::abort();
+    }
+    if (!want) {
+        if (counted.tokens != 0 || !stored.empty() || storage.heap_tokens() != 0) {
+            std::abort();
+        }
+        return;
+    }
+    if (stored.token_count() != fixed.token_count() || counted.tokens != fixed.token_count() ||
+        stored.root().source() != fixed.root().source()) {
+        std::abort();
+    }
+    // In the object up to its capacity, in a block of exactly the tokens beyond it.
+    const std::size_t on_heap =
+        fixed.token_count() > TokenStorage::kInlineTokens ? fixed.token_count() : 0;
+    if (storage.heap_tokens() != on_heap) {
+        std::abort();
+    }
+}
+
 std::optional<std::string> canonical(std::string_view text, std::array<Token, 1024>& tokens) {
     Document doc;
-    if (!doc.parse(text, tokens, Limits{.max_depth = 32, .max_members = 256})) {
+    const ParseResult parsed = doc.parse(text, tokens, kLimits);
+    check_sizing(text, doc, parsed);
+    if (!parsed) {
         return std::nullopt;
     }
     std::string out;

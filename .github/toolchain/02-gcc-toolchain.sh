@@ -32,22 +32,77 @@ apt_retry() {
     done
 }
 
-# add-apt-repository -y ppa:..., in up to six attempts with a growing wait
-# (30, 60, 90, 120, 150 s: about seven and a half minutes). A ppa: shortcut is
-# resolved through Launchpad's API (lazr.restfulclient), a different service from
-# the archive the packages come from, and that API answers 503 for minutes at a
-# time now and then (2026-09-16: the AppImage leg, whose 22.04 base can only get
-# GCC 16 from this PPA, failed after a three-minute outage). apt_retry's three
-# attempts 30 s apart would not have reached the far side of one.
-ppa_retry() {
-    local attempt=1
-    until add-apt-repository -y "$1"
-    do
-        echo "::warning title=add-apt-repository::attempt $attempt of 6 failed for $1"
-        [ "$attempt" -lt 6 ] || return 1
-        sleep $((attempt * 30))
-        attempt=$((attempt + 1))
-    done
+# Register the ubuntu-toolchain-r/test PPA by writing its apt source and its
+# signing key straight into /etc/apt, instead of `add-apt-repository ppa:...`.
+# That shortcut is resolved through Launchpad's API (lazr.restfulclient), a
+# different service from the archive the packages come from
+# (ppa.launchpadcontent.net), and the API answers 503 for minutes at a time now
+# and then (2026-09-16: the AppImage leg, whose 22.04 base can only get GCC 16
+# from this PPA, failed after a three-minute outage; a retry that waits about
+# seven and a half minutes narrowed that without removing it). With the key
+# pinned here nothing but the archive is needed.
+#
+# The key is the PPA's signing_key_fingerprint on Launchpad
+# (https://api.launchpad.net/1.0/~ubuntu-toolchain-r/+archive/ubuntu/test):
+#   C8EC 952E 2A0E 1FBD C509  0F6A 2C27 7A0A 3521 54E5
+# RSA-4096, created 2024-05-02, no expiry, and it signs the archive's InRelease.
+# Launchpad still also signs that file with the PPA's old 1024-bit key
+# (60C3 1780 3A41 BA51 845E  371A 1E93 77A2 BA9E F27F); apt needs one good
+# signature, so only the strong key is trusted here. If Launchpad rotates the
+# key, `apt-get update` fails with NO_PUBKEY for the new id: take the new
+# fingerprint from the API page above, then
+#   gpg --keyserver keyserver.ubuntu.com --recv-keys <FPR>
+#   gpg --export --export-options export-minimal --armor <FPR>
+# and replace the block below (and its copy in ci-runners).
+add_toolchain_ppa() {
+    local codename keyring=/etc/apt/keyrings/ubuntu-toolchain-r-test.asc
+    # shellcheck source=/dev/null
+    codename=$(. /etc/os-release && printf '%s' "${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}")
+    [ -n "$codename" ] || { echo "ERROR: no Ubuntu codename in /etc/os-release"; return 1; }
+
+    install -d -m 0755 /etc/apt/keyrings
+    cat > "$keyring" <<'KEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQINBGYzeoEBEADEVzm0fPTo1KfunTjKV5ZP0Mb86Z6izCXSYbeYt/iAaIfK7a8x
+c13I/uAOxzjcuZHD4sQh7/22I74ignCSexoJD3PnytpZtAxNjyj3jkJpIrdFOVd4
+Cmua5tnEI1Av+B21YLlYYftK2wR+Z6hpsz3NyQ8URR1SCX04BOV9AGxcWb7izkV9
+RHu6xR4x8kAjuTObhhqw/ZR73+U9mig785qmrtapQkF/IanYj2OofqUJwosDo8YA
+shi01735JP9s5do4nnsb6w6xcYQ0HlGn3AxR1k4WA2CK/90QybOmVbLz7IOF3Ou3
+cPfoDzSxAiQemge2msJWPaQLSy/HPUivPB2uNPxkcNIHUVwbjgIig0yaN0EOsveg
+o1m6QvS8sm1MEA2ySl+9+q8wdqTnXbSgA3hq/5OoG4rvHD9GUAd6oRxbz/wdOU3J
+7BlAhEMAHgeQ9DyIzRP9lGeU3QnWNA+WFiiDrLljf+6xewe5iyqLxPqvCkFUDPCF
+emp2oIqeWf6l04IMtM4SJz2AnU1EvytprEEvntMvHMXlBBinw1Q5r3ES/QlPfWr4
+o5CUpu2P3GpZtflDe7jvccyJUMDtlqOVv7wBZPMZykjTAPQ16clGdtIqWdQSk3/b
+UA96RSdpM4gMGXFBGLBoAd7CptafRvPjpRnbMxs2jIxicnASfwJALEFgbQARAQAB
+tD9MYXVuY2hwYWQgUFBBIGZvciBQUEEgZm9yIFVidW50dSBUb29sY2hhaW4gVXBs
+b2FkcyAocmVzdHJpY3RlZCmJAk4EEwEKADgWIQTI7JUuKg4fvcUJD2osJ3oKNSFU
+5QUCZjN6gQIbAwULCQgHAgYVCgkICwIEFgIDAQIeAQIXgAAKCRAsJ3oKNSFU5TkT
+EACpFJ+q0xqfAmRF1886cgtVw+ruJTqfsxdj7ms1os3/I5VXLhPMbUg56mtK9Okj
+0Nf9rY5bnDagJobjtS2JgzMbYWXocPJuwK6ZvmMD5tFSsTov19R3SyIT2x3JAy7S
+/LNWqVeZS41RtM8uSu56PhghE7aAP9PigFTI3CUargpx1DQh6xiHKRR57ZMrLcd4
+l6tj8yb4Hl+OeFRQMcoim696lPMSqzVtJ0epP7yNsz2LFaRmkRP/hf+S4JlSs8uC
+wzAl9eJR2h1v1WoBr0pAW2gjjd8VyKWhaKjneicJPqo5GDvhDl+lbrpqSwSHENlH
+DVyC+XvAjvTf4JhTQE/M1L/sGrqqa65n+WF4ZqauiDvn1bUw0vnL0oaiK/hyH1YG
+XW7khJ7JDlw/6LFNZ6Ih0UuVRTzVBBBz3Sipw5hgM9ztKEYLMI5zlwWGlhEjMnxD
+X5WauIUWjPv3dKQp1qTthN7Fgv3/2J6j+2/tMAfWeWB1tL8H4lVPUCfcpQpkTP/E
+HTnB3oaRiYy6GDuGKsNkhEUvlV2AnVAxO17IN5QQ2lMQ261zaPj9y9v1oCQlzGfm
+UKRJWFGbsooapdm7DTrqrfO+zyRXWPe6GRnYlmeXTRWi8CEIXpCkhhf8rma8KNnW
+S96jsTSU97Lo0hnIbL+4o3qf2BiYcfIwfoIXzUaj5ajGEA==
+=CmYA
+-----END PGP PUBLIC KEY BLOCK-----
+KEY
+    # apt reads the key as its _apt user: do not leave it at a restrictive umask.
+    chmod 0644 "$keyring"
+
+    cat > /etc/apt/sources.list.d/ubuntu-toolchain-r-test.sources <<EOF
+Types: deb
+URIs: https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu
+Suites: ${codename}
+Components: main
+Signed-By: ${keyring}
+EOF
+    apt_retry
 }
 
 echo "==> Installing GCC ${GCC_VERSION} toolchain"
@@ -65,8 +120,8 @@ if ! apt-cache show "gcc-${GCC_VERSION}" >/dev/null 2>&1; then
 fi
 
 if ! apt-cache show "gcc-${GCC_VERSION}" >/dev/null 2>&1; then
-    echo "==> gcc-${GCC_VERSION} still not found, adding ubuntu-toolchain-r PPA"
-    ppa_retry ppa:ubuntu-toolchain-r/test
+    echo "==> gcc-${GCC_VERSION} still not found, adding ubuntu-toolchain-r PPA (pinned key, no Launchpad API)"
+    add_toolchain_ppa
 fi
 
 apt_retry \
