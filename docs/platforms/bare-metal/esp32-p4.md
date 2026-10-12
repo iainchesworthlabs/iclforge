@@ -1203,6 +1203,44 @@ objects, the most the board still reconstructs, was to hand: at about 1.4 ms a f
 would be about 0.89, with a worst burst near `joc12`'s. A stream of 13 declared or more is played
 as its bed, as `joc15`'s 14 are.
 
+## AC-4 from a server
+
+An AC-4 stream a group sends the board as it is, one sync frame a chunk under the data type `ac4`,
+is decoded by the Sendspin player with the decoder the HTTP source uses (`ac4_stream.cpp`,
+`CONFIG_ICLFORGE_AC4`), rendered onto the board's layout and written by the same playout as AC-3
+and E-AC-3. An image lists `ac4` where `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4` is 1, which is the
+default here with the decoder built in (an S3's is 0: only its 2.0 SIMPLE keeps up), and states 6
+channels (`..._AC4_MAX_CODED_CHANNELS`) and no objects, since `decode_by_block()` hands over a
+presentation's channels alone. A server sends a stream past either as PCM it decodes itself, and a
+presentation of objects alone is never sent as it is (`apps/hearth/engine/src/sink_form.cpp`).
+
+Measured 2026-10-12 on board 1 (release shape, decode lane on, null sink, 48 kHz, over Sendspin from
+`hearth-testserver`; DEE's streams, 20 s each; x real time of a 42.7 ms frame, the board's own
+decode and render per burst with the sink's time left out):
+
+| Stream | To | x real time | Worst burst | Late | Under | Internal RAM free, least |
+|---|---|---:|---:|---:|---:|---:|
+| `ac4-stereo-64` | 2.0 | 0.22 | 0.38 | 1 | 0 | 14 KB |
+| `ac4-20-music-192` | 2.0 | 0.18 | 0.41 | 0 | 0 | 28 KB |
+| `ac4-ims-music-64-2997` (29.97 fps converter) | 2.0 | 0.33 | 5.38 | 0 | 0 | 2.9 KB |
+| `ac4-51-music-128` | 5.1 | 0.68 | 0.84 | 0 | 0 | 4.3 KB |
+| `ac4-51-music-192` | 5.1 | 0.63 | 0.82 | 0 | 0 | 19 KB |
+| `ac4-51-music-384` | 5.1 | 0.51 | 0.79 | 0 | 0 | 31 KB |
+| `ac4-51-film-96` | 5.1 | 0.73 | 0.84 | 0 | 0 | 3.9 KB |
+| `ac4-514-tones-256` | 7.1.4 | refused: more channels than 6 | | | | |
+
+Every output's RMS over a play is the host decoder's to 0.01 dB (0.23 dB under on `ac4-stereo-64`,
+whose first second was silent: the player had dropped its first chunk as late, and the decoder waits
+for an I-frame after one). The converter stream's worst burst, 229 ms, came within its first 125
+chunks and not again; the ring held it and nothing ran dry. E-AC-3 plays on the same image are unchanged (`dee-eac3-51` 5.1 0.18,
+internal RAM free 211 to 218 KB), and a player switched from E-AC-3 to AC-4 and back plays each as it
+did alone: the decoders go in turn, and the AC-4 one's 286 KB with them.
+
+What is not measured, and is the thing to watch: the decoder takes nearly all the internal RAM while
+it plays, the 1 to 11 KB at its lowest that the HTTP source's plays leave (sdkconfig.p4), now beside
+Wi-Fi, mDNS and a Sendspin session. Seven plays of 20 s dropped nothing. A board that is also being updated
+over the air, or sent a lyric document, while an AC-4 stream plays has not been run.
+
 ## QEMU
 
 ESP-IDF v6.1's `qemu-system-riscv32` emulates one machine, `esp32c3`, and no other RISC-V part —
