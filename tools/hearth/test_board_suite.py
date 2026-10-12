@@ -553,6 +553,73 @@ class Boot(unittest.TestCase):
         self.assertEqual(record["plays"]["ac3-2.0"]["decoder_permille_samples"], [223, 223, 223])
 
 
+class BaselineNote(unittest.TestCase):
+    """A baseline recorded under another hash than the run's image carries says so."""
+
+    def test_the_same_hash_has_no_note(self) -> None:
+        run = {"profile_hash": "0fb46709d4bb"}
+        self.assertIsNone(bs.baseline_note(run, {"profile_hash": "0fb46709d4bb"}))
+
+    def test_another_hash_says_both_and_that_the_figures_are_as_recorded(self) -> None:
+        note = bs.baseline_note({"profile_hash": "6e5a68ebbb57"}, {"profile_hash": "0fb46709d4bb"})
+        assert note is not None
+        self.assertIn("0fb46709d4bb", note)
+        self.assertIn("6e5a68ebbb57", note)
+        self.assertIn("compared as they were recorded", note)
+        self.assertTrue(note.startswith("note:"))
+
+    def test_a_hash_that_is_not_known_on_either_side_is_not_a_difference(self) -> None:
+        self.assertIsNone(bs.baseline_note({"profile_hash": "x"}, {}))
+        self.assertIsNone(bs.baseline_note({}, {"profile_hash": "x"}))
+        self.assertIsNone(bs.baseline_note({"profile_hash": ""}, {"profile_hash": "x"}))
+
+    def test_the_compare_command_prints_it_and_the_exit_code_is_the_figures(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = {
+                "profile": "s3-n16r8",
+                "profile_hash": "c4b8d369cf36",
+                "boot": {},
+                "plays": {"ac3-2.0": {"state": "finished", "decoder_permille": 123, "units": 938}},
+            }
+            run = {
+                "profile": "s3-n16r8",
+                "profile_hash": "0fb46709d4bb",
+                "boot": {},
+                "plays": {"ac3-2.0": {"state": "finished", "decoder_permille": 124, "units": 938}},
+            }
+            (Path(tmp) / "base.json").write_text(json.dumps(base), "utf-8")
+            (Path(tmp) / "run.json").write_text(json.dumps(run), "utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = bs.main(
+                    [
+                        "compare",
+                        "--run",
+                        str(Path(tmp) / "run.json"),
+                        "--baseline",
+                        str(Path(tmp) / "base.json"),
+                    ]
+                )
+        self.assertEqual(code, 0)
+        self.assertIn("recorded under profile hash c4b8d369cf36", out.getvalue())
+        self.assertIn("the run holds to the baseline", out.getvalue())
+
+    def test_the_note_does_not_hide_a_regression(self) -> None:
+        base = {
+            "profile_hash": "c4b8d369cf36",
+            "profile": "s3-n16r8",
+            "plays": {"ac3-2.0": {"state": "finished", "decoder_permille": 100, "units": 938}},
+        }
+        run = {
+            "profile_hash": "0fb46709d4bb",
+            "profile": "s3-n16r8",
+            "plays": {"ac3-2.0": {"state": "finished", "decoder_permille": 200, "units": 938}},
+        }
+        regressions, _ = bs.compare(run, base, {})
+        self.assertTrue(regressions)
+        self.assertIsNotNone(bs.baseline_note(run, base))
+
+
 class FoldedPin(unittest.TestCase):
     """A pin is the host's hash of a stream in its own layout: a fold is not it."""
 

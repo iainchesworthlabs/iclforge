@@ -721,6 +721,7 @@ ScrollView {
                     reproduction: root.reproduction
                     vocals: root.vocals
                     active: root.visible && root.isKaraoke
+                    positionMs: lyricClock.positionMs
                 }
 
                 Card {

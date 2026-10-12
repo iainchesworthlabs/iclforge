@@ -129,6 +129,30 @@ The sections below contain the complete change list and fixes.
   the pitch ribbon with per-line marks and the browser demo's microphone card (M1 to M7), and what is not
   (the bleed check, the board).
 
+**An Android preset for the libraries Hearth for Android links**
+
+- **`config-android-arm64` and `build-android-arm64`.** `libs/lyrics` and `libs/sendspin`, with
+  cpp-httplib, mbedTLS, libFLAC, Opus and mdns from vcpkg's `arm64-android` triplet, build for
+  `arm64-v8a` under NDK r26 from one preset (the Shield app's wrapper has no vcpkg and leaves
+  Hearth off). The two test binaries link; discovery is deferred to `ctest` because an arm64
+  binary cannot be listed on the host. On a Shield the lyrics suite (83 cases) and the sendspin
+  suite (243) passed (planning/hearth-android.md, phase 0c).
+- **A CI job builds them.** `build-android-native` in `_build.yml` runs the preset on a hosted
+  runner whenever the `android` lane runs, `continue-on-error` until it has gone green three times
+  on hosted runners (`build-android` and `macos-llvm` each started the same way).
+
+**The Android audio backend names no Java package**
+
+- **A second Android app can link `iclforge::audio`'s passthrough backend.** The backend exported
+  `JNI_OnLoad` and a native method named for the Shield app's package
+  (`Java_com_iclforge_shield_NativeBridge_registerPassthroughBridge`), and a shared object
+  defines `JNI_OnLoad` once and a JNI name is a package, so only that one app could use it. It is
+  now two plain C++ functions, `iclforge::audio::android::set_java_vm()` and
+  `register_passthrough_bridge()` (`passthrough_bridge.hpp`), called from the app's own
+  `JNI_OnLoad` and its own native method; the Shield app's behaviour and its Kotlin are unchanged.
+  `check_android_jni.py` checks each app of a list against its own package, and a test holds the
+  audio backend to defining no JNI name (planning/hearth-android.md, phase 0a).
+
 **Karaoke: a pitch library**
 
 - **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one
@@ -1112,6 +1136,30 @@ The sections below contain the complete change list and fixes.
 - **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
   microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
   into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
+
+**Hearth: a singer sees the tune as a ribbon, how each line went, and a summary**
+
+- **A pitch ribbon: the tune as notes and the singer's voice as a line over them** (the microphone,
+  scoring and recording programme, M5). On the Microphone card and under the words in the singer
+  view (`F11`), while the microphone is on and there is a tune: the reference's notes move past a
+  mark for *now*, and the voice is drawn over them, thick and solid where it is within the tolerance
+  and thin and dashed where it is not (a second cue beside colour). A voice an octave away is drawn
+  on the tune's octave, as it is scored. Where nothing is voiced it says **Listening…**.
+- **A mark under each line that has been sung**: three dots and a percentage, in the Karaoke page's
+  lyrics and in the singer view. A line the tune has no notes in has no mark (not a zero); a line
+  the singer was voiced for under a fifth of its notes' time for says **not sung** and carries no
+  number; and without the headphones answer there are none. The line's own times take the lyric
+  delay, so a nudged line is still scored where it is sung.
+- **A summary when it ends**: **Last performance** on the card, kept when the microphone is turned
+  off, the song ends or the device goes, with the pitch score, how much of the tune's time the singer
+  was voiced for, the average sharp or flat, early or late, and the basis (the part, the tolerance,
+  octaves ignored, what was not scored). Cleared by the next start or another song, shown nowhere
+  else and never ranked, named or sent. Not made when the headphones answer is missing.
+- **Engine and controller:** `Performance` keeps its last 30 s of placed frames as a bounded trace;
+  `MicrophoneSession` answers a line's counts, the trace and the reference; `MicrophoneController`
+  gains `ribbon()`, `lineResult()`, `summary` and `scoreRevision`. Two new QML pictures, `LineMark`
+  and `PitchRibbon`, are handed their data, so they are tested without a microphone. Hearth's user
+  guide says what is shown.
 
 **ADM / BW64: rendering constraints, a sample-format option, and what the bridge drops**
 
@@ -4804,6 +4852,14 @@ The sections below contain the complete change list and fixes.
 
 **Build system**
 
+- **A tests-only configure failed with `Target "iclforge-forge-gui-tests" links to:
+  iclforge::app_text_encoding but the target was not found`.** The code-page library was added
+  only for `ICLFORGE_BUILD_CLI` or `ICLFORGE_BUILD_GUI`, and the GUI's Qt-free test binary, which
+  links it, is added whenever `ICLFORGE_BUILD_TESTS` is on, so
+  `-DICLFORGE_BUILD_TESTS=ON -DICLFORGE_BUILD_CLI=OFF -DICLFORGE_BUILD_GUI=OFF` (with Hearth, as a
+  Hearth-only developer configures) stopped the configure. The CI presets build the command line
+  and did not show it. The library is now added when the tests are on, so its own tests run in
+  such a build too.
 - **`libac3forge_c.so` exported the codec it embeds, and the `BUILD_SHARED_LIBS=ON` test pass ran
   on that copy instead of `libac3forge.so`.** On Linux the C library exported the C++ symbols of
   the static codec inside it (346 of the 562 lines in its ABI allowlist, beside its 216 C

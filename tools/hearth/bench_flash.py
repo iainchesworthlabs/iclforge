@@ -3,6 +3,7 @@
 
     python tools/hearth/bench_flash.py build  PROFILE --tag TAG [--worktree DIR]
                                               [--overlay NAME ...] [--wifi] [--no-verify]
+                                              [--configure-only]
     python tools/hearth/bench_flash.py flash  BOARD --build-dir DIR --session ID
                                               [--app-only | --otadata-only] [--erase]
     python tools/hearth/bench_flash.py verify BOARD --build-dir DIR [--profile PROFILE]
@@ -16,6 +17,9 @@ and what they took from a hand-kept list of fragments it takes from the profile:
   options, `idf.py size`, `sink_profile.py verify`), in the ESP-IDF environment, into
   <builds>/<tag>-<profile>. `--wifi` appends the bench's network fragment (never printed) with the
   `wifi-credentials` overlay, which the guard then allows to touch the network keys.
+  `--configure-only` runs `idf.py reconfigure` and the guard's locked-value, fragment and
+  identity checks and stops: what a snapshot or a check of a Kconfig change needs, in
+  seconds where a build takes minutes (a new key in every config recompiles everything).
 - **flash** needs the board's lock to be this session's, reads the MAC of the chip on the port and
   writes nothing unless its last three octets are the bench's for that board, then writes with
   esptool. `--app-only` writes the app and otadata and leaves the bootloader, the table and NVS
@@ -195,12 +199,13 @@ def cmd_build(
         f"-DICLFORGE_PROFILE={args.profile}",
         f"-DICLFORGE_PROFILE_HASH={digest}",
         *([f"-DPROJECT_VER={version}"] if version else []),
-        "build",
+        "reconfigure" if args.configure_only else "build",
     ]
     values = bench.wifi_values(table.wifi_fragment)
     log = directory.parent / f"{directory.name}.log"
     directory.parent.mkdir(parents=True, exist_ok=True)
-    out(f"building {args.profile} ({spec['target']}) into {directory}")
+    what = "configuring" if args.configure_only else "building"
+    out(f"{what} {args.profile} ({spec['target']}) into {directory}")
     out(f"  fragments: {defaults.replace(table.wifi_fragment.as_posix(), '<network fragment>')}")
     code, text = run(argv, None, idf=True)
     if code == 0 and not (directory / "project_description.json").is_file():
@@ -211,11 +216,13 @@ def cmd_build(
     lines.append(f"BUILD_EXIT={code}")
     status = code
     if code == 0 and not args.no_verify:
-        sized, size_text = run(
-            ["idf.py", "-C", str(project), "-B", str(directory), "size", "--format", "json2"],
-            None,
-            idf=True,
-        )
+        sized, size_text = 1, ""
+        if not args.configure_only:
+            sized, size_text = run(
+                ["idf.py", "-C", str(project), "-B", str(directory), "size", "--format", "json2"],
+                None,
+                idf=True,
+            )
         size_json = directory / "size.json"
         if sized == 0:
             size_json.write_text(size_text, "utf-8")
@@ -240,7 +247,8 @@ def cmd_build(
     if code != 0:
         tail = "\n".join(lines[1].splitlines()[-15:])
         out(tail)
-    out(f"{'built' if status == 0 else 'FAILED'}; log {log}")
+    done = "configured" if args.configure_only else "built"
+    out(f"{done if status == 0 else 'FAILED'}; log {log}")
     return 0 if status == 0 else 1
 
 
@@ -530,6 +538,11 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--overlay", action="append", default=[])
     build.add_argument("--wifi", action="store_true", help="append the bench's network fragment")
     build.add_argument("--no-verify", action="store_true", help="skip idf.py size and the guard")
+    build.add_argument(
+        "--configure-only",
+        action="store_true",
+        help="idf.py reconfigure and the guard without the size: a snapshot, not an image",
+    )
 
     flash = sub.add_parser("flash", help="write a build to a board by USB, after a MAC check")
     flash.add_argument("board")
