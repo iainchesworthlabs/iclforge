@@ -1,0 +1,83 @@
+{
+  "format": 1,
+  "profile": "s3-n16r8",
+  "profile_hash": "0fb46709d4bb",
+  "version": "v0.10.0-beta.1-4460-g12c4fdaaf",
+  "chip": "ESP32-S3",
+  "board": "S3b",
+  "recorded": "2026-10-12T10:19Z",
+  "boot": {
+    "when": "boot",
+    "net": 1,
+    "internal_free": 85755,
+    "largest": 31744,
+    "ask_total": 8192,
+    "ask_biggest": 8192,
+    "headroom": 23552,
+    "verdict": "ok",
+    "floor": 0
+  },
+  "plays": {
+    "ac3-2.0": {
+      "state": "finished",
+      "frames": 938,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        123,
+        124,
+        123,
+        123,
+        122
+      ],
+      "decoder_permille": 123,
+      "units": 938,
+      "decode_stack_free": 18256,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0
+    },
+    "eac3-2.0": {
+      "state": "finished",
+      "frames": 938,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        86,
+        86,
+        88,
+        87,
+        87
+      ],
+      "decoder_permille": 87,
+      "units": 938,
+      "decode_stack_free": 18064,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0
+    }
+  },
+  "findings": {},
+  "boot_samples": {
+    "internal_free": [
+      85891,
+      102503,
+      85891,
+      85891,
+      102503,
+      85903,
+      85755,
+      85891
+    ],
+    "largest": [
+      31744,
+      31744,
+      31744,
+      31744,
+      31744,
+      31744,
+      31744,
+      31744
+    ]
+  }
+}
