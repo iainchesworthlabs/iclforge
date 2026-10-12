@@ -174,6 +174,23 @@ public:
         return QUrl::fromLocalFile(path);
     }
 
+    // A binary file of the test's own: a CD+G disc beside a stream, whose packets are not text.
+    // `bytes` is a list of numbers 0 to 255 (Qt.btoa() does not carry the high ones). The
+    // file's URL, or an empty one where it could not be written.
+    [[nodiscard]] Q_INVOKABLE QUrl writeBytes(const QString& name, const QVariantList& bytes) const {
+        QByteArray out;
+        out.reserve(static_cast<qsizetype>(bytes.size()));
+        for (const QVariant& value : bytes) {
+            out.append(static_cast<char>(value.toInt() & 0xFF));
+        }
+        const QString path = QDir(folder_).filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) || file.write(out) != out.size()) {
+            return {};
+        }
+        return QUrl::fromLocalFile(path);
+    }
+
     // The folder the generated files go in, as a URL: a project written there refers to the
     // parts beside it by their names.
     [[nodiscard]] Q_INVOKABLE QUrl folder() const { return QUrl::fromLocalFile(folder_); }

@@ -4989,32 +4989,47 @@
         <translation>%1 / %2 s</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="272"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="279"/>
+        <source>CD+G picture</source>
+        <translation>Imagen CD+G</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="287"/>
+        <source>The picture of the karaoke disc in %1 beside the stream. Its words are part of the picture.</source>
+        <translation>La imagen del disco de karaoke en %1, junto al flujo. Su letra forma parte de la imagen.</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="297"/>
+        <source>The picture in %1 could not be shown: %2</source>
+        <translation>No se pudo mostrar la imagen de %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="311"/>
         <source>Export decoded WAV…</source>
         <translation>Exportar el WAV decodificado…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="278"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="317"/>
         <source>Export objects…</source>
         <translation>Exportar objetos…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="290"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="329"/>
         <source>Exporting…</source>
         <translation>Exportando…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="306"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="345"/>
         <source>LEVELS</source>
         <translation>NIVELES</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="335"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="374"/>
         <source>SOUNDFIELD</source>
         <translation>CAMPO SONORO</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="343"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="382"/>
         <source>Solid dots are bed positions this stream carries. Objects are not here — this plays the 5.1 bed only; open Inspect objects for per-object playback and position.</source>
         <translation>Los puntos sólidos son posiciones de la cama que lleva este flujo. Los objetos no están aquí — esto solo reproduce la cama 5.1; abre Inspeccionar objetos para la reproducción y la posición por objeto.</translation>
     </message>

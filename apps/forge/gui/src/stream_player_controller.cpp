@@ -446,7 +446,8 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
 
 }  // namespace
 
-StreamPlayerController::StreamPlayerController(QObject* parent) : QObject(parent) {}
+StreamPlayerController::StreamPlayerController(QObject* parent)
+    : iclforge::apps::CdgFrameSource(parent) {}
 
 // Out-of-line: sink_ is a unique_ptr<iclforge::audio::MonitorSink>, forward-declared
 // in the header - see ObjectDecodeController's own identical
@@ -489,6 +490,36 @@ double StreamPlayerController::positionSeconds() const {
     }
     return static_cast<double>(read_frame_.load(std::memory_order_relaxed)) /
            static_cast<double>(result_->sample_rate_hz);
+}
+
+double StreamPlayerController::pictureSeconds() const {
+    if (!result_ || result_->sample_rate_hz == 0) {
+        return 0.0;
+    }
+    const std::uint64_t read = read_frame_.load(std::memory_order_relaxed);
+    // Only while playing is anything in flight: a pause keeps the position it
+    // stopped at, and a seek is exact.
+    const std::uint64_t lead = playing_ ? lead_frames_.load(std::memory_order_relaxed) : 0;
+    return static_cast<double>(read - std::min(read, lead)) /
+           static_cast<double>(result_->sample_rate_hz);
+}
+
+QImage StreamPlayerController::pictureFrame(int /*key*/, qlonglong positionMs) {
+    return picture_.frame(positionMs);
+}
+
+void StreamPlayerController::loadPicture(const QString& stream_path) {
+    picture_.clear();
+    picture_file_name_.clear();
+    picture_error_.clear();
+    if (const auto disc = iclforge::apps::find_cdg_beside(stream_path.toStdString())) {
+        picture_file_name_ = QString::fromStdU16String(disc->filename().u16string());
+        if (const auto loaded = picture_.load(*disc); !loaded) {
+            picture_error_ = QString::fromStdString(loaded.error());
+        }
+    }
+    emit pictureStateChanged();
+    emit pictureChanged(0);
 }
 
 QVariantList StreamPlayerController::channelMeta() const {
@@ -580,6 +611,10 @@ void StreamPlayerController::openFile(const QUrl& url) {
     }
     file_path_ = path;
     emit filePathChanged();
+    // The disc beside the stream is read when the stream is opened, not when
+    // it has decoded: a picture that is there needs nothing from the decode,
+    // and a presentation or karaoke choice that decodes again leaves it be.
+    loadPicture(path);
     decodePath(path);
 }
 
@@ -685,6 +720,8 @@ void StreamPlayerController::play() {
     should_play_.store(true, std::memory_order_relaxed);
     worker_active_ = true;
     playing_ = true;
+    // Nothing is in flight until the first publish says how much is.
+    lead_frames_.store(0, std::memory_order_relaxed);
     emit playingChanged();
 
     // The worker keeps its own shared_ptr to the result it started with -
@@ -738,6 +775,13 @@ void StreamPlayerController::play() {
             const auto now = std::chrono::steady_clock::now();
             if (now - published_at >= kPublishInterval) {
                 published_at = now;
+                // What the output has been handed and not yet played: the picture follows what
+                // is heard, which is that far behind what was submitted. A device that does not
+                // say counts as no lead, which is what pictureSeconds() then draws.
+                if (const auto at_device = sink_->position()) {
+                    lead_frames_.store(at_device->frames_queued + at_device->latency_frames,
+                                       std::memory_order_relaxed);
+                }
                 std::vector<iclforge::ac3::analysis::ChannelLevel> snapshot(meter.levels().begin(),
                                                                    meter.levels().end());
                 QMetaObject::invokeMethod(this, [this, result, snapshot = std::move(snapshot)] {

@@ -4989,32 +4989,47 @@
         <translation>%1 / %2 שניות</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="272"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="279"/>
+        <source>CD+G picture</source>
+        <translation>תמונת CD+G</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="287"/>
+        <source>The picture of the karaoke disc in %1 beside the stream. Its words are part of the picture.</source>
+        <translation>תמונת דיסק הקריוקי ב-%1 לצד הזרם. המילים שלו הן חלק מהתמונה.</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="297"/>
+        <source>The picture in %1 could not be shown: %2</source>
+        <translation>לא ניתן היה להציג את התמונה ב-%1: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="311"/>
         <source>Export decoded WAV…</source>
         <translation>ייצאו WAV מפוענח…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="278"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="317"/>
         <source>Export objects…</source>
         <translation>ייצאו אובייקטים…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="290"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="329"/>
         <source>Exporting…</source>
         <translation>מייצא…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="306"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="345"/>
         <source>LEVELS</source>
         <translation>רמות</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="335"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="374"/>
         <source>SOUNDFIELD</source>
         <translation>שדה צליל</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="343"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="382"/>
         <source>Solid dots are bed positions this stream carries. Objects are not here — this plays the 5.1 bed only; open Inspect objects for per-object playback and position.</source>
         <translation>נקודות מלאות הן מיקומים בשכבת הבסיס שהזרם הזה נושא. האובייקטים אינם כאן — זה מנגן רק את שכבת הבסיס 5.1; פתחו את &apos;בדיקת אובייקטים&apos; לניגון ומיקום לכל אובייקט.</translation>
     </message>

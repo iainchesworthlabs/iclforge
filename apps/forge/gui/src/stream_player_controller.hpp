@@ -17,6 +17,8 @@
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/tables.hpp"
 #include "background_jobs.hpp"
+#include "cdg_frame_source.hpp"
+#include "cdg_frames.hpp"
 
 namespace iclforge::audio {
 class MonitorSink;
@@ -105,7 +107,14 @@ struct RawResult {
 // interactive GUI decode dialog in this window already accepts the same
 // trade for the same reason. A feature-length programme is a lot of RAM this
 // way; nothing here pretends otherwise.
-class StreamPlayerController : public QObject {
+//
+// A `name.cdg` beside the stream (a karaoke disc's picture, MP3+G's other
+// half) is held beside the decoded bed and given to the dialog's CdgPicture
+// through the CdgFrameSource this is (apps/shared/cdg-picture), as Hearth's
+// KaraokeController gives it to the lyric view: the picture is a function of
+// the position of what is HEARD, which is pictureSeconds(), the position of
+// what has been submitted less what the sink has not yet played.
+class StreamPlayerController : public iclforge::apps::CdgFrameSource {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
@@ -129,6 +138,15 @@ class StreamPlayerController : public QObject {
 
     Q_PROPERTY(bool playing READ playing NOTIFY playingChanged)
     Q_PROPERTY(double positionSeconds READ positionSeconds NOTIFY positionChanged)
+
+    // The picture of a CD+G disc beside the stream: whether the file beside it
+    // is one (a `name.cdg` of the stream's name, in any case) and could be
+    // read, its file name, why it could not be, and the position the picture
+    // is drawn at. The picture itself is what pictureFrame() answers.
+    Q_PROPERTY(bool hasPicture READ hasPicture NOTIFY pictureStateChanged)
+    Q_PROPERTY(QString pictureFileName READ pictureFileName NOTIFY pictureStateChanged)
+    Q_PROPERTY(QString pictureError READ pictureError NOTIFY pictureStateChanged)
+    Q_PROPERTY(double pictureSeconds READ pictureSeconds NOTIFY positionChanged)
 
     // Same shapes as EncoderController's own channelLevels/channelMeta/
     // soundfield/meterFloorDb - see publishLevels()'s own comment - so
@@ -186,6 +204,19 @@ class StreamPlayerController : public QObject {
 
     [[nodiscard]] bool playing() const { return playing_; }
     [[nodiscard]] double positionSeconds() const;
+
+    [[nodiscard]] bool hasPicture() const { return picture_.loaded(); }
+    [[nodiscard]] QString pictureFileName() const { return picture_file_name_; }
+    [[nodiscard]] QString pictureError() const { return picture_error_; }
+    // Where the picture is drawn: positionSeconds() less what the output has
+    // been handed and not yet played while playing (the device's own buffer
+    // and this sink's queue), so that it follows what is heard. A pause and a
+    // seek are exact: nothing is in flight.
+    [[nodiscard]] double pictureSeconds() const;
+
+    // CdgFrameSource: the disc beside the open stream at `positionMs`. There
+    // is one disc here, so `key` is not read; a null image where there is none.
+    [[nodiscard]] QImage pictureFrame(int key, qlonglong positionMs) override;
 
     [[nodiscard]] QVariantList channelLevels() const { return channel_levels_; }
     [[nodiscard]] QVariantList channelMeta() const;
@@ -255,9 +286,13 @@ class StreamPlayerController : public QObject {
     void exportFinished();
     void presentationChanged();
     void karaokeChanged();
+    void pictureStateChanged();
 
    private:
     void decodePath(const QString& path);
+    // Reads the `.cdg` beside `stream_path`, or forgets the last one: the
+    // picture of an item is the file beside it, found when it is opened.
+    void loadPicture(const QString& stream_path);
     // Decodes the open file again when the karaoke choice changed what it
     // decodes to: only a karaoke AC-3 stream is.
     void redecodeForKaraoke();
@@ -288,6 +323,13 @@ class StreamPlayerController : public QObject {
     std::atomic<std::uint64_t> read_frame_{0};
     std::atomic<bool> seek_pending_{false};
     std::atomic<std::uint64_t> seek_target_{0};
+    // Frames handed to the sink and not yet heard (its queue and the device's
+    // buffer), as of the last publish while playing; 0 otherwise.
+    std::atomic<std::uint64_t> lead_frames_{0};
+
+    iclforge::apps::CdgFrames picture_;
+    QString picture_file_name_;
+    QString picture_error_;
 
     QVariantList channel_levels_;
     QVariantMap soundfield_;

@@ -135,6 +135,146 @@ TestCase {
         verify(StreamPlayerController.summaryLine.indexOf("programme 0 of 2 (0, 1)") > 0);
     }
 
+    // ---- the picture of a CD+G disc beside the stream ------------------------------
+    // A packet as its 24 bytes: command 9, the instruction, two parity bytes, sixteen data
+    // bytes, four parity bytes. libs/lyrics/tests/test_cdg.cpp holds the format to its
+    // arithmetic; here a disc only has to be a disc.
+    function cdgPacket(instruction, data) {
+        const out = new Array(24).fill(0);
+        out[0] = 9;
+        out[1] = instruction;
+        for (let i = 0; i < data.length; ++i) {
+            out[4 + i] = data[i];
+        }
+        return out;
+    }
+
+    // Colour 1 is red and colour 2 green. The screen is red from the second packet (sent by
+    // 7 ms) and green from packet 30 (sent by 104 ms); 60 packets, a fifth of a second.
+    function cdgDisc() {
+        const colours = new Array(16).fill(0);
+        colours[2] = 0x3C;  // colour 1, 0xF00: two six-bit bytes
+        colours[3] = 0x00;
+        colours[4] = 0x03;  // colour 2, 0x0F0
+        colours[5] = 0x30;
+        let bytes = cdgPacket(30, colours).concat(cdgPacket(1, [1]));
+        for (let i = 2; i < 30; ++i) {
+            bytes = bytes.concat(cdgPacket(0, []));
+        }
+        bytes = bytes.concat(cdgPacket(1, [2]));
+        for (let i = 31; i < 60; ++i) {
+            bytes = bytes.concat(cdgPacket(0, []));
+        }
+        return bytes;
+    }
+
+    // The stream copied into a folder of its own (nothing else of the suite's is beside it)
+    // and `disc` written beside it under `discName`; the stream's URL there.
+    function streamWithDisc(folderName, discName, disc) {
+        const folder = audioFixtures.folder() + "/" + folderName;
+        verify(cliRunner.prepare(folder, twoProgrammeStreamUrl));
+        if (disc !== null) {
+            verify(audioFixtures.writeBytes(folderName + "/" + discName, disc).toString().length > 0);
+        }
+        return Qt.resolvedUrl(folder + "/two-programmes.ec3");
+    }
+
+    // Whether the centre of the picture, as the window paints it, is red or green (or neither).
+    // The window is grabbed whole and read where the item sits in it: grabImage(item) crops by the
+    // item's own x and y, which is wrong for an item inside a dialog's layout.
+    function pictureIsColour(win, picture, red, green) {
+        const shot = grabImage(win.contentItem);
+        const at = picture.mapToItem(win.contentItem, picture.width / 2, picture.height / 2);
+        const x = Math.round(at.x);
+        const y = Math.round(at.y);
+        return (shot.red(x, y) > 200) === red && (shot.green(x, y) > 200) === green;
+    }
+
+    // A `name.cdg` beside the stream (in any case) is the picture of a karaoke disc: the dialog
+    // draws it against the transport's position, a seek back replays it, and a pause is exact.
+    function test_aCdgFileBesideTheStreamIsDrawnAgainstThePosition() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+
+        StreamPlayerController.openFile(streamWithDisc("cdg-good", "two-programmes.CDG", cdgDisc()));
+        tryCompare(StreamPlayerController, "busy", false, 15000);
+        compare(StreamPlayerController.error, "");
+        compare(StreamPlayerController.hasPicture, true);
+        // The file is `.CDG`; a case-insensitive file system answers the usual `.cdg` spelling
+        // and a case-sensitive one the file's own, so the name is compared in lower case.
+        compare(StreamPlayerController.pictureFileName.toLowerCase(), "two-programmes.cdg");
+        compare(StreamPlayerController.pictureError, "");
+
+        win.streamPlayerDialogRef.open();
+        tryVerify(() => win.streamPlayerDialogRef.opened);
+        const picture = findChild(win.contentItem, "spCdgPicture");
+        verify(picture !== null);
+        compare(picture.visible, true);
+        verify(findChild(win.contentItem, "spPictureCaption").visible);
+        compare(findChild(win.contentItem, "spPictureError").visible, false);
+
+        // At 50 ms the preset to red has been sent and the one to green has not.
+        StreamPlayerController.seek(0.05);
+        compare(StreamPlayerController.pictureSeconds, StreamPlayerController.positionSeconds);
+        tryVerify(() => picture.ready);
+        tryVerify(() => pictureIsColour(win, picture, true, false));
+        // At 150 ms it is green.
+        StreamPlayerController.seek(0.15);
+        tryVerify(() => pictureIsColour(win, picture, false, true));
+        // Going back is going back: the picture is the one the packets up to 50 ms draw.
+        StreamPlayerController.seek(0.05);
+        tryVerify(() => pictureIsColour(win, picture, true, false));
+        win.streamPlayerDialogRef.close();
+    }
+
+    // No file beside the stream is no picture, and the dialog shows none.
+    function test_aStreamWithNoCdgFileBesideItHasNoPicture() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+
+        StreamPlayerController.openFile(streamWithDisc("cdg-none", "", null));
+        tryCompare(StreamPlayerController, "busy", false, 15000);
+        compare(StreamPlayerController.hasResult, true);
+        compare(StreamPlayerController.hasPicture, false);
+        compare(StreamPlayerController.pictureFileName, "");
+        compare(StreamPlayerController.pictureError, "");
+
+        win.streamPlayerDialogRef.open();
+        tryVerify(() => win.streamPlayerDialogRef.opened);
+        compare(findChild(win.contentItem, "spCdgPicture").visible, false);
+        compare(findChild(win.contentItem, "spPictureCaption").visible, false);
+        compare(findChild(win.contentItem, "spPictureError").visible, false);
+        win.streamPlayerDialogRef.close();
+    }
+
+    // A file of that name that is not CD+G says why, beside the stream that plays on, and the
+    // next stream with no disc beside it takes the picture and the sentence away.
+    function test_aCdgFileThatIsNotCdgSaysWhyAndTheNextStreamClearsIt() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+
+        StreamPlayerController.openFile(streamWithDisc("cdg-bad", "two-programmes.cdg", [1, 2, 3]));
+        tryCompare(StreamPlayerController, "busy", false, 15000);
+        compare(StreamPlayerController.hasResult, true);
+        compare(StreamPlayerController.hasPicture, false);
+        verify(StreamPlayerController.pictureError.length > 0);
+        compare(StreamPlayerController.pictureFileName, "two-programmes.cdg");
+
+        win.streamPlayerDialogRef.open();
+        tryVerify(() => win.streamPlayerDialogRef.opened);
+        const sentence = findChild(win.contentItem, "spPictureError");
+        compare(sentence.visible, true);
+        verify(sentence.text.indexOf("two-programmes.cdg") >= 0);
+        compare(findChild(win.contentItem, "spCdgPicture").visible, false);
+
+        StreamPlayerController.openFile(atmosStreamUrl);
+        tryCompare(StreamPlayerController, "busy", false, 15000);
+        compare(StreamPlayerController.pictureError, "");
+        compare(StreamPlayerController.pictureFileName, "");
+        compare(sentence.visible, false);
+        win.streamPlayerDialogRef.close();
+    }
+
     // The other half: a stream with one programme is not annotated, so the
     // line the dialog has always shown is unchanged for it.
     function test_aStreamWithOneProgrammeCarriesNoProgrammeNote() {
