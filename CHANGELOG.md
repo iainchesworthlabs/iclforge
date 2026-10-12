@@ -54,6 +54,15 @@ The sections below contain the complete change list and fixes.
   any decoder. It fails closed on an object layer it can neither verify nor remove. It cannot be
   combined with `verify-objects`, and is a usage error on AC-4.
 
+**Karaoke in E-AC-3: the choice, with no codec in it**
+
+- **`iclforge/base/karaoke.hpp`.** `KaraokeReproduction` (off, aware, capable), `KaraokeVocals`
+  (none, V1, V2, both), the part levels' -24 to +12 dB span and `karaoke_gain_from_db` move from
+  `iclforge/ac3/decoder/output.hpp` into `iclforge::base`, header-only, so that the E-AC-3
+  decoder, the wire's converters and a later AC-4 mapping name the same types. `iclforge::ac3`
+  re-exports every name, so no caller changes and no symbol is exported or removed
+  (`planning/karaoke-eac3.md`, E1, D5).
+
 **E-AC-3: an associated service mixed into the main**
 
 - **`iclforge::ac3::AssociatedServiceMixer` and `forge decode associated=`.** A description or a
