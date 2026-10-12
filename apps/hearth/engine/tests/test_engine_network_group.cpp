@@ -1966,3 +1966,120 @@ TEST_CASE("engine: a document too big for a board is sent as none, so that it dr
     REQUIRE_FALSE(documents.empty());
     CHECK(documents.front().lyrics.text.empty());
 }
+
+TEST_CASE("engine: the Network page's facts read a board's reported line against the document it was sent",
+          "[hearth][group][websocket][iclforge][lyrics]") {
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    KaraokeGroup group("lyrics_page_group", 30, wanted, true, 16384);
+
+    // Before anything is sent the board holds nothing, and the page has no count to give.
+    const auto before = find_sink(*group.sinks, "decodes");
+    REQUIRE(before.has_value());
+    CHECK_FALSE(before->lyrics_lines.has_value());
+    CHECK(before->lyrics_line_text.empty());
+
+    iclforge::hearth::LyricsUpdate document;
+    document.item = 41;
+    document.document = "[00:01.00]one\n[00:02.00]two\n[00:03.00]three\n";
+    group.sinks->apply_lyrics(group.group_id, document);
+    const auto reports_line = [&](std::int32_t line) {
+        const auto facts = find_sink(*group.sinks, "decodes");
+        return facts && facts->iclforge_state && facts->iclforge_state->lyrics &&
+               facts->iclforge_state->lyrics->item == 41 && facts->iclforge_state->lyrics->line == line;
+    };
+    REQUIRE(eventually([&] { return reports_line(-1); }));
+    auto facts = find_sink(*group.sinks, "decodes");
+    REQUIRE(facts.has_value());
+    CHECK(facts->lyrics_lines == std::size_t{3});
+    CHECK(facts->lyrics_line_text.empty());
+
+    // The sound is 2.5 s in: the board is on the second line, and the page can say which.
+    iclforge::hearth::LyricsUpdate anchor;
+    anchor.item = 41;
+    anchor.anchor = iclforge::hearth::LyricsUpdate::Anchor{.position_ms = 2500, .at_us = 1, .speed = 1.0};
+    group.sinks->apply_lyrics(group.group_id, anchor);
+    REQUIRE(eventually([&] { return reports_line(1); }));
+    facts = find_sink(*group.sinks, "decodes");
+    REQUIRE(facts.has_value());
+    CHECK(facts->lyrics_lines == std::size_t{3});
+    CHECK(facts->lyrics_line_text == "two");
+
+    // A new item's document replaces both: the count and the text are the new file's.
+    iclforge::hearth::LyricsUpdate next;
+    next.item = 42;
+    next.document = "[00:00.50]alpha\n[00:01.00]beta\n";
+    group.sinks->apply_lyrics(group.group_id, next);
+    REQUIRE(eventually([&] {
+        const auto now = find_sink(*group.sinks, "decodes");
+        return now && now->iclforge_state && now->iclforge_state->lyrics && now->iclforge_state->lyrics->item == 42;
+    }));
+    facts = find_sink(*group.sinks, "decodes");
+    REQUIRE(facts.has_value());
+    CHECK(facts->lyrics_lines == std::size_t{2});
+    CHECK(facts->lyrics_line_text.empty());
+}
+
+TEST_CASE("engine: a board that lost the lyrics is sent the document again before the next anchor",
+          "[hearth][group][websocket][iclforge][lyrics]") {
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    KaraokeGroup group("lyrics_recover_group", 30, wanted, true, 16384);
+
+    const auto item_line = [&](std::int64_t item) -> std::optional<std::int32_t> {
+        const auto facts = find_sink(*group.sinks, "decodes");
+        if (facts && facts->iclforge_state && facts->iclforge_state->lyrics &&
+            facts->iclforge_state->lyrics->item == item) {
+            return facts->iclforge_state->lyrics->line;
+        }
+        return std::nullopt;
+    };
+    const auto position = [&](std::int64_t item, std::int64_t position_ms) {
+        iclforge::hearth::LyricsUpdate update;
+        update.item = item;
+        update.anchor = iclforge::hearth::LyricsUpdate::Anchor{.position_ms = position_ms, .at_us = 1, .speed = 1.0};
+        group.sinks->apply_lyrics(group.group_id, update);
+    };
+
+    iclforge::hearth::LyricsUpdate document;
+    document.item = 7;
+    document.document = "[00:01.00]one\n[00:02.00]two\n[00:03.00]three\n";
+    group.sinks->apply_lyrics(group.group_id, document);
+    // The anchor comes straight after the document, as the engine's does: before the board has
+    // reported the item, which is no reason to send the document again (it was, three times).
+    position(7, 1200);
+    REQUIRE(eventually([&] { return item_line(7) == std::optional<std::int32_t>{0}; }));
+    CHECK(of_kind(group.decodes->roles().lyric_commands, Command::kLyrics).size() == 1);
+
+    // A member that reports the item it was sent is not sent the document again.
+    position(7, 1500);
+    REQUIRE(eventually([&] { return of_kind(group.decodes->roles().lyric_commands, Command::kLyricsPosition).size() == 2; }));
+    CHECK(of_kind(group.decodes->roles().lyric_commands, Command::kLyrics).size() == 1);
+
+    // The board loses its document (a restart of its player, or a reconnection) and says so, once
+    // the document has had its time to be reported: a document just sent is not sent again.
+    std::this_thread::sleep_for(2200ms);
+    group.decodes->forget_lyrics();
+    REQUIRE(eventually([&] {
+        const auto facts = find_sink(*group.sinks, "decodes");
+        return facts && facts->iclforge_state && !facts->iclforge_state->lyrics.has_value();
+    }));
+    const std::size_t sent = group.decodes->roles().lyric_commands.size();
+
+    // The next anchor, with no document of its own, is sent behind the group's last one.
+    position(7, 2500);
+    REQUIRE(eventually([&] { return item_line(7) == std::optional<std::int32_t>{1}; }));
+    const auto all = group.decodes->roles().lyric_commands;
+    REQUIRE(all.size() == sent + 2);
+    CHECK(all[sent].command == Command::kLyrics);
+    CHECK(all[sent].lyrics.item == 7);
+    CHECK(all[sent].lyrics.text == document.document.value());
+    CHECK(all[sent + 1].command == Command::kLyricsPosition);
+    CHECK(all[sent + 1].lyrics_position.item == 7);
+    CHECK(all[sent + 1].lyrics_position.position_ms == 2500);
+
+    // And holding it again, the board is not sent it a second time.
+    position(7, 3000);
+    REQUIRE(eventually([&] { return item_line(7) == std::optional<std::int32_t>{2}; }));
+    CHECK(of_kind(group.decodes->roles().lyric_commands, Command::kLyrics).size() == 2);
+}

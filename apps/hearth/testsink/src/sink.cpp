@@ -336,9 +336,15 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                 break;
             case ac::Command::kLyrics: {
                 // The document is parsed as a board would: held when it has lyrics, the item
-                // reported with the line -1 (this sink has no clock of its own to follow it by).
-                const bool held = !command.lyrics.text.empty() &&
-                                  iclforge::lyrics::parse_lyrics(command.lyrics.text).has_value();
+                // reported with the line -1 until an anchor says where the sound is (this sink has
+                // no clock of its own to follow it by: it reports the line of the anchor's position).
+                lyrics_.reset();
+                if (!command.lyrics.text.empty()) {
+                    if (auto parsed = iclforge::lyrics::parse_lyrics(command.lyrics.text)) {
+                        lyrics_ = std::move(*parsed);
+                    }
+                }
+                const bool held = lyrics_.has_value();
                 if (held) {
                     iclforge_state_.lyrics = ac::LyricsReport{.item = command.lyrics.item, .line = -1};
                 } else {
@@ -357,6 +363,12 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                               static_cast<long long>(anchor.item), static_cast<long long>(anchor.position_ms),
                               anchor.speed);
                 log(text);
+                // The line the position is in, for an anchor of the item held.
+                if (lyrics_ && iclforge_state_.lyrics && iclforge_state_.lyrics->item == anchor.item) {
+                    const iclforge::lyrics::LyricPosition at =
+                        iclforge::lyrics::lyric_position(*lyrics_, anchor.position_ms);
+                    iclforge_state_.lyrics->line = at.line ? static_cast<std::int32_t>(*at.line) : -1;
+                }
                 const std::lock_guard lock(sink_->roles_mutex_);
                 sink_->roles_.lyric_commands.push_back(command);
                 break;
@@ -442,6 +454,19 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         sink_->roles_.visualizer.reset();
     }
 
+    // Holds no lyrics from here, and reports it (Sink::forget_lyrics()).
+    void forget_lyrics() {
+        driver().call([&] {
+            lyrics_.reset();
+            iclforge_state_.lyrics.reset();
+            ac::State state = iclforge_state_;
+            state.decoder = bursts_.decoder();
+            state.counters.bursts_played = bursts_.bursts();
+            return session_->set_iclforge_state(state);
+        });
+        log("lyrics dropped");
+    }
+
    private:
     void log(std::string_view text) { sink_->log("[" + std::to_string(id_) + "] " + std::string(text)); }
 
@@ -466,6 +491,8 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     std::string peer_;
     m::PlayerState state_;
     ac::State iclforge_state_;
+    // The document the sink holds, parsed, for the line an anchor's position is in.
+    std::optional<iclforge::lyrics::Lyrics> lyrics_;
     WavOutput output_;
     BurstOutput bursts_;
     // The decoder report last sent.
@@ -846,6 +873,10 @@ void Sink::send_controller_command(const sendspin::controller::CommandMessage& c
     for_each_connection([&](Connection& connection) {
         connection.driver().call([&] { return connection.session().send_command(command); });
     });
+}
+
+void Sink::forget_lyrics() {
+    for_each_connection([&](Connection& connection) { connection.forget_lyrics(); });
 }
 
 void Sink::log(std::string_view text) {

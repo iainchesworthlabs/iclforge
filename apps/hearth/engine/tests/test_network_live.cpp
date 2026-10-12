@@ -705,8 +705,111 @@ TEST_CASE("network sinks live: a karaoke stream is reproduced by the board that 
 // lyrics file beside it (lines at 2, 5 and 8 seconds), and watches the line the board reports against
 // the moment its outputs first carry sound.
 //
-//   ICLFORGE_HEARTH_LIVE_LYRICS_SINK  the board's mDNS instance name; the case is skipped without it
-//   ICLFORGE_HEARTH_LIVE_SECONDS      how long the programme plays (default 14)
+//   ICLFORGE_HEARTH_LIVE_LYRICS_SINK   the board's mDNS instance name; the case is skipped without it
+//   ICLFORGE_HEARTH_LIVE_SECONDS       how long the programme plays (default 14)
+//   ICLFORGE_HEARTH_LIVE_LYRICS_BYTES  pad the file to at least this many bytes with word-timed lines
+//                                      after the item's end: what a board does with a document near
+//                                      the size it states
+//   ICLFORGE_HEARTH_LIVE_LYRICS_STEREO set: play a stereo E-AC-3 tone instead of the karaoke 5.1
+//                                      stream, for a board that decodes two channels (the C6)
+
+namespace {
+
+// The lyrics file's text: lines at 2 s and every 3 s after ("First line", "Second line", "Third
+// line", then "Line 4"...), `timed_lines` of them, then word-timed padding lines, from two minutes in,
+// until it is `min_bytes` long. The padding is what a document costs a board most to hold (a line and
+// each of its words are kept), and it lies beyond the item's end, so the line the board reports while
+// it plays is the unpadded file's.
+[[nodiscard]] std::string live_line_text(int n) {
+    return n == 0 ? "First line" : n == 1 ? "Second line" : n == 2 ? "Third line" : "Line " + std::to_string(n + 1);
+}
+
+[[nodiscard]] std::string live_lyrics_text(int timed_lines, std::size_t min_bytes) {
+    const auto stamp = [](char open, char close, int ms) {
+        char text[16];
+        std::snprintf(text, sizeof text, "%c%02d:%02d.%02d%c", open, ms / 60000, ms / 1000 % 60, ms % 1000 / 10, close);
+        return std::string(text);
+    };
+    std::string out;
+    for (int n = 0; n < timed_lines; ++n) {
+        out += stamp('[', ']', 2000 + 3000 * n);
+        out += live_line_text(n);
+        out += '\n';
+    }
+    for (int n = 0; out.size() < min_bytes && n < 2000; ++n) {
+        const int start = 120000 + 2500 * n;
+        out += stamp('[', ']', start);
+        for (int word = 0; word < 5; ++word) {
+            out += stamp('<', '>', start + 400 * word);
+            out += "padding ";
+        }
+        out += '\n';
+    }
+    return out;
+}
+
+// The programme the lyrics cases play: the karaoke 3/2+LFE stream the cases above use, or, with
+// ICLFORGE_HEARTH_LIVE_LYRICS_STEREO set, a stereo E-AC-3 tone. A board that decodes no more than two
+// channels itself (the C6) is sent a six-channel stream as PCM over player@v1, which carries no lyrics,
+// so a stereo stream is how a case reaches it with lyrics.
+[[nodiscard]] std::vector<std::byte> live_lyrics_programme(int frames) {
+    if (environment("ICLFORGE_HEARTH_LIVE_LYRICS_STEREO")) {
+        return eac3_stream(frames);
+    }
+    std::vector<std::byte> programme;
+    for (const auto& unit : karaoke_units(frames)) {
+        programme.insert(programme.end(), unit.begin(), unit.end());
+    }
+    return programme;
+}
+
+// Pairs the sink `id` the way the page does, as the cases above do: asks, reads the six digits from
+// the board's own GET /status, submits them, and waits for the connection to be paired and its clock
+// to have converged. `unpair` withdraws the pairing however the case ends.
+void pair_live_sink(iclforge::hearth::NetworkSinks& sinks, Unpair& unpair, const std::string& id) {
+    REQUIRE(drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const iclforge::hearth::SinkFacts* facts = row(status, id);
+            return facts != nullptr && !facts->roles.empty();
+        },
+        60s));
+    const iclforge::hearth::NetworkStatus listed = sinks.status();
+    const iclforge::hearth::SinkFacts* const found = row(listed, id);
+    REQUIRE(found != nullptr);
+    const std::string address = found->address;
+    const std::optional<std::string> before = board_status(address);
+    const std::string stale = before ? sendspin_field(*before, "pairing_code").value_or("") : "";
+    sinks.select_sink(id);
+    sinks.pair_sink(id);
+    std::optional<std::string> code;
+    REQUIRE(drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const iclforge::hearth::SinkFacts* facts = row(status, id);
+            if (facts == nullptr || !facts->wants_code) {
+                return false;
+            }
+            if (const std::optional<std::string> text = board_status(address)) {
+                code = sendspin_field(*text, "pairing_code");
+            }
+            return code.has_value() && code->size() == 6 && *code != stale;
+        },
+        45s));
+    sinks.submit_pairing_code(id, *code);
+    unpair.paired(id);
+    REQUIRE(drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const iclforge::hearth::SinkFacts* facts = row(status, id);
+            return facts != nullptr && facts->pair_state == iclforge::hearth::PairState::kPaired &&
+                   facts->link == iclforge::hearth::SinkLink::kConnected &&
+                   facts->iclforge_support.has_value() && facts->clock_converged;
+        },
+        45s));
+}
+
+}  // namespace
 
 TEST_CASE("network sinks live: a board that holds lyrics follows them with the sound",
           "[.][hearth-network-live]") {
@@ -791,16 +894,16 @@ TEST_CASE("network sinks live: a board that holds lyrics follows them with the s
     fs::create_directories(folder);
     const fs::path item = folder / "song.ac3";
     {
+        const std::optional<std::string> padded = environment("ICLFORGE_HEARTH_LIVE_LYRICS_BYTES");
+        const std::string text =
+            live_lyrics_text(3, padded ? static_cast<std::size_t>(std::atoll(padded->c_str())) : 0);
+        std::printf("lyrics file %zu bytes; the board states a most of %u\n", text.size(),
+                    static_cast<unsigned>(support_facts.iclforge_support->lyrics_max_bytes));
         std::ofstream lrc(fs::path(item).replace_extension(".lrc"), std::ios::binary);
-        lrc << "[00:02.00]First line\n[00:05.00]Second line\n[00:08.00]Third line\n";
+        lrc << text;
     }
 
-    const int frames = seconds * 48000 / 1536;
-    const std::vector<std::vector<std::byte>> units = karaoke_units(frames);
-    std::vector<std::byte> programme;
-    for (const auto& unit : units) {
-        programme.insert(programme.end(), unit.begin(), unit.end());
-    }
+    const std::vector<std::byte> programme = live_lyrics_programme(seconds * 48000 / 1536);
     const std::string item_path = item.string();
     const iclforge::hearth::ItemLoader loader =
         [&programme, item_path](const std::string& path) -> std::expected<iclforge::hearth::LoadedItem, std::string> {
@@ -882,4 +985,198 @@ TEST_CASE("network sinks live: a board that holds lyrics follows them with the s
     CHECK(std::abs(first - 2.0) < 0.6);
     CHECK(std::abs(second - 3.0) < 0.5);
     CHECK(std::abs(third - 3.0) < 0.5);
+}
+
+// ---- a board that restarts in the middle of an item ----------------------------------------------
+//
+// A board that restarts comes back holding nothing. The host reads that from the state the board
+// reports (no lyrics, or another item's) and sends the item's document again with its next anchor, so
+// the board is back on the right line without the item being played again. This is that against a
+// real board, hidden: the board is restarted (POST /restart) a few lines into the item, and has to
+// report the item's lyrics again and keep moving through them, and the Network page's facts have to
+// name the line it is on.
+//
+//   ICLFORGE_HEARTH_LIVE_LYRICS_SINK  the board's mDNS instance name; the case is skipped without it
+//   ICLFORGE_HEARTH_LIVE_SECONDS      how long the programme plays (default 60, at least 45)
+
+TEST_CASE("network sinks live: a board that restarts mid-item is sent the lyrics again and follows them",
+          "[.][hearth-network-live]") {
+    const std::optional<std::string> named = environment("ICLFORGE_HEARTH_LIVE_LYRICS_SINK");
+    if (!named) {
+        SKIP("ICLFORGE_HEARTH_LIVE_LYRICS_SINK names no sink");
+    }
+    const std::string id = *named;
+    const int seconds = environment("ICLFORGE_HEARTH_LIVE_SECONDS")
+                            ? std::atoi(environment("ICLFORGE_HEARTH_LIVE_SECONDS")->c_str())
+                            : 60;
+    REQUIRE(seconds >= 45);
+
+    iclforge::hearth::MemorySettingsStore settings;
+    iclforge::hearth::PairingStore store{settings, [] { return std::string("live"); }};
+    const auto identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    iclforge::hearth::NetworkSinks sinks{*identity, "Hearth live test", store, {.request_firewall_exception = false}};
+    REQUIRE(sinks.started());
+    Unpair unpair(sinks);
+    pair_live_sink(sinks, unpair, id);
+
+    const iclforge::hearth::SinkFacts support_facts = *row(sinks.status(), id);
+    REQUIRE(support_facts.iclforge_support.has_value());
+    REQUIRE(support_facts.iclforge_support->lyrics_max_bytes > 0);
+    const std::string address = support_facts.address;
+
+    const std::string group_id = sinks.create_group("Live restart");
+    REQUIRE_FALSE(group_id.empty());
+    sinks.add_group_member(group_id, id);
+
+    namespace fs = std::filesystem;
+    const fs::path folder = fs::temp_directory_path() / "iclforge_live_lyrics_restart";
+    fs::create_directories(folder);
+    const fs::path item = folder / "song.ac3";
+    const int timed_lines = (seconds - 2) / 3;
+    {
+        std::ofstream lrc(fs::path(item).replace_extension(".lrc"), std::ios::binary);
+        lrc << live_lyrics_text(timed_lines, 0);
+    }
+    const std::vector<std::byte> programme = live_lyrics_programme(seconds * 48000 / 1536);
+    const std::string item_path = item.string();
+    const iclforge::hearth::ItemLoader loader =
+        [&programme, item_path](const std::string& path) -> std::expected<iclforge::hearth::LoadedItem, std::string> {
+        if (path != item_path) {
+            return std::unexpected("no such item: " + path);
+        }
+        return iclforge::hearth::LoadedItem{.bytes = programme};
+    };
+    const auto layout = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(layout.has_value());
+    iclforge::hearth::NetworkSinks* const planner = &sinks;
+    iclforge::hearth::EngineOutputs outputs_for_engine{
+        .group = iclforge::hearth::make_group_sink(
+            [planner](const std::string& group) { return planner->group(group); },
+            [planner](const iclforge::hearth::GroupPlanRequest& request) { return planner->plan_group(request); },
+            [planner](const std::string& group, const iclforge::hearth::KaraokeChoice& choice) {
+                planner->apply_karaoke(group, choice);
+            },
+            [planner](const std::string& group, const iclforge::hearth::LyricsUpdate& update) {
+                planner->apply_lyrics(group, update);
+            })};
+    iclforge::hearth::Engine engine(std::move(outputs_for_engine), loader, *layout,
+                                    iclforge::hearth::DecoderSettings{}, iclforge::hearth::EngineTiming{});
+    engine.set_output_preferences(
+        iclforge::hearth::OutputPreferences{.pinned = iclforge::hearth::OutputMode::kNetworkGroup,
+                                            .follow_sink = true,
+                                            .group_name = group_id,
+                                            .group_ready = true});
+    engine.add({iclforge::hearth::QueueItem{.path = item_path, .title = "Live restart"}});
+    engine.play_item(0);
+    std::printf("playing %d s, a line every 3 s from 2 s\n", seconds);
+
+    using Clock = std::chrono::steady_clock;
+    const Clock::time_point began = Clock::now();
+    const auto at = [&] { return std::chrono::duration<double>(Clock::now() - began).count(); };
+
+    // Until the board reports the item's lyrics on its second line or a later one.
+    std::int64_t reported_item = 0;
+    std::int32_t line_before = -1;
+    REQUIRE(drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const iclforge::hearth::SinkFacts* facts = row(status, id);
+            if (facts != nullptr && facts->iclforge_state && facts->iclforge_state->lyrics &&
+                facts->iclforge_state->lyrics->line >= 1) {
+                reported_item = facts->iclforge_state->lyrics->item;
+                line_before = facts->iclforge_state->lyrics->line;
+                return true;
+            }
+            return false;
+        },
+        45s));
+    std::printf("  before the restart: item %lld, line %d, at %.1f s\n", static_cast<long long>(reported_item),
+                static_cast<int>(line_before), at());
+    std::fflush(stdout);
+
+    // The restart: the board reboots into the image it runs, and the reply may never come.
+    {
+        httplib::Client client("http://" + address);
+        client.set_connection_timeout(3, 0);
+        client.set_read_timeout(4, 0);
+        const httplib::Result result = client.Post("/restart", "", "text/plain");
+        std::printf("  POST /restart: %s at %.1f s\n",
+                    result ? ("status " + std::to_string(result->status)).c_str() : "no reply", at());
+        std::fflush(stdout);
+    }
+
+    // The board is gone (the link ends, or what it reports has no lyrics) and then back holding the
+    // item's lyrics again.
+    bool gone = false;
+    double gone_at = 0.0;
+    double back_at = 0.0;
+    REQUIRE(drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const iclforge::hearth::SinkFacts* facts = row(status, id);
+            if (facts == nullptr) {
+                return false;
+            }
+            const bool holds = facts->link == iclforge::hearth::SinkLink::kConnected && facts->iclforge_state &&
+                               facts->iclforge_state->lyrics.has_value();
+            if (!gone) {
+                if (!holds) {
+                    gone = true;
+                    gone_at = at();
+                    std::printf("  the board is gone at %.1f s\n", gone_at);
+                    std::fflush(stdout);
+                }
+                return false;
+            }
+            if (holds && facts->iclforge_state->lyrics->item == reported_item) {
+                back_at = at();
+                return true;
+            }
+            return false;
+        },
+        60s));
+    std::printf("  back at %.1f s (%.1f s after the board went) holding item %lld again\n", back_at,
+                back_at - gone_at, static_cast<long long>(reported_item));
+    std::fflush(stdout);
+
+    // And it goes on through the lines: from the first it reports with a position, the next three
+    // come in order, about 3 s apart.
+    std::vector<std::pair<std::int32_t, double>> observed;
+    std::string first_text;
+    std::optional<std::size_t> first_lines;
+    std::int32_t last = -2;
+    drive(
+        sinks,
+        [&](const iclforge::hearth::NetworkStatus& status) {
+            const iclforge::hearth::SinkFacts* facts = row(status, id);
+            if (facts != nullptr && facts->iclforge_state && facts->iclforge_state->lyrics &&
+                facts->iclforge_state->lyrics->item == reported_item && facts->iclforge_state->lyrics->line >= 0 &&
+                facts->iclforge_state->lyrics->line != last) {
+                last = facts->iclforge_state->lyrics->line;
+                if (observed.empty()) {
+                    first_text = facts->lyrics_line_text;
+                    first_lines = facts->lyrics_lines;
+                }
+                observed.emplace_back(last, at());
+                std::printf("  line %d at %.1f s (\"%s\")\n", static_cast<int>(last), at(),
+                            facts->lyrics_line_text.c_str());
+                std::fflush(stdout);
+            }
+            return observed.size() >= 4;
+        },
+        45s);
+
+    // The board came back on a line at or past the one it was on, and then goes through the file's
+    // lines in order, 3 s apart.
+    REQUIRE(observed.size() >= 4);
+    CHECK(observed[0].first >= line_before);
+    CHECK(observed[1].first == observed[0].first + 1);
+    CHECK(observed[2].first == observed[1].first + 1);
+    CHECK(observed[3].first == observed[2].first + 1);
+    CHECK(std::abs((observed[2].second - observed[1].second) - 3.0) < 1.0);
+    CHECK(std::abs((observed[3].second - observed[2].second) - 3.0) < 1.0);
+    // The Network page's facts say how many lines the file has, and the text of the one it is on.
+    CHECK(first_lines == static_cast<std::size_t>(timed_lines));
+    CHECK(first_text == live_line_text(observed[0].first));
 }

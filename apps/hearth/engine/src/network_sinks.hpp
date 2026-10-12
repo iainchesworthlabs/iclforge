@@ -360,6 +360,14 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
         std::optional<sendspin::player::Settings> intended_settings{};
         std::int64_t next_settings_revision = 1;
         std::optional<std::int32_t> identify_slot{};
+
+        // The lyrics last sent this sink (apply_lyrics()): the item, when, and whether it was told
+        // the item has none (a document too big for it). A sink that does not report the item is
+        // sent the document again, but not while the first is still being reported, and not an
+        // item it was told has none.
+        std::int64_t lyrics_sent_item = 0;
+        Clock::time_point lyrics_sent_at{};
+        bool lyrics_sent_none = false;
     };
 
     struct GroupEntry {
@@ -381,6 +389,9 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
         // them: one that joined while the item played, or reconnected.
         std::int64_t lyrics_item = 0;
         std::string lyrics_text{};
+        // The text of each line of that document, in the order a sink counts them by (the same
+        // reader's), for the Network page to say which line a sink is on.
+        std::vector<std::string> lyrics_line_texts{};
     };
 
     // A dial to make once mutex_ is released: to pair, or not.
