@@ -115,6 +115,7 @@ Proposed ids, from the board and not from the codec:
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none on the bench: any C6 module |
 | `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a `.99`, P4b `.76` |
 | `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | the same boards |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none on the bench: the owner's ESP32-P4X-Function-EV-Board has not arrived |
 
 **AC-4 on the S3 is its own profile, not an overlay on `s3-n16r8`, and so is AC-4 on the P4
 (`p4-rev1-ac4`).** Both were decided by the owner on 2026-10-12. The reason it holds up: AC-4 changes
@@ -127,10 +128,29 @@ run the AC-4 profile.
 A C6 has no AC-4 profile: the decoder's floor (286,365 bytes) never fits beside Wi-Fi
 ([`esp32-sink-compatibility-matrix.md`](esp32-sink-compatibility-matrix.md)).
 
-**A P4 of revision 3.x is a profile of its own, `p4-rev3`, which this file does not have yet.**
-#1400 adds its image (`hearth-sink-esp32p4-rev3`, chips 3.01 to 3.99, `panel` and `panel-dsi`
-fragments over `p4-rev3`, 400 MHz, the bootloader at warn level to fit). It has never run on a
-board, so when it is added it has its guard and its budgets and no play list.
+**A P4 of revision 3.x is a profile of its own, `p4-rev3`** (PR 13, once #1400 was on main). Its
+image is `hearth-sink-esp32p4-rev3` (chips 3.01 to 3.99, `panel` and `panel-dsi` fragments over
+`p4-rev3`, 400 MHz, the bootloader at warn level to fit). It has never run on a board, so it has
+its guard and its budgets and **no play list and no baseline**; `suite.json` has its entry with
+an empty list and says why, and the first board that runs the image adds the rows, as the v1.x
+profiles' were added. What it is:
+
+- **133 locked keys**, snapshotted from a real configured build (2026-10-12): the two revision
+  bounds (`ESP32P4_REV_MIN_FULL` 301 and `ESP32P4_REV_MAX_FULL` 399, so it refuses a v1.x chip,
+  as `p4-rev1` refuses a v3.x one), 400 MHz, the DSI panel and no null display, LVGL's heap in PSRAM
+  (`LV_USE_CUSTOM_MALLOC`), and the I2S queue. **The screen task's stack
+  (`ICLFORGE_EXAMPLE_PANEL_STACK_BYTES`, 16,384, in PSRAM) is locked by hand**: it is `free` for
+  every profile with no screen, where it is inert, and `snapshot` skips a free key, while
+  `verify` reads a locked key first. A test holds it locked here and in no other profile.
+- **Budgets**, about 5% over what the build measured, as the S3's and C6's are: the app
+  2,600,000 bytes (2,469,920 built; CI's #1400 build 2,466,032), static internal RAM 175,000
+  (DIRAM 166,948), the bootloader 24,576 (22,448).
+- **CI reads it**: the `_build.yml` step for this image takes its fragments from
+  `sink_profile.py defaults p4-rev3`, is held by `verify` and packaged with `--profile p4-rev3`,
+  as the boards' are. The release rules' list and the profiles are one list now:
+  `IMAGES_WITHOUT_A_PROFILE` in the test is empty. The panel's null-display build stays an
+  `other_stacks` entry: a development build, not a board's image.
+- **The hash is `6e5a68ebbb57`.** The real build holds to it.
 
 ## What a profile locks
 
@@ -603,7 +623,9 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash) and **`s3-n16r8-ac4` built** (S3a, cross-checked on S3b; `s3-n16r8` re-recorded under its new hash). `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
-PR 3 follows 2. PR 2 adds `p4-rev3` once #1400 is on main, since its fragments are not.
+| 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; no board has run the image, so no list and no baseline |
+
+PR 3 follows 2. `p4-rev3` waited for #1400's fragments to be on main (row 9).
 
 ## Decisions for the owner
 
@@ -631,3 +653,5 @@ Still open:
 - That QEMU can run the release shape's PSRAM execution. It is a spike (PR 5).
 - That the boot line is sufficient. It is an early warning for the failure this page started with,
   and the play list is what holds the rest.
+- That the v3.x image works. No board of that revision has run it: `p4-rev3` holds the shape of
+  its build (placement, sizes, caches, the screen's keys), not that LVGL draws or the panel lights.
