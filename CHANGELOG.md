@@ -92,6 +92,12 @@ The sections below contain the complete change list and fixes.
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
   `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
+  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
+  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
+  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
+  is named on the row when it is chosen, and none is written. The row's strings are translated in
+  the six catalogues.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 

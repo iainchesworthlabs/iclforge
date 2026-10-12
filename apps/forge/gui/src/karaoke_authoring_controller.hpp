@@ -47,11 +47,18 @@ public:
     // The kbps a stream of `mode` ("3/2") starts at (karaoke_default_bitrate_kbps()).
     Q_INVOKABLE int defaultBitrateKbps(const QString& mode) const;
 
-    // The `.lrc` of the same name beside a file, as a file URL, or "" (karaoke_lyrics_beside()).
-    // `url` is a file URL or a path.
+    // The lyrics file of the same name beside a file (`.lrc`, else `.srt`, `.ass` or `.kar`), as a
+    // file URL, or "" (karaoke_lyrics_beside()). `url` is a file URL or a path.
     Q_INVOKABLE QString lyricsBeside(const QString& url) const;
 
-    // Puts a lyrics file beside a saved stream (karaoke_copy_lyrics()): "copied",
-    // "already-there", "exists" (one was there and is left alone), "unreadable" or "failed".
+    // Puts a lyrics file beside a saved stream as the stream's own UTF-8 `.lrc`
+    // (karaoke_copy_lyrics()): "copied", "already-there", "exists" (one was there and is left
+    // alone), "unreadable" or "failed".
     Q_INVOKABLE QString copyLyrics(const QString& lyricsUrl, const QString& streamPath) const;
+
+    // Why a lyrics file cannot be used as lyrics, in the reader's words, or "" when it can
+    // (karaoke_lyrics_problem()): a file in a code page is said so when it is chosen, and the page
+    // asks again for the reason when a copy came back "unreadable". `url` is a file URL or a
+    // path.
+    Q_INVOKABLE QString lyricsProblem(const QString& url) const;
 };

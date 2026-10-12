@@ -6,10 +6,12 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <optional>
 #include <string_view>
 #include <system_error>
 #include <utility>
 
+#include "iclforge/lyrics/lyrics.hpp"
 #include "karaoke_parts.hpp"
 
 namespace forge_gui {
@@ -138,50 +140,53 @@ int karaoke_default_bitrate_kbps(const std::string& mode) {
     return 192;
 }
 
-namespace {
-
-bool is_lrc_extension(const std::filesystem::path& extension) {
-    const std::string text = extension.string();
-    return text.size() == 4 && text[0] == '.' &&
-           std::tolower(static_cast<unsigned char>(text[1])) == 'l' &&
-           std::tolower(static_cast<unsigned char>(text[2])) == 'r' &&
-           std::tolower(static_cast<unsigned char>(text[3])) == 'c';
-}
-
-}  // namespace
-
 std::string karaoke_lyrics_beside(const std::string& media_path) {
-    namespace fs = std::filesystem;
-    std::error_code ec;
-    const fs::path media(media_path);
-    const fs::path folder = media.has_parent_path() ? media.parent_path() : fs::path(".");
-    const std::string stem = media.stem().string();
-    for (fs::directory_iterator it(folder, ec), end; !ec && it != end; it.increment(ec)) {
-        const fs::path& candidate = it->path();
-        if (is_lrc_extension(candidate.extension()) && candidate.stem().string() == stem &&
-            it->is_regular_file(ec)) {
-            return candidate.string();
-        }
-    }
-    return {};
+    const std::optional<std::filesystem::path> found = iclforge::lyrics::find_lyrics_file(media_path);
+    return found ? found->string() : std::string{};
 }
 
-KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path, const std::string& stream_path) {
+KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path, const std::string& stream_path,
+                                      std::string* error) {
     namespace fs = std::filesystem;
     std::error_code ec;
     const fs::path source(lyrics_path);
     if (!fs::is_regular_file(source, ec)) {
+        if (error != nullptr) {
+            *error = "The lyrics file could not be read.";
+        }
         return KaraokeLyricsCopy::kUnreadable;
     }
     fs::path target(stream_path);
     target.replace_extension(".lrc");
-    if (fs::exists(target, ec)) {
-        return fs::equivalent(source, target, ec) ? KaraokeLyricsCopy::kAlreadyThere
-                                                  : KaraokeLyricsCopy::kExists;
+    // The file offered is the one beside the stream already: nothing to write, and nothing of it
+    // is touched.
+    if (fs::exists(target, ec) && fs::equivalent(source, target, ec)) {
+        return KaraokeLyricsCopy::kAlreadyThere;
     }
-    return fs::copy_file(source, target, fs::copy_options::none, ec) && !ec
-               ? KaraokeLyricsCopy::kCopied
-               : KaraokeLyricsCopy::kFailed;
+    const iclforge::lyrics::Placement placed =
+        iclforge::lyrics::place_lyrics_beside(source, fs::path(stream_path));
+    switch (placed.status) {
+        case iclforge::lyrics::PlacementStatus::kWritten:
+            return KaraokeLyricsCopy::kCopied;
+        case iclforge::lyrics::PlacementStatus::kExists:
+            return KaraokeLyricsCopy::kExists;
+        case iclforge::lyrics::PlacementStatus::kUnreadable:
+            if (error != nullptr) {
+                *error = placed.error;
+            }
+            return KaraokeLyricsCopy::kUnreadable;
+        case iclforge::lyrics::PlacementStatus::kFailed:
+            break;
+    }
+    if (error != nullptr) {
+        *error = placed.error;
+    }
+    return KaraokeLyricsCopy::kFailed;
+}
+
+std::string karaoke_lyrics_problem(const std::string& lyrics_path) {
+    const auto read = iclforge::lyrics::read_lyrics(std::filesystem::path(lyrics_path));
+    return read ? std::string{} : read.error();
 }
 
 std::string karaoke_duration_text(double seconds) {

@@ -345,6 +345,10 @@ target_link_libraries(forge-gui
         # AC-4 in the codec list, the QC, the player and the object page, through
         # the decoder's and the encoder's public APIs.
         iclforge::ac4
+        # The Karaoke flow's lyrics: any of .lrc, .srt, .ass and .kar is read and written beside the
+        # stream as the stream's own UTF-8 .lrc (the same place_lyrics_beside `forge encode lyrics=`
+        # uses).
+        iclforge::lyrics
         iclforge::warnings
         iclforge::fmt
         # The project file's reader and writer (apps/shared/project), which `forge` compiles in

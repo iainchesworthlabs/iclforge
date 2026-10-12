@@ -83,10 +83,15 @@ save picker and the run strip are the ones Guided uses; the stream built for Hea
 only what you save is.
 
 The bit rate starts where the mode's width wants it (384 kbps for 3/2, 320 for 3/1 and 2/2, 256 for
-3/0 and 2/1) and stays where you set it. A **Lyrics** row names the `.lrc` that goes beside the
-stream: one of the backing's name beside it is offered, you can choose another or remove it, and
-the stream is saved with the same name and `.lrc`, where Hearth looks for lyrics. A lyrics file
-already there is left as it is.
+3/0 and 2/1) and stays where you set it. A **Lyrics** row names the lyrics file that goes beside
+the stream: one of the backing's name beside it is offered (an `.lrc`, else an `.srt`, `.ass` or
+`.kar`), you can choose another or remove it, and the stream is saved with the same name and
+`.lrc`, where Hearth looks for lyrics. Whatever the file's format, what is written is UTF-8 LRC,
+with a duet's singers, the word times the file has, and the silence between a subtitle file's cues
+marked, which is the one format Hearth reads and sends to a network sink. A file in a code page
+(Latin-1, Shift-JIS, Windows-1255) is named on the row when it is chosen, and none is written; the
+stream is saved as usual. A lyrics file already there is left as it is. `forge encode` does the
+same with `lyrics=`.
 
 The start offsets and trims you set on the parts stay when you add, replace or remove a part.
 
@@ -120,6 +125,7 @@ the reproduction, the vocals and the part levels.
 
 ## What it does not do
 
-- **Timing or editing lyrics.** Hearth reads `.lrc` files beside a stream; nothing here makes or
-  times one, it only puts one you have beside the stream.
+- **Timing or editing lyrics.** Nothing here makes or times a lyrics file; it puts one you have
+  beside the stream, in the one format Hearth reads. Styling and positions in an ASS script are
+  not carried.
 - **E-AC-3 or AC-4.** Their specifications give a karaoke stream no mode.

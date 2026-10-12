@@ -192,6 +192,20 @@ public:
         return QUrl::fromLocalFile(path);
     }
 
+    // A file of exactly these bytes, given as hexadecimal ("5b30305d"): what writeText cannot
+    // make, since it is UTF-8 whatever it is given (a lyrics file in a code page). The file's URL,
+    // or an empty one where it could not be written.
+    [[nodiscard]] Q_INVOKABLE QUrl writeBytes(const QString& name, const QString& hex) const {
+        const QString path = QDir(folder_).filePath(name);
+        QFile file(path);
+        const QByteArray bytes = QByteArray::fromHex(hex.toLatin1());
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+            file.write(bytes) != bytes.size()) {
+            return {};
+        }
+        return QUrl::fromLocalFile(path);
+    }
+
     // The folder the generated files go in, as a URL: a project written there refers to the
     // parts beside it by their names.
     [[nodiscard]] Q_INVOKABLE QUrl folder() const { return QUrl::fromLocalFile(folder_); }
