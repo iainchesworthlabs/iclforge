@@ -429,6 +429,10 @@ the item ending does the same.
   Takes are never put beside the song file.
 - **The last take** is offered with **Show in folder** and **Delete this take**, which removes the
   file and its description.
+- **Your takes** lists what is in the folder, newest first: the five newest, and how many more
+  there are. Each has **Delete**, which asks again (**Delete for good**, or **Keep**) before it
+  removes the file and its description, because a take cannot be got back. Only takes Hearth made
+  are listed: a file with no description beside it is not one, and is never offered for removal.
 
 Turning a take into a karaoke stream with your voice as a vocal part is what the Forge GUI's
 Karaoke flow already does with any mono file: decode the stream's parts with `forge decode`, give
