@@ -631,6 +631,9 @@ TestCase {
                "the sink does not say it applied the settings");
         // A sink that takes lyrics and has been sent none holds none, and the report says so.
         compare(NetworkController.sinkReport.lyricsText, "none held");
+        // No stream is open, so there is no output to say: the key is in the report, empty.
+        verify("outputText" in NetworkController.sinkReport, "the report has no output row");
+        compare(NetworkController.sinkReport.outputText, "");
     }
 
     // The pairing Hearth made is a record in its settings: the Settings

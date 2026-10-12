@@ -29,6 +29,15 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth's Network page says how a sink plays the stream**
+
+- **An "Output" row in "What the sink reports": "passed through as coded" or "decoded by the
+  sink".** It reads the extension role's `output` state key (below). The row is empty while the
+  sink has no stream open, and says "not reported" for a stream the sink does not say how it
+  plays, which is every sink and board that predates the key. The wording is a small header,
+  `sink_output_text.hpp`, with its own test, as the Lyrics row's is; the six catalogues carry the
+  new "Output" label untranslated.
+
 **The extension role's state says how the stream leaves the sink**
 
 - **`output` in `_iclforge_player`'s `client/state`: `"passthrough"` (the coded bits go on to a
