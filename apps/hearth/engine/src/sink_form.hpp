@@ -38,12 +38,14 @@
 //      its settings ask for objects, or leave it to its layout, which has
 //      height speakers - is sent PCM decoded here where that is possible, and
 //      the stream as it is, to be played as its bed, where it is not.
-//      One more condition for a karaoke AC-3 stream the singer wants reproduced (not "as
+//      One more condition for a karaoke AC-3 or E-AC-3 stream the singer wants reproduced (not "as
 //      coded"): the sink's decoder settings list `karaoke`, and `karaoke_vocals` for the capable
-//      reproduction. A sink whose decoder is not told how plays the coded channels, and a group
-//      would then play two things: that sink is sent PCM decoded here instead, with the
-//      reproduction applied, and where it takes no PCM it is sent the stream as it is and the
-//      reason says it is not reproduced (planning/karaoke-phase2.md, W7).
+//      reproduction, and its `karaoke_codecs` list the stream's data type (a sink that lists
+//      none reproduces AC-3's alone). A sink whose decoder is not told how plays the coded
+//      channels, and a group would then play two things: that sink is sent PCM decoded here
+//      instead, with the reproduction applied, and where it takes no PCM it is sent the stream
+//      as it is and the reason says it is not reproduced (planning/karaoke-phase2.md, W7;
+//      planning/karaoke-eac3.md, D6).
 //   2. Else PCM, if the sink offers `player@v1` with a PCM format that
 //      carries the stream's rate and if the policy allows it. The layout is
 //      the one the sink is configured to (its own reported `layout`, else the

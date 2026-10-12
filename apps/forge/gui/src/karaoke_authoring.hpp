@@ -43,29 +43,40 @@ namespace forge_gui {
 // encoder's own default is 192, which is stereo's. 192 for a mode this does not name.
 [[nodiscard]] int karaoke_default_bitrate_kbps(const std::string& mode);
 
-// The lyrics file beside `media_path`: the same name in the same folder with the extension `.lrc`,
-// matched without regard to case, which is where Hearth looks for it (planning/karaoke.md, L1).
-// Empty when there is none.
+// The lyrics file beside `media_path`: the same name in the same folder with the extension `.lrc`
+// and, where there is none, `.srt`, `.ass` or `.kar`, matched without regard to case, which is where
+// Hearth looks for it (planning/karaoke.md, L1; iclforge::lyrics::find_lyrics_file). Empty when
+// there is none.
 [[nodiscard]] std::string karaoke_lyrics_beside(const std::string& media_path);
 
 // What became of a lyrics file offered beside a saved stream.
 enum class KaraokeLyricsCopy : std::uint8_t {
-    // Written beside the stream, under the stream's name with `.lrc`.
+    // Written beside the stream, under the stream's name with `.lrc`, as UTF-8 LRC whatever the
+    // file offered was (iclforge::lyrics::place_lyrics_beside).
     kCopied,
     // It was already there: the file offered is that file.
     kAlreadyThere,
     // A lyrics file of that name was already beside the stream, and was left as it was.
     kExists,
-    // The file offered could not be read.
+    // The file offered could not be read, or is not lyrics (a code page is named, not guessed at).
     kUnreadable,
-    // The copy was refused (a read-only folder, a full disk).
+    // The write was refused (a read-only folder, a full disk).
     kFailed,
 };
 
 // Puts `lyrics_path` beside `stream_path` as the stream's own lyrics file, so that the player finds
-// it by name. An existing lyrics file there is never overwritten.
+// it by name: whichever of `.lrc`, `.srt`, `.ass` and `.kar` it is, written as the one format a
+// player reads (UTF-8 LRC, with a duet's singers and the word times the file has). An existing
+// lyrics file there is never overwritten. `error`, when given, is set to the reason for
+// kUnreadable and kFailed.
 [[nodiscard]] KaraokeLyricsCopy karaoke_copy_lyrics(const std::string& lyrics_path,
-                                                    const std::string& stream_path);
+                                                    const std::string& stream_path,
+                                                    std::string* error = nullptr);
+
+// Why `lyrics_path` cannot be used as lyrics, as a sentence for the page, or "" when it can: it is
+// read the way karaoke_copy_lyrics reads it, so that a file in a code page is said so when it is
+// chosen and not when the stream is saved.
+[[nodiscard]] std::string karaoke_lyrics_problem(const std::string& lyrics_path);
 
 enum class KaraokePart : std::uint8_t { kBacking, kMelody, kVocal1, kVocal2, kLfe };
 

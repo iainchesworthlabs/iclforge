@@ -7,7 +7,7 @@ The picture of a CD+G disc as a window shows it: the disc as images by position,
 A app library, internal to the repository.
 
 - **Uses:** `lyrics`
-- **Used by:** `crucible`, `hearth`
+- **Used by:** `crucible`, `forge`, `hearth`
 - **CI lanes:** windows, linux, macos
 
 ## Build and test

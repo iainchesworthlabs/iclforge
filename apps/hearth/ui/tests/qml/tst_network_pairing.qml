@@ -572,6 +572,8 @@ TestCase {
         // The report says so too, instead of "Nothing sent yet.".
         verify(NetworkController.sinkReport.settingsText.indexOf("does not take") >= 0,
                NetworkController.sinkReport.settingsText);
+        // It lists no lyric commands, and the report says it takes none (W7d).
+        compare(NetworkController.sinkReport.lyricsText, "not offered");
         // A push attempted anyway (the page cannot, but the controller is
         // public) is refused and reported, not dropped.
         const before = NetworkController.sinkSpeakerSettings.layoutText;
@@ -585,7 +587,8 @@ TestCase {
     // takes an edit made on the tab, and reports the revision applied.
     function test_sinkThatTakesSettingsAppliesAnEditFromTheSpeakersTab() {
         const page = makePage();
-        compare(TestServices.startTestSink("Settings sink", true), "", "the second test sink did not start");
+        // Holding up to 4 KB of lyrics, so the report has a Lyrics row to say none is held yet.
+        compare(TestServices.startTestSink("Settings sink", true, 4096), "", "the second test sink did not start");
         let row = null;
         tryVerify(function() {
             row = NetworkController.sinks.find(function(r) { return r.name === "Settings sink"; });
@@ -626,6 +629,8 @@ TestCase {
                   "the sink never reported the revision applied: " + NetworkController.sinkReport.settingsText);
         verify(TestServices.testSinkLog().some(function(line) { return line.indexOf("settings 1 applied") >= 0; }),
                "the sink does not say it applied the settings");
+        // A sink that takes lyrics and has been sent none holds none, and the report says so.
+        compare(NetworkController.sinkReport.lyricsText, "none held");
     }
 
     // The pairing Hearth made is a record in its settings: the Settings

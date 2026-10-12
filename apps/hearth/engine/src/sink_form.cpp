@@ -88,11 +88,25 @@ static_assert(sp::kKaraokeLevelMinDb == ac3::kKaraokeMinLevelDb &&
     return std::ranges::find(support.decoder_settings, key) != support.decoder_settings.end();
 }
 
+// "AC-3", or "AC-3 and E-AC-3": the codecs a sink says it reproduces karaoke for.
+[[nodiscard]] std::string karaoke_codecs_text(const sp::Support& support) {
+    std::string text;
+    for (const sp::DataType type :
+         {sp::DataType::kAc3, sp::DataType::kEac3, sp::DataType::kAc4}) {
+        if (support.reproduces_karaoke(type)) {
+            text += text.empty() ? "" : " and ";
+            text += type_text(type);
+        }
+    }
+    return text.empty() ? std::string("no codec") : text;
+}
+
 // Why a karaoke stream whose reproduction is wanted is not to be left to this sink's own decoder:
 // it has not been told how, so it would play the coded channels, and a group would play two
 // things. Nothing for a stream that is not to be reproduced, and for a sink that takes the
 // settings (the settings command is among the commands it supports, which is how a server
-// learns it can send one).
+// learns it can send one) and reproduces karaoke for the stream's codec (`karaoke_codecs`,
+// which a sink from before the key leaves out and so reproduces AC-3's alone).
 struct KaraokeRefusal {
     std::string why;
     // The sink reproduces the karaoke all the same and only misses a level, so a stream that is
@@ -109,6 +123,15 @@ struct KaraokeRefusal {
     if (!takes_setting(support, "karaoke")) {
         return KaraokeRefusal{
             .why = "This sink does not reproduce karaoke: it does not take the setting"};
+    }
+    // A sink that takes the setting has a path for the codecs it lists, and plays any other
+    // stream as coded: an E-AC-3 karaoke stream sent to a board whose path is AC-3's would be
+    // heard as coded beside a member that reproduces it (planning/karaoke-eac3.md, D6).
+    if (stream.stream && !support.reproduces_karaoke(data_type_of(*stream.stream))) {
+        return KaraokeRefusal{
+            .why = fmt::format("This sink reproduces karaoke for {}, not for {}",
+                               karaoke_codecs_text(support),
+                               type_text(data_type_of(*stream.stream)))};
     }
     if (stream.karaoke->reproduction == sp::Karaoke::kCapable &&
         !takes_setting(support, "karaoke_vocals")) {

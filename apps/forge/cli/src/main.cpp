@@ -22,6 +22,7 @@
 #include "commands/decode.hpp"
 #include "commands/encode.hpp"
 #include "commands/live_audio.hpp"
+#include "commands/lyrics.hpp"
 #include "commands/probe.hpp"
 #include "commands/project.hpp"
 #include "commands/stream_tools.hpp"
@@ -775,7 +776,18 @@ int run_main(int argc, char** argv) {
             }
             return kExitUnavailable;
         }
-        return c->run(Args{args, meta, couple_flag});
+        // lyrics=: a bad file is refused before the encode, and the words are written beside the
+        // stream once it is written (the output is the second argument of the encoders that take
+        // the key, which parse_options refuses it on otherwise).
+        const std::string_view lyrics_out = args.size() > 2 ? std::string_view{args[2]} : std::string_view{};
+        if (const int refused = check_lyrics_option(meta, lyrics_out); refused != kExitOk) {
+            return refused;
+        }
+        const int code = c->run(Args{args, meta, couple_flag});
+        if (code != kExitOk) {
+            return code;
+        }
+        return place_lyrics_option(meta, lyrics_out);
     }
     fmt::println(stderr, "error: unknown command '{}'", command);
     print_command_index(command_infos());
