@@ -1354,6 +1354,10 @@ class RecordingLog final : public testsink::SinkLog {
         const std::lock_guard lock(mutex_);
         return code_;
     }
+    [[nodiscard]] std::vector<std::string> lines() {
+        const std::lock_guard lock(mutex_);
+        return lines_;
+    }
     [[nodiscard]] bool has(std::string_view needle) { return count(needle) > 0; }
     [[nodiscard]] std::size_t count(std::string_view needle) {
         const std::lock_guard lock(mutex_);
@@ -1520,6 +1524,39 @@ struct KaraokeGroup {
         group.reset();
     }
 
+    // What each board holds and what each side logged: for a wait that never came true, which
+    // says whether a board was sent less than the item or the item never reached it.
+    [[nodiscard]] std::string account() {
+        std::string out = "the boards' totals and the trails of both sides:\n";
+        const auto totals = [&out](const char* name, const testsink::Sink& sink) {
+            const testsink::Sink::Totals held = sink.totals();
+            out += std::string("  ") + name + ": connections " + std::to_string(held.connections) +
+                   ", streams " + std::to_string(held.streams) + ", chunks " +
+                   std::to_string(held.chunks) + ", frames " + std::to_string(held.frames) +
+                   ", burst streams " + std::to_string(held.burst_streams) + ", bursts " +
+                   std::to_string(held.bursts) + "\n";
+        };
+        totals("decodes", *decodes);
+        totals("legacy", *legacy);
+        for (const std::string& line : sinks->take_log()) {
+            out += "  host: " + line + "\n";
+        }
+        for (const std::string& line : decodes_log.lines()) {
+            out += "  decodes: " + line + "\n";
+        }
+        for (const std::string& line : legacy_log.lines()) {
+            out += "  legacy: " + line + "\n";
+        }
+        return out;
+    }
+
+    // Waits for `done` as eventually() does, and says what each board holds when it never comes.
+    void await(const std::function<bool()>& done) {
+        if (!eventually(done)) {
+            FAIL(account());
+        }
+    }
+
     // The programme to its end, the `plays`th time.
     void play_through(std::size_t plays = 1) {
         engine->play();
@@ -1544,10 +1581,10 @@ TEST_CASE("engine: a karaoke stream is one reproduction on a board that decodes 
     rig.play_through();
 
     const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
-    REQUIRE(eventually([&] {
+    rig.await([&] {
         return rig.legacy->totals().frames >= expected_frames &&
                rig.decodes->totals().bursts >= static_cast<std::uint64_t>(kFrameCount);
-    }));
+    });
     // The board that takes the keys is sent the stream as it is, and no PCM; the other is sent PCM
     // and no burst.
     CHECK(rig.decodes->totals().bursts == static_cast<std::uint64_t>(kFrameCount));
@@ -1649,10 +1686,10 @@ TEST_CASE("engine: a karaoke stream played as coded asks nothing of the board th
     as_coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
     KaraokeGroup rig("hearth_engine_group_karaoke_coded", kFrameCount, as_coded);
     rig.play_through();
-    REQUIRE(eventually([&] {
+    rig.await([&] {
         return rig.decodes->totals().bursts >= static_cast<std::uint64_t>(kFrameCount) &&
                rig.legacy->totals().bursts >= static_cast<std::uint64_t>(kFrameCount);
-    }));
+    });
     // The stream is as every board plays it without a word, so both are sent it as it is, and
     // neither is told anything: nothing is decoded here for one of them.
     CHECK(rig.decodes->totals().frames == 0);
@@ -1705,10 +1742,10 @@ TEST_CASE("engine: a part level is one level on the board that decodes it and on
     rig.play_through();
 
     const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
-    REQUIRE(eventually([&] {
+    rig.await([&] {
         return rig.legacy->totals().frames >= expected_frames &&
                rig.decodes->totals().bursts >= static_cast<std::uint64_t>(kFrameCount);
-    }));
+    });
     // The board that takes the keys is sent the stream as it is and told the levels with the
     // choice; the other is sent PCM that has them applied.
     CHECK(rig.decodes->totals().bursts == static_cast<std::uint64_t>(kFrameCount));
@@ -1754,10 +1791,10 @@ TEST_CASE("engine: a board that takes the karaoke keys and not the levels is sen
                      /*decodes_takes_levels=*/false);
     rig.play_through();
     const std::uint64_t expected_frames = static_cast<std::uint64_t>(kFrameCount) * 1536;
-    REQUIRE(eventually([&] {
+    rig.await([&] {
         return rig.legacy->totals().frames >= expected_frames &&
                rig.decodes->totals().frames >= expected_frames;
-    }));
+    });
     // Both are sent PCM: the board that would have played the table is not sent the stream.
     CHECK(rig.decodes->totals().bursts == 0);
     CHECK(rig.legacy->totals().bursts == 0);

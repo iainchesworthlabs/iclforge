@@ -222,7 +222,10 @@ class ServerHost {
     // (Group::Programme::more_pcm): the first format its player lists with that many channels,
     // where 0 takes the first it lists that the programme can produce. A client held for PCM
     // is not started on a burst stream while its role is still moving, so a group that has
-    // been told what each sink gets never sends one the other form.
+    // been told what each sink gets never sends one the other form. Nor does the group begin its
+    // timeline while such a client is still moving, for up to a second, so that it is sent the
+    // programme from its first frame: a member that is started after the timeline has begun is
+    // sent it from the frame the group has reached, and never what went before.
     //
     // `codec` is the codec to play it in, where its player lists more than one that the programme
     // can make: PCM, or Opus for a sink on a link that cannot carry PCM (a twelfth of the bytes,

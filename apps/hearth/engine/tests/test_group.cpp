@@ -1953,6 +1953,112 @@ TEST_CASE("group: a held member is sent nothing and plays once it is let go",
     host->reset();
 }
 
+// A sink the host has just asked for PCM (use_pcm) is still moving from the extension role to
+// player@v1 when the programme starts, while another is ready at once. The group does not begin its
+// timeline without the one that is moving: a member that joined after it had begun was sent only
+// what came later, so the sink would play the programme from somewhere in its middle. Asked again
+// and again, since the window is the time the role takes to move.
+TEST_CASE("group: a programme waits for a sink the host has just moved to PCM",
+          "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_moving_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    QuietLog log;
+    // One on the extension role (paired), which the host moves, and one a plain player that is
+    // ready at once.
+    const std::unique_ptr<testsink::Sink> moved =
+        start_sink(scratch / "moved", "Moved", m::Codec::kPcm, log, false);
+    const std::unique_ptr<testsink::Sink> ready =
+        start_sink(scratch / "ready", "Ready", m::Codec::kPcm, log, true);
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    REQUIRE((*host)->enter_pairing_token(moved->pairing_token()));
+    for (const testsink::Sink* sink : {moved.get(), ready.get()}) {
+        (*host)->dial("ws://127.0.0.1:" + std::to_string(sink->port()) + "/sendspin");
+    }
+    REQUIRE(events.wait([](const auto& clients) { return clients.size() == 2; }, 15s));
+    REQUIRE((*host)->approve(ready->client_id(), true));
+
+    const std::string id = moved->client_id();
+    const auto on_extension_role = [&](const auto& clients) {
+        const auto found = clients.find(id);
+        return found != clients.end() && found->second.bursts && found->second.available &&
+               found->second.iclforge_state.has_value();
+    };
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            return clients.size() == 2 && on_extension_role(clients) &&
+                   std::all_of(clients.begin(), clients.end(), [](const auto& entry) {
+                       return entry.second.playing && entry.second.available;
+                   });
+        },
+        30s));
+
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Moving");
+    for (const testsink::Sink* sink : {moved.get(), ready.get()}) {
+        group->add(sink->client_id());
+    }
+    const m::AudioFormat format{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    constexpr std::size_t kFrames = 14400;
+    const std::vector<std::int32_t> programme(kFrames * 2, 3000);
+    // The frames a sink holds, once it has them all or nothing more comes.
+    const auto frames_of = [](const testsink::Sink& sink, std::uint64_t wanted,
+                              std::chrono::seconds wait) {
+        const auto until = std::chrono::steady_clock::now() + wait;
+        while (sink.totals().frames < wanted && std::chrono::steady_clock::now() < until) {
+            std::this_thread::sleep_for(20ms);
+        }
+        return sink.totals().frames;
+    };
+
+    for (std::uint64_t attempt = 1; attempt <= 3; ++attempt) {
+        // Asked, and the programme started and all of it offered at once: the role has not moved.
+        REQUIRE((*host)->use_pcm(id, true));
+        REQUIRE(group->start({.pcm = format, .bursts = std::nullopt, .buffered = true}));
+        std::size_t offset = 0;
+        const auto deadline = std::chrono::steady_clock::now() + 30s;
+        while (offset < programme.size() && std::chrono::steady_clock::now() < deadline) {
+            const std::size_t taken = group->push(std::span<const std::int32_t>(programme).subspan(
+                offset, std::min<std::size_t>(4800 * 2, programme.size() - offset)));
+            if (taken > 0) {
+                offset += taken * 2;
+            } else {
+                std::this_thread::sleep_for(1ms);
+            }
+        }
+        REQUIRE(offset == programme.size());
+        CHECK(group->members_playing() == 2);
+        group->stop();
+
+        // Both play the programme from its first frame, which is what the group keeps on its
+        // timeline for every member.
+        CHECK(frames_of(*ready, attempt * kFrames, 15s) == attempt * kFrames);
+        CHECK(frames_of(*moved, attempt * kFrames, 3s) == attempt * kFrames);
+        CHECK(moved->totals().bursts == 0);
+
+        // And back to the extension role, for the next time.
+        REQUIRE((*host)->use_pcm(id, false));
+        REQUIRE(events.wait(on_extension_role, 30s));
+    }
+    group.reset();
+    host->reset();
+}
+
 TEST_CASE("group: two paired test sinks play E-AC-3 JOC in step over the extension role",
           "[hearth][group][websocket][iclforge]") {
     play_joc_programme(fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_joc_" + scratch_pid_suffix()), "7.1.4", 2);
