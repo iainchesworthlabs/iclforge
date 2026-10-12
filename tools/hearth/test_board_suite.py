@@ -440,6 +440,13 @@ class Run(unittest.TestCase):
 
     def run_rows(self, stand_in: StandIn, profile: str, **kwargs):
         board = bs.Board("127.0.0.1", stand_in.port, 5.0)
+        if "only" not in kwargs:
+            # the /play rows: a Sendspin row is played by the test server (test_suite_sendspin.py)
+            kwargs["only"] = [
+                row["id"]
+                for row in bs.plan(self.suite, profile)
+                if row.get("via", "play") == "play"
+            ]
         return bs.run_suite(
             board,
             profile,
@@ -817,6 +824,7 @@ class LogPaging(unittest.TestCase):
                 repeat=1,
                 sleep=0.01,
                 timeout=5.0,
+                only=["ac3-2.0", "eac3-2.0"],
             )
         finally:
             stand_in.close()
@@ -1071,6 +1079,11 @@ class ResetBy(unittest.TestCase):
             str(self.out),
             "--play-timeout",
             "10",
+            # the /play rows: the Sendspin rows need the test server, which these do not have
+            "--only",
+            "ac3-2.0",
+            "--only",
+            "eac3-2.0",
             *extra,
         ]
         out, err = io.StringIO(), io.StringIO()
@@ -1238,6 +1251,11 @@ class CommandLine(unittest.TestCase):
             str(self.out),
             "--play-timeout",
             "10",
+            # the /play rows: the Sendspin rows need the test server, which these do not have
+            "--only",
+            "ac3-2.0",
+            "--only",
+            "eac3-2.0",
             *extra,
         ]
 
