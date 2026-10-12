@@ -1,10 +1,11 @@
 # Karaoke, phase 2
 
-!!! note "Status as of 2026-10-12: signed off by the owner; W1, W2, W13a, W6's library, W7's host and W8 are merged, and the rest of the builds are in review"
+!!! note "Status as of 2026-10-12: signed off by the owner; W1 to W11 and W13 are merged, W13's media-session position source for Crucible is not started, and W12 is parked"
     [Phase 1](karaoke.md) built Annex C karaoke as K0 to K6 (Hearth's Karaoke page, lyrics and
     singer view; the Forge GUI's Karaoke flow). This page is the plan for what phase 1 left, in
-    the order the owner gave on 2026-10-11 ([Order](#order)). Each item below is a small pull
-    request or a written finding, never a big bang. The owner signed the order off and answered
+    the order the owner gave on 2026-10-11 ([Order](#order)). Each item below was a small pull
+    request or a written finding; the builds that conflicted with one another landed together
+    ([How it landed](#how-it-landed)). The owner signed the order off and answered
     the decisions on 2026-10-11 ([Decisions](#decisions)); two answers changed the plan (D3, where
     the sink decodes, and D8, UTF-16 for `.lrc`). The live status board is
     [ROADMAP.md](../ROADMAP.md).
@@ -14,7 +15,7 @@
     | 0 | This page: scope, order, decisions | Signed off 2026-10-11 |
     | 1 | First items W1 to W3 (the last frame, the GUI polish, word timing as a design) | W1 merged (#1290); W2 merged (#1293); W3 designed in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes) |
     | 2 | Research W4 and W5 (lyrics for a network group; Android and a browser page) | Read from the code; written up in [the findings](karaoke-phase2-findings.md) |
-    | 3 | Builds in [the approved order](#order), one pull request each | W13a, W6's library and writer, W7's wire and host, and W8 are merged; W6's controller and dialog, W7's firmware, W9, W10, W11 and W13b are in review ([the table below](#work-items)) |
+    | 3 | Builds in [the approved order](#order), in small pull requests | W6 to W11 and W13a to W13f are merged, with W7d, the lyrics to a board ([the table below](#work-items)); the last of them landed on one branch ([How it landed](#how-it-landed)) |
     | 4 | W12, the ESP32-P4 with a panel | **Parked** until the board arrives; only its questions are kept |
 
 ## What this phase is
@@ -54,6 +55,19 @@ text/lyric meta data and events". That is W13.
    they can reach it ([W13](#w13-timed-text-import)).
 4. **Parked (W12).** The ESP32-P4 with a panel.
 
+## How it landed
+
+Most of the builds merged on their own: W1 (#1290), W2 (#1293), W13a (#1299),
+W6's library and writer (#1300), W7's wire keys (#1305), host (#1308) and firmware (#1310), W8
+(#1311), W9 (#1312), W10's library gains (#1313), W6's controller (#1303) and W11a (#1326). The rest
+conflicted with one another on the CHANGELOG, the Hearth catalogues and the controller, so they
+were merged into each other once, on one branch, and that branch is PR #1339: W6's timing dialog
+(#1304), W10's sliders and the levels to a sink (#1317, #1327), W11b (#1328), W11c, W13b (#1329) and
+its import of every text format, W13c (#1331), W13d, W13e and W13f (#1334). GitHub marked each of
+those pull requests merged with it, except #1332 (ASS) and #1333 (MIDI karaoke), which were stacked
+on other branches and were closed with a note that their commits are in `main`. W7d, the lyrics to
+a board (#1340), merged on top of it.
+
 ## Work items
 
 Size is in pull requests: **S** is one small PR, **M** is one PR of a few hundred lines with its
@@ -66,14 +80,14 @@ tests, **L** is two to four stacked PRs. "Needs" is what the item cannot start w
 | W3 | **Word timing, as a design.** Which of a tap editor, an estimate and an alignment, and where it lives | S | The owner's choice of shape | Evaluated in [the findings](karaoke-phase2-findings.md#w3-word-timing-the-shapes); recommendation [below](#w3-word-timing) |
 | W4 | **Findings: lyrics for a network group.** Which position the lyric clock follows for a group, how a sink with a screen would get the line and the word, and how the choice reaches a sink that decodes for itself | S | Nothing | Read from `NetworkGroupSink`, `choose_sink_form` and the Sendspin roles: [the findings](karaoke-phase2-findings.md#w4-lyrics-for-a-network-group) |
 | W5 | **Findings: Android and a browser page.** What the C API, the bindings and WebAssembly lack, and the smallest first slice | S | Nothing | Read from `libs/capi`, `bindings/*`, `apps/demos/*`: [the findings](karaoke-phase2-findings.md#w5-android-and-a-browser-page) |
-| W6 | **Word timing, built** (shape per W3, D2) | L | W13a | **Built.** The library and the writer are merged (#1300) and so is Hearth's controller (#1303); the timing dialog and its singer choice land with the rest of the phase |
-| W7 | **The sink decodes locally where it can** (D3): the role's settings carry the karaoke choice, the board applies it and runs the lyrics itself; the host sends PCM only to a sink that cannot | M to L | W13a for the lyrics; D3 | **Built.** The wire keys (#1305), the host's rule (#1308) and the firmware (#1310) are merged; the firmware was verified on a real S3 against the host's decode, within 0.25 dB for each reproduction. The lyrics to the board (W7d) are the document and an anchor on the role, followed on the board's own clock; the panel to draw them is parked ([below](#w12-parked-the-esp32-p4-with-a-panel)) |
+| W6 | **Word timing, built** (shape per W3, D2) | L | W13a | **Merged.** The library and the writer (#1300), Hearth's controller (#1303) and the timing dialog (#1304, in #1339). The dialog also sets a line's singer (W11c), held by `test_theSingerOfALineAndTheNamesAreSetOnTheDialogAndSaved` in `apps/hearth/ui/tests/qml/tst_karaoke_timing.qml` |
+| W7 | **The sink decodes locally where it can** (D3): the role's settings carry the karaoke choice, the board applies it and runs the lyrics itself; the host sends PCM only to a sink that cannot | M to L | W13a for the lyrics; D3 | **Merged.** The wire keys (#1305), the host's rule (#1308), the firmware (#1310) and, as W7d, the lyrics to the board (#1340): the document and an anchor on `_iclforge_player@v1`, followed on the board's own playout clock, which reports the line it is in. The firmware was verified on a real S3 against the host's decode, within 0.25 dB for each reproduction. W7d has a hidden live case, `network sinks live: a board that holds lyrics follows them with the sound` (`apps/hearth/engine/tests/test_network_live.cpp`; skipped without `ICLFORGE_HEARTH_LIVE_LYRICS_SINK`), which compares when the board reports each line with when its outputs first carry sound. The panel to draw the lines is parked ([below](#w12-parked-the-esp32-p4-with-a-panel)). What an S3's player needs to start is in [the findings](karaoke-phase2-findings.md#what-the-build-found-on-an-s3-board) |
 | W8 | **Karaoke in the browser decode demo** (the smallest slice W5 finds) | S to M | D4 | **Merged, PR #1311**: the WebAssembly build was run in Node against `forge decode`, all eight cases sample for sample |
 | W9 | **An LFE part in authoring** (phase 1's decision 6) | M | Nothing; the encoder and the output stage already carry an LFE | **Merged, PR #1312** |
-| W10 | **Annex C's re-levelling of M, V1 and V2** | M to L | A library change, reviewed with the AC-3 decoder's owner session | **Built.** The library's gains (#1313) are merged; Hearth's levels and sliders and the levels to a sink that decodes for itself (verified on a real S3) land with the rest of the phase |
-| W11 | **Duets** beyond the V1 and V2 choice that exists | M | The owner asking for it | **Asked for by the owner on 2026-10-12; built.** The marker in `libs/lyrics` (W11a, #1326), Hearth's view (W11b) and the timing dialog's singer and names (W11c) ([below](#w11-duets)) |
+| W10 | **Annex C's re-levelling of M, V1 and V2** | M to L | A library change, reviewed with the AC-3 decoder's owner session | **Merged.** The library's gains (#1313), Hearth's levels and sliders (#1317) and the levels to a sink that decodes for itself (#1327, verified on a real S3) |
+| W11 | **Duets** beyond the V1 and V2 choice that exists | M | The owner asking for it | **Asked for by the owner on 2026-10-12; merged.** The marker in `libs/lyrics` (W11a, #1326), Hearth's view (W11b, #1328) and the timing dialog's singer and names (W11c, in #1339) ([below](#w11-duets)) |
 | W12 | **The ESP32-P4 with a panel** | L | The board | **Parked**; [questions only](#w12-parked-the-esp32-p4-with-a-panel) |
-| W13 | **Timed-text import.** The lyric module in a library, Crucible importing LRC; SubRip, Advanced SubStation Alpha, MIDI karaoke and CD+G as stretch | L (six PRs; the first is S to M) | D9 to D12; the owner's answer on what Crucible does with the text | Scoped in [the findings](karaoke-phase2-findings.md#w13-timed-text-beyond-lrc-and-crucible). W13a is merged (#1299); W13b, Crucible's lyric strip with start-and-nudge as the position (D9), W13c SubRip, W13d ASS, W13e MIDI karaoke and W13f CD+G (a picture, no text, D11) are built and land with the rest of the phase, with Crucible's import taking all of the text formats; the media-session sources are not started |
+| W13 | **Timed-text import.** The lyric module in a library, Crucible importing LRC; SubRip, Advanced SubStation Alpha, MIDI karaoke and CD+G as stretch | L (six PRs; the first is S to M) | D9 to D12; the owner's answer on what Crucible does with the text | Scoped in [the findings](karaoke-phase2-findings.md#w13-timed-text-beyond-lrc-and-crucible). W13a is merged (#1299), and so are W13b, Crucible's lyric strip with start-and-nudge as the position (D9, #1329), W13c SubRip (#1331), W13d ASS and W13e MIDI karaoke (in #1339) and W13f CD+G (a picture, no text, D11; #1334). Crucible's import takes all of the text formats: `test_aSubRipFileIsImportedAsTimedLines`, `test_anAssScriptIsImportedWithItsSyllableTimes` and `test_aMidiKaraokeFileIsImportedFromItsBytes` in `apps/crucible/ui/tests/qml/tst_lyrics.qml`. The media-session position sources are not started |
 
 ## First items
 
@@ -123,7 +137,7 @@ pure-tone stereo file the two are within 2 dB, the zero-padded one slightly high
 one policy for both programs, with a measured reason, and a real gain on the material it was found
 on: not a claim that every file improves.
 
-**The fix, built as PR #1290.** One function for "what a source supplies at sample `n`" (silence
+**The fix, merged as PR #1290.** One function for "what a source supplies at sample `n`" (silence
 before its offset, its own samples, then its last sample held), `fill_source_frame()` in
 `apps/shared/media`, which `forge` and the GUI both compile. The GUI's four loops and `forge`'s four
 whole-file copies call it, so they cannot drift again; `forge`'s streaming read paths are
@@ -185,15 +199,15 @@ and the choice is D13.
 - **The same hot files as phase 1.** `encoder_controller.cpp`, the Forge GUI's `Main.qml` and its
   catalogues (the lupdate location gate restamps on unrelated edits) are edited by many sessions;
   each PR here is small and merges a fresh `main` first.
-- **Other sessions near this.** PR #1284 (the lyrics and the singer view) is still open, and the
-  session adding an Auld Lang Syne example project works in the same area; the owners are messaged
-  before their files are touched.
+- **Other sessions near this.** PR #1284 (the lyrics and the singer view) merged before this
+  phase's builds; the example projects (#1291, #1319) and the project files (#1301, #1306) were
+  other sessions' work in the same area, and are merged.
 - **A changed byte stream.** W1 changes the last frame of what the GUI writes for a source that is
   not whole frames. A test that pinned the old bytes would be the only casualty, and none is known;
   the GUI suites' byte comparisons use whole frames.
 - **W10 is a library change.** The output stage is shared by the CLI, Hearth, the GUI's player, the
   WebAssembly build and the ESP32 sinks; a new field is additive and defaults to today's behaviour,
-  and it is reviewed with the AC-3 decoder's owner session before it is built.
+  and it was reviewed with the AC-3 decoder's owner session before it was built (PR #1313).
 - **No oracle for re-levelling either.** Annex C leaves it to implementers, so there is nothing to
   compare against; the tests hold the gains to the arithmetic and the table to the library's own
   decoder, as phase 1 did.
@@ -202,12 +216,12 @@ and the choice is D13.
 
 Put to the owner on 2026-10-11 with the answer the plan assumed, and answered the same day:
 approved as assumed except **D3** (the sink decodes locally, with the server's PCM as the
-fallback) and **D8** (UTF-16 is adopted), and **D10** was confirmed. Each can still be reopened
-before its item starts.
+fallback) and **D8** (UTF-16 is adopted), and **D10** was confirmed. Each item they govern was
+built as answered; W12's questions are the only ones still open.
 
 | # | Decision | Answer (2026-10-11) | Alternatives |
 |---|---|---|---|
-| D1 | The GUI pads a short last frame as `forge` does (holds the last sample), so the GUI's files for such a source change by their last frame (PR #1290, built; it is a fix, asked because it changes bytes) | **Approved**: one policy for both, with a measured reason | Leave the GUI alone and document the difference: two programs of one family write different bytes from one plan, and the window's last frame is lower on some material |
+| D1 | The GUI pads a short last frame as `forge` does (holds the last sample), so the GUI's files for such a source change by their last frame (PR #1290, merged; it is a fix, asked because it changes bytes) | **Approved**: one policy for both, with a measured reason | Leave the GUI alone and document the difference: two programs of one family write different bytes from one plan, and the window's last frame is lower on some material |
 | D2 | Word timing's shape: a Hearth tap editor, lines then words, with an estimate as the starting point; the aligner as a recipe | **Approved** | The editor in the Forge GUI (needs the lyrics module in `apps/shared` first); an estimate with no editor; nothing |
 | D3 | Where a karaoke stream is reproduced for a sink | **Changed by the owner: the sink decodes locally where it can.** The stream goes to it as coded with the singer's choice in the role's settings, and the lyrics go to the board, which runs its own cursor; the server converts to PCM only for a sink that cannot decode karaoke (an older board, or one that lists no karaoke setting) | The first draft: Hearth always decodes a karaoke stream and sends PCM, so the group hears one reproduction (it stays as the fallback, and keeps a mixed group consistent) |
 | D4 | Browser first, then nothing for Android until there is a player to put it in | **Approved**: the WebAssembly decoder demo gets the two fields and a panel; lyrics after | Skip the browser; or an Android player as a phase of its own |
@@ -231,10 +245,11 @@ or a tag) that the reader would have to learn and the word-timing editor would h
 are S; the line marker and the view are M together. None of it needs a per-song memory, which the
 owner thinks is "probably not a thing", and none is planned.
 
-**Asked for on 2026-10-12**, with a second example, "Leave Her, Johnny", being built by another
-session as the fixture (V1 the shantyman, V2 the crew). The slice, in three pull requests:
+**Asked for on 2026-10-12**, with a second example, "Leave Her, Johnny", built by another
+session as the fixture (V1 the shantyman, V2 the crew; PR #1319, merged). The slice, in three
+pull requests:
 
-- **W11a, the marker and the names in the library.** A line's singer is `V1:`, `V2:` or `V1+V2:` as
+- **W11a, the marker and the names in the library (#1326).** A line's singer is `V1:`, `V2:` or `V1+V2:` as
   the first thing after the line's time tags (or after its first word tag), in either case, with
   spaces round the `+` and after the colon. It is not part of the line's text. Anything else
   before a colon is text (`V3:` is a word), and a line with no marker is for nobody in particular,
@@ -244,11 +259,11 @@ session as the fixture (V1 the shantyman, V2 the crew). The slice, in three pull
   because the markers say which *vocal of the stream* sings the line, which is what the page needs
   to say which lines the playing vocal covers; and over a bracket tag (`[v1]`) because other
   players show an unknown bracket tag as text, where they show `V1: Leave her` as a legible line.
-- **W11b, Hearth's view.** Two typed names on the Karaoke page (kept for the session, never per
+- **W11b, Hearth's view (#1328).** Two typed names on the Karaoke page (kept for the session, never per
   song; a typed name comes before the file's tag, and `V1` and `V2` before neither), the lyric view
   telling each line's singer by name and by side as well as by colour (colour is never the only cue,
   L4), and a line saying who sings it: the guide vocal that is playing, or you.
-- **W11c, the editor.** The timing dialog sets a line's singer as it times it, so a duet's file is
+- **W11c, the editor (in #1339).** The timing dialog sets a line's singer as it times it, so a duet's file is
   written whole by the tool that times it.
 
 ### W13: timed-text import

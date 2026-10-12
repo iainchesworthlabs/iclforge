@@ -1383,21 +1383,27 @@ std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
     std::vector<std::vector<MidiSyllable>> lines(1);
     int titles = 0;
     for (const MidiText& event : chosen) {
+        std::string_view text = event.text;
+        // An `@` line is a header. Only the title and the artist (`@T`) are kept, so only they and
+        // the words have to be UTF-8: a copyright or version line in a code page is never shown, and
+        // does not refuse a file whose words are fine.
+        const bool header = !text.empty() && text.front() == '@';
+        const bool kept_header = header && text.size() > 2 && (text[1] == 'T' || text[1] == 't');
+        if (header && !kept_header) {
+            continue;
+        }
         if (!valid_utf8(event.text)) {
             return std::unexpected(std::string{"The words of the MIDI file are not UTF-8: they are probably in a "
                                                "code page, which is not read. Save them as UTF-8."});
         }
-        std::string_view text = event.text;
-        if (!text.empty() && text.front() == '@') {
-            if (text.size() > 2 && (text[1] == 'T' || text[1] == 't')) {
-                const std::string value{trim(text.substr(2))};
-                if (titles == 0) {
-                    lyrics.title = value;
-                } else if (titles == 1) {
-                    lyrics.artist = value;
-                }
-                ++titles;
+        if (kept_header) {
+            const std::string value{trim(text.substr(2))};
+            if (titles == 0) {
+                lyrics.title = value;
+            } else if (titles == 1) {
+                lyrics.artist = value;
             }
+            ++titles;
             continue;
         }
         // A `/` or a backslash begins a line wherever it is; so does a line end in the text.

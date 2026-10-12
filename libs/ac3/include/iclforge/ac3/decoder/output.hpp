@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "iclforge/base/downmix_target.hpp"
+#include "iclforge/base/karaoke.hpp"
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/export.hpp"
@@ -129,37 +130,29 @@ struct MixLevelOverride {
 // The aware vocals sit at the stream's own surround level (the programme
 // provider's choice, C.1); the capable ones at the listener's, which Table
 // C.2.3 gives as these defaults.
-enum class KaraokeReproduction : std::uint8_t {
-    // A karaoke stream goes through the stage like any other. The default: the
-    // decoders are a check on the encoder first, and nothing here re-routes a
-    // programme unasked.
-    kOff,
-    // C.2.3.1, Table C.2.2. At DownmixTarget::kAsCoded a karaoke stream with
-    // something to reproduce (acmod 2/1, 3/1, 2/2 or 3/2) comes back as L, C,
-    // R and then the LFE, when there is one, so that three or four channels
-    // replace the four to six coded. A 3/0 stream (L M R) is already that and
-    // a 2/0 one has nothing but L and R; both pass through. A stereo or mono
-    // target is the 2/0 reproduction as it stands (Lo/Ro), and kLtRt is left as
-    // the Lt/Rt fold it is - Annex C defines none. Ignored for a stream that is
-    // not karaoke.
-    kAware,
-    // C.2.3.2, Table C.2.3: as kAware, but the vocals reproduced are
-    // OutputConfig::karaoke_vocals' choice and, at a stereo or mono target,
-    // the 2/0 column is applied too (a listener who asked for no vocals is not
-    // handed them by a Lo/Ro fold). Mono is the sum of the 2/0 reproduction's
-    // left and right, as C.2.3.1 has it.
-    kCapable,
-};
-
-// Which of a karaoke stream's vocal channels the listener hears
-// (KaraokeReproduction::kCapable). A choice of a vocal the stream does not code
-// - V2 of a 3/1 stream - reproduces none.
-enum class KaraokeVocals : std::uint8_t {
-    kNone,
-    kV1,
-    kV2,
-    kBoth,
-};
+// The choice itself is codec-neutral and lives in iclforge/base/karaoke.hpp, so that an AC-4
+// mapping and the wire's converters name the same types; these are its re-exports. What each
+// value of KaraokeReproduction means to THIS output stage:
+//
+//   kOff     A karaoke stream goes through the stage like any other. The default: the
+//            decoders are a check on the encoder first, and nothing here re-routes a
+//            programme unasked.
+//   kAware   C.2.3.1, Table C.2.2. At DownmixTarget::kAsCoded a karaoke stream with
+//            something to reproduce (acmod 2/1, 3/1, 2/2 or 3/2) comes back as L, C, R and
+//            then the LFE, when there is one, so that three or four channels replace the
+//            four to six coded. A 3/0 stream (L M R) is already that and a 2/0 one has
+//            nothing but L and R; both pass through. A stereo or mono target is the 2/0
+//            reproduction as it stands (Lo/Ro), and kLtRt is left as the Lt/Rt fold it is -
+//            Annex C defines none. Ignored for a stream that is not karaoke.
+//   kCapable C.2.3.2, Table C.2.3: as kAware, but the vocals reproduced are
+//            OutputConfig::karaoke_vocals' choice and, at a stereo or mono target, the 2/0
+//            column is applied too (a listener who asked for no vocals is not handed them by
+//            a Lo/Ro fold). Mono is the sum of the 2/0 reproduction's left and right, as
+//            C.2.3.1 has it.
+//
+// A choice of a vocal the stream does not code (V2 of a 3/1 stream) reproduces none.
+using base::KaraokeReproduction;
+using base::KaraokeVocals;
 
 struct OutputConfig {
     DownmixTarget target = DownmixTarget::kAsCoded;
@@ -206,8 +199,11 @@ struct OutputConfig {
     // by default, which folds with exactly what the stream says.
     MixLevelOverride mix_override{};
     // Annex C's karaoke reproduction, off by default - see
-    // KaraokeReproduction. Only the AC-3 decoder (FrameDecoder) knows a frame
-    // is karaoke, so for E-AC-3 this is never applied.
+    // KaraokeReproduction. FrameDecoder knows a frame is karaoke from its own
+    // bsmod and acmod; Eac3Decoder from a programme's, for one independent
+    // substream with no dependent substream and no object layer (the
+    // specification defines no E-AC-3 reproduction: planning/karaoke-eac3.md,
+    // D1 to D3).
     KaraokeReproduction karaoke = KaraokeReproduction::kOff;
     // The listener's choice of vocals under kCapable; read for no other mode.
     KaraokeVocals karaoke_vocals = KaraokeVocals::kBoth;
@@ -228,26 +224,12 @@ struct OutputConfig {
 };
 
 // What a person-facing level control for a karaoke part spans, in dB against Table C.2.3
-// (OutputConfig::karaoke_*_gain are the same levels in linear terms). The bottom of the span
-// is off - a singer who pulls the melody all the way down wants it gone, not 24 dB quieter -
-// and the top is 12 dB over the table. Hearth's Karaoke page, its settings, the wire's
-// karaoke_*_db keys and a sink's decoder all use this one span and this one conversion, so a
-// level means the same on every one of them.
-inline constexpr double kKaraokeMinLevelDb = -24.0;
-inline constexpr double kKaraokeMaxLevelDb = 12.0;
-
-// A level in dB held to that span. A value that is not a number is 0 dB, the table's: the
-// gains above mute one, and a stray NaN from a settings file must not silence the melody.
-[[nodiscard]] inline double karaoke_level_db(double db) {
-    return std::isnan(db) ? 0.0 : std::clamp(db, kKaraokeMinLevelDb, kKaraokeMaxLevelDb);
-}
-
-// That level as the linear gain OutputConfig takes: 0.0 (off) at the bottom of the span, and
-// exactly 1.0 for 0 dB.
-[[nodiscard]] inline double karaoke_gain_from_db(double db) {
-    const double held = karaoke_level_db(db);
-    return held <= kKaraokeMinLevelDb ? 0.0 : std::pow(10.0, held / 20.0);
-}
+// (OutputConfig::karaoke_*_gain are the same levels in linear terms), and the one conversion
+// every control and the wire share: iclforge/base/karaoke.hpp, re-exported here.
+using base::kKaraokeMaxLevelDb;
+using base::kKaraokeMinLevelDb;
+using base::karaoke_gain_from_db;
+using base::karaoke_level_db;
 
 // What the stream itself says about folding down, resolved from whichever
 // syntax carried it. AC-3 carries two coarse levels in bsi and nothing about
