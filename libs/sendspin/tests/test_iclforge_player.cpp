@@ -753,6 +753,54 @@ TEST_CASE("iclforge_player: where the sound is in the lyrics", "[sendspin][iclfo
     CHECK(refused(R"({"command":"lyrics_position","lyrics_position":{"position_ms":0,"at_us":1,"speed":1}})"));
 }
 
+TEST_CASE("iclforge_player: the codecs a sink reproduces karaoke for", "[sendspin][iclforge][karaoke]") {
+    // Written only when the sink lists some, so a sink that states none writes what it always did.
+    ac::Support support = board_support();
+    CHECK(written(support, ac::write_support).find("karaoke_codecs") == std::string::npos);
+
+    // A sink from before the key reproduces AC-3's karaoke and nothing else.
+    const std::optional<ac::Support> before =
+        ac::read_support(Parsed(written(support, ac::write_support)).root());
+    REQUIRE(before.has_value());
+    CHECK(before->karaoke_codecs.empty());
+    CHECK(before->reproduces_karaoke(ac::DataType::kAc3));
+    CHECK_FALSE(before->reproduces_karaoke(ac::DataType::kEac3));
+    CHECK_FALSE(before->reproduces_karaoke(ac::DataType::kAc4));
+
+    // A sink that lists E-AC-3 states it, and each of the types it lists reads back.
+    support.karaoke_codecs = {ac::DataType::kAc3, ac::DataType::kEac3};
+    const std::string text = written(support, ac::write_support);
+    CHECK(text.ends_with(R"("buffer_capacity":1048576,"karaoke_codecs":["ac3","eac3"]})"));
+    const std::optional<ac::Support> read = ac::read_support(Parsed(text).root());
+    REQUIRE(read.has_value());
+    CHECK(read->reproduces_karaoke(ac::DataType::kAc3));
+    CHECK(read->reproduces_karaoke(ac::DataType::kEac3));
+    CHECK_FALSE(read->reproduces_karaoke(ac::DataType::kAc4));
+
+    // A list that names E-AC-3 alone is what it says: AC-3's is not assumed once a sink lists.
+    support.karaoke_codecs = {ac::DataType::kEac3};
+    const std::optional<ac::Support> only =
+        ac::read_support(Parsed(written(support, ac::write_support)).root());
+    REQUIRE(only.has_value());
+    CHECK_FALSE(only->reproduces_karaoke(ac::DataType::kAc3));
+    CHECK(only->reproduces_karaoke(ac::DataType::kEac3));
+
+    const auto with_codecs = [&](const std::string& value) {
+        std::string source = written(board_support(), ac::write_support);
+        source.pop_back();  // the closing brace
+        return ac::read_support(Parsed(source + R"(,"karaoke_codecs":)" + value + "}").root());
+    };
+    // A name this reader does not know is skipped, as one in data_types is.
+    const std::optional<ac::Support> future = with_codecs(R"(["eac3","dts"])");
+    REQUIRE(future.has_value());
+    CHECK(future->karaoke_codecs == std::vector<ac::DataType>{ac::DataType::kEac3});
+    CHECK(with_codecs("[]").has_value());
+    // An element that is not a string, or a list that is not an array, is refused with the object.
+    CHECK_FALSE(with_codecs(R"(["eac3",3])"));
+    CHECK_FALSE(with_codecs(R"("eac3")"));
+    CHECK_FALSE(with_codecs("null"));
+}
+
 TEST_CASE("iclforge_player: what a sink says of the lyrics it holds", "[sendspin][iclforge][lyrics]") {
     // The size the sink holds, in the support object, after the limits the other keys state.
     ac::Support support = board_support();

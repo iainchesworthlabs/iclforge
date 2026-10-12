@@ -13,6 +13,7 @@ iclforge_add_test_binary(iclforge-audio-tests PROJECT audio SOURCES
     test_ring_buffer.cpp
     test_spatial_live.cpp
     test_speakers.cpp
+    test_udp_sender.cpp
     test_watchdog.cpp)
 
 target_link_libraries(iclforge-audio-tests PRIVATE iclforge::audio iclforge::ac3 iclforge::containers)
