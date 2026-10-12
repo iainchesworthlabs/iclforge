@@ -1,0 +1,25 @@
+# The panel (planning/karaoke-p4x-panel.md): LVGL drawing the lyric screen. Over sdkconfig.p4 (and
+# sdkconfig.p4-rev3 for a chip that has the panel), with one of sdkconfig.panel-null or
+# sdkconfig.panel-dsi after it:
+#
+#   idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-null" build
+#
+# LVGL's heap is PSRAM and nothing else (main/panel/lvgl/lv_memory.cpp): ESP-IDF's malloc() would put
+# every allocation of up to 16 KB in internal RAM first, and the AC-4 decoder leaves 1 to 11 KB of
+# it while it plays.
+CONFIG_LV_USE_CUSTOM_MALLOC=y
+
+# TrueType from the image (main/panel/fonts), rasterised on demand: no per-size font arrays and no
+# font converter in the build. The glyph cache is the screen's own RAM (PSRAM): 96 glyphs of up to
+# 64 pixels is about 100 KB for each of the four faces at their largest.
+CONFIG_LV_USE_TINY_TTF=y
+CONFIG_LV_TINY_TTF_CACHE_GLYPH_CNT=96
+CONFIG_LV_TINY_TTF_CACHE_KERNING_CNT=64
+
+# Right-to-left text (Hebrew, Yiddish): the Unicode bidirectional algorithm over a label's text.
+CONFIG_LV_USE_BIDI=y
+
+# The read-back route (main/panel/lvgl/panel.cpp) is a second HTTP server, and the board already
+# keeps the control surface's, the Sendspin host's and mDNS's: the default of ten sockets is what
+# they used, so this is room and not a measured need.
+CONFIG_LWIP_MAX_SOCKETS=16

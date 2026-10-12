@@ -1,9 +1,13 @@
 # ESP32 platform profiles: one locked build per board, and a suite that plays audio on it
 
-**Status, 2026-10-12:** proposed. Nothing in this page is built. It is a design for the owner to
-confirm before any of it is: section [Decisions for the owner](#decisions-for-the-owner) lists what
-is needed. One decision has already been relayed (AC-4 on the S3 is its own profile); it is marked
-where it is used, so the owner can confirm or reverse it.
+**Status, 2026-10-12, later the same day:** the design was merged (#1369) and the owner approved the
+first steps. Built: the S3 fix (#1387, verified on S3a and S3b), the C6's clean refusal (#1395,
+verified on the C6), and the profiles file with its reader and guard (`firmware/hearth-sink/profiles.json`,
+`tools/hearth/sink_profile.py`); nothing reads them yet but their own tests. Not built: everything
+from the boot budget line on ([Order of work](#order-of-work)). Two things this page said before the
+boards ran are corrected where they stood: the C6 is not a config value away
+([the C6](#the-c6-is-not-a-config-value-away)), and `realtime_permille` is not a speed figure on a
+paced sink ([the board suite](#3-the-board-suite)).
 
 ## Why
 
@@ -110,20 +114,21 @@ Proposed ids, from the board and not from the codec:
 | `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a `.99`, P4b `.76` |
 | `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | the same boards |
 
-**AC-4 on the S3 is its own profile, not an overlay on `s3-n16r8`.** This was decided by the owner
-and relayed on 2026-10-12 by the deploy session; it is recorded here for the owner to confirm. The
-reason it holds up: AC-4 changes locked keys, not just adds a feature. `sdkconfig.ac4` sets the
-decode stack to 40,960, `sdkconfig.s3-dcache` takes 32 KB of heap for a 64 KB data cache, and the
-two images have different heap budgets, different speeds and different baselines. An overlay that
-moves six locked keys is a profile with a longer name.
-
-**`p4-rev1-ac4` is proposed by the same reasoning**, which the relay did not cover: the P4 boards
-run `p4` + `sendspin` + `ac4` today, and the published P4 image has AC-4 off. See the
-[decisions](#decisions-for-the-owner).
+**AC-4 on the S3 is its own profile, not an overlay on `s3-n16r8`, and so is AC-4 on the P4
+(`p4-rev1-ac4`).** Both were decided by the owner on 2026-10-12. The reason it holds up: AC-4 changes
+locked keys, not just adds a feature. `sdkconfig.ac4` sets the decode stack to 40,960,
+`sdkconfig.s3-dcache` takes 32 KB of heap for a 64 KB data cache, and the two images have different
+heap budgets, different speeds and different baselines. An overlay that moves six locked keys is a
+profile with a longer name. The published P4 image stays AC-4 off (`esp32-ota.md`, O8); the boards
+run the AC-4 profile.
 
 A C6 has no AC-4 profile: the decoder's floor (286,365 bytes) never fits beside Wi-Fi
-([`esp32-sink-compatibility-matrix.md`](esp32-sink-compatibility-matrix.md)). A P4 of revision 3.x
-has none until there is such a board (`esp32-ota.md`, decision 14).
+([`esp32-sink-compatibility-matrix.md`](esp32-sink-compatibility-matrix.md)).
+
+**A P4 of revision 3.x is a profile of its own, `p4-rev3`, which this file does not have yet.**
+#1400 adds its image (`hearth-sink-esp32p4-rev3`, chips 3.01 to 3.99, `panel` and `panel-dsi`
+fragments over `p4-rev3`, 400 MHz, the bootloader at warn level to fit). It has never run on a
+board, so when it is added it has its guard and its budgets and no play list.
 
 ## What a profile locks
 
@@ -289,6 +294,27 @@ What this buys and what it does not:
 
 The C6 and the P4 have no emulator, so for them layer 1 and layer 3 are the whole suite.
 
+### The C6 is not a config value away
+
+The brief's config-only candidate for the C6 (the decode stack at 24,576, as `sdkconfig.ci-http`
+has it) was tried on a board on 2026-10-12 with the serial console captured, and it is not a fix. A
+C6 with the Sendspin player up has 109 to 117 KB of internal RAM free when an HTTP play opens its
+source, and the play takes a ring, two stacks, the I2S queue and a decoder out of it:
+
+| Build | What an HTTP play did |
+|---|---|
+| ring 32,768, stack 32,768 (main) | `could not allocate 32768 bytes`, `could not start the decode task` |
+| ring 32,768, stack 24,576 | the task started; the decoder failed a 6,144-byte allocation with 5,636 free and `abort()`ed: the board rebooted |
+| ring 8,192, stack 24,576 | AC-3 2.0 played beside 129 failed Wi-Fi buffer allocations and an underrun; E-AC-3 2.0 failed a 7,168-byte allocation with 12,476 free and `abort()`ed |
+
+So the C6 profile does not claim HTTP plays. #1395 makes the board refuse one up front, with
+`why: memory`, from `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` (134,008 in the C6 fragment, a
+sum of the sizes the fragment gives a play and the least decoder's peak), and the Sendspin session
+stays up. The C6's suite plays over Sendspin, which is the product's path on that part, and its
+play list needs a Sendspin server on the bench (the repository's test server is one). Whether the
+HTTP play should work on a C6 at all is the owner's call: it needs the Sendspin player's 48 KB ring
+and 24 KB stack given back for the length of a play.
+
 ### 3. The board suite
 
 `board_suite.py`, in `tools/hearth/` (standard library), replacing the scripts that
@@ -313,8 +339,8 @@ It does, in this order, and stops at the first refusal:
    behind) and for each row of the play list: `POST /play`, poll `/status` to `finished`, read the
    console lines of that play from `/log?from=`.
 4. **Asserts,** per play: `state` finished, not failed; `stream.units` equals the stream's frame
-   count; sink underruns 0; `realtime_permille` against the baseline; `stream.decode_stack_free`
-   at least the baseline's margin; for AC-4, the `pcm_hash=` of the play's `ac4.<label>=` line
+   count; sink underruns 0; the decoder's time per frame against the baseline (below);
+   `stream.decode_stack_free` at least the baseline's margin; for AC-4, the `pcm_hash=` of the play's `ac4.<label>=` line
    equal to the host's pin in
    [`testdata/ac4-probe-pcm-hashes.json`](../testdata/ac4-probe-pcm-hashes.json). The AC-4 profiles
    carry `ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` and play each AC-4 row twice, with `?hash=off` for the
@@ -329,9 +355,19 @@ JOC (`apps/demos/wasm/assets/demo.ec3`, 250 units, the one CI's HTTP step plays)
 profiles the 2.0 SIMPLE and A-SPX gold streams. The streams are the repository's; the suite does
 not generate its own.
 
-**Tolerance, and the ratchet.** `realtime_permille` may be at most 5% and 20 permille above the
-baseline's median of three plays, whichever is more. The 5% and the 20 are a proposal, not a
-measurement of the spread: the first recording runs (PR 7) take each row five times and the
+**The speed figure is not `realtime_permille`.** On an I2S sink every stereo play on an S3 read
+981 to 992 permille in 2026-10-12's runs, whatever it decoded, because the figure includes the
+wait for the DAC (the player's own comment says so for a paced sink). The suite's figure is the
+decoder's: `us_per_frame` less `sink_us_per_frame` and `render_us_per_frame`, which `GET /status`
+carries, over the 32 ms an AC-3 or E-AC-3 frame lasts; for AC-4 the `decoder_permille` of the
+`ac4.<label>=` line, which already leaves them out. A paced sink also hides a short queue: the
+S3's plays held `sink.min_headroom_ms` at 5 ms of a 64 ms queue (0 on the one play that
+underran, with `sink.dry_ms` at 88), and that figure, with `sink.dry_ms`, is the other number a
+baseline records.
+
+**Tolerance, and the ratchet.** The decoder's time per frame may be at most 5% and 20 permille
+above the baseline's median of three plays, whichever is more. The 5% and the 20 are a proposal,
+not a measurement of the spread: the first recording runs (PR 7) take each row five times and the
 tolerance is set from what they show, then written into the profile. A figure better than the
 baseline by more than the tolerance is reported, and the PR that made the speed-up changes the
 baseline in the same commit, so the next regression is measured from the new floor. A baseline
@@ -370,8 +406,9 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | # | PR | Needs a board | Notes |
 |---|---|---|---|
 | 0 | This page, and a row in `planning/README.md` | no | Docs PR; the owner confirms or changes the decisions below |
-| 1 | **The fix**, as profile values: `DECODE_STACK_IN_PSRAM` defaults to 1 on S3 with PSRAM (the AC-4 condition goes), `sdkconfig.psram` says so in words, and `sdkconfig.sendspin-c6` sets `DECODE_STACK_BYTES=24576`; a play on each of S3a, S3b and C6 | yes: HTTP play of the fixed list, 0 underruns, the heap figures | Config-only, not yet tried on a board. Read the board result before the numbers go in the table |
-| 2 | `profiles.json` and `sink_profile.py`, with tests and the guard; no consumer yet | no | `verify` run by hand against today's build dirs first |
+| 1 | **The fix**, as profile values: `DECODE_STACK_IN_PSRAM` defaults to 1 on S3 with PSRAM (the AC-4 condition goes) and `sdkconfig.psram` says so in words | yes | **Built, #1387**: A/B/A on S3b (4065 fails, the fix plays AC-3 and E-AC-3 2.0, 938 frames, stack in PSRAM) and the same on S3a. The C6's half did not work as config; see [the C6](#the-c6-is-not-a-config-value-away) |
+| 1b | The C6 refuses a play it cannot hold: `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` | yes | **Built, #1395**: refused in under half a second with `why: memory`, no reboot, Sendspin stayed connected |
+| 2 | `profiles.json` and `sink_profile.py`, with tests and the guard; no consumer yet | no | **Built**: six profiles; its tests hold the file to `_build.yml`'s fragment lists and to `check_firmware_package.py`'s rules |
 | 3 | `_build.yml`, `package_firmware.py`, `check_firmware_package.py` and the docs tables read it; the guard on every profile build | no | The README's seven stacks become one generated table |
 | 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | |
 | 5 | The QEMU twin of `s3-n16r8` | no | A spike first (PSRAM mode, XIP): the PR says what ran and what did not |
@@ -379,29 +416,27 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | |
 
-PRs 1 and 2 do not depend on each other and can run in parallel; 3 follows 2.
+PR 3 follows 2. PR 2 adds `p4-rev3` once #1400 is on main, since its fragments are not.
 
 ## Decisions for the owner
 
-1. **AC-4 on the S3 as its own profile (`s3-n16r8-ac4`).** Relayed as decided; confirm.
-2. **AC-4 on the P4 as its own profile (`p4-rev1-ac4`)**, with the published `p4-rev1` image
-   staying AC-4 off (O8). Recommended, for the reason in the S3's case. The alternative is one P4
-   profile with AC-4 on, which changes what a published P4 image is.
-3. **The fix's shape (PR 1).** Recommended: change the Kconfig default to match the Sendspin
-   option (`1 if SPIRAM && IDF_TARGET_ESP32S3`), and have the fragment state the value anyway.
-   Either alone repeats the failure when the other changes.
-4. **The recording board for each profile.** Proposed: S3a for both S3 profiles with S3b as the
+Taken on 2026-10-12: AC-4 on the S3 and on the P4 are their own profiles; PR 1 is S3-only and the
+C6 refuses cleanly (option A); the fix's shape is the Kconfig default and the fragment both.
+
+Still open:
+
+1. **The recording board for each profile.** Proposed: S3a for both S3 profiles with S3b as the
    cross-check, C6 `.117` for `c6-16mb`, P4a `.99` for both P4 profiles (P4b needs a USB flash
    after any OTA).
-5. **The tolerance:** 5% and 20 permille over a median of three, for `realtime_permille`; 0
-   underruns; the stack margin the baseline's. Say if looser or tighter.
-6. **QEMU is not the heap authority.** The twin runs the release shape but not Wi-Fi, so a heap
+2. **The tolerance:** 5% and 20 permille over a median of three, for the decoder's time per
+   frame; 0 underruns; the stack margin the baseline's. Say if looser or tighter.
+3. **QEMU is not the heap authority.** The twin runs the release shape but not Wi-Fi, so a heap
    number from it is a smoke floor. The board suite owns the budget. Confirm that is acceptable.
+4. **An HTTP play on the C6.** Left refused. The alternative is giving the Sendspin player's ring
+   and stack back for the length of a play, which is a change to the player, not to a profile.
 
 ## What this does not claim
 
-- That the config-only fix works. It has been read from the code and the Kconfig and not run on a
-  board; PR 1 is where it is.
 - That the S3 release shape keeps up. Its first recorded number is a suite run away; the
   `s3-fast` table is for another shape.
 - That QEMU can run the release shape's PSRAM execution. It is a spike (PR 5).
