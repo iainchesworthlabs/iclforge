@@ -41,7 +41,7 @@ struct OptionToken {
     std::string_view summary;
 };
 
-constexpr std::array<OptionToken, 106> kOptionTokens{{
+constexpr std::array<OptionToken, 109> kOptionTokens{{
     {"couple", "enable channel coupling wherever this command encodes"},
     {"heavy", "§7.7.2 heavy compression"},
     {"heavy2", "Ch2's own heavy compression (layout 1+1)"},
@@ -55,6 +55,9 @@ constexpr std::array<OptionToken, 106> kOptionTokens{{
     {"karaoke", "decode/monitor: an AC-3 karaoke stream (Annex C) as a karaoke-aware decoder plays it - L, C, R; "
                 "play, spdif and spatial hand the stream on and say it is not applied"},
     {"karaoke=", "decode/monitor: on or aware; none, v1, v2 or v1+v2 for the karaoke-capable decoder's vocals; off (the default)"},
+    {"karaoke-melody=", "decode/monitor: the capable decoder's guide melody level against Table C.2.3, -24 (off) to 12 dB (default 0)"},
+    {"karaoke-v1=", "decode/monitor: the capable decoder's V1 level against Table C.2.3, -24 (off) to 12 dB (default 0)"},
+    {"karaoke-v2=", "decode/monitor: the capable decoder's V2 level against Table C.2.3, -24 (off) to 12 dB (default 0)"},
     {"fast-mdct", "names the default forward MDCT (the fast §7.9.4 path)"},
     {"fast-imdct", "names the default inverse MDCT (the fast §7.9.4 step 3)"},
     {"quiet", "no status output at all - errors and the payload only"},
@@ -467,6 +470,12 @@ void print_decode_topic() {
     fmt::println("       only the chosen vocals in it (V1 or V2 alone in the centre, a pair");
     fmt::println("       left and right at unity), and at channels=2 or 1 the 2/0 form with");
     fmt::println("       the melody at clev and a single vocal at 0.7 in both channels.");
+    fmt::println("       karaoke-melody=<dB>, karaoke-v1=<dB> and karaoke-v2=<dB> move one part");
+    fmt::println("       of that choice against Table C.2.3 (C.2.3's additional flexibility):");
+    fmt::println("       0 is the table, 12 the most and -24 or off the bottom, which is silence.");
+    fmt::println("       Raising a part far enough lowers the others, so that no output's sum");
+    fmt::println("       passes 1. They need a choice of vocals: with karaoke bare or off they");
+    fmt::println("       move nothing, and are refused.");
     fmt::println("       monitor plays the same reproduction on its output (L, C, R when the");
     fmt::println("       device is wide enough, the 2/0 form when it folds); play does where it");
     fmt::println("       decodes, which is its PCM fallback. spdif, play's bitstream legs and");

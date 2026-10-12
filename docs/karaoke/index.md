@@ -339,6 +339,18 @@ forge monitor out.ac3 karaoke=none      # L, C, R: the backing and the melody, f
 forge monitor out.ac3 karaoke=v1+v2     # V1 left, V2 right
 ```
 
+The capable decoder's levels are `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` on
+both commands: each part against Table C.2.3, 0 dB the table, up to 12 dB louder and `-24` or `off`
+at the bottom, the span and the defaults of Hearth's sliders.
+
+```text
+forge decode out.ac3 sing.wav karaoke=none karaoke-melody=-6
+forge monitor out.ac3 karaoke=v1 karaoke-v1=-12 karaoke-melody=3
+```
+
+They move nothing under the aware reproduction, so a level without a choice of vocals
+(`karaoke=none`, `v1`, `v2` or `v1+v2`) is refused.
+
 On an output narrower than the stream, which `monitor` folds to unasked, the 2/0 reproduction
 plays. `forge play` applies the choice where it decodes (its PCM fallback), and `forge spdif`
 and `forge play`'s bitstream legs hand the coded stream on: they accept `karaoke` and say it is
@@ -347,9 +359,9 @@ by all of them.
 
 ## What it does not do
 
-- **Re-levelling outside Hearth's Karaoke page.** The library has the three levels
-  (`OutputConfig::karaoke_melody_gain` and its two siblings); `forge decode` and the Forge GUI's
-  player do not offer them.
+- **Re-levelling in the Forge GUI's player.** The library has the three levels
+  (`OutputConfig::karaoke_melody_gain` and its two siblings), and Hearth's Karaoke page and
+  `forge decode` and `forge monitor` offer them; the Forge GUI's player does not.
 - **Finding the times of a file's words.** Hearth's timing window ([Timing the
   lyrics](../hearth/index.md#timing-the-lyrics)) takes them from your presses, and an estimate by
   the letters of a word is only where a press starts from; nothing here aligns words to the sound.

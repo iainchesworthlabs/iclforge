@@ -83,6 +83,14 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **`forge decode` and `forge monitor` re-level the karaoke-capable decoder's parts.**
+  `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
+  flexibility" in the units, the span and the defaults of Hearth's sliders and the wire's
+  `karaoke_*_db` keys: each part against Table C.2.3, 0 dB the table bit for bit, up to 12 dB
+  louder, and -24 or `off` at the bottom. A part raised far enough lowers the others, as the
+  library's gains do. They are the capable decoder's alone: a level with `karaoke` bare, `off` or
+  absent is refused, as is a value outside the span, and the report names the parts that moved
+  (`levels: melody -6.0 dB, V1 off`) (planning/karaoke-phase2.md, W10).
 - **`forge monitor` plays a karaoke stream's reproduction, and `play`, `spdif` and `spatial` read
   the choice.** `karaoke` and `karaoke=none|v1|v2|v1+v2` were `decode`'s alone; every other command
   refused them as unknown options. `monitor` now applies them to an AC-3 stream and lays the
