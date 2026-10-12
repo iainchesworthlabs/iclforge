@@ -55,6 +55,19 @@ class LyricView(context: Context) : View(context) {
             }
         }
 
+    /**
+     * What the stream is, from the decoder report ([StreamFormat.name]): "Dolby Digital 5.1". The footer's
+     * format chip says it with the route ("Dolby Digital 5.1 · passing through"), and alone when the sink
+     * does not say the route; null draws nothing of it.
+     */
+    var format: String? = null
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
+
     /** The text size step: 0 small, 1 medium, 2 large (SS8). */
     var textStep: Int = 1
         set(value) {
@@ -556,9 +569,17 @@ class LyricView(context: Context) : View(context) {
         val widthPx = (right - left).toInt()
         val chips = ArrayList<Pair<String, Int>>()
         // The route comes first: what the signal path is, then where in the song (the spec's order).
-        when (route) {
-            "passthrough" -> chips += context.getString(R.string.route_passthrough) to Tokens.MUTED
-            "pcm" -> chips += context.getString(R.string.route_pcm) to Tokens.MUTED
+        val routeText = when (route) {
+            "passthrough" -> context.getString(R.string.route_passthrough)
+            "pcm" -> context.getString(R.string.route_pcm)
+            else -> null
+        }
+        val formatText = format
+        when {
+            formatText != null && routeText != null ->
+                chips += context.getString(R.string.format_route, formatText, routeText) to Tokens.MUTED
+            formatText != null -> chips += formatText to Tokens.MUTED
+            routeText != null -> chips += routeText to Tokens.MUTED
         }
         if (frame.mode == LyricFrame.Mode.LINE && frame.timed && frame.lineNumber > 0) {
             chips += context.getString(R.string.line_of, frame.lineNumber, frame.lineCount) to Tokens.MUTED

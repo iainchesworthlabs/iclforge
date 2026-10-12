@@ -322,6 +322,10 @@ class Sink {
             // How that stream leaves the sink, as the role's state says it to the server: unset
             // with no stream, with one the output did not take, and for an output that does not say.
             std::optional<sendspin::player::Output> output;
+            // What the output found in the stream's first syncframe, the role's `decoder` state, for
+            // the screen's format chip: unset with no stream the output took, and until it has found
+            // something.
+            std::optional<sendspin::player::DecoderReport> decoder;
         };
         std::vector<Peer> connections;
         std::optional<std::string> pairing_code;

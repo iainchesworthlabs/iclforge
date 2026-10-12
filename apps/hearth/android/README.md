@@ -18,8 +18,7 @@ are the common design, and a pairing code the server asks for in its QR form is 
 the server for the singer's karaoke choice (D8).
 
 What it does not do yet: decode locally for karaoke (phase 4), and play `player@v1`'s PCM, FLAC and
-Opus (5): a stream of those is accepted and dropped. A first-run screen and a chip for the
-stream's format are not built. AC-4 is not listed: nothing has shown a receiver decoding it over
+Opus (5): a stream of those is accepted and dropped. A first-run screen is not built. AC-4 is not listed: nothing has shown a receiver decoding it over
 this route. Phases 4 and 5 are planned in
 [`planning/hearth-android-phases-4-5.md`](../../../planning/hearth-android-phases-4-5.md).
 
@@ -162,12 +161,21 @@ does), "Decoded here" for an output that decodes. It is the extension role's `ou
 sink core sends to the server in `client/state` and puts in its own status (`Sink::Status::Peer::output`,
 `NativeSink.statusJson()`'s `"output"`), and it is absent, and so is the chip, with no stream open, with
 one the output did not take (the receiver's route was gone at the start), and for a sink that does not
-say. The format half of the spec's chip ("Dolby Digital 5.1 · passing through") is not drawn: it needs
-the stream's format as well as its route. The sink core's half is held by a loopback case in
-`iclforge-sink-tests` (a server reads the key in `client/state`, the status says the same, and a stream
-the output did not take says nothing); the chip is held by `LyricViewRenderTest`. The app's own JNI
-JSON is read by `StatusScreenTest` from a canned object: a real server's run to a Shield has not been
-made.
+say. The sink core's half is held by a loopback case in `iclforge-sink-tests` (a server reads the key
+in `client/state`, the status says the same, and a stream the output did not take says nothing); the chip
+is held by `LyricViewRenderTest`. The app's own JNI JSON is read by `StatusScreenTest` from a canned
+object: a real server's run to a Shield has not been made.
+
+**The format, beside the route.** The output reads the stream's first syncframe and the role reports what
+it found (`decoder`: the codec, the coding mode, the LFE, the objects). The status carries it per
+connection (`Sink::Status::Peer::decoder`, written by `sink::status_json` in `libs/sink`, which a host
+case holds, not only the app) and the footer joins it to the route in one chip: "Dolby Digital 5.1 ·
+Passing through", "Dolby Digital Plus 5.1 + objects · Passing through". The name is `StreamFormat.name`:
+the codec, the front channels and the LFE from the coding mode ("1+1" for two programmes), and "+ objects"
+for a stream that carries them. It is the format alone when the sink does not say the route, nothing for a
+codec the screen has no word for, and gone with the stream.
+
+![The footer's format chip: "Dolby Digital 5.1 · Passing through" before the line's place in the song](../../../docs/hearth/screenshots/android-lyric-format.png)
 
 ![The footer's route chip: "Passing through" before the line's place in the song](../../../docs/hearth/screenshots/android-lyric-route.png)
 
@@ -231,9 +239,8 @@ player the same run is made to a reference sink in the test server's own process
 core had the sound in (`reference sink: 55 lyric frame(s) on a line, the last at 14279 ms: "And auld
 lang syne!"` for that file): the chain from a server's document and anchors, through the time filter, to
 the sink's clock, run on the host. It has not been run to a Shield here. **Not shown here:** the pictures on a
-television (they are the view's own render at 1080p, not a photograph of a set), the format chip (it
-needs the stream's format as well as the route), and a duet's "you" and "guide" words (they need the
-reproduction the singer chose).
+television (they are the view's own render at 1080p, not a photograph of a set), and a duet's "you" and
+"guide" words (they need the reproduction the singer chose).
 
 ## A run on a Shield and a receiver (phase 1e)
 

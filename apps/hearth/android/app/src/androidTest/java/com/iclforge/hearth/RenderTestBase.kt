@@ -47,6 +47,7 @@ abstract class RenderTestBase {
         step: Int = 1,
         graceElapsed: Boolean = true,
         route: String? = null,
+        format: String? = null,
     ): Drawn {
         lateinit var bitmap: Bitmap
         var size = 0f
@@ -55,6 +56,7 @@ abstract class RenderTestBase {
             view.delayMs = delayMs
             view.textStep = step
             view.route = route
+            view.format = format
             val now = SystemClock.uptimeMillis()
             view.show(frame, if (graceElapsed) now - 2 * Tokens.NO_LYRICS_GRACE_MS else now)
             view.measure(
@@ -79,7 +81,8 @@ abstract class RenderTestBase {
         step: Int = 1,
         graceElapsed: Boolean = true,
         route: String? = null,
-    ): Bitmap = draw(name, frame, delayMs, step, graceElapsed, route).bitmap
+        format: String? = null,
+    ): Bitmap = draw(name, frame, delayMs, step, graceElapsed, route, format).bitmap
 
     /** Any view laid out at 1080p and drawn to a bitmap, written to `lyric-renders/` as [name].png. */
     protected fun drawView(view: View, name: String): Bitmap {

@@ -98,6 +98,17 @@ class StatusScreenTest : RenderTestBase() {
             """{"connections":[{"id":3,"address":"a","server_name":"b","activity":"playback","streaming":false,"output":null}],"pairing_code":null,"paired_servers":0}""".toByteArray(),
         )
         assertNull(quiet.playingFor?.output)
+        assertNull(quiet.playingFor?.decoder)
+
+        // What the output found in the stream's first syncframe, which a screen names the format from.
+        val found = SinkStatus.parse(
+            """{"connections":[{"id":3,"address":"a","server_name":"b","activity":"playback","streaming":true,"output":"passthrough","decoder":{"data_type":"eac3","acmod":7,"lfe":true,"objects":0,"objects_placed":false}}],"pairing_code":null,"paired_servers":1}""".toByteArray(),
+        )
+        assertEquals(
+            StreamFormat.Report("eac3", 7, lfe = true, objects = 0, objectsPlaced = false),
+            found.playingFor?.decoder,
+        )
+        assertEquals("Dolby Digital Plus 5.1", found.playingFor?.decoder?.let(StreamFormat::name))
     }
 
     // --- the pictures -----------------------------------------------------------------------

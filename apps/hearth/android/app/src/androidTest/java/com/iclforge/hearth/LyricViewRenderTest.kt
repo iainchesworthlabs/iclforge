@@ -4,6 +4,7 @@ import android.graphics.Rect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -245,6 +246,52 @@ class LyricViewRenderTest : RenderTestBase() {
         // A route the screen does not know draws nothing.
         val unknown = render("route-unknown", frame, route = "tape")
         assertEquals(bare, inked(unknown, footer))
+    }
+
+    @Test
+    fun theFormatIsOneChipWithTheRouteAndAloneWhenTheRouteIsNotSaid() {
+        val frame = frameOf(document("auld-lang-syne/auld-lang-syne.lrc"), 1000)
+        val footer = Rect(stage.left, stage.bottom, stage.right, height)
+        val routeOnly = inked(render("format-route-only", frame, route = "passthrough"), footer)
+        val both = inked(
+            render("format-and-route", frame, route = "passthrough", format = "Dolby Digital 5.1"), footer,
+        )
+        val formatOnly = inked(render("format-only", frame, format = "Dolby Digital 5.1"), footer)
+        val none = inked(render("format-none", frame), footer)
+        assertNotNull(routeOnly)
+        assertNotNull("no chip with a format and a route", both)
+        assertNotNull("no chip with a format alone", formatOnly)
+        // The format is said beside the route, in one chip: "Dolby Digital 5.1 · Passing through".
+        assertTrue(
+            "the format added only ${both!!.width() - routeOnly!!.width()} px to the route's chip",
+            both.width() > routeOnly.width() + 150,
+        )
+        // Alone it is a chip too, narrower than with the route and wider than nothing.
+        assertTrue(formatOnly!!.width() > (none?.width() ?: 0) + 100)
+        assertTrue(formatOnly.width() < both.width())
+        // The format is not drawn into the stage: only the footer changed.
+        val stageRegion = Rect(stage.left, stage.top, stage.right, stage.bottom)
+        assertEquals(
+            count(render("format-stage-a", frame), stageRegion, Tokens.TEXT),
+            count(render("format-stage-b", frame, format = "Dolby Digital 5.1"), stageRegion, Tokens.TEXT),
+        )
+    }
+
+    @Test
+    fun aStreamIsNamedByWhatTheOutputFoundInIt() {
+        fun name(type: String, acmod: Int, lfe: Boolean, objects: Int = 0) =
+            StreamFormat.name(StreamFormat.Report(type, acmod, lfe, objects, objectsPlaced = false))
+        assertEquals("Dolby Digital 5.1", name("ac3", 7, true))
+        assertEquals("Dolby Digital 2.0", name("ac3", 2, false))
+        assertEquals("Dolby Digital 1.0", name("ac3", 1, false))
+        assertEquals("Dolby Digital 1+1", name("ac3", 0, false))
+        assertEquals("Dolby Digital Plus 5.1", name("eac3", 7, true))
+        assertEquals("Dolby Digital Plus 5.1 + objects", name("eac3", 7, true, objects = 15))
+        assertEquals("Dolby Digital Plus 4.1", name("eac3", 6, true))
+        assertEquals("Dolby AC-4 2.0", name("ac4", 2, false))
+        // A codec the screen has no word for, and a mode that is not one, are not made up.
+        assertNull(name("dts", 7, true))
+        assertEquals("Dolby Digital", name("ac3", 9, true))
     }
 
     @Test

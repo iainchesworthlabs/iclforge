@@ -260,6 +260,16 @@ The sections below contain the complete change list and fixes.
   were given.
   This is a move: no message, log line or file the test sink writes is different.
 
+**The lyric screen names the stream**
+
+- **The footer's chip says the format with the route.** "Dolby Digital 5.1 · Passing through",
+  "Dolby Digital Plus 5.1 + objects · Decoded here": the Android sink's footer named only how a stream
+  leaves the sink. The output's decoder report (the codec, the coding mode, the LFE, the objects) is now in
+  the sink's status, per connection, and `sink::status_json` in `libs/sink` writes that status for the
+  app's JNI, so the writer is held by a host case and not only on a device. The name is the codec, the
+  front channels and the LFE from the coding mode, "1+1" for two programmes, and "+ objects" for a
+  stream that carries them.
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
