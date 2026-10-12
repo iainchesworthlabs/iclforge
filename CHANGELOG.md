@@ -29,6 +29,15 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**An Android preset for the libraries Hearth for Android links**
+
+- **`config-android-arm64` and `build-android-arm64`.** `libs/lyrics` and `libs/sendspin`, with
+  cpp-httplib, mbedTLS, libFLAC, Opus and mdns from vcpkg's `arm64-android` triplet, build for
+  `arm64-v8a` under NDK r26 from one preset (the Shield app's wrapper has no vcpkg and leaves
+  Hearth off). The two test binaries link; discovery is deferred to `ctest` because an arm64
+  binary cannot be listed on the host. On a Shield the lyrics suite (83 cases) and the sendspin
+  suite (243) passed (planning/hearth-android.md, phase 0c).
+
 **Karaoke: a pitch library**
 
 - **`iclforge::pitch` (`libs/pitch`): a singing voice's pitch, a reference melody and a score of one
