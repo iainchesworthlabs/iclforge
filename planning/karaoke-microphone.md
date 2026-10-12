@@ -496,12 +496,12 @@ and the design.
 | Step | What | Size | Needs | State |
 |---|---|---|---|---|
 | M0 | The measurements that open the microphone (R1 to R3) and a listening check (R6) | S | The owner's OK; a person | R1 and R2 run, R3 half run (2026-10-12); R6 (a listening check) not run |
-| M1 | The `pitch` library: tracker, reference notes, scorer, the synthetic-voice generator and its tests | M | D7 | **Built**, PR #1372 |
+| M1 | The `pitch` library: tracker, reference notes, scorer, the synthetic-voice generator and its tests | M | D7 | **Built**, PR #1372 (merged 2026-10-12) |
 | M2 | `Capture` timestamps, a requested period and a latency report, Windows first; then macOS, PipeWire and ALSA, one S each | M, then S x3 | D4 | **Built for Windows**, PR #1378; macOS, PipeWire and ALSA not started |
 | M3 | Reference extraction: M, V1 and V2 from a karaoke AC-3 (decode as coded, track), and the MIDI note reader with its track choice | M | M1; the lyric library's reader | **Built**: the MIDI melody reader PR #1379; the reference from a karaoke stream's M, V1 and V2 in PR #1385 |
-| M4 | Hearth's microphone session: the card on the Karaoke page, the indicator, the meter, the sidetone, the preferences, with a fake capture in the tests | M to L | M2; D5, D6 | **Built**: the engine's `Performance` PR #1385, the card PR #1397 |
+| M4 | Hearth's microphone session: the card on the Karaoke page, the indicator, the meter, the sidetone, the preferences, with a fake capture in the tests | M to L | M2; D5, D6 | **Built**: the engine's `Performance` PR #1385, the card PR #1397; there is no sidetone (a headset's own monitoring is the answer, as the user guide says) |
 | M5 | Scoring in Hearth: the live view, the per-line marks, the summary, the bleed checks | M to L | M1, M3, M4 | Not started; until the bleed check exists the score is withheld unless the person says they wear headphones |
-| M6 | Recording: the take, the sidecar, the list, the Forge recipe in the user guide | M | M4; D11, D13 | Not started |
+| M6 | Recording: the take, the sidecar, the list, the Forge recipe in the user guide | M | M4; D11, D13 | **Built for the desktop**, PR #1402: the take as a dry-voice FLAC with its `.take.json`, the folder, show and delete for the last one. Not built: a list of takes, and the Forge recipe (D12) |
 | M7 | The browser: the tracker in WebAssembly, a microphone card in the decode demo | M | M1; D16 | Not started |
 | M8 | The board as a source: I2S receive, `source@v1`, the indicator; Hearth's host side (`allow_source`, `start_source`) and scoring from a board's voice | L | The firmware owner (D3); M1, M2 | Not started: waits for D3 |
 | M9 | The board's local mix and monitor: the mix stage, `voice` and a level in the settings keys, measured sidetone | L | M8; R4 | Not started: waits for D3 and M8 |
