@@ -4996,12 +4996,12 @@
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="287"/>
         <source>The picture of the karaoke disc in %1 beside the stream. Its words are part of the picture.</source>
-        <translation>L'image du disque de karaoké dans %1, à côté du flux. Ses paroles font partie de l'image.</translation>
+        <translation>L&apos;image du disque de karaoké dans %1, à côté du flux. Ses paroles font partie de l&apos;image.</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="297"/>
         <source>The picture in %1 could not be shown: %2</source>
-        <translation>L'image de %1 n'a pas pu être affichée : %2</translation>
+        <translation>L&apos;image de %1 n&apos;a pas pu être affichée : %2</translation>
     </message>
     <message>
         <location filename="../qml/StreamPlayerDialog.qml" line="311"/>
