@@ -379,6 +379,13 @@ public:
     // or AC-4 track, which lands in the queue unplayable with a reason, same
     // as addFiles() already does for one.
     Q_INVOKABLE void addFolder(const QString& path);
+    // The files a launch names (command_line.hpp): added the way addFiles() adds them, and the
+    // first of them becomes the item playing and starts. They go behind whatever the queue
+    // holds, so the queue a window brings back at start stays, and the item to start is
+    // chosen on the engine thread (Engine::add_and_play()), not from a position read here
+    // that could be the queue as it was before that restore. main() calls it; it is invokable
+    // so that the Qt Quick suites can hold the real controller to it.
+    Q_INVOKABLE void openAndPlay(const QStringList& paths);
     Q_INVOKABLE void setVolumeDb(double db);
 
     [[nodiscard]] QVariantMap decoderSettings() const { return decoder_settings_; }

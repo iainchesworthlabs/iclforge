@@ -79,6 +79,10 @@ std::size_t write_frame(std::span<const std::uint8_t> message, std::size_t index
     return header + length;
 }
 
+bool is_large_document(std::span<const std::uint8_t> message) {
+    return message.size() > kRetainedMessageBytes && message.front() == message_id::kJson;
+}
+
 std::string_view describe(FrameError error) {
     switch (error) {
         case FrameError::kNone:
@@ -106,9 +110,23 @@ std::string_view describe(FrameError error) {
 }
 
 void Reassembler::reset() {
-    buffer_.clear();
+    if (buffer_.capacity() > kRetainedMessageBytes) {
+        // Whatever it held, the caller is dropping it: an error closes the connection.
+        std::vector<std::uint8_t>().swap(buffer_);
+    } else {
+        buffer_.clear();
+    }
     state_ = State::kIdle;
     delivered_ = false;
+}
+
+void Reassembler::recycle() {
+    // buffer_ still holds the message that was delivered from it, ID first.
+    if (is_large_document(buffer_)) {
+        std::vector<std::uint8_t>().swap(buffer_);
+    } else {
+        buffer_.clear();
+    }
 }
 
 Reassembler::Result Reassembler::fail(FrameError error) {
@@ -131,7 +149,7 @@ Reassembler::Result Reassembler::append(std::span<const std::uint8_t> data, bool
 
 Reassembler::Result Reassembler::push(std::span<const std::uint8_t> frame) {
     if (delivered_) {
-        buffer_.clear();
+        recycle();
         delivered_ = false;
     }
     if (frame.empty()) {
