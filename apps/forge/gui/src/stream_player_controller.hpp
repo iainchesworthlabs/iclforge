@@ -163,6 +163,18 @@ class StreamPlayerController : public QObject {
     Q_PROPERTY(QString karaokeReproduction READ karaokeReproduction WRITE setKaraokeReproduction NOTIFY
                    karaokeChanged)
     Q_PROPERTY(QString karaokeVocals READ karaokeVocals WRITE setKaraokeVocals NOTIFY karaokeChanged)
+    // Annex C.2.3's "additional flexibility", the capable decoder's alone: the level of the guide
+    // melody and of each vocal against Table C.2.3, in dB - 0 is the table bit for bit, the span
+    // is iclforge::ac3::kKaraokeMinLevelDb (-24, which is off) to kKaraokeMaxLevelDb (12), the one
+    // Hearth's sliders, `forge decode karaoke-melody=` and a sink's decoder use. A value outside it
+    // is held to it. Setting one decodes the open file again, when it is a karaoke stream and the
+    // reproduction is "capable": under the others the library ignores them.
+    Q_PROPERTY(double karaokeMelodyDb READ karaokeMelodyDb WRITE setKaraokeMelodyDb NOTIFY
+                   karaokeChanged)
+    Q_PROPERTY(double karaokeVocal1Db READ karaokeVocal1Db WRITE setKaraokeVocal1Db NOTIFY
+                   karaokeChanged)
+    Q_PROPERTY(double karaokeVocal2Db READ karaokeVocal2Db WRITE setKaraokeVocal2Db NOTIFY
+                   karaokeChanged)
     // The open file is an AC-3 karaoke stream; the decode applied a
     // reproduction (so its channels are L, C, R and not the coded ones); and
     // the layout the stream codes.
@@ -209,6 +221,14 @@ class StreamPlayerController : public QObject {
     void setKaraokeReproduction(const QString& name);
     [[nodiscard]] QString karaokeVocals() const { return karaoke_vocals_; }
     void setKaraokeVocals(const QString& name);
+    [[nodiscard]] double karaokeMelodyDb() const { return karaoke_melody_db_; }
+    void setKaraokeMelodyDb(double db);
+    [[nodiscard]] double karaokeVocal1Db() const { return karaoke_vocal1_db_; }
+    void setKaraokeVocal1Db(double db);
+    [[nodiscard]] double karaokeVocal2Db() const { return karaoke_vocal2_db_; }
+    void setKaraokeVocal2Db(double db);
+    // All three back to 0 dB, which decodes the open file once and not three times.
+    Q_INVOKABLE void resetKaraokeLevels();
     [[nodiscard]] bool isKaraoke() const { return result_ && result_->karaoke; }
     [[nodiscard]] bool karaokeReproduced() const { return result_ && result_->karaoke_reproduced; }
     [[nodiscard]] QString codedLayoutLabel() const {
@@ -264,6 +284,9 @@ class StreamPlayerController : public QObject {
     int presentation_index_ = -1;
     QString karaoke_reproduction_ = QStringLiteral("asCoded");
     QString karaoke_vocals_ = QStringLiteral("both");
+    double karaoke_melody_db_ = 0.0;
+    double karaoke_vocal1_db_ = 0.0;
+    double karaoke_vocal2_db_ = 0.0;
     // A choice made while a decode was running: decoded again, with the latest
     // choice, when that one lands.
     bool karaoke_redecode_pending_ = false;
