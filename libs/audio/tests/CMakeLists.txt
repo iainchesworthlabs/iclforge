@@ -1,6 +1,8 @@
 # iclforge-audio-tests - the live-audio library's Catch2 tests (cmake/IclforgeTests.cmake).
 iclforge_add_test_binary(iclforge-audio-tests PROJECT audio SOURCES
     test_audio_backend.cpp
+    test_capture_live.cpp
+    test_capture_timeline.cpp
     test_live_positions.cpp
     test_monitor_live.cpp
     test_passthrough_live.cpp
