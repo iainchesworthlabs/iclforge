@@ -13,12 +13,17 @@ struct FontFile {
     std::size_t size = 0;
 };
 
-// Archivo, Latin, Greek and Cyrillic: the line being sung and the idle screen's name.
+// Archivo, Latin: the line being sung and the idle screen's name.
 [[nodiscard]] FontFile archivo_semibold();
 // Archivo Regular: the lines around it, the header and the footer.
 [[nodiscard]] FontFile archivo_regular();
+// Noto Sans Greek and Cyrillic, at the two weights: a static, subset instance of Noto Sans'
+// variable font (tiny_ttf has no axes), behind each Archivo, for Greek, Russian and the other
+// Cyrillic languages.
+[[nodiscard]] FontFile noto_sans_greek_cyrillic_regular();
+[[nodiscard]] FontFile noto_sans_greek_cyrillic_semibold();
 // Noto Sans Hebrew, at the two weights, a static instance of the variable font the apps bundle
-// (tiny_ttf has no axes): behind each Archivo, for Hebrew and Yiddish.
+// (tiny_ttf has no axes): behind those, for Hebrew and Yiddish.
 [[nodiscard]] FontFile noto_sans_hebrew_regular();
 [[nodiscard]] FontFile noto_sans_hebrew_semibold();
 

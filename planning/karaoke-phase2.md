@@ -307,5 +307,6 @@ before are answered there:
 4. **What the screen shows when nothing is playing, and what a person at the TV controls from the
    board:** the board's name, address, network and pairing code; touch sets the lyric delay and the
    text size, and which vocals sound stays the server's until the role can carry a request back.
-5. **The panel's size and its fonts:** 1024 by 600, Archivo and a static Noto Sans Hebrew in the
-   image; a CJK face does not fit the 4 MB slots and is not in it.
+5. **The panel's size and its fonts:** 1024 by 600, Archivo, a static Noto Sans for Greek and
+   Cyrillic and a static Noto Sans Hebrew in the image; a CJK face does not fit the 4 MB slots and
+   is not in it.

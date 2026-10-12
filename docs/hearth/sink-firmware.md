@@ -31,7 +31,7 @@ has the design and the reasons for it.
 | `hearth-sink-esp32c6` | Any ESP32-C6 module; it uses a 4 MB partition table |
 | `hearth-sink-esp32c6-16mb` | An ESP32-C6 with 16 MB of flash |
 | `hearth-sink-esp32p4-rev1` | An ESP32-P4 of silicon revision v1.x, such as the DFRobot FireBeetle 2 |
-| `hearth-sink-esp32p4-rev3` | An ESP32-P4 of silicon revision v3.x with a 7-inch panel, such as the ESP32-P4-Function-EV-Board ([An ESP32-P4 sink](sink-esp32-p4.md)) |
+| `hearth-sink-esp32p4-rev3` | An ESP32-P4 of silicon revision v3.x with a 7-inch panel, such as the ESP32-P4X-Function-EV-Board ([An ESP32-P4 sink](sink-esp32-p4.md)) |
 
 The two P4 images refuse each other's chips: one for v1.x silicon will not start on v3.x and the
 other way round, which is why a release carries both. The P4 reaches Wi-Fi through its onboard

@@ -178,6 +178,14 @@ FontFile archivo_semibold() {
     static const FontFile font = load_font("Archivo-SemiBold.ttf");
     return font;
 }
+FontFile noto_sans_greek_cyrillic_regular() {
+    static const FontFile font = load_font("NotoSansGreekCyrillic-Regular.ttf");
+    return font;
+}
+FontFile noto_sans_greek_cyrillic_semibold() {
+    static const FontFile font = load_font("NotoSansGreekCyrillic-SemiBold.ttf");
+    return font;
+}
 FontFile noto_sans_hebrew_regular() {
     static const FontFile font = load_font("NotoSansHebrew-Regular.ttf");
     return font;
@@ -206,13 +214,21 @@ int main(int argc, char** argv) {
         "[00:03.00]<00:03.00>" + hava + "<00:03.80>" + nagila + "\n"
         "[00:06.00]<00:06.00>" + hava + "<00:06.70>" + nagila + " <00:07.60>" + venismeha + "\n"
         "[00:10.00]<00:10.00>" + hava + "<00:10.70>" + nagila + " <00:11.60>" + venismeha + "\n";
-    // A line in Russian (the fonts have no Cyrillic) among Latin ones, and a line with music notes.
+    // Russian and Greek, which the fonts have, among Latin ones: "Privet, mir" and "Kalimera kosme".
     const std::string privet = "\xD0\x9F\xD1\x80\xD0\xB8\xD0\xB2\xD0\xB5\xD1\x82";
     const std::string mir = "\xD0\xBC\xD0\xB8\xD1\x80";
+    const std::string kalimera = "\xCE\x9A\xCE\xB1\xCE\xBB\xCE\xB7\xCE\xBC\xCE\xAD\xCF\x81\xCE\xB1";
+    const std::string kosme = "\xCE\xBA\xCF\x8C\xCF\x83\xCE\xBC\xCE\xB5";
+    const std::string cyrillic_greek =
+        "[ti:" + privet + "]\n[00:00.00]<00:00.00>" + privet + ", <00:01.00>" + mir +
+        "\n[00:03.00]<00:03.00>" + kalimera + " <00:04.00>" + kosme +
+        "\n[00:06.00]Back to the Latin letters\n[00:09.00]The end\n";
+    // A line in Arabic, which the fonts have not, among Latin ones, and a line with music notes.
+    const std::string marhaba = "\xD9\x85\xD8\xB1\xD8\xAD\xD8\xA8\xD8\xA7";
     const std::string note = "\xE2\x99\xAA";
     const std::string mixed =
-        "[ti:" + privet + "]\n[00:00.00]<00:00.00>" + note + " <00:00.60>la <00:01.20>la <00:01.80>la " + note +
-        "\n[00:03.00]" + privet + ", " + mir + "\n[00:06.00]Back to the Latin letters\n[00:09.00]The end\n";
+        "[ti:" + marhaba + "]\n[00:00.00]<00:00.00>" + note + " <00:00.60>la <00:01.20>la <00:01.80>la " + note +
+        "\n[00:03.00]" + marhaba + "\n[00:06.00]Back to the Latin letters\n[00:09.00]The end\n";
     const std::string plain =
         "Should auld acquaintance be forgot,\nAnd never brought to mind?\n"
         "Should auld acquaintance be forgot,\nAnd auld lang syne!\n\n"
@@ -279,6 +295,7 @@ int main(int argc, char** argv) {
         {"s8-right-to-left", [&] { hold(hebrew, 7'000); }},
         {"s10-script-undrawable", [&] { hold(mixed, 4'000); }},
         {"s11-notes-dropped", [&] { hold(mixed, 1'200); }},
+        {"s12-cyrillic-greek", [&] { hold(cyrillic_greek, 3'500); }},
     };
 
     int number = 0;

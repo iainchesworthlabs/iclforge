@@ -3456,7 +3456,7 @@ jobs:
             --name hearth-sink-esp32p4-rev1 --out "$GITHUB_WORKSPACE/esp32-firmware"
 
       # The same sink for an ESP32-P4 of CHIP REVISION v3.x, with the lyric screen on the 7-inch MIPI DSI
-      # panel of Espressif's ESP32-P4-Function-EV-Board (planning/karaoke-p4x-panel.md, D7), built and
+      # panel of Espressif's ESP32-P4X-Function-EV-Board (planning/karaoke-p4x-panel.md, D7), built and
       # not run, for the reason the step above gives, and published as the image for such a board
       # (hearth-sink-esp32p4-rev3). sdkconfig.p4-rev3 over sdkconfig.p4 is the revision, 400 MHz and
       # the 160 MHz I2S clock source; sdkconfig.panel and sdkconfig.panel-dsi are LVGL and the panel.

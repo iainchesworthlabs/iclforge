@@ -5,7 +5,8 @@
     off the shelf because the owner's development kit is on its way and the firmware can be ready
     for it. The owner's brief, on 2026-10-12: a P4 of chip revision v3.2 or newer ("P4X") at
     400 MHz with 32 MB of PSRAM, 16 MB of flash and a 7-inch 1024 by 600 capacitive touch panel on
-    MIPI DSI; it receives the multichannel stream and its lyrics, decodes on the chip, writes the
+    MIPI DSI (the board is Espressif's ESP32-P4X-Function-EV-Board, whose user guide says chip
+    revision **v3.1 or later**; this image's minimum, v3.1, covers it); it receives the multichannel stream and its lyrics, decodes on the chip, writes the
     decoded audio out of I2S in TDM to two DACs that are not connected yet, and draws the lyrics
     with the colour moving as the song does. Until the kit is here the firmware runs on the
     owner's FireBeetle 2 boards (revision v1.3, no panel) so that the compute can be measured.
@@ -40,13 +41,21 @@ arrives; this work is the last metre.
 
 ## The kit
 
-The owner described it; the model was not named. **Assumption, to confirm when it arrives:** it
-is [Espressif's ESP32-P4-Function-EV-Board](https://components.espressif.com/components/espp/esp32-p4-function-ev-board)
-with its 7-inch panel, which is exactly that shape (32 MB of PSRAM in the package, 16 MB of flash,
-EK79007 panel at 1024 by 600, GT911 touch, an onboard ES8311 codec, 100 Mbps Ethernet, and an
-ESP32-C6 for Wi-Fi). Waveshare and others sell similar 7-inch P4 boards with other controllers
-and pins, so the panel and the pins are a **board profile**, chosen in Kconfig, with the
-Function-EV profile as the default and every pin marked "check against the schematic".
+The owner named it on 2026-10-12: [Espressif's ESP32-P4X-Function-EV-Board](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32p4/esp32-p4x-function-ev-board/user_guide.html)
+with its 7-inch 1024 by 600 capacitive panel. It is the ESP32-P4-Function-EV-Board with the chip
+changed: its user guide's *Hardware Revision Details* say the main chip is **ESP32-P4 revision v3.1
+or later**, and nothing else differs. So the rest of this page (16 MB of flash, an ES8311 codec and
+its NS4150B amplifier, 100 Mbps Ethernet through an IP101GR, an ESP32-C6-MINI-1 for Wi-Fi, a
+40-pin header J1) is read from the P4X user guide where it says it and from the older board's
+BSP header where it does not. **One rule from that guide: Secure Download is not supported on
+v3.1, so it is never enabled in this image.** The panel and the pins are a **board profile**,
+chosen in Kconfig, with this board as the default and every pin marked "check against the
+schematic"; Waveshare and others sell similar 7-inch P4 boards with other controllers and pins.
+
+What the P4X guide does **not** say, and the bring-up list checks: which driver IC the screen
+has (it links the datasheets of both the EK73217BCGA and the EK79007AD; this firmware has the
+EK79007's driver and init), the number of DSI lanes, the touch controller (the older board's BSP
+has a GT911), and the GPIOs of the codec.
 
 | Fact | Value | Source |
 |---|---|---|
@@ -55,10 +64,10 @@ Function-EV profile as the default and every pin marked "check against the schem
 | I2S | a **160 MHz PLL clock source** (`I2S_CLK_SRC_PLL_160M`, "only supported on P4 hw_ver3") | ESP-IDF `clk_tree_defs.h`; v3.x user guide §1.8 |
 | PSRAM | HEX mode, 200 MHz by default (250 MHz is offered on v3.x) | ESP-IDF `Kconfig.spiram` |
 | MIPI DSI | APLL as a clock source and RGB565/666/888 conversion added | v3.x user guide §1.24 |
-| Panel (Function-EV) | EK79007, 1024 by 600, 2 data lanes, DSI PHY powered by LDO channel 3 at 2.5 V | `espressif/esp_lcd_ek79007` |
-| Backlight / reset (Function-EV) | PWM on GPIO26, reset on GPIO27 (jumpers on the adapter board) | Espressif's BSP header, espp BSP readme |
-| Touch / codec I2C (Function-EV) | SDA GPIO7, SCL GPIO8, shared by the GT911, the ES8311 and anything on the header | Espressif's BSP header |
-| On-board codec I2S (Function-EV) | MCLK 13, BCLK 12, WS 10, DOUT 9, DIN 11; amplifier enable 53 | Espressif's BSP header |
+| Panel | EK79007, 1024 by 600, 2 data lanes, DSI PHY powered by LDO channel 3 at 2.5 V | `espressif/esp_lcd_ek79007` and the older board's BSP; **the P4X guide does not name the driver IC** |
+| Backlight / reset | PWM on GPIO26 (J1 pin 31), reset on GPIO27 (J1 pin 38), software-configurable, to the LCD adapter's J6 | P4X user guide (both lines) |
+| Touch / codec I2C | SDA GPIO7, SCL GPIO8 (J1 pins 3 and 5), shared by the GT911, the ES8311 and anything on the header | the older board's BSP header; the P4X guide lists the two GPIOs on J1 and names no touch controller |
+| On-board codec I2S | MCLK 13, BCLK 12, WS 10, DOUT 9, DIN 11; amplifier enable 53 (also on J1, pin 35) | the older board's BSP header; **the P4X guide gives no codec GPIOs** |
 | SDIO to the C6 | GPIO14 to 19, C6 reset GPIO54 | what `sdkconfig.p4` and `esp_hosted` already use |
 
 Two caveats the BSP's own header carries and this page does not hide: its touch reset and
@@ -141,28 +150,33 @@ and nothing else.
 ### D3. Fonts: TrueType in the image, rendered by LVGL's `tiny_ttf`
 
 No build-time font conversion (it would add Node to the CI image) and no per-size C arrays. The
-fonts are the ones the apps already bundle and license (SIL OFL): **Archivo** (Regular and SemiBold,
-110 KB each) and **Noto Sans Hebrew**. Archivo covers Latin only (Basic, Latin-1, Extended-A, most of
-Extended-B and the Vietnamese block, punctuation and currency; checked against its `cmap` on
-2026-10-12: **no Cyrillic, four Greek letters, no U+266A**), which is an earlier version of this
-page's claim corrected. The Hebrew file the apps bundle
-is a *variable* font whose default instance is Thin (`tiny_ttf` has no axes, and drew it as
-hairlines), so the firmware carries two static instances cut from it with `fontTools`' instancer
-(Regular and SemiBold, 48 KB each). They are embedded in the application image
-(`target_add_binary_data`), 318 KB of flash, and not in a partition of their own: an update over the
-network carries them, and no partition table or package changes. LVGL's `tiny_ttf` rasterises
-glyphs at the size asked and caches them; Hebrew is each Archivo's fallback font.
+fonts are SIL OFL: **Archivo** (Regular and SemiBold, 110 KB each), which the apps bundle, **Noto
+Sans Hebrew**, which they bundle too, and **Noto Sans Greek and Cyrillic**, which only the firmware
+has. Archivo covers Latin only (Basic, Latin-1, Extended-A, most of Extended-B and the Vietnamese
+block, punctuation and currency; checked against its `cmap` on 2026-10-12: **no Cyrillic, four Greek
+letters, no U+266A**), which is an earlier version of this page's claim corrected. The Hebrew file
+the apps bundle is a *variable* font whose default instance is Thin (`tiny_ttf` has no axes, and
+drew it as hairlines), so the firmware carries two static instances cut from it with `fontTools`'
+instancer (Regular and SemiBold, 48 KB each). Greek and Cyrillic are cut the same way from Noto
+Sans' variable font (Regular 400 and SemiBold 600 at normal width, subset to modern Greek with its
+tonos, Cyrillic with its supplement and the combining marks they use; 77 KB each; the owner said yes
+to them on 2026-10-12). They are embedded in the application image (`target_add_binary_data`),
+473 KB of flash, and not in a partition of their own: an update over the network carries them, and
+no partition table or package changes. LVGL's `tiny_ttf` rasterises glyphs at the size asked and
+caches them; Greek and Cyrillic is each Archivo's fallback font and Hebrew is that one's. The two
+Noto faces sit behind Archivo so that a Latin line never leaves the first file.
 
-Not in this build, and said so: **Greek and Cyrillic** (a Noto Sans for them is about 300 KB more;
-a decision for the owner), **CJK** (a usable face is 5 to 16 MB, which the 4 MB slots have no room
-for; a subset face is a build step to write), **Arabic** (Noto Sans Arabic is 845 KB and needs
-shaping LVGL does not do; its joining option exists and is untried), and the Devanagari and Thai
-families (no shaping engine). **A line with a letter outside the fonts' coverage is replaced by
-one sentence**, "This line is in a script this screen cannot show." (the sentence pinned with the
-Hearth family's shared sink-screen spec), and not drawn as the missing-glyph boxes; a title in
-such a script is left out; a music note, which neither font has, is dropped from a line. The test is
-`iclforge::lyrics::text_is_covered()` against a table of the code point ranges the four font files
-carry (`main/panel/lvgl/glyphs.cpp`).
+Not in this build, and said so: polytonic Greek and the Cyrillic Extended blocks, **CJK** (a usable
+face is 5 to 16 MB, which the 4 MB slots have no room for; a subset face is a build step to write),
+**Arabic** (Noto Sans Arabic is 845 KB and needs shaping LVGL does not do; its joining option
+exists and is untried), and the Devanagari and Thai families (no shaping engine). **A line with a
+letter outside the fonts' coverage is replaced by one sentence**, "This line is in a script this
+screen cannot show." (the sentence pinned with the Hearth family's shared sink-screen spec), and not
+drawn as the missing-glyph boxes; a title in such a script is left out; a music note, which none of
+the fonts has, is dropped from a line. The test is `iclforge::lyrics::text_is_covered()` against a
+table of the code point ranges the six font files carry (`main/panel/lvgl/glyphs.cpp`, regenerated
+from the files' `cmap` tables). The licence of the new face is in Hearth's About, Licences
+(`notices/fragments/hearth-fonts.txt`), with LVGL's (`hearth-lvgl.txt`).
 
 ### D4. Rendering mode: partial updates into the panel's PSRAM frame buffer
 
@@ -221,7 +235,7 @@ rev3 image refuses a v1.x one, so a wrong flash cannot happen over the network.
 2.0 plays on standard I2S as it does today; 3 or more channels open TDM in the `i2s_wide` sink at
 the full 16 slots, with `CONFIG_ICLFORGE_EXAMPLE_I2S_FIXED_FRAME=1` for the ES9080 pair when it is
 wired. **Not in this work:** the I2C programming of the DACs (nothing programs one today), and the
-Function-EV's own ES8311 codec as an output so the kit makes sound before the DACs arrive
+P4X board's own ES8311 codec as an output so the kit makes sound before the DACs arrive
 ([Later](#later)).
 
 ## The screen
@@ -274,7 +288,7 @@ wrap past two rows, so a long line stays whole rather than scrolling.
 | S6 | **Plain text** | The file has no times | The text, scrollable by touch, not followed; a chip says "not timed" |
 | S7 | **No lyrics** | Playing, none held | The item's title if the server sent one, "No lyrics for this item" |
 | S8 | **Right to left** | A line whose first strong letter is Hebrew | Right-aligned, words flow right to left, the fill runs right to left within a word |
-| S8b | **A script the fonts lack** | A line with a letter the four font files do not carry (Cyrillic, Greek, Arabic, CJK) | One sentence in its place, "This line is in a script this screen cannot show."; the title in it is left out; a music note is dropped |
+| S8b | **A script the fonts lack** | A line with a letter the six font files do not carry (Arabic, CJK, Indic, Thai, polytonic Greek) | One sentence in its place, "This line is in a script this screen cannot show."; the title in it is left out; a music note is dropped |
 | S9 | **Controls sheet** | A tap on the gear | Lyric delay - / +, text size, brightness, next lines; 72 px targets; it hides itself after 8 s |
 
 The pictures are in [the design sheet](../docs/hearth/screenshots/p4-panel-sheet.png) and on
@@ -305,18 +319,17 @@ the margin and the status line says so (no real lyric hits it).
 
 All of these are Kconfig, in a **board profile** (`CONFIG_ICLFORGE_EXAMPLE_PANEL_BOARD_*`).
 
-| Signal | Function-EV default | Status |
+| Signal | P4X-Function-EV default | Status |
 |---|---|---|
-| Backlight (PWM) | GPIO26 | From the BSP header |
-| Panel reset | GPIO27 | From the BSP header |
+| Backlight (PWM) | GPIO26 | From the P4X user guide (J1 pin 31) |
+| Panel reset | GPIO27 | From the P4X user guide (J1 pin 38) |
 | Touch / I2C SDA, SCL | GPIO7, GPIO8, I2C0 | From the BSP header |
 | Touch INT, RST | not connected on the board | From the BSP header |
 | DSI | 2 lanes, 1024 by 600 at 60 Hz, PHY LDO channel 3 at 2.5 V | From `esp_lcd_ek79007` |
-| TDM BCLK, WS, DOUT | **GPIO 20, 21, 22 (the FireBeetle defaults), placeholders** | **Unchecked.** The BSP header lists GPIO19/20 as USB on this board while SDIO uses 19: pick from the header's free pins with the schematic |
+| TDM BCLK, WS, DOUT | GPIO 20, 21, 22 (the FireBeetle defaults) | **On J1, pins 13, 11 and 12, where the P4X guide's table gives them no other function**; the older BSP header's note of GPIO19/20 as USB does not appear in it. Still to be checked with a meter against the schematic before a DAC is wired; GPIO54 (J1 pin 32) is the C6's reset and is not one to use |
 
-The I2S pins are the only ones that cannot be chosen from a document today, because nothing
-else on the board needs them and the DACs are not wired; they are decided when the kit is on the
-bench.
+The I2S pins are the only ones left to the bench: nothing else on the board uses 20, 21 and 22,
+and the DACs are not wired, so they are confirmed when the kit is on the bench.
 
 ## Measuring on the board with no panel
 
@@ -414,20 +427,20 @@ In this order, each with its own go/no-go; none of it can be done before the kit
 
 | # | Item | What decides it |
 |---|---|---|
-| Q1 | Which board exactly (pins, panel controller, touch address) | The kit's model; the board profile is a Kconfig choice for this |
+| Q1 | The board's panel controller, touch controller and codec pins | **Half answered 2026-10-12**: the board is the ESP32-P4X-Function-EV-Board; its user guide gives the backlight and reset GPIOs and the J1 header, and does not name the display's driver IC (it links EK73217BCGA and EK79007AD), the lane count or the touch controller. The first power-on settles them; the board profile is a Kconfig choice |
 | Q2 | LVGL's right-to-left flex and `lv_label` bidi with Hebrew in a wrapping row | **Answered**: it works, with two things found (the default theme's 10 px gap between flex children, and LVGL mirroring an alignment under an RTL base, which put the fill on the wrong side until the alignment was left to LVGL); the Hebrew picture is the check |
 | Q3 | Internal RAM: LVGL's allocator, the DSI driver's descriptors and the touch driver's buffers against a decoder that leaves 1 to 11 KB | **Half answered**: LVGL's heap is PSRAM (`lv_memory.cpp`), the frame buffer, render buffers, glyph caches and the task's stack are PSRAM, and the panel starts after the player (which came up with 289,687 B of internal heap free). What the panel then takes from internal RAM (its task's control block, the read-back server's 6 KB stack, small structures, the DSI and touch drivers' own) was **not measured**, and nor was the least-free figure during an AC-4 play: that is the next number to take |
 | Q4 | Tearing with one frame buffer | The kit; two buffers cost 1.2 MB of PSRAM |
 | Q5 | PSRAM bandwidth under the decoder's XIP fetches | The scan-out emulation, then the kit |
 | Q6 | A touch control for the vocals needs the role to carry a request back to the server | A protocol decision, its own PR |
 | Q7 | Auto-dim and a screensaver for a screen that is on for hours | Product, after the kit; the backlight PWM is there |
-| Q8 | CJK and Arabic | A font subset and shaping; not in this work |
-| Q9 | The image now links LVGL (MIT) and two OFL fonts and ships no notices file, as it does not for mbedTLS or `esp_hosted` | A notices fragment for the sink images, if the owner wants one: the apps' are generated and the firmware's have never been |
-| Q10 | The lyric **document** the player holds is in internal RAM, about six times its text once held and ten at the peak (measured by the lyrics verification session on 2026-10-12: P4a at 233 KB free, a 16,000-byte document left 66 KB and once broke the play; S3 and C6 far less). The screen's own copies are rows of text in the heap and LVGL is in PSRAM; the document is the player's, and a PSRAM arena for it is the fix on a board that has the PSRAM | The player's lyrics budget (that session's change in `sendspin.cpp`), then an arena |
+| Q8 | CJK, Arabic and polytonic Greek | A font subset and shaping; not in this work (Greek and Cyrillic are in, 2026-10-12) |
+| Q9 | The image links LVGL (MIT) and three OFL fonts and ships no notices file of its own, as it does not for mbedTLS or `esp_hosted` | **Answered for the font and LVGL, 2026-10-12** (the owner: the font's licence goes where the licences are shown): Hearth's NOTICES.txt, which its About, Licences shows, names LVGL and the three typefaces (`hearth-lvgl.txt`, `hearth-fonts.txt`), and `check_hearth_package.py` requires them. The ESP-IDF components the images carry (Apache-2.0 and others, with picolibc's many BSD-style licences, LVGL's stb_truetype, and the Montserrat font LVGL's default theme links) are in the same notices, in `hearth-firmware.txt` and `notices/licences/ESP-IDF-components.txt` (made by `tools/generators/gen_esp_idf_notices.py` from an ESP-IDF checkout and the lvgl component; `tools/ci/test_firmware_notices.py` fails when the ESP-IDF the workflows build with is another) |
+| Q10 | The lyric **document** the player holds is in internal RAM, about six times its text once held and ten at the peak (measured by the lyrics verification session on 2026-10-12: P4a at 233 KB free, a 16,000-byte document left 66 KB and once broke the play; S3 and C6 far less). The screen's own copies (the visible rows, a file with no times as plain text, the title and the names) are in LVGL's heap, which is PSRAM (`main/panel/lvgl/lv_alloc.hpp`: `LvString`, `LvVector`, `LvMap`), as is the plain-text label it builds, so a 12,000-byte text takes none of the internal RAM the decoder leaves; the document is the player's, and a PSRAM arena for it is the fix on a board that has the PSRAM (the lyrics verification session's `PsramScope`, #1396) | The player's lyrics budget (that session's change in `sendspin.cpp`), then an arena |
 
 ## Later
 
-- The Function-EV's ES8311 codec as a sink output, so the kit makes sound with no DACs (needs the
+- The P4X board's ES8311 codec as a sink output, so the kit makes sound with no DACs (needs the
   I2C init of the codec and the MCLK it asks for).
 - The touch control of the vocals, with the role's request path (Q6).
 - A subset CJK face in the fonts partition.

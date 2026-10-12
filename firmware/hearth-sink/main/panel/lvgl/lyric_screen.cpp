@@ -26,6 +26,7 @@
 #include "board_info.hpp"
 #include "fonts.hpp"
 #include "glyphs.hpp"
+#include "lv_alloc.hpp"
 
 namespace player::panel {
 
@@ -62,23 +63,28 @@ constexpr std::size_t kNone = static_cast<std::size_t>(-1);
 
 lv_color_t color(std::uint32_t rgb) { return lv_color_hex(rgb); }
 
-// --- a font, with Hebrew behind it as its fallback, at a size that can change.
+// --- a font, with Greek and Cyrillic and then Hebrew behind it as its fallbacks, at a size that can
+// change. Latin letters never leave the first file; a letter it lacks is asked of the next.
 struct Face {
     lv_font_t* latin = nullptr;
+    lv_font_t* greek_cyrillic = nullptr;
     lv_font_t* hebrew = nullptr;
     int size = 0;
 };
 
-bool make_face(Face& face, const FontFile& latin, const FontFile& hebrew, int px) {
-    if (latin.data == nullptr || hebrew.data == nullptr) {
+bool make_face(Face& face, const FontFile& latin, const FontFile& greek_cyrillic, const FontFile& hebrew,
+               int px) {
+    if (latin.data == nullptr || greek_cyrillic.data == nullptr || hebrew.data == nullptr) {
         return false;
     }
     face.hebrew = lv_tiny_ttf_create_data(hebrew.data, hebrew.size, px);
+    face.greek_cyrillic = lv_tiny_ttf_create_data(greek_cyrillic.data, greek_cyrillic.size, px);
     face.latin = lv_tiny_ttf_create_data(latin.data, latin.size, px);
-    if (face.latin == nullptr || face.hebrew == nullptr) {
+    if (face.latin == nullptr || face.greek_cyrillic == nullptr || face.hebrew == nullptr) {
         return false;
     }
-    face.latin->fallback = face.hebrew;
+    face.greek_cyrillic->fallback = face.hebrew;
+    face.latin->fallback = face.greek_cyrillic;
     face.size = px;
     return true;
 }
@@ -88,15 +94,18 @@ void set_size(Face& face, int px) {
         return;
     }
     lv_tiny_ttf_set_size(face.latin, px);
+    lv_tiny_ttf_set_size(face.greek_cyrillic, px);
     lv_tiny_ttf_set_size(face.hebrew, px);
     face.size = px;
 }
 
-// --- what the screen copies from the player, under its lock (sendspin_read_lyrics).
+// --- what the screen copies from the player, under its lock (sendspin_read_lyrics). The copies are
+// in LVGL's heap (PSRAM on the firmware: lv_alloc.hpp says why), not in the internal RAM a decoder
+// leaves little of.
 struct LineText {
-    std::string text;
+    LvString text;
     Singer singer = Singer::kUnmarked;
-    std::vector<std::string> words;
+    LvVector<LvString> words;
 };
 
 class Snapshot final : public LyricsReader {
@@ -106,12 +115,12 @@ class Snapshot final : public LyricsReader {
     bool held = false;
     bool timed = false;
     std::size_t line_count = 0;
-    std::string title;
-    std::string artist;
-    std::string first_name;
-    std::string second_name;
+    LvString title;
+    LvString artist;
+    LvString first_name;
+    LvString second_name;
     std::optional<std::int64_t> length_ms;
-    std::string plain;
+    LvString plain;
     // Bumped whenever a row's text, the title or the names changed: a rebuild is due.
     std::uint32_t generation = 0;
 
@@ -165,18 +174,18 @@ class Snapshot final : public LyricsReader {
             }
             const iclforge::lyrics::LyricLine& source = lyrics->lines[index];
             LineText& row = lines_[index];
-            bool same = row.text == source.text && row.singer == source.singer &&
+            bool same = std::string_view(row.text) == source.text && row.singer == source.singer &&
                         row.words.size() == source.words.size();
             for (std::size_t w = 0; same && w < source.words.size(); ++w) {
-                same = row.words[w] == source.words[w].text;
+                same = std::string_view(row.words[w]) == source.words[w].text;
             }
             if (!same) {
-                row.text = source.text;
+                row.text.assign(source.text.data(), source.text.size());
                 row.singer = source.singer;
                 row.words.clear();
                 row.words.reserve(source.words.size());
                 for (const iclforge::lyrics::LyricWord& word : source.words) {
-                    row.words.push_back(word.text);
+                    row.words.emplace_back(word.text.data(), word.text.size());
                 }
                 changed = true;
             }
@@ -209,15 +218,15 @@ class Snapshot final : public LyricsReader {
     }
 
    private:
-    static bool assign(std::string& to, const std::string& from) {
-        if (to == from) {
+    static bool assign(LvString& to, const std::string& from) {
+        if (std::string_view(to) == from) {
             return false;
         }
-        to = from;
+        to.assign(from.data(), from.size());
         return true;
     }
 
-    std::map<std::size_t, LineText> lines_;
+    LvMap<std::size_t, LineText> lines_;
 };
 
 // --- the rows' identity: what a rebuild is for.
@@ -364,13 +373,21 @@ lv_obj_t* make_box(lv_obj_t* parent) {
     return box;
 }
 
-lv_obj_t* make_label(lv_obj_t* parent, const std::string& text, const Face& face, std::uint32_t rgb) {
+lv_obj_t* make_label(lv_obj_t* parent, const char* text, const Face& face, std::uint32_t rgb) {
     lv_obj_t* const label = lv_label_create(parent);
-    lv_label_set_text(label, text.c_str());
+    lv_label_set_text(label, text);
     lv_obj_set_style_text_font(label, face.latin, 0);
     lv_obj_set_style_text_color(label, color(rgb), 0);
     lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_CLIP);
     return label;
+}
+
+lv_obj_t* make_label(lv_obj_t* parent, const std::string& text, const Face& face, std::uint32_t rgb) {
+    return make_label(parent, text.c_str(), face, rgb);
+}
+
+lv_obj_t* make_label(lv_obj_t* parent, const LvString& text, const Face& face, std::uint32_t rgb) {
+    return make_label(parent, text.c_str(), face, rgb);
 }
 
 [[nodiscard]] int text_width(const std::string& text, const Face& face) {
@@ -581,7 +598,10 @@ lv_obj_t* make_context_row(lv_obj_t* parent, std::size_t index, bool past, bool 
     if (row == nullptr) {
         return nullptr;
     }
-    const bool rtl = iclforge::lyrics::text_is_right_to_left(row->text);
+    // A line the fonts cannot draw shows a Latin sentence, which runs left to right whatever it replaces.
+    bool undrawable = false;
+    const std::string shown = drawable(row->text, &undrawable);
+    const bool rtl = !undrawable && iclforge::lyrics::text_is_right_to_left(shown);
     const int indent = (duet && row->singer == Singer::kSecond && !rtl) ? kDuetIndent : 0;
     lv_obj_t* const box = make_box(parent);
     lv_obj_set_width(box, content_w);
@@ -593,7 +613,7 @@ lv_obj_t* make_context_row(lv_obj_t* parent, std::size_t index, bool past, bool 
                                          row->singer == Singer::kSecond ? kText : kAccent);
         lv_obj_set_style_text_opa(tag, past ? kSungOpacity : 200, 0);
     }
-    lv_obj_t* const label = make_label(box, drawable(row->text), g.context, past ? kAccent : kMuted);
+    lv_obj_t* const label = make_label(box, shown, g.context, past ? kAccent : kMuted);
     if (past) {
         lv_obj_set_style_text_opa(label, kSungOpacity, 0);
     }
@@ -614,7 +634,7 @@ void build_words(lv_obj_t* flow, const LineText& line, bool rtl) {
     const int space = std::max<int>(4, lv_font_get_glyph_width(g.current.latin, ' ', 0));
     g.words.reserve(line.words.size());
     lv_obj_t* group = nullptr;
-    for (const std::string& word : line.words) {
+    for (const LvString& word : line.words) {
         if (group == nullptr) {
             group = make_box(flow);
             lv_obj_set_size(group, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -812,12 +832,13 @@ void build_plain(int content_w) {
     lv_obj_add_flag(scroller, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(scroller, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_scrollbar_mode(scroller, LV_SCROLLBAR_MODE_OFF);
-    // A line the fonts cannot draw is the one sentence, as it is elsewhere.
-    std::string shown;
+    // A line the fonts cannot draw is the one sentence, as it is elsewhere. The text being laid out is
+    // as long as the file's, so it is built in LVGL's heap too.
+    LvString shown;
     shown.reserve(g.snap.plain.size());
     for (std::size_t at = 0; at < g.snap.plain.size();) {
         std::size_t end = g.snap.plain.find('\n', at);
-        if (end == std::string::npos) {
+        if (end == LvString::npos) {
             end = g.snap.plain.size();
         }
         shown += drawable(std::string_view(g.snap.plain).substr(at, end - at));
@@ -1047,12 +1068,16 @@ bool screen_init(lv_display_t* disp, int width, int height) {
     g.disp = disp;
     g.width = width;
     g.height = height;
+    const FontFile regular = archivo_regular();
+    const FontFile semibold = archivo_semibold();
+    const FontFile greek_regular = noto_sans_greek_cyrillic_regular();
+    const FontFile greek_semibold = noto_sans_greek_cyrillic_semibold();
     const FontFile hebrew_regular = noto_sans_hebrew_regular();
     const FontFile hebrew_semibold = noto_sans_hebrew_semibold();
-    const bool ok = make_face(g.current, archivo_semibold(), hebrew_semibold, 64) &&
-                    make_face(g.context, archivo_regular(), hebrew_regular, 36) &&
-                    make_face(g.small, archivo_regular(), hebrew_regular, 24) &&
-                    make_face(g.big, archivo_semibold(), hebrew_semibold, 72);
+    const bool ok = make_face(g.current, semibold, greek_semibold, hebrew_semibold, 64) &&
+                    make_face(g.context, regular, greek_regular, hebrew_regular, 36) &&
+                    make_face(g.small, regular, greek_regular, hebrew_regular, 24) &&
+                    make_face(g.big, semibold, greek_semibold, hebrew_semibold, 72);
     if (!ok) {
         std::printf("panel: the fonts did not come up\n");
         return false;

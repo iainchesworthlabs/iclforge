@@ -1056,7 +1056,7 @@ on a v3.x chip yet.**
 `main/panel/` is a screen for the lyrics of the item playing, picked by CMake like the sink and the
 source: `none` (every image but a P4's with a panel), and `lvgl`, LVGL 9 drawing
 `lyric_screen.cpp` onto a MIPI DSI panel with touch (`sdkconfig.panel-dsi`, the 7-inch panel of
-Espressif's ESP32-P4-Function-EV-Board) or into a frame buffer in PSRAM with no panel behind it
+Espressif's ESP32-P4X-Function-EV-Board) or into a frame buffer in PSRAM with no panel behind it
 (`sdkconfig.panel-null`), which `GET :8081/panel.bmp` reads back:
 
 ```

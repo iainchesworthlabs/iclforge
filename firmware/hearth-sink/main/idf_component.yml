@@ -29,7 +29,7 @@ dependencies:
     rules:
       - if: "target in [esp32p4, esp32h2]"
   # The panel (planning/karaoke-p4x-panel.md): LVGL draws the lyrics, whether on a MIPI DSI panel
-  # (the 7-inch 1024 by 600 EK79007 panel of Espressif's ESP32-P4-Function-EV-Board, with a GT911
+  # (the 7-inch 1024 by 600 EK79007 panel of Espressif's ESP32-P4X-Function-EV-Board, with a GT911
   # touch controller) or into a frame buffer with no panel behind it, for a board that has none.
   # Only the ESP32-P4 has the DSI host and the 2D engines, so no other target pulls them in. They
   # are compiled for every P4 image, and linked only where main/panel/lvgl is the panel the

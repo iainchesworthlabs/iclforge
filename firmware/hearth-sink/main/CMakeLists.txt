@@ -135,12 +135,13 @@ idf_component_register(
              esp_app_format espressif__mdns
              esp_lcd esp_driver_ledc esp_driver_i2c esp_driver_gpio esp_http_server)
 
-# The panel's fonts, in the image (planning/karaoke-p4x-panel.md, D3): the TrueType files the apps bundle,
-# under the SIL Open Font License (panel/fonts/*-OFL.txt), rasterised by LVGL's tiny_ttf from flash. In the
+# The panel's fonts, in the image (planning/karaoke-p4x-panel.md, D3): Archivo, which the apps bundle, and
+# Noto Sans for Greek and Cyrillic and for Hebrew, under the SIL Open Font License (panel/fonts/*OFL.txt),
+# rasterised by LVGL's tiny_ttf from flash. In the
 # application rather than a partition of their own, so that an update over the network carries them.
 if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
-    foreach(_panel_font IN ITEMS Archivo-Regular Archivo-SemiBold NotoSansHebrew-Regular
-                                  NotoSansHebrew-SemiBold)
+    foreach(_panel_font IN ITEMS Archivo-Regular Archivo-SemiBold NotoSansGreekCyrillic-Regular
+                                  NotoSansGreekCyrillic-SemiBold NotoSansHebrew-Regular NotoSansHebrew-SemiBold)
         target_add_binary_data(${COMPONENT_LIB}
             "${CMAKE_CURRENT_SOURCE_DIR}/panel/fonts/${_panel_font}.ttf" BINARY)
     endforeach()

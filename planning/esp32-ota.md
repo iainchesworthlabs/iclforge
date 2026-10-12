@@ -835,7 +835,7 @@ overlay lists the board recipes use:
 | `hearth-sink-esp32c6` | `hw`, `sendspin`, `c6`, `sendspin-c6` | 4 MB | any C6 module |
 | `hearth-sink-esp32c6-16mb` | the same, then `flash16mb` | 16 MB | a C6 with 16 MB of flash, such as the board on COM9 |
 | `hearth-sink-esp32p4-rev1` | `hw`, `p4`, `sendspin` | 16 MB | a P4 of silicon revision v1.x, such as the FireBeetle 2 on COM10 |
-| `hearth-sink-esp32p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | 16 MB | a P4 of silicon revision v3.x with the 7-inch panel of Espressif's ESP32-P4-Function-EV-Board ([planning/karaoke-p4x-panel.md](karaoke-p4x-panel.md)) |
+| `hearth-sink-esp32p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | 16 MB | a P4 of silicon revision v3.x with the 7-inch panel of Espressif's ESP32-P4X-Function-EV-Board ([planning/karaoke-p4x-panel.md](karaoke-p4x-panel.md)) |
 
 A P4 of revision v3.x needs a build without `sdkconfig.p4`'s revision settings, which
 `sdkconfig.p4-rev3` takes over (v3.1 to v3.99, 400 MHz). It is the one image that carries a

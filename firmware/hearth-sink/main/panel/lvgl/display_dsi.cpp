@@ -1,5 +1,5 @@
 // A MIPI DSI panel and its touch controller, on the ESP32-P4 (planning/karaoke-p4x-panel.md, "The
-// kit"): the 7-inch 1024 by 600 panel of Espressif's ESP32-P4-Function-EV-Board, an EK79007 on two
+// kit"): the 7-inch 1024 by 600 panel of Espressif's ESP32-P4X-Function-EV-Board, an EK79007 on two
 // lanes, with a GT911 touch controller on the I2C bus the board shares with its codec.
 //
 // NOT RUN ON A BOARD YET: the kit is on its way. Everything below is written against the headers of
@@ -166,7 +166,7 @@ void open_backlight() {
 }  // namespace
 
 bool display_open(Display& out) {
-    // The PHY's supply, before the bus: an LDO channel at 2.5 V on the Function-EV board.
+    // The PHY's supply, before the bus: an LDO channel at 2.5 V on the P4X-Function-EV board.
     if (CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI_LDO_CHANNEL >= 0) {
         esp_ldo_channel_config_t ldo_config{};
         ldo_config.chan_id = CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI_LDO_CHANNEL;

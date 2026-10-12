@@ -6,7 +6,7 @@
 // What the panel's fonts can draw (planning/karaoke-p4x-panel.md, D3). A line with a letter they do not
 // have would be drawn as one missing-glyph box a letter; the screen shows a sentence in its place
 // instead (the sentence the Hearth family's shared sink-screen spec pins), a title in such a script is
-// left out, and a music note, which neither font has, is dropped from a line.
+// left out, and a music note, which none of the fonts has, is dropped from a line.
 //
 // Plain C++ with nothing of LVGL or ESP-IDF in it, so that the preview builds it.
 

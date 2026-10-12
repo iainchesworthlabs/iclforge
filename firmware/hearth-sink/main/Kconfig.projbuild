@@ -769,7 +769,7 @@ choice ICLFORGE_EXAMPLE_PANEL
         (a FireBeetle 2) to see what the screen looks like and what drawing
         it costs, read back over HTTP (ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT).
         A MIPI DSI panel is the same drawing on a 1024 by 600 panel over the
-        P4's DSI host, with touch, as on Espressif's ESP32-P4-Function-EV-Board
+        P4's DSI host, with touch, as on Espressif's ESP32-P4X-Function-EV-Board
         (see ICLFORGE_EXAMPLE_PANEL_BOARD_* for its pins).
 
 config ICLFORGE_EXAMPLE_PANEL_NONE
@@ -841,7 +841,7 @@ config ICLFORGE_EXAMPLE_PANEL_BACKLIGHT_GPIO
     default 26
     range -1 54
     help
-        Espressif's ESP32-P4-Function-EV-Board with its 7-inch panel: GPIO26
+        Espressif's ESP32-P4X-Function-EV-Board with its 7-inch panel: GPIO26
         for the backlight, GPIO27 for the panel's reset (both through
         jumpers on the LCD adapter board). Check against the schematic of
         the board the image is for.
@@ -877,7 +877,7 @@ config ICLFORGE_EXAMPLE_PANEL_DSI_LDO_CHANNEL
     range -1 4
     help
         The P4's MIPI DSI PHY is supplied from an on-chip LDO channel, 3 at
-        2.5 V on the ESP32-P4-Function-EV-Board.
+        2.5 V on the ESP32-P4X-Function-EV-Board.
 
 config ICLFORGE_EXAMPLE_PANEL_DSI_LDO_MV
     int "That LDO's voltage, millivolts"

@@ -27,7 +27,7 @@ release carries one for each.
 | | Chip revision v1.x | Chip revision v3.x ("P4X", v3.1 and newer) |
 |---|---|---|
 | Image | `hearth-sink-esp32p4-rev1` | `hearth-sink-esp32p4-rev3` |
-| Example board | DFRobot FireBeetle 2 (v1.3) | ESP32-P4-Function-EV-Board, 7-inch panel |
+| Example board | DFRobot FireBeetle 2 (v1.3) | ESP32-P4X-Function-EV-Board, 7-inch panel |
 | CPU | 360 MHz (400 MHz asserts in its boot) | 400 MHz |
 | I2S clock source | APLL, 125 MHz at most: **no TDM above two channels** | the 160 MHz PLL: TDM at the full 16 × 32 bits |
 | Screen | none | the 7-inch 1024 by 600 panel, with touch |
@@ -98,7 +98,7 @@ chip, and `GET /hardware` says so on such a board.
 
 ### The screen
 
-![The panel's screens on one sheet: singing, a duet, an instrumental break, a file timed by line, Hebrew, a script the fonts lack, idle with a pairing code, idle and connected, held and not started, no lyrics, plain text, and the controls](screenshots/p4-panel-sheet.png)
+![The panel's screens on one sheet: singing, a duet, an instrumental break, a file timed by line, Hebrew, Russian and Greek, a script the fonts lack, idle with no server, with a pairing code and connected, held and not started, no lyrics, plain text, and the controls](screenshots/p4-panel-sheet.png)
 
 The board shows the lyrics of the item playing, against the sound **the board** is playing: the
 server sends the document and where in it the sound is, and the board follows on its own clock, which
@@ -121,7 +121,8 @@ apart. The picture above and the others on this page are drawn by the firmware's
 | ![Instrumental break](screenshots/p4-panel-gap.png) | **An instrumental break** of four seconds or more: four dots that go out one a second, so the line's start is seen coming |
 | ![A file timed by line](screenshots/p4-panel-line-timed.png) | **A file with line times only.** The whole line, emphasised; no word is invented |
 | ![Right to left](screenshots/p4-panel-right-to-left.png) | **Hebrew or Yiddish.** Right-aligned, the words flow right to left and the fill runs from a word's right edge |
-| ![A script the fonts lack](screenshots/p4-panel-script.png) | **A script the fonts cannot draw** (Russian here). One sentence in the line's place; the title in it is left out; a music note is dropped |
+| ![Russian and Greek](screenshots/p4-panel-cyrillic-greek.png) | **Cyrillic or Greek.** Drawn as Latin is, in Noto Sans behind Archivo, with the same fill |
+| ![A script the fonts lack](screenshots/p4-panel-script.png) | **A script the fonts cannot draw** (Arabic here). One sentence in the line's place; the title in it is left out; a music note is dropped |
 | ![Plain text](screenshots/p4-panel-plain.png) | **A file with no times.** The text, scrolled by touch, not followed |
 | ![No lyrics](screenshots/p4-panel-no-lyrics.png) | **Playing, and the server sent no lyrics** |
 | ![The controls](screenshots/p4-panel-controls.png) | **Adjust.** The lyric delay in 50 ms steps and the text size; put away after eight seconds untouched |
@@ -131,34 +132,42 @@ apart. The picture above and the others on this page are drawn by the firmware's
 shown, not changed, until the role has a way to carry a request back.
 
 **Fonts.** Archivo, the apps' own, for Latin (Basic, Latin-1 and Extended-A, most of Extended-B and
-the Vietnamese block, and the punctuation and currency signs a lyric uses), and Noto Sans Hebrew
-behind it, both under the SIL Open Font License, in the image (318 KB of flash). **Not in this
-build:** Greek and Cyrillic (Archivo has neither: a Noto Sans for them is another 300 KB and a
-decision), CJK (a usable face is 5 to 16 MB, which the 4 MB application slots have no room for),
-Arabic (its shaping is not done by LVGL), and the Indic and Thai scripts. **A line in a script the
-screen cannot draw is replaced by one sentence**, "This line is in a script this screen cannot
-show.", not by the font's missing-glyph boxes; a title in one is left out, and a music note (which
-neither font has) is dropped from a line.
+the Vietnamese block, and the punctuation and currency signs a lyric uses); Noto Sans behind it for
+Greek (modern, with its tonos) and Cyrillic (with its supplement), and Noto Sans Hebrew behind that;
+all three under the SIL Open Font License, in the image (473 KB of flash, two weights of each). **Not
+in this build:** polytonic Greek and the Cyrillic Extended blocks, CJK (a usable face is 5 to 16 MB,
+which the 4 MB application slots have no room for), Arabic (its shaping is not done by LVGL), and the
+Indic and Thai scripts. **A line in a script the screen cannot draw is replaced by one sentence**,
+"This line is in a script this screen cannot show.", not by the font's missing-glyph boxes; a title
+in one is left out, and a music note (which none of the fonts has) is dropped from a line.
 
 ### Wiring
 
 All of these are Kconfig (`ICLFORGE_EXAMPLE_PANEL_*`), and the defaults are the
-ESP32-P4-Function-EV-Board's, from Espressif's board support header; **check them against the
-schematic of the board the image is for.**
+[ESP32-P4X-Function-EV-Board's](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32p4/esp32-p4x-function-ev-board/user_guide.html),
+from its user guide and the older board's support header; **check them against the schematic of
+the board the image is for.**
 
 | Signal | Default | |
 |---|---|---|
 | Panel | EK79007, 1024 by 600, two DSI lanes at 900 Mbit/s | from Espressif's driver |
 | DSI PHY supply | LDO channel 3 at 2.5 V | from Espressif's driver |
-| Backlight (PWM), panel reset | GPIO26, GPIO27 | board header |
+| Backlight (PWM), panel reset | GPIO26, GPIO27 | the user guide: J1 pins 31 and 38, to the LCD adapter |
 | Touch (GT911) | I2C SDA GPIO7, SCL GPIO8; address 0x5D, then 0x14; polled | board header |
-| TDM BCLK, WS, DOUT | GPIO20, 21, 22, the FireBeetle defaults | **placeholders, unchecked** |
+| TDM BCLK, WS, DOUT | GPIO20, 21, 22, the FireBeetle defaults | on J1 (pins 13, 11, 12), free in the user guide's table; **not yet checked on the bench** |
+
+Two things the user guide does not settle, and the first power-on checks: **which driver IC the
+screen has** (it links both an EK73217BCGA and an EK79007AD datasheet; this image has the EK79007's
+driver) and which touch controller (the older board's has a GT911). **Secure Download is not
+supported on a v3.1 chip, and the image never enables it.**
 
 ### Memory and time
 
 The screen's own memory is in PSRAM, none in the internal RAM the AC-4 decoder leaves 1 to 11 KB
 of: the frame buffer (1.2 MB at 16 bits), two render buffers (80 KB each), LVGL's heap and glyph
-caches, and the task's stack. The task runs at priority 2, below the decoder and the I2S writer.
+caches, the copies of the lines it shows (the rows, a file's plain text and the title are held in
+LVGL's heap, not ESP-IDF's, which would try internal RAM first for anything up to 16 KB), and the
+task's stack. The task runs at priority 2, below the decoder and the I2S writer.
 
 **Measured on the v1.3 board with no panel** (a FireBeetle 2 at 360 MHz, a synthetic karaoke AC-3
 programme decoded to 2.0 over Wi-Fi for 60 s, the screen filling a looping song at 30 fps):
@@ -211,12 +220,24 @@ leave out is the glass itself.
 ## Licences
 
 The image with a screen carries **LVGL** (MIT licence, from the component registry, version
-9.5), and the fonts of the apps, **Archivo** and **Noto Sans Hebrew**, under the SIL Open Font
-License 1.1 (the texts are `firmware/hearth-sink/main/panel/fonts/OFL.txt` and
-`NotoSansHebrew-OFL.txt`). The Hebrew files are static instances cut from the variable font the apps
-bundle, which the licence allows for a font with no reserved name. Like mbedTLS and `esp_hosted` in
-the same image, they are not yet listed in a notices file shipped with the firmware; the desktop
-apps' `NOTICES.txt` is generated and the sink images have none.
+9.5), and three typefaces under the SIL Open Font License 1.1: **Archivo** and **Noto Sans Hebrew**,
+which the apps bundle, and **Noto Sans Greek and Cyrillic**, which only this image has (the texts
+are in `firmware/hearth-sink/main/panel/fonts/`: `OFL.txt`, `NotoSansHebrew-OFL.txt` and
+`NotoSansGreekCyrillic-OFL.txt`). The Hebrew and the Greek and Cyrillic files are static instances
+cut from a variable font, which the licence allows for a font with no reserved name.
+
+**Where a person reads them:** Hearth's **About, Licences** window, which shows the generated
+`NOTICES.txt` that also ships in each package, names LVGL (`notices/fragments/hearth-lvgl.txt`) and
+all three typefaces (`notices/fragments/hearth-fonts.txt`) with their copyright lines and the text
+of each licence, and, in a section of its own (`notices/fragments/hearth-firmware.txt`), ESP-IDF and
+the third-party components the ESP32 images link (FreeRTOS, lwIP, Mbed TLS, picolibc, HTTP Parser,
+argtable3, TLSF, wpa_supplicant, the Xtensa headers, and what LVGL carries: stb_truetype and the
+Montserrat font with Font Awesome's symbols), each with its text as its own files state it.
+Those texts are `notices/licences/ESP-IDF-components.txt`, made from an ESP-IDF checkout by
+`tools/generators/gen_esp_idf_notices.py` (a new ESP-IDF means running it again; a test fails
+until it is). `tools/ci/check_hearth_package.py` fails a package whose notices lack any of them.
+Forge and Crucible do not ship this firmware or these faces and their licence windows are
+unchanged. The firmware images themselves carry no notices file: the notices travel with Hearth.
 
 ## Related pages
 

@@ -11,26 +11,27 @@ namespace {
 
 using iclforge::lyrics::CodePointRange;
 
-// The code points the four font files (Archivo Regular and SemiBold, Noto Sans Hebrew Regular and
-// SemiBold) all carry, as ranges: read from their `cmap` tables on 2026-10-12 with fontTools,
+// The code points the six font files (Archivo, Noto Sans Hebrew and Noto Sans Greek and Cyrillic, each
+// at Regular and SemiBold) all carry, as ranges: read from their `cmap` tables on 2026-10-12 with
+// fontTools,
 //
 //   for each file: TTFont(file).getBestCmap(); intersect the two weights of a family; union the
 //   families; drop the private-use block and the controls; join adjacent code points.
 //
 // Archivo is Latin: Basic, Latin-1, Extended-A, most of Extended-B and the Vietnamese block, with the
-// punctuation and the currency signs a lyric uses. It has no Cyrillic and no Greek (four letters of
-// it). Noto Sans Hebrew adds the Hebrew block and its presentation forms. Change a font file and
-// this table is regenerated.
+// punctuation and the currency signs a lyric uses. It has four letters of Greek and no Cyrillic. Noto
+// Sans Greek and Cyrillic adds modern Greek with its tonos, Cyrillic with its supplement, and the
+// combining marks they use (not polytonic Greek, U+1F00 to U+1FFF, nor Cyrillic Extended). Noto Sans
+// Hebrew adds the Hebrew block and its presentation forms. Change a font file and this table is
+// regenerated.
 constexpr std::array kCovered = std::to_array<CodePointRange>({
     {0x0020, 0x007E}, {0x00A0, 0x017F}, {0x018F, 0x018F}, {0x0192, 0x0192},
     {0x019D, 0x019D}, {0x01A0, 0x01A1}, {0x01AF, 0x01B0}, {0x01C4, 0x01DC},
     {0x01E6, 0x01E7}, {0x01EA, 0x01EB}, {0x01FA, 0x021B}, {0x022A, 0x022D},
     {0x0230, 0x0233}, {0x0237, 0x0237}, {0x0259, 0x0259}, {0x0272, 0x0272},
     {0x02B9, 0x02BA}, {0x02BC, 0x02BC}, {0x02C6, 0x02C7}, {0x02C9, 0x02C9},
-    {0x02D8, 0x02DD}, {0x0300, 0x0304}, {0x0306, 0x030C}, {0x030F, 0x030F},
-    {0x0311, 0x0313}, {0x031B, 0x031B}, {0x0323, 0x0324}, {0x0326, 0x0328},
-    {0x032E, 0x032E}, {0x0331, 0x0331}, {0x0335, 0x0338}, {0x034F, 0x034F},
-    {0x0394, 0x0394}, {0x03A9, 0x03A9}, {0x03BC, 0x03BC}, {0x03C0, 0x03C0},
+    {0x02D8, 0x02DD}, {0x0300, 0x0377}, {0x037A, 0x037F}, {0x0384, 0x038A},
+    {0x038C, 0x038C}, {0x038E, 0x03A1}, {0x03A3, 0x03E1}, {0x03F0, 0x052F},
     {0x0591, 0x05C7}, {0x05D0, 0x05EA}, {0x05EF, 0x05F4}, {0x1E24, 0x1E25},
     {0x1E62, 0x1E63}, {0x1E6C, 0x1E6D}, {0x1E80, 0x1E85}, {0x1E9E, 0x1E9E},
     {0x1EA0, 0x1EF9}, {0x2009, 0x2009}, {0x200C, 0x2011}, {0x2013, 0x2015},
