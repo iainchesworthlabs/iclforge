@@ -318,7 +318,10 @@ against 26.04's much newer glibc would make the result *less* portable than the 
 exists to supplement. Ubuntu 22.04 ships glibc 2.35 (`ldd --version`), so that is the floor this
 AppImage carries: it needs at least glibc 2.35 on the machine that runs it, and nothing older.
 `.github/toolchain/02-gcc-toolchain.sh`'s existing archive-then-PPA fallback (see that script's
-own header) reaches GCC 16 on 22.04's older archive with no changes needed; Qt comes from
+own header) reaches GCC 16 on 22.04's older archive with no changes needed. The PPA step writes
+the PPA's apt source and its pinned signing key itself, rather than calling
+`add-apt-repository ppa:...`, so this leg needs the PPA's archive but not Launchpad's API, which
+answers 503 for minutes at a time now and then. Qt comes from
 `jurplel/install-qt-action` rather than `apt`, decoupling the Qt version entirely from the base
 image's age, the same way the Windows CI leg already does.
 

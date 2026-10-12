@@ -60,6 +60,15 @@
 
 namespace iclforge::sendspin {
 
+// The token cap (PlayerConfig::max_json_tokens) of a sink on a board, hearth-sink's: one block of
+// 8 KB at the most, where the default's 64 KB cannot be had - an ESP32-C6 with Wi-Fi up has no
+// internal block above 31,744 bytes, and a failed allocation aborts with exceptions off. The
+// largest message a server legitimately sends a player is 98 tokens (server/state with metadata,
+// controller and color, as Music Assistant sends it), and no message comes within twice the cap:
+// tests/test_sessions.cpp, "no message a server sends comes within twice a sink's token cap",
+// holds that to every field set.
+inline constexpr std::size_t kSinkMaxJsonTokens = 512;
+
 struct PlayerConfig {
     noise::KeyPair identity;
     noise::Suite suite = noise::Suite::kChaChaPolySha256;
@@ -82,6 +91,13 @@ struct PlayerConfig {
     player::State iclforge_state;
     // Bounds one reassembled message, ID included.
     std::size_t max_message_bytes = 4 * 1024 * 1024;
+    // The most tokens one JSON message may hold: every value, key and container is one, of 16
+    // bytes. A message over it is dropped as a malformed one is, before any storage is taken for
+    // it. Up to 64 tokens live in the session's own frame; a larger message takes one block of 16
+    // times its tokens, so this is what bounds that block: 64 KB at the default, which a host
+    // has, 8 KB at kSinkMaxJsonTokens, which a board with no PSRAM needs. Below 64 it bounds the
+    // frame's part too; 0 refuses every message.
+    std::size_t max_json_tokens = 4096;
     // The other roles' support objects, offered with the roles listed, and their states reported
     // while each role is active.
     std::optional<source::Support> source_support = std::nullopt;
@@ -279,6 +295,11 @@ class PlayerSession {
     [[nodiscard]] SessionOutput on_handshake_text(std::string_view text);
     [[nodiscard]] SessionOutput on_message(std::span<const std::uint8_t> message, std::int64_t arrival);
     [[nodiscard]] SessionOutput on_json(std::string_view text, std::int64_t arrival);
+    // One JSON message, read into token storage that lives only for this call. Sets
+    // `rehandshake` and returns nothing for a noise/handshake message, which on_json() then
+    // hands to on_rehandshake() with that storage already released.
+    [[nodiscard]] SessionOutput on_json_message(std::string_view text, std::int64_t arrival,
+                                                bool& rehandshake);
     [[nodiscard]] SessionOutput on_activate(const messages::Activate& activate);
     [[nodiscard]] SessionOutput on_rehandshake(std::string_view text);
     [[nodiscard]] SessionOutput pairing_step(pairing_flow::Step step);

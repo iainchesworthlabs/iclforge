@@ -10,7 +10,8 @@
 if(TARGET iclforge_sendspin)
     iclforge_instrument_for_fuzzing(iclforge_sendspin)
 
-    # iclforge::sendspin::json::Document::parse, with a write-and-reparse check
+    # iclforge::sendspin::json::Document::parse, with a write-and-reparse check and a
+    # check that TokenStorage and count_tokens agree with a fixed-storage parse
     # (libs/sendspin/src/json.cpp).
     iclforge_add_container_fuzzer(fuzz_sendspin_json iclforge::sendspin)
 
