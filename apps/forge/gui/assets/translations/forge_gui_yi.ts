@@ -5026,32 +5026,47 @@
         <translation>%1 / %2 ס</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="272"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="279"/>
+        <source>CD+G picture</source>
+        <translation>CD+G בילד</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="287"/>
+        <source>The picture of the karaoke disc in %1 beside the stream. Its words are part of the picture.</source>
+        <translation>דאָס בילד פֿון דער קאַראַאָקע-דיסק אין %1 לעבן דעם סטרים. די ווערטער זענען אַ טייל פֿון דעם בילד.</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="297"/>
+        <source>The picture in %1 could not be shown: %2</source>
+        <translation>דאָס בילד אין %1 האָט נישט געקענט ווערן געוויזן: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/StreamPlayerDialog.qml" line="311"/>
         <source>Export decoded WAV…</source>
         <translation>עקספּאָרטירן דעם דעקאָדירטן WAV…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="278"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="317"/>
         <source>Export objects…</source>
         <translation>עקספּאָרטירן די אָביעקטן…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="290"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="329"/>
         <source>Exporting…</source>
         <translation>עקספּאָרטירט…</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="306"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="345"/>
         <source>LEVELS</source>
         <translation>ניוואָען</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="335"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="374"/>
         <source>SOUNDFIELD</source>
         <translation>קלאַנגפֿעלד</translation>
     </message>
     <message>
-        <location filename="../qml/StreamPlayerDialog.qml" line="343"/>
+        <location filename="../qml/StreamPlayerDialog.qml" line="382"/>
         <source>Solid dots are bed positions this stream carries. Objects are not here — this plays the 5.1 bed only; open Inspect objects for per-object playback and position.</source>
         <translation>פֿולע פּינטלעך זײַנען בעט־פּאָזיציעס וואָס דער דאָזיקער סטרים טראָגט. אָביעקטן זײַנען ניט דאָ — דאָס שפּילט בלויז דאָס 5.1 בעט; עפֿנט באַטראַכטן די אָביעקטן פֿאַר פּער־אָביעקט אָפּשפּילן און פּאָזיציע.</translation>
     </message>

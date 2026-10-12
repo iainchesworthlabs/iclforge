@@ -465,6 +465,12 @@ The sections below contain the complete change list and fixes.
   `CdgScreen::pixels()` and `colour()`, so a picture's backdrop shows where the disc meant video to.
   Both are state of the replay, so a seek back lands where a seek from the start does
   (`iclforge::lyrics`, `cdg.hpp`; planning/karaoke-phase2.md, W13f).
+- **The Forge GUI's Open stream dialog shows a karaoke disc's picture.** A `name.cdg` beside the
+  stream (any case) is drawn under the transport as Hearth draws it, through the shared
+  `apps/shared/cdg-picture` item, against the position of what is heard (the transport's position
+  less what the output has been handed and not yet played). A file of that name that is not CD+G
+  says why and the stream plays on. Three new strings in the seven catalogues
+  (planning/karaoke-phase2.md, W13f).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the
