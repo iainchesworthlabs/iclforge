@@ -97,13 +97,21 @@ def make_build(
     root: Path,
     final: dict[str, str],
     defaults: str | None = "sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram",
+    identity: tuple[str, str] | bool | None = None,
 ) -> Path:
     build = root / "build"
     build.mkdir()
     write_config(build / "sdkconfig", final)
     if defaults is not None:
+        who = ""
+        if identity is not False:
+            who = (
+                f"ICLFORGE_PROFILE:STRING={'a' if identity is None else identity[0]}\n"
+                "ICLFORGE_PROFILE_HASH:STRING="
+                f"{sp.profile_hash(small_data(), 'a') if identity is None else identity[1]}\n"
+            )
         (build / "CMakeCache.txt").write_text(
-            f"CMAKE_BUILD_TYPE:STRING=\nSDKCONFIG_DEFAULTS:UNINITIALIZED={defaults}\n", "utf-8"
+            f"CMAKE_BUILD_TYPE:STRING=\nSDKCONFIG_DEFAULTS:UNINITIALIZED={defaults}\n{who}", "utf-8"
         )
     return build
 
@@ -337,6 +345,30 @@ class Verify(unittest.TestCase):
         self.assertEqual(self.rules(sp.verify(self.data, "a", build)), ["fragments"])
         self.assertEqual(sp.verify(self.data, "a", build, ("wifi-credentials",)), [])
 
+    def test_a_build_that_does_not_say_which_profile_it_is_found(self) -> None:
+        build = make_build(self.root, dict(FINAL), identity=False)
+        findings = sp.verify(self.data, "a", build)
+        self.assertEqual(self.rules(findings), ["identity"])
+        self.assertIn("identity a --cmake", findings[0].message)
+
+    def test_a_build_of_another_profile_is_found(self) -> None:
+        build = make_build(self.root, dict(FINAL), identity=("b", "000000000000"))
+        findings = sp.verify(self.data, "a", build)
+        self.assertEqual(self.rules(findings), ["identity"])
+        self.assertIn("is b, not a", findings[0].message)
+
+    def test_a_build_from_an_older_definition_is_found(self) -> None:
+        build = make_build(self.root, dict(FINAL), identity=("a", "000000000000"))
+        findings = sp.verify(self.data, "a", build)
+        self.assertEqual(self.rules(findings), ["identity"])
+        self.assertIn("another definition", findings[0].message)
+
+    def test_the_hash_follows_what_the_profile_locks(self) -> None:
+        before = sp.profile_hash(self.data, "a")
+        self.data["profiles"]["a"]["locked"]["CONFIG_SPIRAM"] = "n"
+        self.assertNotEqual(before, sp.profile_hash(self.data, "a"))
+        self.assertEqual(len(before), 12)
+
     def test_an_image_over_its_budget_is_found(self) -> None:
         build = make_build(self.root, dict(FINAL))
         (build / sp.APP_NAME).write_bytes(b"\0" * 101)
@@ -476,8 +508,13 @@ class Snapshot(unittest.TestCase):
     def test_a_snapshot_of_a_build_verifies_it(self) -> None:
         data = small_data()
         with tempfile.TemporaryDirectory() as tmp:
-            build = make_build(Path(tmp), dict(FINAL))
+            first = Path(tmp) / "first"
+            first.mkdir()
+            build = make_build(first, dict(FINAL))
             data["profiles"]["a"]["locked"] = sp.snapshot(data, "a", sp.read_final(build), {})
+            second = Path(tmp) / "second"
+            second.mkdir()
+            build = make_build(second, dict(FINAL), identity=("a", sp.profile_hash(data, "a")))
             self.assertEqual(sp.verify(data, "a", build), [])
 
 
@@ -499,6 +536,13 @@ class CommandLine(unittest.TestCase):
         )
         code, out, _ = self.run_cli("table", "s3-n16r8")
         self.assertIn("`hearth-sink-esp32s3`", out)
+
+    def test_identity_is_the_id_and_a_hash_for_a_configure(self) -> None:
+        code, out, _ = self.run_cli("identity", "s3-n16r8", "--cmake")
+        self.assertEqual(code, 0)
+        self.assertRegex(
+            out.strip(), r"^-DICLFORGE_PROFILE=s3-n16r8 -DICLFORGE_PROFILE_HASH=[0-9a-f]{12}$"
+        )
 
     def test_an_unknown_profile_is_exit_2(self) -> None:
         code, _, err = self.run_cli("defaults", "no-such")

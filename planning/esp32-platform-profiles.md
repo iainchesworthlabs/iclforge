@@ -227,33 +227,44 @@ writes the `sdkconfig`):
 
 ## Boot-time budget line
 
-The failure showed at the first play, after the board had been "fine" since boot. The board
-already prints `heap: internal free N (largest block M)` at a play's start and `sendspin: player up
-with internal heap ...`. One more line, at boot, after the network is up and the Sendspin player
-has started (and again when a network comes up later):
+**Built (PR 4).** The failure showed at the first play, after the board had been "fine" since
+boot. The board already prints `heap: internal free N (largest block M)` at a play's start and
+`sendspin: player up with internal heap ...`. One more line, after the network is up and the
+Sendspin player has started at boot, and again when a network comes up later
+(`report_budget` in `firmware/hearth-sink/main/hearth_sink.cpp`):
 
 ```
-budget: internal free 158,320, largest 31,744; asks: http_decode_stack 0 (psram), ring 0 (psram),
-        sendspin_decode_stack 0 (psram), server_stack 8,192, ...; biggest internal ask 8,192;
-        headroom 23,552 -- ok
+budget: when=boot net=1 internal_free=86231 largest=31744 ask_ring=0 ask_decode_stack=0
+ask_fetch_stack=8192 ask_total=8192 ask_biggest=8192 headroom=23552 floor=0 verdict=ok
 ```
 
-The asks are compile-time constants from the Kconfig; the headroom is the largest internal block
-minus the biggest ask that is internal. If it is short, the line says `SHORT` and the figure that
-was missing, and the failed-allocation hook's own line is what follows at the first play. The line
-goes to the console and so to `GET /log`, which is where the suite reads it. It cannot be
-sufficient (later allocations take more), so the profile carries a floor for the largest block
-that the suite holds a board to, and the headroom floor is the profile's stated reserve for what
-comes after boot. Whether a `SHORT` should also reach the page is left to PR 4: `GET /hardware`'s
-JSON is built once, when the control surface starts, which is before the Sendspin player does, so
-a notice there would need that JSON rebuilt.
+(One line on the console; this is the S3b's, 2026-10-12, the `s3-n16r8` image. The C6's, from its
+serial console on the `c6-16mb` image: `internal_free=113188 largest=98304 ask_ring=32768
+ask_decode_stack=32768 ask_fetch_stack=8192 ask_total=73728 ask_biggest=32768 headroom=65536
+floor=134008 verdict=below-floor`, which is the C6 profile saying that it refuses an HTTP play.) The asks are the HTTP play's ring and stacks that this build puts in
+internal RAM, from the same Kconfig the play reads: a ring or a stack in PSRAM asks for 0. The
+headroom is the largest internal block less the biggest single ask. `verdict` is `ok`,
+`short-block` (no block that size), `short-total` (not that much in all) or `below-floor` (the
+build's `PLAY_MIN_FREE_BYTES` would refuse a play). An S3 image with its 32,768-byte decode
+stack internal, as 4065's was, has a 31,744-byte largest block against a 32,768-byte ask, so the
+code gives `short-block` at boot where the failure used to be met at the first play; that shape has
+not been run with this line on a board.
 
-`GET /hardware` also reports the **profile id and a hash of its locked values**. Both are
-compile-time constants, from a generated fragment the profile build adds, so they fit that JSON as
-it is built. A board then says what it runs; the suite refuses a board that runs another profile
-or a `+scratch` image, and a session no longer has to guess from a version string what a slot
-holds.
+It is a floor and not a fit: the decoder, the I2S queue and the heap's fragmentation come after
+it, so the suite also holds a board to a headroom of its own
+(`check_esp_console.py --min-budget-headroom`, which fails a verdict that is not `ok` or a margin
+under the figure). The line goes to the console and so to `GET /log` (2 KB on a C6, where a
+crash clears it: read the serial console there). Whether a `short-*` should also reach the page is
+still open: `GET /hardware`'s JSON is built once, when the control surface starts, before the
+Sendspin player does.
 
+**`GET /hardware` reports the profile id and a hash of its locked values** (`profile`,
+`profile_hash`). Both are compile-time constants: the build is configured with
+`sink_profile.py identity <profile> --cmake` (`-DICLFORGE_PROFILE=` and
+`-DICLFORGE_PROFILE_HASH=`), `verify` fails a build that does not carry its own profile's id and
+current hash, and the board suite refuses a board that runs another profile, an older definition of
+this one, or an image built with neither. A session no longer has to guess from a version string
+what a slot holds.
 ## The suite
 
 Per profile, three layers. A new feature is a new row in the profile's play list and a new figure
@@ -412,7 +423,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 1b | The C6 refuses a play it cannot hold: `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES` | yes | **Built, #1395**: refused in under half a second with `why: memory`, no reboot, Sendspin stayed connected |
 | 2 | `profiles.json` and `sink_profile.py`, with tests and the guard; no consumer yet | no | **Built**: six profiles; its tests hold the file to `_build.yml`'s fragment lists and to `check_firmware_package.py`'s rules |
 | 3 | `_build.yml`, `package_firmware.py` and the docs read it; the guard on every profile build | no | **Built**: each board build takes `sink_profile.py defaults <id>` and is held by `verify` (with `idf.py size` for the static-RAM budget); `package_firmware.py package --profile` refuses a build that is not the profile; `check-docs` holds every fragment list the tree spells to a profile or to `other_stacks`, and the README's profile table is generated; `s3-n16r8-ac4` gets a CI build for the first time. Left: `check_firmware_package.py`'s `IMAGES` still carries its own copy, held to the file by a test, until #1400 lands its row. The repository variable `ESP32_PROFILE_GUARD=warn` turns a finding into an annotation |
-| 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | |
+| 4 | The boot `budget:` line, `profile` in `GET /hardware`, `check_esp_console.py` reads the line | yes, one boot per profile | **Built**: see [the budget line](#boot-time-budget-line); read on S3b and the C6 (the P4s were booked by another session) |
 | 5 | The QEMU twin of `s3-n16r8` | no | A spike first (PSRAM mode, XIP): the PR says what ran and what did not |
 | 6 | `board_suite.py` and its tests (a stub board, as `ota.py` has) | yes, to prove it on one | |
 | 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |

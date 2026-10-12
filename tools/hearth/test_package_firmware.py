@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import package_firmware as packager
 import sink_build_fixture as fixture
+import sink_profile
 
 
 class Package(unittest.TestCase):
@@ -221,8 +222,12 @@ class PackageToAProfile(unittest.TestCase):
 
     def build(self, **kwargs) -> Path:
         build = fixture.make_build(self.root / "b", **kwargs)
+        digest = sink_profile.profile_hash(sink_profile.load(self.profiles), "s")
         (build / "CMakeCache.txt").write_text(
-            "SDKCONFIG_DEFAULTS:UNINITIALIZED=sdkconfig.defaults\n", "utf-8"
+            "SDKCONFIG_DEFAULTS:UNINITIALIZED=sdkconfig.defaults\n"
+            "ICLFORGE_PROFILE:STRING=s\n"
+            f"ICLFORGE_PROFILE_HASH:STRING={digest}\n",
+            "utf-8",
         )
         return build
 

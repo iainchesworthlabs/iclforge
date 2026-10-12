@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import re
 import sys
@@ -215,6 +216,32 @@ def cache_defaults(build: Path) -> list[str] | None:
     return []
 
 
+def cache_value(build: Path, name: str) -> str | None:
+    """A variable of the build's CMakeCache.txt, or None if it has none by that name."""
+    try:
+        text = (build / "CMakeCache.txt").read_text("utf-8", "replace")
+    except OSError:
+        return None
+    prefix = f"{name}:"
+    for line in text.splitlines():
+        if line.startswith(prefix):
+            _, _, value = line.partition("=")
+            return value.strip()
+    return None
+
+
+def profile_hash(data: dict[str, Any], ident: str) -> str:
+    """A short hash of what a profile is: its fragments and its locked values. A board reports
+    the one its image was built with, so one running an older definition is seen."""
+    spec = profile(data, ident)
+    canon = json.dumps(
+        {"fragments": spec["fragments"], "locked": spec.get("locked", {})},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()[:12]
+
+
 def read_size_report(path: Path) -> dict[str, int]:
     """The memory types of `idf.py size --format json2`, as name -> bytes used.
 
@@ -283,6 +310,30 @@ def verify(
                 Finding(
                     "fragments",
                     f"the build was given {';'.join(extras)}, which no declared overlay is",
+                )
+            )
+
+    # 1b. The profile the image says it is (main/CMakeLists.txt, ICLFORGE_PROFILE), which is
+    # what GET /hardware reports and what the board suite refuses a board for.
+    if actual is not None:
+        built_as = cache_value(build, "ICLFORGE_PROFILE")
+        built_hash = cache_value(build, "ICLFORGE_PROFILE_HASH")
+        if not built_as:
+            findings.append(
+                Finding(
+                    "identity",
+                    "the build does not carry its profile: configure it with "
+                    f"`sink_profile.py identity {ident} --cmake`",
+                )
+            )
+        elif built_as != ident:
+            findings.append(Finding("identity", f"the build says it is {built_as}, not {ident}"))
+        elif built_hash != profile_hash(data, ident):
+            findings.append(
+                Finding(
+                    "identity",
+                    f"the build carries hash {built_hash or '(none)'} and profile {ident} is "
+                    f"{profile_hash(data, ident)}: it was configured from another definition",
                 )
             )
 
@@ -515,6 +566,10 @@ def main(argv: list[str] | None = None) -> int:
         help="report findings as warnings and exit 0 (the repository's ESP32_PROFILE_GUARD=warn)",
     )
 
+    who = commands.add_parser("identity", help="a profile's id and the hash of what it locks")
+    who.add_argument("profile")
+    who.add_argument("--cmake", action="store_true", help="as the -D options of a configure")
+
     docs = commands.add_parser("check-docs", help="the fragment lists the docs spell")
     docs.add_argument("--write", action="store_true", help="refresh a generated table")
     docs.add_argument("--root", type=Path, default=REPO)
@@ -549,6 +604,12 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             if not findings:
                 print(f"{args.profile}: the build holds to its profile")
+        elif args.command == "identity":
+            digest = profile_hash(data, args.profile)
+            if args.cmake:
+                print(f"-DICLFORGE_PROFILE={args.profile} -DICLFORGE_PROFILE_HASH={digest}")
+            else:
+                print(f"{args.profile} {digest}")
         elif args.command == "check-docs":
             findings = check_docs(data, args.root, args.files or None, args.write)
             _report(findings, "docs", False)

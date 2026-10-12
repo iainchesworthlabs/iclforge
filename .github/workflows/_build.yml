@@ -3023,8 +3023,9 @@ jobs:
           dir="$RUNNER_TEMP/hearth-sink-esp32s3"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           defaults="$(python3 "$profile" defaults s3-n16r8)"
+          read -r -a identity <<< "$(python3 "$profile" identity s3-n16r8 --cmake)"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32s3 \
-            "-DSDKCONFIG_DEFAULTS=$defaults" \
+            "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
             "-DPROJECT_VER=$version" build >/dev/null
           idf.py -B "$dir" size --format json2 > "$dir/size.json"
           python3 "$profile" verify s3-n16r8 --build-dir "$dir" --size-json "$dir/size.json" \
@@ -3059,8 +3060,9 @@ jobs:
           if [ "${ESP32_PROFILE_GUARD:-}" = warn ]; then guard=(--warn-only); fi
           dir="$RUNNER_TEMP/hearth-sink-esp32s3-ac4"
           defaults="$(python3 "$profile" defaults s3-n16r8-ac4)"
+          read -r -a identity <<< "$(python3 "$profile" identity s3-n16r8-ac4 --cmake)"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32s3 \
-            "-DSDKCONFIG_DEFAULTS=$defaults" build >/dev/null
+            "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" build >/dev/null
           idf.py -B "$dir" size --format json2 > "$dir/size.json"
           python3 "$profile" verify s3-n16r8-ac4 --build-dir "$dir" --size-json "$dir/size.json" \
             --github "${guard[@]}"
@@ -3446,8 +3448,9 @@ jobs:
           dir="$RUNNER_TEMP/hearth_sink-c6-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           defaults="$(python3 "$profile" defaults c6-4mb)"
+          read -r -a identity <<< "$(python3 "$profile" identity c6-4mb --cmake)"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32c6 \
-            "-DSDKCONFIG_DEFAULTS=$defaults" \
+            "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
             "-DPROJECT_VER=$version" build
           idf.py -B "$dir" size --format json2 > "$dir/size.json"
           python3 "$profile" verify c6-4mb --build-dir "$dir" --size-json "$dir/size.json" \
@@ -3476,8 +3479,9 @@ jobs:
           dir="$RUNNER_TEMP/hearth_sink-c6-16mb-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           defaults="$(python3 "$profile" defaults c6-16mb)"
+          read -r -a identity <<< "$(python3 "$profile" identity c6-16mb --cmake)"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32c6 \
-            "-DSDKCONFIG_DEFAULTS=$defaults" \
+            "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
             "-DPROJECT_VER=$version" build >/dev/null
           idf.py -B "$dir" size --format json2 > "$dir/size.json"
           python3 "$profile" verify c6-16mb --build-dir "$dir" --size-json "$dir/size.json" \
@@ -3511,8 +3515,9 @@ jobs:
           dir="$RUNNER_TEMP/hearth_sink-p4-sendspin"
           version="${VERSION_TAG:-$(git -c safe.directory='*' -C "$GITHUB_WORKSPACE" describe --tags --always)}"
           defaults="$(python3 "$profile" defaults p4-rev1)"
+          read -r -a identity <<< "$(python3 "$profile" identity p4-rev1 --cmake)"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 \
-            "-DSDKCONFIG_DEFAULTS=$defaults" \
+            "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
             "-DPROJECT_VER=$version" build
           idf.py -B "$dir" size --format json2 > "$dir/size.json"
           python3 "$profile" verify p4-rev1 --build-dir "$dir" --size-json "$dir/size.json" \
@@ -3541,8 +3546,9 @@ jobs:
           if [ "${ESP32_PROFILE_GUARD:-}" = warn ]; then guard=(--warn-only); fi
           dir="$RUNNER_TEMP/hearth_sink-p4-ac4"
           defaults="$(python3 "$profile" defaults p4-rev1-ac4)"
+          read -r -a identity <<< "$(python3 "$profile" identity p4-rev1-ac4 --cmake)"
           idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET=esp32p4 \
-            "-DSDKCONFIG_DEFAULTS=$defaults" \
+            "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
             -DICLFORGE_STAGE_TIMERS=ON build
           idf.py -B "$dir" size --format json2 > "$dir/size.json"
           python3 "$profile" verify p4-rev1-ac4 --build-dir "$dir" --size-json "$dir/size.json" \
