@@ -329,6 +329,10 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **Crucible's lyric strip draws a CD+G disc.** A `.cdg` file imported against an application is
+  drawn as its picture under the file's name (the shared `CdgPicture`: 300 by 216, as large as
+  fits in whole-pixel steps) and followed by the same Start and nudge an `.lrc` has; its words are
+  pixels, so none are read as text and the page says so (planning/karaoke-phase2.md, W13f and D11).
 - **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
   offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
   dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
@@ -355,6 +359,15 @@ The sections below contain the complete change list and fixes.
   the line's index; Hearth keeps the lines of the document it sent the group and reads the index
   against them. Run against real boards, a line change follows the one before at the file's
   spacing to the polling's resolution (S3a and P4a, a line every 3 s).
+- **The singer view moves about and shows the queue, and the Play page shows the lyrics.** The
+  full-screen view's position bar is pressed or dragged to move the item (the words and the clock
+  show the place held, and the item moves when it is let go, playing or paused), `Left` and
+  `Right` move it five seconds, **Queue** (or `Q`) opens the queue beside the words with the
+  playing item marked and a press playing another, and the top strip names the next item. The
+  Play page gets a **Lyrics** card for an item with lyrics or a CD+G picture: a column beside the
+  queue in a window 1,580 pixels wide or more, the first card of the monitor column in a narrower
+  one, and nothing for an item without. The shortcuts reference lists the singer view's keys
+  (planning/karaoke.md, "Found while building").
 - **The Forge GUI opens and saves projects, and `forge project` runs them.** A `.forgeproj` is a
   JSON file holding the sources (with their paths relative to it and, in the Karaoke flow, which
   part each is), the channel plan, the assignments, the objects' placements and motion, the
@@ -393,6 +406,15 @@ The sections below contain the complete change list and fixes.
   the decoder was run in Node against `forge decode` of the karaoke example below: all eight cases
   match sample for sample. An AC-3 stream's fold levels now come from its own `cmixlev` and
   `surmixlev` (they were the E-AC-3 defaults) (planning/karaoke-phase2.md, W8).
+- **`hearth --open` and `--smoke-shot`.** `--open <file>` adds a file to the queue (with nothing
+  in it the first is loaded and cued, so the Play, Media and Karaoke pages show it), `--seek <ms>`
+  starts that item there and holds it paused, and `--smoke-shot <png>` is `--shot` with network
+  discovery off: a capture with nobody at the machine neither browses the network nor raises
+  Windows' firewall prompt, which `--shot` does. A capture waits for the file's media information
+  and exits 3 when the file did not load, so a script that retakes screenshots can stop on it.
+  The parsing is `command_line.hpp`, held by `hearth_controller_tests`. The Karaoke guide's page
+  screenshot is retaken from the running window, and a duet one is added; the options are in
+  [Hearth's command line](docs/hearth/index.md#command-line).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while

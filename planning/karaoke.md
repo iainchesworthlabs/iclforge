@@ -136,9 +136,12 @@ when this page was corrected.
   Hear step encodes to a temporary file and opens it in the stream player; the run strip lists
   that preview as a run.
 - **Documentation screenshots** were not taken with `--smoke-shot` as the design planned: Hearth
-  has no `--smoke-shot`, and its `--shot` cannot open an item. They were taken by a throwaway QML
+  had no `--smoke-shot`, and its `--shot` could not open an item. They were taken by a throwaway QML
   script run in the test binaries, with a generated stream and a fake output, and the bundled
-  fonts on `QT_QPA_FONTDIR`.
+  fonts on `QT_QPA_FONTDIR`. *Since:* Hearth has `--smoke-shot` (`--shot` with network discovery
+  off, so it raises no firewall prompt), `--open <file>` and `--seek <ms>` (PR #1361), and the
+  guide's Karaoke page screenshot is the running window's. The singer view is still the harness's,
+  since a full-screen window is resized by an offscreen platform to its 800 px screen.
 
 ### Not measured
 
@@ -398,6 +401,8 @@ Not in v1, and not on the lists above; each is a place a later phase can start, 
   the sink decodes coded AC-3 and is sent the choice) and how the current line and word reach it.
 - **A Hearth option that opens an item for a capture.** `--shot` opens nothing, so a screenshot of a
   playing page needs a harness; a `--open <file>` would let the documentation be regenerated.
+  *Built in PR #1361:* `--open`, `--seek` and `--smoke-shot`
+  ([Hearth's command line](../docs/hearth/index.md#command-line)).
 - **A choice kept per item** (P9 says every item; some singers want a duet's vocals remembered per
   song).
 - **Seeking and a queue in the singer view**, and a lyric view beside the queue on the Play page.
