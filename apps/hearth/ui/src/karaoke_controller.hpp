@@ -7,8 +7,10 @@
 #include <QVariantMap>
 #include <QtQmlIntegration>
 
-#include <cstddef>
 #include <memory>
+
+#include "cdg_frame_source.hpp"
+#include "cdg_frames.hpp"
 
 // The lyrics of the item playing (planning/karaoke-design.md, K5): a third QML
 // singleton beside HearthController and NetworkController, so that
@@ -23,7 +25,7 @@
 // and is a no-op for an item it already has.
 namespace iclforge::hearth::ui {
 
-class KaraokeController : public QObject {
+class KaraokeController : public iclforge::apps::CdgFrameSource {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
@@ -197,6 +199,8 @@ public:
     // time the position moves; only the position decides what it is, so a seek and a pause are
     // only another position, and the screen replays from the start when it goes back.
     [[nodiscard]] QImage pictureFrame(qlonglong positionMs);
+    // CdgFrameSource's form of the same: there is one disc here, so the key is not read.
+    [[nodiscard]] QImage pictureFrame(int key, qlonglong positionMs) override;
 
 signals:
     void lyricsChanged();
@@ -237,10 +241,8 @@ private:
     int stamped_lines_ = 0;
     QString timing_error_;
     int reaction_ms_ = kDefaultReactionMs;
-    // The last frame handed out and how many packets it had applied: a position that has not
-    // reached the next packet (they come 300 a second, the view asks 60) is the same picture.
-    QImage frame_;
-    std::size_t frame_applied_ = 0;
+    // The disc of a "picture" status and the screen that follows it (apps/shared/cdg-picture).
+    iclforge::apps::CdgFrames disc_;
 };
 
 }  // namespace iclforge::hearth::ui

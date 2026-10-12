@@ -32,7 +32,7 @@ The *Measured on every merge* strip above loads the newest figures from the appe
 measurement history that CI keeps on the `quality-history` branch. Each tile has one line per codec
 (AC-3, E-AC-3, and AC-4), and a line is the worst case among that codec's own workloads, with the
 workload named. The lines of two codecs come from different workloads and do not compare with each
-other.
+other. A line whose series was last recorded on an older commit than the newest says which.
 
 [Performance and quality](performance-quality.md) explains the measures and links to the full
 performance, decoder-accuracy, listening-quality, object-quality, and memory histories.
