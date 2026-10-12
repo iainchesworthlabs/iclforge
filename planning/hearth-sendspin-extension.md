@@ -333,6 +333,7 @@ the rest are this role's.
 | `why?` | string | A short sentence when the sink stopped playing for a reason of its own; absent otherwise |
 | `layout?` | string | The layout in force, in the grammar `layout_grammar` names, as the sink's page or the last settings made it; absent when the sink does not say. A server that renders for the sink reads it here, and not from what it last sent, since the page can change it |
 | `lyrics?` | object | `{item, line}`: the item number of the document the sink holds, and the line its own clock has the sound in (-1 before the first line, and for a document with no times); absent while it holds none. Sent when a document is taken and when the line changes, which is a few times a minute |
+| `output?` | string | How the stream the sink has leaves it: `"passthrough"`, the coded bits go on to a receiver as they came (IEC 61937); `"pcm"`, the sink decoded the stream and plays the samples. Present while a stream is open; absent with none, and for a sink that does not say, which a server reads as not known. A sink that can do either, as Hearth for Android does, says which it is doing, so a server's page can show it. A value a reader does not know is read as absent. An added optional key, so no version change ([Versions](#versions)) |
 
 The sink sends `client/state` whenever a field other than `levels` changes, and while a stream
 plays it also sends one at most ten times a second with fresh `levels`. `levels` are measured on
@@ -465,6 +466,41 @@ plays, every output carries `ac3::render::IdentifyTone::fill`'s result instead o
 audio: the tone on `output` (its low band when the output carries the LFE) and silence elsewhere.
 A running stream keeps its timeline and its chunks are decoded and discarded, so the stream
 continues in sync when the tone stops. `level_db` is inside `IdentifyTone`'s −60 to −12 dB.
+
+### Requests
+
+`client/command`, object `_iclforge_player`, from a sink to its server:
+`{"command": "decoder", "decoder": {...}}`. It lets a sink's own control (a touch screen's vocals
+button, a TV remote) ask for the **singer's karaoke choice**, which is the server's to hold. It is
+the one thing a sink may send to a server in this role besides its state.
+
+| Key in `decoder` | Values |
+|---|---|
+| `karaoke` | `"off"`, `"aware"`, `"capable"` |
+| `karaoke_vocals` | `"none"`, `"v1"`, `"v2"`, `"both"` |
+| `karaoke_melody_db`, `karaoke_vocal1_db`, `karaoke_vocal2_db` | -24.0 to 12.0 (dB) |
+
+The names and ranges are the settings command's ([Settings](#settings)), so a request is the
+decoder object of a settings command with only these keys. Rules:
+
+- **The sink says what it may ask for.** The support object's `requests` lists the keys, a subset of
+  the five above; absent or empty, the sink asks for none. A server acts only on a key the sink
+  listed, only while the role is active, and a sink sends only what it listed.
+- **A request is advice.** The server applies it as it would the singer's own change on its Karaoke
+  page, so every member and every screen of the server moves together (a group hears one
+  reproduction). There is no reply: a sink that decodes for itself and lists the decoder keys sees
+  the result as the settings command it is sent next, and every sink hears it in the audio. A
+  server that does not act on requests ignores them, and a sink must not assume otherwise.
+- **A passed-through stream is not changed by it.** A sink that hands the coded bits to a receiver
+  plays every vocal whatever is chosen ([the sink screen's SS7](hearth-sink-screen.md)); its request
+  changes what the group's decoding members play and what the server's own screens show.
+- **Refused whole.** A key that is present with a value out of range or a name the reader does not
+  know refuses the request, as a settings object is refused whole. A key that is not one of the five
+  is ignored, as every unknown key is ([E14](#encryption)); a request with none of the five has
+  nothing to ask for and is dropped.
+- **An added optional key and a new object**, so no version change ([Versions](#versions)): a server
+  from before it does not read `_iclforge_player` in `client/command` and a sink from before it does
+  not list `requests`.
 
 ### Lyrics
 

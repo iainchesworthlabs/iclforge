@@ -645,7 +645,7 @@ about 660 against the S3's 120 and the P4's 61), 0 of 5 plays glitched, `decode_
 11,120 bytes, and the least internal heap during a stream 27,968 bytes (it read 17,124 to 52,560
 over the plays made). The boot line is the worst of eight: `internal_free=108792 largest=88064`.
 
-**Recorded again with the E-AC-3 row** (PR 15, the image `v0.10.0-beta.1-4569-g9643eba39-`, profile
+**Recorded again with the E-AC-3 row** (PR 16, the image `v0.10.0-beta.1-4569-g9643eba39-`, profile
 hash `cc71ee4908ff`, five plays a row after eight restarts, the decoder's feature tables out of
 static RAM and the play floor at 160,796, 2026-10-12):
 
@@ -682,7 +682,7 @@ free 11016, largest 1824` over and over: the Wi-Fi receive buffer (1,848 bytes) 
 from a heap that has 11 KB free and no block over 1,824 bytes. It is fragmentation as much as
 total free, the failure the C3 session found on 2026-09-17. It was why the row was not in the
 list: a baseline recorded from a lucky first-stream-after-boot play would have called a board
-that fails after an AC-3 stream "holding". The row is in the list since PR 15, after the AC-3 one,
+that fails after an AC-3 stream "holding". The row is in the list since PR 16, after the AC-3 one,
 as a user plays them.
 
 ### The C6's static RAM budget was wrong (PR 14)
@@ -724,6 +724,50 @@ harness died on a `/status` that timed out. The floor is now 160,796: the 134,00
 bytes the network and the session were left at their least beside an E-AC-3 stream, so a play
 over HTTP is refused unless it leaves them their room. Whether HTTP plays should work on the C6
 is still the owner's call; this keeps the answer the profile gave.
+
+### Sendspin rows for the S3 and the P4 (PR 15)
+
+**Built.** The four profiles with a board gain `ac3-2.0-sendspin` and `eac3-2.0-sendspin`, played
+by the test server as the C6's are ([PR 14](#sendspin-rows-pr-14); the harness's rules are on
+[the bench page](esp32-board-bench.md#sendspin-rows)), and their baselines are re-recorded whole,
+five plays a row after eight restarts, on the image of each profile (the two AC-4 profiles on their
+4517 images, whose profile hashes are the current ones). The `/play` rows came back where they
+were within the tolerance, so those baselines were holding; the new figures:
+
+| profile | board | AC-3 over Sendspin (of a 32 ms burst) | E-AC-3 over Sendspin |
+|---|---|---|---|
+| `s3-n16r8` | S3a | 204 permille, 1 of 5 glitched, heap 58,483 | 167 permille, 2 of 5 glitched, heap 2,935 |
+| `s3-n16r8-ac4` | S3a | 200 permille, 0 of 5 glitched, heap 23,991 | 164 permille, 2 of 5 glitched, heap 2,539 |
+| `p4-rev1` | P4a | 85 permille, 0 of 5 glitched, heap 253,939 | 67 permille, 0 of 5 glitched, heap 203,315 |
+| `p4-rev1-ac4` | P4a | 85 permille, 1 of 5 glitched, heap 246,487 | 67 permille, 0 of 5 glitched, heap 192,879 |
+
+**What a Sendspin row found, and what it did not.**
+
+- **The bursts that were "missing" were late.** An E-AC-3 stream that played 932 bursts and had
+  6 arrive late is the server's own `did not play every burst: 6 late`, and the first judge called it
+  a stream that lost six. A stream's bursts are *accounted for* when played, late or dropped
+  (`suite_sendspin.accounted()`, the server's own test); a late one is a glitch and is counted as
+  one, and a burst that is none of them is a finding.
+- **The S3's E-AC-3 stream starts late.** Two of five plays in each S3 profile lost 11 to 17 bursts
+  to lateness at the start of the stream (0.35 to 0.55 s of audio), and one of the two E-AC-3
+  plays in the probe on S3a's 4065 image lost two. The S3's decoder is not the cause (164 to 167
+  permille of a burst) and the loss is at the start of the stream, which suggests the start
+  alignment; that is not investigated. The P4 is better on the profile images (none of ten
+  E-AC-3 plays on 4565 and 4517 lost one; one AC-3 play of five in `p4-rev1-ac4` lost 7) than on
+  the 3556 image in the probes, where three of five E-AC-3 plays lost 1 to 6. The S3 rows are
+  held as they are, with the baseline's glitched plays and two more allowed, and the loss is a
+  finding for whoever takes the S3's Sendspin start.
+- **The S3's internal heap is thin during an E-AC-3 stream.** The least internal heap during it was
+  2.5 to 2.9 KB in the recordings (6.6 KB in the probes), and an AC-3 stream after an E-AC-3 one
+  read 7.2 KB where the first stream of a boot read 58 to 60 KB (24 KB with the AC-4 decoder in
+  the image): the same shape as the C6's ([PR 14](#sendspin-rows-pr-14)). The E-AC-3 row has a
+  `play_heap_free_bytes` tolerance of 2,048 so that a play that takes it is the regression. The
+  P4's heap is 190 to 250 KB and has none.
+- **One hang, not explained.** On the first attempt S3a stopped answering (HTTP and console
+  silent) just after its eighth restart, before the first play, with the same image the rerun then
+  recorded on without trouble. An esptool reset recovered it. Nothing else was using it; S3b was
+  booked by another session for a network-stall experiment around then, which may or may not be
+  related. It is noted and not reproduced.
 
 ## Changing a profile
 
@@ -786,7 +830,8 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
 | 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; no board has run the image, so no list and no baseline |
-| 10 | Sendspin rows: the suite plays a stream the way the C6's product path does, with the test server | yes | **Built** (the harness, tests, the C6's AC-3 row and its baseline); the E-AC-3 row joined it in PR 15, once the decoder's feature tables were out of static RAM, see [Sendspin rows](#sendspin-rows-pr-14) |
+| 10 | Sendspin rows: the suite plays a stream the way the C6's product path does, with the test server | yes | **Built** (the harness, tests, the C6's AC-3 row and its baseline); the E-AC-3 row joined it in PR 16, once the decoder's feature tables were out of static RAM, see [Sendspin rows](#sendspin-rows-pr-14) |
+| 11 | Sendspin rows for the S3 and the P4 profiles, and their baselines | yes | **Built** (S3a and P4a, the four baselines re-recorded); the S3's E-AC-3 stream starts late in two plays of five, see [PR 15](#sendspin-rows-for-the-s3-and-the-p4-pr-15) |
 
 PR 3 follows 2. `p4-rev3` waited for #1400's fragments to be on main (row 9).
 
@@ -808,7 +853,7 @@ Still open:
    number from it is a smoke floor. The board suite owns the budget. Confirm that is acceptable.
 4. **An HTTP play on the C6.** Left refused. The alternative is giving the Sendspin player's ring
    and stack back for the length of a play, which is a change to the player, not to a profile.
-5. ~~**E-AC-3 on the C6 over Sendspin.**~~ Done in PR 15: the heap was fixed (27,776 bytes of the decoder library's feature tables out of static RAM), the row is in the list and recorded ([Sendspin rows](#sendspin-rows-pr-14)); the C6 lists E-AC-3 to a server, as before.
+5. ~~**E-AC-3 on the C6 over Sendspin.**~~ Done in PR 16: the heap was fixed (27,776 bytes of the decoder library's feature tables out of static RAM), the row is in the list and recorded ([Sendspin rows](#sendspin-rows-pr-14)); the C6 lists E-AC-3 to a server, as before.
 
 ## What this does not claim
 

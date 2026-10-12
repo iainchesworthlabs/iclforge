@@ -34,7 +34,7 @@ from pathlib import Path
 
 # The Android apps of the tree, each checked on its own: a package, its Kotlin, its native
 # definitions, its library. A second app (planning/hearth-android.md) is one more entry here.
-APPS = ("apps/demos/android/app",)
+APPS = ("apps/demos/android/app", "apps/hearth/android/app")
 APP = APPS[0]
 # The native code besides an app's own that a JNI name could be defined in. The audio backend
 # defines none since its registration became two plain C++ functions the app calls

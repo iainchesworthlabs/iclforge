@@ -324,7 +324,9 @@ class Judging(unittest.TestCase):
         self.assertTrue(any("no sendspin.stream= line" in f for f in findings))
 
     def test_late_dropped_invalid_and_underruns_are_glitches_not_findings(self) -> None:
-        line = STREAM_LINE.replace("late=0", "late=2").replace("dropped=0", "dropped=1")
+        # 938 sent: 935 played, 2 late, 1 dropped
+        line = STREAM_LINE.replace("bursts=938", "bursts=935")
+        line = line.replace("late=0", "late=2").replace("dropped=0", "dropped=1")
         line = line.replace("invalid=0", "invalid=4").replace("underruns=0", "underruns=3")
         line = line.replace("resyncs=0", "resyncs=2")
         run = self.run_of(line=line)
@@ -367,7 +369,7 @@ class Judging(unittest.TestCase):
 
     def test_late_chunks_the_server_names_are_a_glitch_when_every_burst_was_played(self) -> None:
         text = "C6 did not play every burst: 2 late, 0 dropped with no room for them"
-        line = STREAM_LINE.replace("late=0", "late=2")
+        line = STREAM_LINE.replace("bursts=938", "bursts=936").replace("late=0", "late=2")
         run = self.run_of(code=3, line=line, failure=text)
         self.assertEqual(ss.judge(run, {"units": 938}), [])
         self.assertEqual(ss.glitches(run), ["2 late chunk(s)"])
@@ -384,6 +386,20 @@ class Judging(unittest.TestCase):
         self.assertIn("170 bursts played, expected 938", ss.judge(run, {"units": 938}))
         gone = self.run_of(code=3, line=None, failure="C6 went away")
         self.assertTrue(any("went away" in f for f in ss.judge(gone, {"units": 938})))
+
+    def test_late_bursts_are_accounted_for_and_a_lost_one_is_not(self) -> None:
+        # P4a, 2026-10-12: 932 played and 6 late of 938 sent, the server's own "did not play every
+        # burst: 6 late": a glitch, not a stream that lost data.
+        line = STREAM_LINE.replace("bursts=938", "bursts=932").replace("late=0", "late=6")
+        run = self.run_of(
+            code=3, line=line, failure="B did not play every burst: 6 late, 0 dropped"
+        )
+        self.assertEqual(ss.judge(run, {"units": 938}), [])
+        self.assertEqual(ss.accounted(run.stream or {}), 938)
+        # two of them neither played nor late: lost
+        lost = STREAM_LINE.replace("bursts=938", "bursts=930").replace("late=0", "late=6")
+        findings = ss.judge(self.run_of(line=lost), {"units": 938})
+        self.assertIn("930 bursts played, expected 938 (6 late, 0 dropped)", findings)
 
     def test_every_burst_of_the_stream_is_played(self) -> None:
         line = STREAM_LINE.replace("bursts=938", "bursts=900")
@@ -597,9 +613,12 @@ class InTheSuite(unittest.TestCase):
             out.extra = {"play_heap_free": heap, "resyncs": resyncs, "burst_us": burst, "late": 0}
             return out
 
-        median = bs._median(
-            [result(26000, 0, 21000), result(2600, 3, 24000), result(40000, 0, 22000)]
-        )
+        runs = [result(26000, 0, 21000), result(2600, 3, 24000), result(40000, 0, 22000)]
+        for run, got in zip(runs, (936, 938, 938), strict=True):
+            run.frames = got
+            run.extra["via"] = "sendspin"
+        median = bs._median(runs)
+        self.assertEqual(median.frames, 938)  # not the first play's, which lost two to late
         self.assertEqual(median.extra["play_heap_free"], 2600)
         self.assertEqual(median.extra["resyncs"], 3)
         self.assertEqual(median.extra["burst_us"], 22000)

@@ -210,13 +210,13 @@ cmake --build D:/ac3bld/suite-testserver --target hearth-testserver
   <id>`), never a bare `forget`, which drops the owner's Hearth. A record that was there before
   the run and is not the suite's name is left. `--keep-pairing` keeps it.
 - **The board is not polled while it plays.** The C6's E-AC-3 play had 2.6 to 3.2 KB of internal
-  heap at its least (19 to 31 KB since the decoder's feature tables left static RAM, PR 15), and
+  heap at its least (19 to 31 KB since the decoder's feature tables left static RAM, PR 16), and
   its HTTP server answers from that heap: with the server polling `/status` every second and a
   relay every 0.4 s, the same play rebooted the board once in four. The server is started without
   `--status`, the totals come from the log afterwards, and the decode stack from one
   `GET /status` after the stream.
 - **A C6 that has more free RAM refuses fewer plays.** `CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES`
-  is a check on free RAM, and when PR 15 gave the C6 28 KB back the 134,008 it had been sized to
+  is a check on free RAM, and when PR 16 gave the C6 28 KB back the 134,008 it had been sized to
   stopped refusing: the suite's `*-refused` rows started an HTTP play, AC-3 2.0 ran beside Wi-Fi
   buffer allocations failing at 6 to 14 KB free, and the harness died on a `/status` that timed
   out with the play still running. A change that gives a board memory back is a change to that
