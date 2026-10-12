@@ -14,6 +14,10 @@ import Crucible
 // in the accent, left to right, and underlined. A file that times lines and not words has the whole
 // line emphasised.
 //
+// A `.cdg` file (D11) is imported the same way and followed by the same Start and nudge, and what it
+// draws is the disc's picture (the shared CdgPicture) where an `.lrc` draws its words: a disc
+// carries no text.
+//
 // Nothing here keeps lyrics: CrucibleLyrics does, per application, and this asks it with the time.
 ColumnLayout {
     id: root
@@ -66,6 +70,12 @@ ColumnLayout {
     readonly property var cursor: root.revision >= 0 && root.nowMs >= 0 && root.appId >= 0
                                   ? CrucibleLyrics.cursor(root.appId, root.nowMs)
                                   : ({ line: -1, inLine: false, word: -1, fraction: 0, positionMs: -1, fills: [] })
+    // A file with times or a disc: what Start, Stop and the nudge are for.
+    readonly property bool followable: root.status === "timed" || root.status === "picture"
+    // The song's position for a disc's picture: where the clock has it, and the first picture
+    // before it has begun.
+    readonly property real pictureMs: root.revision >= 0 && root.nowMs >= 0 && root.appId >= 0
+                                      ? Math.max(0, CrucibleLyrics.positionMs(root.appId, root.nowMs)) : 0
     readonly property int currentLine: root.cursor.line ?? -1
     readonly property bool inLine: root.cursor.inLine === true
     readonly property int currentRow: (root.following && root.inLine && root.currentLine < root.lines.length)
@@ -100,7 +110,7 @@ ColumnLayout {
         id: lyricsDialog
         objectName: "lyricsDialog"
         title: qsTr("Choose the lyrics")
-        nameFilters: [qsTr("Lyrics (*.lrc *.srt *.ass *.kar *.txt)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("Lyrics and CD+G (*.lrc *.srt *.ass *.kar *.txt *.cdg)"), qsTr("All files (*)")]
         onAccepted: CrucibleLyrics.importFile(root.appId, selectedFile.toString())
     }
 
@@ -142,7 +152,9 @@ ColumnLayout {
             text: root.status === "error" ? root.errorText
                   : (root.fileName.length > 0
                      ? (root.status === "timed" ? qsTr("%1 · %2 lines").arg(root.fileName).arg(root.lines.length)
-                                                : qsTr("%1 · no times, so shown whole and not followed").arg(root.fileName))
+                        : root.status === "picture"
+                          ? qsTr("%1 · a CD+G picture: its words are pixels, so none are read").arg(root.fileName)
+                          : qsTr("%1 · no times, so shown whole and not followed").arg(root.fileName))
                      : "")
             color: root.status === "error" ? Theme.text : Theme.textMuted
             font.pixelSize: Theme.fontSmall
@@ -151,7 +163,7 @@ ColumnLayout {
 
         RowLayout {
             Layout.fillWidth: true
-            visible: root.status === "timed"
+            visible: root.followable
             spacing: Theme.space2
             CrucibleButton {
                 objectName: "lyricsStart"
@@ -306,10 +318,24 @@ ColumnLayout {
             }
         }
 
+        // The picture of a CD+G disc: no text, so there are no words to follow.
+        CdgPicture {
+            id: disc
+            objectName: "lyricPicture"
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.round(width * 216 / 300)
+            visible: root.status === "picture"
+            source: CrucibleLyrics
+            key: root.appId
+            positionMs: root.pictureMs
+            Accessible.role: Accessible.Graphic
+            Accessible.name: qsTr("CD+G picture")
+        }
+
         Text {
             objectName: "lyricsHint"
             Layout.fillWidth: true
-            visible: root.status === "timed"
+            visible: root.followable
             text: qsTr("Press Start as the song begins. This application's position is not read, so a "
                        + "pause or a seek in it is not followed: press Start again, or nudge the words.")
             color: Theme.textMuted
