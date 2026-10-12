@@ -25,7 +25,14 @@ qt_add_executable(crucible_qmltests
     ../shared/theme/src/system_theme.cpp
     ../shared/theme/src/system_theme.hpp
     ../shared/preferences/src/language_manager.cpp
-    ../shared/preferences/src/language_manager.hpp)
+    ../shared/preferences/src/language_manager.hpp
+    # The picture of a CD+G disc the lyric strip draws (apps/shared/cdg-picture), compiled into
+    # this second embedding for the reason the window's target gives.
+    ../shared/cdg-picture/src/cdg_frame_source.hpp
+    ../shared/cdg-picture/src/cdg_frames.cpp
+    ../shared/cdg-picture/src/cdg_frames.hpp
+    ../shared/cdg-picture/src/cdg_picture.cpp
+    ../shared/cdg-picture/src/cdg_picture.hpp)
 # The icon provider and the tray answer are per platform, the same way the
 # window's own target selects them (apps/crucible/CMakeLists.txt): this target
 # embeds the same sources and has to make the same choice. Every file listed
@@ -81,6 +88,7 @@ qt6_add_resources(crucible_qmltests "crucible_qmltests_notices"
 # suites cannot disagree about what a scripted machine is.
 target_include_directories(crucible_qmltests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/ui/src" "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../shared/cdg-picture/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/../shared/theme/src"
     "${CMAKE_SOURCE_DIR}/apps/crucible/engine/tests")
 target_compile_definitions(crucible_qmltests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX

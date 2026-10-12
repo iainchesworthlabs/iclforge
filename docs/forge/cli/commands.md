@@ -1004,8 +1004,11 @@ Top level:
 `container`, for a container input: `format` (`"matroska"`, `"mp4"` or `"mpegts"`), `codec_id` (the
 Matroska CodecID or MP4 sample entry, such as `"A_EAC3"`, `"ec-3"` or `"ac-4"`; `null` for
 MPEG-TS), `track`, `language`, `samples`, `sample_rate_hz` and `channels` (each `null` where the
-container does not state it, as MPEG-TS does not), and two members of which the one for another
-format is `null`. `mp4`: `timescale`, `movie_timescale`, `edits` and `codec_box`, the sample
+container does not state it, as MPEG-TS does not), `other_tracks` (an array of the tracks the
+file declares and the command reads none of, in file order and up to 64: `track`, `kind` of
+`"audio"`, `"video"`, `"text"` or `"other"`, `codec_id` as the container names it, such as
+`"avc1"`, `"tx3g"` or `"S_TEXT/UTF8"`, and `language`; empty for a file with none and for MPEG-TS),
+and two members of which the one for another format is `null`. `mp4`: `timescale`, `movie_timescale`, `edits` and `codec_box`, the sample
 entry's `dac3`, `dec3` or `dac4` as `type`, `bytes`, `fscod`, `bsid`, `bsmod`, `bsmod_label`,
 `acmod`, `lfeon`, `bit_rate_code`, `data_rate_kbps`, `independent_substreams`, `num_dep_sub`,
 `chan_loc`, `asvc`, `asvc_label` and `complexity_index` (a `dac4` reads as zero in the fields that
