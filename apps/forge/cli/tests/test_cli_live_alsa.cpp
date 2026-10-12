@@ -1207,8 +1207,11 @@ TEST_CASE("monitor plays a karaoke stream's reproduction as L R C and the LFE, n
                        "vocals: no vocals"));
         CHECK(contains(text, "played 32 frames"));
         REQUIRE(fs::exists(out));
+        // Whole frames of four float32 channels: the device's own padding of silence round the
+        // stream is whole periods, so it keeps every sample in the place its channel has.
         const auto raw = read_bytes(out);
-        REQUIRE(raw.size() == kFrames * 4 * sizeof(float));
+        REQUIRE(raw.size() % (4 * sizeof(float)) == 0);
+        REQUIRE(raw.size() >= kFrames * 4 * sizeof(float));
         const auto energy = channel_energy(raw, 4);
         // The melody and nothing else: the third place of the four, which is a device's centre.
         CHECK(energy[2] > 1.0);
@@ -1236,7 +1239,7 @@ TEST_CASE("monitor names a layout that changes mid-stream instead of reading pas
     // Four reproduced channels, then six coded: karaoke switching off at bsmod, which the sink
     // opened for the first frame's width cannot play.
     const auto dir = scratch_dir();
-    const auto karaoke = write_melody_only_karaoke_stream(dir, "karaoke_switch");
+    const auto karaoke = write_melody_only_karaoke_stream(dir, "karaoke_switch_first");
     const auto plain = dir / "karaoke_switch_plain.ac3";
     REQUIRE(run_cli(null_config(), "sine \"" + plain.string() + "\" 1 448 440 1 51",
                     dir / "karaoke_switch_plain_make.log") == 0);
