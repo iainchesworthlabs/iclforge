@@ -742,7 +742,14 @@ esp_err_t SendspinHost::Impl::on_frame(httpd_req_t* req) {
         return ESP_OK;
     }
     connection->set_assembling(false);
-    host->deliver(*connection, connection->session().receive(incoming, host->arrival_of(connection->fd())));
+    ss::SessionOutput out = connection->session().receive(incoming, host->arrival_of(connection->fd()));
+    if (out.large_document) {
+        // A lyrics or metadata document: once an item, not the stream. The session holds nothing
+        // in `incoming` (it decrypted the frame into its own buffer), so the capacity the document
+        // grew goes back to the heap now, where a chunk's is kept for the next chunk.
+        std::vector<std::uint8_t>().swap(incoming.bytes);
+    }
+    host->deliver(*connection, std::move(out));
     host->after_call();
     return ESP_OK;
 }

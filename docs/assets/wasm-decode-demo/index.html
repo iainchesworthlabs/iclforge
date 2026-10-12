@@ -74,6 +74,31 @@
     border-radius: 6px;
     padding: 6px 10px;
   }
+  #lyricsPanel label { color: var(--muted); font-size: 0.9rem; }
+  #lyricsPanel input[type="range"] { accent-color: var(--accent); }
+  #lyricsDelayText { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.9rem; min-width: 5.5em; }
+  #lyricsStatus { margin-top: 10px; color: var(--muted); font-size: 0.9rem; min-height: 1.2em; }
+  #lyricsStatus.error { color: #f87171; }
+  /* The words follow the sound: the line being sung large, the ones round it small. Colour is never
+     the only cue (a word being sung is also underlined and bold, a singer is named and indented). */
+  #lyricsView { margin-top: 12px; line-height: 1.5; text-align: center; }
+  #lyricsView .lyric { margin: 4px 0; color: var(--muted); font-size: 0.95rem; }
+  #lyricsView .lyric.current { color: var(--text); font-size: 1.5rem; margin: 10px 0; }
+  #lyricsView .lyric .who { font-size: 0.8rem; margin-right: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  #lyricsView .lyric.side-second { padding-left: 2.5rem; }
+  #lyricsView .lyric.timeless { color: var(--text); }
+  #lyricsView .word.sung { color: var(--accent); }
+  #lyricsView .word.now {
+    font-weight: 700;
+    text-decoration: underline;
+    background-image: linear-gradient(to right, var(--accent), var(--accent));
+    background-repeat: no-repeat;
+    background-size: var(--fill, 0%) 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: var(--text);
+  }
+  #lyricsView .word.now.filling { color: transparent; }
   canvas { display: block; margin: 0 auto; background: #0d1526; border-radius: 8px; }
   .hint { color: var(--muted); font-size: 0.82rem; text-align: center; margin: 10px 0 0; line-height: 1.5; }
   .hint a { color: var(--accent); }
@@ -128,11 +153,30 @@
       </select>
     </div>
     <p class="hint">
-      This is a karaoke AC-3 stream (Annex C of ETSI TS 102 366): L and R, a guide melody where a
+      This is a karaoke stream (Annex C of ETSI TS 102 366): L and R, a guide melody where a
       centre would be, and one or two vocals where the surrounds would be. A stereo fold is already
       Annex C's 2/0 reproduction, with the vocals at the level the programme set. A karaoke-capable
       decoder lets the listener choose which vocals are heard; choosing one decodes the stream again
       with it. The reproduction is the library's, the one <code>forge decode karaoke=v1</code> writes.
+    </p>
+  </div>
+
+  <div id="lyricsPanel" class="panel">
+    <div class="controls">
+      <label for="lyricsInput">Words</label>
+      <input type="file" id="lyricsInput" accept=".lrc,.srt,.ass,.ssa,.kar,.mid,.txt"
+             aria-label="Choose a lyrics file: LRC, SubRip, ASS or MIDI karaoke">
+      <label for="lyricsDelay">Delay</label>
+      <input type="range" id="lyricsDelay" min="-1000" max="1000" step="10" value="0"
+             aria-label="Lyric delay in milliseconds">
+      <span id="lyricsDelayText">0 ms</span>
+    </div>
+    <div id="lyricsStatus"></div>
+    <div id="lyricsView" aria-live="off"></div>
+    <p class="hint">
+      A <code>.lrc</code>, <code>.srt</code>, <code>.ass</code> or <code>.kar</code> file follows the
+      decoded sound, a word at a time where the file times its words: the reader is the library's, the
+      one Hearth and Crucible use, compiled into this page. A positive delay shows the words later.
     </p>
   </div>
 

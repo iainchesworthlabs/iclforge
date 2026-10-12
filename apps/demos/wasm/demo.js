@@ -49,6 +49,17 @@ let decodedLabel = '';
 
 const el = (id) => document.getElementById(id);
 
+// --- Lyrics ------------------------------------------------------------------------------
+// The words of the stream, read by the library's own reader (libs/lyrics, compiled into the
+// module as parseLyrics / LyricsDocument - apps/demos/wasm/lyrics_bindings.cpp) and followed
+// against the position of what is playing. The reader is asked where the position is on every
+// frame, so a seek, a pause and a stop are only another position.
+let lyricsModule = null;   // its own module instance, kept: a document lives in the module that made it
+let lyricsDocument = null; // the Embind LyricsDocument, deleted when another file is loaded
+let lyricsData = null;     // document.describe(): the lines and their words, as plain objects
+let lyricsDelayMs = 0;
+let lyricsShownKey = '';
+
 function setStatus(text, isError) {
     const status = el('status');
     status.textContent = text;
@@ -422,8 +433,128 @@ function buildSoloControls(objectCount, labels) {
     }
 }
 
+function setLyricsStatus(text, isError) {
+    const status = el('lyricsStatus');
+    status.textContent = text;
+    status.classList.toggle('error', Boolean(isError));
+}
+
+function singerLabel(line) {
+    if (!lyricsData || line.singer === '') return '';
+    const first = lyricsData.firstSingerName || 'V1';
+    const second = lyricsData.secondSingerName || 'V2';
+    if (line.singer === 'v1') return first;
+    if (line.singer === 'v2') return second;
+    return `${first} + ${second}`;
+}
+
+// One line as an element. `now`, for the line being sung, makes each word a span carrying its
+// state; the others are plain text.
+function lineElement(line, className, state) {
+    const row = document.createElement('div');
+    row.className = `lyric ${className}` + (line.singer === 'v2' ? ' side-second' : '');
+    if (line.singer !== '') {
+        const who = document.createElement('span');
+        who.className = 'who';
+        who.textContent = singerLabel(line);
+        row.appendChild(who);
+    }
+    if (state && line.words.length > 0) {
+        line.words.forEach((word, index) => {
+            const span = document.createElement('span');
+            const wordState = state.wordStates[index];
+            span.className = 'word' + (wordState === 0 ? ' sung' : wordState === 1 ? ' now' : '');
+            if (wordState === 1) {
+                span.style.setProperty('--fill', `${Math.round(state.fraction * 100)}%`);
+                span.classList.add('filling');
+            }
+            span.textContent = word.text;
+            row.appendChild(span);
+        });
+    } else {
+        row.appendChild(document.createTextNode(line.text));
+    }
+    return row;
+}
+
+// Draws the previous, current and next lines for the playing position. Only changed when what it
+// would draw has: the key is the line and the word and the fill to the percent.
+function drawLyrics() {
+    const view = el('lyricsView');
+    if (!lyricsDocument || !lyricsData) {
+        requestAnimationFrame(drawLyrics);
+        return;
+    }
+    const lines = lyricsData.lines;
+    if (!lyricsData.timed) {
+        // Plain text is shown whole and is not followed.
+        if (lyricsShownKey !== 'plain') {
+            view.replaceChildren(...lines.map((line) => lineElement(line, 'timeless', null)));
+            lyricsShownKey = 'plain';
+        }
+        requestAnimationFrame(drawLyrics);
+        return;
+    }
+    const at = lyricsDocument.position(currentPlaybackSeconds() * 1000, lyricsDelayMs);
+    const current = at.line;
+    const states = [];
+    if (current !== null && at.inLine) {
+        const words = lines[current].words;
+        for (let w = 0; w < words.length; w++) {
+            states.push(lyricsDocument.wordState(current, w, at.positionMs));
+        }
+    }
+    const key = `${current}|${at.inLine}|${states.join('')}|${Math.round(at.fraction * 100)}`;
+    if (key !== lyricsShownKey) {
+        lyricsShownKey = key;
+        const rows = [];
+        const before = current === null ? -1 : current - 1;
+        const after = current === null ? 0 : current + 1;
+        if (before >= 0) rows.push(lineElement(lines[before], 'previous', null));
+        if (current !== null && lines[current].text !== '') {
+            // After a line has ended (the gap a SubRip cue leaves) it is not being sung.
+            rows.push(at.inLine
+                ? lineElement(lines[current], 'current', { wordStates: states, fraction: at.fraction })
+                : lineElement(lines[current], 'previous', null));
+        }
+        // The next line that has words in it: a line that only marks a time is no line to read.
+        for (let n = after; n < lines.length && n < after + 3; n++) {
+            if (lines[n].text !== '') {
+                rows.push(lineElement(lines[n], 'next', null));
+                break;
+            }
+        }
+        view.replaceChildren(...rows);
+    }
+    requestAnimationFrame(drawLyrics);
+}
+
+async function loadLyrics(file) {
+    try {
+        lyricsModule = lyricsModule ?? await loadModule();
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const duration = decoded ? Math.round(decoded.durationSeconds * 1000) : -1;
+        const parsed = lyricsModule.parseLyrics(bytes, duration);
+        if (!parsed.ok) {
+            setLyricsStatus(`${file.name}: ${parsed.error}`, true);
+            return;
+        }
+        if (lyricsDocument) lyricsDocument.delete();
+        lyricsDocument = parsed.document;
+        lyricsData = lyricsDocument.describe();
+        lyricsShownKey = '';
+        const sung = lyricsData.lines.filter((line) => line.text !== '').length;
+        const kind = lyricsData.timed ? (lyricsData.lines.some((l) => l.words.length > 0)
+            ? 'timed by word' : 'timed by line') : 'plain text, not followed';
+        const title = lyricsData.title ? `"${lyricsData.title}" - ` : '';
+        setLyricsStatus(`${title}${sung} lines, ${kind}${lyricsData.hasSingers ? ', a duet' : ''}.`, false);
+    } catch (err) {
+        setLyricsStatus(`Could not read ${file.name}: ${err.message}`, true);
+    }
+}
+
 // The fold's own options, with the karaoke reproduction the page asks for. It only changes a
-// stream that is karaoke (an AC-3 stream flagged bsmod 7): any other decodes as it did. At the
+// stream that is karaoke (an AC-3 or E-AC-3 stream flagged bsmod 7): any other decodes as it did. At the
 // stereo fold the stream's own mix is already Annex C's 2/0 reproduction, so the choices are the
 // capable decoder's: which vocals are heard.
 const KARAOKE_CHOICES = {
@@ -628,6 +759,14 @@ window.addEventListener('DOMContentLoaded', () => {
         if (playing) pause(); else play();
     });
     el('karaokeChoice').addEventListener('change', onKaraokeChange);
+    el('lyricsInput').addEventListener('change', (e) => {
+        if (e.target.files.length > 0) loadLyrics(e.target.files[0]);
+    });
+    el('lyricsDelay').addEventListener('input', (e) => {
+        lyricsDelayMs = Number(e.target.value);
+        el('lyricsDelayText').textContent = `${lyricsDelayMs > 0 ? '+' : ''}${lyricsDelayMs} ms`;
+        lyricsShownKey = '';
+    });
     const seek = el('seek');
     seek.addEventListener('pointerdown', () => { seekDragging = true; });
     seek.addEventListener('input', () => {
@@ -654,4 +793,5 @@ window.addEventListener('DOMContentLoaded', () => {
 
     requestAnimationFrame(draw);
     requestAnimationFrame(drawObjects);
+    requestAnimationFrame(drawLyrics);
 });

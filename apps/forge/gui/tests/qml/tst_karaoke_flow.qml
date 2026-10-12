@@ -77,6 +77,7 @@ TestCase {
         StreamPlayerController.pause();
         StreamPlayerController.karaokeReproduction = "asCoded";
         StreamPlayerController.karaokeVocals = "both";
+        StreamPlayerController.resetKaraokeLevels();
         while (EncoderController.sourceModel.length > 0) {
             EncoderController.removeSource(0);
         }
@@ -412,6 +413,90 @@ TestCase {
         compare(findByName(ctx.win, "karaokePlays-L").text, "L");
     }
 
+    // The decoded stream the player holds, as a WAV, and the peak of one of its channels: what the
+    // reproduction actually put there, not only that the page says so.
+    function exportedPeak(name, channel) {
+        const out = audioFixtures.folder().toString() + "/" + name;
+        StreamPlayerController.exportDecodedWav(out);
+        tryVerify(() => !StreamPlayerController.exporting, 30000);
+        return audioFixtures.channelPeak(out, channel);
+    }
+
+    function test_thePartLevelsAreTheCapablePlayersAndTakeAPartOutOfTheSums() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        press(ctx, "karaokeNextButton");   // Levels
+        press(ctx, "karaokeNextButton");   // Hear: the stream is built
+        tryCompare(ctx.flow, "currentStepKey", "hear", 5000);
+        tryCompare(ctx.flow, "previewState", "ready", 60000);
+
+        // The levels are the capable player's: closed under the aware one, open under capable.
+        const levels = findByName(ctx.win, "karaokePartLevels");
+        tryCompare(StreamPlayerController, "karaokeReproduction", "aware", 5000);
+        compare(levels.enabled, false);
+        mouseClick(findByName(findByName(ctx.win, "karaokeListening"), "seg-capable"));
+        tryCompare(StreamPlayerController, "karaokeReproduction", "capable", 5000);
+        compare(levels.enabled, true);
+        mouseClick(findByName(findByName(ctx.win, "karaokeVocals"), "seg-none"));
+        tryCompare(StreamPlayerController, "karaokeVocals", "none", 5000);
+        tryVerify(() => !StreamPlayerController.busy && StreamPlayerController.channelMeta.length === 3, 30000);
+
+        // At the table's own levels the centre is the melody, and it is a real signal.
+        compare(findByName(ctx.win, "karaokePlays-C").text, "M");
+        compare(findByName(ctx.win, "karaokeLevelText-M").text, "0 dB");
+        const at_table = exportedPeak("kl-table.wav", 2);
+        verify(at_table > 0.01, "the melody is heard: " + at_table);
+
+        // The melody 6 dB down: the centre is that fraction of it, exactly - no vocals are
+        // chosen, so nothing else is scaled - and the page still says what plays.
+        StreamPlayerController.karaokeMelodyDb = -6;
+        tryVerify(() => !StreamPlayerController.busy && StreamPlayerController.hasResult, 30000);
+        compare(findByName(ctx.win, "karaokeLevelText-M").text, "-6 dB");
+        const six_down = exportedPeak("kl-six.wav", 2);
+        fuzzyCompare(six_down, at_table * Math.pow(10, -6 / 20), 1e-4);
+        compare(findByName(ctx.win, "karaokePlays-C").text, "M");
+
+        // All the way down is off: nothing in the centre, and the page takes it out of what plays.
+        StreamPlayerController.karaokeMelodyDb = -24;
+        tryVerify(() => !StreamPlayerController.busy && StreamPlayerController.hasResult, 30000);
+        compare(findByName(ctx.win, "karaokeLevelText-M").text, "off");
+        compare(findByName(ctx.win, "karaokePlays-C").text, "silent");
+        compare(exportedPeak("kl-off.wav", 2), 0.0);
+        verify(exportedPeak("kl-off-left.wav", 0) > 0.01, "the backing is still heard");
+
+        // A level is held to the library's span, and Reset puts all three back.
+        StreamPlayerController.karaokeVocal1Db = 40;
+        compare(StreamPlayerController.karaokeVocal1Db, 12);
+        compare(findByName(ctx.win, "karaokeLevelText-V1").text, "+12 dB");
+        StreamPlayerController.karaokeVocal2Db = -100;
+        compare(StreamPlayerController.karaokeVocal2Db, -24);
+        verify(ctx.flow.levelsMoved);
+        mouseClick(findByName(ctx.win, "karaokeResetLevels"));
+        compare(StreamPlayerController.karaokeMelodyDb, 0);
+        compare(StreamPlayerController.karaokeVocal1Db, 0);
+        compare(StreamPlayerController.karaokeVocal2Db, 0);
+        tryVerify(() => !StreamPlayerController.busy && StreamPlayerController.hasResult, 30000);
+        compare(findByName(ctx.win, "karaokePlays-C").text, "M");
+        verify(exportedPeak("kl-reset.wav", 2) > 0.01);
+    }
+
+    function test_aStreamWithNoVocal2HasNoLevelForIt() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead });
+        tryCompare(ctx.flow.plan, "mode", "3/1", 5000);
+        press(ctx, "karaokeNextButton");
+        press(ctx, "karaokeNextButton");
+        tryCompare(ctx.flow, "currentStepKey", "hear", 5000);
+        tryCompare(ctx.flow, "previewState", "ready", 60000);
+        // The levels are the capable player's; a part the stream does not have has none.
+        mouseClick(findByName(findByName(ctx.win, "karaokeListening"), "seg-capable"));
+        tryCompare(StreamPlayerController, "karaokeReproduction", "capable", 5000);
+        tryCompare(findByName(ctx.win, "karaokeLevel-M"), "enabled", true, 5000);
+        compare(findByName(ctx.win, "karaokeLevel-V1").enabled, true);
+        compare(findByName(ctx.win, "karaokeLevel-V2").enabled, false);
+    }
+
     // ---- Save -----------------------------------------------------------------------
     function test_saveWritesAKaraokeStreamTheCommandLineReproduces() {
         const ctx = openFlow();
@@ -613,6 +698,59 @@ TestCase {
         verify(audioFixtures.remove(out2) && audioFixtures.remove(beside2));
         saveTo(ctx, out2);
         compare(cliRunner.size(beside2), 0, "a lyrics file the author removed was put beside the stream");
+    }
+
+    function test_aSubRipFileBesideTheBackingIsWrittenBesideTheStreamAsUtf8Lrc() {
+        const song = audioFixtures.writeTones("kc-song.wav", 48000, 1.024, [440, 620]);
+        const words = audioFixtures.writeText(
+            "kc-song.srt", "1\n00:00:01,000 --> 00:00:03,000\nLa la\n\n2\n00:00:05,000 --> 00:00:06,000\nLa\n");
+        // What the stream's own lyrics file should hold: LRC, with the silence between the cues
+        // marked as a time with no text, which a player reads as the line being over.
+        const expected = audioFixtures.writeText("kc-song-expected.lrc",
+                                                 "[00:01.00]La la\n[00:03.00]\n[00:05.00]La\n");
+        verify(song.toString().length > 0 && words.toString().length > 0 && expected.toString().length > 0);
+        const ctx = openFlow();
+        useParts(ctx, { backing: song, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        // Offered because an .srt of the backing's name is beside it and there is no .lrc.
+        compare(ctx.flow.lyricsUrl, words.toString());
+        compare(ctx.flow.lyricsProblem, "");
+        ctx.flow.currentStepKey = "save";
+        compare(findByName(ctx.win, "karaokeLyricsFile").text, "kc-song.srt");
+        verify(!findByName(ctx.win, "karaokeLyricsProblem").visible);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_srt_lyrics.ac3");
+        const beside = Qt.resolvedUrl("_test_output/tst_karaoke_srt_lyrics.lrc");
+        verify(audioFixtures.remove(out) && audioFixtures.remove(beside));
+        saveTo(ctx, out);
+        verify(cliRunner.sameBytes(expected, beside), "the SubRip file was not written as LRC beside the stream");
+        verify(ctx.flow.lyricsNote.indexOf("beside the stream") >= 0, ctx.flow.lyricsNote);
+    }
+
+    function test_aLyricsFileInACodePageIsSaidSoWhenChosenAndNothingIsWritten() {
+        const song = audioFixtures.writeTones("kd-song.wav", 48000, 1.024, [440, 620]);
+        // "[00:01.00]Caf" and an e acute as the one byte E9: Latin-1, which is not UTF-8.
+        const words = audioFixtures.writeBytes("kd-song.lrc", [0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x2e, 0x30, 0x30, 0x5d, 0x43, 0x61, 0x66, 0xe9, 0x0a]);
+        verify(song.toString().length > 0 && words.toString().length > 0);
+        const ctx = openFlow();
+        useParts(ctx, { backing: song, melody: melody });
+        tryCompare(ctx.flow.plan, "mode", "3/0", 5000);
+        compare(ctx.flow.lyricsUrl, words.toString());
+        // Said when it is offered, with the reader's own reason, and not found out at save.
+        verify(ctx.flow.lyricsProblem.indexOf("UTF-8") >= 0, ctx.flow.lyricsProblem);
+        ctx.flow.currentStepKey = "save";
+        const problem = findByName(ctx.win, "karaokeLyricsProblem");
+        verify(problem.visible);
+        verify(problem.text.indexOf("cannot be used") >= 0, problem.text);
+
+        const out = Qt.resolvedUrl("_test_output/tst_karaoke_codepage_lyrics.ac3");
+        const beside = Qt.resolvedUrl("_test_output/tst_karaoke_codepage_lyrics.lrc");
+        verify(audioFixtures.remove(out) && audioFixtures.remove(beside));
+        saveTo(ctx, out);
+        // The stream is written; the words are not, and the note says why.
+        verify(cliRunner.size(out) > 0, "the stream was not written");
+        compare(cliRunner.size(beside), 0, "a file in a code page was put beside the stream");
+        verify(ctx.flow.lyricsNote.indexOf("could not be read") >= 0, ctx.flow.lyricsNote);
     }
 
     // Parts of 2.0 s end in half a frame. The window once wrote silence into the

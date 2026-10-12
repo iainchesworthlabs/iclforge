@@ -13,6 +13,7 @@
 // correctly - and hold the C decode surface to the behaviour
 // libs/ac3/tests/decoder/test_eac3_decoder.cpp establishes for the C++ one.
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -32,7 +33,11 @@
 #include <vector>
 
 #include "iclforge/ac3/core/eac3_tables.hpp"
+#include "iclforge/ac3/decoder/decoder.hpp"
+#include "iclforge/ac3/decoder/output.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
+#include "iclforge/ac3/encoder/encoder.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge_c/iclforge.h"
 #include "iclforge/ac4/io/carriage.hpp"
@@ -4325,4 +4330,585 @@ TEST_CASE("AC-4 accessors are null-safe", "[capi][ac4]") {
 
     iclforge_ac4_decoder_destroy(nullptr);
     iclforge_ac4_encoder_destroy(nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Karaoke (ETSI TS 102 366 Annex C): the decoder's choice of reproduction, and the lyrics reader.
+//
+// What a reproduction IS, level for level, is held by libs/ac3's output-stage tests and the
+// decode cases in apps/forge/cli/tests; these hold the C surface around it: that the choice and
+// the levels reach the stage in the library's own units, what the frame says its channels are,
+// and that a reader of lyrics through plain C gets what the C++ reader read.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr int kKaraokeFrames = 6;
+
+// One frame of a karaoke 3/2 stream at a time: L, M, R, V1 and V2 as tones of five different
+// pitches, so that a part that lands in the wrong place or at the wrong level is visible, and the
+// stream's frames differ from one another (a repeated or out-of-order frame would show).
+std::vector<std::vector<std::byte>> karaoke_frames(bool karaoke) {
+    iclforge::ac3::FrameEncoder encoder{
+        {.bitrate_kbps = 448,
+         .acmod = iclforge::ac3::Acmod::k3_2,
+         .cmixlev = iclforge::ac3::meta::CentreMixLevel::kMinus3dB,
+         .surmixlev = iclforge::ac3::meta::SurroundMixLevel::kMinus6dB,
+         .info = {.bsmod = karaoke ? iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke
+                                   : iclforge::ac3::meta::BitstreamMode::kCompleteMain}}};
+    const std::array<double, 5> pitch = {300.0, 500.0, 700.0, 900.0, 1100.0};
+    std::vector<std::vector<std::byte>> frames;
+    std::array<std::vector<float>, 5> signal;
+    for (auto& channel : signal) {
+        channel.resize(iclforge::ac3::kSamplesPerFrame);
+    }
+    for (int frame = 0; frame < kKaraokeFrames; ++frame) {
+        for (std::size_t c = 0; c < signal.size(); ++c) {
+            fill_tone(signal[c].data(), pitch[c], frame, 48000.0);
+            for (auto& sample : signal[c]) {
+                sample *= 0.4F;
+            }
+        }
+        const std::vector<std::span<const float>> channels{signal[0], signal[1], signal[2],
+                                                           signal[3], signal[4]};
+        auto coded = encoder.encode_frame(channels);
+        REQUIRE(coded.has_value());
+        frames.push_back(std::move(*coded));
+    }
+    return frames;
+}
+
+// The frame's channels, copied out, so that the frame can be destroyed.
+std::vector<std::vector<float>> channels_of(const iclforge_decoded_frame_t* frame) {
+    std::vector<std::vector<float>> out;
+    for (std::size_t c = 0; c < iclforge_decoded_frame_channel_count(frame); ++c) {
+        const float* samples = iclforge_decoded_frame_channel_samples(frame, c);
+        out.emplace_back(samples, samples + iclforge_decoded_frame_samples_per_channel(frame));
+    }
+    return out;
+}
+
+// Decodes every frame through `decoder`, handing each to `check` before it is destroyed.
+template <class Check>
+void decode_each(iclforge_decoder_t* decoder, const std::vector<std::vector<std::byte>>& frames,
+                 Check&& check) {
+    for (const auto& bytes : frames) {
+        iclforge_decoded_frame_t* decoded = nullptr;
+        REQUIRE(iclforge_decoder_decode_frame(decoder,
+                                              reinterpret_cast<const uint8_t*>(bytes.data()),
+                                              bytes.size(), &decoded) == ICLFORGE_OK);
+        REQUIRE(decoded != nullptr);
+        check(decoded);
+        iclforge_decoded_frame_destroy(decoded);
+    }
+}
+
+iclforge_decoder_t* karaoke_decoder(iclforge_karaoke_reproduction_t reproduction,
+                                    iclforge_karaoke_vocals_t vocals = ICLFORGE_KARAOKE_VOCALS_BOTH,
+                                    double melody_db = 0.0, double vocal1_db = 0.0,
+                                    double vocal2_db = 0.0) {
+    iclforge_decoder_config_t config;
+    iclforge_decoder_config_init(&config);
+    iclforge_karaoke_config_t karaoke;
+    iclforge_karaoke_config_init(&karaoke);
+    karaoke.reproduction = reproduction;
+    karaoke.vocals = vocals;
+    karaoke.melody_db = melody_db;
+    karaoke.vocal1_db = vocal1_db;
+    karaoke.vocal2_db = vocal2_db;
+    iclforge_decoder_t* decoder = nullptr;
+    REQUIRE(iclforge_decoder_create_with_karaoke(&config, &karaoke, &decoder) == ICLFORGE_OK);
+    REQUIRE(decoder != nullptr);
+    return decoder;
+}
+
+}  // namespace
+
+TEST_CASE("iclforge_karaoke_config_init fills the defaults OutputConfig has", "[capi][karaoke]") {
+    iclforge_karaoke_config_t config;
+    // Not zeroes: both vocals is the default, and zero is "none".
+    std::memset(&config, 0xFF, sizeof(config));
+    iclforge_karaoke_config_init(&config);
+    const iclforge::ac3::OutputConfig defaults{};
+    CHECK(config.reproduction == ICLFORGE_KARAOKE_OFF);
+    CHECK(static_cast<int>(config.reproduction) == static_cast<int>(defaults.karaoke));
+    CHECK(config.vocals == ICLFORGE_KARAOKE_VOCALS_BOTH);
+    CHECK(static_cast<int>(config.vocals) == static_cast<int>(defaults.karaoke_vocals));
+    CHECK(config.melody_db == 0.0);
+    CHECK(config.vocal1_db == 0.0);
+    CHECK(config.vocal2_db == 0.0);
+    iclforge_karaoke_config_init(nullptr);  // a no-op, not a crash
+    CHECK(ICLFORGE_KARAOKE_MIN_LEVEL_DB == -24.0);
+    CHECK(ICLFORGE_KARAOKE_MAX_LEVEL_DB == 12.0);
+}
+
+TEST_CASE("a decoder made without karaoke leaves a karaoke stream as coded, and says what it is",
+          "[capi][karaoke]") {
+    const auto frames = karaoke_frames(true);
+
+    iclforge_decoder_config_t config;
+    iclforge_decoder_config_init(&config);
+    iclforge_decoder_t* decoder = nullptr;
+    REQUIRE(iclforge_decoder_create(&config, &decoder) == ICLFORGE_OK);
+    decode_each(decoder, frames, [](const iclforge_decoded_frame_t* decoded) {
+        CHECK(iclforge_decoded_frame_bsmod(decoded) == 7);
+        CHECK(iclforge_decoded_frame_is_karaoke(decoded) == 1);
+        CHECK(iclforge_decoded_frame_acmod(decoded) == ICLFORGE_ACMOD_3_2);
+        CHECK(iclforge_decoded_frame_channel_count(decoded) == 5);
+        CHECK(iclforge_decoded_frame_output_acmod(decoded) == ICLFORGE_ACMOD_3_2);
+        CHECK(iclforge_decoded_frame_output_lfe(decoded) == 0);
+        CHECK(iclforge_decoded_frame_karaoke_reproduced(decoded) == 0);
+    });
+    iclforge_decoder_destroy(decoder);
+
+    // A stream that is not karaoke says so, whatever the decoder was told.
+    const auto plain = karaoke_frames(false);
+    iclforge_decoder_t* aware = karaoke_decoder(ICLFORGE_KARAOKE_AWARE);
+    decode_each(aware, plain, [](const iclforge_decoded_frame_t* decoded) {
+        CHECK(iclforge_decoded_frame_bsmod(decoded) == 0);
+        CHECK(iclforge_decoded_frame_is_karaoke(decoded) == 0);
+        CHECK(iclforge_decoded_frame_channel_count(decoded) == 5);
+        CHECK(iclforge_decoded_frame_output_acmod(decoded) == ICLFORGE_ACMOD_3_2);
+        CHECK(iclforge_decoded_frame_karaoke_reproduced(decoded) == 0);
+    });
+    iclforge_decoder_destroy(aware);
+
+    CHECK(iclforge_decoded_frame_bsmod(nullptr) == 0);
+    CHECK(iclforge_decoded_frame_is_karaoke(nullptr) == 0);
+    CHECK(iclforge_decoded_frame_output_lfe(nullptr) == 0);
+    CHECK(iclforge_decoded_frame_karaoke_reproduced(nullptr) == 0);
+}
+
+TEST_CASE("the karaoke decoder's frames are the C++ output stage's, bit for bit",
+          "[capi][karaoke]") {
+    // The same stream through iclforge::ac3::FrameDecoder with the OutputConfig the C choice
+    // stands for. What is checked is the translation - the enums, and dB to the library's gains -
+    // so the C++ side is the oracle and no arithmetic is restated here.
+    const auto frames = karaoke_frames(true);
+
+    struct Case {
+        const char* name;
+        iclforge_karaoke_reproduction_t reproduction;
+        iclforge_karaoke_vocals_t vocals;
+        double melody_db, vocal1_db, vocal2_db;
+    };
+    const Case cases[] = {
+        {"aware", ICLFORGE_KARAOKE_AWARE, ICLFORGE_KARAOKE_VOCALS_BOTH, 0.0, 0.0, 0.0},
+        {"capable, none", ICLFORGE_KARAOKE_CAPABLE, ICLFORGE_KARAOKE_VOCALS_NONE, 0.0, 0.0, 0.0},
+        {"capable, v1", ICLFORGE_KARAOKE_CAPABLE, ICLFORGE_KARAOKE_VOCALS_V1, 0.0, 0.0, 0.0},
+        {"capable, v2", ICLFORGE_KARAOKE_CAPABLE, ICLFORGE_KARAOKE_VOCALS_V2, 0.0, 0.0, 0.0},
+        {"capable, both", ICLFORGE_KARAOKE_CAPABLE, ICLFORGE_KARAOKE_VOCALS_BOTH, 0.0, 0.0, 0.0},
+        {"capable, levels", ICLFORGE_KARAOKE_CAPABLE, ICLFORGE_KARAOKE_VOCALS_BOTH, -6.0, 3.0,
+         -24.0},
+        // Held to the span: the bottom is off, the top 12 dB, and a number that is not one is 0 dB.
+        {"capable, off the span", ICLFORGE_KARAOKE_CAPABLE, ICLFORGE_KARAOKE_VOCALS_BOTH, -60.0,
+         40.0, std::numeric_limits<double>::quiet_NaN()},
+    };
+    for (const auto& item : cases) {
+        CAPTURE(item.name);
+        iclforge::ac3::DecoderConfig expected_config{};
+        expected_config.output.karaoke = static_cast<iclforge::ac3::KaraokeReproduction>(item.reproduction);
+        expected_config.output.karaoke_vocals = static_cast<iclforge::ac3::KaraokeVocals>(item.vocals);
+        expected_config.output.karaoke_melody_gain =
+            iclforge::ac3::karaoke_gain_from_db(item.melody_db);
+        expected_config.output.karaoke_vocal1_gain =
+            iclforge::ac3::karaoke_gain_from_db(item.vocal1_db);
+        expected_config.output.karaoke_vocal2_gain =
+            iclforge::ac3::karaoke_gain_from_db(item.vocal2_db);
+        iclforge::ac3::FrameDecoder expected{expected_config};
+
+        iclforge_decoder_t* decoder = karaoke_decoder(item.reproduction, item.vocals, item.melody_db,
+                                                      item.vocal1_db, item.vocal2_db);
+        std::size_t index = 0;
+        double loudest = 0.0;
+        decode_each(decoder, frames, [&](const iclforge_decoded_frame_t* decoded) {
+            const auto want = expected.decode_frame(frames[index]);
+            REQUIRE(want.has_value());
+            ++index;
+            // Annex C's reproduction: three channels where five were coded, and the frame says so.
+            REQUIRE(iclforge_decoded_frame_channel_count(decoded) == want->channels.size());
+            CHECK(iclforge_decoded_frame_channel_count(decoded) == 3);
+            CHECK(iclforge_decoded_frame_acmod(decoded) == ICLFORGE_ACMOD_3_2);  // as coded
+            CHECK(iclforge_decoded_frame_output_acmod(decoded) == ICLFORGE_ACMOD_3_0);
+            CHECK(iclforge_decoded_frame_output_lfe(decoded) == 0);
+            CHECK(iclforge_decoded_frame_karaoke_reproduced(decoded) == 1);
+            const auto got = channels_of(decoded);
+            for (std::size_t c = 0; c < got.size(); ++c) {
+                REQUIRE(got[c].size() == want->channels[c].size());
+                CHECK(got[c] == want->channels[c]);
+                for (const float sample : got[c]) {
+                    loudest = std::max(loudest, static_cast<double>(std::abs(sample)));
+                }
+            }
+        });
+        // Real signal came out, not silence agreeing with silence.
+        CHECK(loudest > 0.05);
+        iclforge_decoder_destroy(decoder);
+    }
+}
+
+TEST_CASE("the capable decoder's levels move the part by the dB asked", "[capi][karaoke]") {
+    // No vocals chosen, so the three outputs' sums are 1, 1 and the melody's gain: a melody at
+    // or below the table is the only part that moves, and the centre is that fraction of M.
+    const auto frames = karaoke_frames(true);
+
+    iclforge_decoder_config_t config;
+    iclforge_decoder_config_init(&config);
+    iclforge_decoder_t* coded = nullptr;
+    REQUIRE(iclforge_decoder_create(&config, &coded) == ICLFORGE_OK);
+    std::vector<std::vector<std::vector<float>>> as_coded;
+    decode_each(coded, frames, [&](const iclforge_decoded_frame_t* decoded) {
+        as_coded.push_back(channels_of(decoded));
+    });
+    iclforge_decoder_destroy(coded);
+
+    const auto quieter = [&](double melody_db) {
+        iclforge_decoder_t* decoder = karaoke_decoder(
+            ICLFORGE_KARAOKE_CAPABLE, ICLFORGE_KARAOKE_VOCALS_NONE, melody_db);
+        std::size_t index = 0;
+        double worst = 0.0;
+        double centre_peak = 0.0;
+        const double gain = melody_db <= ICLFORGE_KARAOKE_MIN_LEVEL_DB
+                                ? 0.0
+                                : std::pow(10.0, melody_db / 20.0);
+        decode_each(decoder, frames, [&](const iclforge_decoded_frame_t* decoded) {
+            const auto got = channels_of(decoded);
+            REQUIRE(got.size() == 3);  // L, C, R
+            const auto& coded_frame = as_coded[index++];  // L, M, R, V1, V2
+            for (std::size_t i = 0; i < got[1].size(); ++i) {
+                worst = std::max(worst, std::abs(static_cast<double>(got[0][i]) -
+                                                 static_cast<double>(coded_frame[0][i])));
+                worst = std::max(worst, std::abs(static_cast<double>(got[2][i]) -
+                                                 static_cast<double>(coded_frame[2][i])));
+                worst = std::max(worst, std::abs(static_cast<double>(got[1][i]) -
+                                                 gain * static_cast<double>(coded_frame[1][i])));
+                centre_peak = std::max(centre_peak, std::abs(static_cast<double>(got[1][i])));
+            }
+        });
+        iclforge_decoder_destroy(decoder);
+        return std::pair{worst, centre_peak};
+    };
+    const auto [at_table, table_peak] = quieter(0.0);
+    CHECK(at_table < 1e-6);
+    CHECK(table_peak > 0.05);
+    const auto [six_down, six_peak] = quieter(-6.0);
+    CHECK(six_down < 1e-6);
+    CHECK(six_peak == Catch::Approx(table_peak * std::pow(10.0, -6.0 / 20.0)).margin(1e-6));
+    const auto [muted, muted_peak] = quieter(-24.0);
+    CHECK(muted < 1e-6);
+    CHECK(muted_peak == 0.0);
+}
+
+TEST_CASE("decode_frame_into writes a reproduction's channels first, and says how many",
+          "[capi][karaoke]") {
+    const auto frames = karaoke_frames(true);
+    iclforge_decoder_t* decoder = karaoke_decoder(ICLFORGE_KARAOKE_AWARE);
+    iclforge_decoder_t* reference = karaoke_decoder(ICLFORGE_KARAOKE_AWARE);
+
+    std::array<std::vector<float>, ICLFORGE_DECODER_MAX_CHANNELS> planar;
+    std::array<float*, ICLFORGE_DECODER_MAX_CHANNELS> pointers{};
+    for (std::size_t c = 0; c < planar.size(); ++c) {
+        planar[c].assign(ICLFORGE_SAMPLES_PER_FRAME, 0.0F);
+        pointers[c] = planar[c].data();
+    }
+    for (const auto& bytes : frames) {
+        iclforge_decoded_frame_t* into = nullptr;
+        REQUIRE(iclforge_decoder_decode_frame_into(
+                    decoder, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
+                    pointers.data(), pointers.size(), ICLFORGE_SAMPLES_PER_FRAME,
+                    &into) == ICLFORGE_OK);
+        CHECK(iclforge_decoded_frame_karaoke_reproduced(into) == 1);
+        CHECK(iclforge_decoded_frame_output_acmod(into) == ICLFORGE_ACMOD_3_0);
+        iclforge_decoded_frame_destroy(into);
+
+        iclforge_decoded_frame_t* owned = nullptr;
+        REQUIRE(iclforge_decoder_decode_frame(reference,
+                                              reinterpret_cast<const uint8_t*>(bytes.data()),
+                                              bytes.size(), &owned) == ICLFORGE_OK);
+        const auto want = channels_of(owned);
+        REQUIRE(want.size() == 3);
+        for (std::size_t c = 0; c < 3; ++c) {
+            CHECK(planar[c] == want[c]);
+        }
+        iclforge_decoded_frame_destroy(owned);
+    }
+    iclforge_decoder_destroy(reference);
+    iclforge_decoder_destroy(decoder);
+}
+
+namespace {
+
+// An enumerator no enumeration has, as a C caller can build one: a cast would be
+// -Wconversion's "unspecified", so the bytes are copied in.
+template <class Enum>
+Enum outside_the_enum(int value) {
+    static_assert(sizeof(Enum) == sizeof(int));
+    Enum result{};
+    std::memcpy(&result, &value, sizeof(result));
+    return result;
+}
+
+}  // namespace
+
+TEST_CASE("iclforge_decoder_create_with_karaoke refuses what it cannot make sense of",
+          "[capi][karaoke]") {
+    iclforge_decoder_config_t config;
+    iclforge_decoder_config_init(&config);
+    iclforge_karaoke_config_t karaoke;
+    iclforge_karaoke_config_init(&karaoke);
+    iclforge_decoder_t* decoder = nullptr;
+
+    CHECK(iclforge_decoder_create_with_karaoke(nullptr, &karaoke, &decoder) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(iclforge_decoder_create_with_karaoke(&config, nullptr, &decoder) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(iclforge_decoder_create_with_karaoke(&config, &karaoke, nullptr) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+
+    karaoke.reproduction = outside_the_enum<iclforge_karaoke_reproduction_t>(3);
+    CHECK(iclforge_decoder_create_with_karaoke(&config, &karaoke, &decoder) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    karaoke.reproduction = outside_the_enum<iclforge_karaoke_reproduction_t>(-1);
+    CHECK(iclforge_decoder_create_with_karaoke(&config, &karaoke, &decoder) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    iclforge_karaoke_config_init(&karaoke);
+    karaoke.vocals = outside_the_enum<iclforge_karaoke_vocals_t>(4);
+    CHECK(iclforge_decoder_create_with_karaoke(&config, &karaoke, &decoder) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(decoder == nullptr);
+}
+
+namespace {
+
+// A duet, word-timed on its first line, as an editor wrote it: the singers named, V1 sings the
+// first, V2 the second and both the third.
+constexpr std::string_view kDuetLrc =
+    "[ti:Leave Her Johnny]\n"
+    "[ar:Traditional]\n"
+    "[al:Shanties]\n"
+    "[by:test]\n"
+    "[length:00:30]\n"
+    "[v1:Shantyman]\n"
+    "[v2:Crew]\n"
+    "[00:12.00]V1: <00:12.00>Should <00:12.60>auld <00:13.10>acquaintance <00:14.20>be "
+    "<00:14.60>forgot,\n"
+    "[00:16.00]V2: And never brought to mind?\n"
+    "[00:20.00]V1+V2: Leave her, Johnny, leave her\n";
+
+iclforge_lyrics_t* parse_lyrics_text(std::string_view text, int64_t duration_ms = -1) {
+    iclforge_lyrics_t* lyrics = nullptr;
+    REQUIRE(iclforge_lyrics_parse(reinterpret_cast<const uint8_t*>(text.data()), text.size(),
+                                  duration_ms, &lyrics) == ICLFORGE_OK);
+    REQUIRE(lyrics != nullptr);
+    return lyrics;
+}
+
+// A build whose standard library has no <filesystem> answers every lyrics function with
+// ICLFORGE_ERROR_UNSUPPORTED (libs/capi/src/lyrics_absent.cpp): the cases below then have nothing
+// to hold, and say so.
+bool lyrics_built() {
+    iclforge_lyrics_t* lyrics = nullptr;
+    const std::string_view text = "[00:01.00]x\n";
+    const auto status = iclforge_lyrics_parse(reinterpret_cast<const uint8_t*>(text.data()),
+                                              text.size(), -1, &lyrics);
+    iclforge_lyrics_destroy(lyrics);
+    return status != ICLFORGE_ERROR_UNSUPPORTED;
+}
+
+}  // namespace
+
+TEST_CASE("the lyrics reader reads a word-timed duet through the C API", "[capi][lyrics]") {
+    if (!lyrics_built()) {
+        SKIP("lyrics are not built into this library");
+    }
+    iclforge_lyrics_t* lyrics = parse_lyrics_text(kDuetLrc, 30000);
+
+    CHECK(std::string_view{iclforge_lyrics_title(lyrics)} == "Leave Her Johnny");
+    CHECK(std::string_view{iclforge_lyrics_artist(lyrics)} == "Traditional");
+    CHECK(std::string_view{iclforge_lyrics_album(lyrics)} == "Shanties");
+    CHECK(std::string_view{iclforge_lyrics_author(lyrics)} == "test");
+    CHECK(std::string_view{iclforge_lyrics_first_singer_name(lyrics)} == "Shantyman");
+    CHECK(std::string_view{iclforge_lyrics_second_singer_name(lyrics)} == "Crew");
+    int64_t length = -1;
+    CHECK(iclforge_lyrics_length_ms(lyrics, &length) == 1);
+    CHECK(length == 30000);
+    CHECK(iclforge_lyrics_offset_ms(lyrics) == 0);
+    CHECK(iclforge_lyrics_timed(lyrics) == 1);
+    CHECK(iclforge_lyrics_has_singers(lyrics) == 1);
+
+    REQUIRE(iclforge_lyrics_line_count(lyrics) == 3);
+    // Line 0: word-timed, V1's.
+    CHECK(iclforge_lyrics_line_start_ms(lyrics, 0) == 12000);
+    CHECK(iclforge_lyrics_line_end_ms(lyrics, 0) == 16000);
+    CHECK(std::string_view{iclforge_lyrics_line_text(lyrics, 0)} ==
+          "Should auld acquaintance be forgot,");
+    CHECK(iclforge_lyrics_line_singer(lyrics, 0) == ICLFORGE_LYRICS_SINGER_FIRST);
+    REQUIRE(iclforge_lyrics_line_word_count(lyrics, 0) == 5);
+    CHECK(iclforge_lyrics_word_start_ms(lyrics, 0, 0) == 12000);
+    CHECK(iclforge_lyrics_word_end_ms(lyrics, 0, 0) == 12600);
+    CHECK(iclforge_lyrics_word_start_ms(lyrics, 0, 2) == 13100);
+    CHECK(iclforge_lyrics_word_end_ms(lyrics, 0, 4) == 16000);  // a line's last word runs to the next
+    CHECK(std::string_view{iclforge_lyrics_word_text(lyrics, 0, 1)}.starts_with("auld"));
+    // Line 1: timed as a line only. No word times are invented for it.
+    CHECK(iclforge_lyrics_line_start_ms(lyrics, 1) == 16000);
+    CHECK(iclforge_lyrics_line_end_ms(lyrics, 1) == 20000);
+    CHECK(std::string_view{iclforge_lyrics_line_text(lyrics, 1)} == "And never brought to mind?");
+    CHECK(iclforge_lyrics_line_singer(lyrics, 1) == ICLFORGE_LYRICS_SINGER_SECOND);
+    CHECK(iclforge_lyrics_line_word_count(lyrics, 1) == 0);
+    // Line 2: both, and the last line ends where the item does.
+    CHECK(iclforge_lyrics_line_singer(lyrics, 2) == ICLFORGE_LYRICS_SINGER_BOTH);
+    CHECK(iclforge_lyrics_line_end_ms(lyrics, 2) == 30000);
+
+    iclforge_lyrics_destroy(lyrics);
+}
+
+TEST_CASE("the lyrics cursor says which line and word a position is in, less the delay",
+          "[capi][lyrics]") {
+    if (!lyrics_built()) {
+        SKIP("lyrics are not built into this library");
+    }
+    iclforge_lyrics_t* lyrics = parse_lyrics_text(kDuetLrc, 30000);
+    iclforge_lyrics_position_t at{};
+
+    iclforge_lyrics_position(lyrics, 5000, 0, &at);  // before the first line
+    CHECK(at.has_line == 0);
+    CHECK(at.has_word == 0);
+    CHECK(at.position_ms == 5000);
+
+    iclforge_lyrics_position(lyrics, 12700, 0, &at);  // 100 ms into the second word
+    CHECK(at.has_line == 1);
+    CHECK(at.line == 0);
+    CHECK(at.in_line == 1);
+    CHECK(at.has_word == 1);
+    CHECK(at.word == 1);
+    CHECK(at.fraction == Catch::Approx(0.2).margin(1e-9));
+
+    // The singer's nudge: the words are shown later, so the answer is for an earlier position.
+    iclforge_lyrics_position(lyrics, 12700, 700, &at);
+    CHECK(at.position_ms == 12000);
+    CHECK(at.word == 0);
+
+    iclforge_lyrics_position(lyrics, 16500, 0, &at);  // a line that has no words
+    CHECK(at.line == 1);
+    CHECK(at.in_line == 1);
+    CHECK(at.has_word == 0);
+
+    iclforge_lyrics_position(lyrics, 31000, 0, &at);  // after the last line has ended
+    CHECK(at.line == 2);
+    CHECK(at.in_line == 0);
+
+    CHECK(iclforge_lyrics_word_state(lyrics, 0, 0, 12300) == ICLFORGE_LYRICS_WORD_BEING_SUNG);
+    CHECK(iclforge_lyrics_word_state(lyrics, 0, 0, 13000) == ICLFORGE_LYRICS_WORD_SUNG);
+    CHECK(iclforge_lyrics_word_state(lyrics, 0, 1, 12300) == ICLFORGE_LYRICS_WORD_NOT_YET_SUNG);
+
+    // Nothing written for a NULL on either side.
+    iclforge_lyrics_position_t untouched{};
+    untouched.line = 77;
+    iclforge_lyrics_position(nullptr, 1000, 0, &untouched);
+    CHECK(untouched.line == 77);
+    iclforge_lyrics_position(lyrics, 1000, 0, nullptr);
+
+    iclforge_lyrics_destroy(lyrics);
+}
+
+TEST_CASE("the lyrics reader reads UTF-16, plain text and the other timed formats", "[capi][lyrics]") {
+    if (!lyrics_built()) {
+        SKIP("lyrics are not built into this library");
+    }
+    SECTION("UTF-16 with a byte-order mark, as an editor saves 'Unicode'") {
+        // Hebrew letters, "shalom" - the reason the library reads UTF-16 at all.
+        const std::u16string text = u"[ti:שלום]\n[00:01.00]שלום\n";
+        std::vector<uint8_t> bytes{0xFF, 0xFE};
+        for (const char16_t unit : text) {
+            bytes.push_back(static_cast<uint8_t>(unit & 0xFF));
+            bytes.push_back(static_cast<uint8_t>(unit >> 8));
+        }
+        iclforge_lyrics_t* lyrics = nullptr;
+        REQUIRE(iclforge_lyrics_parse(bytes.data(), bytes.size(), -1, &lyrics) == ICLFORGE_OK);
+        // What comes back is UTF-8 always.
+        CHECK(std::string_view{iclforge_lyrics_title(lyrics)} == "\xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D");
+        REQUIRE(iclforge_lyrics_line_count(lyrics) == 1);
+        CHECK(std::string_view{iclforge_lyrics_line_text(lyrics, 0)} ==
+              "\xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D");
+        iclforge_lyrics_destroy(lyrics);
+    }
+    SECTION("plain text is not followed") {
+        iclforge_lyrics_t* lyrics = parse_lyrics_text("Should auld acquaintance\nBe forgot\n");
+        CHECK(iclforge_lyrics_timed(lyrics) == 0);
+        CHECK(iclforge_lyrics_line_count(lyrics) == 2);
+        int64_t length = -1;
+        CHECK(iclforge_lyrics_length_ms(lyrics, &length) == 0);
+        CHECK(length == -1);  // untouched, as every has-value function leaves it
+        iclforge_lyrics_destroy(lyrics);
+    }
+    SECTION("a SubRip file, which is told by what it holds") {
+        iclforge_lyrics_t* lyrics = parse_lyrics_text(
+            "1\n00:00:12,000 --> 00:00:15,500\nShould auld acquaintance\nbe forgot\n\n"
+            "2\n00:00:20,250 --> 00:00:22,000\nAnd never brought to mind?\n");
+        REQUIRE(iclforge_lyrics_line_count(lyrics) == 2);
+        CHECK(iclforge_lyrics_line_start_ms(lyrics, 0) == 12000);
+        // A cue ends where its cue does, not where the next begins.
+        CHECK(iclforge_lyrics_line_end_ms(lyrics, 0) == 15500);
+        CHECK(std::string_view{iclforge_lyrics_line_text(lyrics, 0)} ==
+              "Should auld acquaintance be forgot");
+        iclforge_lyrics_destroy(lyrics);
+    }
+    SECTION("an Advanced SubStation Alpha script's karaoke tags are word times") {
+        iclforge_lyrics_t* lyrics = parse_lyrics_text(
+            "[Events]\n"
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+            "Dialogue: 0,0:00:12.00,0:00:15.50,Default,,0,0,0,,{\\k50}Should {\\k30}auld "
+            "{\\k80}acquaint{\\k20}ance\n");
+        REQUIRE(iclforge_lyrics_line_count(lyrics) == 1);
+        REQUIRE(iclforge_lyrics_line_word_count(lyrics, 0) == 4);
+        CHECK(iclforge_lyrics_word_start_ms(lyrics, 0, 0) == 12000);
+        CHECK(iclforge_lyrics_word_start_ms(lyrics, 0, 1) == 12500);
+        iclforge_lyrics_destroy(lyrics);
+    }
+}
+
+TEST_CASE("the lyrics reader refuses what is not lyrics, with the reason, and touches nothing",
+          "[capi][lyrics]") {
+    if (!lyrics_built()) {
+        SKIP("lyrics are not built into this library");
+    }
+    iclforge_lyrics_t* lyrics = reinterpret_cast<iclforge_lyrics_t*>(0x1);
+    const std::vector<uint8_t> latin1 = {'[', '0', '0', ':', '0', '1', '.', '0', '0', ']', 0xE9, '\n'};
+
+    // Empty, in an encoding that is not read, and a NULL pointer with a size.
+    CHECK(iclforge_lyrics_parse(nullptr, 0, -1, &lyrics) == ICLFORGE_ERROR_LYRICS_UNREADABLE);
+    CHECK(std::string_view{iclforge_lyrics_error_message()}.size() > 0);
+    CHECK(lyrics == reinterpret_cast<iclforge_lyrics_t*>(0x1));
+    CHECK(iclforge_lyrics_parse(latin1.data(), latin1.size(), -1, &lyrics) ==
+          ICLFORGE_ERROR_LYRICS_UNREADABLE);
+    const std::string reason = iclforge_lyrics_error_message();
+    CHECK_FALSE(reason.empty());
+    CHECK(lyrics == reinterpret_cast<iclforge_lyrics_t*>(0x1));
+    CHECK(iclforge_lyrics_parse(nullptr, 5, -1, &lyrics) == ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(iclforge_lyrics_parse(latin1.data(), latin1.size(), -1, nullptr) ==
+          ICLFORGE_ERROR_INVALID_ARGUMENT);
+    CHECK(std::string_view{iclforge_status_message(ICLFORGE_ERROR_LYRICS_UNREADABLE)} ==
+          "not lyrics");
+
+    // The message is cleared by a parse that succeeds.
+    iclforge_lyrics_t* good = parse_lyrics_text("[00:01.00]Hello\n");
+    CHECK(std::string_view{iclforge_lyrics_error_message()}.empty());
+    iclforge_lyrics_destroy(good);
+
+    // Every accessor is safe with NULL and with an index out of range.
+    CHECK(std::string_view{iclforge_lyrics_title(nullptr)}.empty());
+    CHECK(iclforge_lyrics_line_count(nullptr) == 0);
+    CHECK(iclforge_lyrics_timed(nullptr) == 0);
+    CHECK(iclforge_lyrics_has_singers(nullptr) == 0);
+    CHECK(iclforge_lyrics_length_ms(nullptr, nullptr) == 0);
+    CHECK(iclforge_lyrics_word_state(nullptr, 0, 0, 0) == ICLFORGE_LYRICS_WORD_NOT_YET_SUNG);
+    iclforge_lyrics_destroy(nullptr);
+    iclforge_lyrics_t* one = parse_lyrics_text("[00:01.00]Hello\n");
+    CHECK(std::string_view{iclforge_lyrics_line_text(one, 5)}.empty());
+    CHECK(iclforge_lyrics_line_start_ms(one, 5) == 0);
+    CHECK(iclforge_lyrics_line_word_count(one, 5) == 0);
+    CHECK(iclforge_lyrics_line_singer(one, 5) == ICLFORGE_LYRICS_SINGER_UNMARKED);
+    CHECK(std::string_view{iclforge_lyrics_word_text(one, 0, 3)}.empty());
+    CHECK(iclforge_lyrics_word_state(one, 0, 3, 0) == ICLFORGE_LYRICS_WORD_NOT_YET_SUNG);
+    iclforge_lyrics_destroy(one);
 }

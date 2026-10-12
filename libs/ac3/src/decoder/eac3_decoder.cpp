@@ -1547,6 +1547,20 @@ void Eac3Decoder::reset() {
     im.dither_ = DitherGenerator{};
 }
 
+void Eac3Decoder::set_skip_object_reconstruction(bool skip) {
+    auto& im = *impl_;
+    if (im.config_.skip_object_reconstruction == skip) {
+        return;
+    }
+    im.config_.skip_object_reconstruction = skip;
+    // Each identity's reconstruction state goes either way: skipped, it is not used and is the
+    // block a part with no spare heap wants back; reconstructing, a state from before the change
+    // has history that is not this stream's.
+    for (auto& state : im.joc_state_) {
+        state.reset();
+    }
+}
+
 int Eac3Decoder::output_latency_samples() const {
     return impl_->output_.latency_samples();
 }
@@ -4345,6 +4359,21 @@ MixLevels resolve_mix_levels(int bsid, Acmod acmod, const std::optional<meta::Mi
     return mix_levels(mixing);
 }
 
+// D2: the levels a karaoke programme reproduces at are `clev` and `slev` of Annex C, which an
+// E-AC-3 bsi has no fields for; the Lo/Ro group of mixmdate takes their place. Where mixmdate is
+// absent a genuine E-AC-3 stream (bsid above 8) gets -3 dB for both, which is what Dolby's decoder
+// used, measured, and not AC-3's -4.5 and -6 dB defaults that MixLevels starts from. This is
+// scoped to a karaoke programme on purpose: the same measurement shows Dolby's decoder folding
+// every E-AC-3 stream without mixmdate at -3 and -3, which is a change to every such fold and is
+// put to the owner on its own (planning/karaoke-eac3.md, D10).
+void karaoke_default_levels(MixLevels& levels, int bsid,
+                            const std::optional<meta::MixMetadata>& mixing) {
+    if (bsid > 8 && !mixing.has_value()) {
+        levels.loro_clev = meta::level::kMinus3dB;
+        levels.loro_slev = meta::level::kMinus3dB;
+    }
+}
+
 // §6.3.2.2 Table 47: which Annex E channel locations a JOC downmix of
 // `dmx_config_idx` needs, in JOC channel order. Table 53 (§6.3.5.2) confirms
 // channel POSITIONS 5/6 are generic in the reconstruction maths themselves,
@@ -4419,6 +4448,11 @@ std::vector<DecodedSubstream> Eac3Decoder::flush() {
     // because that is all there is: by definition the assembly these belong
     // to never completed (see this function's own doc comment), so there is
     // no rendered program to fold instead.
+    // A dependent among the flushed substreams makes its programme more than one substream, which
+    // is not a karaoke programme (D3); the access units before it said so by the same rule.
+    const bool any_dependent = std::ranges::any_of(ready, [](const DecodedSubstream& substream) {
+        return substream.strmtyp == StreamType::kDependent;
+    });
     for (auto& substream : ready) {
         // A local rather than impl_->au_views_: OutputStage keeps working storage
         // of its own and this is one call per stream, not a hot path.
@@ -4428,13 +4462,30 @@ std::vector<DecodedSubstream> Eac3Decoder::flush() {
             views.emplace_back(channel);
         }
         const auto layout = eac3::chanmap::expand(substream.location_map());
-        impl_->output_.apply(views, layout, substream.acmod, substream.lfe,
-                             resolve_mix_levels(substream.bsid, substream.acmod, substream.mixing,
-                                                substream.cmixlev, substream.surmixlev,
-                                                substream.alternate_bsi),
-                             substream.dialnorm, substream.dialnorm2);
+        MixLevels levels =
+            resolve_mix_levels(substream.bsid, substream.acmod, substream.mixing, substream.cmixlev,
+                               substream.surmixlev, substream.alternate_bsi);
+        // Each flushed substream is its own programme here (above), so the rule asks about it
+        // alone; this has to agree with apply_output(), or the last access unit of a karaoke
+        // stream would come out at another channel count than the rest.
+        const bool karaoke =
+            impl_->config_.output.karaoke != KaraokeReproduction::kOff &&
+            substream.strmtyp == StreamType::kIndependent && !any_dependent &&
+            is_karaoke_programme(substream.info, substream.acmod, 1,
+                                 substream.object_metadata.has_value());
+        levels.karaoke = karaoke;
+        if (karaoke) {
+            karaoke_default_levels(levels, substream.bsid, substream.mixing);
+            // One independent substream, so its channels are the coded ones in Table 5.8's order,
+            // which is the order the output stage's acmod form takes.
+            impl_->output_.apply(views, substream.acmod, substream.lfe, levels, substream.dialnorm,
+                                 substream.dialnorm2);
+        } else {
+            impl_->output_.apply(views, layout, substream.acmod, substream.lfe, levels,
+                                 substream.dialnorm, substream.dialnorm2);
+        }
         substream.channels.resize(
-            output_channel_count(impl_->config_.output, substream.acmod, substream.lfe));
+            output_channel_count(impl_->config_.output, substream.acmod, substream.lfe, karaoke));
     }
     return ready;
 }
@@ -4461,7 +4512,8 @@ Eac3Decoder::decode_access_unit_by_block(std::span<const std::byte> unit, BlockS
 void Eac3Decoder::apply_output(DecodedAccessUnit& out, std::span<const std::span<float>> external) {
     if (impl_->config_.output.target == DownmixTarget::kAsCoded &&
         impl_->config_.output.mode == OperatingMode::kCustom &&
-        !impl_->config_.output.apply_dialnorm) {
+        !impl_->config_.output.apply_dialnorm &&
+        impl_->config_.output.karaoke == KaraokeReproduction::kOff) {
         return;
     }
     // impl_->config_.skip_reconstruction leaves `out.channels` empty (harmless below)
@@ -4490,17 +4542,40 @@ void Eac3Decoder::apply_output(DecodedAccessUnit& out, std::span<const std::span
     // seats the layout filled), but passing the rendered answer keeps the two
     // in agreement.
     const bool rendered_lfe = out.layout.index_of(eac3::chanmap::Location::kLfe) >= 0;
+    bool karaoke_out = false;
     {
         // Outside eac3_decode_access_unit, so it reports as its own root
         // zone: this is the fold the caller's config asked for, applied to a
         // finished program, not part of decoding one.
         ICLFORGE_ZONE_SCOPED_N("eac3_output");
-        impl_->output_.apply(impl_->au_views_, out.layout, out.acmod, rendered_lfe,
-                             resolve_mix_levels(out.bsid, out.acmod, out.mixing, out.cmixlev,
-                                                out.surmixlev, out.alternate_bsi),
-                             out.dialnorm, out.dialnorm2);
+        MixLevels levels = resolve_mix_levels(out.bsid, out.acmod, out.mixing, out.cmixlev,
+                                              out.surmixlev, out.alternate_bsi);
+        // Annex C's reproduction, for a programme that is one independent substream flagged
+        // karaoke (is_karaoke_programme, decoder.hpp). Its channels are the coded ones in Table 5.8's
+        // order, which is the order the output stage's acmod form takes, so that form is used
+        // here as FrameDecoder uses it; the layout form would seat a lone Cs vocal in both
+        // surrounds and make V2 of a 2/1 stream a choice that plays V1.
+        levels.karaoke =
+            impl_->config_.output.karaoke != KaraokeReproduction::kOff &&
+            is_karaoke_programme(out.info, out.acmod, static_cast<std::size_t>(out.substream_count),
+                              out.object_metadata.has_value());
+        if (levels.karaoke) {
+            karaoke_default_levels(levels, out.bsid, out.mixing);
+            impl_->output_.apply(impl_->au_views_, out.acmod, rendered_lfe, levels, out.dialnorm,
+                                 out.dialnorm2);
+        } else {
+            impl_->output_.apply(impl_->au_views_, out.layout, out.acmod, rendered_lfe, levels,
+                                 out.dialnorm, out.dialnorm2);
+        }
+        karaoke_out = levels.karaoke;
     }
     if (!external.empty()) {
+        return;
+    }
+    // A reproduction has put its three or four channels in the first slots, at every target.
+    if (karaoke_out) {
+        out.channels.resize(
+            output_channel_count(impl_->config_.output, out.acmod, rendered_lfe, true));
         return;
     }
     // output_channel_count() keys off acmod, which describes the BED; what
@@ -4842,9 +4917,19 @@ std::expected<std::optional<DecodedAccessUnit>, DecodeError> Eac3Decoder::decode
         // layout has - the three cases apply_output's own tail sorts by.
         const bool folded = impl_->config_.output.target != DownmixTarget::kAsCoded &&
                             lead.acmod != Acmod::kDualMono;
+        // Annex C's reproduction leaves three or four slots at an as-coded target (and the
+        // fold's one or two at the others, which output_channel_count says the same).
+        const bool karaoke_out =
+            impl_->config_.output.karaoke != KaraokeReproduction::kOff &&
+            is_karaoke_programme(out.info, lead.acmod, static_cast<std::size_t>(out.substream_count),
+                              out.object_metadata.has_value());
         const std::size_t slots =
-            folded ? (impl_->config_.output.target == DownmixTarget::kMono ? 1U : 2U)
-                   : views.size();
+            karaoke_out
+                ? output_channel_count(impl_->config_.output, lead.acmod,
+                                       out.layout.index_of(eac3::chanmap::Location::kLfe) >= 0,
+                                       true)
+            : folded ? (impl_->config_.output.target == DownmixTarget::kMono ? 1U : 2U)
+                     : views.size();
         const std::size_t samples = views.empty() ? 0 : views.front().size();
         const int blocks = static_cast<int>(samples / static_cast<std::size_t>(kSamplesPerBlock));
         std::array<std::span<const float>, kMaxSlots> block_views{};

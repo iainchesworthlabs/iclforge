@@ -1,6 +1,8 @@
 # iclforge-audio-tests - the live-audio library's Catch2 tests (cmake/IclforgeTests.cmake).
 iclforge_add_test_binary(iclforge-audio-tests PROJECT audio SOURCES
     test_audio_backend.cpp
+    test_capture_live.cpp
+    test_capture_timeline.cpp
     test_live_positions.cpp
     test_monitor_live.cpp
     test_passthrough_live.cpp
@@ -11,6 +13,7 @@ iclforge_add_test_binary(iclforge-audio-tests PROJECT audio SOURCES
     test_ring_buffer.cpp
     test_spatial_live.cpp
     test_speakers.cpp
+    test_udp_sender.cpp
     test_watchdog.cpp)
 
 target_link_libraries(iclforge-audio-tests PRIVATE iclforge::audio iclforge::ac3 iclforge::containers)

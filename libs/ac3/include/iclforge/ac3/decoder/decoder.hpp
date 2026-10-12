@@ -728,7 +728,10 @@ struct DecodedAccessUnit {
     // Parallel to `layout`, except for dual mono - unless DecoderConfig::
     // output asked for a fold, in which case this holds the folded output and
     // `layout` still describes what was rendered before it. See
-    // iclforge::ac3::output_channel_count().
+    // iclforge::ac3::output_channel_count(). So does Annex C's karaoke
+    // reproduction (OutputConfig::karaoke, for a programme that is one
+    // independent substream flagged bsmod 7): L, C, R and then the LFE, in the
+    // first slots, which iclforge::ac3::output_mode() names.
     std::vector<std::vector<float>> channels;
     // §7.10, same convention as DecodedFrame::concealed: std::nullopt on any
     // access unit that assembled normally. ConcealmentAction::kBedOnly is the
@@ -736,6 +739,34 @@ struct DecodedAccessUnit {
     // so the program is real but narrower than the stream promised.
     std::optional<Concealment> concealed = std::nullopt;
 };
+
+// Whether a programme is one Eac3Decoder reproduces karaoke for, when OutputConfig::karaoke asks
+// (planning/karaoke-eac3.md, D1 to D3): its own bsmod and acmod say it is karaoke (Annex C.2.1),
+// it was assembled from exactly one substream (an independent one: the chanmap of a dependent has
+// no V1 or V2, and what a decoder does with one there is nowhere specified), and it carries no
+// object layer. The decoder, the CLI and Hearth ask this one rule, so none of them re-derives it.
+// Inline, so it adds no symbol to the library.
+//
+// This form is for a caller that has read the headers and not decoded: a stream's bsmod and
+// acmod (io::ScannedProgramme's, or a syncframe's), how many substreams its access unit holds,
+// and whether it declares an object layer (a JOC complexity index in its addbsi).
+[[nodiscard]] inline bool is_karaoke_programme(meta::BitstreamMode bsmod, Acmod acmod,
+                                               std::size_t substreams, bool objects) {
+    return substreams == 1 && !objects && meta::is_karaoke(bsmod, acmod);
+}
+
+[[nodiscard]] inline bool is_karaoke_programme(const std::optional<meta::BsiInfo>& info, Acmod acmod,
+                                               std::size_t substreams, bool objects) {
+    return info.has_value() && is_karaoke_programme(info->bsmod, acmod, substreams, objects);
+}
+
+[[nodiscard]] inline bool is_karaoke_programme(const DecodedAccessUnit& unit) {
+    return is_karaoke_programme(unit.info, unit.acmod,
+                                unit.substream_count > 0
+                                    ? static_cast<std::size_t>(unit.substream_count)
+                                    : std::size_t{0},
+                                unit.object_metadata.has_value());
+}
 
 class ICLFORGE_AC3_EXPORT Eac3Decoder {
    public:
@@ -761,6 +792,15 @@ class ICLFORGE_AC3_EXPORT Eac3Decoder {
     // point of calling this at the start of a stream instead of making a new
     // decoder.
     void reset();
+
+    // Whether this decoder reconstructs a stream's objects from here on (the flag it was made with,
+    // DecoderConfig::skip_object_reconstruction), for a caller that learns after the decoder is
+    // made that a stream carries more objects than it can place: it plays that stream's bed,
+    // without another decoder's allocations. Taking it true lets go of the reconstruction state,
+    // which is the largest block a decode holds (147,504 bytes, in one piece, in single precision
+    // less); false makes it again at the next frame that has objects. The bed's bits are the same
+    // either way. Call it between streams, as reset(), and the decode that follows starts clean.
+    void set_skip_object_reconstruction(bool skip);
 
     // Decodes one syncframe. Overlap-add state is kept per substream identity,
     // so the substreams of successive access units stay independent of each

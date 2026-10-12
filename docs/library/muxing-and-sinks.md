@@ -234,6 +234,15 @@ whole, with a note saying why. `forge` and the GUI do not apply the trim. Neithe
 nor `mvhd` is needed to find a sample, so one too short to read, one that declares more entries
 than it holds, or one longer than `ReadOptions::max_edits` is left out, and the file still reads.
 
+**The other tracks come back listed.** `Demuxed::skipped` holds each track the reader saw and did not
+select, in file order and up to 64, as a `SkippedTrack`: its `track_id`, a `kind` from the `hdlr`
+handler (`kAudio` for `soun`, `kVideo` for `vide`, `kText` for `text`, `sbtl`, `subt` and `clcp`,
+`kOther` for the rest), the first sample entry's four characters as `codec_id` (`avc1`, `mp4a`,
+`tx3g`, `wvtt`) and its `language`. None of their samples is read. The Matroska reader's
+`Demuxed::skipped` is the same, with the `TrackNumber`, a `kind` from the `TrackType` (1 video, 2
+audio, 17 subtitle) and the `CodecID`. It is what a caller needs to tell a person that a file also
+carries a picture or a subtitle track; `forge probe` prints it.
+
 **Untrusted input.** An MP4's sample table is an *index*, which is a wider attack surface than
 Matroska's in-line framing: `stsc` names chunks, `stco` names absolute file offsets and `stsz`
 names sizes, all self-declared and all resolved against each other before a byte of audio is

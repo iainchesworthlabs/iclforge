@@ -252,10 +252,15 @@ ColumnLayout {
     property bool rateChosen: false
 
     // ---- the lyrics file that goes beside the stream --------------------------------
-    // A `.lrc` the player finds by the stream's name (Hearth's L1). Offered from beside the
-    // first part when one of its name is there; the author's own choice, or removal, wins.
+    // A lyrics file (.lrc, .srt, .ass or .kar), written beside the stream as its own UTF-8 `.lrc`
+    // that the player finds by the stream's name (Hearth's L1). Offered from beside the first part
+    // when one of its name is there; the author's own choice, or removal, wins.
     property string lyricsUrl: ""
     property bool lyricsChosen: false
+    // Why the file cannot be used as lyrics (a code page is named, not guessed at), as the
+    // reader says it, or empty. Asked when a file is chosen, so that it is not found out at save.
+    readonly property string lyricsProblem: flow.lyricsUrl.length > 0
+                                            ? KaraokeAuthoring.lyricsProblem(flow.lyricsUrl) : ""
     // What became of the copy, as a sentence; empty until a stream has been saved.
     property string lyricsNote: ""
 
@@ -277,7 +282,8 @@ ColumnLayout {
                                    + "was left as it is.");
             break;
         case "unreadable":
-            flow.lyricsNote = qsTr("The lyrics file could not be read, so none was put beside the stream.");
+            flow.lyricsNote = qsTr("The lyrics file could not be read, so none was put beside the "
+                                   + "stream: %1").arg(KaraokeAuthoring.lyricsProblem(flow.lyricsUrl));
             break;
         default:
             flow.lyricsNote = qsTr("The lyrics could not be written beside the stream.");
@@ -515,6 +521,50 @@ ColumnLayout {
     function joinedParts(parts) {
         return parts.length > 0 ? parts.join(" + ") : qsTr("silent");
     }
+
+    // The level of each part against Table C.2.3 (Annex C.2.3's "additional flexibility", the
+    // capable decoder's): the span is the library's, the one Hearth's sliders use, and the bottom
+    // of it is off.
+    readonly property real levelMinDb: -24
+    readonly property real levelMaxDb: 12
+
+    function partDb(part) {
+        switch (part) {
+        case "M": return StreamPlayerController.karaokeMelodyDb;
+        case "V1": return StreamPlayerController.karaokeVocal1Db;
+        case "V2": return StreamPlayerController.karaokeVocal2Db;
+        }
+        return 0;
+    }
+
+    function setPartDb(part, db) {
+        switch (part) {
+        case "M": StreamPlayerController.karaokeMelodyDb = db; break;
+        case "V1": StreamPlayerController.karaokeVocal1Db = db; break;
+        case "V2": StreamPlayerController.karaokeVocal2Db = db; break;
+        }
+    }
+
+    function levelText(db) {
+        if (db <= flow.levelMinDb) {
+            return qsTr("off");
+        }
+        return qsTr("%1 dB").arg((db > 0 ? "+" : "") + Math.round(db));
+    }
+
+    // A part pulled to the bottom of its control is not heard: the capable decoder takes it out of
+    // the sums. Only the capable decoder has levels.
+    function partOff(part) {
+        return flow.listening === "capable" && flow.partDb(part) <= flow.levelMinDb;
+    }
+
+    function audibleParts(parts) {
+        return parts.filter((part) => !flow.partOff(part));
+    }
+
+    readonly property bool levelsMoved: StreamPlayerController.karaokeMelodyDb !== 0
+                                        || StreamPlayerController.karaokeVocal1Db !== 0
+                                        || StreamPlayerController.karaokeVocal2Db !== 0
 
     function listeningText() {
         if (flow.listening === "asCoded") {
@@ -1023,6 +1073,89 @@ ColumnLayout {
                             }
                         }
 
+                        // The level of each part: the capable decoder's, so closed under the
+                        // others, and closed for a part the stream does not have.
+                        ColumnLayout {
+                            objectName: "karaokePartLevels"
+                            Layout.fillWidth: true
+                            spacing: Theme.space2
+                            enabled: flow.listening === "capable"
+                            opacity: enabled ? 1.0 : 0.45
+
+                            Repeater {
+                                model: [
+                                    { part: "M", label: qsTr("Melody"), present: flow.plan.melody === true },
+                                    { part: "V1", label: qsTr("Vocal 1"), present: flow.plan.vocals >= 1 },
+                                    { part: "V2", label: qsTr("Vocal 2"), present: flow.plan.vocals >= 2 }
+                                ]
+                                delegate: RowLayout {
+                                    id: levelRow
+                                    required property var modelData
+                                    readonly property real db: flow.partDb(levelRow.modelData.part)
+                                    Layout.fillWidth: true
+                                    spacing: Theme.space3
+                                    enabled: levelRow.modelData.present
+                                    opacity: enabled ? 1.0 : 0.45
+                                    Text {
+                                        Layout.preferredWidth: Math.round(110 * Theme.fontScale)
+                                        text: qsTr("%1 level").arg(levelRow.modelData.label)
+                                        font.pixelSize: Theme.fontNormal
+                                        color: Theme.text
+                                    }
+                                    Slider {
+                                        id: levelSlider
+                                        objectName: "karaokeLevel-" + levelRow.modelData.part
+                                        Layout.fillWidth: true
+                                        from: flow.levelMinDb
+                                        to: flow.levelMaxDb
+                                        stepSize: 1
+                                        snapMode: Slider.SnapAlways
+                                        value: levelRow.db
+                                        Accessible.name: qsTr("%1 level, dB").arg(levelRow.modelData.label)
+                                        Accessible.description: flow.levelText(levelRow.db)
+                                        onMoved: flow.setPartDb(levelRow.modelData.part, value)
+                                        // A drag writes `value` and the binding above is gone, so
+                                        // it is put back from the controller.
+                                        Connections {
+                                            target: StreamPlayerController
+                                            function onKaraokeChanged() {
+                                                levelSlider.value = levelRow.db;
+                                            }
+                                        }
+                                    }
+                                    Text {
+                                        objectName: "karaokeLevelText-" + levelRow.modelData.part
+                                        Layout.preferredWidth: Math.round(60 * Theme.fontScale)
+                                        horizontalAlignment: Text.AlignRight
+                                        text: flow.levelText(levelRow.db)
+                                        font.pixelSize: Theme.fontNormal
+                                        font.family: Theme.monoFamily
+                                        color: Theme.text
+                                    }
+                                }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.space3
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: qsTr("Each part's level against Table C.2.3: 0 dB is the table, and "
+                                               + "the bottom of the control is off. Raising one part far enough "
+                                               + "lowers the others, so that no speaker is driven past full scale. "
+                                               + "The capable player only.")
+                                    wrapMode: Text.WordWrap
+                                    font.pixelSize: Theme.fontSmall
+                                    color: Theme.neutral700
+                                }
+                                Button {
+                                    objectName: "karaokeResetLevels"
+                                    text: qsTr("Reset levels")
+                                    enabled: flow.levelsMoved
+                                    onClicked: StreamPlayerController.resetKaraokeLevels()
+                                }
+                            }
+                        }
+
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: Theme.space3
@@ -1078,13 +1211,13 @@ ColumnLayout {
                                 Repeater {
                                     model: {
                                         const rows = [
-                                            { speaker: "L", parts: flow.outputs.l },
-                                            { speaker: "C", parts: flow.outputs.c },
-                                            { speaker: "R", parts: flow.outputs.r }
+                                            { speaker: "L", parts: flow.audibleParts(flow.outputs.l) },
+                                            { speaker: "C", parts: flow.audibleParts(flow.outputs.c) },
+                                            { speaker: "R", parts: flow.audibleParts(flow.outputs.r) }
                                         ];
                                         if (flow.listening === "asCoded") {
-                                            rows.push({ speaker: "Ls", parts: flow.outputs.ls });
-                                            rows.push({ speaker: "Rs", parts: flow.outputs.rs });
+                                            rows.push({ speaker: "Ls", parts: flow.audibleParts(flow.outputs.ls) });
+                                            rows.push({ speaker: "Rs", parts: flow.audibleParts(flow.outputs.rs) });
                                         }
                                         if (flow.plan.lfe === true) {
                                             rows.push({ speaker: "LFE", parts: flow.outputs.lfe });
@@ -1224,11 +1357,23 @@ ColumnLayout {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: qsTr("An .lrc file is put beside the stream under the stream's name, where "
-                                   + "Hearth finds it. One of the backing's name beside it is offered.")
+                        text: qsTr("A lyrics file (.lrc, .srt, .ass or .kar) is written beside the stream "
+                                   + "as the stream's own .lrc, in UTF-8, where Hearth finds it. One of "
+                                   + "the backing's name beside it is offered.")
                         wrapMode: Text.WordWrap
                         font.pixelSize: Theme.fontSmall
                         color: Theme.textMuted
+                    }
+                    Text {
+                        objectName: "karaokeLyricsProblem"
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        text: flow.lyricsProblem.length > 0
+                              ? qsTr("These lyrics cannot be used: %1").arg(flow.lyricsProblem) : ""
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Theme.fontSmall
+                        font.bold: true
+                        color: Theme.text
                     }
                     Text {
                         objectName: "karaokeLyricsNote"
@@ -1439,7 +1584,7 @@ ColumnLayout {
         objectName: "karaokeLyricsDialog"
         title: qsTr("Choose the lyrics")
         fileMode: FileDialog.OpenFile
-        nameFilters: [qsTr("Lyrics (*.lrc)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("Lyrics (*.lrc *.srt *.ass *.kar)"), qsTr("All files (*)")]
         onAccepted: {
             flow.lyricsChosen = true;
             flow.lyricsUrl = selectedFile.toString();

@@ -159,7 +159,7 @@ session to confirm ([plan, D13](hearth-android.md#decisions)).
 |---|---|
 | Spacing | 4, 8, 12, 16, 24, 32 `u` (`Theme.space1` to `space8`) |
 | Radius | 0, everywhere |
-| Faces | Archivo (Regular, Medium, SemiBold, ExtraBold) for Latin **only** (its cmap has 398 Latin codepoints, 4 Greek and no Cyrillic, checked on all four weights 2026-10-12); Noto Sans for Greek and Cyrillic (the panel's image carries it, 473 KB for its three faces; the desktop and Android fall back to the system's until one is bundled); Noto Sans Hebrew (Regular and SemiBold static instances; the bundled file is variable and its default instance is Thin) for Hebrew and Yiddish; Noto Sans Arabic where the surface can shape; the system's CJK face where there is one |
+| Faces | Archivo (Regular, Medium, SemiBold, ExtraBold) for Latin **only** (its `cmap` has 398 Latin codepoints, four Greek letters and no Cyrillic, checked on all four weights 2026-10-12), with a Noto Sans for Greek and Cyrillic where the surface has no system face to fall back to (the ESP32-P4 image carries one, 473 KB for its three faces; the desktop and Android fall back to the system's until one is bundled); Noto Sans Hebrew (Regular and SemiBold static instances; the bundled file is variable and its default instance is Thin) for Hebrew and Yiddish; Noto Sans Arabic where the surface can shape; the system's CJK face where there is one |
 | Type size | the `u` sizes in [layout](#layout), times the surface's text-size step (S, M, L; `Theme.fontScale` on the desktop) |
 | Case and tracking | header and chips: uppercase, tracked at `trackingWide` (1.2 `u`), as `LyricScreen.qml` draws them |
 | Icons | Material Symbols Sharp, the handful of glyphs `Theme.qml` lists |
@@ -214,7 +214,7 @@ Scripts, by tier, so SS5 has something to test against:
 | Input | Mouse, keyboard | D-pad and OK, back, media keys; a game controller | Touch (GT911) |
 | Focus | Keyboard focus ring (2 `u`, offset 2) | The same ring on D-pad focus; no pointer | Touch targets of 72u; no focus |
 | Text engine | Qt (HarfBuzz) | Android's (bidi, shaping, system fonts) | LVGL `tiny_ttf` and its bidi; no shaping engine |
-| Fonts | Bundled, plus the system's | Bundled Archivo, Hebrew and Arabic; the system's CJK | Archivo and two Hebrew instances in the image (318 KB) |
+| Fonts | Bundled, plus the system's | Bundled Archivo, Hebrew and Arabic; the system's CJK | Archivo, Noto Sans Greek and Cyrillic and Noto Sans Hebrew, each at two weights, in the image (473 KB) |
 | Scripts | T1 to T4 | T1 to T4 | T1 and T2 |
 | Frame rate | vsync | 30 while a word is sung | 30, 5, 1 |
 | Strings | Hearth's `.ts` catalogues | `strings.xml` per language | English in the built screens; whether a catalogue is wanted is the P4X session's to say |
