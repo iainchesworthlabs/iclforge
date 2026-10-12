@@ -1049,22 +1049,21 @@ struct Eac3Decoder::Impl {
     // encoder's), so nothing round-trips through double on the way to
     // `coeffs` - the coefficients are written into the store directly.
     // Two sides: with a second lane the next block's spectrum is made while this block's
-    // channels are reconstructed from the other (decode_substream_core's second pass). The
-    // second side is made when a decode first asks for it, for the reason imdct_scratch_lane1_ is.
+    // channels are reconstructed from the other (decode_substream_core's second pass). Each
+    // side is made when a decode first asks for it, for the reason imdct_scratch_lane1_ is:
+    // the first was a member, 2,048 bytes at Q7.24 and float in every decoder, and only a
+    // stream with enhanced coupling asks for either.
     struct EcplSpectrum {
         std::array<internal::decode_scalar_t, 256> real{};
         std::array<internal::decode_scalar_t, 256> imag{};
     };
-    EcplSpectrum ecpl_spectrum_side0_{};
-    std::unique_ptr<EcplSpectrum> ecpl_spectrum_side1_;
+    std::array<std::unique_ptr<EcplSpectrum>, 2> ecpl_spectrum_;
     [[nodiscard]] EcplSpectrum& ecpl_spectrum(std::size_t side) {
-        if (side == 0) {
-            return ecpl_spectrum_side0_;
+        auto& slot = ecpl_spectrum_[side];
+        if (!slot) {
+            slot = std::make_unique<EcplSpectrum>();
         }
-        if (!ecpl_spectrum_side1_) {
-            ecpl_spectrum_side1_ = std::make_unique<EcplSpectrum>();
-        }
-        return *ecpl_spectrum_side1_;
+        return *slot;
     }
     // §3.5.5.2/.3's per-bin amplitude and angle, for one channel of one block.
     //
