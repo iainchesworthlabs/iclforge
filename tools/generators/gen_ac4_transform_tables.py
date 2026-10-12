@@ -1,8 +1,12 @@
 """The inverse transform's tables in double, for the float and fixed-point tiers to keep in flash.
 
-Writes libs/dsp/src/tiered/tables/transform_tables.hpp: for each block length
-of a 2048-sample frame at 44.1 or 48 kHz (2048, 1024, 512, 256 and 128), the values the decoder
-otherwise computes when it builds its transforms (libs/dsp/src/tiered/fft.cpp, mdct.cpp,
+Writes libs/dsp/src/tiered/tables/transform_tables.hpp: for each block length Table 186 lists
+at 44.1 or 48 kHz, which are every block of every frame length the decoder has (context.hpp's
+frame_len_base: 2048 at frame rate indices 2 and 13, 1920 at 0 and 1, 1536 at 3 and 4, 960 at 5 and
+6, 1024 at 7, 768 at 8 and 9, 512 at 10, and 384 at 11 and 12, divided by the high frame rate
+mode's factor of 2 or 4, and each halved down to a sixteenth where Table 186 has the length:
+2048 to 128, 1920 to 120, 1536 to 96, 1024 to 128, 960 to 120, 768 to 96, 512 to 128 and 384 to
+96), the values the decoder otherwise computes when it builds its transforms (libs/dsp/src/tiered/fft.cpp, mdct.cpp,
 kbd.cpp and synthesis.cpp), in the order it stores them:
 
   kFftRootsN    e^(-2 pi i (p k mod n) / n) for each pass of the N/2-point FFT, {re, im};
@@ -42,9 +46,16 @@ HEADER = (
     / "transform_tables.hpp"
 )
 
-LENGTHS = (2048, 1024, 512, 256, 128)
-# Table 186's alpha for each of LENGTHS (libs/dsp/src/tiered/kbd.cpp, kAlphas).
-ALPHA = {2048: 3.0, 1024: 4.0, 512: 4.5, 256: 5.0, 128: 6.0}
+# Table 186's lengths at 44.1 and 48 kHz and their alpha (libs/dsp/src/tiered/kbd.cpp, kAlphas):
+# the three columns, the 2048-sample frame's, the 1920's and the 1536's.
+ALPHA = {
+    2048: 3.0, 1920: 3.0, 1536: 3.0,
+    1024: 4.0, 960: 4.0, 768: 4.0,
+    512: 4.5, 480: 4.5, 384: 4.5,
+    256: 5.0, 240: 5.0, 192: 5.0,
+    128: 6.0, 120: 6.0, 96: 6.0,
+}
+LENGTHS = tuple(ALPHA)
 
 
 def radices(length: int) -> list[int]:
