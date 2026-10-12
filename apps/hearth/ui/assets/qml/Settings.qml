@@ -580,9 +580,10 @@ ScrollView {
                         Text {
                             Layout.fillWidth: true
                             text: qsTr("System follows the language the desktop is set to. Applies at once. "
-                                      + "Hearth's catalogues carry every string but none are translated yet, "
-                                      + "so the words stay in English while the layout direction and the "
-                                      + "typeface follow the language chosen.")
+                                      + "The Karaoke page, the lyrics and the singer view are translated; "
+                                      + "the other pages are not yet, so their words stay in English while "
+                                      + "the layout direction and the typeface follow the language chosen. "
+                                      + "The translations are machine-made and have not been read by a speaker.")
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSmall
                             wrapMode: Text.WordWrap
