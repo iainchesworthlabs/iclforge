@@ -349,9 +349,11 @@ struct MixLevels {
     const std::optional<meta::AlternateBsi>& alternate);
 
 // E-AC-3 (Table E1.2's mixmdate group). std::nullopt - no mixmdate on the
-// wire at all - falls back on the AC-3 defaults above rather than on zero, so
-// a stream that says nothing folds down the same way either generation of it
-// would.
+// wire at all - falls back on -3 dB for the centre and -3 dB for the surrounds in
+// Lo/Ro, which is what Dolby's decoder folds such a stream at, and not on the AC-3
+// defaults above (-4.5 and -6 dB): those stand in for an AC-3 bsi with no level to
+// read, and an E-AC-3 bsi has none to fall back on (planning/karaoke-eac3.md, D10).
+// Lt/Rt keeps §7.8.2's -3 dB, and an absent group is not zero.
 [[nodiscard]] ICLFORGE_AC3_EXPORT MixLevels mix_levels(const std::optional<meta::MixMetadata>& mix);
 
 // How many channels apply() will leave behind for a given coded programme.
