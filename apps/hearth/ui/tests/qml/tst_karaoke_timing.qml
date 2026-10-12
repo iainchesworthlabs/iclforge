@@ -346,6 +346,175 @@ TestCase {
         compare(named(win, "timingLater").enabled, false);
     }
 
+    // --- correcting a word ---------------------------------------------------------------------
+
+    // A file that came with the times of its words, as an aligner's does: every word of it is taken as
+    // given, so the words pass has none to press until one is chosen.
+    readonly property string timedText:
+        "[00:01.00]<00:01.00>Should <00:01.60>auld <00:02.40>acquaintance\n"
+        + "[00:05.00]<00:05.00>Be <00:05.50>forgot\n"
+        + "[00:09.00]<00:09.00>And <00:09.50>never <00:10.00>brought\n"
+
+    // The box a word is drawn in, as the row's delegate makes it on a later frame. The dialog lays
+    // itself out a frame after it opens too: until it has, the list has no height and a click on
+    // the first row is clipped away, so that is waited for as well.
+    function wordBox(dialog, lineIndex, wordIndex) {
+        const name = "timingWord-" + lineIndex + "-" + wordIndex;
+        const match = function(it) { return it.objectName === name; };
+        const list = H.find(dialog.contentItem, function(it) { return it.objectName === "timingLines"; });
+        verify(list !== null, "no list of lines");
+        tryVerify(function() { return list.height > 50; }, 5000);
+        tryVerify(function() { return H.find(dialog.contentItem, match) !== null; }, 5000);
+        return H.find(dialog.contentItem, match);
+    }
+
+    function openTimed(at) {
+        verify(TestServices.writeTextFile("timing_song.lrc", timedText).length > 0);
+        const open = openDialog(item, at);
+        tryCompare(KaraokeController, "timing", true, 5000);
+        compare(KaraokeController.stampedLines, 3);
+        compare(KaraokeController.timingLines[0].words[1].tapped, true);
+        return open;
+    }
+
+    function test_aWordOfAFileThatCameTimedIsChosenAndPressedAgain() {
+        const open = openTimed(1900);
+        const win = open.win;
+        const dialog = open.dialog;
+        compare(named(win, "timingWordHint").visible, false);
+        dialog.setMode("words");
+        compare(named(win, "timingWordHint").visible, true);
+
+        // Every word is pressed already: there is nothing for Space to do, and nothing to nudge.
+        compare(named(win, "timingTap").enabled, false);
+        compare(named(win, "timingLater").enabled, false);
+        compare(named(win, "timingChosenWord").visible, false);
+        space(win);
+        compare(line(0).words[1].startMs, 1600);
+        compare(KaraokeController.timingDirty, false);
+
+        // A click on the word chooses it, and says which and when.
+        mouseClick(wordBox(dialog, 0, 1));
+        compare(dialog.selectedLine, 0);
+        compare(dialog.selectedWord, 1);
+        compare(dialog.wordArmed, true);
+        compare(named(win, "timingChosenWord").visible, true);
+        compare(named(win, "timingChosenWord").text,
+                qsTr("Chosen word: %1, in line %2, starts at %3.").arg(line(0).words[1].text).arg(1).arg("0:01.60"));
+        compare(named(win, "timingNext").text,
+                qsTr("Space presses the chosen word again: %1").arg(line(0).words[1].text));
+        verify(named(win, "timingTap").enabled);
+        verify(named(win, "timingLater").enabled);
+
+        // The press is this word's, less the reaction time, and moves nothing else.
+        space(win);
+        compare(line(0).words[1].startMs, 1800);
+        compare(line(0).words[1].tapped, true);
+        compare(line(0).words[0].startMs, 1000);
+        compare(line(0).words[2].startMs, 2400);
+        compare(line(0).startMs, 1000);
+        compare(KaraokeController.timingDirty, true);
+        compare(named(win, "timingChosenWord").text,
+                qsTr("Chosen word: %1, in line %2, starts at %3.").arg(line(0).words[1].text).arg(1).arg("0:01.80"));
+
+        // It was spent: another Space does not press it again, and there is no other word to press.
+        compare(dialog.wordArmed, false);
+        compare(named(win, "timingTap").enabled, false);
+        hold(dialog, 2300);
+        space(win);
+        compare(line(0).words[1].startMs, 1800);
+    }
+
+    function test_aChosenWordIsNudgedAndStampedAgainNotItsLine() {
+        const open = openTimed(2100);
+        const win = open.win;
+        const dialog = open.dialog;
+        mouseClick(wordBox(dialog, 0, 1));
+        compare(dialog.selectedWord, 1);
+
+        mouseClick(named(win, "timingLater"));
+        compare(line(0).words[1].startMs, 1610);
+        mouseClick(named(win, "timingEarlier"));
+        mouseClick(named(win, "timingEarlier"));
+        compare(line(0).words[1].startMs, 1590);
+        // The line, and the words beside it, did not move with it.
+        compare(line(0).startMs, 1000);
+        compare(line(0).words[0].startMs, 1000);
+        compare(line(0).words[2].startMs, 2400);
+
+        // Stamp again is a press, at the position less the reaction time.
+        mouseClick(named(win, "timingStampAgain"));
+        compare(line(0).words[1].startMs, 2000);
+        compare(line(0).startMs, 1000);
+        compare(named(win, "timingChosenWord").text,
+                qsTr("Chosen word: %1, in line %2, starts at %3.").arg(line(0).words[1].text).arg(1).arg("0:02.00"));
+    }
+
+    function test_aWordStaysBetweenItsNeighbours() {
+        const open = openTimed(5000);
+        const win = open.win;
+        mouseClick(wordBox(open.dialog, 0, 1));
+        // Stamped far past the next word, it is put at the next word's own time, not beyond it.
+        mouseClick(named(win, "timingStampAgain"));
+        compare(line(0).words[1].startMs, 2400);
+        compare(line(0).words[2].startMs, 2400);
+        compare(line(0).words[0].startMs, 1000);
+    }
+
+    function test_choosingALineLetsTheWordGoAndTheNudgeIsTheLines() {
+        const open = openTimed(0);
+        const win = open.win;
+        const dialog = open.dialog;
+        mouseClick(wordBox(dialog, 1, 1));
+        compare(dialog.selectedLine, 1);
+        compare(dialog.selectedWord, 1);
+
+        // The row, away from its words.
+        mouseClick(named(win, "timingLine-1"), 4, 4);
+        compare(dialog.selectedLine, 1);
+        compare(dialog.selectedWord, -1);
+        compare(named(win, "timingChosenWord").visible, false);
+
+        mouseClick(named(win, "timingLater"));
+        compare(line(1).startMs, 5010);
+        // The words went with their line, since it is the line that was nudged.
+        compare(line(1).words[1].startMs, 5510);
+    }
+
+    function test_theChosenWordIsPressedInPlaceOfTheNextGuessOnceAndThenTheGuessesGoOn() {
+        const open = openDialog(item, 1100);
+        const win = open.win;
+        const dialog = open.dialog;
+        tryCompare(KaraokeController, "timing", true, 5000);
+        stampThreeLines(open);
+
+        // In the first line, with its first word to press next.
+        hold(dialog, 4100);
+        compare(named(win, "timingNext").text, qsTr("Next word: %1").arg("Should"));
+        mouseClick(wordBox(dialog, 0, 2));
+        compare(named(win, "timingNext").text,
+                qsTr("Space presses the chosen word again: %1").arg("acquaintance"));
+        space(win);
+        compare(line(0).words[2].tapped, true);
+        compare(line(0).words[2].startMs, 4000);
+        compare(line(0).words[0].tapped, false);
+
+        // Spent: the next Space is the first word's again, as it was.
+        compare(named(win, "timingNext").text, qsTr("Next word: %1").arg("Should"));
+        hold(dialog, 1500);
+        space(win);
+        compare(line(0).words[0].tapped, true);
+        compare(line(0).words[0].startMs, 1400);
+        compare(line(0).words[2].startMs, 4000);
+
+        // Chosen again, it is for the press again.
+        mouseClick(wordBox(dialog, 0, 2));
+        compare(dialog.wordArmed, true);
+        hold(dialog, 4600);
+        space(win);
+        compare(line(0).words[2].startMs, 4500);
+    }
+
     // --- saving and leaving ------------------------------------------------------------------------
 
     function test_saveWritesTheItemsFileKeepsTheFirstAndTheViewReadsIt() {

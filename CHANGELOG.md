@@ -204,6 +204,13 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The timing window corrects one word.** In **Time the lyrics...** a click on a word chooses it
+  (it is outlined, and the item is cued 1.5 s before it) and the window says which word it is and
+  when it starts. In the words pass the next `Space` presses that word, once, in place of the next
+  guess; **Stamp again** presses it at the position now; **-10 ms** and **+10 ms** move it, and
+  not its line. A file that came with the times of its words (from a forced aligner, say) opens
+  with every word taken as given, and only its lines could be stamped again or nudged, so one wrong
+  word could not be put right. A word stays between its neighbours; choosing its line lets it go.
 - **The timing window sets who sings a line.** In **Time the lyrics...** a chosen line takes a
   **Singer** (not marked, V1, V2 or both) and each row shows its marker; two **Name** fields set
   what the file calls the singers (`[v1:]` and `[v2:]`, kept with the file, unlike the names typed on
