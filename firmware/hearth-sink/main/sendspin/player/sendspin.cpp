@@ -668,6 +668,11 @@ void start_player(const iclforge::render::OutputLayout& layout) {
                                                static_cast<std::size_t>(std::max(sink_max_slots(), 1)));
     config.max_delay_ms = static_cast<double>(kMaxDelayMs);
     config.max_coded_channels = kMaxCodedChannels;
+    // A stream declaring more objects than the board states it places is played as its bed
+    // (iclforge/object_limit.hpp): the figure the support object carries is the one it keeps to.
+    if (kMaxObjects >= 0) {
+        config.max_objects = static_cast<std::uint8_t>(kMaxObjects);
+    }
     config.core = kDecodeCore;
     config.stack_bytes = kDecodeStackBytes;
     config.stack_in_psram = kDecodeStackInPsram;
@@ -871,6 +876,26 @@ std::optional<iclforge::ControlSendspin> sendspin_status() {
     s.settings_revision = play.settings_revision;
     s.identifying = play.identifying;
     return s;
+}
+
+bool sendspin_read_lyrics(LyricsReader& reader, std::int64_t delay_ms,
+                          const iclforge::lyrics::StageOptions& options) {
+    // The position is on the server's clock, which the host's time filter gives for the board's
+    // (as the report of the line does). Without a converged clock there is no position, and the
+    // stage is "waiting" with the first lines to show.
+    const iclforge::SendspinHost* const clock = g_clock.load();
+    const std::optional<std::int64_t> server =
+        clock != nullptr ? clock->server_time(esp_timer_get_time()) : std::nullopt;
+    const std::lock_guard lock(g_mutex);
+    const iclforge::lyrics::Lyrics* const lyrics = g_lyrics ? g_lyrics->lyrics() : nullptr;
+    std::optional<std::int64_t> position;
+    if (g_lyrics && server) {
+        position = g_lyrics->position_ms(*server);
+    }
+    const iclforge::lyrics::Stage stage = iclforge::lyrics::make_stage(lyrics, position, delay_ms, options);
+    const std::int64_t item = (g_lyrics && g_lyrics->item()) ? *g_lyrics->item() : -1;
+    reader.on_lyrics(item, lyrics, stage);
+    return true;
 }
 
 bool sendspin_pairing(std::string_view action) {

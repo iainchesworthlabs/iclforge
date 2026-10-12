@@ -994,393 +994,403 @@
 <context>
     <name>KaraokePage</name>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="83"/>
+        <location filename="../qml/KaraokePage.qml" line="90"/>
         <source>The lines are marked for %1 and for %2.</source>
         <translation>השורות מסומנות עבור %1 ועבור %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="86"/>
+        <location filename="../qml/KaraokePage.qml" line="93"/>
         <source>Both vocals play, so %1 and %2 are both in the mix.</source>
         <translation>שתי השירות מושמעות, ולכן %1 ו-%2 שניהם בתמהיל.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="89"/>
+        <location filename="../qml/KaraokePage.qml" line="96"/>
         <source>No vocal plays: you sing the lines of %1 and of %2.</source>
         <translation>אף שירה אינה מושמעת: אתם שרים את השורות של %1 ושל %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="92"/>
-        <location filename="../qml/KaraokePage.qml" line="93"/>
+        <location filename="../qml/KaraokePage.qml" line="99"/>
+        <location filename="../qml/KaraokePage.qml" line="100"/>
         <source>The vocal of %1 plays: you sing the lines of %2.</source>
         <translation>השירה של %1 מושמעת: אתם שרים את השורות של %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="140"/>
+        <location filename="../qml/KaraokePage.qml" line="147"/>
         <source>off</source>
         <translation>כבוי</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="142"/>
+        <location filename="../qml/KaraokePage.qml" line="149"/>
         <source>%1 dB</source>
         <translation>%1 dB</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="253"/>
+        <location filename="../qml/KaraokePage.qml" line="260"/>
         <source>the LFE, as coded</source>
         <translation>ה-LFE, כפי שמקודד</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="257"/>
+        <location filename="../qml/KaraokePage.qml" line="264"/>
         <source>silent</source>
         <translation>שקט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="290"/>
+        <location filename="../qml/KaraokePage.qml" line="297"/>
         <source>Karaoke</source>
         <translation>קריוקי</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="296"/>
+        <location filename="../qml/KaraokePage.qml" line="303"/>
         <source>Nothing is playing</source>
         <translation>שום דבר לא מושמע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="307"/>
+        <location filename="../qml/KaraokePage.qml" line="314"/>
         <source>Add a karaoke stream to the queue and play it. What you choose here applies to it.</source>
         <translation>הוסיפו זרם קריוקי לתור והשמיעו אותו. מה שתבחרו כאן יחול עליו.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="311"/>
+        <location filename="../qml/KaraokePage.qml" line="318"/>
         <source>Karaoke, %1 coded: %2</source>
         <translation>קריוקי, %1 מקודד: %2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="316"/>
+        <location filename="../qml/KaraokePage.qml" line="328"/>
         <source>An AC-3 stream, but not a karaoke one: its service is %1.</source>
         <translation>זרם AC-3, אך לא זרם קריוקי: השירות שלו הוא %1.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="318"/>
-        <source>Karaoke is an AC-3 mode (Annex C of ETSI TS 102 366). This is not an AC-3 stream.</source>
-        <translation>קריוקי הוא מצב של AC-3 (נספח C של ETSI TS 102 366). זה אינו זרם AC-3.</translation>
-    </message>
-    <message>
-        <location filename="../qml/KaraokePage.qml" line="329"/>
+        <location filename="../qml/KaraokePage.qml" line="346"/>
         <source>Reproduction</source>
         <translation>שחזור</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="330"/>
+        <location filename="../qml/KaraokePage.qml" line="347"/>
         <source>Annex C, ETSI TS 102 366</source>
         <translation>נספח C, ETSI TS 102 366</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="336"/>
-        <location filename="../qml/KaraokePage.qml" line="340"/>
+        <location filename="../qml/KaraokePage.qml" line="353"/>
+        <location filename="../qml/KaraokePage.qml" line="357"/>
         <source>Decoder</source>
         <translation>מפענח</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="344"/>
+        <location filename="../qml/KaraokePage.qml" line="361"/>
         <source>As coded</source>
         <translation type="unfinished">כפי שקודד</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="345"/>
+        <location filename="../qml/KaraokePage.qml" line="362"/>
         <source>Aware</source>
         <translation>מודע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="346"/>
+        <location filename="../qml/KaraokePage.qml" line="363"/>
         <source>Capable</source>
         <translation>בעל יכולת</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="354"/>
+        <location filename="../qml/KaraokePage.qml" line="371"/>
         <source>The channels as the stream codes them: the vocals come from the surround speakers.</source>
         <translation>הערוצים כפי שהזרם מקודד אותם: השירה יוצאת מהרמקולים ההיקפיים.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="357"/>
+        <location filename="../qml/KaraokePage.qml" line="374"/>
         <source>L, C and R, with the vocals at the level the programme set (Table C.2.2).</source>
         <translation>L, C ו-R, כשהשירה ברמה שקבעה התוכנית (טבלה C.2.2).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="359"/>
+        <location filename="../qml/KaraokePage.qml" line="376"/>
         <source>L, C and R, with the vocals you choose (Table C.2.3).</source>
         <translation>L, C ו-R, עם השירה שתבחרו (טבלה C.2.3).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="368"/>
-        <location filename="../qml/KaraokePage.qml" line="372"/>
+        <location filename="../qml/KaraokePage.qml" line="385"/>
+        <location filename="../qml/KaraokePage.qml" line="389"/>
         <source>Vocals</source>
         <translation>שירה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="376"/>
+        <location filename="../qml/KaraokePage.qml" line="393"/>
         <source>None</source>
         <translation>ללא</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="377"/>
+        <location filename="../qml/KaraokePage.qml" line="394"/>
         <source>V1</source>
         <translation>V1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="378"/>
+        <location filename="../qml/KaraokePage.qml" line="395"/>
         <source>V2</source>
         <translation>V2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="379"/>
+        <location filename="../qml/KaraokePage.qml" line="396"/>
         <source>Both</source>
         <translation>שתיהן</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="389"/>
+        <location filename="../qml/KaraokePage.qml" line="406"/>
         <source>Melody</source>
         <translation>מנגינה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="410"/>
+        <location filename="../qml/KaraokePage.qml" line="427"/>
         <source>%1 level, dB</source>
         <translation>רמת %1, דציבלים</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="437"/>
+        <location filename="../qml/KaraokePage.qml" line="454"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable decoder only.</source>
         <translation>הרמה של כל חלק ביחס לטבלה C.2.3: 0 dB הוא הטבלה, וקצהו התחתון של הפקד פירושו כבוי. הגברת חלק אחד מספיק מורידה את האחרים, כך שאף רמקול לא יידחף מעבר לסולם המלא. במפענח בעל היכולת בלבד.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="447"/>
+        <location filename="../qml/KaraokePage.qml" line="464"/>
         <source>Reset levels</source>
         <translation>איפוס הרמות</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="461"/>
+        <location filename="../qml/KaraokePage.qml" line="478"/>
         <source>These controls do not apply to the stream that is playing.</source>
         <translation>הפקדים האלה אינם חלים על הזרם שמושמע כעת.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="474"/>
+        <location filename="../qml/KaraokePage.qml" line="491"/>
         <source>This is going out as a bitstream, so the receiver decodes it and the choice above is not applied. Unless the receiver is karaoke-capable, V1 and V2 play from its surround speakers.</source>
         <translation>זה יוצא כזרם סיביות, ולכן המקלט מפענח אותו והבחירה שלמעלה אינה מיושמת. אלא אם המקלט מסוגל לקריוקי, V1 ו-V2 מושמעים מהרמקולים ההיקפיים שלו.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="483"/>
+        <location filename="../qml/KaraokePage.qml" line="500"/>
         <source>Choose output…</source>
         <translation>בחרו פלט…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="492"/>
+        <location filename="../qml/KaraokePage.qml" line="509"/>
         <source>This is going to a network group. A sink that takes the karaoke settings decodes the stream itself and reproduces it as chosen here; one that does not is sent PCM with the reproduction applied, so the group plays one reproduction. The Network page says which each sink was sent.</source>
         <translation>זה נשלח לקבוצת רשת. נגן שמקבל את הגדרות הקריוקי מפענח את הזרם בעצמו ומשחזר אותו כפי שנבחר כאן; נגן שאינו מקבל אותן מקבל PCM כשהשחזור כבר הוחל, כך שהקבוצה משמיעה שחזור אחד. דף הרשת מציג מה נשלח לכל נגן.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="509"/>
+        <location filename="../qml/KaraokePage.qml" line="526"/>
         <source>The stereo fold is Lt/Rt. Annex C defines no Lt/Rt reproduction, so the stream plays as its Lt/Rt fold and the choice above has no effect. The Lo/Ro fold reproduces karaoke.</source>
         <translation>מיקס הסטריאו הוא Lt/Rt. נספח C אינו מגדיר שחזור Lt/Rt, ולכן הזרם מושמע כמיקס ה-Lt/Rt שלו והבחירה שלמעלה אינה משפיעה. מיקס Lo/Ro משחזר קריוקי.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="518"/>
+        <location filename="../qml/KaraokePage.qml" line="535"/>
         <source>Use Lo/Ro</source>
         <translation>השתמשו ב-Lo/Ro</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="527"/>
+        <location filename="../qml/KaraokePage.qml" line="544"/>
         <source>Lyrics</source>
         <translation>מילות השיר</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="529"/>
+        <location filename="../qml/KaraokePage.qml" line="546"/>
         <source>%1 · line %2 of %3</source>
         <translation>%1 · שורה %2 מתוך %3</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="551"/>
+        <location filename="../qml/KaraokePage.qml" line="568"/>
         <source>, word-timed</source>
         <translation>, בתזמון לפי מילה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="552"/>
+        <location filename="../qml/KaraokePage.qml" line="569"/>
         <source>, line-timed</source>
         <translation>, בתזמון לפי שורה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="562"/>
+        <location filename="../qml/KaraokePage.qml" line="579"/>
         <source>Time the lyrics…</source>
         <translation>סנכרון המילים…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="567"/>
+        <location filename="../qml/KaraokePage.qml" line="584"/>
         <source>Full screen · F11</source>
         <translation>מסך מלא · F11</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="583"/>
-        <location filename="../qml/KaraokePage.qml" line="591"/>
+        <location filename="../qml/KaraokePage.qml" line="600"/>
+        <location filename="../qml/KaraokePage.qml" line="608"/>
         <source>Show</source>
         <translation>הצגה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="594"/>
+        <location filename="../qml/KaraokePage.qml" line="611"/>
         <source>Words</source>
         <translation>מילים</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="595"/>
+        <location filename="../qml/KaraokePage.qml" line="612"/>
         <source>Picture</source>
         <translation>תמונה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="617"/>
+        <location filename="../qml/KaraokePage.qml" line="634"/>
         <source>This is the picture of the CD+G disc beside the lyrics. Its words are part of the picture; choose Words to follow the lyrics file.</source>
         <translation>זו התמונה של דיסק ה-CD+G שלצד המילים. המילים שלה הן חלק מהתמונה; בחרו „מילים” כדי לעקוב אחרי קובץ המילים.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="621"/>
+        <location filename="../qml/KaraokePage.qml" line="638"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
         <translation>למילים האלה אין זמנים, ולכן הן מוצגות במלואן ואינן נעקבות.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="614"/>
+        <location filename="../qml/KaraokePage.qml" line="829"/>
+        <source>%1 karaoke, %2: not reproduced (see the notice).</source>
+        <translation>קריוקי %1, %2: לא משוחזר (ראו את ההודעה).</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="831"/>
+        <source>%1 karaoke, %2.</source>
+        <translation>קריוקי %1, %2.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="631"/>
         <source>This is the picture of a CD+G disc. Its words are part of the picture, so there is no text to follow.</source>
         <translation>זו התמונה של דיסק CD+G. המילים שלו הן חלק מהתמונה, ולכן אין טקסט לעקוב אחריו.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="623"/>
+        <location filename="../qml/KaraokePage.qml" line="640"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
         <translation>הקובץ הזה מתזמן שורות, לא מילים: שורה שלמה מודגשת בזמן שהיא מושרת.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="643"/>
+        <location filename="../qml/KaraokePage.qml" line="660"/>
         <source>First singer</source>
         <translation>זמר ראשון</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="652"/>
+        <location filename="../qml/KaraokePage.qml" line="669"/>
         <source>Name of the first singer (V1)</source>
         <translation>שם הזמר הראשון (V1)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="659"/>
+        <location filename="../qml/KaraokePage.qml" line="676"/>
         <source>Second singer</source>
         <translation>זמר שני</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="668"/>
+        <location filename="../qml/KaraokePage.qml" line="685"/>
         <source>Name of the second singer (V2)</source>
         <translation>שם הזמר השני (V2)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="711"/>
+        <location filename="../qml/KaraokePage.qml" line="728"/>
         <source>The stream</source>
         <translation>הזרם</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="716"/>
+        <location filename="../qml/KaraokePage.qml" line="733"/>
         <source>Backing left</source>
         <translation>ליווי שמאל</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="717"/>
+        <location filename="../qml/KaraokePage.qml" line="734"/>
         <source>Backing right</source>
         <translation>ליווי ימין</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="718"/>
+        <location filename="../qml/KaraokePage.qml" line="735"/>
         <source>Melody guide</source>
         <translation>מנגינת הנחיה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="390"/>
-        <location filename="../qml/KaraokePage.qml" line="719"/>
+        <location filename="../qml/KaraokePage.qml" line="407"/>
+        <location filename="../qml/KaraokePage.qml" line="736"/>
         <source>Vocal 1</source>
         <translation>שירה 1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="391"/>
-        <location filename="../qml/KaraokePage.qml" line="720"/>
+        <location filename="../qml/KaraokePage.qml" line="323"/>
+        <source>Flagged karaoke, but this %1 programme has a dependent substream or objects, which Annex C has no vocals for: it plays as coded.</source>
+        <translation>מסומן כקריוקי, אך לתוכנית %1 הזו יש תת־זרם תלוי או עצמים שאין להם קולות בנספח C: היא מושמעת כפי שהיא מקודדת.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="332"/>
+        <source>An E-AC-3 stream, but not a karaoke one: its service is %1.</source>
+        <translation>זרם E-AC-3, אך לא זרם קריוקי: השירות שלו הוא %1.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="335"/>
+        <source>Karaoke is an AC-3 and E-AC-3 mode (Annex C of ETSI TS 102 366). This is neither.</source>
+        <translation>קריוקי הוא מצב של AC-3 ושל E-AC-3 (נספח C של ETSI TS 102 366). זה אינו אף אחד מהם.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KaraokePage.qml" line="408"/>
+        <location filename="../qml/KaraokePage.qml" line="737"/>
         <source>Vocal 2</source>
         <translation>שירה 2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="737"/>
+        <location filename="../qml/KaraokePage.qml" line="754"/>
         <source>not in this stream</source>
         <translation>לא בזרם הזה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="738"/>
+        <location filename="../qml/KaraokePage.qml" line="755"/>
         <source>heard</source>
         <translation>נשמע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="738"/>
+        <location filename="../qml/KaraokePage.qml" line="755"/>
         <source>muted</source>
         <translation>מושתק</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="748"/>
+        <location filename="../qml/KaraokePage.qml" line="765"/>
         <source>What plays</source>
         <translation>מה מושמע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="786"/>
+        <location filename="../qml/KaraokePage.qml" line="803"/>
         <source>Nothing karaoke is playing.</source>
         <translation>לא מושמע קריוקי.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="794"/>
+        <location filename="../qml/KaraokePage.qml" line="811"/>
         <source>Signal path</source>
         <translation>נתיב האות</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="802"/>
+        <location filename="../qml/KaraokePage.qml" line="819"/>
         <source>Decoded as the stream says.</source>
         <translation>מפוענח כפי שהזרם קובע.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="805"/>
+        <location filename="../qml/KaraokePage.qml" line="822"/>
         <source>as coded</source>
         <translation>כפי שמקודד</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="806"/>
+        <location filename="../qml/KaraokePage.qml" line="823"/>
         <source>aware</source>
         <translation>מודע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="807"/>
+        <location filename="../qml/KaraokePage.qml" line="824"/>
         <source>capable, vocals: %1</source>
         <translation>בעל יכולת, שירה: %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="808"/>
+        <location filename="../qml/KaraokePage.qml" line="825"/>
         <source>none</source>
         <translation>ללא</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="809"/>
+        <location filename="../qml/KaraokePage.qml" line="826"/>
         <source>both</source>
         <translation>שתיהן</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="812"/>
-        <source>AC-3 karaoke, %1: not reproduced (see the notice).</source>
-        <translation>קריוקי AC-3, %1: לא משוחזר (ראו את ההודעה).</translation>
-    </message>
-    <message>
-        <location filename="../qml/KaraokePage.qml" line="813"/>
-        <source>AC-3 karaoke, %1.</source>
-        <translation>קריוקי AC-3, %1.</translation>
-    </message>
-    <message>
-        <location filename="../qml/KaraokePage.qml" line="825"/>
+        <location filename="../qml/KaraokePage.qml" line="843"/>
         <source>Nothing is playing.</source>
         <translation>שום דבר לא מושמע.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="827"/>
+        <location filename="../qml/KaraokePage.qml" line="845"/>
         <source>%1 · %2 ch at %3 Hz</source>
         <translation>%1 · %2 ערוצים ב-%3 הרץ</translation>
     </message>
@@ -5470,17 +5480,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1343"/>
+        <location filename="../../src/hearth_controller.cpp" line="1354"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2404"/>
+        <location filename="../../src/hearth_controller.cpp" line="2415"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2407"/>
+        <location filename="../../src/hearth_controller.cpp" line="2418"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>

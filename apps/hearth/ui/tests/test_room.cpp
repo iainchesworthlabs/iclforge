@@ -25,6 +25,8 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
 #include "iclforge/sendspin/discovery.hpp"
+#include "iclforge/ac3/core/eac3_tables.hpp"
+#include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
@@ -490,6 +492,70 @@ bool write_ac4_stream(const std::string& path, const std::string& kind, std::str
     return out.good() ? true : fail("could not write " + path);
 }
 
+namespace {
+
+// An E-AC-3 programme of `kind` ("karaoke-3/2" or "karaoke-3/2+rear") as the AC-3 case's tones,
+// one independent substream flagged bsmod 7 with a 3/2 bed and an LFE; "+rear" adds the rear
+// pair in a dependent substream (a 7.1 programme, which Annex C has no vocals for).
+bool write_eac3_stream(const std::string& path, const std::string& kind, std::string* error) {
+    const auto fail = [error](std::string why) {
+        if (error != nullptr) {
+            *error = std::move(why);
+        }
+        return false;
+    };
+    const bool rear = kind == "karaoke-3/2+rear";
+    if (kind != "karaoke-3/2" && !rear) {
+        return fail("no such kind of E-AC-3 stream: " + kind);
+    }
+    iclforge::ac3::eac3::FrameConfig bed;
+    bed.sample_rate = iclforge::ac3::SampleRate::k48000;
+    bed.bitrate_kbps = 448;
+    bed.acmod = iclforge::ac3::Acmod::k3_2;
+    bed.lfe = true;
+    bed.info = iclforge::ac3::meta::BsiInfo{.bsmod = iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke};
+    iclforge::ac3::eac3::AccessUnitConfig config;
+    config.independent = bed;
+    if (rear) {
+        iclforge::ac3::eac3::FrameConfig pair;
+        pair.sample_rate = iclforge::ac3::SampleRate::k48000;
+        pair.bitrate_kbps = 320;
+        pair.acmod = iclforge::ac3::Acmod::k2_2;
+        pair.chanmap = iclforge::ac3::eac3::chanmap::k71Rear;
+        config.dependents.push_back(pair);
+    }
+    iclforge::ac3::eac3::AccessUnitEncoder encoder{config};
+    const auto channels = static_cast<std::size_t>(encoder.channel_count());
+    // The bed's six, as the AC-3 case has them, then the dependent's four.
+    constexpr std::array<double, 10> kHz = {440.0, 800.0, 620.0, 1030.0, 1270.0, 90.0,
+                                            1500.0, 1700.0, 1900.0, 2100.0};
+    std::vector<std::vector<float>> input;
+    for (std::size_t c = 0; c < channels; ++c) {
+        input.push_back(tone(kHz[c]));
+    }
+    std::ofstream out(std::filesystem::path(path), std::ios::binary);
+    if (!out) {
+        return fail("could not open " + path);
+    }
+    const std::size_t frame = iclforge::ac3::kSamplesPerFrame;
+    const std::size_t frames = (10 * 48000) / frame;
+    for (std::size_t f = 0; f < frames; ++f) {
+        std::vector<std::span<const float>> views;
+        for (const auto& channel : input) {
+            views.emplace_back(channel.data() + (f * frame), frame);
+        }
+        const auto unit = encoder.encode_access_unit(views);
+        if (!unit) {
+            return fail("the encoder refused an access unit");
+        }
+        out.write(reinterpret_cast<const char*>(unit->bytes.data()),
+                  static_cast<std::streamsize>(unit->bytes.size()));
+    }
+    return out.good() ? true : fail("could not write " + path);
+}
+
+}  // namespace
+
 bool write_ac3_stream(const std::string& path, const std::string& kind, std::string* error) {
     const auto fail = [error](std::string why) {
         if (error != nullptr) {
@@ -497,6 +563,9 @@ bool write_ac3_stream(const std::string& path, const std::string& kind, std::str
         }
         return false;
     };
+    if (kind.starts_with("eac3-")) {
+        return write_eac3_stream(path, kind.substr(5), error);
+    }
     const bool karaoke = kind.starts_with("karaoke-");
     if (!karaoke && !kind.starts_with("main-")) {
         return fail("no such kind of stream: " + kind);

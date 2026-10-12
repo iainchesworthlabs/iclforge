@@ -1,0 +1,5 @@
+# The panel with no glass behind it (planning/karaoke-p4x-panel.md): LVGL draws into a frame buffer
+# in PSRAM and GET http://<address>:8081/panel.bmp reads it back. What a board with no screen (the
+# FireBeetle 2) runs to see the screen and to measure what drawing it costs. After sdkconfig.panel.
+CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL=y
+CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT=8081

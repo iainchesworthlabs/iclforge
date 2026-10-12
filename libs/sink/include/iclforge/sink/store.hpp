@@ -15,14 +15,14 @@
 #include "iclforge/sendspin/handshake_session.hpp"
 #include "iclforge/sendspin/noise.hpp"
 
-// What a test sink keeps between runs, in its state directory: its X25519 identity, its pairing
+// What a sink keeps between runs, in its state directory: its X25519 identity, its pairing
 // PSK, its pairing records and the last-playback server (pairing.md, Pairing Records;
 // connection.md, Multiple servers). Each is a small text file of hex, written readable by its
 // owner only. The store is also the player's key ring.
 //
 // Thread-safe: sessions on different threads look up PSKs while another stores a pairing.
 
-namespace iclforge::hearth::testsink {
+namespace iclforge::sink {
 
 using sendspin::crypto::Key32;
 
@@ -72,4 +72,4 @@ class Store final : public sendspin::handshake::ClientKeyring {
 [[nodiscard]] std::string hex_of(const Key32& bytes);
 [[nodiscard]] std::optional<Key32> key_from_hex(std::string_view text);
 
-}  // namespace iclforge::hearth::testsink
+}  // namespace iclforge::sink

@@ -14,15 +14,15 @@
 #include "iclforge/sendspin/crypto.hpp"
 #include "iclforge/sendspin/handshake.hpp"
 #include "iclforge/sendspin/noise.hpp"
-#include "store.hpp"
+#include "iclforge/sink/store.hpp"
 
 namespace iclforge::hearth::testserver {
 
 namespace {
 
 namespace fs = std::filesystem;
-using testsink::hex_of;
-using testsink::key_from_hex;
+using sink::hex_of;
+using sink::key_from_hex;
 
 constexpr std::string_view kStateFile = "server.txt";
 
