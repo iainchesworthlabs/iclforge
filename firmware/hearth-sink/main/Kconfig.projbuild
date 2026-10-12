@@ -691,6 +691,26 @@ config ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS
         fixtures each aborted within about 10 to 12 seconds, so
         sdkconfig.sendspin-c6 sets this to 2.
 
+config ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS
+    int "E-AC-3 objects reconstructed and placed in real time (-1 = none stated, 0 = none)"
+    default 0 if IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C3
+    default 4 if IDF_TARGET_ESP32S3 && ICLFORGE_EXAMPLE_DECODE_LANE = 1
+    default -1
+    range -1 15
+    help
+        What the board's support object says about objects, so that a server which wants a
+        stream's objects placed can send it PCM rendered on its own side when the stream has more
+        than this (planning/hearth-sendspin-extension.md): decoded on the board, a stream past it
+        plays its bed alone. 0 is a statement, not an absence: the fixed-point decoder of an
+        ESP32-C6 or ESP32-C3 plays the bed and reconstructs no objects. -1 states nothing, which a
+        server reads as the board placing whatever the format carries (the ESP32-P4: 12 objects
+        take 0.79 of real time, 15 extrapolate to about 0.9).
+
+        The ESP32-S3's 4 is its release image's (sdkconfig.s3-fast) with the decode lane on:
+        a 32 ms frame of JOC 7.1.4 takes 0.92 of real time with 4 objects, 1.02 with 5 and 1.15
+        with 6, about 3.1 to 3.7 ms an object; without the lane 4 objects take 1.11
+        (planning/esp32-714-realtime.md, measured 2026-10-11).
+
 config ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES
     int "Largest lyric document held for the item playing, bytes (0 = none)"
     default 16384

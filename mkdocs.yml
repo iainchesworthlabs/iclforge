@@ -114,6 +114,7 @@ nav:
           - Rust: library/rust-api.md
   - Karaoke:
       - Guide: karaoke/index.md
+      - Timing with a forced aligner: karaoke/forced-alignment.md
   - Validation:
       - How output is checked: verification.md
       - Threat model: threat-model.md

@@ -36,7 +36,6 @@ namespace m = messages;
 using handshake::PskCategory;
 
 constexpr std::string_view kPlayerRole = "player@v1";
-constexpr std::size_t kMaxTokens = 4096;
 
 [[nodiscard]] std::string_view text_of(std::span<const std::uint8_t> bytes) {
     return {static_cast<const char*>(static_cast<const void*>(bytes.data())), bytes.size()};
@@ -304,9 +303,22 @@ bool PlayerSession::on_artwork(std::span<const std::uint8_t> message) {
 }
 
 SessionOutput PlayerSession::on_json(std::string_view text, std::int64_t arrival) {
-    std::vector<json::Token> tokens;
+    // The message's tokens are read in on_json_message(), whose frame holds a kilobyte of
+    // them. A re-handshake runs X25519 and SHA-256 on this same task, which has a few KB of
+    // stack to spare, so it is entered once that frame is gone.
+    bool rehandshake = false;
+    SessionOutput out = on_json_message(text, arrival, rehandshake);
+    if (rehandshake) {
+        return on_rehandshake(text);
+    }
+    return out;
+}
+
+SessionOutput PlayerSession::on_json_message(std::string_view text, std::int64_t arrival,
+                                             bool& rehandshake) {
+    json::TokenStorage tokens;
     json::Document document;
-    if (!document.parse(text, tokens, kMaxTokens)) {
+    if (!document.parse(text, tokens, config_.max_json_tokens)) {
         return {};
     }
     const std::optional<m::Envelope> envelope = m::read_envelope(document);
@@ -318,7 +330,8 @@ SessionOutput PlayerSession::on_json(std::string_view text, std::int64_t arrival
     SessionOutput out;
 
     if (type == "noise/handshake") {
-        return on_rehandshake(text);
+        rehandshake = true;
+        return {};
     }
     if (phase_ == Phase::kHello) {
         if (type != "server/hello") {
