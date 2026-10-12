@@ -20,7 +20,8 @@ endif()
 
 # files.cpp is the part that reads a file: kept apart so that a program that only parses text (the sink
 # firmware) does not link the stream and file-system code.
-add_library(iclforge_lyrics STATIC src/lyrics.cpp src/timing.cpp src/cdg.cpp src/files.cpp)
+add_library(iclforge_lyrics STATIC src/lyrics.cpp src/timing.cpp src/cdg.cpp src/files.cpp
+                                  src/midi_melody.cpp)
 add_library(iclforge::lyrics ALIAS iclforge_lyrics)
 target_include_directories(iclforge_lyrics PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
