@@ -246,4 +246,32 @@ class LyricViewRenderTest : RenderTestBase() {
         val unknown = render("route-unknown", frame, route = "tape")
         assertEquals(bare, inked(unknown, footer))
     }
+
+    @Test
+    fun anItemWithNoLyricsIsNamedInTheHeaderWhenTheServerSaysWhatIsPlaying() {
+        // The frame the sink answers for a stream with no document and a metadata@v1 title (D7).
+        val named = LyricFrame.parse(
+            ("""{"item":-1,"streaming":true,"mode":"none","position_ms":0,"title":"Spring",""" +
+                """"artist":"Hearth","album":"Seasons"}""").toByteArray(Charsets.UTF_8),
+        )
+        val unnamed = LyricFrame.parse(
+            """{"item":-1,"streaming":true,"mode":"none","position_ms":0}""".toByteArray(Charsets.UTF_8),
+        )
+        assertEquals("Spring", named.title)
+        // The header's text row, above its hairline (which is there with or without a title).
+        val u = height / 600f
+        val header = Rect(
+            stage.left, stage.top - (Tokens.HEADER_U * u).toInt(), stage.right, stage.top - (4 * u).toInt(),
+        )
+        val withTitle = render("s7-titled", named)
+        val without = render("s7-untitled", unnamed)
+        // The sentence is said either way, in the middle of the stage...
+        assertTrue("the sentence was not said", count(withTitle, centre, Tokens.TEXT) > 200)
+        // ...and the header says what the item is only when the server said so.
+        val titled = inked(withTitle, header)
+        assertNotNull("no title in the header", titled)
+        assertTrue("the title is too short to be one", titled!!.width() > 100)
+        assertTrue("the title left the margins", titled.left >= stage.left && titled.right <= stage.right)
+        assertTrue("the header of an item with no name drew something", inked(without, header) == null)
+    }
 }

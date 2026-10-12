@@ -650,6 +650,75 @@ TEST_CASE("sink: a lyric document and its anchors become a frame on the sink's o
     CHECK((*sink)->lyric_frame().mode == iclforge::lyrics::StageMode::kNoLyrics);
 }
 
+TEST_CASE("sink: what the server says is playing names an item with no lyrics, and the document's tags are the fallback",
+          "[sink][websocket]") {
+    const fs::path dir = scratch("now_playing");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.lyrics_max_bytes = ac::kMaxLyricsBytes;
+    options.other_roles = {"metadata@v1"};
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole), "metadata@v1"}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    CHECK(log.wait("burst stream AC-3 48000 Hz"));
+
+    // Nothing said and no document: the item has no name.
+    iclforge::sink::LyricFrame frame = (*sink)->lyric_frame();
+    CHECK(frame.mode == iclforge::lyrics::StageMode::kNoLyrics);
+    CHECK(frame.streaming);
+    CHECK(frame.title.empty());
+
+    // The server says what is playing: the frame names the item, though it holds no lyrics.
+    iclforge::sendspin::metadata::State playing;
+    playing.title = "Spring";
+    playing.artist = "Hearth";
+    playing.album = "Seasons";
+    REQUIRE(server.call([&] { return server.server.send_state({.metadata = playing}); }));
+    REQUIRE(log.wait("metadata \"Spring\""));
+    frame = (*sink)->lyric_frame();
+    CHECK(frame.mode == iclforge::lyrics::StageMode::kNoLyrics);
+    CHECK(frame.item == -1);
+    CHECK(frame.streaming);
+    CHECK(frame.title == "Spring");
+    CHECK(frame.artist == "Hearth");
+    CHECK(frame.album == "Seasons");
+
+    // A document with its own title: what the server says comes first, and the other fields the
+    // document has and the server leaves out are the document's.
+    iclforge::sendspin::metadata::State titled;
+    titled.title = "Spring (server)";
+    REQUIRE(server.call([&] { return server.server.send_state({.metadata = titled}); }));
+    REQUIRE(log.wait("metadata \"Spring (server)\""));
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = {.item = 5,
+                       .text = "[ti:Test song]" "\n" "[ar:The document]" "\n"
+                               "[00:00.00]First line" "\n" "[00:04.00]Second" "\n"};
+    REQUIRE(server.call([&] { return server.server.iclforge_command(document); }));
+    CHECK(log.wait("lyrics for item 5: held"));
+    frame = (*sink)->lyric_frame();
+    CHECK(frame.item == 5);
+    CHECK(frame.title == "Spring (server)");
+    CHECK(frame.artist == "The document");
+
+    // The server clears it: the document's tags are what is left.
+    REQUIRE(server.call([&] { return server.server.send_state({.metadata = std::optional<iclforge::sendspin::metadata::State>{}}); }));
+    REQUIRE(log.wait("metadata cleared"));
+    frame = (*sink)->lyric_frame();
+    CHECK(frame.title == "Test song");
+    CHECK(frame.artist == "The document");
+    CHECK(frame.album.empty());
+}
+
 TEST_CASE("sink: the status says who is connected, for what, and the code a server asked by",
           "[sink][websocket]") {
     const fs::path dir = scratch("status");

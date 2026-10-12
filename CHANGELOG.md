@@ -29,6 +29,14 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth for Android names an item that has no lyrics**
+
+- **The sink lists `metadata@v1` and the lyric screen's header shows what the server says is playing.**
+  `Sink::lyric_frame()` takes the title, artist and album from the server's `metadata@v1` state for
+  the connection, with the document's own tags as the fallback, so an item with no lyrics has a name
+  over "No lyrics for this item" (the spec's S7). A cleared state falls back to the document. Held by a
+  loopback case (nothing said, said, said over a document, cleared) and the Shield's render test.
+
 **Hearth: a microphone and a pitch score on the Karaoke page**
 
 - **A singer can turn a microphone on and see how close their pitch is to the tune** (the

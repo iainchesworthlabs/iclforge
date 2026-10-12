@@ -214,6 +214,9 @@ std::string NativeSink::start(const std::string& state_directory, const std::str
     // The words of a karaoke item are held and followed on the sink's own clock, and drawn
     // (lyric_frame()): the most a server may send one message of.
     options.lyrics_max_bytes = sendspin::player::kMaxLyricsBytes;
+    // What the server says is playing (metadata@v1), so an item with no lyrics still has a title on
+    // the screen (D7). The sink keeps it per connection and Sink::lyric_frame() reads it.
+    options.other_roles = {"metadata@v1"};
 
     std::expected<std::unique_ptr<sink::Sink>, std::string> started =
         sink::Sink::start(std::move(options), impl_->outputs, impl_->log);

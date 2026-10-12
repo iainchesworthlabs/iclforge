@@ -411,6 +411,9 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             ++roles.states;
             if (state.metadata) {
                 roles.metadata = *state.metadata;
+                // This connection's, for the title a screen shows when it holds no document (D7).
+                // Called with the session's lock held, as inspect() takes it to read.
+                metadata_ = *state.metadata;
                 text += roles.metadata ? " metadata \"" + roles.metadata->title.value_or("") + "\""
                                        : std::string(" metadata cleared");
             }
@@ -493,6 +496,11 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         return driver().inspect([&] { return pairing_code_; });
     }
 
+    // What this connection's server last said is playing (metadata@v1), none once it cleared it.
+    [[nodiscard]] std::optional<sendspin::metadata::State> metadata() {
+        return driver().inspect([&] { return metadata_; });
+    }
+
     // Whether this connection holds a lyric document, held or not (the item is known).
     [[nodiscard]] bool has_lyric_item() {
         return driver().inspect([&] { return follower_.item().has_value(); });
@@ -570,6 +578,8 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     iclforge::lyrics::Follower follower_;
     // A stream is open: what the screen's "no lyrics" and its idle screen are told apart by.
     bool streaming_ = false;
+    // metadata@v1's latest state from this connection's server, for Sink::lyric_frame().
+    std::optional<sendspin::metadata::State> metadata_;
     // The burst output took the stream that is open (BurstStreamOutput::start returned true).
     bool burst_taken_ = false;
     // What this connection was admitted for, and the code its server asked to pair by.
@@ -1000,14 +1010,32 @@ LyricFrame Sink::lyric_frame(std::int64_t delay_ms, const iclforge::lyrics::Stag
     LyricFrame frame;
     bool found = false;
     bool streaming = false;
+    std::optional<sendspin::metadata::State> metadata;
     for (const std::shared_ptr<Connection>& connection : all) {
         if (!found && connection->has_lyric_item()) {
             frame = connection->lyric_frame(delay_ms, options);
             found = true;
+            // What the server that sent the document says is playing, if it says.
+            metadata = connection->metadata();
+        } else if (!found && !metadata) {
+            // No document held yet: a server that says what is playing still names the item.
+            metadata = connection->metadata();
         }
         streaming = streaming || connection->streaming();
     }
     frame.streaming = streaming;
+    // What the server says is playing (metadata@v1) names the item first, and the document's own
+    // tags are the fallback (D7): an item with no lyrics still has a title to show.
+    if (metadata) {
+        const auto name = [](const std::optional<std::string>& said, std::string& into) {
+            if (said && !said->empty()) {
+                into = *said;
+            }
+        };
+        name(metadata->title, frame.title);
+        name(metadata->artist, frame.artist);
+        name(metadata->album, frame.album);
+    }
     return frame;
 }
 

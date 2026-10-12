@@ -174,8 +174,19 @@ holds still to be moved: once nothing on the screen (the pairing screen or the l
 included) has changed for two minutes, it dims to 40% and moves 6 u a minute round a small ring; a key or
 a touch brings it back (`IdleGuard`, held by `LyricConformanceTest`). **Reduced motion** has nothing to
 switch off: the only thing that moves is the fill, which the spec keeps, and the count-in's dots go out in
-steps and do not fade. **Not done:** the no-lyrics screen's title (S7 names the item when it has a title,
-which a sink with no document gets only from `metadata@v1`, D7, phase 3).
+steps and do not fade.
+
+**The item's name when it has no lyrics (D7).** The sink lists `metadata@v1`, keeps what each server says is
+playing, and `Sink::lyric_frame()` fills the frame's title, artist and album from it: what the server says
+comes first and the document's own `[ti:]`, `[ar:]` and `[al:]` are the fallback. The header then names an
+item that has no lyrics, over the "No lyrics for this item" sentence (S7). What Hearth's engine sends is its
+own: the lyrics file's tags where it has them, otherwise the name its queue shows, and no artist or album
+for an item with no lyrics file, since nothing reads a tag from a stream or a container. The sink core's half
+is held by a loopback case (no document and no title, the server's title, the server's title over a
+document's, and the document's once the server clears it) and the header by `LyricViewRenderTest`; a
+real server's `metadata@v1` to a Shield has not been run.
+
+![An item with no lyrics, named in the header by what the server says is playing, over the sentence](../../../docs/hearth/screenshots/android-lyric-no-lyrics-titled.png)
 
 To see it live, `hearth-testserver --lyrics examples/karaoke/auld-lang-syne/auld-lang-syne.lrc
 --play examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --player ws://<the Shield>:8928/sendspin ...`
