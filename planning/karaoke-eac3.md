@@ -14,7 +14,7 @@
     | 0 | The evidence: what E-AC-3 and AC-4 define, what real decoders do | Done 2026-10-12 ([findings](karaoke-eac3-findings.md)) |
     | 1 | The support matrix, AC-3 beside E-AC-3, gaps assigned | Done 2026-10-12 ([matrix](karaoke-support-matrix.md)) |
     | 2 | Decisions D1 to D9 | **Approved as recommended, 2026-10-12** ([below](#decisions)) |
-    | 3 | Part one: E1 to E9, one small pull request each | E1 to E5, E7 and E9 merged 2026-10-12; E4c (#1421) and D10 (#1420) merged, E6 (#1427) in the merge queue; E8 is this page's docs pass; the C6 and P4 board runs of E4b are open. The state of each is in [the table](#work-items) |
+    | 3 | Part one: E1 to E9, one small pull request each | E1 to E5, E7 and E9 merged 2026-10-12; E4c (#1421), D10 (#1420) and E6 (#1427) merged; E8 is this page's docs pass; the C6 and P4 board runs of E4b are open. The state of each is in [the table](#work-items) |
     | 4 | Part two: the AC-4 options and their decisions | Written ([options](karaoke-ac4-options.md)); no build |
 
 ## What this is
@@ -70,7 +70,7 @@ with its tests, **L** two to four stacked. "Needs" is what the item cannot start
 | E4b | **The boards**: `burst_player.cpp` takes the flag from an E-AC-3 header too and advertises the codec key; run on the S3 (the existing live test, extended), then the C6 and the P4 | M | E4a; a board lock; the S3 stack-margin check | **Built, PR #1413 (merged)**; run on the S3 only: the C6 and the P4 are not run |
 | E4c | **Hearth's page and the Forge GUI's stream player**: the controls enable for E-AC-3 (phase 1's P6 changes), `report_unit` sets the flag, the bed layout path takes E-AC-3, the notices say what is ours | M | E2; Karaoke G's push (Hearth's catalogues) | **Built**: the engine's part in #1394 (merged), the page's words in **PR #1421 (merged)**; the Forge GUI's stream player is in E6 |
 | E5 | **Authoring flags and the WebAssembly glue**: `eac3-encode ... bsmod=7` writes the mixing group from `cmixlev`/`surmixlev` (D4) and a warning where the layout is 1+1 or mono; the WASM `is_karaoke_unit()` reads E-AC-3 | S | D4; E2 | **Built, PR #1398 (merged)** |
-| E6 | **The Forge GUI's flow offers E-AC-3** (D7): a format choice in the Karaoke flow, default AC-3, a card that says the reproduction is ours for E-AC-3 | M | D7; E2, E5 | **Built, PR #1427 (in the merge queue)** |
+| E6 | **The Forge GUI's flow offers E-AC-3** (D7): a format choice in the Karaoke flow, default AC-3, a card that says the reproduction is ours for E-AC-3 | M | D7; E2, E5 | **Built, PR #1427 (merged)** |
 | E7 | **The oracle**: a verify script under `tools/checks` (local only, like `quality_race.py`'s Dolby leg) that builds the tone streams, decodes them with the Reference Player and with `forge decode`, and compares **ratios**; the measured ratios of [the findings](karaoke-eac3-findings.md) are constants in the library's tests, so the evidence outlives the installed decoder | S | Nothing; written with E2 | **Built**, in #1394 (merged); local only |
 | E8 | **The docs**: the user guide, `docs/library/decoding.md`, the ROADMAP rows, the [correction list](karaoke-eac3-findings.md#what-the-repository-says-that-this-corrects) | S | E2 to E6 | **This pull request** |
 | E9 | **The LFE's level in the reproduction** (D8), for both codecs: the library's output stage and its one test | S | D8; review with the AC-3 session [ecf0c9] | **Built**, in #1394 (merged) |
