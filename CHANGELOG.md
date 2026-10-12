@@ -146,6 +146,24 @@ The sections below contain the complete change list and fixes.
   not measured, and `planning/hearth-sink-screen.md` is the one design (model, screens, layout in
   units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
   are held to. Nothing is built.
+- **The first spikes were run on a Shield.** `planning/hearth-android-findings.md` F12 records them:
+  `libs/lyrics` and `libs/sendspin` (with cpp-httplib, mbedTLS, libFLAC, Opus and mdns from vcpkg)
+  build for `arm64-android` under NDK r26 and their 83 and 243 test cases pass on the Shield; an
+  `ENCODING_IEC61937` track on the Shield reports its position in steps of about 20 ms, needs 8
+  bursts queued to start and 4 to hold, and drifted -0.3 ppm against `CLOCK_MONOTONIC` over 10
+  minutes with no underruns; the Shield's HDMI audio route disappears when its display sleeps.
+- **A receiver loses its Dolby lock in half a second of PCM silence and keeps it through null
+  bursts.** Read over the Onkyo's network port while the Shield streamed: silence of 1, 3 or 6 s
+  dropped the lock after about 0.5 s and the receiver took about 0.8 s to return once the bursts
+  resumed; null bursts for 1, 3 or 6 s never dropped it; a cold lock took 1.0 to 1.4 s. The plan's
+  decisions D1 to D14 are accepted as recommended.
+- **Dolby JOC streams lock the receiver as Atmos through the Shield's IEC 61937 route.** The three
+  encoder fixtures (5.1.4, 7.1.4, 9.1.6), wrapped into E-AC-3 bursts at the 192 kHz carrier, were
+  reported by the Onkyo as `Dolby Atmos/DD+` after about 2.1 s, with no underruns.
+- **A stream this project signs locks as Atmos, and the same stream unsigned falls back to the
+  bed.** `forge atmos ... sign-objects` with the owner's test key verified 750 of 750 frames and
+  was reported by the Onkyo as `Dolby Atmos/DD+` (5.0.4); the same stream with its object
+  container unsigned was reported as `Dolby Audio - DD+` (5.1), with no underruns in either.
 
 **A Sendspin sink library, which Hearth's test sink is the first program of**
 
