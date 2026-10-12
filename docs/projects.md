@@ -33,6 +33,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `iab` | `libs/iab/` | SMPTE ST 2098-2 Immersive Audio Bitstream reading and writing, as bare bitstreams and in MXF. | `base` | `adm`, `examples`, `forge` | core |
 | `lyrics` (internal) | `libs/lyrics/` | Timed lyrics: an LRC file, in UTF-8 or UTF-16, read into lines of timed words and written back, the file's place beside a media item, the stateless cursor that says which line and word a playing position is in, and the editing a tap timer needs (a line's start, a word's start, an estimate by letters). Standard library only, so that Hearth, Crucible, the sink firmware and the browser can all link it. Internal; never installed. | nothing | `crucible`, `esp-idf`, `hearth`, `hearth-sink` | core |
 | `objects` | `libs/objects/` | The object-audio model: an object's position and path over time, the placement an encoder is handed each frame, and the Object Audio Metadata payload of ETSI TS 103 420 with the EMDF container it travels in. | `base`, `dsp` | `ac3`, `ac4`, `adm`, `app-media`, `audio`, `baremetal`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `render` | core |
+| `pitch` (internal) | `libs/pitch/` | A singing voice's pitch: a fundamental-frequency tracker (the McLeod Pitch Method, written from the paper), a reference melody as a contour on a fixed grid or as notes, and a pitch score of one against the other with an estimate of how early or late the singer is. Standard library only, so that Hearth, the browser and the sink firmware can all link it. Internal; never installed. | nothing | `hearth` | core |
 | `render` | `libs/render/` | From what a decoder produced to what the speakers want: layouts and their text form, routing, per-output trim and delay, the bed and object renderer and the panning under it. | `base`, `objects` | `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink` | core |
 | `sendspin` (internal) | `libs/sendspin/` | The Sendspin protocol: the server half Hearth's engine uses and the player half its test sink and the ESP32 sinks use. Internal; never installed. | `time-filter` | `esp-idf`, `hearth`, `hearth-sink` | core |
 
@@ -59,7 +60,7 @@ tests are beside it, and `ctest -L <project>` runs them.
 | `demo-android` | `apps/demos/android/` | The Android (Shield) demo application. | `ac3`, `audio`, `base`, `containers` | nothing | android |
 | `demo-wasm` | `apps/demos/wasm/` | The browser demos, built with Emscripten. | `ac3`, `ac4`, `objects` | nothing | wasm |
 | `forge` | `apps/forge/` | Forge: the command-line tool (forge) and the desktop application (forge-gui) for encoding, decoding, analysis and QC of AC-3, E-AC-3 and AC-4. | `ac3`, `ac4`, `adm`, `audio`, `base`, `containers`, `dsp`, `iab`, `objects`, `render`, `app-media`, `app-preferences`, `app-project`, `app-theme` | nothing | windows, linux, macos |
-| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
+| `hearth` | `apps/hearth/` | Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server. | `ac3`, `ac4`, `audio`, `base`, `containers`, `device`, `lyrics`, `objects`, `pitch`, `render`, `sendspin`, `app-media`, `app-preferences`, `app-theme` | nothing | windows, linux, macos |
 
 ## Bindings
 
@@ -111,6 +112,7 @@ flowchart LR
     iab["iab"]
     lyrics(["lyrics"])
     objects["objects"]
+    pitch(["pitch"])
     render["render"]
     sendspin(["sendspin"])
     time_filter["time-filter"]
