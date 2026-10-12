@@ -30,7 +30,20 @@
   ],
   "free": {
     "ICLFORGE_EXAMPLE_WIFI_*": "the board's network is its own, kept in NVS; a published image has none built in (package_firmware.py refuses one)",
-    "ICLFORGE_EXAMPLE_HTTP_URL": "the stream a build plays at boot: empty on a board, a test server's on a CI shape"
+    "ICLFORGE_EXAMPLE_HTTP_URL": "the stream a build plays at boot: empty on a board, a test server's on a CI shape",
+    "ICLFORGE_EXAMPLE_PANEL_STACK_BYTES": "the screen task's stack, in PSRAM: declared for every target and inert in a profile whose panel is NONE (every one here); a profile that enables the screen locks it by hand, which verify honours before this",
+    "LV_SPAN_SNIPPET_STACK_SIZE": "LVGL's own count of text-span snippets it keeps on its stack, not a task's stack: there on every P4 build, which carries the library, and used only where the screen is"
+  },
+  "other_stacks": {
+    "sdkconfig.defaults;sdkconfig.hw": "the S3 with neither PSRAM nor a network: the i2s_player example's shape, the bare-metal probe's and the README's first sections'; not a board's image",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram": "the S3 with PSRAM and a network before the Sendspin player: the HTTP-source shapes of the 714 and device-UI plans and the stream set; not a board's image",
+    "sdkconfig.defaults;sdkconfig.ac4;sdkconfig.hw": "the bare-metal S3 probe's AC-4 build (firmware/baremetal), a footprint measurement and not the sink",
+    "sdkconfig.defaults;sdkconfig.wifi": "the bare-metal C6 probe's network load (firmware/baremetal), not the sink",
+    "sdkconfig.defaults;sdkconfig.c6": "the C6 overlay's own header: the part with no Sendspin player, which no image is built for",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4": "the P4 overlay's own header: the part with no Sendspin player, which no image is built for",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin": "sdkconfig.p4-rev3's own header: the v3.x revision over the P4 shape, before the panel; no image is built from it",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-dsi": "the ESP32-P4 of revision v3.x with the LVGL screen: the release image hearth-sink-esp32p4-rev3 (#1400). It has no profile yet: no board of that revision has run it, and p4-rev3 is its own change, which needs a configured build for its locked values. Until then _build.yml spells its list, and tools/hearth/test_sink_profile.py names it",
+    "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;sdkconfig.panel-null": "the P4 with the panel's frame buffer in PSRAM and no screen behind it (sdkconfig.panel-null): what a board with no panel runs to see the screen; a development build, built and not run or packaged"
   },
   "overlays": {
     "wifi-credentials": {
@@ -45,6 +58,19 @@
         "ICLFORGE_EXAMPLE_REPORT_EVERY_FRAMES"
       ],
       "note": "observation only: the PCM hash an AC-4 play carries and how often progress lines print; no placement, size or cache"
+    },
+    "qemu-net": {
+      "touches": [
+        "ICLFORGE_EXAMPLE_NETWORK_*",
+        "ETH_USE_OPENETH",
+        "ICLFORGE_EXAMPLE_SINK_*",
+        "SPIRAM_MODE_*",
+        "SPIRAM_SPEED*",
+        "ESP_CONSOLE_*",
+        "ESP_CONSOLE*"
+      ],
+      "fragment": "qemu-net",
+      "note": "the release shape on QEMU (planning/esp32-platform-profiles.md): Ethernet in place of Wi-Fi, the capture sink in place of I2S, quad PSRAM in place of octal, the console on UART0; nothing about stacks, rings, caches or features"
     }
   },
   "profiles": {
@@ -71,7 +97,8 @@
       },
       "budget": {
         "app_bytes_max": 1600000,
-        "bootloader_bytes_max": 32768
+        "bootloader_bytes_max": 32768,
+        "internal_static_bytes_max": 185000
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -139,11 +166,11 @@
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES": "32768",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM": "1",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS": "250",
-        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES": "16384",
+        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES": "2048",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES": "25600",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS": "0",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS": "20",
-        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS": "2",
+        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS": "0",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_PCM": "1",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES": "262144",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES": "8192",
@@ -209,7 +236,8 @@
       "image": null,
       "budget": {
         "app_bytes_max": null,
-        "bootloader_bytes_max": 32768
+        "bootloader_bytes_max": 32768,
+        "internal_static_bytes_max": null
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -279,14 +307,14 @@
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS": "2",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE": "25",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_BUFFER_MS": "300",
-        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES": "32768",
+        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES": "40960",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM": "1",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS": "250",
-        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES": "16384",
+        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES": "2048",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CHUNK_BYTES": "25600",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_CODED_CHANNELS": "0",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_DELAY_MS": "20",
-        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS": "2",
+        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS": "0",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_PCM": "1",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES": "262144",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_SERVER_STACK_BYTES": "8192",
@@ -357,7 +385,8 @@
       },
       "budget": {
         "app_bytes_max": 1880000,
-        "bootloader_bytes_max": 32768
+        "bootloader_bytes_max": 32768,
+        "internal_static_bytes_max": 108000
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -477,7 +506,8 @@
       },
       "budget": {
         "app_bytes_max": 1835008,
-        "bootloader_bytes_max": 32768
+        "bootloader_bytes_max": 32768,
+        "internal_static_bytes_max": 108000
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -599,7 +629,8 @@
       },
       "budget": {
         "app_bytes_max": null,
-        "bootloader_bytes_max": 24576
+        "bootloader_bytes_max": 24576,
+        "internal_static_bytes_max": null
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -744,7 +775,8 @@
       "image": null,
       "budget": {
         "app_bytes_max": null,
-        "bootloader_bytes_max": 24576
+        "bootloader_bytes_max": 24576,
+        "internal_static_bytes_max": null
       },
       "locked": {
         "CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
@@ -820,7 +852,7 @@
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS": "6",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE": "0",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_BUFFER_MS": "300",
-        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES": "32768",
+        "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES": "40960",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM": "0",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS": "250",
         "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LYRICS_MAX_BYTES": "16384",
