@@ -74,6 +74,22 @@ module.exports = defineConfig({
             use: { baseURL: decodeBase },
         },
         {
+            // The decode demo's microphone card: the tracker and scorer in the module, and the
+            // page's promises. Chromium's fake device supplies a tone and the flags grant the
+            // permission prompt, as the encode project's do: no real microphone is opened.
+            name: 'microphone',
+            testMatch: 'microphone.spec.js',
+            use: {
+                baseURL: decodeBase,
+                launchOptions: {
+                    args: [
+                        '--use-fake-ui-for-media-stream',
+                        '--use-fake-device-for-media-stream',
+                    ],
+                },
+            },
+        },
+        {
             name: 'encode',
             testMatch: 'encode.spec.js',
             use: {
