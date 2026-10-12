@@ -1078,8 +1078,16 @@ PlayPosition Player::position() const {
 namespace {
 
 // The lyrics beside an item as a sink is sent them: the library's own LRC text, whichever format
-// the file was, so that a board reads one. Empty when the item has none, or its file is not readable.
-[[nodiscard]] std::string lyric_document(const std::string& path, std::chrono::milliseconds duration) {
+// the file was, so that a board reads one, and the tags the file carries. Empty when the item has
+// none, or its file is not readable.
+struct LyricItem {
+    std::string document{};
+    std::string title{};
+    std::string artist{};
+    std::string album{};
+};
+
+[[nodiscard]] LyricItem lyric_item(const std::string& path, std::chrono::milliseconds duration) {
     const std::optional<std::filesystem::path> file = lyrics::find_lyrics_file(path);
     if (!file) {
         return {};
@@ -1087,7 +1095,13 @@ namespace {
     const std::optional<std::int64_t> length =
         duration.count() > 0 ? std::optional<std::int64_t>{duration.count()} : std::nullopt;
     const auto read = lyrics::read_lyrics(*file, length);
-    return read ? lyrics::write_lrc(*read) : std::string{};
+    if (!read) {
+        return {};
+    }
+    return LyricItem{.document = lyrics::write_lrc(*read),
+                     .title = read->title,
+                     .artist = read->artist,
+                     .album = read->album};
 }
 
 }  // namespace
@@ -1104,9 +1118,25 @@ void Player::follow_lyrics() {
         lyrics_queue_item_ = at.item;
         lyrics_opens_ = opens_;
         ++lyrics_serial_;
-        group_->set_lyrics(lyrics_serial_, lyric_document(queue_.items()[at.item].path, at.duration));
+        const QueueItem& item = queue_.items()[at.item];
+        const LyricItem lyric = lyric_item(item.path, at.duration);
+        group_->set_lyrics(lyrics_serial_, lyric.document);
+        // What is playing, for the members that show it (D7). The file's own name is what the engine
+        // shows for the item; a lyrics file that names the song, its artist or its album says it
+        // better, and nothing else is known, so nothing else is sent.
+        NowPlaying now;
+        now.title = lyric.title.empty() ? item.title : lyric.title;
+        if (!lyric.artist.empty()) {
+            now.artist = lyric.artist;
+        }
+        if (!lyric.album.empty()) {
+            now.album = lyric.album;
+        }
+        now.duration_ms = at.duration.count();
+        group_->set_now_playing(lyrics_serial_, now);
     }
     group_->follow_lyrics(lyrics_serial_, at.heard.count());
+    group_->follow_now_playing(lyrics_serial_, at.heard.count());
 }
 
 TransportOutcome Player::play() {

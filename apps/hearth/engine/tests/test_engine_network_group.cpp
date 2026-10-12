@@ -1429,7 +1429,8 @@ struct KaraokeGroup {
     iclforge::render::OutputLayout master = iclforge::render::OutputLayout::stereo();
 
     KaraokeGroup(const std::string& name, int frames, const iclforge::hearth::DecoderSettings& wanted,
-                 bool decodes_takes_levels = true, std::uint32_t lyrics_bytes = 0)
+                 bool decodes_takes_levels = true, std::uint32_t lyrics_bytes = 0,
+                 std::vector<std::string> decodes_roles = {})
         : scratch(fs::path{ICLFORGE_TEST_SCRATCH_DIR} / (name + "_" + scratch_pid_suffix())),
           item_path((fs::path{ICLFORGE_TEST_SCRATCH_DIR} / (name + "_" + scratch_pid_suffix()) / "programme.ac3")
                          .string()),
@@ -1437,7 +1438,8 @@ struct KaraokeGroup {
         namespace ss = iclforge::sendspin;
         fs::remove_all(scratch);
         const auto make_sink = [&](const std::string& id, bool karaoke, RecordingLog& log,
-                                   std::vector<std::int32_t> widths, bool levels = true) {
+                                   std::vector<std::int32_t> widths, bool levels = true,
+                                   std::vector<std::string> roles = {}) {
             testsink::SinkOptions options;
             options.name = id;
             options.address = "127.0.0.1";
@@ -1450,12 +1452,13 @@ struct KaraokeGroup {
             options.karaoke = karaoke;
             options.karaoke_levels = levels;
             options.lyrics_max_bytes = lyrics_bytes;
+            options.other_roles = std::move(roles);
             options.pcm_channels = std::move(widths);
             auto started = testsink::Sink::start(options, log);
             REQUIRE(started.has_value());
             return std::move(*started);
         };
-        decodes = make_sink("decodes", true, decodes_log, {2, 6}, decodes_takes_levels);
+        decodes = make_sink("decodes", true, decodes_log, {2, 6}, decodes_takes_levels, std::move(decodes_roles));
         legacy = make_sink("legacy", false, legacy_log, {6});
 
         store = std::make_unique<iclforge::hearth::PairingStore>(
@@ -1969,6 +1972,38 @@ TEST_CASE("engine: an item with no lyrics tells the boards it has none, and a bo
     // Neither takes them, so neither is sent any.
     CHECK(group.decodes->roles().lyric_commands.empty());
     CHECK(group.legacy->roles().lyric_commands.empty());
+}
+
+TEST_CASE("engine: a member that shows what is playing is told the item and where the sound is (D7)",
+          "[hearth][group][websocket][iclforge][metadata]") {
+    constexpr int kFrameCount = 60;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    // The decoding board lists metadata@v1 as well; no lyrics file is beside the item, so the title is
+    // the one the queue shows.
+    KaraokeGroup group("now_playing_group", kFrameCount, wanted, true, 0, {"metadata@v1"});
+    group.engine->play();
+    const auto shown = [&] { return group.decodes->roles().metadata; };
+    group.await([&] { return shown() && shown()->title == "Karaoke programme" && shown()->progress; });
+    const auto playing = *shown();
+    CHECK_FALSE(playing.artist.has_value());
+    CHECK_FALSE(playing.album.has_value());
+    REQUIRE(playing.progress.has_value());
+    CHECK(playing.progress->playback_speed == 1000);
+    // The item is about two seconds long, and the position is somewhere in it.
+    CHECK(playing.progress->track_duration_ms > 1000);
+    CHECK(playing.progress->track_duration_ms < 4000);
+    CHECK(playing.progress->track_progress_ms >= 0);
+    CHECK(playing.progress->track_progress_ms <= playing.progress->track_duration_ms);
+    // The board that lists no metadata role is told nothing.
+    CHECK_FALSE(group.legacy->roles().metadata.has_value());
+
+    // The item ends and the output closes: nothing is playing, and the board stops showing it.
+    REQUIRE(eventually([&] {
+        const EngineStatus status = group.engine->status();
+        return status.state == TransportState::kStopped && !status.history.empty();
+    }));
+    group.await([&] { return !shown().has_value(); });
 }
 
 TEST_CASE("engine: a board that lists lyrics is told an item has none, so it drops the last item's",

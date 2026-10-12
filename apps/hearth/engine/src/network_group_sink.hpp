@@ -51,6 +51,19 @@ class Group;
 
 namespace iclforge::hearth {
 
+// What the open group's members that show what is playing (metadata@v1) are told of an item (D7,
+// planning/hearth-android.md): the engine knows a title, and an artist and an album only from the
+// item's lyrics file, whose tags a sink reads from the document too. A field it does not know is left
+// out and not guessed.
+struct NowPlaying {
+    // The item's name as the engine shows it, or the lyrics file's [ti:] when it has one.
+    std::string title{};
+    std::optional<std::string> artist{};
+    std::optional<std::string> album{};
+    // How long the item is, 0 when that is not known (the role's "unknown or unlimited").
+    std::int64_t duration_ms = 0;
+};
+
 class NetworkGroupSink {
 public:
     virtual ~NetworkGroupSink() = default;
@@ -111,6 +124,22 @@ public:
     // when what they are holding would be off: a change of speed (a pause, a resume), a jump (a seek)
     // or drift, and one every few seconds to correct the rest.
     virtual void follow_lyrics(std::int64_t item, std::int64_t heard_ms) {
+        static_cast<void>(item);
+        static_cast<void>(heard_ms);
+    }
+
+    // The item playing, for the members that show it (metadata@v1): `item` is the number follow_lyrics()
+    // is given for it, new with every item. Its title, artist and album go out at once, and where the
+    // sound is follows (follow_now_playing()). Nothing when the group is not open; the members' state
+    // is cleared when it closes, so a sink shows nothing playing once the programme has ended.
+    virtual void set_now_playing(std::int64_t item, const NowPlaying& now) {
+        static_cast<void>(item);
+        static_cast<void>(now);
+    }
+    // Where in item `item` the sound is, as follow_lyrics() has it. The members are sent a position
+    // on the terms LyricsAnchors gives: when the speed changed (a pause, a resume), the position jumped
+    // or drifted, and one every few seconds; they move it on themselves from the time and the speed.
+    virtual void follow_now_playing(std::int64_t item, std::int64_t heard_ms) {
         static_cast<void>(item);
         static_cast<void>(heard_ms);
     }
