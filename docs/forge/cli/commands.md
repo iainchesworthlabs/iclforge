@@ -651,7 +651,12 @@ with no object layer. The vocals sit at the stream's Lo/Ro surround level, `loro
 `mixmdate` (an E-AC-3 `bsi` has no `surmixlev`), and the melody at `lorocmixlev` in the 2/0 form;
 where the stream sends no `mixmdate` both are -3 dB, which is what Dolby's decoder used. A
 programme with a dependent substream (Annex E gives a dependent's channel map no vocal), or with
-an object layer, is decoded as coded and the report says why. This reproduction is this
+an object layer, is decoded as coded and the report says why. `eac3-encode` with `bsmod=7` above
+1/0 writes that `mixmdate` group whether or not `mixmeta` is given, its `lorocmixlev` and
+`lorosurmixlev` taken from `cmixlev=` and `surmixlev=` (-4.5 and -6 dB by default, the level an
+AC-3 karaoke stream is made at), so a player is told the level the author set and not left to
+its own default; `bsmod=7` on mono is Table 5.7's voice-over and on `1+1` a service Annex A and
+Annex G prohibit, and both encoders write them as asked with a warning. This reproduction is this
 project's by analogy with Annex C and by that decoder; a player built on FFmpeg flags the stream
 as karaoke and plays the vocals from the surround channels, as it does an AC-3 one
 (`planning/karaoke-eac3-findings.md` has the clauses and the measurements).
