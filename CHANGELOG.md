@@ -138,7 +138,7 @@ The sections below contain the complete change list and fixes.
   platform. A voice through one Windows 11 workstation's own shared-mode path was measured at about
   130 ms, so a monitor is offered with its measured latency and not promised. The plan's build table
   says what is built: the pitch library, capture times, the melody reader, the microphone card, takes,
-  the pitch ribbon with per-line marks and the browser demo's microphone card (M1 to M7), and what is not
+  the pitch ribbon with per-line marks and the browser demo's microphone card (M1 to M7, all merged), and what is not
   (the bleed check, the board).
 
 **An Android preset for the libraries Hearth for Android links**
@@ -233,6 +233,16 @@ The sections below contain the complete change list and fixes.
   bed.** `forge atmos ... sign-objects` with the owner's test key verified 750 of 750 frames and
   was reported by the Onkyo as `Dolby Atmos/DD+` (5.0.4); the same stream with its object
   container unsigned was reported as `Dolby Audio - DD+` (5.1), with no underruns in either.
+- **Phases 4 and 5 of the Android sink are planned, and the plan's status says what is built.**
+  `planning/hearth-android-phases-4-5.md` turns the two remaining phases into pull requests, tests and
+  spikes: a routing output that passes a stream through or decodes it locally (the test sink's decode
+  path extracted into `libs/sink` behind a PCM seam), the karaoke reproduction applied on the device,
+  and then `player@v1` PCM, FLAC and Opus, transport keys and a phone profile; with the risks, five
+  calls for the owner to veto and the small leftovers that come first. `planning/hearth-android.md` now
+  lists what each phase built and by which pull request, `planning/hearth-android-findings.md` F13
+  records what the build found (a receiver in standby is no route at all), and the owner's answers of
+  2026-10-13 are in: the sink stays available until the person leaves it, and "Both" asks the server
+  for `aware` while the other vocals choices ask for `capable`.
 
 **A Sendspin sink library, which Hearth's test sink is the first program of**
 
@@ -3559,6 +3569,16 @@ The sections below contain the complete change list and fixes.
   pressed, the eight seconds, a file with no times having no delay row, a tap), which is AR7's "a focus
   walk", and draws it with the ring on the focused control (`android-lyric-sheet.png`).
 
+**Hearth for Android shows the pairing code as a QR**
+
+- **A server that asks for the QR form of its dynamic pairing code is shown a QR on the idle screen.**
+  The `SP:1` token was drawn as one cut-off line; it is now a code at the right of the screen on a
+  light card with the token under it, and the words say to scan it or type the token. The encoder is a
+  small one in the app (byte mode, level M, versions 1 to 6, no dependency), and a token it cannot hold
+  is shown as text and not as a wrong code. Checked by decoding with OpenCV: 16 of 16 payloads, and the
+  whole idle-screen picture at full size and at half and 0.35 scale. `tools/hearth/check_qr_matrices.py`
+  is the check.
+
 **Hearth for Android: the sink screen's tokens in one file**
 
 - **`docs/hearth/design/sink-screen-tokens.json`** (phase 3a of `planning/hearth-android.md`, D13): the
@@ -3694,6 +3714,15 @@ The sections below contain the complete change list and fixes.
   A new project row (`hearth-android`, lane `android`), `check_android_jni.py` taught the second
   package, and a CI job, `build-android-hearth`, that builds the debug APK with vcpkg in front of the
   NDK's toolchain (`continue-on-error` until it has gone green on hosted runners).
+
+**Hearth's Network page says how a sink plays the stream**
+
+- **An "Output" row in "What the sink reports": "passed through as coded" or "decoded by the
+  sink".** It reads the extension role's `output` state key (below). The row is empty while the
+  sink has no stream open, and says "not reported" for a stream the sink does not say how it
+  plays, which is every sink and board that predates the key. The wording is a small header,
+  `sink_output_text.hpp`, with its own test, as the Lyrics row's is; the six catalogues carry the
+  new "Output" label untranslated.
 
 ### Changed
 
@@ -4159,6 +4188,23 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**WebAssembly demo: the lyrics test**
+
+- **The browser demo's "follows a lyrics file" test failed against the example it loads, and had
+  from the day it was added.** It asked the seek bar for 8.5 / 16.0 of its thousand steps, but
+  `auld-lang-syne.ac3` is 516 frames, 16.512 s, and the bar takes whole steps: 531 is 8.77 s, which
+  the 600 ms delay shows in the third line's first word, not the second line's last, "mind?". The
+  case also expected the first line at the end, after the page had been left at the second.
+  The test now reads the stream's length from the page and asks for 8.55 s, the middle of the
+  100 ms in which the second word of the third line and, less the delay, the second line's last
+  word are both being sung. The third line has the first's words, so what tells them apart is
+  checked as well: the second line before it and the fourth after it. After a file in a code page
+  is refused (named, with the reader's reason), a seek proves the words already on the page are
+  still the ones followed: a page that dropped them would go on showing the last lines it drew.
+  The page and the module are unchanged. Run against a build of the module in headless Chromium,
+  the five cases of `decode.spec.js` pass; a page that drops its document on a refused file fails
+  the new seek check.
 
 **Lyrics on a board**
 

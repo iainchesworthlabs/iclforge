@@ -1,6 +1,7 @@
 package com.iclforge.hearth
 
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.view.KeyEvent
 import android.widget.FrameLayout
 import org.junit.After
@@ -156,6 +157,38 @@ class StatusScreenTest : RenderTestBase() {
         )
         assertNotNull(inked(paired, stage))
         assertTrue("the code is still up when paired", count(paired, stage, Tokens.ACCENT, tolerance = 3) < 200)
+    }
+
+    @Test
+    fun aServerThatAskedForTheQrFormIsShownTheQrAtTheRightAndNotACutOffLine() {
+        val token = "SP:1MFRGGZDFMZTWQ9LKNNWG93TPOBYXE43UOV3HJ5S"
+        val picture = draw(
+            "s1-idle-qr",
+            content(StatusScreens.Choice(StatusScreens.Kind.IDLE), SinkStatus(emptyList(), token, 0)),
+        )
+        // The card is a large light square at the right of the stage, with dark modules on it.
+        val right = Rect((width * 0.6f).toInt(), stage.top, stage.right, stage.bottom)
+        val light = count(picture, right, Tokens.TEXT, tolerance = 3)
+        val dark = count(picture, Rect(right.left, right.top, right.right, right.top + 330), Tokens.BG, tolerance = 3)
+        val u = height / 600f
+        val side = (320f * u).toInt()
+        assertTrue("no light card: $light px", light > side * side / 4)
+        assertTrue("no modules on it: $dark px", dark > side * side / 10)
+        // The words are not the digits path: no accent text, and the line "scan" is on the left.
+        assertTrue("the token was drawn as text", longestRun(picture, stage, Tokens.ACCENT) < 12)
+        assertNotNull(inked(picture, Rect(stage.left, stage.top, (width * 0.55f).toInt(), stage.bottom)))
+        // A token too long for the encoder falls back to the text rather than to a wrong code.
+        val long = draw(
+            "s1-idle-qr-too-long",
+            content(
+                StatusScreens.Choice(StatusScreens.Kind.IDLE),
+                SinkStatus(emptyList(), "SP:1" + "A".repeat(120), 0),
+            ),
+        )
+        assertTrue(
+            "a card for a token that is too long",
+            count(long, right, Tokens.TEXT, tolerance = 3) < side * side / 8,
+        )
     }
 
     @Test
