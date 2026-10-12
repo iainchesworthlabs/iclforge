@@ -50,6 +50,8 @@ qt_add_executable(hearth_qmltests
     src/item_loader.hpp
     src/karaoke_controller.cpp
     src/karaoke_controller.hpp
+    src/microphone_controller.cpp
+    src/microphone_controller.hpp
     src/network_controller.cpp
     src/network_controller.hpp
     # Settings.qml imports HearthLanguage now, so the suite needs the
