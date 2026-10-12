@@ -1,5 +1,6 @@
 #include "karaoke_authoring_controller.hpp"
 
+#include <QCoreApplication>
 #include <QStringList>
 #include <QUrl>
 
@@ -13,6 +14,27 @@ namespace {
 QString to_q(const std::string& text) {
     return QString::fromStdString(text);
 }
+
+// The language groups of the code pages (apps/shared/text-encoding) as the picker names them. The
+// list is only for lupdate, which finds the strings by QT_TRANSLATE_NOOP; the group a page carries
+// is looked up in the catalogue under the same context at run time, and shown as it is where the
+// catalogue has none. The page's own name ("Windows-1251", "Shift-JIS") is not translated.
+[[maybe_unused]] constexpr const char* kCodePageGroups[] = {
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Western European"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Central European"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Cyrillic"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Greek"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Turkish"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Hebrew"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Arabic"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Baltic"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Vietnamese"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Thai"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Japanese"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Simplified Chinese"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Traditional Chinese"),
+    QT_TRANSLATE_NOOP("LyricsEncoding", "Korean"),
+};
 
 QString level_name(forge_gui::KaraokeCheckLevel level) {
     switch (level) {
@@ -158,12 +180,34 @@ QString KaraokeAuthoring::lyricsBeside(const QString& url) const {
     return found.empty() ? QString() : QUrl::fromLocalFile(to_q(found)).toString();
 }
 
-QString KaraokeAuthoring::lyricsProblem(const QString& url) const {
-    return to_q(forge_gui::karaoke_lyrics_problem(local_path(url)));
+QString KaraokeAuthoring::lyricsProblem(const QString& url, const QString& codePage) const {
+    return to_q(forge_gui::karaoke_lyrics_problem(local_path(url), codePage.toStdString()));
 }
 
-QString KaraokeAuthoring::copyLyrics(const QString& lyricsUrl, const QString& streamPath) const {
-    switch (forge_gui::karaoke_copy_lyrics(local_path(lyricsUrl), local_path(streamPath))) {
+QVariantList KaraokeAuthoring::codePages() const {
+    QVariantList pages;
+    for (const auto& page : forge_gui::karaoke_code_pages()) {
+        const QString group = QCoreApplication::translate("LyricsEncoding", page.group.c_str());
+        QVariantMap row;
+        row.insert(QStringLiteral("name"), to_q(page.name));
+        row.insert(QStringLiteral("label"), group + QStringLiteral(" (") + to_q(page.title) + QLatin1Char(')'));
+        pages.append(row);
+    }
+    return pages;
+}
+
+bool KaraokeAuthoring::lyricsNeedsCodePage(const QString& url) const {
+    return forge_gui::karaoke_lyrics_needs_code_page(local_path(url));
+}
+
+QString KaraokeAuthoring::lyricsPreview(const QString& url, const QString& codePage) const {
+    return to_q(forge_gui::karaoke_lyrics_preview(local_path(url), codePage.toStdString()));
+}
+
+QString KaraokeAuthoring::copyLyrics(const QString& lyricsUrl, const QString& streamPath,
+                                     const QString& codePage) const {
+    switch (forge_gui::karaoke_copy_lyrics(local_path(lyricsUrl), local_path(streamPath), nullptr,
+                                           codePage.toStdString())) {
         case forge_gui::KaraokeLyricsCopy::kCopied: return QStringLiteral("copied");
         case forge_gui::KaraokeLyricsCopy::kAlreadyThere: return QStringLiteral("already-there");
         case forge_gui::KaraokeLyricsCopy::kExists: return QStringLiteral("exists");

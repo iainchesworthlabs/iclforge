@@ -208,7 +208,13 @@ The sections below contain the complete change list and fixes.
   refusal now says what to name, and bytes the page does not have refuse the file. The conversion is
   the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
   it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
-  GUI's picker will link as well.
+  GUI's picker links as well.
+- **The Forge GUI's Lyrics row offers a code page for a file that is not UTF-8 or UTF-16.** A
+  **Code page** list appears under the problem line, with no page chosen and none guessed; the
+  page chosen reads the file, the first lines are shown as it reads them, and the stream is saved
+  with the words beside it as UTF-8 LRC (the same conversion as `lyrics-encoding=`). Choosing
+  another file forgets the page. The page names' language groups are translated in the six
+  catalogues.
 
   refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
@@ -3454,8 +3460,10 @@ The sections below contain the complete change list and fixes.
   (`NetworkSinks::set_sink_opus_fallback`, the Decoder tab's "Audio decoded here" choice, and
   `choose_sink_form`'s `PcmCodec`): for a board on a link too poor for PCM, audio Hearth decodes
   for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
-  sink, applies at the group's next play, and is kept for the run. The group editor says which a
-  member is sent.
+  sink, applies at the group's next play, and is kept with the sink's pairing record
+  (`PairingStore::set_opus()`, `pairing/N/opus` in the settings, written only for a sink set to
+  Opus): it is read back at the sink's first hello of a run, so a restart of Hearth does not undo
+  it, and forgetting the pairing forgets the choice. The group editor says which a member is sent.
 - **The Sendspin player plays a stream's bed when it declares more objects than the board says it
   places** (`BurstPlayerConfig::max_objects`, `iclforge/object_limit.hpp`,
   `Eac3Decoder::set_skip_object_reconstruction()`): the decision is made from the first unit's
