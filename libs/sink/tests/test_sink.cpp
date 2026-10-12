@@ -388,7 +388,8 @@ TEST_CASE("sink: a burst stream and its karaoke settings reach the burst output"
         [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
     CHECK(log.wait("burst stream AC-3 48000 Hz to 5.1"));
 
-    // Two bursts' payloads, which the sink does not read.
+    // Two bursts' payloads: a syncword, which the server's session checks, and bytes the sink does not
+    // read.
     std::vector<std::vector<std::uint8_t>> sent;
     const std::int64_t first = server.clock.now_us() + 400'000;
     for (int index = 0; index < 2; ++index) {
@@ -396,6 +397,8 @@ TEST_CASE("sink: a burst stream and its karaoke settings reach the burst output"
         for (std::size_t byte = 0; byte < payload.size(); ++byte) {
             payload[byte] = static_cast<std::uint8_t>((byte * 3U) + static_cast<std::size_t>(index));
         }
+        payload[0] = 0x0B;
+        payload[1] = 0x77;
         const std::uint16_t pd = iclforge::sendspin::burst_length_code(iclforge::sendspin::BurstDataType::kAc3,
                                                                        payload.size());
         const std::int64_t at = first + (static_cast<std::int64_t>(index) * 32'000);
