@@ -329,87 +329,132 @@
 <context>
     <name>LyricStrip</name>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="112"/>
+        <location filename="../qml/LyricStrip.qml" line="114"/>
+        <source>Following %1: %2</source>
+        <translation>Siguiendo %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="115"/>
+        <source>Following %1.</source>
+        <translation>Siguiendo %1.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="118"/>
+        <source>This application has not published where it is in the song (a media session). Press Start to begin by hand, or follow one that is playing:</source>
+        <translation>Esta aplicación no ha publicado en qué punto de la canción está (una sesión multimedia). Pulse Iniciar para empezar a mano, o siga una que esté sonando:</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="120"/>
+        <source>Waiting for this application to publish where it is in the song (a media session). Press Start to begin by hand.</source>
+        <translation>Esperando a que esta aplicación publique en qué punto de la canción está (una sesión multimedia). Pulse Iniciar para empezar a mano.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="123"/>
+        <source>%1 does not publish where it is in the song. Press Start to begin by hand.</source>
+        <translation>%1 no publica en qué punto de la canción está. Pulse Iniciar para empezar a mano.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="126"/>
+        <source>Media sessions cannot be read here: %1 Press Start to begin by hand.</source>
+        <translation>Aquí no se pueden leer las sesiones multimedia: %1 Pulse Iniciar para empezar a mano.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="129"/>
+        <source>The track changed to “%1”, so these lyrics are not followed. Import the lyrics for it, or follow it anyway.</source>
+        <translation>La pista cambió a «%1», así que no se sigue esta letra. Importe la letra de la nueva, o sígala de todos modos.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="132"/>
+        <source>The media session went away, so the words carry on by the clock from where they were.</source>
+        <translation>La sesión multimedia desapareció, así que la letra continúa por el reloj desde donde estaba.</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="175"/>
         <source>Choose the lyrics</source>
         <translation>Elegir la letra</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="113"/>
+        <location filename="../qml/LyricStrip.qml" line="176"/>
         <source>All files (*)</source>
         <translation>Todos los archivos (*)</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="113"/>
+        <location filename="../qml/LyricStrip.qml" line="176"/>
         <source>Lyrics and CD+G (*.lrc *.srt *.ass *.kar *.txt *.cdg)</source>
         <translation>Letras y CD+G (*.lrc *.srt *.ass *.kar *.txt *.cdg)</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="121"/>
+        <location filename="../qml/LyricStrip.qml" line="184"/>
         <source>Select an application to give it lyrics.</source>
         <translation>Seleccione una aplicación para darle una letra.</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="137"/>
+        <location filename="../qml/LyricStrip.qml" line="200"/>
         <source>Import lyrics…</source>
         <translation>Importar letra…</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="142"/>
+        <location filename="../qml/LyricStrip.qml" line="205"/>
         <source>Clear</source>
         <translation>Borrar</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="154"/>
+        <location filename="../qml/LyricStrip.qml" line="217"/>
         <source>%1 · %2 lines</source>
         <translation>%1 · %2 líneas</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="156"/>
+        <location filename="../qml/LyricStrip.qml" line="219"/>
         <source>%1 · a CD+G picture: its words are pixels, so none are read</source>
         <translation>%1 · una imagen CD+G: sus palabras son píxeles, así que no se lee ninguna</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="157"/>
+        <location filename="../qml/LyricStrip.qml" line="220"/>
         <source>%1 · no times, so shown whole and not followed</source>
         <translation>%1 · sin tiempos, así que se muestra completa y no se sigue</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="170"/>
+        <location filename="../qml/LyricStrip.qml" line="233"/>
         <source>Start again</source>
         <translation>Iniciar de nuevo</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="170"/>
+        <location filename="../qml/LyricStrip.qml" line="233"/>
         <source>Start</source>
         <translation>Iniciar</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="175"/>
+        <location filename="../qml/LyricStrip.qml" line="238"/>
         <source>Stop</source>
         <translation>Detener</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="183"/>
+        <location filename="../qml/LyricStrip.qml" line="245"/>
+        <source>Follow the media session</source>
+        <translation>Seguir la sesión multimedia</translation>
+    </message>
+    <message>
+        <location filename="../qml/LyricStrip.qml" line="252"/>
         <source>Show the words earlier</source>
         <translation>Mostrar la letra antes</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="192"/>
+        <location filename="../qml/LyricStrip.qml" line="261"/>
         <source>Words shifted by %1</source>
         <translation>Letra desplazada %1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="197"/>
+        <location filename="../qml/LyricStrip.qml" line="266"/>
         <source>Show the words later</source>
         <translation>Mostrar la letra después</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="332"/>
+        <location filename="../qml/LyricStrip.qml" line="401"/>
         <source>CD+G picture</source>
         <translation>Imagen CD+G</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="339"/>
+        <location filename="../qml/LyricStrip.qml" line="134"/>
         <source>Press Start as the song begins. This application&apos;s position is not read, so a pause or a seek in it is not followed: press Start again, or nudge the words.</source>
         <translation>Pulse Iniciar cuando empiece la canción. La posición de esta aplicación no se lee, así que una pausa o un salto en ella no se sigue: pulse Iniciar de nuevo o desplace la letra.</translation>
     </message>

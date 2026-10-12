@@ -19,8 +19,13 @@
 
 #include "cdg_frames.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
+#include "media_monitor.hpp"
 
 namespace {
+
+using iclforge::crucible::ui::MediaApplication;
+using iclforge::crucible::ui::MediaPlayback;
+using iclforge::crucible::ui::MediaSession;
 
 using iclforge::lyrics::LyricLine;
 using iclforge::lyrics::LyricPosition;
@@ -84,10 +89,62 @@ struct Entry {
     QString file_name;
     QString error_text;
     QVariantList lines;
+    // By hand (Start): `running` and `started_ms` are the position. Not by hand, the position is
+    // the media session's.
+    bool by_hand = false;
     bool running = false;
     qlonglong started_ms = 0;
     int nudge_ms = 0;
+    // A media session had the position and went away: the words carry on by hand from where they
+    // were, and say so.
+    bool lost = false;
+    // The session the person picked (held until it goes), or empty for the best match.
+    std::string session_id;
+    // The matched session as last read, the track it was when the lyrics were bound to it, and
+    // whether it has since become another.
+    std::optional<MediaSession> session;
+    std::string bound_track;
+    bool track_changed = false;
 };
+
+[[nodiscard]] bool is_followable(const Entry& entry) {
+    return entry.status == QStringLiteral("timed") || entry.status == QStringLiteral("picture");
+}
+
+// The media session has the position: one is matched, it publishes a timeline, and it is still the
+// track the lyrics were bound to.
+[[nodiscard]] bool session_has_position(const Entry& entry) {
+    return !entry.by_hand && entry.session.has_value() && entry.session->has_position && !entry.track_changed;
+}
+
+[[nodiscard]] bool is_following(const Entry& entry) {
+    return is_followable(entry) && (entry.by_hand ? entry.running : session_has_position(entry));
+}
+
+// What changed for a person, as one string to compare before and after a read of the sessions.
+[[nodiscard]] std::string stamp(const Entry& entry) {
+    std::string out = entry.by_hand ? "h" : "s";
+    out += entry.running ? "r" : "-";
+    out += entry.lost ? "l" : "-";
+    out += entry.track_changed ? "c" : "-";
+    if (entry.session) {
+        out += entry.session->id;
+        out += entry.session->has_position ? "+" : "-";
+        out += entry.session->playback == MediaPlayback::kPlaying ? "p" : "n";
+        out += entry.session->title;
+    }
+    return out;
+}
+
+// What a list of sessions is, for knowing whether a picker has to reread.
+[[nodiscard]] std::string signature(const std::vector<MediaSession>& sessions) {
+    std::string out;
+    for (const MediaSession& session : sessions) {
+        out += session.id + "|" + session.title + "|" + session.artist + "|"
+               + std::to_string(static_cast<int>(session.playback)) + "|" + (session.has_position ? "1" : "0") + "\n";
+    }
+    return out;
+}
 
 // An application's lyrics from the bytes of a file, as the reader takes them: an LRC file (UTF-8, or
 // UTF-16 with a byte-order mark), a SubRip file, an Advanced SubStation Alpha script or a MIDI karaoke
@@ -139,6 +196,15 @@ struct Entry {
 
 struct CrucibleLyrics::State {
     std::unordered_map<int, Entry> entries;
+    // What each application is, for matching its session: kept apart from the entries because the
+    // strip says it before there is a file, and a new file does not forget it.
+    std::unordered_map<int, MediaApplication> applications;
+    // The sessions as last read, and whether any read (or a test's script) has been applied: a
+    // reader that is switched off is "unavailable" until something is.
+    std::vector<MediaSession> sessions;
+    bool fed = false;
+    // The thread that reads them; null when the environment turns it off (and in the QML suite).
+    MediaMonitor* monitor = nullptr;
 
     [[nodiscard]] const Entry* find(int app) const {
         const auto it = entries.find(app);
@@ -150,6 +216,14 @@ CrucibleLyrics::CrucibleLyrics(QObject* parent)
     : iclforge::apps::CdgFrameSource(parent), state_(std::make_unique<State>()) {
     // A new file, a clear or a nudge is a different picture at the same position.
     connect(this, &CrucibleLyrics::changed, this, &CrucibleLyrics::pictureChanged);
+    // The sessions are read by a thread of the monitor's, only while an application with lyrics
+    // wants one. ICLFORGE_CRUCIBLE_MEDIA_SESSIONS=off turns it off (and is what the QML suite sets, so
+    // that a developer's own music does not move a test).
+    if (qgetenv("ICLFORGE_CRUCIBLE_MEDIA_SESSIONS") != "off") {
+        state_->monitor = new MediaMonitor(nullptr, MediaMonitor::kPollIntervalMs, this);
+        connect(state_->monitor, &MediaMonitor::sessionsRead, this,
+                [this](const std::vector<MediaSession>& read) { applySessions(read, nowMs()); });
+    }
 }
 
 CrucibleLyrics::~CrucibleLyrics() = default;
@@ -159,12 +233,27 @@ qlonglong CrucibleLyrics::nowMs() const {
     return static_cast<qlonglong>(std::chrono::duration_cast<std::chrono::milliseconds>(since).count());
 }
 
+namespace {
+
+// Whether any application with lyrics is waiting on a session.
+[[nodiscard]] bool any_wants_sessions(const std::unordered_map<int, Entry>& entries) {
+    for (const auto& item : entries) {
+        if (is_followable(item.second) && !item.second.by_hand) {
+            return true;
+        }
+    }
+    return false;
+}
+
+}  // namespace
+
 bool CrucibleLyrics::importText(int app, const QString& name, const QString& text, qlonglong durationMs) {
     const QByteArray bytes = text.toUtf8();
     Entry entry = make_entry(name, std::string_view{bytes.constData(), static_cast<std::size_t>(bytes.size())},
                              durationMs);
     const bool ok = entry.status != QStringLiteral("error");
     state_->entries[app] = std::move(entry);
+    refresh_monitor();
     emit changed(app);
     return ok;
 }
@@ -196,12 +285,14 @@ bool CrucibleLyrics::importFile(int app, const QString& fileUrl, qlonglong durat
     }
     const bool ok = entry.status != QStringLiteral("error");
     state_->entries[app] = std::move(entry);
+    refresh_monitor();
     emit changed(app);
     return ok;
 }
 
 void CrucibleLyrics::clear(int app) {
     if (state_->entries.erase(app) > 0) {
+        refresh_monitor();
         emit changed(app);
     }
 }
@@ -219,8 +310,10 @@ void CrucibleLyrics::prune(const QVariantList& liveApps) {
     }
     for (const int app : gone) {
         state_->entries.erase(app);
+        state_->applications.erase(app);
         emit changed(app);
     }
+    refresh_monitor();
 }
 
 QString CrucibleLyrics::status(int app) const {
@@ -255,23 +348,33 @@ void CrucibleLyrics::startAt(int app, qlonglong now_ms) {
         || (it->second.status != QStringLiteral("timed") && it->second.status != QStringLiteral("picture"))) {
         return;
     }
+    // Start is by hand: it takes the position from the person, from this moment, and lets go of
+    // whichever session had it.
+    it->second.by_hand = true;
     it->second.running = true;
     it->second.started_ms = now_ms;
+    it->second.lost = false;
+    refresh_monitor();
     emit changed(app);
 }
 
 void CrucibleLyrics::stop(int app) {
     const auto it = state_->entries.find(app);
-    if (it == state_->entries.end() || !it->second.running) {
+    if (it == state_->entries.end() || !is_following(it->second)) {
         return;
     }
+    // Stopping a session's following is by hand too: it stays stopped until the person says
+    // (Start, or the media session again), and does not start again with the next read.
+    it->second.by_hand = true;
     it->second.running = false;
+    it->second.lost = false;
+    refresh_monitor();
     emit changed(app);
 }
 
 bool CrucibleLyrics::running(int app) const {
     const Entry* entry = state_->find(app);
-    return entry != nullptr && entry->running;
+    return entry != nullptr && is_following(*entry);
 }
 
 int CrucibleLyrics::nudgeMs(int app) const {
@@ -298,10 +401,224 @@ void CrucibleLyrics::nudge(int app, int deltaMs) {
 
 qlonglong CrucibleLyrics::positionMs(int app, qlonglong now_ms) const {
     const Entry* entry = state_->find(app);
-    if (entry == nullptr || !entry->running) {
+    if (entry == nullptr || !is_following(*entry)) {
         return -1;
     }
-    return std::max<qlonglong>(0, now_ms - entry->started_ms);
+    if (entry->by_hand) {
+        return std::max<qlonglong>(0, now_ms - entry->started_ms);
+    }
+    // The session's own position, carried forward from when it was read.
+    const std::optional<std::int64_t> position = iclforge::crucible::ui::position_at(*entry->session, now_ms);
+    return position ? static_cast<qlonglong>(*position) : -1;
+}
+
+void CrucibleLyrics::refresh_monitor() {
+    if (state_->monitor != nullptr) {
+        state_->monitor->setWanted(any_wants_sessions(state_->entries));
+    }
+}
+
+void CrucibleLyrics::setApplication(int app, const QString& name, const QString& imagePath, const QString& appId) {
+    MediaApplication facts;
+    facts.name = name.toStdString();
+    facts.image_path = imagePath.toStdString();
+    facts.app_id = appId.toStdString();
+    const auto it = state_->applications.find(app);
+    if (it != state_->applications.end() && it->second.name == facts.name && it->second.image_path == facts.image_path
+        && it->second.app_id == facts.app_id) {
+        return;
+    }
+    state_->applications[app] = std::move(facts);
+    // Another application, or another name for it, is another match: ask again of what was read.
+    if (state_->entries.contains(app)) {
+        applySessions(state_->sessions, nowMs());
+    }
+}
+
+QString CrucibleLyrics::positionSource(int app) const {
+    const Entry* entry = state_->find(app);
+    return entry != nullptr && entry->by_hand ? QStringLiteral("hand") : QStringLiteral("session");
+}
+
+bool CrucibleLyrics::sessionsAvailable() const {
+    if (state_->monitor == nullptr) {
+        // Switched off: only what a script has fed is there to follow.
+        return state_->fed;
+    }
+    return state_->monitor->support().available;
+}
+
+QString CrucibleLyrics::sessionsUnavailableReason() const {
+    if (state_->monitor == nullptr) {
+        return state_->fed ? QString{}
+                           : QStringLiteral("Reading what other players are playing is turned off.");
+    }
+    const iclforge::crucible::ui::MediaSessionSupport support = state_->monitor->support();
+    return support.available ? QString{} : from_utf8(support.reason);
+}
+
+QString CrucibleLyrics::sessionState(int app) const {
+    const Entry* entry = state_->find(app);
+    if (entry == nullptr || !is_followable(*entry)) {
+        return QStringLiteral("none");
+    }
+    if (entry->by_hand) {
+        return entry->lost ? QStringLiteral("lost") : QStringLiteral("hand");
+    }
+    if (!sessionsAvailable()) {
+        return QStringLiteral("unavailable");
+    }
+    if (entry->session && entry->track_changed) {
+        return QStringLiteral("changed");
+    }
+    if (entry->session) {
+        return entry->session->has_position ? QStringLiteral("following") : QStringLiteral("no-timeline");
+    }
+    return QStringLiteral("waiting");
+}
+
+QString CrucibleLyrics::sessionLabel(int app) const {
+    const Entry* entry = state_->find(app);
+    if (entry == nullptr || !entry->session) {
+        return {};
+    }
+    const MediaSession& session = *entry->session;
+    return from_utf8(session.name.empty() ? session.id : session.name);
+}
+
+QString CrucibleLyrics::sessionTrack(int app) const {
+    const Entry* entry = state_->find(app);
+    if (entry == nullptr || !entry->session) {
+        return {};
+    }
+    const MediaSession& session = *entry->session;
+    if (session.title.empty()) {
+        return {};
+    }
+    return from_utf8(session.artist.empty() ? session.title : session.title + " - " + session.artist);
+}
+
+void CrucibleLyrics::useSession(int app, const QString& sessionId) {
+    const auto it = state_->entries.find(app);
+    if (it == state_->entries.end() || !is_followable(it->second)) {
+        return;
+    }
+    Entry& entry = it->second;
+    entry.by_hand = false;
+    entry.running = false;
+    entry.lost = false;
+    entry.track_changed = false;
+    entry.session_id = sessionId.toStdString();
+    entry.session.reset();
+    entry.bound_track.clear();
+    refresh_monitor();
+    // Match at once against what was last read, so that the strip has it before the next poll.
+    applySessions(state_->sessions, nowMs());
+    emit changed(app);
+}
+
+QVariantList CrucibleLyrics::sessions(int app) const {
+    QVariantList out;
+    const Entry* entry = state_->find(app);
+    for (const MediaSession& session : state_->sessions) {
+        QVariantMap map;
+        map.insert(QStringLiteral("id"), from_utf8(session.id));
+        map.insert(QStringLiteral("name"), from_utf8(session.name.empty() ? session.id : session.name));
+        map.insert(QStringLiteral("title"), from_utf8(session.title));
+        map.insert(QStringLiteral("artist"), from_utf8(session.artist));
+        map.insert(QStringLiteral("state"), session.playback == MediaPlayback::kPlaying ? QStringLiteral("playing")
+                                            : session.playback == MediaPlayback::kPaused ? QStringLiteral("paused")
+                                                                                         : QStringLiteral("stopped"));
+        map.insert(QStringLiteral("hasPosition"), session.has_position);
+        map.insert(QStringLiteral("matched"),
+                   entry != nullptr && entry->session.has_value() && entry->session->id == session.id);
+        out.push_back(map);
+    }
+    return out;
+}
+
+void CrucibleLyrics::applySessions(const std::vector<MediaSession>& read, qlonglong nowMs) {
+    const bool list_changed = !state_->fed || signature(read) != signature(state_->sessions);
+    state_->fed = true;
+    state_->sessions = read;
+
+    std::vector<int> touched;
+    for (auto& item : state_->entries) {
+        Entry& entry = item.second;
+        if (!is_followable(entry) || entry.by_hand) {
+            continue;
+        }
+        const std::string before = stamp(entry);
+
+        std::optional<std::size_t> pick;
+        if (!entry.session_id.empty()) {
+            for (std::size_t i = 0; i < read.size(); ++i) {
+                if (read[i].id == entry.session_id) {
+                    pick = i;
+                    break;
+                }
+            }
+        } else if (const auto facts = state_->applications.find(item.first); facts != state_->applications.end()) {
+            pick = iclforge::crucible::ui::best_session(facts->second, read);
+        }
+
+        if (pick) {
+            entry.session = read[*pick];
+            const std::string key = iclforge::crucible::ui::track_key(*entry.session);
+            if (entry.bound_track.empty()) {
+                entry.bound_track = key;
+            } else if (!key.empty() && key != entry.bound_track) {
+                entry.track_changed = true;
+            }
+        } else if (entry.session) {
+            // It had a session and the session went: the words carry on from where they were, by
+            // hand, and say so, rather than jumping or stopping. A session that was not playing
+            // has no time to carry on with: it is held where it was, stopped.
+            const std::optional<std::int64_t> position = iclforge::crucible::ui::position_at(*entry.session, nowMs);
+            const bool was_playing = entry.session->playback == MediaPlayback::kPlaying && !entry.track_changed;
+            entry.by_hand = true;
+            entry.running = position.has_value() && was_playing;
+            entry.started_ms = nowMs - position.value_or(0);
+            entry.lost = true;
+            entry.session.reset();
+        }
+        if (stamp(entry) != before) {
+            touched.push_back(item.first);
+        }
+    }
+    refresh_monitor();
+    for (const int app : touched) {
+        emit changed(app);
+    }
+    if (list_changed) {
+        emit sessionsChanged();
+    }
+}
+
+void CrucibleLyrics::applySessionList(const QVariantList& read, qlonglong nowMs) {
+    std::vector<MediaSession> sessions;
+    sessions.reserve(static_cast<std::size_t>(read.size()));
+    for (const QVariant& value : read) {
+        const QVariantMap map = value.toMap();
+        MediaSession session;
+        session.id = map.value(QStringLiteral("id")).toString().toStdString();
+        session.name = map.value(QStringLiteral("name")).toString().toStdString();
+        session.executable = map.value(QStringLiteral("executable")).toString().toStdString();
+        session.desktop_id = map.value(QStringLiteral("desktopId")).toString().toStdString();
+        session.title = map.value(QStringLiteral("title")).toString().toStdString();
+        session.artist = map.value(QStringLiteral("artist")).toString().toStdString();
+        session.duration_ms = map.value(QStringLiteral("durationMs")).toLongLong();
+        session.has_position = map.value(QStringLiteral("hasPosition"), true).toBool();
+        session.position_ms = map.value(QStringLiteral("positionMs")).toLongLong();
+        session.read_at_ms = nowMs;
+        session.rate = map.value(QStringLiteral("rate"), 1.0).toDouble();
+        const QString playback = map.value(QStringLiteral("playback"), QStringLiteral("playing")).toString();
+        session.playback = playback == QLatin1String("playing")  ? MediaPlayback::kPlaying
+                           : playback == QLatin1String("paused") ? MediaPlayback::kPaused
+                                                                 : MediaPlayback::kStopped;
+        sessions.push_back(std::move(session));
+    }
+    applySessions(sessions, nowMs);
 }
 
 QImage CrucibleLyrics::pictureFrame(int key, qlonglong positionMs) {
@@ -323,7 +640,7 @@ QVariantMap CrucibleLyrics::cursor(int app, qlonglong now_ms) const {
     map.insert(QStringLiteral("positionMs"), static_cast<qlonglong>(-1));
     map.insert(QStringLiteral("fills"), QVariantList{});
     const Entry* entry = state_->find(app);
-    if (entry == nullptr || !entry->running || !entry->lyrics.timed) {
+    if (entry == nullptr || !is_following(*entry) || !entry->lyrics.timed) {
         return map;
     }
     const qlonglong position = positionMs(app, now_ms);

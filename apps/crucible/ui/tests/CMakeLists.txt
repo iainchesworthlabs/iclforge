@@ -19,6 +19,10 @@ qt_add_executable(crucible_qmltests
     ui/src/crucible_controller.hpp
     ui/src/lyrics_controller.cpp
     ui/src/lyrics_controller.hpp
+    ui/src/media_monitor.cpp
+    ui/src/media_monitor.hpp
+    ui/src/media_session.cpp
+    ui/src/media_session.hpp
     ui/src/app_entry.hpp
     ui/src/app_icon_provider.hpp
     ui/src/tray_support.hpp
@@ -46,13 +50,22 @@ qt_add_executable(crucible_qmltests
 # shared library, so nothing is inherited from the other target.
 if(WIN32)
     target_sources(crucible_qmltests PRIVATE ui/src/platform/windows/app_icon_provider.cpp
+                                                ui/src/platform/windows/media_sessions.cpp
                                                 ui/src/platform/windows/tray_support.cpp)
+    target_link_libraries(crucible_qmltests PRIVATE WindowsApp)
 elseif(LINUX)
     target_sources(crucible_qmltests PRIVATE ui/src/platform/linux/app_icon_provider.cpp
                                                 ui/src/platform/linux/tray_support.cpp)
     target_sources(crucible_qmltests PRIVATE ui/src/desktop_entries.cpp ui/src/desktop_entries.hpp)
+    if(ICLFORGE_CRUCIBLE_DBUS_LIB)
+        target_sources(crucible_qmltests PRIVATE ui/src/platform/linux/media_sessions.cpp)
+        target_link_libraries(crucible_qmltests PRIVATE ${ICLFORGE_CRUCIBLE_DBUS_LIB})
+    else()
+        target_sources(crucible_qmltests PRIVATE ui/src/platform/linux/no_media_sessions.cpp)
+    endif()
 elseif(APPLE)
     target_sources(crucible_qmltests PRIVATE ui/src/platform/macos/app_icon_provider.mm
+                                                ui/src/platform/macos/media_sessions.mm
                                                 ui/src/platform/macos/tray_support.cpp)
     set_target_properties(crucible_qmltests PROPERTIES
         OBJCXX_STANDARD 23

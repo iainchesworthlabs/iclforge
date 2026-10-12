@@ -272,19 +272,38 @@ text. It is imported by its extension, in any case, and drawn under the file's n
 draws it: 300 by 216 pixels, as large as fits in whole-pixel steps, against the same Start and the
 same nudge as an `.lrc`. Its words are pixels, so none are read as text, and the page says so.
 
-**Where the position comes from.** Crucible taps what an application plays and knows nothing of
-its track, so it has no way to read where a song is. The position is **start-and-nudge**:
+**Where the position comes from.** Crucible taps what an application plays, which tells it
+nothing of the song's place, so the position is the application's **media session** where it
+publishes one, and **start-and-nudge** where it does not.
 
-- press **Start** as the song begins, and the strip runs from there on this window's own clock;
-- **Start again** begins it again, which is what a restart in the player needs;
-- the **-0.1 s** and **+0.1 s** buttons show the words earlier or later (up to ten seconds either
-  way), which is what a slow player or a sluggish output needs;
+The media session is what the system's own media controls read: the System Media Transport
+Controls on Windows (Windows 10, version 1809 or later), MPRIS on the D-Bus session bus on Linux,
+and the now-playing information on macOS. The strip is matched to the application's session by its
+executable's name (a session names its source by the program's own identifier; Windows gives no
+process id), follows it from the moment lyrics are imported with no press of Start, and carries the
+player's position forward between reads, so **a pause and a seek in the player are followed**. The
+strip says whose session it follows and what track it is.
+
+- When no session is matched and some are playing, they are offered as buttons: choose the player.
+- **Start** is by hand: the strip runs from there on this window's own clock, and lets go of the
+  session until **Follow the media session** takes it back. A session that publishes no position
+  (a live stream) cannot be followed, and the strip says so.
+- If the session goes away (the player quits), the words **carry on by the clock from where they
+  were** and say so, instead of jumping or stopping.
+- If the session's track changes (its title, artist or length), the lyrics are **not** followed
+  against it: they were for the last. Import the lyrics for the new one, or follow it anyway.
+- The **-0.1 s** and **+0.1 s** buttons show the words earlier or later (up to ten seconds either
+  way) on top of either origin, which is what a slow player or a sluggish output needs.
 - **Stop** stops following and keeps the lyrics, and **Clear** drops them.
 
-It does not see a pause or a seek in the player, and the page says so beside the buttons. Reading
-the position from the application's own media session, where it publishes one (the transport
-controls on Windows, MPRIS on Linux, the now-playing information on macOS), is a separate change
-that would replace the Start press and keep everything else.
+Where the platform cannot read sessions, the strip says why and keeps Start and the nudge: a
+Linux build without Qt's D-Bus module, and **macOS**, whose only reader is a private framework that
+developers report macOS 15.4 and later withholds from programs Apple has not entitled (no Mac has
+run Crucible's reader; see [the findings](../../planning/karaoke-phase2-findings.md)). The sessions
+are read on a thread of their own, only while an application with lyrics is waiting on one;
+`ICLFORGE_CRUCIBLE_MEDIA_SESSIONS=off` turns the reading off.
+
+By hand, it does not see a pause or a seek in the player, and the page says so beside the buttons.
 
 Lyrics belong to the application of this session: they go when it leaves the list. An `.lrc` that
 cannot be read says why on the page (not UTF-8 or UTF-16, empty, no lyrics in it), and a file with

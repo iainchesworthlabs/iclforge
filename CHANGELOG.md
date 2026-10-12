@@ -263,6 +263,15 @@ The sections below contain the complete change list and fixes.
   drawn as its picture under the file's name (the shared `CdgPicture`: 300 by 216, as large as
   fits in whole-pixel steps) and followed by the same Start and nudge an `.lrc` has; its words are
   pixels, so none are read as text and the page says so (planning/karaoke-phase2.md, W13f and D11).
+- **Crucible's lyric strip follows an application's media session.** The position is the player's
+  own where it publishes one (the System Media Transport Controls on Windows, MPRIS on Linux, the
+  now-playing information on macOS), so a pause and a seek are followed with no press of Start; the
+  words carry on by the clock if the session goes away, and are not followed against a new track's
+  title, artist or length. Start is by hand and **Follow the media session** takes it back; a
+  session that is not matched is offered when others are playing. The sessions are read on a
+  thread of their own, only while an application with lyrics waits on one. The macOS reader is the
+  private now-playing framework, which developers report macOS 15.4 and later withholds, and no
+  Mac has run it (planning/karaoke-phase2.md, D9; planning/karaoke-phase2-findings.md).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the

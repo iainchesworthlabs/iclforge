@@ -402,6 +402,10 @@ class DeskIsolation : public QObject {
 
 public slots:
     void applicationAvailable() {
+        // The window reads what other players are playing (media_monitor.hpp) while an application
+        // has lyrics to follow; a developer's own music must not move a case, so the reader is off
+        // and the lyrics suite scripts what the system would have said (applySessionList).
+        qputenv("ICLFORGE_CRUCIBLE_MEDIA_SESSIONS", "off");
         QCoreApplication::setOrganizationName(QStringLiteral("iclforge"));
         QCoreApplication::setApplicationName(QStringLiteral("Crucible"));
         QQuickStyle::setStyle(QStringLiteral("Basic"));
