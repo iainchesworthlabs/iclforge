@@ -95,6 +95,27 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **`forge decode` and `forge monitor` re-level the karaoke-capable decoder's parts.**
+  `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
+  flexibility" in the units, the span and the defaults of Hearth's sliders and the wire's
+  `karaoke_*_db` keys: each part against Table C.2.3, 0 dB the table bit for bit, up to 12 dB
+  louder, and -24 or `off` at the bottom. A part raised far enough lowers the others, as the
+  library's gains do. They are the capable decoder's alone: a level with `karaoke` bare, `off` or
+  absent is refused, as is a value outside the span, and the report names the parts that moved
+  (`levels: melody -6.0 dB, V1 off`) (planning/karaoke-phase2.md, W10).
+- **`forge monitor` plays a karaoke stream's reproduction, and `play`, `spdif` and `spatial` read
+  the choice.** `karaoke` and `karaoke=none|v1|v2|v1+v2` were `decode`'s alone; every other command
+  refused them as unknown options. `monitor` now applies them to an AC-3 stream and lays the
+  reproduction out as the 3/0 mode it is (L, R, C and the LFE in a device's order, with the
+  speakers named to the output) where it laid the coded 3/2 layout out before, folds to the output's
+  width as it always has (the 2/0 reproduction is what plays on a stereo endpoint), refuses
+  `downmix=ltrt` as `decode` does, and says which reproduction was played. `play` applies it where it
+  decodes (its PCM fallback). `spdif`, `play`'s bitstream legs and `spatial` hand a stream on or
+  place its objects without decoding, so they accept the choice and warn that it is not applied (a
+  receiver reproduces the stream); E-AC-3 and AC-4 streams warn that karaoke is AC-3's. `monitor`
+  also stops with "the channel layout changes mid-stream" where a stream's layout changes after
+  the output was opened, in place of reading past the narrower frame (planning/karaoke-phase2.md,
+  W5 and W10).
 - **The karaoke guide has a recipe for timing a song's words with a forced aligner.** [Timing a
   song with a forced aligner](docs/karaoke/forced-alignment.md) takes a song and its plain lyrics
   through WhisperX (with Demucs where the vocal has to be separated), both run outside the
@@ -343,15 +364,6 @@ The sections below contain the complete change list and fixes.
   the decoder was run in Node against `forge decode` of the karaoke example below: all eight cases
   match sample for sample. An AC-3 stream's fold levels now come from its own `cmixlev` and
   `surmixlev` (they were the E-AC-3 defaults) (planning/karaoke-phase2.md, W8).
-- **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
-  `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
-  part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table
-  C.2.3 (the span and defaults of Hearth's sliders), and a decoded frame says `bsmod`, `is_karaoke`,
-  `output_acmod`, `output_lfe` and `karaoke_reproduced`, with `channel_labels` for the channels that
-  are there. `iclforge.lyrics` reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke files into
-  lines of timed words with their singers (`parse`, `read`, `find_file`) and gives the cursor
-  (`Lyrics.position`, `word_state`): the reader Hearth uses, bound as it is (planning/karaoke-phase2.md,
-  W5).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while

@@ -1,6 +1,6 @@
 # Karaoke, phase 2: findings
 
-!!! note "Status as of 2026-10-11: read from the code on `main` at `c6aef2b00`; nothing here is built"
+!!! note "Status as of 2026-10-12: read from the code on `main` at `c6aef2b00` on 2026-10-11; what it recommends is built, apart from W12's panel"
     The research behind [the phase 2 plan](karaoke-phase2.md): [word timing](#w3-word-timing-the-shapes)
     (W3), [lyrics for a network group](#w4-lyrics-for-a-network-group) (W4) and
     [Android and a browser page](#w5-android-and-a-browser-page) (W5). Each ends in a
@@ -10,6 +10,7 @@
     Where a claim was measured it says so; the rest is read from the source and says that, so a
     later reader can tell which to trust and which to run. The sizes are the plan's: **S** is one
     small pull request, **M** one of a few hundred lines with its tests, **L** two to four stacked.
+    The last section was added on 2026-10-12, after the builds, and records what a board showed.
 
 ## W3: word timing, the shapes
 
@@ -412,3 +413,27 @@ as it is.
 | Android | Not a slice: a player app first |
 | W13 | The lyric module to a `lyrics` library under `libs` first (S to M), before W6's writer; Crucible has no position source, so its import needs one (D9); CD+G is a picture, not text; "mini karaoke" read as MIDI karaoke (D10) |
 | E19 (D13) | The Forge GUI's timing tool: A leave it and point at Hearth (**S**), B open the stream in Hearth from the GUI (**M**, needs Hearth to take a file argument, which it does not), C share the session and dialog (**L**, and the GUI's position is not delay-corrected); the lyric file is unchanged under A and B, and under C the GUI becomes a writer of `.lrc` ([above](#e19-timing-the-words-in-the-forge-gui-the-options)) |
+
+## What the build found on an S3 board
+
+Found on 2026-10-12, while building W7d (the lyrics to a board, #1340) and then running its tree
+and `main`'s on a real ESP32-S3 by OTA. Nothing above predicted these; each is a fact about the
+internal RAM an S3 has left once Wi-Fi is up, or about a build that nothing in the pull-request
+gate runs.
+
+| What was tried | Why it matters | Result |
+|---|---|---|
+| W7d's tree, which links the lyric library | The Sendspin decode task takes a 32,768-byte stack from internal RAM (`ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES`); with Wi-Fi up the largest internal block is 31,744 bytes, so the stack fitted only by what was allocated before it. Linking the lyric library alone added 320 bytes of `.bss`, the locale objects that `<fstream>` and `<filesystem>` pull in | The player did not start, and the OTA rolled the image back after its 300 s trial |
+| `main`'s S3 release image shape, `sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram;sdkconfig.sendspin;sdkconfig.s3-fast` (the step "Build the S3 board's Sendspin player and package its image" of `build-esp32s3`, `.github/workflows/_build.yml`), before #1340 | CI builds and packages this image and never runs it | It built and did not start its Sendspin player on a board, for the same reason |
+| `main` at #1340, same shape | #1336 made the root `CMakeLists.txt` add `libs/lyrics` only when neither minimum-footprint profile is on, because the ESP-IDF component's archive does not stage it; #1340 made the sink's player link `iclforge::lyrics`; a sink build is a minimum-footprint build | The sink firmware did not configure (`Target "__idf_iclforge" links to: iclforge::lyrics but the target was not found`, `firmware/esp-idf/iclforge/CMakeLists.txt`). The PR Gate builds no ESP32 sink image, so neither pull request saw it |
+| `main` with #1344, same shape | #1344 adds `libs/lyrics` also when `ICLFORGE_SENDSPIN_PLAYER_ONLY` is set, which the component sets for a sink and a packed archive never has | It builds and starts its player on an S3 board (flashed by OTA on trial) |
+
+**The stack's fix** is in the tree since #1340: `BurstPlayerConfig::stack_in_psram` and the Kconfig
+symbol `ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM` (`firmware/hearth-sink/main/Kconfig.projbuild`),
+which defaults to 1 for an ESP32-S3 with PSRAM, so the stack no longer depends on what was
+allocated before it. The Kconfig symbol was new: a build directory configured before it existed
+keeps its `sdkconfig`, and the symbol appears only once that file is deleted.
+
+**What to re-check.** An S3 measurement made with the Sendspin player in an image of the shape above,
+built from a tree before #1340, was not made with the player running. An image built from a tree
+with `stack_in_psram` was.

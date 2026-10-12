@@ -82,6 +82,37 @@ struct ReadTrack {
     std::string language{"und"};
 };
 
+// What a track the reader did not select is, by its TrackType: 1 is video, 2 is audio, 17 is a
+// subtitle track (text, or a bitmap such as VobSub or PGS: the codec says which), and any other
+// type is other.
+enum class TrackKind : std::uint8_t { kAudio, kVideo, kText, kOther };
+
+[[nodiscard]] constexpr std::string_view describe(TrackKind kind) {
+    switch (kind) {
+        case TrackKind::kAudio:
+            return "audio";
+        case TrackKind::kVideo:
+            return "video";
+        case TrackKind::kText:
+            return "text";
+        case TrackKind::kOther:
+            break;
+    }
+    return "other";
+}
+
+// A track the reader saw and did not read: what a file holds besides the audio it gave up. Its
+// frames are not read through this; it is what the Tracks element says, for a caller that wants to
+// tell a person what else the file carries.
+struct SkippedTrack {
+    std::uint64_t track_number = 0;
+    TrackKind kind = TrackKind::kOther;
+    // The CodecID as stored ("V_MPEG4/ISO/AVC", "A_AAC", "S_TEXT/UTF8", "S_VOBSUB").
+    std::string codec_id;
+    // As stored, "und" when the file names none.
+    std::string language{"und"};
+};
+
 // Bounds on what the reader will do for one file - defences against a
 // hostile container rather than tuning knobs (see the header comment). The
 // defaults sit far above anything a real AC-3/E-AC-3 file reaches (the
@@ -114,6 +145,8 @@ struct Demuxed {
     ReadTrack track;
     // Views into the buffer passed to demux(), which must outlive this.
     std::vector<std::span<const std::byte>> frames;
+    // The other tracks the file declares, in file order, up to 64: none of their frames are read.
+    std::vector<SkippedTrack> skipped;
 };
 
 // Reads a complete Matroska file held in one buffer. Frames come back as

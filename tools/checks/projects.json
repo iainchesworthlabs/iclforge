@@ -28,7 +28,7 @@
     "hearth":   {"kind": "app", "path": "apps/hearth", "may_use": ["ac3", "ac4", "audio", "base", "containers", "device", "lyrics", "objects", "render", "sendspin", "app-cdg-picture", "app-media", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"], "purpose": "Hearth: the reference player: its engine (the queue, the transport, the output decision), the Qt application, and the test sink and test server."},
     "crucible": {"kind": "app", "path": "apps/crucible", "may_use": ["ac3", "ac4", "audio", "base", "containers", "lyrics", "objects", "app-cdg-picture", "app-preferences", "app-theme"], "lanes": ["windows", "linux", "macos"], "purpose": "Crucible: the Atmos monitoring bed and its virtual output device, for Windows, Linux and macOS."},
     "demo-android": {"kind": "app", "path": "apps/demos/android", "may_use": ["ac3", "audio", "base", "containers"], "lanes": ["android"], "purpose": "The Android (Shield) demo application."},
-    "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "objects"], "lanes": ["wasm"], "purpose": "The browser demos, built with Emscripten."},
+    "demo-wasm":    {"kind": "app", "path": "apps/demos/wasm", "may_use": ["ac3", "ac4", "lyrics", "objects"], "lanes": ["wasm"], "purpose": "The browser demos, built with Emscripten."},
 
     "python": {"kind": "binding", "path": "bindings/python", "may_use": ["ac3", "ac4", "base", "containers", "lyrics", "objects"], "lanes": ["python"], "purpose": "The Python binding: the iclforge wheel, built with scikit-build-core."},
     "rust":   {"kind": "binding", "path": "bindings/rust", "may_use": ["capi"], "lanes": ["rust"], "purpose": "The Rust crates: iclforge and iclforge-sys over the C API."},
