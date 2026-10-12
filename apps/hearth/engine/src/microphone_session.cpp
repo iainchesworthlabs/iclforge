@@ -268,4 +268,12 @@ MicrophoneSnapshot MicrophoneSession::snapshot() const {
     return s;
 }
 
+pitch::Tally MicrophoneSession::tally(std::int64_t start_ms, std::int64_t end_ms) const {
+    return performance_ ? performance_->tally(start_ms, end_ms) : pitch::Tally{};
+}
+
+const std::deque<TracePoint>* MicrophoneSession::trace() const {
+    return performance_ ? &performance_->trace() : nullptr;
+}
+
 }  // namespace iclforge::hearth
