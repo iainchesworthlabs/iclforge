@@ -298,7 +298,7 @@ profile's `budget` is also where the heap table lives:
 | | S3 `s3-n16r8` | C6 `c6-16mb` | Source |
 |---|---|---|---|
 | Largest internal block, Wi-Fi up, Sendspin up | 31,744 | 31,232 | 2026-10-12 deploy, 4065 |
-| Static internal RAM | 176,854 (budget 185,000) | 144,139 (budget 151,000; [corrected in PR 14](#the-c6s-static-ram-budget-was-wrong-pr-14)) | `idf.py size` |
+| Static internal RAM | 176,854 (budget 185,000) | 116,307 (budget 122,000; [corrected in PR 14, then lowered](#the-c6s-static-ram-budget-was-wrong-pr-14)) | `idf.py size` |
 | Free low-water over the play list | recorded by the first suite run | same | board suite |
 
 The numbers above are today's, from a failing build: the first PR fixes the build and then the
@@ -668,8 +668,23 @@ the C6 steps were skipped. The first `bench_flash.py build c6-16mb` of this tree
 guard with 144,139 against 108,000, which is how it was found. **The budget is now 151,000** (the
 measured 144,139 and 4.8%, as the S3's 185,000 is its 176,854 and 4.6%). A budget is not in the
 profile hash, so no baseline moves.
-Static RAM is also what the C6's heap is the remainder of: the same tables are the
-reason the E-AC-3 stream above has so little left.
+Static RAM is also what the C6's heap is the remainder of: the same tables were the
+reason the E-AC-3 stream above had so little left.
+
+**Then lowered to 122,000, with the tables out.** The 39,752 bytes of `.bss` of
+`libiclforge_ac3_minimal.a` in the linked image (not the archive's 39,864: the three
+translation units' copies of `fixed_imdct_tables()` are one weak symbol in the image, and that
+table, 5,728 bytes, is every stream's) were tables of tools a plain stereo stream never uses.
+Taken out, each where its tool is: the ECPL double tables (`xcos3_table`, `ecpl_y`: 10,240) are no
+longer linked, their narrowed copies being evaluated from the same expressions where the scratch
+makes them; the 512-point DFT's twiddles (5,536) and the transient pre-noise cross-fades
+(3,072) are members of the heap objects that exist only for a stream that uses those tools; and
+JOC's MDCT-domain direct-form branches, which a profile with no direct form cannot take and whose
+stubs they would have called, no longer name the double transforms, so `mdct.cpp`'s double
+tables (8,928) are not linked. DIRAM of both C6 images 144,139 -> **116,307**
+(`.dram0.bss` 81,736 -> 53,904), budget 116,307 and 4.9% = 122,000. What is left of the
+library's 11,976 bytes is `fixed_imdct_tables` (5,728), JOC's float MDCT tables (4,496, which
+only an object stream in the MDCT domain reads) and 1,752 of small tables.
 
 ## Changing a profile
 

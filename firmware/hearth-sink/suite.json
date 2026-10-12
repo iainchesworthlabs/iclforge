@@ -79,7 +79,8 @@
       "plays": [
         {"id": "ac3-2.0-refused", "stream": "ac3-2.0", "expect": "refused-memory"},
         {"id": "eac3-2.0-refused", "stream": "eac3-2.0", "expect": "refused-memory"},
-        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"}
+        {"id": "ac3-2.0-sendspin", "stream": "ac3-2.0", "via": "sendspin"},
+        {"id": "eac3-2.0-sendspin", "stream": "eac3-2.0", "via": "sendspin"}
       ]
     },
     "c6-4mb": {
