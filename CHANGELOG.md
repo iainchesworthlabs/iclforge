@@ -4839,6 +4839,25 @@ The sections below contain the complete change list and fixes.
   do, and no `float` PCM hash moves (56 plays and cuts compared, the probe's six fixtures at their pins).
   [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md#the-low-power-sram) has the measurements.
 
+**Sendspin: a group's timeline and a board that is moving**
+
+- **A board the host moved onto `player@v1` as an item started could miss the start of it, and was
+  never sent what it missed.** The group planner asks for the move (`ServerHost::use_pcm()`),
+  which takes a round trip on the live connection, and `Group` began its timeline as soon as one
+  member could play: a member that was ready after that was started at the frame the group had
+  reached. On a loopback the move takes a few milliseconds and the engine's first PCM block goes
+  in about as soon (3 to 4 ms after the plan in the runs measured); with the machine busy the
+  board joined 24 to 244 ms after the first block and held 4,864 or 29,184 frames fewer than the
+  item, and Hearth's karaoke group tests that wait for a board's frames failed when their 60 s
+  wait expired: 3 rounds in 40 with 64 busy processes, none in 80 with the change. The group
+  now holds the start of its timeline while a member the host asked to
+  move is still moving (on the extension role, or on `player@v1` without the state it owes
+  before a stream), for at most a second, so every member is sent the programme from its first
+  frame; a member that has not moved by then is left behind as before. `group: a programme waits
+  for a sink the host has just moved to PCM` fails without the change, the moved sink holding
+  9,600 of 14,400 frames each of three times. The karaoke group cases' waits for a board's
+  totals now report what each board holds and what both sides logged when they expire.
+
 ## [0.10.0-beta.1] - 2026-09-01
 
 Tenth tagged release. The E-AC-3 encoder catches up with the decision quality AC-3 got in 0.7.0,
