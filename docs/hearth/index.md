@@ -258,6 +258,13 @@ here" choice, PCM or Opus: Opus is lossy and a twelfth of PCM's bytes, so it rid
 link, and it applies the next time the group plays. A board lists Opus only where its firmware
 decodes it, which the C6's does.
 
+A member that states how many objects it places (`max_objects`, per data type) is sent an item
+that has more as PCM decoded here, with the objects placed at the layout it takes. Hearth reads an
+AC-4 presentation's count from its first I-frame, the LFE not counted. An AC-4 presentation of
+objects alone has no channels for the member to fall back to, so its limit holds whatever the
+member's layout or objects setting say; one with channels besides is played by a member that places
+fewer as its bed, as an E-AC-3 stream is.
+
 ### Languages
 
 The window ships in English and in German, Spanish, French, Arabic, Hebrew and Yiddish, chosen in

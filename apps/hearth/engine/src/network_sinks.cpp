@@ -834,6 +834,7 @@ std::vector<render::OutputLayout> NetworkSinks::plan_group(const GroupPlanReques
                             .sample_rate = request.sample_rate,
                             .coded_channels = request.coded_channels,
                             .objects = request.objects,
+                            .objects_alone = request.objects_alone,
                             .karaoke = request.karaoke};
     const GroupFormPlan plan = plan_group_forms(needs, request.layout, facts);
 

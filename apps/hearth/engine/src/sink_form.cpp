@@ -200,7 +200,9 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
 // Why a sink that would place this stream's objects is not to be sent it as it is: it states
 // fewer objects than the stream has, and would place them. Nothing for a stream with none, for a
 // sink that states no limit for the type, and for one whose settings or layout leave the objects
-// out (it plays the bed, which is what the stream is to it).
+// out (it plays the bed, which is what the stream is to it). A stream of objects alone (an AC-4
+// presentation with no channels) has no bed, so the sink's settings and layout do not matter:
+// past its limit it plays nothing.
 [[nodiscard]] std::optional<std::string> object_refusal(const StreamNeeds& stream,
                                                         const SinkFacts& sink) {
     if (!stream.stream || stream.objects == 0 || !sink.iclforge_support) {
@@ -211,10 +213,12 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
     if (!limit || stream.objects <= *limit) {
         return std::nullopt;
     }
-    bool places = false;
+    bool places = stream.objects_alone;
     const std::optional<sp::ObjectsPolicy> policy =
         sink.intended_settings ? sink.intended_settings->decoder.objects : std::nullopt;
-    if (policy == sp::ObjectsPolicy::kAlways) {
+    if (stream.objects_alone) {
+        // Placed or not, there is nothing else to play.
+    } else if (policy == sp::ObjectsPolicy::kAlways) {
         places = true;
     } else if (policy != sp::ObjectsPolicy::kNever) {
         places = configured_layout(sink, stream).has_height();
@@ -375,9 +379,12 @@ SinkChoice choose_sink_form(const StreamNeeds& stream, const SinkFacts& sink,
                                       reproduced)};
     }
     // The sink decodes the stream but would play its bed alone, past the objects it places.
-    // Decoded here, the objects are placed; where that is not possible it plays the bed.
-    SinkChoice pcm = pcm_choice(*objects, stream, sink, policy, /*may_fold=*/false);
-    if (pcm.form == SinkForm::kPcm) {
+    // Decoded here, the objects are placed; where that is not possible it plays the bed. A stream
+    // of objects alone has no bed, so there a fold to a width the sink takes is worth having
+    // (the other way, it plays nothing), and where PCM is not possible the sink is sent nothing,
+    // with the reason, and not a stream it would play silence of.
+    SinkChoice pcm = pcm_choice(*objects, stream, sink, policy, /*may_fold=*/stream.objects_alone);
+    if (pcm.form == SinkForm::kPcm || stream.objects_alone) {
         return pcm;
     }
     return {.form = SinkForm::kCoded,
