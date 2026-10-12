@@ -30,8 +30,8 @@ REPO = HERE.parents[1]
 
 # Images the release rules know that no profile describes yet. Naming one here is a
 # decision, not a default: the rule lists in tools/ci/check_firmware_package.py and the
-# profiles file are meant to be the same list.
-IMAGES_WITHOUT_A_PROFILE: set[str] = {"hearth-sink-esp32p4-rev3"}
+# profiles file are meant to be the same list. None is left: the P4's v3.x image has its profile.
+IMAGES_WITHOUT_A_PROFILE: set[str] = set()
 
 
 def small_data() -> dict:
@@ -97,13 +97,21 @@ def make_build(
     root: Path,
     final: dict[str, str],
     defaults: str | None = "sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram",
+    identity: tuple[str, str] | bool | None = None,
 ) -> Path:
     build = root / "build"
     build.mkdir()
     write_config(build / "sdkconfig", final)
     if defaults is not None:
+        who = ""
+        if identity is not False:
+            who = (
+                f"ICLFORGE_PROFILE:STRING={'a' if identity is None else identity[0]}\n"
+                "ICLFORGE_PROFILE_HASH:STRING="
+                f"{sp.profile_hash(small_data(), 'a') if identity is None else identity[1]}\n"
+            )
         (build / "CMakeCache.txt").write_text(
-            f"CMAKE_BUILD_TYPE:STRING=\nSDKCONFIG_DEFAULTS:UNINITIALIZED={defaults}\n", "utf-8"
+            f"CMAKE_BUILD_TYPE:STRING=\nSDKCONFIG_DEFAULTS:UNINITIALIZED={defaults}\n{who}", "utf-8"
         )
     return build
 
@@ -173,17 +181,165 @@ class TheFile(unittest.TestCase):
                     f"the release rules publish {name} and no profile describes it",
                 )
 
-    def test_the_workflow_builds_what_the_profiles_say(self) -> None:
-        """_build.yml spells each published image's fragments by hand until it reads
-        `sink_profile.py defaults`; until then they are held to the profiles here."""
-        text = (REPO / ".github" / "workflows" / "_build.yml").read_text("utf-8")
-        spelled = set(re.findall(r'"-DSDKCONFIG_DEFAULTS=([^"]+)"', text))
-        for ident in ("s3-n16r8", "c6-16mb", "c6-4mb", "p4-rev1", "p4-rev1-ac4"):
-            self.assertIn(
-                sp.defaults_string(self.data, ident),
-                spelled,
-                f"_build.yml does not build {ident} as the profile says",
+    def test_the_measure_overlay_sets_only_the_keys_it_declares(self) -> None:
+        """An image built with `measure` is the profile's, not a scratch build, because the
+        overlay moves nothing the guard holds: its fragment sets only observation keys, each of
+        them declared, and none of them a stack, a ring, a cache or a placement."""
+        spec = self.data["overlays"]["measure"]
+        self.assertEqual(spec.get("fragment"), "measure")
+        text = (sp.PROJECT / "sdkconfig.measure").read_text("utf-8")
+        keys = [
+            line.split("=", 1)[0]
+            for line in text.splitlines()
+            if line.startswith("CONFIG_") and "=" in line
+        ]
+        self.assertTrue(keys, "sdkconfig.measure sets nothing")
+        for key in keys:
+            self.assertTrue(sp._matches(key, spec["touches"]), f"{key} is not declared")
+            for word in ("STACK", "RING", "CACHE", "IN_PSRAM", "DMA", "LANE", "CORE"):
+                self.assertNotIn(word, key, f"measure may not move {key}")
+
+    def test_a_measure_image_is_the_profile_s_and_its_hash_key_may_differ_from_the_locked_value(
+        self,
+    ) -> None:
+        locked = self.data["profiles"]["p4-rev1-ac4"]["locked"]
+        self.assertEqual(locked["CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH"], "0")
+        moved = sp.touched(self.data, ("measure",))
+        self.assertTrue(sp._matches("CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH", moved))
+        names = sp.fragment_names(self.data, "p4-rev1-ac4", ("measure",))
+        self.assertEqual(names[-1], "sdkconfig.measure")
+
+    def test_the_v3_profile_has_the_screen_s_fragments_in_order_and_no_board_yet(self) -> None:
+        spec = self.data["profiles"]["p4-rev3"]
+        self.assertEqual(
+            spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "panel", "panel-dsi"]
+        )
+        self.assertEqual(spec["target"], "esp32p4")
+        self.assertEqual(spec["boards"], [], "a board is named when one has run the image")
+        self.assertEqual(spec["image"]["name"], "hearth-sink-esp32p4-rev3")
+
+    def test_the_two_p4_images_refuse_each_other_s_chips(self) -> None:
+        """v1.x and v3.x firmware are not interchangeable (Espressif's v3.x guide, 1.1): the
+        revision windows of the two profiles do not overlap, so neither takes the other's chip."""
+        old, new = (self.data["profiles"][i]["image"] for i in ("p4-rev1", "p4-rev3"))
+        self.assertLess(old["highest"], new["lowest"])
+        self.assertEqual(old["refuse_above"], old["highest"])
+        self.assertEqual(new["refuse_above"], new["highest"])
+
+    def test_the_v3_profile_locks_the_screen_task_s_stack_which_is_free_for_every_other(
+        self,
+    ) -> None:
+        key = "CONFIG_ICLFORGE_EXAMPLE_PANEL_STACK_BYTES"
+        self.assertTrue(sp.is_free(self.data, key))
+        self.assertEqual(self.data["profiles"]["p4-rev3"]["locked"][key], "16384")
+        for ident, spec in self.data["profiles"].items():
+            if ident != "p4-rev3":
+                self.assertNotIn(key, spec["locked"], f"{ident} has no screen")
+
+    def test_the_v3_profile_is_on_400_mhz_with_the_screen_on_and_no_other_display(self) -> None:
+        locked = self.data["profiles"]["p4-rev3"]["locked"]
+        self.assertEqual(locked["CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400"], "y")
+        self.assertEqual(locked["CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI"], "y")
+        self.assertEqual(locked["CONFIG_LV_USE_CUSTOM_MALLOC"], "y")
+        self.assertEqual(locked["CONFIG_ESP32P4_REV_MIN_FULL"], "301")
+        self.assertEqual(locked["CONFIG_ESP32P4_REV_MAX_FULL"], "399")
+        self.assertNotIn("CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL", locked)
+
+    def test_the_v3_profile_has_budgets_a_build_can_be_held_to(self) -> None:
+        budget = self.data["profiles"]["p4-rev3"]["budget"]
+        self.assertGreater(budget["app_bytes_max"], 2_400_000)
+        self.assertGreater(budget["internal_static_bytes_max"], 150_000)
+        self.assertEqual(budget["bootloader_bytes_max"], 24576)
+
+    def test_the_panel_s_stack_keys_are_free_and_not_unplaced_in_a_profile_without_a_screen(
+        self,
+    ) -> None:
+        """Main's P4X work (#1400) put ICLFORGE_EXAMPLE_PANEL_STACK_BYTES in every target's
+        Kconfig and LVGL's LV_SPAN_SNIPPET_STACK_SIZE in every P4 build. Both match `*STACK*`,
+        and a build of any profile had two findings for keys that place nothing there."""
+        data = sp.load()
+        for key in (
+            "CONFIG_ICLFORGE_EXAMPLE_PANEL_STACK_BYTES",
+            "CONFIG_LV_SPAN_SNIPPET_STACK_SIZE",
+        ):
+            self.assertTrue(sp.is_watched(data, key), key)
+            self.assertTrue(sp.is_free(data, key), key)
+        # a real stack key that is not one of these is still not free
+        self.assertFalse(sp.is_free(data, "CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"))
+
+    def test_every_profile_locks_the_sendspin_ac4_listing_keys(self) -> None:
+        """#1446's two keys are declared with no dependency, so they are in every profile's
+        configuration and match the watch pattern: a profile that does not lock them is reported
+        [unplaced] by the first build after main is merged in."""
+        for ident, spec in self.data["profiles"].items():
+            locked = spec["locked"]
+            self.assertIn("CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4", locked, ident)
+            self.assertIn("CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_CODED_CHANNELS", locked, ident)
+            self.assertTrue(
+                sp.is_watched(self.data, "CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4"), "the pattern"
             )
+
+    def test_the_ac4_profiles_lock_the_burst_player_s_40_kb_decode_stack(self) -> None:
+        for ident in ("s3-n16r8-ac4", "p4-rev1-ac4"):
+            locked = self.data["profiles"][ident]["locked"]
+            self.assertEqual(
+                locked["CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES"], "40960", ident
+            )
+
+    def test_the_workflow_builds_each_profile_from_the_file_and_verifies_it(self) -> None:
+        """_build.yml takes each board's fragments from `sink_profile.py defaults` and holds
+        the build to the profile with `verify`; no board build spells its own list."""
+        text = (REPO / ".github" / "workflows" / "_build.yml").read_text("utf-8")
+        read = set(re.findall(r'"\$profile" defaults ([a-z0-9-]+)', text))
+        checked = set(re.findall(r'"\$profile" verify ([a-z0-9-]+)', text))
+        board_builds = {
+            "s3-n16r8",
+            "s3-n16r8-ac4",
+            "c6-16mb",
+            "c6-4mb",
+            "p4-rev1",
+            "p4-rev1-ac4",
+            "p4-rev3",
+        }
+        self.assertEqual(read, board_builds)
+        self.assertEqual(checked, board_builds)
+        spelled = re.findall(
+            r'"-DSDKCONFIG_DEFAULTS=(sdkconfig\.defaults;sdkconfig\.hw[^"]*)"', text
+        )
+        # The P4X panel's null-display build (#1400) is a development build, not a board's
+        # image, and is not a profile. It is an `other_stacks` entry, so a list that is not it
+        # still fails. The v3.x image is the profile p4-rev3 and is built from the file.
+        unprofiled = {
+            "sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.panel;"
+            "sdkconfig.panel-null",
+        }
+        listed = set(sp.load()["other_stacks"])
+        self.assertLessEqual(unprofiled, listed)
+        self.assertEqual(
+            [name for name in spelled if name not in unprofiled],
+            [],
+            "a board build in _build.yml spells its own fragment list",
+        )
+
+    def test_the_qemu_overlay_moves_no_stack_ring_cache_or_feature(self) -> None:
+        """The twin is the release shape because the overlay touches only what QEMU has no
+        hardware for. A pattern that could move a stack, a ring or a cache is a different
+        shape, which CI would then be running in place of the board's."""
+        touches = self.data["overlays"]["qemu-net"]["touches"]
+        locked = self.data["profiles"]["s3-n16r8"]["locked"]
+        moved = [key for key in locked if sp._matches(key, touches)]
+        self.assertTrue(moved, "the overlay touches nothing the profile locks")
+        for key in moved:
+            for word in ("STACK", "RING", "CACHE", "IN_PSRAM", "DMA", "AC4", "SENDSPIN", "LANE"):
+                self.assertNotIn(word, key, f"qemu-net may move {key}")
+        # What it does move is each one of the four things QEMU has no hardware for.
+        for key in (
+            "CONFIG_ICLFORGE_EXAMPLE_NETWORK_OPENETH",
+            "CONFIG_ICLFORGE_EXAMPLE_SINK_CAPTURE",
+            "CONFIG_SPIRAM_MODE_QUAD",
+            "CONFIG_ESP_CONSOLE_UART_DEFAULT",
+        ):
+            self.assertTrue(sp._matches(key, touches), f"qemu-net does not declare {key}")
 
     def test_the_profiles_are_distinct_builds(self) -> None:
         seen: dict[str, str] = {}
@@ -276,6 +432,17 @@ class Verify(unittest.TestCase):
         self.assertIn("DECODE_STACK_IN_PSRAM is 0", findings[0].message)
         self.assertIn("locks 1", findings[0].message)
 
+    def test_a_key_that_is_free_and_locked_is_held_to_the_locked_value(self) -> None:
+        """The screen task's stack is `free` for every profile with no screen and locked by hand
+        in the one that has one: locked is read first."""
+        self.data["free"]["ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"] = "inert elsewhere"
+        final = dict(FINAL)
+        final["CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"] = "16384"
+        build = make_build(self.root, final)
+        findings = sp.verify(self.data, "a", build)
+        self.assertEqual(self.rules(findings), ["locked"])
+        self.assertIn("DECODE_STACK_BYTES is 16384", findings[0].message)
+
     def test_a_key_the_build_does_not_have_fails_unless_locked_off(self) -> None:
         final = dict(FINAL)
         del final["CONFIG_ICLFORGE_EXAMPLE_DECODE_STACK_BYTES"]
@@ -335,6 +502,30 @@ class Verify(unittest.TestCase):
         self.assertEqual(self.rules(sp.verify(self.data, "a", build)), ["fragments"])
         self.assertEqual(sp.verify(self.data, "a", build, ("wifi-credentials",)), [])
 
+    def test_a_build_that_does_not_say_which_profile_it_is_found(self) -> None:
+        build = make_build(self.root, dict(FINAL), identity=False)
+        findings = sp.verify(self.data, "a", build)
+        self.assertEqual(self.rules(findings), ["identity"])
+        self.assertIn("identity a --cmake", findings[0].message)
+
+    def test_a_build_of_another_profile_is_found(self) -> None:
+        build = make_build(self.root, dict(FINAL), identity=("b", "000000000000"))
+        findings = sp.verify(self.data, "a", build)
+        self.assertEqual(self.rules(findings), ["identity"])
+        self.assertIn("is b, not a", findings[0].message)
+
+    def test_a_build_from_an_older_definition_is_found(self) -> None:
+        build = make_build(self.root, dict(FINAL), identity=("a", "000000000000"))
+        findings = sp.verify(self.data, "a", build)
+        self.assertEqual(self.rules(findings), ["identity"])
+        self.assertIn("another definition", findings[0].message)
+
+    def test_the_hash_follows_what_the_profile_locks(self) -> None:
+        before = sp.profile_hash(self.data, "a")
+        self.data["profiles"]["a"]["locked"]["CONFIG_SPIRAM"] = "n"
+        self.assertNotEqual(before, sp.profile_hash(self.data, "a"))
+        self.assertEqual(len(before), 12)
+
     def test_an_image_over_its_budget_is_found(self) -> None:
         build = make_build(self.root, dict(FINAL))
         (build / sp.APP_NAME).write_bytes(b"\0" * 101)
@@ -353,6 +544,158 @@ class Verify(unittest.TestCase):
         self.data["profiles"]["a"]["locked"] = {}
         build = make_build(self.root, dict(FINAL))
         self.assertIn("locked", self.rules(sp.verify(self.data, "a", build)))
+
+
+def size_report(diram_used: int) -> str:
+    """`idf.py size --format json2`, with the CMake chatter a re-run puts before it."""
+    report = {
+        "version": "1.2",
+        "total_size": 1,
+        "layout": [
+            {"name": "Flash Code", "total": 0, "used": 5, "free": 0, "parts": {}},
+            {"name": "DIRAM", "total": 341760, "used": diram_used, "free": 1, "parts": {}},
+        ],
+    }
+    return "[0/1] Re-running CMake...\n-- {note}\n" + json.dumps(report, indent=4) + "\nERROR: x\n"
+
+
+class StaticRam(unittest.TestCase):
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+        self.data = small_data()
+        self.data["profiles"]["a"]["budget"]["internal_static_bytes_max"] = 1000
+        self.build = make_build(self.root, dict(FINAL))
+
+    def tearDown(self) -> None:
+        self.dir.cleanup()
+
+    def test_the_report_is_found_after_other_output(self) -> None:
+        path = self.root / "size.json"
+        path.write_text(size_report(900), "utf-8")
+        self.assertEqual(sp.read_size_report(path)["DIRAM"], 900)
+
+    def test_static_internal_ram_inside_the_budget_passes(self) -> None:
+        path = self.root / "size.json"
+        path.write_text(size_report(1000), "utf-8")
+        self.assertEqual(sp.verify(self.data, "a", self.build, size_json=path), [])
+
+    def test_static_internal_ram_over_the_budget_is_found(self) -> None:
+        path = self.root / "size.json"
+        path.write_text(size_report(1001), "utf-8")
+        findings = sp.verify(self.data, "a", self.build, size_json=path)
+        self.assertEqual([finding.rule for finding in findings], ["budget"])
+        self.assertIn("1,001", findings[0].message)
+
+    def test_without_a_report_the_budget_is_not_judged(self) -> None:
+        self.assertEqual(sp.verify(self.data, "a", self.build), [])
+
+    def test_a_file_with_no_report_is_an_error(self) -> None:
+        path = self.root / "size.json"
+        path.write_text("nothing here\n", "utf-8")
+        with self.assertRaises(sp.ProfileError):
+            sp.read_size_report(path)
+
+
+class Docs(unittest.TestCase):
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+        self.data = small_data()
+        self.data["other_stacks"] = {"sdkconfig.defaults;sdkconfig.hw": "the probe's"}
+
+    def tearDown(self) -> None:
+        self.dir.cleanup()
+
+    def doc(self, text: str) -> Path:
+        path = self.root / "page.md"
+        path.write_text(text, "utf-8")
+        return path
+
+    def test_a_profile_a_listed_stack_and_a_ci_shape_are_known(self) -> None:
+        path = self.doc(
+            "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.psram\n"
+            "and sdkconfig.defaults;sdkconfig.hw for the probe,\n"
+            "and sdkconfig.defaults;sdkconfig.ci-http for CI.\n"
+        )
+        self.assertEqual(sp.check_docs(self.data, self.root, [path]), [])
+
+    def test_a_stack_nobody_listed_is_found_with_its_line(self) -> None:
+        path = self.doc("fine\nbuild with sdkconfig.defaults;sdkconfig.psram;sdkconfig.hw now\n")
+        findings = sp.check_docs(self.data, self.root, [path])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("page.md:2", findings[0].message)
+
+    def test_a_stale_generated_table_is_found_and_can_be_written(self) -> None:
+        path = self.doc(f"{sp.TABLE_BEGIN}\n\nold\n\n{sp.TABLE_END}\n")
+        findings = sp.check_docs(self.data, self.root, [path])
+        self.assertEqual([finding.rule for finding in findings], ["docs"])
+        self.assertEqual(sp.check_docs(self.data, self.root, [path], write=True), [])
+        self.assertEqual(sp.check_docs(self.data, self.root, [path]), [])
+        self.assertIn("`hearth-sink-esp32s3`", path.read_text("utf-8"))
+
+    def test_a_table_with_no_end_is_found(self) -> None:
+        path = self.doc(f"{sp.TABLE_BEGIN}\nnever closed\n")
+        findings = sp.check_docs(self.data, self.root, [path])
+        self.assertIn(sp.TABLE_END, findings[0].message)
+
+    def test_the_real_tree_holds(self) -> None:
+        self.assertEqual(sp.check_docs(sp.load()), [])
+
+
+class ExpectedConsole(unittest.TestCase):
+    """The lines that say where a profile put its rings and stacks (the QEMU twin's checks)."""
+
+    def data(self, **locked: str) -> dict:
+        data = small_data()
+        data["profiles"]["a"]["locked"] = {f"CONFIG_{key}": value for key, value in locked.items()}
+        return data
+
+    def test_a_profile_with_psram_expects_its_stacks_and_rings_there(self) -> None:
+        data = self.data(
+            SPIRAM="y",
+            ICLFORGE_SENDSPIN="y",
+            ICLFORGE_EXAMPLE_RING_IN_PSRAM="1",
+            ICLFORGE_EXAMPLE_RING_BYTES="32768",
+            ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM="1",
+            ICLFORGE_EXAMPLE_DECODE_STACK_BYTES="40960",
+            ICLFORGE_EXAMPLE_SENDSPIN_RING_BYTES="262144",
+            ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_IN_PSRAM="1",
+            ICLFORGE_EXAMPLE_SENDSPIN_DECODE_STACK_BYTES="32768",
+            ICLFORGE_EXAMPLE_DECODE_LANE="1",
+            ICLFORGE_EXAMPLE_DECODE_CORE="1",
+        )
+        self.assertEqual(
+            sp.expected_console(data, "a"),
+            [
+                "player: ring 32768 bytes in PSRAM",
+                "player: decode stack 40960 bytes in PSRAM",
+                "burst player: ring 262144 bytes and buffers in PSRAM",
+                "burst player: decode stack 32768 bytes in PSRAM",
+                "player: decode stages on cores 1 and 0",
+            ],
+        )
+
+    def test_a_stack_the_profile_leaves_internal_is_not_expected_in_psram(self) -> None:
+        data = self.data(
+            SPIRAM="y",
+            ICLFORGE_EXAMPLE_DECODE_STACK_IN_PSRAM="0",
+            ICLFORGE_EXAMPLE_DECODE_STACK_BYTES="32768",
+        )
+        self.assertEqual(sp.expected_console(data, "a"), [])
+
+    def test_a_profile_with_no_psram_expects_none_of_the_psram_lines(self) -> None:
+        data = self.data(
+            ICLFORGE_EXAMPLE_RING_IN_PSRAM="1",
+            ICLFORGE_EXAMPLE_RING_BYTES="32768",
+            ICLFORGE_EXAMPLE_DECODE_CORE="-1",
+        )
+        self.assertEqual(sp.expected_console(data, "a"), [])
+
+    def test_the_release_profile_expects_the_http_stack_in_psram(self) -> None:
+        """The 2026-10-12 failure, as a line a build has to print."""
+        lines = sp.expected_console(sp.load(), "s3-n16r8")
+        self.assertIn("player: decode stack 32768 bytes in PSRAM", lines)
 
 
 class Snapshot(unittest.TestCase):
@@ -377,8 +720,13 @@ class Snapshot(unittest.TestCase):
     def test_a_snapshot_of_a_build_verifies_it(self) -> None:
         data = small_data()
         with tempfile.TemporaryDirectory() as tmp:
-            build = make_build(Path(tmp), dict(FINAL))
+            first = Path(tmp) / "first"
+            first.mkdir()
+            build = make_build(first, dict(FINAL))
             data["profiles"]["a"]["locked"] = sp.snapshot(data, "a", sp.read_final(build), {})
+            second = Path(tmp) / "second"
+            second.mkdir()
+            build = make_build(second, dict(FINAL), identity=("a", sp.profile_hash(data, "a")))
             self.assertEqual(sp.verify(data, "a", build), [])
 
 
@@ -400,6 +748,13 @@ class CommandLine(unittest.TestCase):
         )
         code, out, _ = self.run_cli("table", "s3-n16r8")
         self.assertIn("`hearth-sink-esp32s3`", out)
+
+    def test_identity_is_the_id_and_a_hash_for_a_configure(self) -> None:
+        code, out, _ = self.run_cli("identity", "s3-n16r8", "--cmake")
+        self.assertEqual(code, 0)
+        self.assertRegex(
+            out.strip(), r"^-DICLFORGE_PROFILE=s3-n16r8 -DICLFORGE_PROFILE_HASH=[0-9a-f]{12}$"
+        )
 
     def test_an_unknown_profile_is_exit_2(self) -> None:
         code, _, err = self.run_cli("defaults", "no-such")
