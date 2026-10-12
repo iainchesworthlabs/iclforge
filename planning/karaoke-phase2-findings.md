@@ -5,6 +5,8 @@
     (W3), [lyrics for a network group](#w4-lyrics-for-a-network-group) (W4) and
     [Android and a browser page](#w5-android-and-a-browser-page) (W5). Each ends in a
     recommendation with a size, and the plan's decisions D2 to D4 are the owner's answers to them.
+    [E19](#e19-timing-the-words-in-the-forge-gui-the-options), added on 2026-10-12 and read from
+    the tree at `main` then, is the one section that follows a later state of the code.
     Where a claim was measured it says so; the rest is read from the source and says that, so a
     later reader can tell which to trust and which to run. The sizes are the plan's: **S** is one
     small pull request, **M** one of a few hundred lines with its tests, **L** two to four stacked.
@@ -361,6 +363,79 @@ A sink that does not list the keys (an older firmware, a board that cannot decod
 PCM decoded on the host, which is finding (a) above. That is also what keeps a group that mixes
 boards consistent: every member plays the same reproduction, whichever end made it.
 
+## E19: timing the words in the Forge GUI, the options
+
+**A decision for the owner; nothing here is built.** Word timing exists in Hearth only (W6, with the
+singer and the names per line from W11c). The Forge GUI's Karaoke flow builds the stream and puts a
+`.lrc` beside the saved one (W2), and has no tool for making that file's times. The question is
+whether it should, and the three ways of answering are below with what each costs and what each
+means for the lyric file the GUI writes. Everything here is read from the tree at `main`; the
+sizes are the plan's (**S**, **M**, **L**).
+
+### What has changed since W3 said where it lives
+
+W3 put the editor in Hearth because a program may not use another program
+(`tools/checks/projects.json`) and the lyric module then sat in `apps/hearth/engine`, so a second
+user would have had to move it first. That move is done: W13a made it `libs/lyrics`, internal and
+standard-library only, with the writer (`write_lrc`), the estimate and the line and word setters in
+it (`timing.hpp`). So the data side of timing is reachable from the Forge programs by one row:
+`lyrics` added to `forge`'s `may_use`. What is not shared is the rest of the editor:
+
+| Piece | Where it is | What a second user needs |
+|---|---|---|
+| The lyric data, the writer, the estimate, the setters | `libs/lyrics` | A `may_use` row for `forge`; nothing to move |
+| The session: lines, taps, nudges, the singer, the names, the reaction time, the save with its `.lrc.bak` | `KaraokeController` in `apps/hearth/ui/src`, mixed in with the page's loaded lyrics, the delay, the duet view and the CD+G picture | To be split out into a Qt object of its own in a shared place (a new app-library row, kind `app-library`, `may_use` `lyrics`), with Hearth's controller using it |
+| The window | `apps/hearth/ui/assets/qml/LyricTimingDialog.qml`, 537 lines, 41 `qsTr` calls; it reads Hearth's `KaraokeController` and `HearthController` singletons and `LyricClock.qml` | To move to a shared QML module (the buttons, the segmented control and the theme it draws with already are in `apps/shared/theme`) with the transport and the clock as properties its host binds |
+| The transport and the clock | Hearth: `HearthController` (`play`, `pause`, `seek`, `playing`) and the engine's heard position, interpolated by `LyricClock` | The GUI has `StreamPlayerController` (`play`, `pause`, `seek(seconds)`, `playing`, `positionSeconds`); see the clock below |
+| The tests | `tst_karaoke_timing.qml` (16 cases) and the controller's cases in `test_karaoke_controller.cpp`, with the dialog's mutants | To move with the pieces above, or be run twice |
+
+**The clock is the part that does not transfer for free.** Hearth stamps in *heard* time: the
+position of the output less its path's delay, so a file made on one device plays right on any. The
+GUI's `positionSeconds` is `read_frame_ / sample_rate`, the frames handed to the output
+(`stream_player_controller.cpp`), with no device delay taken off. A press made against it is early
+by the output's own latency, which Hearth's guide names a Bluetooth speaker or a receiver with a
+long path as the place it is large (the size was not measured for this page). The reaction time
+setting would absorb a constant latency if the person calibrated on that device, but it is one
+number for a person's reaction and the device both, so a file timed on one output and played on
+another would be off by the difference. A shared tool would need the player to publish a
+delay-corrected position, which is a change to the GUI's player and not to the tool.
+
+### The options
+
+| | A. Leave it, and say where | B. Open the stream in Hearth from the GUI | C. Embed the dialog through a shared component |
+|---|---|---|---|
+| **What it is** | The Save step's lyrics note names Hearth's **Time the lyrics...** as the next step, and the GUI guide says the same | A button after Save that starts Hearth on the stream, on the Karaoke page | The session and the dialog move to shared code; the GUI's Hear step gets **Time the lyrics...** against the stream it just built |
+| **Size** | **S**: a sentence in `KaraokeFlow.qml`, its strings in the six catalogues (the lupdate gate), and the guide | **M**, two pull requests: Hearth's side, then the GUI's | **L**, three to four stacked: the library row and the session split, the shared dialog (Hearth moves onto it), the GUI's use, the clock |
+| **What must be true first** | Nothing | Hearth must open a file it is handed (see below); the GUI must find Hearth's program; a second Hearth must not start beside a running one | The session split and the dialog move leave Hearth's own 16 cases and mutants passing; the player publishes a heard position |
+| **The lyric file the GUI writes** | Unchanged: the GUI copies the file it was offered byte for byte, never over one that is there (W2); Hearth's save then rewrites that `.lrc` in place and keeps the first as `.lrc.bak` | Unchanged, as A: the GUI writes nothing new | The GUI becomes a writer. Its output is `write_lrc`'s: UTF-8 without a byte-order mark, `[offset:]` applied and not written, only `ti`, `ar`, `al`, `by`, `v1`, `v2` and `length` tags kept (any other id tag is dropped), and a `.srt`, `.ass` or `.kar` input becomes an `.lrc`. The "never over an existing one" rule has to give way for a save the person asked for, with the `.lrc.bak` Hearth keeps |
+| **What it leaves undone** | A person moves between two programs, and the GUI's project keeps pointing at the lyrics beside the backing, not at the timed file | The same two-program flow, shorter by a click; Hearth has to be installed | Nothing about timing; it is the one place to author a karaoke file from parts to a timed `.lrc` |
+| **Risk** | None | The program-to-program launch has no check in the layering table (it reads includes and links), so the GUI must degrade when Hearth is absent; a launch is per platform | The most: a shared module two programs depend on, and the clock difference above |
+
+### Two things found on the way that decide B
+
+- **Hearth takes no file argument.** `apps/hearth/ui/src/main.cpp` reads `--shot`, `--page`,
+  `--decoder-format` and `--open-output-picker` from the command line, and a search of `apps/hearth`
+  for anything reading the arguments, a file-open event or a single-instance guard finds nothing
+  else. So a button that starts Hearth with a path would need that argument built first. Nothing
+  guards against a second instance either, so a second launch starts a second engine beside the
+  first (what it does with the output device and the port the first holds was not tried).
+- **The Windows installer already assumes it does.** `cmake/Packaging.cmake` registers `.ac3` and
+  `.ec3` to `"$INSTDIR\bin\hearth.exe" "%1"` and its comment says `hearth <file>` launch handling
+  already understands a file. From the source that is not so, which means a double-clicked stream
+  opens Hearth empty. This was read from the code and not run on an installed build. It is a
+  defect of its own whichever option is chosen, and the argument B needs is the same fix.
+
+### Recommendation
+
+**A now, and B when the file argument is built for its own sake (it fixes the association).** The
+one authoring function that needs a player's clock already has a place that has the clock, and the
+GUI's Hear step plays the stream that was built, so a person can save, open the stream in Hearth and
+time it without the GUI holding a second timing tool. **C** is the cost of a second user, which W3
+declined for lack of one; it is worth it only if the GUI is meant to be the single place a karaoke
+file is made end to end, and then the heard-position question is the part to settle first. The
+owner's three answers: A, B, or C; A and B do not exclude C later, since each leaves the lyric file
+as it is.
+
 ## What the findings add to the plan
 
 | Plan item | What the findings say |
@@ -371,3 +446,4 @@ boards consistent: every member plays the same reproduction, whichever end made 
 | W8 | The browser decode demo: two arguments, a flag, a panel; **S** to **M** |
 | Android | Not a slice: a player app first |
 | W13 | The lyric module to a `lyrics` library under `libs` first (S to M), before W6's writer; Crucible has no position source, so its import needs one (D9); CD+G is a picture, not text; "mini karaoke" read as MIDI karaoke (D10) |
+| E19 (D13) | The Forge GUI's timing tool: A leave it and point at Hearth (**S**), B open the stream in Hearth from the GUI (**M**, needs Hearth to take a file argument, which it does not), C share the session and dialog (**L**, and the GUI's position is not delay-corrected); the lyric file is unchanged under A and B, and under C the GUI becomes a writer of `.lrc` ([above](#e19-timing-the-words-in-the-forge-gui-the-options)) |

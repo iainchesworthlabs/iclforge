@@ -208,14 +208,18 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
 }
 
 // PCM for a sink that is not to be sent the stream as it is, for `refusal`'s reason: at the rate
-// the stream has, at the sink's layout and folded where its formats do not take that; or nothing,
-// and why.
+// the stream has, at the sink's layout and, where `may_fold`, folded where its formats do not take
+// that; or nothing, and why. A refusal that the sink's own decode would answer with its bed (the
+// objects it does not place) is not worth a fold: a 7.1.4 sink sent 2.0 PCM for the sake of a
+// few objects loses its speakers, which is worse than the bed alone.
 [[nodiscard]] SinkChoice pcm_choice(const std::string& refusal, const StreamNeeds& stream,
-                                    const SinkFacts& sink, const SinkFormPolicy& policy) {
+                                    const SinkFacts& sink, const SinkFormPolicy& policy,
+                                    bool may_fold = true) {
     // Opus where the person set the sink to it and it lists it: stereo at 48 kHz, which is all
     // Opus is listed at, so a stream of another rate goes the PCM way below.
     constexpr std::uint32_t kOpusRate = 48000;
     if (policy.pcm_fallback && policy.opus && sink_lists_opus(sink) &&
+        (may_fold || configured_layout(sink, stream).slots() <= 2) &&
         (stream.sample_rate == 0 || stream.sample_rate == kOpusRate)) {
         if (const std::optional<render::OutputLayout> stereo = render::OutputLayout::named("2.0")) {
             return {.form = SinkForm::kPcm,
@@ -270,7 +274,7 @@ constexpr std::array<Folded, 3> kFoldTargets{{{"7.1", 8}, {"5.1", 6}, {"2.0", 2}
                                       wanted.text(), caveat)};
     }
     for (const Folded& target : kFoldTargets) {
-        if (target.channels < wanted.slots() && lists(target.channels)) {
+        if (may_fold && target.channels < wanted.slots() && lists(target.channels)) {
             const std::optional<render::OutputLayout> folded =
                 render::OutputLayout::named(target.name);
             if (folded) {
@@ -349,7 +353,7 @@ SinkChoice choose_sink_form(const StreamNeeds& stream, const SinkFacts& sink,
     }
     // The sink decodes the stream but would play its bed alone, past the objects it places.
     // Decoded here, the objects are placed; where that is not possible it plays the bed.
-    SinkChoice pcm = pcm_choice(*objects, stream, sink, policy);
+    SinkChoice pcm = pcm_choice(*objects, stream, sink, policy, /*may_fold=*/false);
     if (pcm.form == SinkForm::kPcm) {
         return pcm;
     }
