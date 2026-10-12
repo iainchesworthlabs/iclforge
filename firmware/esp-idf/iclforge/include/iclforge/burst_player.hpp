@@ -26,8 +26,9 @@
 // the sink at that time.
 //
 //   _iclforge_player@v1's bursts (planning/hearth-sendspin-extension.md, Burst
-//   chunks) are decoded, AC-3 or E-AC-3 with any object layer, and rendered
-//   onto the board's layout by iclforge::render;
+//   chunks) are decoded, AC-3 or E-AC-3 with any object layer, or AC-4's channels
+//   where the build has its decoder (ac4_stream.hpp), and rendered onto the
+//   board's layout by iclforge::render;
 //   player@v1's PCM, which is what Music Assistant sends, is rendered onto the
 //   same layout as a stereo or mono bed.
 //
@@ -94,6 +95,10 @@ struct BurstPlayerConfig {
     // default, and every board with room to decode whatever `outputs.count`
     // does not already turn away.
     std::size_t max_coded_channels = 0;
+    // As max_coded_channels, for an AC-4 stream: the most channels a frame may decode to, which is
+    // what the board keeps up with (the P4's 6, the S3's 2), refused once the decoder has said how
+    // many a frame has. 0 refuses none.
+    std::size_t max_ac4_channels = 0;
     // The most objects an E-AC-3 stream may declare for the board to place them in real time, which
     // the support object states as max_objects (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_MAX_OBJECTS), and
     // nothing for a board that states none. A stream that declares more (iclforge/object_limit.hpp:
@@ -238,6 +243,9 @@ class BurstPlayer {
     // Whether this build decodes Opus (CONFIG_ICLFORGE_SENDSPIN_OPUS): a firmware lists the format
     // in its player@v1 support only where it does.
     [[nodiscard]] static bool decodes_opus();
+    // Whether this build decodes AC-4 (CONFIG_ICLFORGE_AC4): a firmware lists the data type in its
+    // support only where it does, and where it keeps up (CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4).
+    [[nodiscard]] static bool decodes_ac4();
 
     struct Impl;
 
