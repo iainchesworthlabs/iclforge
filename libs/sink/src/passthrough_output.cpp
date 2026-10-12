@@ -305,8 +305,10 @@ void PassthroughOutput::pump() {
     }
     if (!link_->is_open()) {
         // The device went away under the stream (the display slept, the cable moved). What was due
-        // meanwhile is dropped, and while the stream is open the link is tried again, since the
-        // route comes back with the display.
+        // meanwhile is dropped, and counted as such: a run on a Shield whose HDMI link dropped every
+        // 20 s showed a quarter of the bursts missing with no late or dropped burst reported. While
+        // the stream is open the link is tried again, since the route comes back with the display.
+        counts_.dropped += pending_.size();
         pending_.clear();
         if (streaming_ && now - reopened_at_us_ >= options_.reopen_period_us) {
             reopened_at_us_ = now;
