@@ -91,10 +91,20 @@ struct DecodeOutcome {
 struct KaraokeChoice {
     iclforge::ac3::KaraokeReproduction reproduction = iclforge::ac3::KaraokeReproduction::kOff;
     iclforge::ac3::KaraokeVocals vocals = iclforge::ac3::KaraokeVocals::kBoth;
+    // Linear gains on M, V1 and V2 (OutputConfig::karaoke_*_gain), which the library reads under
+    // kCapable alone: 1.0 is Table C.2.3 bit for bit.
+    double melody_gain = 1.0;
+    double vocal1_gain = 1.0;
+    double vocal2_gain = 1.0;
 };
 
-KaraokeChoice karaoke_choice_of(const QString& reproduction, const QString& vocals) {
+KaraokeChoice karaoke_choice_of(const QString& reproduction, const QString& vocals,
+                                double melody_db = 0.0, double vocal1_db = 0.0,
+                                double vocal2_db = 0.0) {
     KaraokeChoice out;
+    out.melody_gain = iclforge::ac3::karaoke_gain_from_db(melody_db);
+    out.vocal1_gain = iclforge::ac3::karaoke_gain_from_db(vocal1_db);
+    out.vocal2_gain = iclforge::ac3::karaoke_gain_from_db(vocal2_db);
     if (reproduction == QLatin1String("aware")) {
         out.reproduction = iclforge::ac3::KaraokeReproduction::kAware;
     } else if (reproduction == QLatin1String("capable")) {
@@ -382,6 +392,9 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
         iclforge::ac3::DecoderConfig config;
         config.output.karaoke = karaoke_choice.reproduction;
         config.output.karaoke_vocals = karaoke_choice.vocals;
+        config.output.karaoke_melody_gain = karaoke_choice.melody_gain;
+        config.output.karaoke_vocal1_gain = karaoke_choice.vocal1_gain;
+        config.output.karaoke_vocal2_gain = karaoke_choice.vocal2_gain;
         iclforge::ac3::FrameDecoder decoder{config};
         std::vector<std::size_t> order;
         bool have_first = false;
@@ -446,7 +459,8 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
 
 }  // namespace
 
-StreamPlayerController::StreamPlayerController(QObject* parent) : QObject(parent) {}
+StreamPlayerController::StreamPlayerController(QObject* parent)
+    : iclforge::apps::CdgFrameSource(parent) {}
 
 // Out-of-line: sink_ is a unique_ptr<iclforge::audio::MonitorSink>, forward-declared
 // in the header - see ObjectDecodeController's own identical
@@ -489,6 +503,36 @@ double StreamPlayerController::positionSeconds() const {
     }
     return static_cast<double>(read_frame_.load(std::memory_order_relaxed)) /
            static_cast<double>(result_->sample_rate_hz);
+}
+
+double StreamPlayerController::pictureSeconds() const {
+    if (!result_ || result_->sample_rate_hz == 0) {
+        return 0.0;
+    }
+    const std::uint64_t read = read_frame_.load(std::memory_order_relaxed);
+    // Only while playing is anything in flight: a pause keeps the position it
+    // stopped at, and a seek is exact.
+    const std::uint64_t lead = playing_ ? lead_frames_.load(std::memory_order_relaxed) : 0;
+    return static_cast<double>(read - std::min(read, lead)) /
+           static_cast<double>(result_->sample_rate_hz);
+}
+
+QImage StreamPlayerController::pictureFrame(int /*key*/, qlonglong positionMs) {
+    return picture_.frame(positionMs);
+}
+
+void StreamPlayerController::loadPicture(const QString& stream_path) {
+    picture_.clear();
+    picture_file_name_.clear();
+    picture_error_.clear();
+    if (const auto disc = iclforge::apps::find_cdg_beside(stream_path.toStdString())) {
+        picture_file_name_ = QString::fromStdU16String(disc->filename().u16string());
+        if (const auto loaded = picture_.load(*disc); !loaded) {
+            picture_error_ = QString::fromStdString(loaded.error());
+        }
+    }
+    emit pictureStateChanged();
+    emit pictureChanged(0);
 }
 
 QVariantList StreamPlayerController::channelMeta() const {
@@ -580,6 +624,10 @@ void StreamPlayerController::openFile(const QUrl& url) {
     }
     file_path_ = path;
     emit filePathChanged();
+    // The disc beside the stream is read when the stream is opened, not when
+    // it has decoded: a picture that is there needs nothing from the decode,
+    // and a presentation or karaoke choice that decodes again leaves it be.
+    loadPicture(path);
     decodePath(path);
 }
 
@@ -618,6 +666,63 @@ void StreamPlayerController::setKaraokeVocals(const QString& name) {
     redecodeForKaraoke();
 }
 
+namespace {
+
+// A level held to the library's span (a value that is not a number is 0 dB), which is what
+// OutputConfig's own conversion does with it, so the property reads back what is applied.
+double held_level_db(double db) { return iclforge::ac3::karaoke_level_db(db); }
+
+}  // namespace
+
+void StreamPlayerController::setKaraokeMelodyDb(double db) {
+    const double held = held_level_db(db);
+    if (held == karaoke_melody_db_) {
+        return;
+    }
+    karaoke_melody_db_ = held;
+    emit karaokeChanged();
+    if (karaoke_reproduction_ == QLatin1String("capable")) {
+        redecodeForKaraoke();
+    }
+}
+
+void StreamPlayerController::setKaraokeVocal1Db(double db) {
+    const double held = held_level_db(db);
+    if (held == karaoke_vocal1_db_) {
+        return;
+    }
+    karaoke_vocal1_db_ = held;
+    emit karaokeChanged();
+    if (karaoke_reproduction_ == QLatin1String("capable")) {
+        redecodeForKaraoke();
+    }
+}
+
+void StreamPlayerController::setKaraokeVocal2Db(double db) {
+    const double held = held_level_db(db);
+    if (held == karaoke_vocal2_db_) {
+        return;
+    }
+    karaoke_vocal2_db_ = held;
+    emit karaokeChanged();
+    if (karaoke_reproduction_ == QLatin1String("capable")) {
+        redecodeForKaraoke();
+    }
+}
+
+void StreamPlayerController::resetKaraokeLevels() {
+    if (karaoke_melody_db_ == 0.0 && karaoke_vocal1_db_ == 0.0 && karaoke_vocal2_db_ == 0.0) {
+        return;
+    }
+    karaoke_melody_db_ = 0.0;
+    karaoke_vocal1_db_ = 0.0;
+    karaoke_vocal2_db_ = 0.0;
+    emit karaokeChanged();
+    if (karaoke_reproduction_ == QLatin1String("capable")) {
+        redecodeForKaraoke();
+    }
+}
+
 void StreamPlayerController::redecodeForKaraoke() {
     // Only a karaoke stream decodes to anything else for the choice; the
     // others keep what is already in memory, and the position with it. A
@@ -640,7 +745,9 @@ void StreamPlayerController::decodePath(const QString& path) {
         presentation_index_ >= 0
             ? std::optional<std::size_t>{static_cast<std::size_t>(presentation_index_)}
             : std::nullopt;
-    const KaraokeChoice choice = karaoke_choice_of(karaoke_reproduction_, karaoke_vocals_);
+    const KaraokeChoice choice =
+        karaoke_choice_of(karaoke_reproduction_, karaoke_vocals_, karaoke_melody_db_,
+                          karaoke_vocal1_db_, karaoke_vocal2_db_);
     jobs_.run([this, path, presentation, choice] {
         auto outcome = decode_stream_to_memory(path, presentation, choice);
         QMetaObject::invokeMethod(this, [this, outcome = std::move(outcome)]() mutable {
@@ -685,6 +792,8 @@ void StreamPlayerController::play() {
     should_play_.store(true, std::memory_order_relaxed);
     worker_active_ = true;
     playing_ = true;
+    // Nothing is in flight until the first publish says how much is.
+    lead_frames_.store(0, std::memory_order_relaxed);
     emit playingChanged();
 
     // The worker keeps its own shared_ptr to the result it started with -
@@ -738,6 +847,13 @@ void StreamPlayerController::play() {
             const auto now = std::chrono::steady_clock::now();
             if (now - published_at >= kPublishInterval) {
                 published_at = now;
+                // What the output has been handed and not yet played: the picture follows what
+                // is heard, which is that far behind what was submitted. A device that does not
+                // say counts as no lead, which is what pictureSeconds() then draws.
+                if (const auto at_device = sink_->position()) {
+                    lead_frames_.store(at_device->frames_queued + at_device->latency_frames,
+                                       std::memory_order_relaxed);
+                }
                 std::vector<iclforge::ac3::analysis::ChannelLevel> snapshot(meter.levels().begin(),
                                                                    meter.levels().end());
                 QMetaObject::invokeMethod(this, [this, result, snapshot = std::move(snapshot)] {

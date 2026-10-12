@@ -16,12 +16,14 @@
 
 #include <QVariantList>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <numbers>
 #include <optional>
 
 #include "../../../shared/preferences/src/language_manager.hpp"
+#include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/version.hpp"
 
 // Standard Qt Quick Test entry point: discovers and runs every tst_*.qml
@@ -161,6 +163,22 @@ public:
         return QUrl::fromLocalFile(path);
     }
 
+    // The peak magnitude of one channel of a WAV file (any the library reads: the player's own
+    // export is 32-bit float), so that a suite can say what a stream put in a channel and
+    // not only that it decoded. -1 where the file or the channel is not there.
+    [[nodiscard]] Q_INVOKABLE double channelPeak(const QUrl& file, int channel) const {
+        const auto wav = iclforge::ac3::io::read_wav(file.toLocalFile().toStdString());
+        if (!wav.has_value() || channel < 0 ||
+            static_cast<std::size_t>(channel) >= wav->channels.size()) {
+            return -1.0;
+        }
+        double peak = 0.0;
+        for (const float sample : wav->channels[static_cast<std::size_t>(channel)]) {
+            peak = std::max(peak, static_cast<double>(std::abs(sample)));
+        }
+        return peak;
+    }
+
     // A text file of the test's own beside the generated audio: a project that another
     // version wrote, say. The file's URL, or an empty one where it could not be written.
     [[nodiscard]] Q_INVOKABLE QUrl writeText(const QString& name, const QString& text) const {
@@ -169,6 +187,23 @@ public:
         const QByteArray bytes = text.toUtf8();
         if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
             file.write(bytes) != bytes.size()) {
+            return {};
+        }
+        return QUrl::fromLocalFile(path);
+    }
+
+    // A binary file of the test's own: a CD+G disc beside a stream, whose packets are not text.
+    // `bytes` is a list of numbers 0 to 255 (Qt.btoa() does not carry the high ones). The
+    // file's URL, or an empty one where it could not be written.
+    [[nodiscard]] Q_INVOKABLE QUrl writeBytes(const QString& name, const QVariantList& bytes) const {
+        QByteArray out;
+        out.reserve(static_cast<qsizetype>(bytes.size()));
+        for (const QVariant& value : bytes) {
+            out.append(static_cast<char>(value.toInt() & 0xFF));
+        }
+        const QString path = QDir(folder_).filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) || file.write(out) != out.size()) {
             return {};
         }
         return QUrl::fromLocalFile(path);

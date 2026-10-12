@@ -53,6 +53,8 @@ iclforge_add_test_binary(iclforge-crucible-tests PROJECT crucible SOURCES
     test_platform_seams.cpp
     test_diagnostics.cpp
     ../../ui/tests/test_desktop_entries.cpp
+    ../../ui/tests/test_lyric_osc.cpp
+    ../../ui/tests/test_media_session.cpp
     ../../ui/tests/test_translations.cpp
     test_engine.cpp
     test_engine_commands.cpp
@@ -67,7 +69,9 @@ iclforge_add_test_binary(iclforge-crucible-tests PROJECT crucible SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/output_stage.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/signing_hook.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/engine.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/desktop_entries.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/desktop_entries.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/lyric_osc.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/media_session.cpp")
 # test_engine_commands.cpp saves the signing key's env-var fallbacks with
 # std::getenv before clearing them for its own case - same C4996 reasoning as
 # libs/base/src/crypto/signing_key.cpp (libs/base/CMakeLists.txt) and

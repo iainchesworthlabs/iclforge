@@ -63,6 +63,7 @@ TestCase {
         }
         tryVerify(function() { return HearthController.queue.length === 0; }, 10000);
         KaraokeController.delayMs = 0;
+        KaraokeController.preferPicture = false;
         KaraokeController.firstSingerName = "";
         KaraokeController.secondSingerName = "";
         KaraokeController.load("", 0);
@@ -587,6 +588,103 @@ TestCase {
         verify(picture.visible);
     }
 
+    // A lyrics file and a CD+G disc both beside the item: the words are the default and the singer
+    // chooses the picture, for this run of the app (the owner's answer to C12).
+    function test_aDiscBesideALyricsFileIsAChoiceAndTheWordsAreTheDefault() {
+        const lrc = TestServices.writeTextFile("both.lrc", lyrics());
+        verify(lrc.length > 0);
+        verify(TestServices.writeBinaryFile("both.cdg", cdgDisc()).length > 0);
+        const view = newView();
+        KaraokeController.load(lrc.replace(/\.lrc$/, ".ac3"), 10000);
+        view.positionMs = 500;
+        const picture = H.find(view, function(item) { return item.objectName === "lyricPicture"; });
+        const stage = H.find(view, function(item) { return item.objectName === "lyricStage"; });
+        verify(picture !== null && stage !== null);
+
+        // The words, by default: the lyrics file's status, its stage shown and the picture not.
+        compare(view.status, "timed");
+        compare(view.showingPicture, false);
+        verify(stage.visible);
+        verify(!picture.visible);
+
+        // The choice shows the disc instead, against the same position, and takes the words
+        // off the screen; the status stays the lyrics file's, so nothing else loses them.
+        KaraokeController.preferPicture = true;
+        tryVerify(function() { return picture.visible; }, 5000);
+        verify(!stage.visible);
+        compare(view.status, "timed");
+        tryVerify(function() { return picture.ready; }, 5000);
+        waitForRendering(picture);
+        let image = grabImage(picture);
+        compare(image.red(450, 200), 255);
+        compare(image.green(450, 200), 0);
+        view.positionMs = 1100;
+        waitForRendering(picture);
+        image = grabImage(picture);
+        compare(image.red(450, 200), 0);
+        compare(image.green(450, 200), 255);
+
+        // And back to the words.
+        KaraokeController.preferPicture = false;
+        tryVerify(function() { return stage.visible; }, 5000);
+        verify(!picture.visible);
+    }
+
+    // The Karaoke page offers the choice only where there is one, names the file that is shown,
+    // and the singer view's bar offers it too.
+    function test_theLyricsCardOffersWordsOrPictureOnlyWhereBothAreBesideTheItem() {
+        const both = TestServices.writeAc3Stream("both_song.ac3", "karaoke-3/2");
+        verify(both.length > 0);
+        verify(TestServices.writeTextFile("both_song.lrc", lyrics()).length > 0);
+        verify(TestServices.writeBinaryFile("both_song.cdg", cdgDisc()).length > 0);
+        const win = openPage();
+        HearthController.setLayoutText("5.1");
+        tryVerify(function() { return HearthController.speakerLabels.length === 6; }, 10000);
+        HearthController.addFiles([both]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000);
+        HearthController.playItem(0);
+        const view = named(win, "lyricsView");
+        tryCompare(view, "status", "timed", 10000);
+        const row = named(win, "lyricsShowRow");
+        verify(row !== null);
+        tryVerify(function() { return row.visible; }, 5000);
+        compare(KaraokeController.preferPicture, false);
+        tryVerify(function() { return named(win, "lyricsFile").text.indexOf("both_song.lrc") >= 0; }, 5000);
+
+        // Choosing Picture is a click on its segment: the disc is shown, its file is named, and the
+        // note says what it is and how to get the words back.
+        mouseClick(named(named(win, "lyricsShowChoice"), "seg-picture"));
+        compare(KaraokeController.preferPicture, true);
+        const picture = H.find(view, function(item) { return item.objectName === "lyricPicture"; });
+        tryVerify(function() { return picture.visible; }, 5000);
+        tryVerify(function() { return named(win, "lyricsFile").text === "both_song.cdg"; }, 5000);
+        tryVerify(function() { return named(win, "lyricsNote").text.indexOf("beside the lyrics") >= 0; }, 5000);
+        // The row stays: it is how the words come back.
+        verify(row.visible);
+        mouseClick(named(named(win, "lyricsShowChoice"), "seg-words"));
+        compare(KaraokeController.preferPicture, false);
+        tryVerify(function() { return !picture.visible; }, 5000);
+        tryVerify(function() { return named(win, "lyricsFile").text.indexOf("both_song.lrc") >= 0; }, 5000);
+    }
+
+    function test_theLyricsCardHasNoChoiceForLyricsAloneOrADiscAlone() {
+        const win = openPage();
+        const view = named(win, "lyricsView");
+        play();
+        tryCompare(view, "status", "timed", 10000);
+        compare(named(win, "lyricsShowRow").visible, false);
+        HearthController.stop();
+
+        const disc = TestServices.writeAc3Stream("alone_song.ac3", "karaoke-3/2");
+        verify(disc.length > 0);
+        verify(TestServices.writeBinaryFile("alone_song.cdg", cdgDisc()).length > 0);
+        HearthController.addFiles([disc]);
+        tryVerify(function() { return HearthController.queue.length === 2; }, 10000);
+        HearthController.playItem(1);
+        tryCompare(view, "status", "picture", 10000);
+        compare(named(win, "lyricsShowRow").visible, false);
+    }
+
     // --- Settings ------------------------------------------------------------
 
     function test_settingsHasALyricDelayThatIsKeptAndCanBeReset() {
@@ -647,6 +745,8 @@ TestCase {
         const v1 = named(screen.contentItem, "lyricScreenVocals-v1");
         verify(v1 !== null);
         tryVerify(function() { return v1.visible; }, 5000);
+        // The song has lyrics and no disc: there is no words-or-picture choice on the bar.
+        compare(named(screen.contentItem, "lyricScreenShow").visible, false);
         mouseClick(v1);
         tryCompare(HearthController.decoderSettings, "karaoke", "capable", 10000);
         compare(HearthController.decoderSettings.karaokeVocals, "v1");
@@ -660,5 +760,45 @@ TestCase {
         win.toggleLyricScreen();
         tryCompare(screen, "visible", false, 5000);
         HearthController.setDecoderSettings({ karaoke: "aware", karaokeVocals: "both" });
+    }
+
+    // The same choice on the singer view's bar, where the mouse is nearer than the page.
+    function test_theSingerViewBarChoosesWordsOrPictureWhereBothAreBesideTheItem() {
+        const both = TestServices.writeAc3Stream("bar_song.ac3", "karaoke-3/2");
+        verify(both.length > 0);
+        verify(TestServices.writeTextFile("bar_song.lrc", lyrics()).length > 0);
+        verify(TestServices.writeBinaryFile("bar_song.cdg", cdgDisc()).length > 0);
+        const win = openPage();
+        HearthController.setLayoutText("5.1");
+        tryVerify(function() { return HearthController.speakerLabels.length === 6; }, 10000);
+        HearthController.addFiles([both]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000);
+        HearthController.playItem(0);
+        tryCompare(named(win, "lyricsView"), "status", "timed", 10000);
+        const screen = findChild(win, "lyricScreen");
+        win.openLyricScreen();
+        tryCompare(screen, "visible", true, 5000);
+        // Opened, not only visible: a click during the popup's enter transition can miss.
+        tryCompare(screen, "opened", true, 10000);
+        const choice = named(screen.contentItem, "lyricScreenShow");
+        const words = named(screen.contentItem, "lyricScreenShow-words");
+        const picture = named(screen.contentItem, "lyricScreenShow-picture");
+        verify(choice !== null && words !== null && picture !== null);
+        tryVerify(function() { return choice.visible; }, 5000);
+        compare(words.selected, true);
+        compare(picture.selected, false);
+        const view = named(screen.contentItem, "lyricScreenView");
+        compare(view.showingPicture, false);
+
+        mouseClick(picture);
+        tryCompare(KaraokeController, "preferPicture", true, 5000);
+        tryCompare(picture, "selected", true, 5000);
+        compare(words.selected, false);
+        tryCompare(view, "showingPicture", true, 5000);
+        mouseClick(words);
+        tryCompare(KaraokeController, "preferPicture", false, 5000);
+        tryCompare(view, "showingPicture", false, 5000);
+        win.toggleLyricScreen();
+        tryCompare(screen, "visible", false, 5000);
     }
 }
