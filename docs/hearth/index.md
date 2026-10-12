@@ -247,7 +247,9 @@ the start of an item, so two AC-4 items in a queue play about that far apart.
 In a network group, a member on the Hearth extension role takes the stream itself as IEC 61937
 bursts, and a member that is a standard Sendspin player takes PCM decoded here. An AC-4 item goes
 to an extension-role member as IEC 61937-14 bursts only if the member lists `ac4` among its data
-types (no ESP32 build does yet); otherwise that member gets nothing for the item. It also gets
+types (an ESP32-P4 whose image has the AC-4 decoder does, up to 5.1, and states no objects; no
+other board does); otherwise that member gets PCM decoded here where it takes PCM, and else nothing
+for the item. It also gets
 nothing when the presentation chosen on the AC-4 tab is one a sink would not choose with no
 preferences: Hearth decodes that presentation here, and only the PCM members hear it.
 

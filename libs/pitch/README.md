@@ -7,7 +7,7 @@ A singing voice's pitch: a fundamental-frequency tracker (the McLeod Pitch Metho
 A library, internal to the repository.
 
 - **Uses:** nothing
-- **Used by:** `hearth`
+- **Used by:** `demo-wasm`, `hearth`
 - **CI lanes:** core
 - **CMake target:** `iclforge::pitch`
 
