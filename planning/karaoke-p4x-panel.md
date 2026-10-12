@@ -18,7 +18,7 @@
     | W12a `Stage` in `libs/lyrics` | Built, 13 host test cases, mutation-checked |
     | W12b the panel, the screen, the preview tool | Built; the screens are in [the design sheet](../docs/hearth/sink-esp32-p4.md#the-screen), drawn by the firmware's own code on a computer |
     | W12c the DSI panel and touch | Written against ESP-IDF v6.1 and the vendor drivers' headers and built by CI; **never run** |
-    | W12d the rev3 image | Built by CI; the update chooser picks it by chip revision (tests); **never run on a v3.x chip** |
+    | W12d the rev3 image | Built (a local build found and fixed a bootloader 576 bytes over its window: Warn log level, 22,448 bytes); the update chooser picks it by chip revision (tests); **never run on a v3.x chip** |
     | W12e measured on the FireBeetle with no panel | See [Measured](#measured) |
     | W12f docs | [An ESP32-P4 sink](../docs/hearth/sink-esp32-p4.md) |
     | W12g bring-up on the kit | Waits for the kit |
