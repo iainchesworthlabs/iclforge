@@ -58,8 +58,11 @@ void CdgPicture::setPositionMs(qreal position_ms) {
 
 void CdgPicture::refresh() {
     const bool was_ready = ready();
-    frame_ = source_ != nullptr ? source_->pictureFrame(key_, static_cast<qlonglong>(std::llround(position_ms_)))
-                                : QImage{};
+    // The pointer is read once: GCC cannot see through QPointer's two reads of it, and says so
+    // (-Wnull-dereference) under the warnings the Linux legs build with.
+    CdgFrameSource* const source = source_.data();
+    frame_ = source != nullptr ? source->pictureFrame(key_, static_cast<qlonglong>(std::llround(position_ms_)))
+                               : QImage{};
     update();
     if (was_ready != ready()) {
         emit frameChanged();
