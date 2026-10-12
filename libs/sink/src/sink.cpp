@@ -505,7 +505,7 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     // now on the server's clock. Nothing without a progress or a converged clock.
     struct MetadataProgress {
         std::int64_t position_ms = 0;
-        std::optional<std::int64_t> length_ms;
+        std::optional<std::int64_t> length_ms{};
     };
     [[nodiscard]] std::optional<MetadataProgress> metadata_progress() {
         return driver().inspect([&]() -> std::optional<MetadataProgress> {
@@ -517,7 +517,8 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             if (!position) {
                 return std::nullopt;
             }
-            MetadataProgress out{.position_ms = *position};
+            MetadataProgress out;
+            out.position_ms = *position;
             if (metadata_->progress->track_duration_ms > 0) {
                 out.length_ms = metadata_->progress->track_duration_ms;
             }
