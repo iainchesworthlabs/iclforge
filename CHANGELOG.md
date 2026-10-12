@@ -40,6 +40,17 @@ The sections below contain the complete change list and fixes.
   whose best track matches under half of them, is refused with the reason instead of guessed at.
   Tempo changes, running status and a note-on of velocity 0 are read. It is the reference a singer's
   pitch will be scored against; nothing links it yet.
+**Hearth for Android: the plan**
+
+- **A plan, its findings and one screen design for Hearth's three surfaces.** `planning/hearth-android.md`
+  sets out a Sendspin sink app for Android TV that passes the coded stream through to the receiver as
+  the Shield demo does and shows the karaoke lyrics: the requirements, the component boundaries, the
+  project rules, fourteen decisions with a recommendation and a cost each, a phased plan with sizes,
+  the spikes that need a Shield and a receiver, and the questions for the owner.
+  `planning/hearth-android-findings.md` keeps what was read from the code apart from what is
+  not measured, and `planning/hearth-sink-screen.md` is the one design (model, screens, layout in
+  units, tokens, rules, per-platform differences) that the desktop, the app and the ESP32-P4X panel
+  are held to. Nothing is built.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
@@ -95,6 +106,14 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke guide has a recipe for timing a song's words with a forced aligner.** [Timing a
+  song with a forced aligner](docs/karaoke/forced-alignment.md) takes a song and its plain lyrics
+  through WhisperX (with Demucs where the vocal has to be separated), both run outside the
+  repository, to an enhanced `.lrc` that Hearth reads and its timing window corrects. It records
+  the versions run, the first-run downloads, the output of one run on a freely licensed
+  recording, and what the aligner got wrong; nothing in the tree depends on either tool. The
+  findings gain E19, the three ways the Forge GUI could offer word timing and what each means for
+  the lyric file it writes (planning/karaoke-phase2-findings.md, decision D13 in the plan).
 - **A sink that decodes a karaoke stream itself applies the part levels.** The Sendspin
   extension's decoder settings take three more keys, `karaoke_melody_db`, `karaoke_vocal1_db` and
   `karaoke_vocal2_db` (-24.0, which is off, to 12.0 dB against Table C.2.3), which a sink lists
@@ -196,6 +215,13 @@ The sections below contain the complete change list and fixes.
   its speakers are laid out from the reproduction and not the coded layout), and the ESP32 sink
   firmware does the same. A sink that does not list them is sent PCM decoded in Hearth with the
   reproduction applied, so a group of both plays one reproduction (planning/karaoke-phase2.md, W7).
+- **The timing window corrects one word.** In **Time the lyrics...** a click on a word chooses it
+  (it is outlined, and the item is cued 1.5 s before it) and the window says which word it is and
+  when it starts. In the words pass the next `Space` presses that word, once, in place of the next
+  guess; **Stamp again** presses it at the position now; **-10 ms** and **+10 ms** move it, and
+  not its line. A file that came with the times of its words (from a forced aligner, say) opens
+  with every word taken as given, and only its lines could be stamped again or nudged, so one wrong
+  word could not be put right. A word stays between its neighbours; choosing its line lets it go.
 - **The timing window sets who sings a line.** In **Time the lyrics...** a chosen line takes a
   **Singer** (not marked, V1, V2 or both) and each row shows its marker; two **Name** fields set
   what the file calls the singers (`[v1:]` and `[v2:]`, kept with the file, unlike the names typed on
@@ -277,6 +303,15 @@ The sections below contain the complete change list and fixes.
   to it draw, so a seek back replays from the start. The words of a disc are pixels, so nothing is
   read as text, and the page says so; a lyrics file beside the stream is shown in its place
   (planning/karaoke-phase2.md, W13f).
+- **A CD+G picture scrolls smoothly and honours its transparent colour.** A scroll command's fine
+  offset (up to 5 pixels left and 11 up, the low bits of its two direction bytes) was read and
+  dropped, so a disc that scrolls its words a pixel at a time jumped a tile at a time; the picture is
+  now shown shifted by the offset the last scroll command set (the border stays a ring, and a value
+  past the largest is read as the largest, so the shift never leaves the memory). Instruction 28,
+  *define transparent colour*, was skipped; the colour it names now has an alpha of 0 in
+  `CdgScreen::pixels()` and `colour()`, so a picture's backdrop shows where the disc meant video to.
+  Both are state of the replay, so a seek back lands where a seek from the start does
+  (`iclforge::lyrics`, `cdg.hpp`; planning/karaoke-phase2.md, W13f).
 - **A sink that decodes for itself is sent the lyrics, and where the sound is in them.** Two commands
   on `_iclforge_player@v1`, `lyrics` (the item's document, as the library's LRC text, converted
   from SubRip, ASS or MIDI karaoke where that is what the file is) and `lyrics_position` (the
@@ -2778,6 +2813,17 @@ The sections below contain the complete change list and fixes.
   take the new strings.
 
 ### Changed
+
+**Shared code**
+
+- **The picture of a CD+G disc is shared code, `apps/shared/cdg-picture`.** Hearth's picture item
+  and the frame cache that was in its `KaraokeController` moved to a project of their own so that
+  Crucible and the Forge GUI can draw a disc as well: `CdgFrames` (a disc as images by position,
+  Qt Gui only), `CdgFrameSource` (what a window asks for a frame, `pictureFrame(key, positionMs)`,
+  and is told changed by `pictureChanged(key)`) and `CdgPicture` (the Qt Quick item, which takes a
+  `source` where it took a `controller`). A program may not use another program, and Crucible's
+  row did not list Hearth, so the item could not be reached where it was. Nothing is drawn or
+  timed differently (planning/karaoke-phase2.md, W13f).
 
 **JSON**
 
