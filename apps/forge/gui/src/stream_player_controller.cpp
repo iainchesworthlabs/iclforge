@@ -91,10 +91,20 @@ struct DecodeOutcome {
 struct KaraokeChoice {
     iclforge::ac3::KaraokeReproduction reproduction = iclforge::ac3::KaraokeReproduction::kOff;
     iclforge::ac3::KaraokeVocals vocals = iclforge::ac3::KaraokeVocals::kBoth;
+    // Linear gains on M, V1 and V2 (OutputConfig::karaoke_*_gain), which the library reads under
+    // kCapable alone: 1.0 is Table C.2.3 bit for bit.
+    double melody_gain = 1.0;
+    double vocal1_gain = 1.0;
+    double vocal2_gain = 1.0;
 };
 
-KaraokeChoice karaoke_choice_of(const QString& reproduction, const QString& vocals) {
+KaraokeChoice karaoke_choice_of(const QString& reproduction, const QString& vocals,
+                                double melody_db = 0.0, double vocal1_db = 0.0,
+                                double vocal2_db = 0.0) {
     KaraokeChoice out;
+    out.melody_gain = iclforge::ac3::karaoke_gain_from_db(melody_db);
+    out.vocal1_gain = iclforge::ac3::karaoke_gain_from_db(vocal1_db);
+    out.vocal2_gain = iclforge::ac3::karaoke_gain_from_db(vocal2_db);
     if (reproduction == QLatin1String("aware")) {
         out.reproduction = iclforge::ac3::KaraokeReproduction::kAware;
     } else if (reproduction == QLatin1String("capable")) {
@@ -382,6 +392,9 @@ DecodeOutcome decode_stream_to_memory(const QString& path,
         iclforge::ac3::DecoderConfig config;
         config.output.karaoke = karaoke_choice.reproduction;
         config.output.karaoke_vocals = karaoke_choice.vocals;
+        config.output.karaoke_melody_gain = karaoke_choice.melody_gain;
+        config.output.karaoke_vocal1_gain = karaoke_choice.vocal1_gain;
+        config.output.karaoke_vocal2_gain = karaoke_choice.vocal2_gain;
         iclforge::ac3::FrameDecoder decoder{config};
         std::vector<std::size_t> order;
         bool have_first = false;
@@ -618,6 +631,63 @@ void StreamPlayerController::setKaraokeVocals(const QString& name) {
     redecodeForKaraoke();
 }
 
+namespace {
+
+// A level held to the library's span (a value that is not a number is 0 dB), which is what
+// OutputConfig's own conversion does with it, so the property reads back what is applied.
+double held_level_db(double db) { return iclforge::ac3::karaoke_level_db(db); }
+
+}  // namespace
+
+void StreamPlayerController::setKaraokeMelodyDb(double db) {
+    const double held = held_level_db(db);
+    if (held == karaoke_melody_db_) {
+        return;
+    }
+    karaoke_melody_db_ = held;
+    emit karaokeChanged();
+    if (karaoke_reproduction_ == QLatin1String("capable")) {
+        redecodeForKaraoke();
+    }
+}
+
+void StreamPlayerController::setKaraokeVocal1Db(double db) {
+    const double held = held_level_db(db);
+    if (held == karaoke_vocal1_db_) {
+        return;
+    }
+    karaoke_vocal1_db_ = held;
+    emit karaokeChanged();
+    if (karaoke_reproduction_ == QLatin1String("capable")) {
+        redecodeForKaraoke();
+    }
+}
+
+void StreamPlayerController::setKaraokeVocal2Db(double db) {
+    const double held = held_level_db(db);
+    if (held == karaoke_vocal2_db_) {
+        return;
+    }
+    karaoke_vocal2_db_ = held;
+    emit karaokeChanged();
+    if (karaoke_reproduction_ == QLatin1String("capable")) {
+        redecodeForKaraoke();
+    }
+}
+
+void StreamPlayerController::resetKaraokeLevels() {
+    if (karaoke_melody_db_ == 0.0 && karaoke_vocal1_db_ == 0.0 && karaoke_vocal2_db_ == 0.0) {
+        return;
+    }
+    karaoke_melody_db_ = 0.0;
+    karaoke_vocal1_db_ = 0.0;
+    karaoke_vocal2_db_ = 0.0;
+    emit karaokeChanged();
+    if (karaoke_reproduction_ == QLatin1String("capable")) {
+        redecodeForKaraoke();
+    }
+}
+
 void StreamPlayerController::redecodeForKaraoke() {
     // Only a karaoke stream decodes to anything else for the choice; the
     // others keep what is already in memory, and the position with it. A
@@ -640,7 +710,9 @@ void StreamPlayerController::decodePath(const QString& path) {
         presentation_index_ >= 0
             ? std::optional<std::size_t>{static_cast<std::size_t>(presentation_index_)}
             : std::nullopt;
-    const KaraokeChoice choice = karaoke_choice_of(karaoke_reproduction_, karaoke_vocals_);
+    const KaraokeChoice choice =
+        karaoke_choice_of(karaoke_reproduction_, karaoke_vocals_, karaoke_melody_db_,
+                          karaoke_vocal1_db_, karaoke_vocal2_db_);
     jobs_.run([this, path, presentation, choice] {
         auto outcome = decode_stream_to_memory(path, presentation, choice);
         QMetaObject::invokeMethod(this, [this, outcome = std::move(outcome)]() mutable {
