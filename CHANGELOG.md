@@ -29,6 +29,16 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Audio: when a packet was captured**
+
+- **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
+  programme, M2). `Capture::stamps()` is a second lock-free ring of `CaptureStamp`s (the packet's
+  first frame in the stream, and its time in nanoseconds on `std::chrono::steady_clock`'s clock);
+  `CaptureTimeline` fits a line through the last 64 and gives the time of any frame, the frame at a
+  time, and the device's measured rate; `Capture::start()` takes `CaptureOptions` with a requested
+  packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
+  `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
+  consumer must treat as "no time", and a caller that does not use any of it sees no change.
 **Karaoke: a plan for a microphone, scoring and recording**
 
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`
@@ -105,6 +115,14 @@ The sections below contain the complete change list and fixes.
   named, exit code 2), and a `.lrc` already beside the stream is left as it was. In the library,
   `iclforge::lyrics::place_lyrics_beside()` does this and `write_lrc()` takes `LrcWriteOptions` with
   `mark_gaps`. `forge` may now use `libs/lyrics` (`tools/checks/projects.json`).
+- **The lyric library reads a code page when a program supplies the conversion.**
+  `iclforge::lyrics::TextEncoding` carries a decoder callback (the library holds no table of any
+  page, as it is linked into firmware), and every reader (`parse_lyrics`, `parse_subrip`,
+  `parse_ass`, `parse_midi_karaoke`, `parse_timed_text`, `read_lyrics`, `place_lyrics_beside`) takes
+  one as its last argument. It is asked only for text that is not UTF-8 and has no UTF-16 mark, a
+  MIDI file's title, artist and syllables one at a time and never its other `@` lines; a file that
+  is UTF-8 or UTF-16 is read as it was whatever is given, and without a decoder a code page is still
+  refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
 - **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
   name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
   dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
@@ -264,6 +282,20 @@ The sections below contain the complete change list and fixes.
 
 **AC-3 karaoke streams (Annex C)**
 
+- **The karaoke guide's "From a program" table has its C API, Python and Rust rows.** Each names the
+  call that reproduces a karaoke stream and the lyric reader, and links the binding's own page
+  ([C API](docs/library/c-api.md#karaoke-streams-annex-c), [Python](docs/library/python-api.md#karaoke-streams-and-lyrics),
+  [Rust](docs/library/rust-api.md#karaoke-and-lyrics)); only the C++ and WebAssembly rows were there
+  until the bindings landed.
+- **The Python binding reproduces a karaoke stream and reads lyrics.** `DecoderConfig` takes
+  `karaoke` (`KaraokeReproduction`: `kOff`, `kAware`, `kCapable`), `karaoke_vocals` and the three
+  part levels `karaoke_melody_db`, `karaoke_vocal1_db` and `karaoke_vocal2_db` in dB against Table
+  C.2.3 (the span and defaults of Hearth's sliders), and a decoded frame says `bsmod`, `is_karaoke`,
+  `output_acmod`, `output_lfe` and `karaoke_reproduced`, with `channel_labels` for the channels that
+  are there. `iclforge.lyrics` reads LRC (UTF-8 or UTF-16), SubRip, ASS and MIDI karaoke files into
+  lines of timed words with their singers (`parse`, `read`, `find_file`) and gives the cursor
+  (`Lyrics.position`, `word_state`): the reader Hearth uses, bound as it is (planning/karaoke-phase2.md,
+  W5).
 - **`forge decode` and `forge monitor` re-level the karaoke-capable decoder's parts.**
   `karaoke-melody=<dB>`, `karaoke-v1=<dB>` and `karaoke-v2=<dB>` are Annex C.2.3's "additional
   flexibility" in the units, the span and the defaults of Hearth's sliders and the wire's
@@ -546,6 +578,28 @@ The sections below contain the complete change list and fixes.
   follows them on its playout clock and logs and reports the line, with `iclforge::lyrics::Follower`
   and `Playhead` in the library. A panel to draw them waits for a board with a screen
   (planning/karaoke-phase2.md, W7d).
+- **The ESP32-P4 sink draws the lyrics on a panel, with the colour moving as the song does, and
+  there is an image for a P4 of chip revision v3.x.** `hearth_sink` takes a screen
+  (`main/panel/`, chosen like the sink and the source): LVGL 9 drawing the lines before and after
+  the one being sung, the words of it with the fill moving by time, a duet's two singers by name
+  and side, an instrumental break as four dots, right-to-left text, and an idle screen with the
+  board's name, address and pairing code, with Archivo, Noto Sans Greek and Cyrillic and Noto Sans
+  Hebrew in the image (a line in a script none of them draws is one sentence, not boxes); touch
+  sets the board's own lyric delay and text size. It runs on a MIPI DSI panel with a GT911 (the
+  7-inch panel of Espressif's ESP32-P4X-Function-EV-Board, the pins from its user guide and board
+  support header) or into a frame buffer in PSRAM with no panel, which `GET :8081/panel.bmp` reads
+  back, so the screen is drawn and its cost measured on a board that has none; `firmware/hearth-sink/preview`
+  draws the same code on a computer. What a screen shows is `iclforge::lyrics::Stage` and
+  `Follower::stage()` in the library, tested on the host. The new image,
+  `hearth-sink-esp32p4-rev3`, is built over `sdkconfig.p4` by `sdkconfig.p4-rev3` (chip revisions
+  v3.1 to v3.99, 400 MHz, and the 160 MHz PLL as the I2S clock so that TDM opens at 16 by 32 bits);
+  the two P4 images refuse each other's chips, and `ota.py` picks one by the revision the board
+  reports. The panel and the v3.x chip have not run on a board: CI builds both. Hearth's
+  About, Licences window names LVGL, the new Noto Sans face, and ESP-IDF with the third-party
+  components the ESP32 sink images link (FreeRTOS, lwIP, Mbed TLS, picolibc and the rest, each with
+  its licence text), which no notices file carried before; `gen_esp_idf_notices.py` makes the
+  texts and a test fails when ESP-IDF's version moves without them
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md), planning/karaoke-p4x-panel.md, W12).
 - **Hearth's Karaoke page, lyric views and timing window are translated.** The page, the lyric view,
   the singer view, the timing window, the lyric delay and the shortcuts that go with them are filled
   in the German, Spanish, French, Arabic, Hebrew and Yiddish catalogues (145 strings, with the singer view's and
@@ -3307,6 +3361,14 @@ The sections below contain the complete change list and fixes.
   for it goes as Opus at 2.0, which the group's plan asks the host for by codec. The choice is per
   sink, applies at the group's next play, and is kept for the run. The group editor says which a
   member is sent.
+- **The Sendspin player plays a stream's bed when it declares more objects than the board says it
+  places** (`BurstPlayerConfig::max_objects`, `iclforge/object_limit.hpp`,
+  `Eac3Decoder::set_skip_object_reconstruction()`): the decision is made from the first unit's
+  header (the complexity index less the LFE), before the object reconstruction allocates its 147 KB,
+  with the decoder the player already holds and no other made; a listener who chose objects
+  "always" is not overruled. On an ESP32-S3 (release image, lane on, null sink, 7.1.4, over
+  Sendspin) streams of 3 to 11 declared objects that took 1.07 to 2.27 of real time with 63 to
+  360 chunks late took 0.47 to 0.55, with 0 to 10 late and one underrun.
 
 **Library internals**
 

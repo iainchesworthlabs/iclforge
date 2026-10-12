@@ -1,0 +1,37 @@
+# Overlay for an ESP32-P4 of CHIP REVISION v3.x (the one with the errata fixes: v3.1, v3.2 and on),
+# after sdkconfig.p4, which it corrects for this silicon:
+#
+#   idf.py -DIDF_TARGET=esp32p4 "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.p4-rev3;sdkconfig.sendspin" build
+#
+# v1.x and v3.x firmware images are not interchangeable (Espressif's v3.x user guide, section 1.1):
+# this image refuses a v1.x chip at boot and sdkconfig.p4's refuses this one, which is why they are
+# two images (hearth-sink-esp32p4-rev1 and -rev3, planning/karaoke-p4x-panel.md, D7). Everything
+# else in sdkconfig.p4 (PSRAM, the hosted Wi-Fi buffers, the code in PSRAM, the DMA queue, the
+# low-power SRAM kept out of the heap) is as true of this silicon and is not repeated.
+#
+# NOT RUN ON A v3.x BOARD YET. What this changes was read from ESP-IDF v6.1's Kconfig and the v3.x
+# user guide, not measured; the first thing the kit does is run it
+# (planning/karaoke-p4x-panel.md, "Bring-up on the kit").
+
+# Revisions 3.x and not below (ESP-IDF's own default for this switch is off): the minimum is v3.1,
+# ESP-IDF's default, which is the one that fixed the MSPI power-on fault, so the workaround that
+# v3.0 needs is not built.
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=n
+CONFIG_ESP32P4_REV_MIN_301=y
+
+# 400 MHz, v3.x's own number: the decoders scale with the clock almost exactly. sdkconfig.p4 asks for
+# 360 because a v1.3 chip's CPLL calibration asserts at 400.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400=y
+
+# What the new silicon makes possible and the image does not need to say: the I2S controller has a
+# 160 MHz PLL clock source, which sink/i2s_wide picks by CONFIG_ESP32P4_SELECTS_REV_LESS_V3 (so TDM
+# opens at the full sixteen 32-bit slots); and PSRAM runs at 200 MHz hex by ESP-IDF's default for
+# this chip (250 MHz is offered; not asked for until it is measured).
+
+# The second stage bootloader of a v3.x chip is bigger than a v1.x one: 25,152 bytes at the Info log
+# level, which is 576 over the 24,576-byte window below the partition table at 0x8000 (the v1.x
+# bootloader was 24,368, with 208 to spare, and the P4's bootloader starts at 0x2000 so has the
+# window it has). A build for it failed on exactly that line on 2026-10-12. The Warn level is what
+# sdkconfig.p4's own note measured as the way back (20,896 bytes on v1.x): the bootloader says
+# nothing on a good boot and still says what is wrong on a bad one.
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
