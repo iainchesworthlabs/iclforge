@@ -81,6 +81,12 @@ class MicrophoneController : public QObject {
     // The last take: name, path, folder, seconds; empty before one.
     Q_PROPERTY(QVariantMap lastTake READ lastTake NOTIFY recordingChanged)
     Q_PROPERTY(QString takesFolder READ takesFolder NOTIFY takesFolderChanged)
+    // The takes in that folder, newest first, at most 50: each a map of `path`, `name`, `folder`,
+    // `seconds`, `created` (UTC), `title` (the item's) and `startMs` (where in the item it began,
+    // -1 when that was not known). Made from the descriptions beside the files, so listing opens
+    // no audio: a file with no description of this program's is not a take. Read again by
+    // refreshTakes(), and when a take is kept or deleted or the folder is changed.
+    Q_PROPERTY(QVariantList takes READ takes NOTIFY takesChanged)
 
     // The live view: voiced, hz, referenceHz, centsFromReference (absent where there is no note or
     // the singer is not voiced), itemMs.
@@ -124,6 +130,9 @@ class MicrophoneController : public QObject {
     [[nodiscard]] int inputDelayMs() const { return input_delay_ms_; }
     [[nodiscard]] int offsetMs() const { return offset_ms_; }
     [[nodiscard]] static int maxAlignmentMs() { return kMaxAlignmentMs; }
+    // A test seam: a take's file may hold this many bytes, and the take then ends by itself as
+    // it does when a disk fills. 0 is none; nothing but the tests sets it.
+    void limit_take_bytes_for_test(std::uint64_t bytes);
     void setInputDelayMs(int ms);
     void setOffsetMs(int ms);
     [[nodiscard]] double level() const { return level_; }
@@ -140,6 +149,7 @@ class MicrophoneController : public QObject {
     [[nodiscard]] double takeSeconds() const { return take_seconds_; }
     [[nodiscard]] QString takeError() const { return take_error_; }
     [[nodiscard]] QVariantMap lastTake() const { return last_take_; }
+    [[nodiscard]] QVariantList takes() const { return takes_; }
     [[nodiscard]] QString takesFolder() const { return takes_folder_; }
 
     // Lists the inputs again.
@@ -162,6 +172,11 @@ class MicrophoneController : public QObject {
     Q_INVOKABLE bool deleteLastTake();
     // Opens the folder in the file manager.
     Q_INVOKABLE void showTakes();
+    // Reads the folder again.
+    Q_INVOKABLE void refreshTakes();
+    // Removes one take of the list, its file and its description. False for a path that is not
+    // in the list: another folder's file, or one that was never a take, is never touched.
+    Q_INVOKABLE bool deleteTake(const QString& path);
     // Where takes go: a folder URL from a dialog, or a path. Kept.
     Q_INVOKABLE void setTakesFolder(const QString& urlOrPath);
 
@@ -214,6 +229,7 @@ class MicrophoneController : public QObject {
     void scoreChanged();
     void recordingChanged();
     void takesFolderChanged();
+    void takesChanged();
     void summaryChanged();
 
    private:
@@ -250,6 +266,7 @@ class MicrophoneController : public QObject {
     double take_seconds_ = 0.0;
     QString take_error_;
     QVariantMap last_take_;
+    QVariantList takes_;
     QString takes_folder_;
     QString item_path_;
     QString prefer_;

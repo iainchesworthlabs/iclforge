@@ -183,9 +183,9 @@ Each its own PR, in the order a person would notice them:
 |---|---|---|---|
 | **5a** | **`player@v1` PCM, FLAC and Opus** through `StreamOutput` into the same `PcmSink` | M | The codecs are the project's ports, which build for `arm64-android` (D11c); the sink lists them in the `player@v1` support as the boards do. **A member sent PCM there is sent no lyrics** ([F4](hearth-android-findings.md#f4-karaoke-and-pass-through)); that is the host's rule, not this app's, and it is why karaoke stays on the extension role |
 | **5b** | **Volume and mute for the PCM path**: the role's `levels` applied to the PCM stream. A pass-through stream has **no volume**: the receiver owns it, and the sheet says so | S | The report already carries `levels`; the TV's volume keys keep working through the system |
-| **5c** | **Transport back to the server**: a `MediaSession` so the TV remote's play, pause and next keys and the system's now-playing card work, sent as the `controller@v1` commands | M | If `libs/sendspin` has no `controller@v1` on the player side, a protocol PR first, as D8 was |
-| **5d** | **A capability report to a file**: the probe's table (formats, widths, rates) written as one JSON file the person can send, so that S4's device table can grow past one Shield | S | Optional; the person's own action, never sent anywhere |
-| **5e** | **A phone and tablet profile** (D11b): the same sink with a touch layout, no pass-through, decode as the only route | M | After 4; a separate mode of the same app, not a second app; the controls sheet becomes a bottom sheet |
+| **5c** (owner's yes first) | **Transport back to the server**: a `MediaSession` so the TV remote's play, pause and next keys and the system's now-playing card work, sent as the `controller@v1` commands | M | If `libs/sendspin` has no `controller@v1` on the player side, a protocol PR first, as D8 was |
+| **5d** (owner's yes first) | **A capability report to a file**: the probe's table (formats, widths, rates) written as one JSON file the person can send, so that S4's device table can grow past one Shield | S | Optional; the person's own action, never sent anywhere |
+| **5e** (owner's yes first) | **A phone and tablet profile** (D11b): the same sink with a touch layout, no pass-through, decode as the only route | M | After 4; a separate mode of the same app, not a second app; the controls sheet becomes a bottom sheet |
 | **5f** | **AC-4 passed through** when a receiver that decodes it is found | S | Until then the sink decodes AC-4 itself (4f) and says so |
 | not planned | A CD+G picture on the TV | | No picture goes to a sink and none of the options is planned ([F10](hearth-android-findings.md#f10-cdg-and-a-sink)) |
 
@@ -221,12 +221,13 @@ The emulator CI job is **not** in this list: the owner asked for it to wait.
 
 ## Calls to veto
 
-Made, with the reason; the owner changes one by saying so.
+Made, with the reason; the owner changes one by saying so. **Reviewed with the owner on 2026-10-13:** C1 to
+C4 stand (C2 and C4 with the wording below, which says what they cost), and C5 is narrowed.
 
 | # | Call | Why |
 |---|---|---|
-| C1 | The PCM half starts as `audio::PcmOutput` over `MonitorSink`, not a new Kotlin `AudioTrack` | It exists, it is tested on the host too, and it needs no Java; P2 can overturn it with a number |
-| C2 | The route changes only at a stream's start or on the person's own change of the reproduction | The relock is audible; a sink that changes mode on its own is a sink that clicks |
+| C1 | The PCM half starts as `audio::PcmOutput` over `MonitorSink`, not a new Kotlin `AudioTrack` | It exists and needs no Java and no JNI link, an estimated 80 lines of `PcmSink` against 300 for a Kotlin class and its link; the `PcmSink` seam makes the other choice a one-class swap. **What was read on 2026-10-13:** the Android `MonitorSink` calls itself a preview path, takes a channel count and no channel mask below API 32 (the Shield is API 30), and reports a disconnect once for the caller to reopen. An `AudioTrack` through a bridge like `PassthroughBridge` is more code, and buys the explicit mask, a volume and the same failure handling as the burst track: it is the fallback, and P2's number decides |
+| C2 | The route changes only at a stream's start or on the person's own change of the reproduction, **wherever it is made** (the TV remote, or the server's Karaoke page) | The relock is audible; a sink that changes mode on its own is a sink that clicks. **What it costs:** the server's default reproduction is `aware`, so a karaoke song decodes and the receiver changes mode for about a second at its start, while other songs stay passed through (accepted by the owner, question 5) |
 | C3 | "Decode here" is not in the first PR | Nothing needs it yet; it is a control, not a capability |
-| C4 | AC-4 is **decoded, not passed through**, even on a route that lists the encoding | R8: nothing has shown a receiver decoding it over this route |
-| C5 | Phase 5 follows 4 without the owner's sign-off per PR | They are the ordinary player half; D11(c) was accepted |
+| C4 | AC-4 is **decoded, not passed through**, even on a route that lists the encoding | R8: nothing has shown a receiver decoding it over this route. **What it costs:** a decoded AC-4 stream with objects is rendered to 7.1 PCM at most, so the receiver gets no Atmos from AC-4. Today that is moot: the Shield's route lists no AC-4 profile, and the alternative is the host's PCM fallback, which sends no lyrics. 5f flips it where a receiver that decodes AC-4 is found |
+| C5 | **5a and 5b** follow phase 4's exit without a sign-off per PR; **5c, 5d and 5e each wait for the owner's yes** | D11(c) covers PCM, FLAC and Opus for Music Assistant and their levels. The transport keys may need a protocol PR, the capability report is a new file a person sends, and the phone profile is D11(b)'s second UI mode, which D11 put after phase 4 |

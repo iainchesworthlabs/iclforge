@@ -587,9 +587,9 @@ One more divergence was found and fixed rather than recorded:
   once the two decoders' channel orders agreed: channel 0 (L) at 48.93 dB, and a near-silent
   surround channel gated on absolute difference at a −46.0 dBFS floor (measured −55.31 dBFS).
 
-Annex C's karaoke reproduction has no outside oracle at all: it is informative, no decoder this
-project can run implements it, and there is no karaoke stream from anyone else. It is held to
-the annex's own tables instead - Table C.2.2's 3/0 columns coefficient by coefficient off an
+Annex C's karaoke reproduction is informative, and there is no karaoke stream from anyone else
+(Dolby's encoder cannot write `bsmod` 7). It is held to the annex's own tables first - Table
+C.2.2's 3/0 columns coefficient by coefficient off an
 impulse in every karaoke `acmod` (and its 2/0 column against the Lo/Ro fold), then a coded 3/2
 stream flagged `bsmod` 7 decoded as coded and as Lk, Ck, Rk, sample for sample, and a 3/2 stream
 flagged as a main service shown to ignore the request. The karaoke-capable decoder's Table C.2.3
@@ -597,7 +597,14 @@ is held the same way: its four listener choices, in both the 3/0 and the 2/0 rep
 mono sum), are transcribed from the specification's page 105-106 into the tests and compared
 coefficient by coefficient, with a level pair (clev 0.5, slev 0.25) no cell could be mistaken for,
 and again over a coded stream through the decoder and through `forge decode`. That checks the code
-against the reading of the table, not the reading against anyone's decoder. The part-to-speaker
+against the reading of the table, not the reading against anyone's decoder. For that there is one
+outside decoder: Dolby's reference decoder reproduces karaoke for AC-3 and, though Annex E defines
+no reproduction, for E-AC-3. `tools/checks/verify_karaoke_oracle.py` encodes a tone-per-channel
+stream both ways, decodes it with `forge decode` and with the Reference Player's `dlbac3dec`, and
+compares what each output channel carries as ratios, because the scale-down that keeps a sum
+under 1 is an implementation's choice. The player is licensed, so the script runs locally and not
+in CI; its measured ratios are constants in `libs/ac3/tests/decoder/test_eac3_karaoke.cpp`, so
+the evidence outlives the installed player. The part-to-speaker
 table the Forge GUI's Karaoke flow shows is held to the decoder the same way: every mode is
 encoded with a tone in each part and decoded as coded, aware and capable for each choice of
 vocals, and in the Lo/Ro fold, and the tones on each output are compared (this found that a

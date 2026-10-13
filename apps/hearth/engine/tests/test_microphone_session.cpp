@@ -417,6 +417,28 @@ TEST_CASE("microphone session: a discarded take is gone", "[microphone][take]") 
     CHECK(!std::filesystem::exists(folder.path / "gone.flac"));
 }
 
+TEST_CASE("microphone session: a take the disk cannot hold ends by itself, and is kept",
+          "[microphone][take]") {
+    Rig r = rig(voice());
+    TakeFolder folder;
+    REQUIRE(r.session->start("").has_value());
+    r.session->limit_take_bytes(30000);
+    REQUIRE(r.session->begin_take(folder.path / "full.flac", {}).has_value());
+    run(r, kT0, kT0 + 2'900'000'000);
+    const auto snapshot = r.session->snapshot();
+    CHECK(!snapshot.taking);
+    CHECK(!r.session->taking());
+    CHECK(snapshot.take_error.find("disk") != std::string::npos);
+    // The microphone is still on, and what was written is a take, handed over once.
+    CHECK(snapshot.open);
+    const auto kept = r.session->take_ended_by_itself();
+    REQUIRE(kept.has_value());
+    CHECK(!r.session->take_ended_by_itself().has_value());
+    CHECK(std::filesystem::file_size(kept->audio) <= 30000);
+    CHECK(std::filesystem::exists(kept->sidecar));
+    CHECK(!decode_take(kept->audio, kRate).empty());
+}
+
 TEST_CASE("microphone session: a device that goes away or stalls is reported", "[microphone]") {
     SECTION("unplugged") {
         Rig r = rig(sine(440.0, 5.0, 0.1));

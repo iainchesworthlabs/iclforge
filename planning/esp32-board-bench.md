@@ -223,6 +223,12 @@ cmake --build D:/ac3bld/suite-testserver --target hearth-testserver
   figure too. The floor is 160,796 now (planning/esp32-platform-profiles.md, "The C6's static RAM
   budget"); `bench.py status --probe` showing `/status playing` on a board nobody booked is how a
   play left behind looks.
+- **A file too short to be a stream is looped.** The AC-4 seeds are three frames: a stream entry
+  with `sendspin_seconds` is played by the server over and over for that long (`--seconds`), the
+  row holds that every burst the server sent is accounted for (its report's `programme.bursts`),
+  and the stream's `period_us` is what the permille is taken over (an AC-3 stream's is the
+  suite's 32 ms). A glitched play does not fail a row: `glitched_plays` of `plays` is the figure,
+  with an allowance by row id in the profile's tolerance.
 - **Music Assistant is displaced** while a stream plays: it holds a board by unpaired access (PSK
   `sentinel`), and the server pairs at the dial and wins. It has to dial the board again.
 
