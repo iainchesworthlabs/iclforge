@@ -4892,6 +4892,42 @@ The sections below contain the complete change list and fixes.
   repeats, and so do the 19 cases of the four projects. Run in headless Chromium 153 on Windows
   against an existing build of the module with this `mic.js` copied over the built one; the WASM
   job does not run on pull requests.
+- **The browser demo's microphone stays closed when another stream is loaded while the browser is
+  still asking for it.** Closing a session did nothing unless it was on, and a session is on only
+  after the last step of opening, which waits first for the browser to ask the person and then
+  for the capture worklet's module. The page closes the session on every decode of another
+  stream, and while a press is opening the microphone only the microphone button is disabled, so
+  a stream loaded with the prompt still open closed nothing, and the microphone opened when the
+  person allowed it. Where the first stream had no tune to score (a karaoke stream with only L
+  and R) and the next was not karaoke, the microphone was then on behind a card that was no
+  longer shown, with no indicator and no button to close it: in Chromium 153 the fake
+  microphone's track was still `live` when the check gave up after 10 s. Where the first stream
+  had a tune, the page had deleted it by then, and the card showed the module's error, "Cannot
+  pass deleted object as a pointer of type ReferenceContour" (the microphone itself was closed,
+  by the entry above).
+  `MicrophoneSession.stop()` now ends an opening. What `start()` holds is let go at once, the
+  microphone with it when the browser had already handed it over and the worklet's module was
+  still loading; a microphone the browser hands over afterwards is closed as it arrives; and
+  `start()` resolves with the session off and throws nothing, whatever the browser answers, so
+  the page reads `on` before it says the microphone is open. A second `start()` while one is
+  opening no longer opens a second microphone. The page also counts the decodes that take the
+  microphone away, and a press that one of them overtakes opens nothing and leaves the status
+  and the button as that decode set them. That covers a stream that arrives before the browser
+  has been asked, because a press first starts the sound output and waits for it: with the
+  session's change alone, the browser was then asked and the microphone opened behind the hidden
+  card. The card's words are unchanged, as are opening and closing a microphone with no stream
+  loaded in between.
+  Three cases in `microphone.spec.js` hold it: a session over stand-ins closed at each of its two
+  waits, with the wait then ending either way, and the page twice, once with its call to the
+  browser held open in place of the prompt (Chromium's fake prompt answers at once) and once with
+  the output's start held. The repository has no karaoke stream without a tune, so the test
+  makes one from a stereo stream by setting `bsmod` to 7 and redoing both CRC words of each
+  syncframe. Against the code as it was, the first fails 17 of its checks, the second finds the
+  track `live` and then the error on the card, and the third finds the browser asked; with the
+  change the eleven microphone cases pass, 88 of 88 over eight repeats, and so do the 22 cases of
+  the four projects. Run in headless Chromium 153 on Windows against an existing build of the
+  module with this `mic.js` and `demo.js` copied over the built ones; the WASM job does not run
+  on pull requests.
 
 **Forge GUI user guide: the Karaoke page's note on the length warning**
 
