@@ -123,6 +123,10 @@
     "b4083ba0f": {
       "commit": "b4083ba0fb691ce7a8fdbf21e579bd06db46c127",
       "what": "Release build on Windows: cl.exe, Qt from C:/Qt/6.8.3/msvc2022_64, taken 2026-10-13 or after"
+    },
+    "2d6d4bf3f": {
+      "commit": "2d6d4bf3f5f006284c6f2e325310c3049e59c8fb",
+      "what": "Release build on Windows: cl.exe, Qt from C:/Qt/6.8.3/msvc2022_64, taken 2026-10-13 or after"
     }
   },
   "pictures": [
@@ -134,7 +138,7 @@
         "{out}"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/overview-default.png",
@@ -146,7 +150,7 @@
         "tier=advanced"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/guided-wizard-source.png",
@@ -157,7 +161,7 @@
         "{media}/roundtrip-51.wav"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/loading-a-source-loaded.png",
@@ -168,7 +172,7 @@
         "{media}/roundtrip-51.wav"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/format-eac3-714.png",
@@ -182,7 +186,7 @@
         "preset=7.1.4"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/format-dual-mono.png",
@@ -195,7 +199,7 @@
         "bedIndex=0"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/format-expert-passthrough.png",
@@ -208,7 +212,7 @@
         "height=1710"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/coding-tools-off.png",
@@ -222,7 +226,7 @@
         "currentTab=coding"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/coding-tools-enabled.png",
@@ -239,7 +243,7 @@
         "spxAtten=true"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/metadata-tab.png",
@@ -254,7 +258,7 @@
         "currentTab=meta"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/objects-tab.png",
@@ -270,7 +274,7 @@
         "height=1500"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/source-assignment.png",
@@ -284,7 +288,7 @@
         "smokeScrollY=600"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/karaoke-parts-empty.png",
@@ -296,7 +300,7 @@
         "height=1010"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/forge/gui/screenshots/channel-levels-live.png",
@@ -310,7 +314,7 @@
         "preset=7.1.4"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a",
+      "build": "2d6d4bf3f",
       "note": "--smoke encodes the file and takes the picture when the run has finished, so the strip shows a run."
     },
     {
@@ -325,7 +329,7 @@
         "height=1930"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a",
+      "build": "2d6d4bf3f",
       "note": "A window is no taller than its screen: on the 1920-pixel screen this was taken on, height=1930 came out 1901 pixels."
     },
     {
@@ -342,7 +346,7 @@
         "vbrQuality=75"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a",
+      "build": "2d6d4bf3f",
       "note": "Not the same on every machine: with the live input shown, the rail lists this computer's capture devices by name. Nothing is opened or recorded."
     },
     {
@@ -358,7 +362,7 @@
         "codecIndex=1"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a",
+      "build": "2d6d4bf3f",
       "note": "Not the same on every machine: with the live input shown, the rail lists this computer's capture devices by name. Nothing is opened or recorded."
     },
     {
@@ -376,7 +380,7 @@
         "vbrQuality=75"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a",
+      "build": "2d6d4bf3f",
       "note": "Not the same on every machine: with the live input shown, the rail lists this computer's capture devices by name. Nothing is opened or recorded."
     },
     {
@@ -741,7 +745,7 @@
         "height=1100"
       ],
       "environment": "hidden-desktop",
-      "build": "c4fa8b161"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/karaoke/screenshots/forge-karaoke-levels.png",
@@ -753,7 +757,7 @@
         "karaokeStep=levels"
       ],
       "environment": "hidden-desktop",
-      "build": "c4fa8b161"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/karaoke/screenshots/forge-karaoke-hear.png",
@@ -765,7 +769,7 @@
         "karaokeStep=hear"
       ],
       "environment": "hidden-desktop",
-      "build": "c4fa8b161",
+      "build": "2d6d4bf3f",
       "note": "The grab waits for the Hear step to build its stream and decode it. Nothing is played."
     },
     {
@@ -778,7 +782,7 @@
         "karaokeStep=save"
       ],
       "environment": "hidden-desktop",
-      "build": "c4fa8b161"
+      "build": "2d6d4bf3f"
     },
     {
       "path": "docs/crucible/screenshots/crucible-room.png",
