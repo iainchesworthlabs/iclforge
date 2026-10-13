@@ -54,8 +54,20 @@
 // its position, within fifteen seconds leaves the capture's exit code at 3,
 // with the picture of whatever the window said, so a script that regenerates
 // the documentation fails rather than keeping a wrong picture.
-// `--page karaoke` opens the Karaoke page. src/command_line.hpp reads all of
-// these, and test_command_line.cpp holds it to what is said here.
+// `--page karaoke` opens the Karaoke page, and two more names open what a
+// person reaches from it: `--page singer` the singer view (F11), which a
+// capture draws in the window as it is and not on the whole screen, so that the
+// picture is not the size of whatever monitor it was taken on, and
+// `--page timing` the window that times the lyrics, once the item is loaded.
+// `--setting <key>=<value>` puts a value in a capture's scratch settings store
+// before the window reads it (`microphone/takesFolder=<folder>`,
+// `appearance/textScale=150`): the store starts empty, and this is how a capture shows
+// what a person set once. It is dropped, with a line in the log, when there is
+// no capture, so it never writes to a person's own settings.
+// `--size <width>x<height>` opens the window at that size, for a capture of a
+// page whose cards run on below the size it opens at.
+// src/command_line.hpp reads all of these, and test_command_line.cpp holds it
+// to what is said here.
 //
 // Translations run through the family's own LanguageManager
 // (apps/shared/preferences/src/language_manager.cpp, shared rather than copied), pointed at
@@ -104,6 +116,9 @@ constexpr int kOpenPollMs = 50;
 // After the item is loaded (and cued at its --seek position): the lyric view
 // reads its file one event-loop turn later and the page lays out once more.
 constexpr int kOpenSettleMs = 500;
+// How much longer a capture of the timing window settles: the window waits for the item's
+// lyrics to have been read before it opens, and then comes up.
+constexpr int kTimingOpensMs = 1500;
 constexpr int kExitItemNotLoaded = 3;
 
 bool save_window(QQmlApplicationEngine& engine, const QString& path) {
@@ -125,6 +140,32 @@ bool save_window(QQmlApplicationEngine& engine, const QString& path) {
 void mark_frames_for_tracy(QQuickWindow* window) {
     QObject::connect(window, &QQuickWindow::frameSwapped, window,
                      [] { ICLFORGE_FRAME_MARK_NAMED("UI"); }, Qt::DirectConnection);
+}
+
+// Puts the window where a `--page` says: on one of Main.qml's pages, or on the
+// page that something opens over, with that open. The same for a launch and for
+// what another launch hands over (single_instance.hpp), so that a name that is
+// not a page never leaves the window on no page at all.
+void show_page(QObject* root, const QString& page) {
+    const auto open_over = [root](const char* under, const char* opener) {
+        root->setProperty("page", QString::fromLatin1(under));
+        QMetaObject::invokeMethod(root, opener);
+    };
+    if (page == QLatin1String("firstrun")) {
+        QMetaObject::invokeMethod(root, "openFirstRun");
+    } else if (page == QLatin1String("shortcuts")) {
+        open_over("play", "openShortcuts");
+    } else if (page == QLatin1String("about")) {
+        open_over("play", "openAbout");
+    } else if (page == QLatin1String("licences")) {
+        open_over("play", "openLicences");
+    } else if (page == QLatin1String("singer")) {
+        open_over("karaoke", "openLyricScreen");
+    } else if (page == QLatin1String("timing")) {
+        open_over("karaoke", "openLyricTiming");
+    } else if (!page.isEmpty()) {
+        root->setProperty("page", page);
+    }
 }
 
 }  // namespace
@@ -239,6 +280,18 @@ int main(int argc, char** argv) {
     // has just pointed the store at an empty scratch directory, so it finds nothing to copy.
     iclforge::settings_migration::migrate_program(iclforge::settings_migration::Program::kHearth);
 
+    // --setting: what the capture's scratch store holds before anything reads it. The parser
+    // keeps none without a capture, so this is never a person's own store. A value is kept as
+    // text, which is how the INI store a capture uses holds every value.
+    if (!command_line.settings.isEmpty()) {
+        QSettings scratch(QSettings::defaultFormat(), QSettings::UserScope,
+                          QCoreApplication::organizationName(),
+                          QCoreApplication::applicationName());
+        for (const auto& [key, value] : command_line.settings) {
+            scratch.setValue(key, value);
+        }
+    }
+
     QQmlApplicationEngine engine;
     // The family's own language manager, pointed at this app's catalogues:
     // the system locale by default, a saved override once the person has
@@ -272,19 +325,18 @@ int main(int argc, char** argv) {
     if (!shot_path.isEmpty()) {
         engine.rootObjects().first()->setProperty("suppressFirstRun", true);
     }
-    if (page == QLatin1String("firstrun")) {
-        QMetaObject::invokeMethod(engine.rootObjects().first(), "openFirstRun");
-    } else if (page == QLatin1String("shortcuts")) {
-        engine.rootObjects().first()->setProperty("page", QStringLiteral("play"));
-        QMetaObject::invokeMethod(engine.rootObjects().first(), "openShortcuts");
-    } else if (page == QLatin1String("about")) {
-        engine.rootObjects().first()->setProperty("page", QStringLiteral("play"));
-        QMetaObject::invokeMethod(engine.rootObjects().first(), "openAbout");
-    } else if (page == QLatin1String("licences")) {
-        engine.rootObjects().first()->setProperty("page", QStringLiteral("play"));
-        QMetaObject::invokeMethod(engine.rootObjects().first(), "openLicences");
-    } else if (!page.isEmpty()) {
-        engine.rootObjects().first()->setProperty("page", page);
+    if (command_line.size.has_value()) {
+        if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) {
+            window->resize(command_line.size->first, command_line.size->second);
+        }
+    }
+    show_page(engine.rootObjects().first(), page);
+    // The singer view takes the whole screen. A capture puts the window back as it was, with
+    // the view still open in it, so that the picture has the window's size on every machine.
+    if (page == QLatin1String("singer") && !shot_path.isEmpty()) {
+        if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) {
+            window->showNormal();
+        }
     }
     if (!decoder_format.isEmpty()) {
         engine.rootObjects().first()->setProperty("decoderFormat", decoder_format);
@@ -314,8 +366,8 @@ int main(int argc, char** argv) {
                 }
                 QObject* const root =
                     engine.rootObjects().isEmpty() ? nullptr : engine.rootObjects().first();
-                if (root != nullptr && !requested_page.isEmpty()) {
-                    root->setProperty("page", requested_page);
+                if (root != nullptr) {
+                    show_page(root, requested_page);
                 }
                 if (auto* window = qobject_cast<QQuickWindow*>(root)) {
                     if ((window->windowStates() & Qt::WindowMinimized) != 0) {
@@ -375,6 +427,10 @@ int main(int argc, char** argv) {
     // at the output it plays to). A step that does not come within the time
     // allowed ends the sequence as not done: a capture is taken all the same,
     // for what the window says, and the exit code says it did not load.
+    // The timing window opens a moment after the item is loaded (KaraokePage.qml's
+    // openTiming()), so a capture of it settles for that much longer.
+    const int settle_ms =
+        kOpenSettleMs + (page == QLatin1String("timing") ? kTimingOpensMs : 0);
     enum class Step { kLoading, kStarting, kHolding, kDone };
     struct Cue {
         Step step = Step::kLoading;
@@ -385,7 +441,8 @@ int main(int argc, char** argv) {
     wait->setInterval(kOpenPollMs);
     QObject::connect(
         wait, &QTimer::timeout, &app,
-        [&app, &engine, controller, wait, cue, first_path, shot_path, seek_ms = command_line.seek_ms] {
+        [&app, &engine, controller, wait, cue, first_path, shot_path, settle_ms,
+         seek_ms = command_line.seek_ms] {
             cue->waited += kOpenPollMs;
             const bool timed_out = cue->waited >= kOpenWaitMs;
             bool done = false;
@@ -426,7 +483,7 @@ int main(int argc, char** argv) {
             if (shot_path.isEmpty()) {
                 return;
             }
-            QTimer::singleShot(kOpenSettleMs, &app, [&engine, shot_path, done] {
+            QTimer::singleShot(settle_ms, &app, [&engine, shot_path, done] {
                 const bool saved = save_window(engine, shot_path);
                 QCoreApplication::exit(!saved ? 2 : (done ? 0 : kExitItemNotLoaded));
             });

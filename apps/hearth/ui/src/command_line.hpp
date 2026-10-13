@@ -1,9 +1,11 @@
 #pragma once
 
+#include <QList>
 #include <QString>
 #include <QStringList>
 
 #include <optional>
+#include <utility>
 
 // What Hearth's command line asks for, read once by main() (main.cpp's own header comment
 // is the usage text, and docs/hearth/index.md's "Command line" section the reference).
@@ -49,6 +51,17 @@ struct CommandLine {
     // held paused there: a stopped item reports no position, so a page that shows one (a lyric
     // view part way through a word) needs the item to have been started.
     std::optional<qlonglong> seek_ms;
+    // --setting <key>=<value>, as many times as it is given: what a capture's settings store
+    // holds before the window reads it (`microphone/takesFolder=D:/takes`). A capture runs
+    // against a scratch store that starts empty, so that it shows nobody's own devices or
+    // folders, and this is how it shows a state that a person reaches by choosing something
+    // once. Only a capture has that store: without --shot or --smoke-shot the option is
+    // dropped and said so, so that it can never write to a person's own settings.
+    QList<std::pair<QString, QString>> settings;
+    // --size <width>x<height>: the window's size in pixels, for a capture of a page that is
+    // longer than the window opens at (the Karaoke page's cards run on below it). The system
+    // still has its say: a window is not made taller than the screen it is on.
+    std::optional<std::pair<int, int>> size;
     // What was not understood, for the log.
     QStringList warnings;
 
@@ -91,7 +104,7 @@ struct CommandLine {
             }
         } else if (arg == QLatin1String("--page")) {
             // play, media, speakers, decoder, network, settings, karaoke, firstrun,
-            // shortcuts, about or licences
+            // shortcuts, about, licences, singer or timing
             if (has_value) {
                 out.page = args[i + 1];
             }
@@ -120,6 +133,25 @@ struct CommandLine {
                             .arg(args[i + 1]));
                 }
             }
+        } else if (arg == QLatin1String("--size")) {
+            const QStringList parts = has_value ? args[i + 1].split(QLatin1Char('x')) : QStringList{};
+            bool width_ok = false;
+            bool height_ok = false;
+            const int width = parts.size() == 2 ? parts[0].toInt(&width_ok) : 0;
+            const int height = parts.size() == 2 ? parts[1].toInt(&height_ok) : 0;
+            if (width_ok && height_ok && width > 0 && height > 0) {
+                out.size = std::pair{width, height};
+            } else {
+                out.warnings.push_back(
+                    QStringLiteral("--size takes <width>x<height> in pixels, as 1280x1400"));
+            }
+        } else if (arg == QLatin1String("--setting")) {
+            const qsizetype eq = has_value ? args[i + 1].indexOf(QLatin1Char('=')) : -1;
+            if (eq <= 0) {
+                out.warnings.push_back(QStringLiteral("--setting takes <key>=<value>"));
+            } else {
+                out.settings.push_back({args[i + 1].left(eq), args[i + 1].mid(eq + 1)});
+            }
         } else {
             continue;
         }
@@ -133,6 +165,11 @@ struct CommandLine {
         out.warnings.push_back(
             QStringLiteral("--seek has no item to cue without a file (on its own, or --open <file>)"));
         out.seek_ms.reset();
+    }
+    if (!out.settings.isEmpty() && out.shot_path.isEmpty()) {
+        out.warnings.push_back(QStringLiteral(
+            "--setting is for a capture's scratch settings (--shot or --smoke-shot), and is not used"));
+        out.settings.clear();
     }
     return out;
 }

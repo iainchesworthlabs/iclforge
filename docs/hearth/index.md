@@ -358,9 +358,11 @@ at start, and take screenshots of the window with nobody at the machine.
 | `--` | Ends the options: everything after it is a file, so `hearth -- --page` opens a file called `--page` |
 | `--open <file>` | A file named as an option, once for each `--open`, in the order given with any others: it cannot be read as anything else, so it is the form to write in a script. It queues and plays as a file on its own does; a capture or `--seek` cues the first file instead (loaded, not playing), so the Play, Media and Karaoke pages show it |
 | `--seek <ms>` | Starts the first file at that position in milliseconds and holds it paused there, so a lyric view shows a word part way through (a stopped item has no position to show). It plays a moment of sound at the output it goes to, and needs a file |
-| `--page <name>` | Opens on a page (`play`, `media`, `speakers`, `decoder`, `network`, `settings` or `karaoke`), or on a dialog over the Play page (`firstrun`, `shortcuts`, `about` or `licences`) |
+| `--page <name>` | Opens on a page (`play`, `media`, `speakers`, `decoder`, `network`, `settings` or `karaoke`), on a dialog over the Play page (`firstrun`, `shortcuts`, `about` or `licences`), or on the Karaoke page with the singer view open (`singer`) or the window that times the lyrics (`timing`, which opens once a file is loaded). A capture draws the singer view in the window at its own size, not on the whole screen, so that the picture does not depend on the monitor |
 | `--decoder-format <eac3\|ac4>` | Which tab the Decoder page opens on |
 | `--open-output-picker` | Opens the output picker over the page |
+| `--size <width>x<height>` | Opens the window at that size in pixels, as `--size 1280x1400`, for a picture of a page whose cards run on below the size the window opens at. A window is not made taller than the screen it is on |
+| `--setting <key>=<value>` | Puts a value in a capture's settings before the window reads them, once for each `--setting`: `microphone/takesFolder=<folder>` for where the Microphone card looks for takes, `appearance/textScale=150` for the text size. It needs `--smoke-shot` or `--shot`; without one it is not used, and the log says so, so it never changes a person's own settings |
 | `--smoke-shot <png>` | Saves the window to a PNG once it has settled, and quits, **with network discovery off**: nothing browses the network, so there is no firewall prompt and no sink from the network in the picture. This is the one to put in a script |
 | `--shot <png>` | The same capture with network discovery on, as the window runs. On Windows that asks for a Windows Firewall rule (a UAC prompt), so run it where somebody can answer it |
 
@@ -379,7 +381,7 @@ taskbar button rather than bring its window forward.
 
 A capture runs against a scratch settings store, so it neither reads nor changes a person's own
 queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
-asks for it. Its exit code is 0 for a picture saved, 2 when the picture could not be saved, and
+asks for it. The store starts empty; `--setting` is how a capture shows what a person chose once. Its exit code is 0 for a picture saved, 2 when the picture could not be saved, and
 3 when an `--open` file did not load, or did not reach its `--seek` position, within fifteen seconds
 (the picture is saved all the same, for what the window said about the file). A script that
 regenerates screenshots can stop on that.
