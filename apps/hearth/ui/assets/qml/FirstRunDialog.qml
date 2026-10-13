@@ -94,7 +94,7 @@ Dialog {
         DialogScroll {
             id: scroll
             objectName: "firstRunScroll"
-            spacing: Theme.gap
+            columnSpacing: Theme.gap
 
             Text {
                 text: qsTr("FIRST RUN")

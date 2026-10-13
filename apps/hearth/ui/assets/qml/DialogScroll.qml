@@ -25,7 +25,7 @@ ScrollView {
     id: root
 
     default property alias content: column.data
-    property alias spacing: column.spacing
+    property alias columnSpacing: column.spacing
 
     // The height the column asks for, at the width there is.
     readonly property real wantedHeight: column.implicitHeight + root.topPadding + root.bottomPadding

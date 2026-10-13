@@ -40,6 +40,8 @@ TestCase {
 
     function cleanup() {
         HearthController.textScale = "100";
+        // The window that applied the size may be gone already; Theme outlives it.
+        Theme.fontScale = 1.0;
         if (startLanguage.length > 0 && LanguageManager.currentLanguage !== startLanguage) {
             LanguageManager.setLanguage(startLanguage);
         }
@@ -74,7 +76,11 @@ TestCase {
                + root.height + " tall");
         const scroll = inDialog(dialog, scrollName);
         const flick = scroll.contentItem;
-        verify(scroll.overflowing, "the body is not scrolling, so the text did not need it here");
+        // The layout settles on the next frame after the window took its size.
+        tryVerify(function() { return scroll.overflowing; }, 5000,
+                  "the body is not scrolling, so the text did not need it here: it wants "
+                  + scroll.wantedHeight + " and has " + scroll.height + " in a dialog " + dialog.height
+                  + " tall (natural " + dialog.implicitHeight + ") in a window " + root.height + " tall");
         verify(flick.contentHeight > flick.height, "the body is no taller than its view");
         for (let i = 0; i < buttonNames.length; ++i) {
             const button = inDialog(dialog, buttonNames[i]);

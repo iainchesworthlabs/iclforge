@@ -65,7 +65,7 @@ Dialog {
         DialogScroll {
             id: scroll
             objectName: "shortcutsScroll"
-            spacing: Theme.space2
+            columnSpacing: Theme.space2
 
             Text {
                 text: qsTr("Keyboard shortcuts")

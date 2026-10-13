@@ -87,7 +87,7 @@ Dialog {
         DialogScroll {
             id: scroll
             objectName: "aboutScroll"
-            spacing: Theme.space2
+            columnSpacing: Theme.space2
 
             RowLayout {
                 spacing: Theme.space3
