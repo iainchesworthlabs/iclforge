@@ -180,8 +180,9 @@ can also be called.
 
 **C++23, and use it.** `std::expected` for recoverable failure, `std::span` for borrowed
 sequences, `fmt::print`/`fmt::format` for output — not the `std::print`/`std::format`
-equivalents, since NDK r26's bundled libc++ has no `<format>` at all (see
-`docs/platforms/android.md`) and {fmt} sidesteps the gap outright rather than routing around it
+equivalents, since NDK r26's bundled libc++ had no `<format>` at all (the Android pin is r28c
+now, whose libc++ has it; see `docs/platforms/android.md`) and {fmt} is one formatting library on
+every toolchain, which sidesteps a per-toolchain gap outright rather than routing around it
 file by file — designated initializers for configuration structs, `constexpr` and `consteval` for
 anything computable at build time. (A handful of older call sites already used C-style
 `%`-specifier output before this convention existed; those keep their existing format strings but

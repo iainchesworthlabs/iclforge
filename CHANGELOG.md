@@ -3902,6 +3902,21 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Android: NDK r28c**
+
+- **Every Android build is pinned to NDK r28c (28.2.13676358), up from r26b (26.1.10909125).** The
+  two Gradle apps' `ndkVersion`, the four `sdkmanager` installs and the `ANDROID_NDK_HOME` of
+  `_build.yml` and `codeql.yml`, `tools/ci/regenerate_android_locks.sh`, the preset's text and
+  docs/platforms/android.md. r26's libc++ (LLVM 17) was what put a `std::expected` payload's
+  has-value flag in the payload's tail padding and then copied the payload over it
+  (llvm-project#68552 and #70494, android/ndk#1963: r27 has half the fix, r28 both), answered true
+  from `std::ranges::binary_search` for every value between the first element and the last
+  (llvm-project#61160), and ended a range-for's temporaries before its first iteration; r28c's
+  clang 19.0.1 and libc++ 19 have all three right. What r28c adds is measured in
+  docs/platforms/android.md; what it still lacks is floating-point `from_chars`
+  (`strtod` stays) and `std::jthread`/`std::stop_token` without `-fexperimental-library`.
+  {fmt} stays the one formatting library on every toolchain.
+
 **Shared code**
 
 - **The picture of a CD+G disc is shared code, `apps/shared/cdg-picture`.** Hearth's picture item

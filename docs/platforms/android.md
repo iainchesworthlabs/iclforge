@@ -30,7 +30,7 @@ enabled, and that build (which carries the key) must never leave the user's own 
 
 ## Build and run
 
-An Android SDK with **NDK 26.1.10909125** and **CMake 3.31.6** installed (`local.properties` →
+An Android SDK with **NDK 28.2.13676358** (r28c) and **CMake 3.31.6** installed (`local.properties` →
 `sdk.dir`), plus a Shield TV reachable over the network or USB:
 
 ```bash
@@ -61,7 +61,7 @@ project the desktop tools build from.
 
 ## Toolchain
 
-**NDK r26.1.10909125**, pinned explicitly in `app/build.gradle.kts` rather than left to "whichever
+**NDK r28c (28.2.13676358)**, pinned explicitly in `app/build.gradle.kts` rather than left to "whichever
 NDK Gradle resolves" — a build failure should mean something changed, not that a different NDK got
 silently picked. CMake **3.31.6** (the closest available match in the SDK manager's package
 repository to the root project's declared `3.28...4.3` range; there is no 3.28.x package for
@@ -69,19 +69,21 @@ Android). `ANDROID_STL=c++_shared` — the app's `iclforge::ac3`/`iclforge::audi
 linked into one shared object (`iclforge_jni.so`), and a static STL would duplicate global state
 (locale, iostream init) if anything else in the process ever pulled in libc++ too.
 
-The r26 pin also reaches into the library itself: r26's bundled libc++ does not implement
-`<format>` at all unless the compiler is invoked with `-fexperimental-library`, which nothing in
-this project's Android build passes. Rather than avoiding formatted output file by file to route
-around that, the whole project uses [{fmt}](https://github.com/fmtlib/fmt) — `fmt::format`/
-`fmt::print` in place of `std::format`/`std::print` everywhere — since {fmt} has no
-such gap (see `cmake/Fmt.cmake` and `CONTRIBUTING.md`'s code-conventions section). That single
-choice is also what lets `iclforge::containers::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
+The pin used to be r26b, and that reached into the library itself: r26's bundled libc++ (LLVM 17)
+does not implement `<format>` at all unless the compiler is invoked with `-fexperimental-library`.
+Rather than avoiding formatted output file by file to route around that, the whole project uses
+[{fmt}](https://github.com/fmtlib/fmt) — `fmt::format`/`fmt::print` in place of
+`std::format`/`std::print` everywhere — since {fmt} has no such gap (see `cmake/Fmt.cmake` and
+`CONTRIBUTING.md`'s code-conventions section). r28c's libc++ (LLVM 19) has `<format>` and `<print>`
+without the flag; the convention stays, because it is one formatting library on every toolchain,
+the macOS wheel's deployment target included, and not a per-toolchain split. That single choice is
+also what lets `iclforge::containers::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
 note in `apps/demos/android/app/src/main/cpp/CMakeLists.txt` for why this app still doesn't link them
 regardless (it never muxes a file).
 
-The same libc++ implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
-overloads — a gap {fmt} does not close, since {fmt} only formats text *out*, the same direction
-`std::format` goes. Library code that has to turn text *into* a `double` therefore uses `strtod`
+The libc++ still implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
+overloads (r28c included, measured) — a gap {fmt} does not close, since {fmt} only formats text *out*,
+the same direction `std::format` goes. Library code that has to turn text *into* a `double` therefore uses `strtod`
 instead (`libs/ac3/src/encoder/plan.cpp`, `encoder/assignment.cpp`,
 `libs/objects/src/scene_text.hpp`, which also serves the object-scene file formats' parsing —
 the write side of that same file goes through `fmt::format`, like everything else, once {fmt}
@@ -91,6 +93,18 @@ the matching `to_chars` gap there (`'to_chars' is unavailable: introduced in mac
 raw `std::format` call would hit — so this leg and **Build wheels (macos-latest)** are the two
 that catch a *parsing* regression; a *formatting* one shows up everywhere, same as any other
 compile error.
+
+What r28c has that r26b did not, measured by compiling one translation unit per feature against both
+(2026-10-13): `std::format` and `std::print` (r26 only behind `-fexperimental-library`, and only
+`format`), `std::ranges::contains` and `fold_left`, `std::expected::transform`, `std::mdspan`, a correct `std::ranges::binary_search` (r26b's answers
+true for every value between the first element and the last, llvm-project#61160), a
+`std::expected` whose has-value flag survives a trivially copyable payload with tail padding
+(llvm-project#68552 and #70494, android/ndk#1963: r27 has half the fix, r28 both), and Clang 19's
+P2718R0, which keeps a range-for's temporaries alive to the end of the loop. What it still does not
+have: floating-point `from_chars`, `std::views::enumerate`, `std::flat_map`, `std::atomic_ref`, and
+`std::jthread` / `std::stop_token` without `-fexperimental-library` (the header is there; the
+types are behind the flag, which nothing here passes: `libs/audio/src/backend/android/monitor.cpp`
+keeps its own stop flag).
 
 `minSdk = 26` (Oreo) is a hard floor, not a target: `monitor.cpp` depends on AAudio outright, which
 does not exist below API 26, and there is no fallback path. Real Shield TV hardware (2017 model
@@ -213,7 +227,7 @@ So the backend is split, unlike the other three:
 its object signer) and `iclforge::audio` and not the AC-4 library
 (`libs/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
 default, on, so the NDK build compiles the library and holds its sources to building under
-NDK r26 (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
+the pinned NDK (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
 calls them. The live encode loop makes E-AC-3 only. The `play_file` diagnostic (below) replays
 E-AC-3 files only, and refuses a file that does not open with an AC-3 or E-AC-3 syncframe, an
 AC-4 file included. The app never asks the passthrough sink for AC-4.
@@ -791,7 +805,7 @@ adb -s <shield-ip>:5555 install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
 ```
 
-`local.properties` needs `sdk.dir` pointing at an Android SDK with NDK 26.1.10909125 and CMake
+`local.properties` needs `sdk.dir` pointing at an Android SDK with NDK 28.2.13676358 and CMake
 3.31.6 installed (via Android Studio's SDK Manager, or `sdkmanager --install`). For a local *signed*
 build, also drop a `signing.key` asset into `app/src/main/assets/` as described in
 [Object signing](#object-signing).
@@ -802,7 +816,7 @@ The Shield app's Gradle wrapper has no vcpkg, so it leaves `ICLFORGE_BUILD_HEART
 build `libs/sendspin`. A CMake preset does, under the same NDK:
 
 ```bash
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 cmake --preset config-android-arm64
 cmake --build --preset build-android-arm64
 ```
@@ -870,7 +884,7 @@ The app builds alongside the desktop packages rather than only ever being hand-b
 `.github/workflows/_build.yml`'s `build-android` job builds the **debug** variant in every run in
 which the Android lane runs: the nightly run, and the run after a merge that changes
 `apps/demos/android/` (no Android SDK/NDK setup beyond what `ubuntu-latest` ships plus an explicit
-`sdkmanager` install of the exact NDK version, `26.1.10909125`, the same "don't trust whatever the
+`sdkmanager` install of the exact NDK version, `28.2.13676358`, the same "don't trust whatever the
 image happens to cache" reasoning every other toolchain step in that workflow already follows) — a
 smoke test proving the Gradle/CMake/NDK toolchain and every native source file still build. A
 change to `src/` reaches it in the nightly run. **Object signing in CI reaches the debug APK
