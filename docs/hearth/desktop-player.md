@@ -258,4 +258,5 @@ reference's **About…** button opens the version and the licences.
 `hearth --smoke-shot <png> --page <name>` saves a page to a file with network discovery off and a
 scratch settings store ([Command line](index.md#command-line)). These were taken on Windows with
 `QT_QPA_PLATFORM=windows:darkmode=0`, which draws the light theme whatever the desktop is set to,
+and `QSG_DISTANCEFIELD_ANTIALIASING=gray`, which keeps coloured subpixel edges out of the text,
 with the three files named by `--open` and a position by `--seek`.
