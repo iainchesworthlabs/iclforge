@@ -40,8 +40,9 @@ is listed while it is playing: PipeWire gives it a stream when it starts making 
 the stream away when it stops, so the list follows the sound rather than the windows. The
 **macOS** seam is written to say both halves — listed while macOS is holding sound open for an
 application, greyed while nothing is coming out of it — and, below macOS 14.0, to say instead
-that Core Audio there cannot report which processes are using sound, so nothing can be listed;
-nobody has yet seen either sentence on a Mac. On all three, a placed application keeps its place
+that Core Audio there cannot report which processes are using sound, so nothing can be listed
+(since the macOS floor became 14.4 no Mac shows that second sentence; the gate is still in the
+code); nobody has yet seen either sentence on a Mac. On all three, a placed application keeps its place
 while it runs, silent or not.
 
 The order is sound first, then applications with a session but no sound, then silent ones, and by

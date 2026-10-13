@@ -13,6 +13,7 @@ satisfies that, and the combined work is distributed under the GPL; the
 text is LICENSE.txt beside this file.
 
 Qt Quick 3D contains, each under its own terms: Intel Embree 3.13.3
-(Apache-2.0), tinyexr 1.0.9 (BSD-3-Clause), meshoptimizer 0.18 (MIT),
-xatlas (MIT) and a fog shader (MIT). Qt's attribution for each is at
-https://doc.qt.io/qt-6/licenses-used-in-qt.html
+(Apache-2.0), tinyexr 1.0.13 (BSD-3-Clause), meshoptimizer 1.2 (MIT),
+xatlas (MIT), a fog shader (MIT), a closest-point-on-triangle routine
+(Apache-2.0) and a blue-noise texture (CC0-1.0). Qt's attribution for
+each is at https://doc.qt.io/qt-6/licenses-used-in-qt.html

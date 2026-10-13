@@ -4036,6 +4036,18 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Qt 6.12, the long-term-support release, and macOS 14.4 as the minimum**
+
+- **The three GUI applications are built against Qt 6.12.0** (6.10.3 before it). The Windows and
+  macOS packages carry it, and the Third-party notices in each name the versions of the code in
+  that Qt's own kit. Linux packages use the system's Qt, as before.
+- **The macOS minimum is 14.4**, up from 13.3, which is the floor of Qt 6.12. It applies to the whole
+  macOS package, the command-line program included, and the Homebrew cask now requires macOS 14.
+- **Hearth's and Forge's Windows and macOS packages no longer carry Quick 3D's QML profiler backend
+  and the library it loads.** Qt's deployment tool added both, neither application loads them, and
+  they hold third-party code (meshoptimizer and xatlas) that the notices of those two packages did
+  not name. Crucible, which has a 3D view, still carries them, and its notices cover them.
+
 **The app icon is in the Signal red**
 
 - **The mark is the brand red, `#ec3013`, on the Signal ink, `#201e1d`**, the colours the three apps'
