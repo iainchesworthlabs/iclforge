@@ -13,14 +13,29 @@ See [README.md](README.md) for the project overview and
 This release adds:
 
 - an AC-4 decoder and encoder, written from ETSI TS 103 190-1 and -2, with A-JOC and direct-coded
-  objects, in `ac3cli`, the Forge GUI and Hearth's desktop player, and in the C API, Python, Rust
-  and WebAssembly bindings; AC-4 in MP4, CMAF, MPEG-TS and IEC 61937-14 bursts; AC-4 on the
-  ESP32-P4; and Android building the AC-4 libraries;
-- Hearth's desktop player, with its network sinks on the ESP32-S3, ESP32-C6 and ESP32-P4, firmware
-  updates over the network, and diagnostics;
-- fixed-point decoding for ESP32-C3 and ESP32-C6, with real-time ESP32-S3 work;
+  objects, in `forge`, the Forge GUI and Hearth's desktop player, and in the C API, Python, Rust
+  and WebAssembly bindings; AC-4 in MP4, CMAF, MPEG-TS and IEC 61937-14 bursts; and the AC-4
+  decoder on the ESP32-P4 and the ESP32-S3;
+- Hearth: the desktop player; its network sinks on the ESP32-S3, ESP32-C6 and ESP32-P4, with
+  firmware updates over the network and diagnostics; Hearth for Android, a sink for Android TV
+  that passes AC-3 and E-AC-3 to a receiver; and the Sendspin sink library the test sink and the
+  Android app are built on;
+- karaoke: AC-3's Annex C streams, and the same reproduction for E-AC-3, in the decoder, in
+  `forge`, in a Karaoke flow in the Forge GUI and on a Karaoke page in Hearth, with timed lyrics
+  from `.lrc`, SubRip, Advanced SubStation Alpha and MIDI karaoke files, a microphone with a pitch
+  score, lyrics on the network sinks and in Crucible, and a browser demo;
+- new names: the family is ICL Forge, its programs are `forge`, `forge-gui`, `hearth` and
+  `crucible`, its libraries are `iclforge::<library>`, and the repository is a tree of
+  self-contained projects under `libs/`, `apps/`, `bindings/` and `firmware/`
+  ([Renamed](docs/renamed.md) puts each old name beside its new one);
+- IAMF v2.0 reading and writing, an IAB (SMPTE ST 2098-2) writer and lossless audio, more of ADM,
+  object signing with several keys and a licensed gate, and an associated E-AC-3 service mixed
+  into the main;
+- fixed-point decoding for ESP32-C3 and ESP32-C6, with real-time ESP32-S3 work, and one locked
+  build profile for each board;
 - Crucible on Windows and Linux, with macOS code built and tested in CI;
-- per-channel quality gates and continued performance, quality, and memory histories;
+- per-channel quality gates and continued performance, quality, and memory histories, with AC-4
+  in them;
 - wider WebAssembly encoding, microphone capture, and expanded Rust bindings;
 - a pull-request gate, a verified branch and a nightly run in place of the full CI matrix on
   every change.
@@ -89,7 +104,6 @@ The sections below contain the complete change list and fixes.
   been read. The reference is read on a worker thread and cancelled when the item changes.
   Hearth's user guide has a section on it.
 
-**Hearth: what a singer's performance is scored against, and how**
 **Karaoke in E-AC-3: the documentation says what the decoder does**
 
 - **The user guide, Hearth's page and the plan stop saying "E-AC-3 has no karaoke mode, this is
@@ -236,16 +250,7 @@ The sections below contain the complete change list and fixes.
   to 90 %, and 78 % when the echo is as weak as the noise. Held with synthetic rooms and eight
   mutants, all killed. The threshold is provisional (it needs a real room and a real singer), and
   nothing in Hearth calls it yet.
-**Audio: when a packet was captured**
 
-- **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
-  programme, M2). `Capture::stamps()` is a second lock-free ring of `CaptureStamp`s (the packet's
-  first frame in the stream, and its time in nanoseconds on `std::chrono::steady_clock`'s clock);
-  `CaptureTimeline` fits a line through the last 64 and gives the time of any frame, the frame at a
-  time, and the device's measured rate; `Capture::start()` takes `CaptureOptions` with a requested
-  packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
-  `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
-  consumer must treat as "no time", and a caller that does not use any of it sees no change.
 **Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
 
 - **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
@@ -451,14 +456,6 @@ The sections below contain the complete change list and fixes.
   with the words beside it as UTF-8 LRC (the same conversion as `lyrics-encoding=`). Choosing
   another file forgets the page. The page names' language groups are translated in the six
   catalogues.
-
-  refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
-- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
-  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
-  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
-  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
-  is named on the row when it is chosen, and none is written. The row's strings are translated in
-  the six catalogues.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
