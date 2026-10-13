@@ -29,6 +29,22 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: what the boards do, and the pages that said otherwise**
+
+- **The Hearth sink pages say what each board does with a karaoke stream.** The S3 reproduces
+  AC-3 and E-AC-3 karaoke itself (levels within 0.25 dB of the host's decode in Hearth's live
+  case). The C6 decodes two channels, so Hearth decodes a 5.1 karaoke stream for it and sends 2.0
+  PCM, for both codecs, and the live case skips it with the reason. A v1.x P4 reproduces both at
+  its 2.0 layout (within 0.2 dB for AC-3 and 0.7 dB for E-AC-3), and cannot open the 3.0 layout
+  the case uses by default. One earlier run on that board, started from its second slot after an
+  update restart, played nothing and is recorded as not explained.
+- **`docs/verification.md` and the development-status row no longer say no outside decoder
+  reproduces karaoke.** Dolby's reference decoder does, for AC-3 and for E-AC-3
+  (`tools/checks/verify_karaoke_oracle.py`, local only); the E-AC-3 row says what is reproduced.
+- **The Hearth page and the Karaoke guide say a sink is sent PCM when it decodes fewer channels of
+  the codec than the stream has**, as well as when it does not list the codec for karaoke. The
+  ROADMAP row and the plan's board cells say what was run.
+
 **Karaoke in E-AC-3: the live karaoke cases take a layout, and skip a board that is not the one decoding**
 
 - **`network sinks live: a karaoke stream is reproduced by the board that decodes it` and its E-AC-3
