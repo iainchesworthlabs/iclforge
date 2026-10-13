@@ -28,11 +28,15 @@ TestCase {
 
     Component { id: stripComponent; LyricStrip { width: 320 } }
     Component { id: roomPage; RoomPage { width: 1480; height: 700 } }
+    Component { id: shell; Main {} }
 
     function cleanup() {
-        for (const app of [7, 8, 9]) {
+        for (const app of [7, 8, 9, 900, 901]) {
             CrucibleLyrics.clear(app);
         }
+        // And the scripted machine of a case that ran the window, back to the real one.
+        CrucibleController.stop();
+        TestServices.clear();
         // No session of an earlier case is left for the next to be matched with.
         CrucibleLyrics.applySessionList([], 0);
         // And the events out are off again, with the destination they were given.
@@ -358,6 +362,52 @@ TestCase {
         strip.app = { app: 8 };
         tryCompare(strip, "fileName", "b.lrc", 5000);
         compare(strip.lines.length, 1);
+    }
+
+    // `crucible --shot --lyrics Name=<file>@<time>` (main.cpp) finds the application by its name in
+    // the list the engine published and selects it through the window's selectApplication(), which
+    // the strip follows, and then imports the file and starts the strip by hand. The option's own
+    // parsing is plain Catch2 (test_capture_lyrics.cpp); this holds the window's half of it.
+    function test_theCaptureHookSelectsTheApplicationTheStripIsFor() {
+        if (!TestServices.scriptSessions([{ app: 900, name: "Hearth", active: true },
+                                          { app: 901, name: "Microsoft Edge", active: true }])) {
+            skip("the scripted machine is not available in this harness");
+        }
+        CrucibleController.firstRunAcknowledged = true;
+        // The window starts the engine itself, as it does for a capture.
+        const window = createTemporaryObject(shell, testCase, { suppressFirstRun: true });
+        verify(window);
+        tryCompare(window, "visible", true);
+        if (!CrucibleController.running) {
+            skip("the engine did not run over the scripted machine: " + CrucibleController.lastError);
+        }
+        tryVerify(function() { return CrucibleController.apps.length === 2; }, 5000,
+                  "the scripted applications reach the room");
+        const strip = findChild(window, "lyricStrip");
+        verify(strip, "the Room page has the strip");
+        // Nothing is selected on a fresh window, and the strip asks for an application.
+        compare(strip.appId, -1);
+        compare(findChild(strip, "lyricsNoApp").visible, true);
+
+        // The option's steps, in its order, over one of the two applications.
+        window.selectApplication(901);
+        compare(strip.appId, 901);
+        compare(strip.app.name, "Microsoft Edge");
+        verify(CrucibleLyrics.importFile(901, TestServices.writeTextFile("capture.lrc", song)));
+        // 1.25 s into the song, which is in the first line (1.00 to 5.00 s). The word it is at
+        // moves on in a quarter of a second, too short a moment for a case to wait for.
+        CrucibleLyrics.startAt(901, CrucibleLyrics.nowMs() - 1250);
+        tryCompare(strip, "status", "timed", 5000);
+        tryCompare(strip, "following", true, 5000);
+        tryVerify(function() { return strip.currentRow === 0; }, 5000, "the first line is being sung");
+        verify(findChild(strip, "lyricStage").visible, "the line being sung is drawn");
+        compare(strip.sessionState, "hand");
+
+        // Another application is another strip, with no lyrics of this one's.
+        window.selectApplication(900);
+        compare(strip.appId, 900);
+        compare(strip.status, "none");
+        compare(CrucibleLyrics.status(901), "timed");
     }
 
     // --- the position from a media session (planning/karaoke-phase2.md, D9) ------------------------

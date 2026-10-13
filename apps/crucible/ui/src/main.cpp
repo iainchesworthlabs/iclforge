@@ -5,11 +5,20 @@
 // the way forge-gui's smoke modes do, so a headless check can see the screen;
 // `--page settings` (or output, room, room3d; about, licences or firstrun for
 // that dialog over the room) picks the page it shows first,
-// `--place Name=x,y,z` positions a listed application before the capture, and
-// `--language ar` runs the window in one of the languages it ships so a
-// capture can show that language and its layout. A `--shot` run never shows
-// the first-run dialog unless `--page firstrun` asked for it, so a capture
-// against a fresh settings store is clean.
+// `--place Name=x,y,z` positions a listed application before the capture,
+// `--lyrics Name=<file>[@<time>]` selects that application, imports the
+// lyrics file against it and, with a time (`5.75` seconds, or `0:05.75` as an
+// .lrc writes it), starts the lyric strip by hand so that the song is at that
+// time when the window is grabbed, which is what a picture of the line being
+// sung needs (without a time the strip follows the application's media
+// session, whatever that says), and `--language ar` runs the window in one of
+// the languages it ships so a capture can show that language and its layout.
+// A `--shot` run never shows the first-run dialog unless `--page firstrun`
+// asked for it, so a capture against a fresh settings store is clean. A
+// capture whose `--lyrics` could not be shown (no such application, a file
+// that could not be read, a time given to a file with no times) takes no
+// picture and exits with code 3, so that a picture is never taken of what was
+// not asked for.
 
 #include <QFont>
 #include <QFontDatabase>
@@ -22,6 +31,7 @@
 
 #include "iclforge/base/detail/profiling.hpp"
 
+#include "capture_lyrics.hpp"
 #include "crucible_controller.hpp"
 #include "diagnostics.hpp"
 #include <QQmlApplicationEngine>
@@ -37,13 +47,24 @@
 #include "app_entry.hpp"
 #include "app_icon_provider.hpp"
 
+#include <algorithm>
 #include <memory>
+#include <utility>
+#include <vector>
 #include <QUrl>
 
 #include "language_manager.hpp"
+#include "lyrics_controller.hpp"
 #include "settings_migration.hpp"
 
 namespace {
+
+// How long a capture waits, after the last thing it applied, before it grabs the window: the
+// placement glides and the views settle. `--lyrics` starts the strip so that the song is at its
+// time at the end of this wait.
+constexpr int kSettleMs = 1500;
+// What a capture exits with when it was asked for lyrics it could not show.
+constexpr int kLyricsNotShownExit = 3;
 
 // Qt's own messages - this file's --shot and --place lines, a QML warning,
 // a font that failed to register - into the diagnostics ring
@@ -147,6 +168,7 @@ int main(int argc, char** argv) {
     QString page;
     QString language;
     QStringList placements;
+    QStringList lyrics_specs;
     const QStringList args = QCoreApplication::arguments();
     for (qsizetype i = 1; i + 1 < args.size(); ++i) {
         if (args[i] == QLatin1String("--shot")) {
@@ -155,6 +177,8 @@ int main(int argc, char** argv) {
             page = args[i + 1];  // room, output or settings
         } else if (args[i] == QLatin1String("--place")) {
             placements.push_back(args[i + 1]);  // name=x,y,z, applied before the shot
+        } else if (args[i] == QLatin1String("--lyrics")) {
+            lyrics_specs.push_back(args[i + 1]);  // name=file[@time], imported before the shot
         } else if (args[i] == QLatin1String("--language")) {
             language = args[i + 1];  // en, fr, de, es, ar, he, yi
         }
@@ -227,11 +251,38 @@ int main(int argc, char** argv) {
     // list arrives when the engine's first refresh does, which is not at a
     // fixed time, so this polls until every named application has been
     // placed (or gives up after six seconds) rather than guessing once.
+    //
+    // `--lyrics Name=<file>[@<time>]` is found the same way: the application
+    // is selected in the room (Main.qml's selectApplication, which the lyric
+    // strip follows) and the file imported against it. The strip is started
+    // only when the polling has ended, so that the song is at the time at the
+    // grab and not at the moment the file was read.
     auto* poll = new QTimer(&app);
     auto pending = std::make_shared<QStringList>(placements);
     auto tries = std::make_shared<int>(0);
-    auto take_shot = [&engine, shot_path] {
+    struct LyricsJob {
+        iclforge::crucible::ui::CaptureLyrics request;
+        int app = -1;  // the application's id, once it is listed
+        bool imported = false;
+    };
+    auto lyrics_jobs = std::make_shared<std::vector<LyricsJob>>();
+    // Set when a request could not be shown: the grab is then not taken, and the exit code says so.
+    auto lyrics_failed = std::make_shared<bool>(false);
+    for (const QString& spec : lyrics_specs) {
+        if (auto request = iclforge::crucible::ui::parse_capture_lyrics(spec.toStdString())) {
+            lyrics_jobs->push_back(LyricsJob{std::move(*request)});
+        } else {
+            qWarning("--lyrics: %s is not Name=<file> or Name=<file>@<time>", qPrintable(spec));
+            *lyrics_failed = true;
+        }
+    }
+    auto take_shot = [&engine, shot_path, lyrics_failed] {
         if (shot_path.isEmpty()) {
+            return;
+        }
+        if (*lyrics_failed) {
+            qWarning("--shot: no picture taken, the lyrics asked for could not be shown");
+            QCoreApplication::exit(kLyricsNotShownExit);
             return;
         }
         auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
@@ -247,8 +298,11 @@ int main(int argc, char** argv) {
         }
         QCoreApplication::exit(code);
     };
-    QObject::connect(poll, &QTimer::timeout, &app, [&engine, &app, poll, pending, tries, take_shot, shot_path] {
+    QObject::connect(poll, &QTimer::timeout, &app, [&engine, &app, poll, pending, tries, take_shot, shot_path,
+                                                    lyrics_jobs, lyrics_failed] {
         auto* controller = engine.singletonInstance<CrucibleController*>("Crucible", "CrucibleController");
+        auto* lyrics = lyrics_jobs->empty() ? nullptr
+                                            : engine.singletonInstance<CrucibleLyrics*>("Crucible", "CrucibleLyrics");
         if (controller != nullptr) {
             for (auto it = pending->begin(); it != pending->end();) {
                 const QString& spec = *it;
@@ -278,17 +332,68 @@ int main(int argc, char** argv) {
                 it = done ? pending->erase(it) : it + 1;
             }
         }
+        if (controller != nullptr && lyrics != nullptr) {
+            for (LyricsJob& job : *lyrics_jobs) {
+                if (job.imported) {
+                    continue;
+                }
+                const QString wanted = QString::fromStdString(job.request.application);
+                for (QObject* object : controller->apps()) {
+                    auto* entry = qobject_cast<iclforge::crucible::ui::AppEntry*>(object);
+                    if (entry == nullptr || entry->name().compare(wanted, Qt::CaseInsensitive) != 0) {
+                        continue;
+                    }
+                    job.app = entry->app();
+                    const QVariant selected(job.app);
+                    QMetaObject::invokeMethod(engine.rootObjects().first(), "selectApplication",
+                                              Q_ARG(QVariant, selected));
+                    lyrics->importFile(job.app, QString::fromStdString(job.request.file));
+                    job.imported = true;
+                    break;
+                }
+            }
+        }
         ++*tries;
-        if (pending->isEmpty() || *tries >= 24) {
+        const bool lyrics_found = std::all_of(lyrics_jobs->begin(), lyrics_jobs->end(),
+                                              [](const LyricsJob& job) { return job.imported; });
+        if ((pending->isEmpty() && lyrics_found) || *tries >= 24) {
             for (const QString& spec : *pending) {
                 qWarning("--place: no application named %s after %d polls", qPrintable(spec.left(spec.indexOf(QLatin1Char('=')))), *tries);
             }
+            // The strip starts now, so that the song is where the option said when the window is
+            // grabbed, after the wait below.
+            const qlonglong until_grab = shot_path.isEmpty() ? 0 : kSettleMs;
+            for (const LyricsJob& job : *lyrics_jobs) {
+                const QString name = QString::fromStdString(job.request.application);
+                if (!job.imported || lyrics == nullptr) {
+                    qWarning("--lyrics: no application named %s after %d polls", qPrintable(name), *tries);
+                    *lyrics_failed = true;
+                } else if (lyrics->status(job.app) == QLatin1String("error")) {
+                    qWarning("--lyrics: %s: %s", qPrintable(name), qPrintable(lyrics->errorText(job.app)));
+                    *lyrics_failed = true;
+                } else if (!job.request.at_ms) {
+                    qInfo("--lyrics: %s -> app %d, %s, left to its media session", qPrintable(name), job.app,
+                          qPrintable(lyrics->fileName(job.app)));
+                } else {
+                    lyrics->startAt(job.app, iclforge::crucible::ui::capture_start_ms(
+                                                 lyrics->nowMs(), *job.request.at_ms, until_grab));
+                    if (lyrics->running(job.app)) {
+                        qInfo("--lyrics: %s -> app %d, %s, the song at %lld ms when the picture is taken",
+                              qPrintable(name), job.app, qPrintable(lyrics->fileName(job.app)),
+                              static_cast<long long>(*job.request.at_ms));
+                    } else {
+                        qWarning("--lyrics: %s: %s has no times to start from, so no line is being sung",
+                                 qPrintable(name), qPrintable(lyrics->fileName(job.app)));
+                        *lyrics_failed = true;
+                    }
+                }
+            }
             poll->stop();
             // Let the placement glide and the views settle before the grab.
-            QTimer::singleShot(shot_path.isEmpty() ? 0 : 1500, &app, take_shot);
+            QTimer::singleShot(shot_path.isEmpty() ? 0 : kSettleMs, &app, take_shot);
         }
     });
-    if (!placements.isEmpty() || !shot_path.isEmpty()) {
+    if (!placements.isEmpty() || !lyrics_specs.isEmpty() || !shot_path.isEmpty()) {
         poll->start(250);
     }
 
