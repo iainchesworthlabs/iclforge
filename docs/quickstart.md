@@ -107,4 +107,5 @@ for (int frame = 0; frame < 31; ++frame) {
 - [CLI reference](forge/cli/index.md) — encode, decode, inspect, and validate from a shell.
 - [GUI guide](forge/gui/index.md) — file and live audio, objects, metadata, and quality checks.
 - [Crucible](crucible/index.md) — capture and position desktop applications.
-- [Hearth](hearth/index.md) — ESP32 network playback and desktop-player status.
+- [Hearth](hearth/index.md) — the desktop player, its ESP32 network sinks and the Android TV sink.
+- [Karaoke](karaoke/index.md) — playing, timing, singing and making karaoke streams.

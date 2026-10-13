@@ -32,6 +32,10 @@ into two objects. Output follows the selected audio device.
 Anything you have not placed, and whichever application is full-screen in front, is mixed into
 the 5.1 bed.
 
+The room can also show the lyrics of the selected application: a lyrics file (`.lrc`, SubRip,
+Advanced SubStation Alpha or MIDI karaoke) or a CD+G disc's picture, imported against it and
+followed as it plays ([The room, Lyrics](room.md#06-lyrics)).
+
 ## The four things it needs from a system
 
 1. **Enumerate** which applications are playing.
