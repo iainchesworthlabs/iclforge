@@ -304,27 +304,6 @@ The sections below contain the complete change list and fixes.
   the hairline under it fills by it. A host case holds the position, the pause and the document's own
   length winning; `LyricViewRenderTest` holds the pixels.
 
-**Hearth for Android, phase 4: the decode a sink plays is the test sink's**
-
-- **`iclforge::sink::DecodingBurstOutput` (`libs/sink`, target `iclforge::sink_decode`): a burst output
-  that decodes and renders, handing the samples to a `PcmSink`.** It is the test sink's `BurstOutput`
-  (AC-3, E-AC-3 with an object layer, and AC-4, rendered to a speaker layout) with the WAV file and the
-  play-time log behind an interface: the sink is opened for the stream's rate and slots, told when each
-  burst is due and the frames it stands for, handed the interleaved frames, told of a clear and closed.
-  The test sink's `BurstOutput` is that output with a `WavPcmSink`, so the decode a program plays and
-  the one the test sink's suites hold are one piece of code. Nine programmes (AC-3, E-AC-3, JOC and a
-  karaoke stream, to stereo and to their own layouts, and AC-4) give byte-equal WAV files and the same
-  frame columns in the log before and after.
-- **The renderer and the AC-3 and AC-4 libraries run on the Shield.** Cross-built for `arm64-android`
-  and run there: the renderer's tests pass, the AC-3 and AC-4 decodes are bit-identical to the host's
-  (AC-4's differ only at 1e-27 in 96 frames of leading silence), and the decoders run 19 to 94 times
-  real time on one core. Ten AC-3 tests fail there on an NDK r26 libc++ bug in `std::expected` (a
-  trivially copyable payload with tail padding reports no value), which a task is open to audit.
-- **The Android preset configures again, and builds the AC-3 tests.** `apps/shared/text-encoding` found
-  no `iconv` below API 28 and stopped `config-android-arm64` configuring (the leg that holds it is
-  `continue-on-error`, so nothing said so); Android now has its own platform file with no conversion. One
-  AC-3 encoder test used `std::ranges::contains`, which NDK r26's libc++ has not.
-
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
@@ -349,6 +328,27 @@ The sections below contain the complete change list and fixes.
   dropped, and with no sung line the file's commonest style is read. Lines in one style at one time
   are all read. The reader no longer shows a doubled line or an interleaved translation for such a
   script (planning/karaoke-formats-options.md, D14).
+
+**Hearth for Android, phase 4: the decode a sink plays is the test sink's**
+
+- **`iclforge::sink::DecodingBurstOutput` (`libs/sink`, target `iclforge::sink_decode`): a burst output
+  that decodes and renders, handing the samples to a `PcmSink`.** It is the test sink's `BurstOutput`
+  (AC-3, E-AC-3 with an object layer, and AC-4, rendered to a speaker layout) with the WAV file and the
+  play-time log behind an interface: the sink is opened for the stream's rate and slots, told when each
+  burst is due and the frames it stands for, handed the interleaved frames, told of a clear and closed.
+  The test sink's `BurstOutput` is that output with a `WavPcmSink`, so the decode a program plays and
+  the one the test sink's suites hold are one piece of code. Nine programmes (AC-3, E-AC-3, JOC and a
+  karaoke stream, to stereo and to their own layouts, and AC-4) give byte-equal WAV files and the same
+  frame columns in the log before and after.
+- **The renderer and the AC-3 and AC-4 libraries run on the Shield.** Cross-built for `arm64-android`
+  and run there: the renderer's tests pass, the AC-3 and AC-4 decodes are bit-identical to the host's
+  (AC-4's differ only at 1e-27 in 96 frames of leading silence), and the decoders run 19 to 94 times
+  real time on one core. Ten AC-3 tests fail there on an NDK r26 libc++ bug in `std::expected` (a
+  trivially copyable payload with tail padding reports no value), which a task is open to audit.
+- **The Android preset configures again, and builds the AC-3 tests.** `apps/shared/text-encoding` found
+  no `iconv` below API 28 and stopped `config-android-arm64` configuring (the leg that holds it is
+  `continue-on-error`, so nothing said so); Android now has its own platform file with no conversion. One
+  AC-3 encoder test used `std::ranges::contains`, which NDK r26's libc++ has not.
 
 **Forge writes the lyrics beside the stream it encodes**
 
