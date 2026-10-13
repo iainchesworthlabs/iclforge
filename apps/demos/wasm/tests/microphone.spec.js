@@ -11,10 +11,11 @@ const { test, expect } = require('@playwright/test');
 // Two things are held. The arithmetic: the module's tracker finds a sung pitch, a contour is read
 // from a channel in slices, and the scorer counts what is on the tune with octaves folded. And what
 // the page promises: the microphone is off until the button is pressed, the score is withheld
-// until the person says they wear headphones, nothing is sent anywhere, and closing it stops the
-// tracks. The device is Chromium's fake one (with the permission prompt granted by the flags in
-// playwright.config.js): no real microphone is opened by this suite. That device is not a tone: it
-// is a beep of about 20 ms twice a second, and silence between.
+// until the person says they wear headphones, nothing is sent anywhere, closing it stops the
+// tracks, and one that could not be opened all the way is not left open. The device is Chromium's
+// fake one (with the permission prompt granted by the flags in playwright.config.js): no real
+// microphone is opened by this suite. That device is not a tone: it is a beep of about 20 ms twice
+// a second, and silence between.
 
 const AULD_LANG_SYNE = path.join(__dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.ac3');
 const AULD_LANG_SYNE_WORDS = path.join(__dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.lrc');
@@ -325,6 +326,150 @@ test('a session places the voice where the sound it sang along to was, and score
     expect(out.dropped.score.percent).toBeGreaterThan(40);
 });
 
+test('a session that cannot open all the way closes what it had opened', async ({ page }) => {
+    await page.goto('index.html');
+    const out = await page.evaluate(async () => {
+        // @ts-ignore
+        const module = await window.createIclForgeModule();
+        const { MicrophoneSession, readReference } = await import('./mic.js');
+        const rate = 48000;
+        // A tune, so that a session has a scorer to make: the last thing it makes.
+        const tune = new Float32Array(rate);
+        for (let i = 0; i < tune.length; i++) {
+            tune[i] = 0.4 * Math.sin((2 * Math.PI * 220 * i) / rate);
+        }
+        const reference = await readReference(module, tune, rate, {});
+
+        // Opening takes its steps in order: the tracker, the microphone, the worklet's module, the
+        // nodes, the scorer, and a word to the page. `step` is the one that fails, with `thrown`.
+        const run = async (step, thrown) => {
+            let fail = step;
+            const trip = (at) => {
+                if (fail === at) {
+                    throw thrown;
+                }
+            };
+            // The module's own tracker and scorer, each kept so that it can be asked whether it was
+            // deleted: one that is not is memory the page never gets back.
+            const made = [];
+            const kept = (Type, at) => function (...args) {
+                trip(at);
+                const object = new Type(...args);
+                made.push(object);
+                return object;
+            };
+            const tracks = [];
+            const nodes = [];
+            const node = (more) => {
+                const one = { disconnected: false, connect() {}, disconnect() { this.disconnected = true; }, ...more };
+                nodes.push(one);
+                return one;
+            };
+            const ctx = {
+                // A rate the tracker cannot follow is the first thing that can stop it.
+                get sampleRate() { return fail === 'rate' ? 0 : rate; },
+                outputLatency: 0.02, baseLatency: 0.01, destination: {},
+                audioWorklet: { addModule: async () => { trip('addModule'); } },
+                createMediaStreamSource: () => node({}),
+                createGain: () => node({ gain: { value: 1 } }),
+            };
+            const mediaDevices = {
+                getUserMedia: async () => {
+                    trip('getUserMedia');
+                    const track = { readyState: 'live', getSettings: () => ({}), stop() { this.readyState = 'ended'; } };
+                    tracks.push(track);
+                    return { getAudioTracks: () => [track], getTracks: () => [track] };
+                },
+            };
+            const session = new MicrophoneSession({
+                module: { PitchTracker: kept(module.PitchTracker, 'tracker'), PitchScorer: kept(module.PitchScorer, 'scorer') },
+                reference, audioContext: ctx, playback: () => ({ playing: false, startCtxTime: 0 }), mediaDevices,
+                onUpdate: () => trip('update'),
+                createCaptureNode: () => { trip('captureNode'); return node({ port: {} }); },
+            });
+
+            let caught = null;
+            try {
+                await session.start();
+            } catch (err) {
+                caught = err;
+            }
+            const ended = () => tracks.every((t) => t.readyState === 'ended');
+            const deleted = () => made.every((o) => o.isDeleted());
+            const result = {
+                threw: caught === null ? 'nothing' : (caught === thrown ? 'what the step threw' : String(caught.message)),
+                on: session.on,
+                tracks: tracks.length,
+                tracksEnded: ended(),
+                made: made.length,
+                deleted: deleted(),
+                nodes: nodes.length,
+                disconnected: nodes.every((n) => n.disconnected),
+                listening: nodes.some((n) => n.port && Boolean(n.port.onmessage)),
+            };
+            // The next press opens it, and closing that leaves nothing open either.
+            fail = null;
+            await session.start();
+            result.opensAfter = session.on;
+            result.tracksAfter = tracks.length;
+            session.stop();
+            result.closedAfter = !session.on && ended() && deleted();
+            return result;
+        };
+
+        const out = {
+            // The errors are the ones a browser gives at each step.
+            rate: await run('rate', null),
+            refused: await run('getUserMedia', new DOMException('Permission denied', 'NotAllowedError')),
+            noWorklet: await run('addModule', new DOMException("Unable to load a worklet's module.", 'AbortError')),
+            noNode: await run('captureNode', new DOMException('The node name is not defined in AudioWorkletGlobalScope.', 'InvalidStateError')),
+            noScorer: await run('scorer', new Error('the scorer could not be made')),
+            pageThrew: await run('update', new Error('the page could not draw it')),
+        };
+        reference.delete();
+        return out;
+    });
+
+    // A rate the tracker cannot follow: the page is given a sentence, and the tracker that said so
+    // is deleted. No microphone was asked for.
+    expect(out.rate.threw).toContain('which the pitch tracker cannot follow');
+    expect(out.rate).toMatchObject({ on: false, tracks: 0, made: 1, deleted: true, nodes: 0 });
+
+    // The person refuses the microphone (the common one): the page is given the browser's own error,
+    // by which it picks its sentence, and the tracker made for the session is deleted.
+    expect(out.refused.threw).toBe('what the step threw');
+    expect(out.refused).toMatchObject({ on: false, tracks: 0, made: 1, deleted: true, nodes: 0 });
+
+    // The microphone opened and the worklet's module would not load (a page that may not load one
+    // from a Blob): the track is ended, so the microphone is not left open with nothing to close it.
+    expect(out.noWorklet.threw).toBe('what the step threw');
+    expect(out.noWorklet).toMatchObject({ on: false, tracks: 1, tracksEnded: true, made: 1, deleted: true, nodes: 0 });
+
+    // The capture node could not be made: the same, and the source made from the stream is let go.
+    expect(out.noNode.threw).toBe('what the step threw');
+    expect(out.noNode).toMatchObject({ on: false, tracks: 1, tracksEnded: true, made: 1, deleted: true,
+                                       nodes: 1, disconnected: true });
+
+    // The scorer could not be made, with the graph already connected: every node is disconnected.
+    expect(out.noScorer.threw).toBe('what the step threw');
+    expect(out.noScorer).toMatchObject({ on: false, tracks: 1, tracksEnded: true, made: 1, deleted: true,
+                                         nodes: 3, disconnected: true, listening: false });
+
+    // Everything was open and the page's own callback threw: start() failed, so it is closed, the
+    // scorer with the rest.
+    expect(out.pageThrew.threw).toBe('what the step threw');
+    expect(out.pageThrew).toMatchObject({ on: false, tracks: 1, tracksEnded: true, made: 2, deleted: true,
+                                          nodes: 3, disconnected: true, listening: false });
+
+    // After any of them the next press opens the microphone (one more track), and closing it ends
+    // every track and deletes every object made along the way.
+    for (const [name, result] of Object.entries(out)) {
+        expect(result.opensAfter, name).toBe(true);
+        expect(result.tracksAfter, name).toBe(result.tracks + 1);
+        expect(result.closedAfter, name).toBe(true);
+    }
+});
+
 test('a line that was not sung is marked as such under the words, with the headphones answer', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(String(error)));
@@ -446,5 +591,53 @@ test('the card keeps its promises: off until pressed, score withheld, nothing se
     expect(states.every((s) => s === 'ended')).toBe(true);
 
     expect(sent, 'nothing is sent from the page').toEqual([]);
+    expect(pageErrors).toEqual([]);
+});
+
+test('a microphone the card opened and could not follow is closed again', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(String(error)));
+
+    // The page as a site that embeds it may serve it: scripts from its own origin and no other,
+    // which leaves out the Blob the capture worklet is loaded from. So the microphone opens (the
+    // fake device, with the prompt granted) and the step after it fails.
+    await page.route('**/index.html', async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({
+            response,
+            headers: { ...response.headers(), 'content-security-policy': "script-src 'self' 'unsafe-eval'" },
+        });
+    });
+    // The tracks the browser hands the page, kept from before the page's own script runs.
+    await page.addInitScript(() => {
+        const w = /** @type {any} */ (window);
+        w.__micTracks = [];
+        const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = async (constraints) => {
+            const stream = await original(constraints);
+            w.__micTracks.push(...stream.getAudioTracks());
+            return stream;
+        };
+    });
+
+    await page.goto('index.html');
+    await page.locator('#fileInput').setInputFiles(AULD_LANG_SYNE);
+    await expect(page.locator('#micStatus')).toContainText('Scored against the melody guide (M).', { timeout: 60000 });
+
+    // Press it: the card says it did not work (the words are the browser's), and offers the button
+    // again with nothing shown as on.
+    await page.locator('#micToggle').click();
+    await expect(page.locator('#micStatus')).toHaveClass(/error/, { timeout: 20000 });
+    await expect(page.locator('#micToggle')).toBeEnabled();
+    await expect(page.locator('#micToggle')).toHaveText('Turn the microphone on');
+    await expect(page.locator('#micIndicator')).toBeHidden();
+
+    // The microphone did open, or this shows nothing; and what the card says is so: its track has
+    // ended. A track left live here is a microphone that is on with no indicator and no button
+    // that closes it.
+    const states = await page.evaluate(() => (/** @type {any} */ (window)).__micTracks.map((t) => t.readyState));
+    expect(states.length).toBeGreaterThan(0);
+    expect(states).toEqual(states.map(() => 'ended'));
+
     expect(pageErrors).toEqual([]);
 });

@@ -4910,6 +4910,29 @@ The sections below contain the complete change list and fixes.
   under 4x CPU throttling and 30 of 30 with the check started 0 to 450 ms later. Against a page
   whose meter never moves, the test fails at this check. The 15 s failure itself was not seen on
   the machine this was done on: there the looks leave the silence in under 14 s.
+- **The browser demo's microphone is closed again when it could not be opened all the way.**
+  Opening it takes steps in order: the pitch tracker, the browser's microphone, the capture
+  worklet's module (loaded from a Blob), the nodes, the scorer. A session counts as on only after
+  the last of them, and closing one that is not on does nothing, so when a step failed, what the
+  steps before it had made stayed as it was, and the page dropped the session and showed the
+  error. A refused microphone left the tracker made for that press undeleted, one for each
+  refused press. A failure after the microphone had opened left its track live while the card
+  said the microphone was off, with no indicator and no button that would close it. A page
+  served with a script policy that leaves out `blob:` is one way to get there, because the
+  worklet's module is then refused: in Chromium 153 under `script-src 'self' 'unsafe-eval'`, the
+  fake microphone's track was still `live` after the card had reported the failure.
+  `MicrophoneSession.start()` now lets go of whatever it had made when any step throws (the
+  tracks ended, the nodes disconnected, the tracker and the scorer deleted) and then gives the
+  page the error it gave before. That includes the page's own callback throwing at the end, which
+  used to leave a session that was on behind a failed start. Opening and closing a microphone
+  that works is unchanged, as are the card's words. Two cases in `microphone.spec.js` hold it: a
+  session over stand-ins that fail at each step in turn, which also holds that the next press
+  opens the microphone, and the page itself under that policy with Chromium's fake device.
+  Against `mic.js` as it was, the first fails at every step from the refusal on and the second
+  finds the track `live`; with the change the eight microphone cases pass, 64 of 64 over eight
+  repeats, and so do the 19 cases of the four projects. Run in headless Chromium 153 on Windows
+  against an existing build of the module with this `mic.js` copied over the built one; the WASM
+  job does not run on pull requests.
 
 **Forge GUI user guide: the Karaoke page's note on the length warning**
 

@@ -269,16 +269,28 @@ export class MicrophoneSession {
     }
 
     // Opens the microphone: a person's press, and the only thing that does. Throws with a sentence
-    // for the page when it will not open.
+    // for the page when it will not open, and then nothing is left open: opening takes its steps in
+    // order and any of them can fail (the person refuses, or the page may not load a worklet from a
+    // Blob), so what the steps before it made is let go here. A microphone that had opened is
+    // closed, as the page will say it is.
     async start({ deviceId } = {}) {
         if (this.on) {
             return;
         }
         this._summary = null;
+        try {
+            await this._open(deviceId);
+        } catch (err) {
+            this.on = false;
+            this._release();
+            throw err;
+        }
+    }
+
+    // The steps of start(), which lets go of what they made when one of them throws.
+    async _open(deviceId) {
         this._tracker = new this.module.PitchTracker(this.ctx.sampleRate);
         if (!this._tracker.valid()) {
-            this._tracker.delete();
-            this._tracker = null;
             throw new Error(`This browser's audio runs at ${this.ctx.sampleRate} Hz, which the pitch tracker cannot follow.`);
         }
         this._stream = await this.mediaDevices.getUserMedia({
@@ -332,6 +344,13 @@ export class MicrophoneSession {
         }
         this._summary = this._takeSummary();
         this.on = false;
+        this._release();
+        this.onUpdate();
+    }
+
+    // Lets go of whatever is held, which after a start that failed part-way is only some of it: the
+    // nodes out of the graph, the microphone's tracks ended, the module's objects deleted.
+    _release() {
         if (this._node) {
             this._node.port.onmessage = null;
             this._node.disconnect();
@@ -348,7 +367,6 @@ export class MicrophoneSession {
         this._scorer = null;
         this.level = 0;
         this.live = { voiced: false, hz: 0, itemMs: null, cents: null };
-        this.onUpdate();
     }
 
     _takeSummary() {
