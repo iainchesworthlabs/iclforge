@@ -284,6 +284,7 @@ ScrollView {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Theme.gap
+                //: Section: the height speakers, those above ear level.
                 Text { text: qsTr("Heights"); color: Theme.text; font.pixelSize: Theme.fontNormal
                        elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                 SegmentedControl {
@@ -490,6 +491,7 @@ ScrollView {
                         spacing: Theme.gap / 2
                         Rectangle { implicitWidth: 16; implicitHeight: 3; color: Theme.text }
                         Text {
+                            //: Direction label on the speaker plan: the front of the room.
                             text: qsTr("front")
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSmall
@@ -766,6 +768,7 @@ ScrollView {
                 }
                 AppButton {
                     objectName: "speakersClearRouting"
+                    //: Button: remove every speaker-to-output assignment.
                     text: qsTr("Clear")
                     onClicked: HearthController.clearRouting()
                 }
@@ -810,11 +813,13 @@ ScrollView {
                         }
                         Text {
                             width: levels.sizeWidth
+                            //: Column heading: a speaker's size for bass management, Large or Small.
                             text: qsTr("SIZE"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro
                         }
                         Text {
                             width: levels.fieldWidth
                             horizontalAlignment: Text.AlignRight
+                            //: Column heading: a level adjustment for the speaker, in dB.
                             text: qsTr("TRIM"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro
                         }
                         Item { width: levels.unitWidth; height: 1 }
@@ -826,6 +831,7 @@ ScrollView {
                         Item { width: levels.unitWidth; height: 1 }
                         Item { width: Theme.gap; height: 1 }
                         Text {
+                            //: Column heading of the buttons that play pink noise on one speaker, to hear which it is.
                             text: qsTr("IDENTIFY"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro
                         }
                     }
@@ -881,7 +887,9 @@ ScrollView {
                                     accessibleName: qsTr("Size for %1").arg(row.modelData)
                                     currentValue: root.smallFlags[row.index] === true ? "small" : "large"
                                     model: [
+                                        //: A speaker's size: a large speaker plays the full range.
                                         { value: "large", label: qsTr("Large") },
+                                        //: A speaker's size: a small speaker's bass goes to the LFE output instead.
                                         { value: "small", label: qsTr("Small") }
                                     ]
                                     onSelected: function(value) {
@@ -1089,6 +1097,7 @@ ScrollView {
 
                 Card {
                     ordinal: "05"
+                //: Button: play pink noise on this speaker's output, to hear which speaker it is.
                 title: qsTr("Identify")
                 framed: true
 

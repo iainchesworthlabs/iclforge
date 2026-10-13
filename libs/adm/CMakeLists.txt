@@ -264,7 +264,7 @@ iclforge_add_library(adm
 # declaration requested - independent of, and layered on top of, the ordinary
 # CXX_VISIBILITY_PRESET default. GNU ld/gold/lld all support it; MSVC's link.exe (and clang-cl's
 # lld-link, which parses MSVC-style arguments) do not - guarded the same way this project's other
-# frontend-variant-sensitive flags are (see the root CMakeLists.txt's AC3_FP_CONTRACT_FLAG). Not
+# frontend-variant-sensitive flags are (see the root CMakeLists.txt's ICLFORGE_FP_CONTRACT_FLAG). Not
 # needed on iclforge_adm_shared: it never statically embeds adm/bw64 itself (see this file's header
 # comment - it links iclforge_adm_shared, a real shared-library dependency, not an archive), and its own
 # leaked symbol count is in the same small ballpark (~130) every other library here already

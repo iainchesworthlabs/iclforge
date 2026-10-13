@@ -13,20 +13,32 @@ import ForgeGui
 // fill-on-identical-fill trap Hearth's Main.qml already documents for
 // buttons.
 //
-// `unit` writes a suffix INSIDE the box, right-aligned and muted, which is
+// `unit` writes a suffix INSIDE the box, at the end of it and muted, which is
 // where the design puts "dB", "ms", "Hz" and "dBFS" rather than in a
-// separate label after the field.
+// separate label after the field. The end is the right of the box in a window
+// read left to right and the left of it in one read right to left, and the
+// number starts at the other side: so a field with a unit aligns its text
+// explicitly (an explicit alignment is mirrored with the window, an implicit
+// one follows the first strong letter of the text, and a number has none),
+// and the padding that keeps the number clear of the unit is put on the side
+// the unit is. A field without one is left as it was, aligned by its text.
 QQC.TextField {
     id: control
 
     property string unit: ""
 
+    // Padding is physical in a TextField, so it is swapped here.
+    readonly property bool layoutMirrored: LayoutMirroring.enabled
+    readonly property real unitPadding: unitLabel.visible
+                                        ? unitLabel.implicitWidth + Theme.space3 * 2 : Theme.space3
+
     implicitHeight: Math.max(30, contentHeight + 10)
     color: Theme.text
     font.pixelSize: Theme.fontBody
     font.family: Theme.monoFamily
-    leftPadding: Theme.space3
-    rightPadding: unitLabel.visible ? unitLabel.implicitWidth + Theme.space3 * 2 : Theme.space3
+    horizontalAlignment: control.unit.length > 0 ? TextInput.AlignLeft : undefined
+    leftPadding: control.layoutMirrored ? control.unitPadding : Theme.space3
+    rightPadding: control.layoutMirrored ? Theme.space3 : control.unitPadding
     verticalAlignment: TextInput.AlignVCenter
     selectByMouse: true
 

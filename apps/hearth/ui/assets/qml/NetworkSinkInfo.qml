@@ -21,9 +21,12 @@ ColumnLayout {
         }
         const rows = [
             { label: qsTr("Connection"), value: root.sink.linkText ?? "" },
+            //: Row: what kind of sink this is, a Hearth sink or a standard Sendspin player.
             { label: qsTr("Kind"), value: root.sink.kindText ?? "" },
             { label: qsTr("Address"), value: root.sink.address ?? "" },
+            //: Row: the Sendspin roles the sink announces, such as player and metadata.
             { label: qsTr("Roles"), value: root.sink.rolesText ?? "" },
+            //: Row: the stream forms the sink takes, that is accepts, for example E-AC-3 or PCM. A verb, not a noun.
             { label: qsTr("Takes"), value: root.sink.takesText ?? "" },
             { label: qsTr("Outputs"), value: root.sink.outputsText ?? "" },
             { label: qsTr("Latency"), value: root.sink.latencyText ?? "" },

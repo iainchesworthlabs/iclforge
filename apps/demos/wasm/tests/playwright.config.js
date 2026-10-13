@@ -75,8 +75,9 @@ module.exports = defineConfig({
         },
         {
             // The decode demo's microphone card: the tracker and scorer in the module, and the
-            // page's promises. Chromium's fake device supplies a tone and the flags grant the
-            // permission prompt, as the encode project's do: no real microphone is opened.
+            // page's promises. Chromium's fake device supplies a beep of about 20 ms twice a second
+            // (silence between: a level is something to wait for, not to sample) and the flags grant
+            // the permission prompt, as the encode project's do: no real microphone is opened.
             name: 'microphone',
             testMatch: 'microphone.spec.js',
             use: {
@@ -95,9 +96,10 @@ module.exports = defineConfig({
             use: {
                 baseURL: encodeBase,
                 // The microphone-capture test needs a microphone: Chromium's
-                // fake media stack supplies a synthetic device (a tone) and
-                // auto-grants the getUserMedia permission prompt, so the test
-                // exercises the real capture path headlessly.
+                // fake media stack supplies a synthetic device (a short beep
+                // twice a second, silence between) and auto-grants the
+                // getUserMedia permission prompt, so the test exercises the
+                // real capture path headlessly.
                 launchOptions: {
                     args: [
                         '--use-fake-ui-for-media-stream',

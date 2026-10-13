@@ -511,6 +511,11 @@ Dialog {
                                     visible: row.modelData.words.length > 0
                                     Layout.fillWidth: true
                                     spacing: 0
+                                    // The words run in the line's own direction, by its first strong
+                                    // letter, whichever way the window reads (LyricView.qml says why).
+                                    LayoutMirroring.enabled: false
+                                    layoutDirection: KaraokeController.isRightToLeft(row.modelData.text)
+                                                     ? Qt.RightToLeft : Qt.LeftToRight
                                     Repeater {
                                         model: row.modelData.words
                                         // A word is a button: a click chooses it. The box that says

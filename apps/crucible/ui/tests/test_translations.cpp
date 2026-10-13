@@ -8,13 +8,15 @@
 #include <ios>
 #include <iterator>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
-// The six Crucible translation catalogues (apps/crucible/ui/assets/translations/
-// crucible_<code>.ts), read as files rather than through Qt: these cases
+// The Qt Linguist catalogues of Crucible (apps/crucible/ui/assets/translations/
+// crucible_<code>.ts) and of Hearth (apps/hearth/ui/assets/translations/
+// hearth_<code>.ts), read as files rather than through Qt: these cases
 // ride the plain iclforge-crucible-tests binary, so they run on a developer's own ctest and
 // on every CI leg, including the ones that build no Qt at all. What they
 // check is what a reader of the catalogue cannot see at a glance and what a
@@ -44,6 +46,40 @@ constexpr std::array<std::string_view, 10> kBrandTerms{
     "ICL Forge", "Crucible", "Dolby Atmos", "E-AC-3", "AC-3",
     "JOC", "PCM", "HDMI", "PipeWire", "WirePlumber"};
 
+// Hearth's window names more formats and one protocol than Crucible's does.
+// "Hearth" is the product; Sendspin, Opus, mDNS and WiFi are names of things
+// that are written the same way in every language the window ships in.
+constexpr std::array<std::string_view, 19> kHearthBrandTerms{
+    "Hearth", "Sendspin", "ICL Forge", "iclforge", "Dolby", "Atmos", "AC-3", "E-AC-3",
+    "AC-4", "JOC", "PCM", "Opus", "IEC 61937", "Matroska", "MP4", "MPEG-TS", "mDNS",
+    "WiFi", "NOTICES.txt"};
+
+// A message in which English builds a plural by appending a suffix that a
+// placeholder carries ("%1 entr%2", with y or ies in %2). No other language
+// makes its plural that way, so a translation cannot use the placeholder, and
+// the rule below lets such a translation leave that one placeholder out. The
+// window still hands the argument over; Qt notes that the string has nowhere
+// for it and prints it nowhere.
+//
+// Each entry names a piece of the source that picks the message out and the
+// placeholder that may be absent. The cure is in the QML and C++ (a `%n`
+// message, which gives each language the forms it needs), not here: when a
+// source is reworded it leaves its catalogue, and the entry stops matching.
+struct SuffixPlaceholder {
+    std::string_view source_has;
+    std::string_view placeholder;
+};
+
+constexpr std::array<SuffixPlaceholder, 7> kHearthSuffixPlaceholders{{
+    {"entr%2", "%2"},               // Media.qml: the edit list's "%1 entr%2"
+    {"substream%3", "%3"},          // Media.qml: the dec3 box's row
+    {"group%3", "%3"},              // NetworkSinkList.qml: "%1 found · %2 group%3"
+    {"speaker%2", "%2"},            // NetworkSinkSpeakers.qml: "%1 speaker%2 reaches no slot ..."
+    {"Slot%1 %2 %3", "%1"},         // NetworkSinkSpeakers.qml: "Slot%1 %2 %3 silent."
+    {"Slot%1 %2 %3", "%3"},         //   the is / are that agrees with it
+    {"substream%5", "%5"},          // network_controller.cpp: "%4 substream%5"
+}};
+
 // The catalogues are regenerated centrally once the source changes of this
 // pass have landed, and the review that fills the new entries follows that
 // regeneration (docs/crucible/localisation.md, "Regenerating the
@@ -53,8 +89,9 @@ constexpr std::array<std::string_view, 10> kBrandTerms{
 //
 // Turned on 2026-09-06, the day the catalogues were refilled: the six
 // Crucible files carry 385 messages each and the six forge-gui files 795, none
-// of them unfinished and none vanished. From here an entry left unfinished,
-// or a dead entry left behind, fails the build.
+// of them unfinished and none vanished. Hearth's six were refilled on
+// 2026-10-13 (1101 messages each) and are held to the same two rules. From
+// here an entry left unfinished, or a dead entry left behind, fails the build.
 //
 // The translations behind that are machine-made and have not been read by a
 // speaker of any of the six languages, which the window says in its own
@@ -64,6 +101,19 @@ constexpr std::array<std::string_view, 10> kBrandTerms{
 // second one, and turning this on does not pre-empt it.
 constexpr bool kCatalogueRefilled = true;
 
+// One app's six files and the terms its window must not translate.
+struct CatalogueSet {
+    std::string_view name;
+    std::string_view dir;
+    std::string_view prefix;
+    std::span<const std::string_view> brand_terms;
+    std::span<const SuffixPlaceholder> droppable;
+};
+
+const CatalogueSet kCrucible{"crucible", ICLFORGE_CRUCIBLE_TS_DIR, "crucible_", kBrandTerms, {}};
+const CatalogueSet kHearth{"hearth", ICLFORGE_HEARTH_TS_DIR, "hearth_", kHearthBrandTerms,
+                           kHearthSuffixPlaceholders};
+
 struct Message {
     std::string context;
     std::string source;
@@ -71,14 +121,17 @@ struct Message {
     // whether the entry was marked unfinished or vanished.
     std::string attributes;
     std::string translation;
+    // `<message numerus="yes">`: the translation holds one <numerusform> per
+    // plural form the language needs rather than a single text.
+    bool numerus = false;
 };
 
-[[nodiscard]] fs::path catalogue_path(std::string_view code) {
-    return fs::path{ICLFORGE_CRUCIBLE_TS_DIR} / ("crucible_" + std::string{code} + ".ts");
+[[nodiscard]] fs::path catalogue_path(const CatalogueSet& set, std::string_view code) {
+    return fs::path{std::string{set.dir}} / (std::string{set.prefix} + std::string{code} + ".ts");
 }
 
-[[nodiscard]] std::string read_catalogue(std::string_view code) {
-    const auto path = catalogue_path(code);
+[[nodiscard]] std::string read_catalogue(const CatalogueSet& set, std::string_view code) {
+    const auto path = catalogue_path(set, code);
     std::ifstream in(path, std::ios::binary);
     INFO("catalogue " << path.string());
     REQUIRE(in.is_open());
@@ -132,6 +185,11 @@ struct Message {
         Message message;
         message.context = context;
         message.source = element(text, message_at, message_end, "<source>", "</source>");
+        const auto message_tag_end = text.find('>', message_at);
+        if (message_tag_end != std::string::npos && message_tag_end < message_end) {
+            message.numerus = text.substr(message_at, message_tag_end - message_at)
+                                  .find("numerus=\"yes\"") != std::string::npos;
+        }
         // The opening tag first, so an entry marked unfinished or vanished is
         // recognised whether or not it carries any text.
         const auto tag_at = text.find("<translation", message_at);
@@ -170,17 +228,128 @@ struct Message {
     return text.find_first_not_of(" \t\r\n") == std::string_view::npos;
 }
 
-// %1 .. %9, in the order they appear, so a translation that reorders them is
-// accepted and one that drops or invents one is not.
+// The bodies of the <numerusform> elements of a plural message's translation,
+// in order. A self-closed element is an empty form.
+[[nodiscard]] std::vector<std::string> numerus_forms(const std::string& translation) {
+    std::vector<std::string> forms;
+    std::size_t at = 0;
+    while (true) {
+        const auto open = translation.find("<numerusform", at);
+        if (open == std::string::npos) {
+            break;
+        }
+        const auto tag_end = translation.find('>', open);
+        if (tag_end == std::string::npos) {
+            break;
+        }
+        if (translation[tag_end - 1] == '/') {
+            forms.emplace_back();
+            at = tag_end;
+            continue;
+        }
+        const auto close = translation.find("</numerusform>", tag_end);
+        if (close == std::string::npos) {
+            break;
+        }
+        forms.push_back(translation.substr(tag_end + 1, close - (tag_end + 1)));
+        at = close;
+    }
+    return forms;
+}
+
+// The texts a rule reads: one per plural form for a plural message, the
+// translation itself for any other.
+[[nodiscard]] std::vector<std::string> bodies(const Message& message) {
+    if (message.numerus) {
+        return numerus_forms(message.translation);
+    }
+    return {message.translation};
+}
+
+// %1 .. %9 and %n, in sorted order, so a translation that reorders them is
+// accepted and one that drops or invents one is not. %L1 and %Ln (the
+// locale-aware forms) count as %1 and %n.
 [[nodiscard]] std::vector<std::string> placeholders(const std::string& text) {
     std::vector<std::string> found;
     for (std::size_t i = 0; i + 1 < text.size(); ++i) {
-        if (text[i] == '%' && text[i + 1] >= '1' && text[i + 1] <= '9') {
-            found.push_back(text.substr(i, 2));
+        if (text[i] != '%') {
+            continue;
+        }
+        std::size_t at = i + 1;
+        if (text[at] == 'L' && at + 1 < text.size()) {
+            ++at;
+        }
+        const char c = text[at];
+        if ((c >= '1' && c <= '9') || c == 'n') {
+            found.push_back(std::string{'%', c});
+            i = at;
         }
     }
     std::sort(found.begin(), found.end());
     return found;
+}
+
+// Whether `translation` carries the placeholders of `source`: all of them,
+// none that the source lacks, apart from those the set lists as droppable for
+// this message.
+[[nodiscard]] bool carries_placeholders(const std::string& source, const std::string& translation,
+                                        std::span<const SuffixPlaceholder> droppable) {
+    auto missing = placeholders(source);
+    for (const auto& have : placeholders(translation)) {
+        const auto it = std::find(missing.begin(), missing.end(), have);
+        if (it == missing.end()) {
+            return false;
+        }
+        missing.erase(it);
+    }
+    return std::all_of(missing.begin(), missing.end(), [&](const std::string& left) {
+        return std::any_of(droppable.begin(), droppable.end(), [&](const SuffixPlaceholder& d) {
+            return d.placeholder == left && source.find(d.source_has) != std::string::npos;
+        });
+    });
+}
+
+// An empty string when the translation is fine, otherwise what is wrong. A
+// plural message holds the placeholders in every form; %n is the one that a
+// form may spell out in words ("One file"), so it is asked of at least one.
+[[nodiscard]] std::string placeholder_fault(const Message& message,
+                                            std::span<const SuffixPlaceholder> droppable) {
+    if (!message.numerus) {
+        return carries_placeholders(message.source, message.translation, droppable)
+                   ? std::string{}
+                   : std::string{"placeholders differ from the source"};
+    }
+    const auto forms = numerus_forms(message.translation);
+    if (forms.empty()) {
+        return "a plural entry with no form";
+    }
+    const bool wants_count = message.source.find("%n") != std::string::npos ||
+                             message.source.find("%Ln") != std::string::npos;
+    bool counted = false;
+    for (const auto& form : forms) {
+        std::string source_without_count = message.source;
+        for (const std::string_view count : {"%Ln", "%n"}) {
+            for (auto at = source_without_count.find(count); at != std::string::npos;
+                 at = source_without_count.find(count)) {
+                source_without_count.erase(at, count.size());
+            }
+        }
+        std::string form_without_count = form;
+        for (const std::string_view count : {"%Ln", "%n"}) {
+            for (auto at = form_without_count.find(count); at != std::string::npos;
+                 at = form_without_count.find(count)) {
+                form_without_count.erase(at, count.size());
+                counted = true;
+            }
+        }
+        if (!carries_placeholders(source_without_count, form_without_count, droppable)) {
+            return "a plural form's placeholders differ from the source";
+        }
+    }
+    if (wants_count && !counted) {
+        return "no plural form shows the count (%n)";
+    }
+    return {};
 }
 
 [[nodiscard]] bool carries_term(const std::string& text, std::string_view term) {
@@ -208,12 +377,13 @@ struct Message {
     return source.substr(0, cut) + "...";
 }
 
-// Every entry across the six files that carries the given type, named so a
-// failure says which file and which string.
-[[nodiscard]] std::vector<std::string> entries_marked(std::string_view type) {
+// Every entry across the set's six files that carries the given type, named
+// so a failure says which file and which string.
+[[nodiscard]] std::vector<std::string> entries_marked(const CatalogueSet& set,
+                                                      std::string_view type) {
     std::vector<std::string> found;
     for (const auto code : kLanguages) {
-        for (const Message& message : parse(read_catalogue(code))) {
+        for (const Message& message : parse(read_catalogue(set, code))) {
             if (marked(message, type)) {
                 found.push_back(std::string{code} + " / " + message.context + " / " +
                                 quoted(message.source));
@@ -237,11 +407,11 @@ struct Message {
     return out.empty() ? std::string{"none"} : out;
 }
 
-}  // namespace
+// The rules, once for each app. A case below names the app it covers, so a
+// failure says whose catalogue it was and ctest can run one app's alone.
 
-TEST_CASE("crucible translation catalogues carry no unfinished entry",
-          "[crucible][translations]") {
-    const auto unfinished = entries_marked("unfinished");
+void check_no_unfinished(const CatalogueSet& set) {
+    const auto unfinished = entries_marked(set, "unfinished");
     if (!unfinished.empty()) {
         WARN("unfinished entries: " << unfinished.size() << ", first: " << unfinished.front()
              << " - this case only fails once kCatalogueRefilled is turned on, which is the"
@@ -252,6 +422,118 @@ TEST_CASE("crucible translation catalogues carry no unfinished entry",
     // that it is the expected state of a string lupdate has just extracted,
     // and the count above is what the pass still owes a translator.
     CHECK((unfinished.empty() || !kCatalogueRefilled));
+}
+
+void check_no_dead(const CatalogueSet& set) {
+    auto dead = entries_marked(set, "vanished");
+    const auto obsolete = entries_marked(set, "obsolete");
+    dead.insert(dead.end(), obsolete.begin(), obsolete.end());
+    if (!dead.empty()) {
+        WARN("dead entries: " << dead.size() << ", first: " << dead.front()
+             << " - this case only fails once kCatalogueRefilled is turned on, which is the"
+                " commit that lands the refilled catalogues");
+    }
+    INFO(listed(dead));
+    // The same two states as above: a string this pass reworded leaves its
+    // old entry behind until the regeneration drops it.
+    CHECK((dead.empty() || !kCatalogueRefilled));
+}
+
+void check_non_empty(const CatalogueSet& set) {
+    for (const auto code : kLanguages) {
+        const auto messages = parse(read_catalogue(set, code));
+        REQUIRE_FALSE(messages.empty());
+        for (const Message& message : messages) {
+            if (awaiting_translation(message) || blank(message.source)) {
+                continue;
+            }
+            INFO(code << " / " << message.context << ": " << quoted(message.source));
+            const auto texts = bodies(message);
+            CHECK_FALSE(texts.empty());
+            for (const auto& text : texts) {
+                CHECK_FALSE(blank(text));
+            }
+        }
+    }
+}
+
+void check_placeholders(const CatalogueSet& set) {
+    for (const auto code : kLanguages) {
+        for (const Message& message : parse(read_catalogue(set, code))) {
+            const auto texts = bodies(message);
+            if (awaiting_translation(message) ||
+                std::all_of(texts.begin(), texts.end(), blank)) {
+                continue;
+            }
+            INFO(code << " / " << message.context << ": " << quoted(message.source));
+            INFO("translation: " << quoted(message.translation));
+            const auto fault = placeholder_fault(message, set.droppable);
+            INFO(fault);
+            CHECK(fault.empty());
+        }
+    }
+}
+
+void check_brand_terms(const CatalogueSet& set) {
+    for (const auto code : kLanguages) {
+        for (const Message& message : parse(read_catalogue(set, code))) {
+            if (awaiting_translation(message)) {
+                continue;
+            }
+            const auto texts = bodies(message);
+            if (std::all_of(texts.begin(), texts.end(), blank)) {
+                continue;
+            }
+            for (const auto term : set.brand_terms) {
+                if (!carries_term(message.source, term)) {
+                    continue;
+                }
+                for (const auto& text : texts) {
+                    INFO(code << " / " << message.context << " [" << term << "]: "
+                              << quoted(message.source));
+                    INFO("translation: " << quoted(text));
+                    CHECK(carries_term(text, term));
+                }
+            }
+        }
+    }
+}
+
+void check_one_source_set(const CatalogueSet& set) {
+    // Every language is generated from the same extraction, so a difference
+    // here is a hand edit or a file that missed the last lupdate rather than
+    // anything about the language itself.
+    std::set<std::pair<std::string, std::string>> first;
+    std::string_view first_code;
+    for (const auto code : kLanguages) {
+        std::set<std::pair<std::string, std::string>> here;
+        for (const Message& message : parse(read_catalogue(set, code))) {
+            here.emplace(message.context, message.source);
+        }
+        if (first.empty()) {
+            first = here;
+            first_code = code;
+            REQUIRE_FALSE(first.empty());
+            continue;
+        }
+        for (const auto& entry : first) {
+            INFO(first_code << " has an entry " << code << " does not: " << entry.first << " / "
+                            << quoted(entry.second));
+            CHECK(here.contains(entry));
+        }
+        for (const auto& entry : here) {
+            INFO(code << " has an entry " << first_code << " does not: " << entry.first << " / "
+                      << quoted(entry.second));
+            CHECK(first.contains(entry));
+        }
+    }
+}
+
+}  // namespace
+
+TEST_CASE("crucible translation catalogues carry no unfinished entry",
+          "[crucible][translations]") {
+    check_no_unfinished(kCrucible);
 }
 
 // The GUI's seven catalogues, held to the two rules that matter most once a
@@ -298,94 +580,149 @@ TEST_CASE("gui translation catalogues carry no unfinished or dead entry",
 
 TEST_CASE("crucible translation catalogues carry no dead entry",
           "[crucible][translations]") {
-    auto dead = entries_marked("vanished");
-    const auto obsolete = entries_marked("obsolete");
-    dead.insert(dead.end(), obsolete.begin(), obsolete.end());
-    if (!dead.empty()) {
-        WARN("dead entries: " << dead.size() << ", first: " << dead.front()
-             << " - this case only fails once kCatalogueRefilled is turned on, which is the"
-                " commit that lands the refilled catalogues");
-    }
-    INFO(listed(dead));
-    // The same two states as above: a string this pass reworded leaves its
-    // old entry behind until the regeneration drops it.
-    CHECK((dead.empty() || !kCatalogueRefilled));
+    check_no_dead(kCrucible);
 }
 
 TEST_CASE("every finished crucible translation is non-empty", "[crucible][translations]") {
-    for (const auto code : kLanguages) {
-        const auto messages = parse(read_catalogue(code));
-        REQUIRE_FALSE(messages.empty());
-        for (const Message& message : messages) {
-            if (awaiting_translation(message) || blank(message.source)) {
-                continue;
-            }
-            INFO(code << " / " << message.context << ": " << quoted(message.source));
-            CHECK_FALSE(blank(message.translation));
-        }
-    }
+    check_non_empty(kCrucible);
 }
 
 TEST_CASE("placeholders survive translation in every crucible catalogue",
           "[crucible][translations]") {
-    for (const auto code : kLanguages) {
-        for (const Message& message : parse(read_catalogue(code))) {
-            if (awaiting_translation(message) || blank(message.translation)) {
-                continue;
-            }
-            INFO(code << " / " << message.context << ": " << quoted(message.source));
-            INFO("translation: " << quoted(message.translation));
-            CHECK(placeholders(message.source) == placeholders(message.translation));
-        }
-    }
+    check_placeholders(kCrucible);
 }
 
 TEST_CASE("brand terms survive translation in every crucible catalogue",
           "[crucible][translations]") {
-    for (const auto code : kLanguages) {
-        for (const Message& message : parse(read_catalogue(code))) {
-            if (awaiting_translation(message) || blank(message.translation)) {
-                continue;
-            }
-            for (const auto term : kBrandTerms) {
-                if (!carries_term(message.source, term)) {
-                    continue;
-                }
-                INFO(code << " / " << message.context << " [" << term << "]: "
-                          << quoted(message.source));
-                INFO("translation: " << quoted(message.translation));
-                CHECK(carries_term(message.translation, term));
-            }
-        }
-    }
+    check_brand_terms(kCrucible);
 }
 
 TEST_CASE("all six crucible catalogues share one source set", "[crucible][translations]") {
-    // Every language is generated from the same extraction, so a difference
-    // here is a hand edit or a file that missed the last lupdate rather than
-    // anything about the language itself.
-    std::set<std::pair<std::string, std::string>> first;
-    std::string_view first_code;
+    check_one_source_set(kCrucible);
+}
+
+// Hearth's six, held to the same six rules as Crucible's. They were the only
+// catalogues of the three that a case did not read: Hearth's window shipped
+// the language machinery with every entry but the Karaoke page's still
+// unfinished, and a test that asked for complete catalogues would have failed
+// from its first commit. They were filled on 2026-10-13.
+//
+// The tag is `hearth`, the way the GUI's is `gui`, so the Linux pass that runs
+// "[crucible],[seams]" leaves these to the legs that run all of ctest.
+
+TEST_CASE("hearth translation catalogues carry no unfinished entry",
+          "[hearth][translations]") {
+    check_no_unfinished(kHearth);
+}
+
+TEST_CASE("hearth translation catalogues carry no dead entry", "[hearth][translations]") {
+    check_no_dead(kHearth);
+}
+
+TEST_CASE("every finished hearth translation is non-empty", "[hearth][translations]") {
+    check_non_empty(kHearth);
+}
+
+TEST_CASE("placeholders survive translation in every hearth catalogue",
+          "[hearth][translations]") {
+    check_placeholders(kHearth);
+}
+
+TEST_CASE("brand terms survive translation in every hearth catalogue",
+          "[hearth][translations]") {
+    check_brand_terms(kHearth);
+}
+
+TEST_CASE("all six hearth catalogues share one source set", "[hearth][translations]") {
+    check_one_source_set(kHearth);
+}
+
+TEST_CASE("hearth catalogues carry the messages the window has", "[hearth][translations]") {
+    // A file that parsed to nothing, or to a fragment, would pass every rule
+    // above it. 1101 messages today; the floor is below that so that a string
+    // the window drops does not fail this, and far above anything a broken
+    // read produces.
     for (const auto code : kLanguages) {
-        std::set<std::pair<std::string, std::string>> here;
-        for (const Message& message : parse(read_catalogue(code))) {
-            here.emplace(message.context, message.source);
-        }
-        if (first.empty()) {
-            first = here;
-            first_code = code;
-            REQUIRE_FALSE(first.empty());
-            continue;
-        }
-        for (const auto& entry : first) {
-            INFO(first_code << " has an entry " << code << " does not: " << entry.first << " / "
-                            << quoted(entry.second));
-            CHECK(here.contains(entry));
-        }
-        for (const auto& entry : here) {
-            INFO(code << " has an entry " << first_code << " does not: " << entry.first << " / "
-                      << quoted(entry.second));
-            CHECK(first.contains(entry));
-        }
+        const auto messages = parse(read_catalogue(kHearth, code));
+        INFO("hearth_" << code << ".ts parsed to " << messages.size() << " messages");
+        CHECK(messages.size() > 900);
     }
+}
+
+// The rules that no catalogue exercises today, run on a made-up one: no message
+// of the three apps has a plural form, and the six English-suffix strings above
+// are the only ones that may leave a placeholder out. Written so that the day a
+// `%n` message arrives the rule it meets has been seen to work.
+TEST_CASE("the plural and suffix-placeholder rules read a catalogue correctly",
+          "[hearth][translations]") {
+    const std::string text = R"(<?xml version="1.0" encoding="utf-8"?>
+<TS version="2.1" language="fr" sourcelanguage="en">
+<context>
+    <name>Demo</name>
+    <message numerus="yes">
+        <source>%n file(s) in %1</source>
+        <translation>
+            <numerusform>%n fichier dans %1</numerusform>
+            <numerusform>%n fichiers dans %1</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n file(s) in %1</source>
+        <translation>
+            <numerusform>Un fichier dans %1</numerusform>
+            <numerusform>Des fichiers dans %1</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n file(s) in %1</source>
+        <translation>
+            <numerusform>%n fichier dans %1</numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n file(s) in %1</source>
+        <translation>
+            <numerusform>%n fichier</numerusform>
+            <numerusform>%n fichiers dans %1</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>%1 entr%2</source>
+        <translation>entrees : %1</translation>
+    </message>
+    <message>
+        <source>%1 file%2</source>
+        <translation>fichiers : %1</translation>
+    </message>
+    <message>
+        <source>%1 of %2</source>
+        <translation>%L1 sur %L2</translation>
+    </message>
+</context>
+</TS>
+)";
+    const auto messages = parse(text);
+    REQUIRE(messages.size() == 7);
+    const std::span<const SuffixPlaceholder> listed_suffixes{kHearthSuffixPlaceholders};
+
+    // A plural entry with both forms and the count: fine.
+    CHECK(messages[0].numerus);
+    CHECK(placeholder_fault(messages[0], {}).empty());
+    // No form shows the count: caught.
+    CHECK_FALSE(placeholder_fault(messages[1], {}).empty());
+    // An empty form: the non-empty rule sees it.
+    const auto empty_forms = bodies(messages[2]);
+    REQUIRE(empty_forms.size() == 2);
+    CHECK(std::any_of(empty_forms.begin(), empty_forms.end(), blank));
+    // A form that drops %1: caught.
+    CHECK_FALSE(placeholder_fault(messages[3], {}).empty());
+    // The listed suffix string may omit its suffix placeholder ...
+    CHECK(placeholder_fault(messages[4], listed_suffixes).empty());
+    // ... a string that is not listed may not ...
+    CHECK_FALSE(placeholder_fault(messages[5], listed_suffixes).empty());
+    // ... and nothing may be left out where the set lists nothing.
+    CHECK_FALSE(placeholder_fault(messages[4], {}).empty());
+    // %L1 and %L2 are %1 and %2.
+    CHECK(placeholder_fault(messages[6], {}).empty());
 }

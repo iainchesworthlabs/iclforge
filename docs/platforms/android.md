@@ -38,10 +38,13 @@ cd apps/demos/android
 ./gradlew assembleDebug --no-daemon
 adb connect <shield-ip>:5555          # if not on USB
 adb -s <shield-ip>:5555 install -r app/build/outputs/apk/debug/app-debug.apk
-adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
+adb -s <shield-ip>:5555 shell am start -n com.iainchesworthlabs.shield/com.iclforge.shield.MainActivity
 ```
 
-[Building and running](#building-and-running) below covers the SDK setup and signed builds.
+The application id is `com.iainchesworthlabs.shield`, the repository's account as the macOS bundle
+ids and the Linux desktop ids have it; the code's package is `com.iclforge.shield`, so the activity
+is named by its full class. [Building and running](#building-and-running) below covers the SDK
+setup and signed builds.
 
 ## What's reused, what's new
 
@@ -812,7 +815,7 @@ cd apps/demos/android
 ./gradlew assembleDebug --no-daemon
 adb connect <shield-ip>:5555          # if not on USB
 adb -s <shield-ip>:5555 install -r app/build/outputs/apk/debug/app-debug.apk
-adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
+adb -s <shield-ip>:5555 shell am start -n com.iainchesworthlabs.shield/com.iclforge.shield.MainActivity
 ```
 
 `local.properties` needs `sdk.dir` pointing at an Android SDK with NDK 28.2.13676358 and CMake

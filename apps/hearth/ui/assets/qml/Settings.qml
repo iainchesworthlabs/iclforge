@@ -207,8 +207,8 @@ ScrollView {
                         }
                         Text {
                             objectName: "settingsLyricDelayValue"
-                            text: qsTr("%1 ms").arg((KaraokeController.delayMs > 0 ? "+" : "")
-                                                    + KaraokeController.delayMs)
+                            text: qsTr("%1 ms").arg(Theme.ltr((KaraokeController.delayMs > 0 ? "+" : "")
+                                                    + KaraokeController.delayMs))
                             color: Theme.text
                             font.family: Theme.monoFamily
                             font.pixelSize: Theme.fontSmall
@@ -217,6 +217,7 @@ ScrollView {
                         }
                         AppButton {
                             objectName: "settingsLyricDelayReset"
+                            //: Button: set the lyric delay back to zero.
                             text: qsTr("Reset")
                             enabled: KaraokeController.delayMs !== 0
                             onClicked: KaraokeController.delayMs = 0
@@ -401,6 +402,7 @@ ScrollView {
                                             AppButton {
                                                 objectName: "pairingForget-" + pairingRow.index
                                                 Layout.preferredWidth: Math.round(64 * Theme.fontScale)
+                                                //: Button: forget this pairing record. The sink or player must pair again.
                                                 text: qsTr("Forget")
                                                 Accessible.description: qsTr("Forgets this pairing; it has to pair again with a new code.")
                                                 onClicked: HearthController.forgetPairing(pairingRow.modelData.id)
@@ -455,6 +457,7 @@ ScrollView {
                             accessibleName: qsTr("Theme")
                             currentValue: HearthController.theme
                             model: [
+                                //: Option: follow the desktop's own setting.
                                 { value: "system", label: qsTr("System") },
                                 { value: "light", label: qsTr("Light") },
                                 { value: "dark", label: qsTr("Dark") }
@@ -580,9 +583,6 @@ ScrollView {
                         Text {
                             Layout.fillWidth: true
                             text: qsTr("System follows the language the desktop is set to. Applies at once. "
-                                      + "The Karaoke page, the lyrics and the singer view are translated; "
-                                      + "the other pages are not yet, so their words stay in English while "
-                                      + "the layout direction and the typeface follow the language chosen. "
                                       + "The translations are machine-made and have not been read by a speaker.")
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSmall

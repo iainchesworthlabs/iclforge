@@ -585,6 +585,7 @@ Item {
 
                                     Text {
                                         anchors.centerIn: parent
+                                        //: Clip indicator of a level meter: lit when the signal reached full scale.
                                         text: qsTr("CLIP")
                                         font.pixelSize: Theme.fontMicro
                                         font.bold: true
@@ -606,6 +607,7 @@ Item {
                                     // own comment).
                                     text: {
                                         if (levelRow.routedTo < 0) {
+                                            //: A speaker that goes to no output.
                                             return qsTr("unrouted");
                                         }
                                         const name = HearthController.outputNames[levelRow.routedTo] ?? "";
@@ -661,6 +663,7 @@ Item {
                                 { key: "momentary", label: qsTr("MOMENTARY"), unit: qsTr("LUFS") },
                                 { key: "shortTerm", label: qsTr("SHORT-TERM"), unit: qsTr("LUFS") },
                                 { key: "integrated", label: qsTr("INTEGRATED"), unit: qsTr("LUFS") },
+                                //: Loudness range (LRA), one of the loudness figures beside MOMENTARY and SHORT-TERM.
                                 { key: "range", label: qsTr("RANGE"), unit: qsTr("LU") },
                                 { key: "truePeak", label: qsTr("TRUE PEAK"), unit: qsTr("dBTP") }
                             ]
@@ -670,7 +673,7 @@ Item {
                                 required property var modelData
                                 label: loudnessTile.modelData.label
                                 value: HearthController.loudness[loudnessTile.modelData.key] !== undefined
-                                       ? Number(HearthController.loudness[loudnessTile.modelData.key]).toFixed(1)
+                                       ? Theme.ltr(Number(HearthController.loudness[loudnessTile.modelData.key]).toFixed(1))
                                          + " " + loudnessTile.modelData.unit
                                        : qsTr("—")
                             }
@@ -697,20 +700,20 @@ Item {
                         StatTile {
                             label: qsTr("DIALNORM")
                             value: HearthController.thisFrame.dialnorm !== undefined
-                                   ? qsTr("−%1 dB").arg(HearthController.thisFrame.dialnorm) : qsTr("—")
+                                   ? Theme.ltrNumbers(qsTr("−%1 dB").arg(HearthController.thisFrame.dialnorm)) : qsTr("—")
                         }
                         StatTile {
                             label: qsTr("COMPR")
                             value: HearthController.thisFrame.comprDb !== undefined
-                                   ? qsTr("%1 dB").arg(Number(HearthController.thisFrame.comprDb).toFixed(1))
+                                   ? qsTr("%1 dB").arg(Theme.ltr(Number(HearthController.thisFrame.comprDb).toFixed(1)))
                                    : qsTr("—")
                         }
                         StatTile {
                             label: qsTr("DYNRNG")
                             value: HearthController.thisFrame.dynrngMinDb !== undefined
                                    ? qsTr("%1…%2 dB")
-                                         .arg(Number(HearthController.thisFrame.dynrngMinDb).toFixed(1))
-                                         .arg(Number(HearthController.thisFrame.dynrngMaxDb).toFixed(1))
+                                         .arg(Theme.ltr(Number(HearthController.thisFrame.dynrngMinDb).toFixed(1)))
+                                         .arg(Theme.ltr(Number(HearthController.thisFrame.dynrngMaxDb).toFixed(1)))
                                    : qsTr("—")
                         }
                         StatTile {

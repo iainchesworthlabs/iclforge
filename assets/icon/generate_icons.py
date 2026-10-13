@@ -25,11 +25,14 @@ from PIL import Image, ImageDraw
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-# The WASM demo page's own existing palette (apps/demos/wasm/index.html's
-# :root CSS vars: --bg/--accent) - reused here rather than inventing a
-# third brand color for a project that already has one established.
-BG = (11, 18, 32, 255)  # #0b1220
-ACCENT = (96, 165, 250, 255)  # #60a5fa
+# The family's own Signal palette (apps/shared/theme/assets/qml/Theme.qml,
+# palette "signal", light): the brand red, #ec3013, on the palette's ink,
+# #201e1d - the colours the three apps' windows are drawn in, so the icon and
+# the window it opens are one thing. (Until 2026-10-13 the mark was the WASM
+# demo page's blue, #60a5fa on #0b1220, taken from that page's :root variables
+# before the apps had a palette; the demo pages keep their own.)
+BG = (32, 30, 29, 255)  # #201e1d, Theme.qml's signal ink
+ACCENT = (236, 48, 19, 255)  # #ec3013, Theme.qml's signal accent
 
 # Rendered once at high resolution and downsampled (LANCZOS) for every
 # smaller output below, so even the 16px Windows .ico frame is

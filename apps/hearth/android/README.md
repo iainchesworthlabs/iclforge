@@ -205,9 +205,13 @@ line in no face's script is said and not drawn. It runs on an emulator and on a 
 adb install -r -t app/build/intermediates/apk/debug/app-debug.apk
 adb install -r -t app/build/intermediates/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w -e class com.iclforge.hearth.LyricViewRenderTest \
-    com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner
-adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders
+    com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner
+adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders
 ```
+
+The application id is `com.iainchesworthlabs.hearth`, the repository's account; the code's package is
+`com.iclforge.hearth`. So the instrumentation package and the data directory carry the id, and a test
+class is named by the package.
 
 **Conformance (2c).** The spec's fixtures are held at fixed positions by one checked-in file:
 `libs/sink/tests/lyric-frames/cases.txt` lists each document (the karaoke examples, a file timed as lines,

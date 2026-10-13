@@ -188,6 +188,13 @@ public:
     // position, so a seek and a pause are only another position.
     Q_INVOKABLE QVariantMap cursor(qlonglong positionMs) const;
 
+    // Whether `text` reads right to left, by its first strong letter (what
+    // QString::isRightToLeft() answers for it): the direction a view sets the
+    // words of a line out in. It is the text's own, and not the window's: an
+    // English line reads left to right in a window that is mirrored for Arabic,
+    // and a Hebrew line reads right to left in one that is not.
+    Q_INVOKABLE bool isRightToLeft(const QString& text) const;
+
     // Opens a session over the loaded lyrics, or over `textFile` (a file URL
     // or a path: a plain text file, or a `.lrc`) when given. False, with
     // timingError, when nothing is playing or there are no words to time.

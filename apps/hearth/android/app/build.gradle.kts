@@ -23,7 +23,12 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.iclforge.hearth"
+        // What the app is installed as, and so the name of its data directory and of its
+        // instrumentation package (<id>.test). It follows the repository's account, as the macOS
+        // bundle ids and the Linux desktop ids do, and is not the package of the code: the
+        // namespace above stays com.iclforge.hearth, which the JNI names of the native code spell
+        // (tools/checks/check_android_jni.py). No release has carried this app.
+        applicationId = "com.iainchesworthlabs.hearth"
         // 26 (Oreo): notification channels and the foreground-service start the sink needs, and
         // the floor of AAudio for the pass-through output that comes after this skeleton. Android
         // TV hardware from 2017 on is above it.

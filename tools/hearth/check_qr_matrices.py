@@ -7,7 +7,7 @@ and has no dependency, so its output is checked here by an independent decoder: 
 QRCodeDetector. QrCodeTest writes qr-matrices.txt to the app's files directory (lyric-renders/);
 this pulls nothing itself:
 
-    adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders/qr-matrices.txt
+    adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders/qr-matrices.txt
     python tools/hearth/check_qr_matrices.py qr-matrices.txt
 
 Each line is the payload's bytes in hex, a tab, and the matrix's rows joined by "/" ("#" dark, "."

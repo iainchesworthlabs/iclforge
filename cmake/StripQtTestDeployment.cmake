@@ -100,7 +100,7 @@
 # from one directory into a single per-directory cmake_install.cmake,
 # executed top to bottom as one script, so a set() from that install(CODE)
 # is still visible when this file's include() runs a moment later. apps/forge/gui
-# and apps/crucible each do exactly that - install(CODE "set(_ac3_macos_
+# and apps/crucible each do exactly that - install(CODE "set(_iclforge_macos_
 # bundle_name \"forge-gui\")") (or "crucible") right before their own
 # install(SCRIPT .../StripQtTestDeployment.cmake ...) - with the SAME
 # COMPONENT keyword on both calls, since a component-scoped install (`cmake
@@ -146,49 +146,49 @@
 # $ENV{DESTDIR} the way every hand-written install script has to: install(FILES)
 # prepends it for you, install(SCRIPT) does not, and CPack's own staging install
 # does not set it at all - so this is correct under both.
-set(_ac3_prefix "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
+set(_iclforge_prefix "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
 
 # "bin" rather than ${CMAKE_INSTALL_BINDIR}: an install script sees neither the
 # cache nor the configure-time scope, GNUInstallDirs hard-codes "bin" on Windows
 # anyway, and tools/ci/check_crucible_package.py already spells the same path
 # out for the same reason.
-set(_ac3_qt_test_files
-    "${_ac3_prefix}/bin/Qt6Test.dll"
-    "${_ac3_prefix}/bin/Qt6Testd.dll"
-    "${_ac3_prefix}/bin/Qt6QuickTest.dll"
-    "${_ac3_prefix}/bin/Qt6QuickTestd.dll")
+set(_iclforge_qt_test_files
+    "${_iclforge_prefix}/bin/Qt6Test.dll"
+    "${_iclforge_prefix}/bin/Qt6Testd.dll"
+    "${_iclforge_prefix}/bin/Qt6QuickTest.dll"
+    "${_iclforge_prefix}/bin/Qt6QuickTestd.dll")
 
-foreach(_ac3_file IN LISTS _ac3_qt_test_files)
-    if(EXISTS "${_ac3_file}")
-        message(STATUS "Removing Qt Test from the package: ${_ac3_file}")
-        file(REMOVE "${_ac3_file}")
+foreach(_iclforge_file IN LISTS _iclforge_qt_test_files)
+    if(EXISTS "${_iclforge_file}")
+        message(STATUS "Removing Qt Test from the package: ${_iclforge_file}")
+        file(REMOVE "${_iclforge_file}")
     endif()
 endforeach()
 
-if(EXISTS "${_ac3_prefix}/qml/QtTest")
-    message(STATUS "Removing Qt Test from the package: ${_ac3_prefix}/qml/QtTest")
-    file(REMOVE_RECURSE "${_ac3_prefix}/qml/QtTest")
+if(EXISTS "${_iclforge_prefix}/qml/QtTest")
+    message(STATUS "Removing Qt Test from the package: ${_iclforge_prefix}/qml/QtTest")
+    file(REMOVE_RECURSE "${_iclforge_prefix}/qml/QtTest")
 endif()
 
-# macOS: _ac3_macos_bundle_name arrives via an install(CODE) set() just
+# macOS: _iclforge_macos_bundle_name arrives via an install(CODE) set() just
 # before this file's install(SCRIPT) - see the header comment for why that is
 # the only way this file learns the bundle's name at all, and only DEFINED on
 # APPLE since Windows callers never set it.
-if(APPLE AND DEFINED _ac3_macos_bundle_name)
-    set(_ac3_macos_bundle "${_ac3_prefix}/${_ac3_macos_bundle_name}.app")
-    set(_ac3_macos_plugin "${_ac3_macos_bundle}/Contents/PlugIns/libquicktestplugin.dylib")
+if(APPLE AND DEFINED _iclforge_macos_bundle_name)
+    set(_iclforge_macos_bundle "${_iclforge_prefix}/${_iclforge_macos_bundle_name}.app")
+    set(_iclforge_macos_plugin "${_iclforge_macos_bundle}/Contents/PlugIns/libquicktestplugin.dylib")
 
     # EXISTS OR IS_SYMLINK, not EXISTS alone - see the header comment on why
     # this plugin's current dangling-symlink shape under Homebrew's Qt6
     # reads as absent to EXISTS but not to IS_SYMLINK.
-    if(EXISTS "${_ac3_macos_plugin}" OR IS_SYMLINK "${_ac3_macos_plugin}")
-        message(STATUS "Removing Qt Test from the package: ${_ac3_macos_plugin}")
-        file(REMOVE "${_ac3_macos_plugin}")
+    if(EXISTS "${_iclforge_macos_plugin}" OR IS_SYMLINK "${_iclforge_macos_plugin}")
+        message(STATUS "Removing Qt Test from the package: ${_iclforge_macos_plugin}")
+        file(REMOVE "${_iclforge_macos_plugin}")
     endif()
 
-    if(EXISTS "${_ac3_macos_bundle}/Contents/Resources/qml/QtTest")
-        message(STATUS "Removing Qt Test from the package: ${_ac3_macos_bundle}/Contents/Resources/qml/QtTest")
-        file(REMOVE_RECURSE "${_ac3_macos_bundle}/Contents/Resources/qml/QtTest")
+    if(EXISTS "${_iclforge_macos_bundle}/Contents/Resources/qml/QtTest")
+        message(STATUS "Removing Qt Test from the package: ${_iclforge_macos_bundle}/Contents/Resources/qml/QtTest")
+        file(REMOVE_RECURSE "${_iclforge_macos_bundle}/Contents/Resources/qml/QtTest")
     endif()
 
     # Belt-and-braces, not measured against any artifact this repo has
@@ -196,16 +196,16 @@ if(APPLE AND DEFINED _ac3_macos_bundle_name)
     # same reason as the PlugIns file above: a framework bundle deployed the
     # way a dangling Homebrew Cellar symlink deploys everything else here
     # would otherwise read as absent too.
-    foreach(_ac3_macos_framework IN ITEMS QtTest QtQuickTest)
-        set(_ac3_macos_framework_path "${_ac3_macos_bundle}/Contents/Frameworks/${_ac3_macos_framework}.framework")
-        if(EXISTS "${_ac3_macos_framework_path}" OR IS_SYMLINK "${_ac3_macos_framework_path}")
-            message(STATUS "Removing Qt Test from the package: ${_ac3_macos_framework_path}")
-            file(REMOVE_RECURSE "${_ac3_macos_framework_path}")
+    foreach(_iclforge_macos_framework IN ITEMS QtTest QtQuickTest)
+        set(_iclforge_macos_framework_path "${_iclforge_macos_bundle}/Contents/Frameworks/${_iclforge_macos_framework}.framework")
+        if(EXISTS "${_iclforge_macos_framework_path}" OR IS_SYMLINK "${_iclforge_macos_framework_path}")
+            message(STATUS "Removing Qt Test from the package: ${_iclforge_macos_framework_path}")
+            file(REMOVE_RECURSE "${_iclforge_macos_framework_path}")
         endif()
     endforeach()
 endif()
 
-# unset(_ac3_macos_bundle_name) here is not just the same tidiness as the
+# unset(_iclforge_macos_bundle_name) here is not just the same tidiness as the
 # other unsets below - it is load-bearing. install(SCRIPT)/install(CODE) are
 # plain include()s into one flat, shared variable scope that runs from the
 # top-level cmake_install.cmake down through every subdirectory's own, in
@@ -219,11 +219,11 @@ endif()
 # throwaway two-target CMakeLists.txt: a value set by one directory's
 # install(CODE) was still readable, unmodified, from a second, sibling
 # directory's install(SCRIPT) later in the same install.
-unset(_ac3_file)
-unset(_ac3_qt_test_files)
-unset(_ac3_macos_bundle)
-unset(_ac3_macos_plugin)
-unset(_ac3_macos_framework)
-unset(_ac3_macos_framework_path)
-unset(_ac3_macos_bundle_name)
-unset(_ac3_prefix)
+unset(_iclforge_file)
+unset(_iclforge_qt_test_files)
+unset(_iclforge_macos_bundle)
+unset(_iclforge_macos_plugin)
+unset(_iclforge_macos_framework)
+unset(_iclforge_macos_framework_path)
+unset(_iclforge_macos_bundle_name)
+unset(_iclforge_prefix)

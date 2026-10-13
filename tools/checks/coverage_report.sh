@@ -160,7 +160,9 @@ fi
 # libs/sink is the sink core that was apps/hearth/testsink/src/sink.cpp and store.cpp, counted in the
 # apps/hearth row above until it moved. Its floors are under that row's (87/77), which it was part of,
 # and have not been measured on their own: the first hosted run of this job sets them (planning/
-# hearth-android.md, phase 1a).
+# hearth-android.md, phase 1a). A row here needs its directory in the gcovr --filter below as well:
+# this one was added without it, and the first run that got as far as the gate (2026-10-13, run
+# 38354367943) said "no data for libs/sink" of a library built and tested with coverage on.
 #
 # apps/crucible/engine/src is the platform-free engine core iclforge-crucible-tests compiles in;
 # the rest of apps/crucible keeps its own floors in coverage_crucible.ps1.
@@ -224,7 +226,7 @@ html="$build_dir/coverage.html"
 # but it made the DSP-heavy cases 2-6x slower (the ten-minute playout case
 # 4.9 s -> 30.8 s), so the flag stays.
 gcovr --root . \
-    --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|ac4|iab)/.*' \
+    --filter 'libs/(ac3|base|dsp|objects|render|containers|audio|capi|adm|sendspin|sink|ac4|iab)/.*' \
     --exclude 'libs/[^/]*/(tests|fuzz)/.*' \
     --filter 'apps/forge/cli/src/.*' \
     --filter 'apps/shared/media/src/.*' \

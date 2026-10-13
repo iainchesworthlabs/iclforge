@@ -453,12 +453,37 @@ ScrollView {
                 Row {
                     spacing: Theme.gap / 2
                     height: Math.round(28 * Theme.fontScale)
-                    Text { width: levels.labelWidth; height: parent.height; verticalAlignment: Text.AlignVCenter; text: qsTr("SPK"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro }
-                    Text { width: levels.outWidth; height: parent.height; verticalAlignment: Text.AlignVCenter; text: qsTr("OUT"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro }
-                    Text { width: levels.sizeWidth; height: parent.height; verticalAlignment: Text.AlignVCenter; text: qsTr("SIZE"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro }
+                    Text {
+                        width: levels.labelWidth
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        //: Narrow column heading: short for SPEAKER.
+                        text: qsTr("SPK")
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontMicro
+                    }
+                    Text {
+                        width: levels.outWidth
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        //: Narrow column heading: short for OUTPUT, the sink's audio slot the speaker goes to.
+                        text: qsTr("OUT")
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontMicro
+                    }
+                    Text {
+                        width: levels.sizeWidth
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        //: Column heading: a speaker's size for bass management, Large or Small.
+                        text: qsTr("SIZE")
+                        color: Theme.textMuted
+                        font.pixelSize: Theme.fontMicro
+                    }
                     Text {
                         width: levels.fieldWidth; height: parent.height
                         horizontalAlignment: Text.AlignRight; verticalAlignment: Text.AlignVCenter
+                        //: Column heading: a level adjustment for the speaker, in dB.
                         text: qsTr("TRIM"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro
                     }
                     Text {
@@ -469,6 +494,7 @@ ScrollView {
                     Item { width: Theme.gap; height: 1 }
                     Text {
                         height: parent.height; verticalAlignment: Text.AlignVCenter
+                        //: Column heading of the buttons that play pink noise on one speaker, to hear which it is.
                         text: qsTr("IDENTIFY"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro
                     }
                 }
@@ -525,7 +551,9 @@ ScrollView {
                                 accessibleName: qsTr("Size for %1").arg(row.modelData)
                                 currentValue: root.smallFlags[row.index] === true ? "small" : "large"
                                 model: [
+                                    //: A speaker's size: a large speaker plays the full range.
                                     { value: "large", label: qsTr("Large") },
+                                    //: A speaker's size: a small speaker's bass goes to the LFE output instead.
                                     { value: "small", label: qsTr("Small") }
                                 ]
                                 onSelected: function(value) {
@@ -647,7 +675,9 @@ ScrollView {
                             Text {
                                 id: identifyLabel
                                 anchors.centerIn: parent
-                                text: identifyButton.active ? qsTr("Stop") : qsTr("Identify")
+                                text: identifyButton.active ? qsTr("Stop")
+                                //: Button: play pink noise on this speaker's output, to hear which speaker it is.
+                                    : qsTr("Identify")
                                 color: Theme.text
                             }
                             MouseArea {

@@ -104,8 +104,22 @@ RowLayout {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Theme.gap
-                Text { Layout.preferredWidth: 160; text: qsTr("MEMBER"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro; font.bold: true }
-                Text { Layout.preferredWidth: 140; text: qsTr("GETS"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro; font.bold: true }
+                Text {
+                    Layout.preferredWidth: 160
+                    //: Column heading: a sink or player that belongs to the group.
+                    text: qsTr("MEMBER")
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontMicro
+                    font.bold: true
+                }
+                Text {
+                    Layout.preferredWidth: 140
+                    //: Column heading: the form of the stream the group sends this member, for example E-AC-3 or PCM.
+                    text: qsTr("GETS")
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontMicro
+                    font.bold: true
+                }
                 Text { Layout.fillWidth: true; text: qsTr("VOLUME"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro; font.bold: true }
                 Item { Layout.preferredWidth: 28 }
                 Text { Layout.preferredWidth: 48; text: qsTr("MUTE"); color: Theme.textMuted; font.pixelSize: Theme.fontMicro; font.bold: true }
@@ -327,6 +341,7 @@ RowLayout {
                     color: Theme.text
                     font.pixelSize: Theme.fontSmall
                 }
+                //: How far ahead of playback the group sends audio to its members.
                 Text { text: qsTr("Lead time"); color: Theme.textMuted; font.pixelSize: Theme.fontSmall }
                 Text {
                     Layout.fillWidth: true
@@ -335,6 +350,7 @@ RowLayout {
                     font.pixelSize: Theme.fontSmall
                     wrapMode: Text.WordWrap
                 }
+                //: The count of audio chunks that reached a member after they were due.
                 Text { text: qsTr("Late chunks"); color: Theme.textMuted; font.pixelSize: Theme.fontSmall }
                 Text { text: qsTr("—"); color: Theme.text; font.pixelSize: Theme.fontSmall }
             }

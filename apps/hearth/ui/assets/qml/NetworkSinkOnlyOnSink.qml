@@ -18,6 +18,7 @@ ColumnLayout {
 
     readonly property var rows: [
         { label: qsTr("Name"), value: root.sink.name ?? "" },
+        //: Row: the width in bits of one slot of the sink's I2S frame. Not a firmware slot.
         { label: qsTr("Slot width"), value: root.sink.slotsText ?? "" },
         { label: qsTr("Network"), value: root.sink.network ?? "" },
         { label: qsTr("Firmware"), value: root.sink.firmware ?? "" }

@@ -180,6 +180,34 @@ function besideLabel(root, labelText, predicate) {
     return null;
 }
 
+// The visible Texts that show a negative number with a decimal point ("-3.0 dB", "-0.50"): a minus
+// sign (hyphen-minus or U+2212) and digits, with no letter or digit before the sign, so "AC-3" is not
+// one. A sentence that names a level in whole numbers ("-31 dBFS") is written, not worked out, and is
+// not looked for here.
+function negativeDecimals(root) {
+    return findAll(root, function(item) {
+        return typeof item.text === "string" && item.font !== undefined && item.visible
+               && /(^|[^A-Za-z0-9])[-\u2212]\d+\.\d/.test(item.text);
+    });
+}
+
+// Of those, the ones with a minus sign that is not inside a left-to-right isolate (U+2066 to
+// U+2069): next to Arabic or Hebrew words, a sign outside one lands after its digits.
+function bareNegativeDecimals(root) {
+    return findAll(root, function(item) {
+        return typeof item.text === "string" && item.font !== undefined && item.visible
+               && /(^|[^\u2066A-Za-z0-9])[-\u2212]\d+\.\d/.test(item.text);
+    });
+}
+
+// Every visible Text that holds a bidi isolate control (U+2066 to U+2069).
+function isolated(root) {
+    return findAll(root, function(item) {
+        return typeof item.text === "string" && item.font !== undefined && item.visible
+               && /[\u2066-\u2069]/.test(item.text);
+    });
+}
+
 function isSlider(item) {
     return item.from !== undefined && item.to !== undefined && item.visualPosition !== undefined;
 }

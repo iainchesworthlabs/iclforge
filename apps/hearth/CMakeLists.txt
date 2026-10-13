@@ -25,7 +25,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     # add_subdirectory(ui), but the path string itself depends on neither and
     # can be settled first. install() only needs the path at configure time;
     # the file it names just has to exist by the time something installs,
-    # which it does once this whole configure finishes - ac3_generate_notices
+    # which it does once this whole configure finishes - iclforge_generate_notices
     # (below, via notices.cmake) writes it with plain file(WRITE), and every
     # add_subdirectory()/include() here runs as one configure regardless of
     # order.
@@ -37,7 +37,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     # this (the parent) scope, so a resource added from notices.cmake after
     # that finalization has already happened is silently left out of the
     # build - confirmed by a real build whose Licences dialog fell back to
-    # its "no embedded notices file" text. ac3_generate_notices overwrites
+    # its "no embedded notices file" text. iclforge_generate_notices overwrites
     # this with the real content later in this same configure, still well
     # before ninja's rcc step reads it at build time.
     file(WRITE "${ICLFORGE_HEARTH_NOTICES_FILE}" "")
