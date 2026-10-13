@@ -159,10 +159,11 @@ A headless session never shows the menu, so each entry is fired through its
 | 87 | Show silent apps / Show background processes checks | None | UI | roomworkflow::test_silentAndBackgroundApplicationsFollowTheirSettings |
 | 88 | Save diagnostics… → dialog → file written or reason shown | Logic (`exportDiagnostics`) | UI | settingsdialogs::test_saveDiagnosticsWritesTheFileThePageSuggests; settings::test_exportWritesAFile, settings::test_diagnosticsReportWithholdsTheKeyPath |
 | 89 | Settings persist to the store a relaunch reads | Logic (controller getters) | UI | every `settingsworkflow`/`signalpath`/`roomworkflow` case that reads `TestServices.storedSetting` |
-| 90 | Motion segment (System / Reduced / Full); stored as `appearance/motion`; applied to Theme at start and on change; an unknown stored value reads as System | None | UI | settingsworkflow::test_appearanceChoicesAreStoredAndApplied; shell::test_motionFollowsTheSetting |
-| 91 | The person's Motion choice wins over the operating system's request, in both directions | None | UI | motion::test_theSystemAnswersWhenThePersonHasNotChosen, motion::test_thePersonsOwnChoiceWinsOverTheSystem |
-| 92 | Room markers and level bars glide only when motion is full; reduced they take the engine's value at once | None | UI | motion::test_theMarkerGlidesWhenMotionIsFull, motion::test_theMarkerJumpsWhenMotionIsReduced, motion::test_theLevelBarEasesWhenMotionIsFull, motion::test_theLevelBarTakesTheReadingAtOnceWhenMotionIsReduced |
-| 93 | The waiting mark is three still squares while motion is reduced | None | UI | motion::test_theWaitingMarkStopsTurningWhenMotionIsReduced |
+| 90 | The page's About block ("About Crucible…") asks for About, and the window opens the same dialog the `?` does | None | UI | settingsworkflow::test_theAboutBlockAsksForTheAboutDialog; about::test_aboutOpensFromTheSettingsPage |
+| 91 | Motion segment (System / Reduced / Full); stored as `appearance/motion`; applied to Theme at start and on change; an unknown stored value reads as System | None | UI | settingsworkflow::test_appearanceChoicesAreStoredAndApplied; shell::test_motionFollowsTheSetting |
+| 92 | The person's Motion choice wins over the operating system's request, in both directions | None | UI | motion::test_theSystemAnswersWhenThePersonHasNotChosen, motion::test_thePersonsOwnChoiceWinsOverTheSystem |
+| 93 | Room markers and level bars glide only when motion is full; reduced they take the engine's value at once | None | UI | motion::test_theMarkerGlidesWhenMotionIsFull, motion::test_theMarkerJumpsWhenMotionIsReduced, motion::test_theLevelBarEasesWhenMotionIsFull, motion::test_theLevelBarTakesTheReadingAtOnceWhenMotionIsReduced |
+| 94 | The waiting mark is three still squares while motion is reduced | None | UI | motion::test_theWaitingMarkStopsTurningWhenMotionIsReduced |
 
 ## Cases without a feature row of their own
 

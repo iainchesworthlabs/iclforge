@@ -5,7 +5,7 @@ settings, objects, metadata, and results. The equivalent [`forge`](../cli/index.
 shown at the bottom of the window.
 
 The screenshots use the current workbench in the default Signal light theme. Theme and text-size
-settings are covered under [Preferences](#preferences). See [Install Forge](../index.md#installing)
+settings are covered under [Settings](#settings). See [Install Forge](../index.md#installing)
 for packages and source-build instructions.
 
 ## First run
@@ -52,8 +52,9 @@ panes, divided by a vertical rule:
   already-encoded file — see [QC a stream](qc.md)), an **Inspect objects…** button (its decode-side
   counterpart for Dolby Atmos object metadata/audio — see [Inspect objects](inspect-objects.md)),
   an **Open stream…** button (plays an already-encoded file and exports its decode — see
-  [Open stream](open-stream.md)), a **Preferences** button, and an **About** button (the version
-  and the licence). The title strip above the header ends in a **Project…** menu (**Open
+  [Open stream](open-stream.md)), a **Settings** button, and an **About** button (the version,
+  the licence, the repository, and **Licences…**, which lists what this build carries from others).
+  The title strip above the header ends in a **Project…** menu (**Open
   project…** and **Save project…**, which keep what is set up in a file — see
   [Projects](projects.md)).
 - **Left rail — "the signal"** (always visible, never scrolled away, and never affected by which
@@ -98,7 +99,7 @@ panes, divided by a vertical rule:
       device** / **Retry as file**; a refusal that never opened a run (an incomplete assignment,
       the sixteen-object cap) lands in the same banner rather than only a status line.
     - The last thirty finished runs persist across a restart, restored alongside the "reopen the
-      last session's sources" preference below.
+      last session's sources" setting below.
 
 ## Guided, Advanced, Expert
 
@@ -120,7 +121,7 @@ panes, divided by a vertical rule:
     - **Step 2 (Speakers)**'s cards can open a **room picker** sub-screen: say what's *in the
       room* and the channel layout falls out of the parts.
     - **Step 3 (Quality)**'s **Good / Better / Best** cards set a fixed CBR bit rate (192 / 448 /
-      768 kbps) normally, or — when a VBR default ([Preferences](#preferences)) or an
+      768 kbps) normally, or — when a VBR default ([Settings](#settings)) or an
       already-selected Variable rate mode applies — a VBR quality target instead (40 / 75 / 90),
       since a fixed bit rate isn't what either of those is asking for.
     - **Step 4 (Movement)**'s cards drive [object mode](objects-and-motion.md), with trajectory
@@ -174,9 +175,10 @@ for good, this session, and dialnorm/DRC stay exactly what was set.
 Dual mono (`1+1`) gets the same contract, applied to each of its two programmes independently —
 see [Dual mono](format-and-channels.md#dual-mono) for why nothing is shared between them.
 
-## Preferences
+## Settings
 
-A real dialog, persisted across sessions (QSettings), three columns:
+A real dialog, persisted across sessions (QSettings), opened from the header's **Settings**
+button. It is called Settings, as Crucible's and Hearth's pages are. Three columns:
 
 - **Appearance**
     - Theme (Light / Dark / System) and **Text size** (100% / 125% / 150% / 175% / System, the
@@ -212,7 +214,7 @@ A real dialog, persisted across sessions (QSettings), three columns:
       contract](#the-loudness-contract) already gives DRC profile and measure loudness,
       generalised to container/rate mode/bit rate/VBR quality too. An edit made before Save is
       never clobbered: touch a field once (Guided, Advanced or Expert, any of them count) and
-      Preferences stops overwriting it for the rest of the session.
+      Settings stops overwriting it for the rest of the session.
     - **Capture** — start monitoring as soon as a device is chosen, and whether Record asks for a
       filename or writes straight to the output folder under a timestamped take name.
     - **Command line** — keep the `forge` line visible.
@@ -221,11 +223,37 @@ A real dialog, persisted across sessions (QSettings), three columns:
       window logged. It carries no audio, no part of any file you loaded and no signing key,
       it's written where you choose, and nothing is sent anywhere — see [Saving a diagnostics
       file](accessibility.md#saving-a-diagnostics-file).
+- **At the foot of the dialog**
+    - **About Forge…** opens About over the dialog. About says what this is, the version and the
+      build it came from, the licence and the repository, and its **Licences…** button opens the
+      third-party notices: the text of the `NOTICES.txt` the package installs, embedded in the
+      program. It acts at once and leaves what you have changed in the dialog as it was, so
+      **Cancel** still cancels it. About is also the header's **About** button; Crucible and
+      Hearth reach theirs from their Settings too.
+    - **Cancel** and **Save**: [why the dialog keeps both](#why-settings-has-save-and-cancel).
 
 Application icons are generated from a single procedural source; see
 [`apps/shared/theme/assets/icons/README.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/shared/theme/assets/icons/README.md).
 Headless QML coverage is tracked in
 [`apps/forge/gui/tests/FEATURE_COVERAGE.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/apps/forge/gui/tests/FEATURE_COVERAGE.md).
+
+### Why Settings has Save and Cancel
+
+Crucible's and Hearth's Settings apply each choice as it is made; this one has **Save** and
+**Cancel**, and keeps them. What holds it that way, in the code and the tests:
+
+- **Cancel is a contract.** The dialog edits a working copy of the values and writes it back on
+  Save, so Cancel and Esc leave every one of them as it was
+  (`TiersAndFlows::test_preferencesDialogSavesOnSaveAndDiscardsOnCancel`).
+- **Save does more than store.** It offers each changed default to the encode in hand, once, and
+  only for a field nothing has touched this session (the contract above, and
+  `test_preferencesDefaultsApplyOnSaveOnlyToUntouchedFields`). A control that wrote as it was
+  changed would make that offer at every step of the VBR-quality slider and every key typed into
+  the naming pattern, a pattern being meaningful only whole, with no moment at which the
+  person has finished.
+- **What already acts at once is an act, not a setting.** **Language** swaps the whole window's
+  text and layout direction and the language manager persists it itself, so there is nothing
+  left to cancel; **Save diagnostics…** and **About Forge…** do something and keep nothing.
 
 ## Next
 

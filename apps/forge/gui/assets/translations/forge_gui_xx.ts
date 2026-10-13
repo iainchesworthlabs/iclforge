@@ -24,8 +24,8 @@
             <translation>[VÉRSÎÕN ~~~]</translation>
         </message>
         <message>
-            <source>LICENSE</source>
-            <translation>[LÎCÉNSÉ ~~~]</translation>
+            <source>LICENCES</source>
+            <translation>[LÎCÉNCÉS ~~~]</translation>
         </message>
         <message>
             <source>ICL Forge is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see the &lt;a href="https://www.gnu.org/licenses/gpl-3.0.html"&gt;GNU General Public License&lt;/a&gt; for details.</source>
@@ -34,6 +34,10 @@
         <message>
             <source>Includes the Archivo typeface, licensed under the SIL Open Font License 1.1.</source>
             <translation>[Înclûdés thé Àrchîvõ typéfàcé, lîcénséd ûndér thé SÎL Õpén Fõnt Lîcénsé 1.1. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Licences…</source>
+            <translation>[Lîcéncés… ~~~~]</translation>
         </message>
         <message>
             <source>Close</source>
@@ -294,6 +298,10 @@
         <message>
             <source>Could not write %1: %2</source>
             <translation>[Cõûld nõt wrîté %1: %2 ~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository's LICENSE say what it ships.</source>
+            <translation>[Thîs bûîld càrrîés nõ émbéddéd nõtîcés fîlé (:/nõtîcés/NÕTÎCÉS.txt wàs nõt cõmpîléd în); thé NÕTÎCÉS.txt bésîdé thé àpplîcàtîõn ànd thé répõsîtõry's LÎCÉNSÉ sày whàt ît shîps. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
     </context>
     <context>
@@ -1458,6 +1466,21 @@
         </message>
     </context>
     <context>
+        <name>LicencesDialog</name>
+        <message>
+            <source>Third-party licences</source>
+            <translation>[Thîrd-pàrty lîcéncés ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>THIRD-PARTY LICENCES</source>
+            <translation>[THÎRD-PÀRTY LÎCÉNCÉS ~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>Close</source>
+            <translation>[Clõsé ~~]</translation>
+        </message>
+    </context>
+    <context>
         <name>LoudnessGroup</name>
         <message>
             <source>DRC profile</source>
@@ -1814,10 +1837,6 @@
             <translation>[Õpén stréàm… ~~~~~]</translation>
         </message>
         <message>
-            <source>Preferences</source>
-            <translation>[Préféréncés ~~~~]</translation>
-        </message>
-        <message>
             <source>About</source>
             <translation>[Àbõût ~~]</translation>
         </message>
@@ -2004,6 +2023,10 @@
         <message>
             <source>Save project…</source>
             <translation>[Sàvé prõjéct… ~~~~~]</translation>
+        </message>
+        <message>
+            <source>Settings</source>
+            <translation>[Séttîngs ~~~]</translation>
         </message>
         <message>
             <source>Where the sound comes from</source>
@@ -2986,8 +3009,8 @@
             <translation>[Àn éncõdé îs rûnnîng. Thé rûns strîp shõws îts prõgréss. ~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
-            <source>Encodes the loaded sources into the output folder set in Preferences. The runs strip reports the result.</source>
-            <translation>[Éncõdés thé lõàdéd sõûrcés întõ thé õûtpût fõldér sét în Préféréncés. Thé rûns strîp répõrts thé résûlt. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+            <source>Encodes the loaded sources into the output folder set in Settings. The runs strip reports the result.</source>
+            <translation>[Éncõdés thé lõàdéd sõûrcés întõ thé õûtpût fõldér sét în Séttîngs. Thé rûns strîp répõrts thé résûlt. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>obj %1 · %2</source>
@@ -3408,8 +3431,8 @@
             <translation>[Àll fîlés (*) ~~~~~]</translation>
         </message>
         <message>
-            <source>Preferences</source>
-            <translation>[Préféréncés ~~~~]</translation>
+            <source>Settings</source>
+            <translation>[Séttîngs ~~~]</translation>
         </message>
         <message>
             <source>APPEARANCE</source>
@@ -3682,6 +3705,10 @@
         <message>
             <source>Writes a plain-text support file where you choose. Nothing is sent anywhere.</source>
             <translation>[Wrîtés à plàîn-téxt sûppõrt fîlé whéré yõû chõõsé. Nõthîng îs sént ànywhéré. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>About Forge…</source>
+            <translation>[Àbõût Fõrgé… ~~~~~]</translation>
         </message>
         <message>
             <source>Cancel</source>

@@ -568,9 +568,9 @@ public:
         mime.setUrls(urls);
         const QPointF at = item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
         QWindow* window = item->window();
-        QDragEnterEvent enter(at.toPoint(), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+        QDragEnterEvent enter = drag_event<QDragEnterEvent>(at, &mime);
         QCoreApplication::sendEvent(window, &enter);
-        QDragMoveEvent move(at.toPoint(), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+        QDragMoveEvent move = drag_event<QDragMoveEvent>(at, &mime);
         QCoreApplication::sendEvent(window, &move);
         QDropEvent drop(at, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
         QCoreApplication::sendEvent(window, &drop);
@@ -578,6 +578,22 @@ public:
     }
 
 private:
+    // A drag event at `at`, copying `mime`. Qt 6.12 deprecates the QPoint
+    // constructors of QDragEnterEvent and QDragMoveEvent for QPointF ones,
+    // which the 6.8 kits Hearth still builds against do not have - and the
+    // deprecation is an error under this build's warnings-as-errors. Asking
+    // the type which constructor it has, in a template, keeps the QPoint call
+    // from being instantiated at all on a kit that deprecates it, with no
+    // version test to go stale.
+    template <class Event>
+    [[nodiscard]] static Event drag_event(QPointF at, const QMimeData* mime) {
+        if constexpr (requires { Event(at, Qt::CopyAction, mime, Qt::LeftButton, Qt::NoModifier); }) {
+            return Event(at, Qt::CopyAction, mime, Qt::LeftButton, Qt::NoModifier);
+        } else {
+            return Event(at.toPoint(), Qt::CopyAction, mime, Qt::LeftButton, Qt::NoModifier);
+        }
+    }
+
     [[nodiscard]] static QWindow* window_of(QObject* target) {
         if (auto* window = qobject_cast<QWindow*>(target)) {
             return window;

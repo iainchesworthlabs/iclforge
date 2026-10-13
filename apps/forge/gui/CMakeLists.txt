@@ -159,6 +159,7 @@ set(ICLFORGE_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/FirstRunScreen.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PreferencesDialog.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AboutDialog.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LicencesDialog.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/QcGateMeter.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/QcDialog.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ObjectInspectorDialog.qml"
@@ -255,6 +256,23 @@ qt_add_resources(forge-gui "forge_gui_icons"
     FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/iclforge-32.png"
         "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/theme/assets/icons/iclforge-256.png")
+
+# This build's third-party notices: the NOTICES.txt the package installs,
+# embedded as :/notices/NOTICES.txt so About > Licences... shows exactly what
+# this build ships (EncoderController::licenceNotices(), LicencesDialog.qml) -
+# the call apps/crucible and apps/hearth make for the same dialog.
+# notices/forge/notices.cmake writes the real file from the top-level scope,
+# after this directory, because it needs ICLFORGE_GUI_QT_VERSION from here. Qt
+# finalises this target's resources at the end of THIS scope, so a resource
+# added from there would be left out silently (apps/hearth/CMakeLists.txt found
+# that out with a real build): the file is created empty now and overwritten
+# later in this same configure, still well before ninja's rcc step reads it.
+set(ICLFORGE_FORGE_NOTICES_FILE "${CMAKE_BINARY_DIR}/notices/NOTICES.txt")
+file(WRITE "${ICLFORGE_FORGE_NOTICES_FILE}" "")
+qt_add_resources(forge-gui "forge_gui_notices"
+    PREFIX "/notices"
+    BASE "${CMAKE_BINARY_DIR}/notices"
+    FILES "${ICLFORGE_FORGE_NOTICES_FILE}")
 
 # ---------------------------------------------------------------------------
 # GUI localisation: lupdate (scan every source SOURCE_TARGETS' own target already

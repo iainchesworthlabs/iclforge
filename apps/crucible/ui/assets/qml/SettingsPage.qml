@@ -18,6 +18,10 @@ Flickable {
     readonly property real innerWidth: width - Theme.space6 * 2
     readonly property bool twoUp: innerWidth >= 1000
 
+    // About Crucible…: Main.qml opens the AboutDialog over the page, as it
+    // does for the header's ? and the tray menu's About.
+    signal showAbout()
+
     // Object names for the Qt Quick suites, which cannot drive a native
     // picker headless and accept a chosen file on the dialog itself
     // (ui/tests/qml/tst_settingsworkflow.qml).
@@ -606,6 +610,21 @@ Flickable {
                 Note {
                     visible: CrucibleLyrics.oscEnabled
                     text: qsTr("Each message begins with the application's name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line's number, text and times; /word the same for a word of a word-timed line; /position the song's place in milliseconds. Times are milliseconds from the start of the song.")
+                }
+            }
+
+            // About, reached from Settings in all three programs (Forge's
+            // Settings dialog and Hearth's Settings page have the same
+            // button): what this is, its version and build, and the licences.
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.space3
+                RailBlock { ordinal: "09"; label: qsTr("ABOUT"); Layout.fillWidth: true; Layout.fillHeight: false }
+                Note { text: qsTr("What this is, the version and build it came from, and the licences it carries.") }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: Theme.space2
+                    CrucibleButton { objectName: "settingsAboutButton"; text: qsTr("About Crucible…"); onClicked: page.showAbout() }
                 }
             }
         }

@@ -146,6 +146,14 @@ qt6_add_resources(forge_gui_qmltests "forge_gui_qmltests_translations"
     BASE "${CMAKE_CURRENT_BINARY_DIR}/tests"
     FILES ${ICLFORGE_GUI_TEST_QM_FILES})
 
+# The notices resource forge-gui embeds (../CMakeLists.txt, forge_gui_notices):
+# the same file, so a suite can hold About > Licences... to this build's own
+# NOTICES.txt as apps/crucible/ui/tests/CMakeLists.txt does for its dialog.
+qt6_add_resources(forge_gui_qmltests "forge_gui_qmltests_notices"
+    PREFIX "/notices"
+    BASE "${CMAKE_BINARY_DIR}/notices"
+    FILES "${ICLFORGE_FORGE_NOTICES_FILE}")
+
 # The standard Qt Quick Test hookup: QUICK_TEST_MAIN's generated main() reads
 # this macro to find the tst_*.qml files at run time. -input on the ctest
 # COMMAND line below is a second, redundant way to say the same thing -

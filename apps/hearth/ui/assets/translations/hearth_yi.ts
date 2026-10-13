@@ -4,57 +4,57 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="73"/>
+        <location filename="../qml/AboutDialog.qml" line="74"/>
         <source>built from %1</source>
         <translation>געבויט פֿון %1</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="82"/>
+        <location filename="../qml/AboutDialog.qml" line="83"/>
         <source>About Hearth</source>
         <translation>וועגן Hearth</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="101"/>
+        <location filename="../qml/AboutDialog.qml" line="102"/>
         <source>Hearth</source>
         <translation>Hearth</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="109"/>
+        <location filename="../qml/AboutDialog.qml" line="110"/>
         <source>WHAT IT DOES</source>
         <translation>וואָס עס טוט</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="111"/>
+        <location filename="../qml/AboutDialog.qml" line="112"/>
         <source>Plays AC-3, E-AC-3 and E-AC-3 JOC to a device on this computer, as a bitstream to a receiver, or to Hearth sinks and Sendspin players on the network, and shows what the decoder did with each stream. Part of the ICL Forge project: the decoder, the renderer and the Sendspin implementation are the library&apos;s.</source>
         <translation>שפּילט AC-3, E-AC-3 און E-AC-3 JOC אויף אַ מכשיר אין דעם קאָמפּיוטער, ווי אַ ביטסטרים צו אַ רעסיווער, אָדער צו Hearth־שפּילער און Sendspin־שפּילער אין נעץ, און ווײַזט וואָס דער דעקאָדער האָט געטאָן מיט יעדן סטרים. אַ טייל פֿון דעם ICL Forge פּראָיעקט: דער דעקאָדער, דער רענדערער און די Sendspin־אימפּלעמענטאַציע זענען פֿון דער ביבליאָטעק.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="118"/>
+        <location filename="../qml/AboutDialog.qml" line="119"/>
         <source>VERSION</source>
         <translation>ווערסיע</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="124"/>
+        <location filename="../qml/AboutDialog.qml" line="125"/>
         <source>LICENCES</source>
         <translation>ליצענצן</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="126"/>
+        <location filename="../qml/AboutDialog.qml" line="127"/>
         <source>Hearth and the iclforge library are free software under the GNU General Public License, version 3 or later; the full text is LICENSE.txt in the package. Dolby, Dolby Atmos and Dolby Digital Plus are trademarks of Dolby Laboratories; this is a clean-room implementation of published standards and is not affiliated with Dolby.</source>
         <translation>Hearth און די ביבליאָטעק iclforge זײַנען פֿרײַע סאָפֿטווער אונטער דער GNU General Public License, ווערסיע 3 אָדער שפּעטער; דער פֿולער טעקסט איז LICENSE.txt אין דעם פּעקל. Dolby, Dolby Atmos און Dolby Digital Plus זײַנען האַנדלס־מאַרקן פֿון Dolby Laboratories; דאָס איז אַ ריין־צימער־אימפּלעמענטאַציע פֿון פּובליקירטע סטאַנדאַרטן און איז נישט פֿאַרבונדן מיט Dolby.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="136"/>
+        <location filename="../qml/AboutDialog.qml" line="137"/>
         <source>Licences lists the third-party code in this build with each one&apos;s licence. The package carries the same text as NOTICES.txt.</source>
         <translation>„ליצענצן“ ווײַזט דעם קאָד פֿון דריטע צדדים אין דעם דאָזיקן בוי מיט דער ליצענץ פֿון יעדן. דאָס פּעקל טראָגט דעם זעלבן טעקסט ווי NOTICES.txt.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="150"/>
+        <location filename="../qml/AboutDialog.qml" line="151"/>
         <source>Licences…</source>
         <translation>ליצענצן…</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="151"/>
+        <location filename="../qml/AboutDialog.qml" line="152"/>
         <source>Close</source>
         <translation>פֿאַרמאַכן</translation>
     </message>
@@ -4939,306 +4939,321 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>Settings</name>
     <message>
-        <location filename="../qml/Settings.qml" line="35"/>
+        <location filename="../qml/Settings.qml" line="41"/>
         <source>Save diagnostics</source>
         <translation>היט אָפּ די דיאַגנאָסטיק</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="38"/>
+        <location filename="../qml/Settings.qml" line="44"/>
         <source>Text files (*.txt)</source>
         <translation>טעקסט־טעקעס (*.txt)</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="38"/>
+        <location filename="../qml/Settings.qml" line="44"/>
         <source>All files (*)</source>
         <translation>אַלע טעקעס (*)</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="67"/>
+        <location filename="../qml/Settings.qml" line="73"/>
         <source>Live diagnostics</source>
         <translation>לעבעדיקע דיאַגנאָסטיק</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="69"/>
+        <location filename="../qml/Settings.qml" line="75"/>
         <source>LIVE DIAGNOSTICS</source>
         <translation>לעבעדיקע דיאַגנאָסטיק</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="97"/>
+        <location filename="../qml/Settings.qml" line="103"/>
         <source>Close</source>
         <translation>פֿאַרמאַכן</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="135"/>
+        <location filename="../qml/Settings.qml" line="141"/>
         <source>Playback</source>
         <translation>אָפּשפּילן</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="141"/>
+        <location filename="../qml/Settings.qml" line="147"/>
         <source>Gapless between items</source>
         <translation>אָן שטילקייטן צווישן אײַטעמס</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="142"/>
+        <location filename="../qml/Settings.qml" line="148"/>
         <source>Keeps the output open from one item to the next when both have the same sample rate and speaker layout. When either changes, the output reopens and the queue says so.</source>
         <translation>האַלט דעם אַרויסגאַנג אָפֿן פֿון איין אײַטעם צום קומענדיקן ווען ביידע האָבן די זעלבע סאַמפּל־ראַטע און דעם זעלבן הילכער־אויסלייג. ווען איינע פֿון זיי ענדערט זיך, עפֿנט זיך דער אַרויסגאַנג ווידער און דער ריי זאָגט עס.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="152"/>
+        <location filename="../qml/Settings.qml" line="158"/>
         <source>Pick up the queue where it was left</source>
         <translation>פֿאָרזעצן דעם ריי וווּ ער איז געבליבן</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="153"/>
+        <location filename="../qml/Settings.qml" line="159"/>
         <source>On the next start, at the item and position playing when Hearth closed.</source>
         <translation>בײַם קומענדיקן אָנהייב, בײַם אײַטעם און דער פּאָזיציע וואָס האָבן געשפּילט ווען Hearth האָט זיך פֿאַרמאַכט.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="162"/>
+        <location filename="../qml/Settings.qml" line="168"/>
         <source>An item fails</source>
         <translation>אַן אײַטעם פֿאַלט דורך</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="169"/>
+        <location filename="../qml/Settings.qml" line="175"/>
         <source>When an item fails</source>
         <translation>ווען אַן אײַטעם פֿאַלט דורך</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="172"/>
+        <location filename="../qml/Settings.qml" line="178"/>
         <source>Skip to the next</source>
         <translation>איבערשפּרינגען צום קומענדיקן</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="173"/>
+        <location filename="../qml/Settings.qml" line="179"/>
         <source>Stop</source>
         <translation>אָפּשטעלן</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="186"/>
+        <location filename="../qml/Settings.qml" line="192"/>
         <source>Lyric delay</source>
         <translation>פֿאַרשפּעטונג פֿון די ווערטער</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="210"/>
+        <location filename="../qml/Settings.qml" line="216"/>
         <source>%1 ms</source>
         <translation>%1 ms</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="221"/>
+        <location filename="../qml/Settings.qml" line="227"/>
         <source>Reset</source>
         <extracomment>Button: set the lyric delay back to zero.</extracomment>
         <translation>צוריקשטעלן</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="232"/>
+        <location filename="../qml/Settings.qml" line="238"/>
         <source>Shows the lyrics later (+) or sooner (-) than the music, on top of the timing in the lyrics file. Nudge it when the words are off against this output.</source>
         <translation>ווײַזט די ווערטער שפּעטער (+) אָדער פֿריִער (-) ווי די מוזיק, אין צוגאָב צו דער צײַט אין דער ווערטער־טעקע. פֿאַרשטעלט עס ווען די ווערטער פּאַסן ניט צו דעם אַרויסגאַנג.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="244"/>
+        <location filename="../qml/Settings.qml" line="250"/>
         <source>Network</source>
         <translation>נעץ</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="251"/>
-        <location filename="../qml/Settings.qml" line="262"/>
+        <location filename="../qml/Settings.qml" line="257"/>
+        <location filename="../qml/Settings.qml" line="268"/>
         <source>Name</source>
         <translation>נאָמען</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="284"/>
+        <location filename="../qml/Settings.qml" line="290"/>
         <source>How sinks and players show this computer.</source>
         <translation>ווי שפּילער ווײַזן דעם דאָזיקן קאָמפּיוטער.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="294"/>
+        <location filename="../qml/Settings.qml" line="300"/>
         <source>Look for Sendspin players on this network</source>
         <translation>זוכן Sendspin־שפּילער אין דעם דאָזיקן נעץ</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="295"/>
+        <location filename="../qml/Settings.qml" line="301"/>
         <source>Over mDNS. Off, the Network page lists only players already paired.</source>
         <translation>דורך mDNS. אויס, רשימט דער נעץ־בלאַט נאָר שפּילער וואָס זענען שוין געפּאָרט.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="306"/>
+        <location filename="../qml/Settings.qml" line="312"/>
         <source>PAIRING RECORDS</source>
         <translation>פּאָרונג־רעקאָרדס</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="316"/>
+        <location filename="../qml/Settings.qml" line="322"/>
         <source>No sink or player has paired with this computer yet.</source>
         <translation>קיין שפּילער האָט זיך נאָך נישט געפּאָרט מיט דעם דאָזיקן קאָמפּיוטער.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="346"/>
+        <location filename="../qml/Settings.qml" line="352"/>
         <source>SINK OR PLAYER</source>
         <translation>שפּילער</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="354"/>
+        <location filename="../qml/Settings.qml" line="360"/>
         <source>PAIRED</source>
         <translation>געפּאָרט</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="395"/>
+        <location filename="../qml/Settings.qml" line="401"/>
         <source>paired %1</source>
         <translation>געפּאָרט אום %1</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="406"/>
+        <location filename="../qml/Settings.qml" line="412"/>
         <source>Forget</source>
         <extracomment>Button: forget this pairing record. The sink or player must pair again.</extracomment>
         <translation>פֿאַרגעסן</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="407"/>
+        <location filename="../qml/Settings.qml" line="413"/>
         <source>Forgets this pairing; it has to pair again with a new code.</source>
         <translation>פֿאַרגעסט די דאָזיקע פּאָרונג; ער דאַרף זיך ווידער פּאָרן מיט אַ נײַעם קאָד.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="424"/>
+        <location filename="../qml/Settings.qml" line="430"/>
         <source>Kept in this computer&apos;s settings folder, readable by your account only. Forgetting one means pairing again with a new code.</source>
         <translation>אָפּגעהיט אין דעם אײַנשטעלונג־פּאַפּקע פֿון דעם דאָזיקן קאָמפּיוטער, לייענבאַר נאָר פֿאַר אײַער קאָנטאָ. פֿאַרגעסן אײנעם מיינט זיך ווידער פּאָרן מיט אַ נײַעם קאָד.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="443"/>
+        <location filename="../qml/Settings.qml" line="449"/>
         <source>Appearance</source>
         <translation>אויסזען</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="450"/>
-        <location filename="../qml/Settings.qml" line="457"/>
+        <location filename="../qml/Settings.qml" line="456"/>
+        <location filename="../qml/Settings.qml" line="463"/>
         <source>Theme</source>
         <translation>טעמע</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="461"/>
-        <location filename="../qml/Settings.qml" line="488"/>
-        <location filename="../qml/Settings.qml" line="512"/>
-        <location filename="../qml/Settings.qml" line="545"/>
-        <location filename="../qml/Settings.qml" line="588"/>
+        <location filename="../qml/Settings.qml" line="467"/>
+        <location filename="../qml/Settings.qml" line="494"/>
+        <location filename="../qml/Settings.qml" line="518"/>
+        <location filename="../qml/Settings.qml" line="551"/>
+        <location filename="../qml/Settings.qml" line="594"/>
         <source>System</source>
         <extracomment>Option: follow the desktop&apos;s own setting.</extracomment>
         <translation>סיסטעם</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="462"/>
+        <location filename="../qml/Settings.qml" line="468"/>
         <source>Light</source>
         <translation>ליכטיק</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="463"/>
+        <location filename="../qml/Settings.qml" line="469"/>
         <source>Dark</source>
         <translation>טונקל</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="472"/>
-        <location filename="../qml/Settings.qml" line="479"/>
+        <location filename="../qml/Settings.qml" line="478"/>
+        <location filename="../qml/Settings.qml" line="485"/>
         <source>Palette</source>
         <translation>פּאַלעטע</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="483"/>
+        <location filename="../qml/Settings.qml" line="489"/>
         <source>Signal</source>
         <extracomment>Palette name. A product name: leave it as it is unless the language has an established rendering of its own.</extracomment>
         <translation>סיגנאַל</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="485"/>
+        <location filename="../qml/Settings.qml" line="491"/>
         <source>Ink</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>טינט</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="487"/>
+        <location filename="../qml/Settings.qml" line="493"/>
         <source>Console</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>קאָנסאָל</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="497"/>
-        <location filename="../qml/Settings.qml" line="505"/>
+        <location filename="../qml/Settings.qml" line="503"/>
+        <location filename="../qml/Settings.qml" line="511"/>
         <source>Text size</source>
         <translation>טעקסט־גרייס</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="523"/>
+        <location filename="../qml/Settings.qml" line="529"/>
         <source>Every size in the window follows this; 100% is the size it is drawn at. System takes the text size the desktop reports and counts 9 pt as 100%.</source>
         <translation>יעדע גרייס אין דעם פֿענצטער גייט נאָך דעם דאָזיקן; 100 % איז די גרייס אין וועלכער עס ווערט געצייכנט. סיסטעם נעמט די טעקסט־גרייס וואָס דער דעסקטאָפּ מעלדט און ציילט 9 pt ווי 100 %.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="534"/>
-        <location filename="../qml/Settings.qml" line="542"/>
+        <location filename="../qml/Settings.qml" line="540"/>
+        <location filename="../qml/Settings.qml" line="548"/>
         <source>Motion</source>
         <translation>באַוועגונג</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="546"/>
+        <location filename="../qml/Settings.qml" line="552"/>
         <source>Reduced</source>
         <translation>פֿאַרמינערט</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="547"/>
+        <location filename="../qml/Settings.qml" line="553"/>
         <source>Full</source>
         <translation>פֿול</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="558"/>
+        <location filename="../qml/Settings.qml" line="564"/>
         <source>Reduced draws the waiting mark as three still squares instead of a turning spinner. System follows the desktop&apos;s own setting for animation.</source>
         <translation>פֿאַרמינערט צייכנט דעם וואַרט־סימן ווי דרײַ שטילע קוואַדראַטן אַנשטאָט אַ דרייענדיקן קרײַז. סיסטעם גייט נאָך דער אַנימאַציע־אײַנשטעלונג פֿון דעם דעסקטאָפּ.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="569"/>
-        <location filename="../qml/Settings.qml" line="576"/>
-        <location filename="../qml/Settings.qml" line="592"/>
+        <location filename="../qml/Settings.qml" line="575"/>
+        <location filename="../qml/Settings.qml" line="582"/>
+        <location filename="../qml/Settings.qml" line="598"/>
         <source>Language</source>
         <translation>שפּראַך</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="620"/>
+        <location filename="../qml/Settings.qml" line="626"/>
         <source>System follows the language the desktop is set to. Applies at once. The translations are machine-made and have not been read by a speaker.</source>
         <translation>סיסטעם גייט נאָך דער שפּראַך אויף וועלכער דער דעסקטאָפּ איז אײַנגעשטעלט. ווירקט תיכּף. די איבערזעצונגען זײַנען מאַשין־געמאַכט און קיין רעדער האָט זיי נישט איבערגעלייענט.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="631"/>
+        <location filename="../qml/Settings.qml" line="637"/>
         <source>Diagnostics</source>
         <translation>דיאַגנאָסטיק</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="636"/>
+        <location filename="../qml/Settings.qml" line="642"/>
         <source>A text file of what Hearth has done: outputs opened, streams played, sinks found and paired, and every error. Pairing keys, codes and file paths are left out.</source>
         <translation>אַ טעקסט־טעקע פֿון וואָס Hearth האָט געטאָן: אַרויסגאַנגען געעפֿנט, סטרימס געשפּילט, שפּילער געפֿונען און געפּאָרט, און יעדער פֿעלער. פּאָרונג־שליסלען, קאָדן און טעקע־וועגן ווערן אויסגעלאָזט.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="648"/>
+        <location filename="../qml/Settings.qml" line="654"/>
         <source>Save diagnostics…</source>
         <translation>היט אָפּ די דיאַגנאָסטיק…</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="649"/>
+        <location filename="../qml/Settings.qml" line="655"/>
         <source>Writes a plain-text support file where you choose. Nothing is sent anywhere.</source>
         <translation>שרײַבט אַ פּשוט־טעקסט שטיצע־טעקע וווּ איר קלײַבט אויס. גאָרנישט ווערט ניט געשיקט ערגעץ.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="657"/>
+        <location filename="../qml/Settings.qml" line="663"/>
         <source>View live…</source>
         <translation>ווײַזן לעבעדיק…</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="658"/>
+        <location filename="../qml/Settings.qml" line="664"/>
         <source>Opens the same report in a window that keeps itself up to date. Nothing is sent anywhere.</source>
         <translation>עפֿנט דעם זעלבן באַריכט אין אַ פֿענצטער וואָס האַלט זיך אַליין אַקטועל. גאָרנישט ווערט ניט געשיקט ערגעץ.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="663"/>
+        <location filename="../qml/Settings.qml" line="669"/>
         <source>Copy diagnostics</source>
         <translation>קאָפּירן די דיאַגנאָסטיק</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="664"/>
+        <location filename="../qml/Settings.qml" line="670"/>
         <source>Copies the same report to the clipboard. Nothing is sent anywhere.</source>
         <translation>קאָפּירט דעם זעלבן באַריכט אין דער קליפּבאָרד. גאָרנישט ווערט ניט געשיקט ערגעץ.</translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="702"/>
+        <source>About</source>
+        <translation>וועגן</translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="707"/>
+        <source>What this is, the version and build it came from, and the licences it carries.</source>
+        <translation>וואָס דאָס איז, די ווערסיע און דער בוי פֿון וואַנען עס איז געקומען, און די ליצענצן וואָס עס טראָגט.</translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="714"/>
+        <source>About Hearth…</source>
+        <translation>וועגן Hearth…</translation>
     </message>
 </context>
 <context>

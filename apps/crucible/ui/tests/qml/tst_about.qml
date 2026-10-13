@@ -64,6 +64,22 @@ TestCase {
                 "the Qt Quick 3D section follows has3D");
     }
 
+    // The page's About block asks, Main.qml opens: the same dialog the header's
+    // ? and the tray menu open, with the same Licences… beneath it.
+    function test_aboutOpensFromTheSettingsPage() {
+        const window = createTemporaryObject(shell, testCase);
+        verify(window);
+        tryCompare(window, "visible", true);
+        window.page = "settings";
+        const button = findChild(window, "settingsAboutButton");
+        verify(button, "the Settings page has an About button");
+        verify(!window.aboutDialog.opened);
+        button.clicked();
+        tryCompare(window.aboutDialog, "opened", true);
+        window.aboutDialog.close();
+        tryCompare(window.aboutDialog, "opened", false);
+    }
+
     function test_licencesOpenFromAbout() {
         const window = createTemporaryObject(shell, testCase);
         verify(window);

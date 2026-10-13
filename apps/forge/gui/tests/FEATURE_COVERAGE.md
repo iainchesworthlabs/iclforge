@@ -254,11 +254,13 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | Amp destination encodes directly | UI | UI | GuidedWizard::test_ampDestinationEncodesDirectlyAndThreadsItsDevicePick |
 | The wizard's Next button stays on screen and its scroll area exists | logic | logic | SweepConformance::test_guidedFooterStaysOnScreen |
 
-## Preferences, about, first run, shell
+## Settings, about, first run, shell
+
+The dialog is called Settings; the case names and the object names (`prefs*`) keep the name they were written with.
 
 | Feature | Before | Now | Test case(s) |
 |---|---|---|---|
-| Preferences Save / Cancel | UI | UI | TiersAndFlows::test_preferencesDialogSavesOnSaveAndDiscardsOnCancel |
+| Settings Save / Cancel | UI | UI | TiersAndFlows::test_preferencesDialogSavesOnSaveAndDiscardsOnCancel |
 | Palette / theme | logic | logic | ThemePalettes::* (sets the dialog's choice, then presses Save) |
 | Text size | logic | logic | Keyboard::test_textSizeSettingReachesTheTheme |
 | Motion (System / Reduced / Full): working copy, Save applies it to Theme, Cancel discards it, the choice wins over the system's | none | UI | ThemePalettes::test_prefsMotionRoundTripsAndAppliesOnSave |
@@ -272,6 +274,9 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | Output folder chooser / Reset | none | none | FolderDialog. Same seam would work, but no case. |
 | Meters show (mode), monitor button, clip latch | UI/logic | UI/logic | ClipLatch::test_clipLatchStaysLitUntilClickedOrANewTransportStarts (UI); meter mode: none |
 | About dialog shows version, closes | none | UI | E2eSettings::test_aboutDialogShowsTheBuildsVersionAndCloses |
+| About says LICENCES, names the repository (a link) and opens Licences… over itself | none | UI | E2eSettings::test_aboutHeadsTheLicencesNamesTheRepositoryAndOpensTheNotices |
+| Licences text is this build's embedded NOTICES.txt, and not the fallback sentence | none | UI | E2eSettings::test_licenceNoticesAreThisBuildsEmbeddedFile, test_aboutHeadsTheLicencesNamesTheRepositoryAndOpensTheNotices |
+| Settings is called Settings; its About Forge… opens About over it and Cancel still cancels | none | UI | E2eSettings::test_settingsDialogIsCalledSettingsAndReachesAbout |
 | Window floor, header accessibility | logic | logic | MainShell::* |
 | Keyboard tab chain / focus ring / names | logic | logic | Keyboard::*, Accessibility::* |
 | Themes / palettes | logic | logic | ThemePalettes::* |

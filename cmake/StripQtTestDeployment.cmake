@@ -1,9 +1,12 @@
 # ---------------------------------------------------------------------------
-# Install-time removal of Qt's test module from a packaged application.
+# Install-time removal of Qt's test module from a packaged application, and
+# of Quick 3D's leftovers from one that does not carry Quick 3D (the second
+# job - see "SECOND JOB" below).
 #
 # Run with install(SCRIPT) immediately AFTER the qt_generate_deploy_qml_app_script()
 # script of the target it belongs to (apps/crucible/CMakeLists.txt,
-# apps/forge/gui/CMakeLists.txt), so it deletes what that script has just written.
+# apps/forge/gui/CMakeLists.txt, apps/hearth/ui/CMakeLists.txt), so it deletes
+# what that script has just written.
 #
 # WHY THIS EXISTS
 #
@@ -58,6 +61,31 @@
 # free to put the payload back silently - deleting the deployed copy is the
 # surgical fix. tools/ci/check_crucible_package.py asserts the absence on the
 # Crucible zip in CI, so this staying wired is checked rather than assumed.
+#
+# SECOND JOB: QUICK 3D'S PROFILER BACKEND AND UTILITY LIBRARY
+#
+# Measured 2026-10-13 against the Qt 6.12.0 kit and the Hearth zip built from
+# it (the same import is in the 6.8.3 kit). windeployqt deploys EVERY plugin
+# in the kit's plugins/qmltooling/ - they are loaded for QML debugging and
+# profiling - and one of them, qmldbg_quick3dprofiler.dll, imports
+# Qt6Quick3DUtils.dll. That library holds third-party code (meshoptimizer and
+# xatlas, both MIT: the Quick3DUtils entries of the kit's sbom/*.spdx). So an
+# application with no Quick 3D in it - Hearth, forge-gui - shipped a
+# debugging plugin it never loads, and a DLL nothing else imports, carrying
+# code whose licence needs its notice in the package. The Quick 3D notice
+# section (notices/fragments/qt-quick3d.txt) is Crucible's, written for "the
+# room's 3D view", and would be false in either of the other two.
+#
+# Removal rather than a notice, for the reason given above for Qt Test: the
+# plugin profiles Quick 3D rendering, which these applications do not have,
+# and the library's only importer is that plugin (checked by dumpbin /dependents
+# over every DLL in the Hearth zip). The test for "carries no Quick 3D" is the
+# package's own content - no Qt6Quick3D.dll beside the application - rather
+# than a flag from each caller, which would need the same variable-crossing
+# install(CODE) trick as the macOS bundle name below, for no gain. Crucible
+# does carry Qt6Quick3D.dll, which imports the library itself, so it keeps
+# both, and its package has the notice.
+# tools/ci/check_hearth_package.py asserts the absence on Hearth's package.
 #
 # Windows AND macOS: both platforms' packages carry their own Qt (Linux finds
 # the system's, so this file never runs there - apps/forge/gui's and apps/crucible's
@@ -170,6 +198,24 @@ if(EXISTS "${_iclforge_prefix}/qml/QtTest")
     file(REMOVE_RECURSE "${_iclforge_prefix}/qml/QtTest")
 endif()
 
+# The second job (see the header): Quick 3D's profiler backend and its utility
+# library, in a package that carries no Quick 3D. Qt6Quick3D.dll beside the
+# application is what says the module is there at all (Crucible's room).
+if(NOT EXISTS "${_iclforge_prefix}/bin/Qt6Quick3D.dll"
+   AND NOT EXISTS "${_iclforge_prefix}/bin/Qt6Quick3Dd.dll")
+    set(_iclforge_quick3d_leftovers
+        "${_iclforge_prefix}/plugins/qmltooling/qmldbg_quick3dprofiler.dll"
+        "${_iclforge_prefix}/plugins/qmltooling/qmldbg_quick3dprofilerd.dll"
+        "${_iclforge_prefix}/bin/Qt6Quick3DUtils.dll"
+        "${_iclforge_prefix}/bin/Qt6Quick3DUtilsd.dll")
+    foreach(_iclforge_file IN LISTS _iclforge_quick3d_leftovers)
+        if(EXISTS "${_iclforge_file}")
+            message(STATUS "Removing Quick 3D's leftovers from a package without Quick 3D: ${_iclforge_file}")
+            file(REMOVE "${_iclforge_file}")
+        endif()
+    endforeach()
+endif()
+
 # macOS: _iclforge_macos_bundle_name arrives via an install(CODE) set() just
 # before this file's install(SCRIPT) - see the header comment for why that is
 # the only way this file learns the bundle's name at all, and only DEFINED on
@@ -203,6 +249,26 @@ if(APPLE AND DEFINED _iclforge_macos_bundle_name)
             file(REMOVE_RECURSE "${_iclforge_macos_framework_path}")
         endif()
     endforeach()
+
+    # The second job (see the header), in a bundle's shape: Contents/PlugIns/
+    # qmltooling/ for the plugin, Contents/Frameworks/QtQuick3DUtils.framework
+    # for the library, and QtQuick3D.framework present is what says the bundle
+    # carries Quick 3D. Not measured against a macOS artifact - the Windows
+    # shape above is - these are Qt's own layout for the two files, the same
+    # belt-and-braces footing as the QtTest frameworks above, and EXISTS OR
+    # IS_SYMLINK for the same dangling-symlink reason.
+    set(_iclforge_macos_quick3d "${_iclforge_macos_bundle}/Contents/Frameworks/QtQuick3D.framework")
+    if(NOT EXISTS "${_iclforge_macos_quick3d}" AND NOT IS_SYMLINK "${_iclforge_macos_quick3d}")
+        foreach(_iclforge_macos_leftover IN ITEMS
+                "Contents/PlugIns/qmltooling/libqmldbg_quick3dprofiler.dylib"
+                "Contents/Frameworks/QtQuick3DUtils.framework")
+            set(_iclforge_macos_leftover_path "${_iclforge_macos_bundle}/${_iclforge_macos_leftover}")
+            if(EXISTS "${_iclforge_macos_leftover_path}" OR IS_SYMLINK "${_iclforge_macos_leftover_path}")
+                message(STATUS "Removing Quick 3D's leftovers from a package without Quick 3D: ${_iclforge_macos_leftover_path}")
+                file(REMOVE_RECURSE "${_iclforge_macos_leftover_path}")
+            endif()
+        endforeach()
+    endif()
 endif()
 
 # unset(_iclforge_macos_bundle_name) here is not just the same tidiness as the
@@ -221,6 +287,10 @@ endif()
 # directory's install(SCRIPT) later in the same install.
 unset(_iclforge_file)
 unset(_iclforge_qt_test_files)
+unset(_iclforge_quick3d_leftovers)
+unset(_iclforge_macos_quick3d)
+unset(_iclforge_macos_leftover)
+unset(_iclforge_macos_leftover_path)
 unset(_iclforge_macos_bundle)
 unset(_iclforge_macos_plugin)
 unset(_iclforge_macos_framework)

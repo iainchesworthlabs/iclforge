@@ -1013,10 +1013,11 @@ run by anyone here**; see below.
       sound hardware rather than what has a window. It says *both* halves — listed while macOS
       holds sound open for it, greyed while nothing is coming out — and claims nothing about how
       long a paused player lingers, because that is exactly the thing one launch would settle
-      and no launch has happened. The macOS 14.0 floor is a real runtime gate
-      (`__builtin_available`, the shape `system_audio_tap_api_available()` already uses), since
-      the deployment target is 13.3; below it the list is empty and the rule says why rather
-      than leaving an empty room unexplained. An application's identity comes from the
+      and no launch has happened. The macOS 14.0 floor is a runtime gate
+      (`__builtin_available`, the shape `system_audio_tap_api_available()` already uses) that
+      was real while the deployment target was 13.3; below it the list is empty and the rule says
+      why rather than leaving an empty room unexplained. The target is 14.4 now (Qt 6.12's
+      floor), so no Mac takes that branch, and the gate is kept rather than removed. An application's identity comes from the
       *outermost* `.app` bundle its executable lies in, which is what puts a browser's audio
       helper in the room as the browser: Windows' same-image process walk finds nothing here,
       because the helper is a different binary with a different name inside the same bundle.

@@ -24,6 +24,7 @@ TestCase {
     height: 820
 
     Component { id: settingsPage; SettingsPage { width: 1480; height: 780 } }
+    Component { id: spyComponent; SignalSpy {} }
 
     function init() {
         CrucibleController.stop();
@@ -226,6 +227,22 @@ TestCase {
     }
 
     // --- behaviour ----------------------------------------------------------------
+
+    // About is reached from Settings, as it is in Forge and Hearth. The page
+    // owns no dialog (Main.qml owns the one the header's ? and the tray also
+    // open), so its block is a button that asks for it; tst_about.qml's
+    // test_aboutOpensFromTheSettingsPage holds the window's side of that.
+    function test_theAboutBlockAsksForTheAboutDialog() {
+        const page = makePage();
+        const asked = createTemporaryObject(spyComponent, testCase,
+                                            { target: page, signalName: "showAbout" });
+        verify(asked.valid, "the page declares showAbout()");
+        const button = findChild(page, "settingsAboutButton");
+        verify(button, "the page carries an About button");
+        compare(button.text, "About Crucible…");
+        click(button);
+        compare(asked.count, 1);
+    }
 
     function test_behaviourChecksAreStored() {
         const page = makePage();

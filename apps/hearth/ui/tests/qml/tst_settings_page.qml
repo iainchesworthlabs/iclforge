@@ -24,6 +24,7 @@ TestCase {
     height: 1600
 
     Component { id: settingsComponent; Settings { width: 1200; height: 1600 } }
+    Component { id: spyComponent; SignalSpy {} }
 
     function initTestCase() {
         HearthController.start();
@@ -189,6 +190,21 @@ TestCase {
     // above steers around it by checking only the title line.
     function withoutWrittenLine(report) {
         return report.split("\n").filter(function(line) { return !line.startsWith("written: "); }).join("\n");
+    }
+
+    // About is reached from Settings, as it is in Forge and Crucible. The page
+    // owns no dialog (Main.qml owns the one the keyboard reference's About...
+    // also opens), so its card's button asks for it; tst_dialogs.qml's
+    // test_settingsAboutOpensAboutAndItsLicences holds the window's side.
+    function test_aboutCardAsksForTheAboutDialog() {
+        const page = makePage();
+        const asked = createTemporaryObject(spyComponent, testCase,
+                                            { target: page, signalName: "showAbout" });
+        verify(asked.valid, "Settings declares showAbout()");
+        const button = findChild(page, "settingsAboutButton");
+        compare(button.text, "About Hearth…");
+        click(button, "About Hearth...");
+        compare(asked.count, 1);
     }
 
     function test_copyDiagnosticsPutsTheReportOnTheClipboard() {

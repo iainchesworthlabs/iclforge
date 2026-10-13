@@ -4,57 +4,57 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="73"/>
+        <location filename="../qml/AboutDialog.qml" line="74"/>
         <source>built from %1</source>
         <translation>construit à partir de&#xa0;%1</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="82"/>
+        <location filename="../qml/AboutDialog.qml" line="83"/>
         <source>About Hearth</source>
         <translation>À propos de Hearth</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="101"/>
+        <location filename="../qml/AboutDialog.qml" line="102"/>
         <source>Hearth</source>
         <translation>Hearth</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="109"/>
+        <location filename="../qml/AboutDialog.qml" line="110"/>
         <source>WHAT IT DOES</source>
         <translation>CE QUE C&apos;EST</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="111"/>
+        <location filename="../qml/AboutDialog.qml" line="112"/>
         <source>Plays AC-3, E-AC-3 and E-AC-3 JOC to a device on this computer, as a bitstream to a receiver, or to Hearth sinks and Sendspin players on the network, and shows what the decoder did with each stream. Part of the ICL Forge project: the decoder, the renderer and the Sendspin implementation are the library&apos;s.</source>
         <translation>Lit l&apos;AC-3, l&apos;E-AC-3 et l&apos;E-AC-3 JOC sur un périphérique de cet ordinateur, sous forme de bitstream vers un récepteur, ou vers des lecteurs Hearth et des lecteurs Sendspin du réseau, et montre ce que le décodeur a fait de chaque flux. Fait partie du projet ICL Forge&#xa0;: le décodeur, le moteur de rendu et l&apos;implémentation de Sendspin sont ceux de la bibliothèque.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="118"/>
+        <location filename="../qml/AboutDialog.qml" line="119"/>
         <source>VERSION</source>
         <translation>VERSION</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="124"/>
+        <location filename="../qml/AboutDialog.qml" line="125"/>
         <source>LICENCES</source>
         <translation>LICENCES</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="126"/>
+        <location filename="../qml/AboutDialog.qml" line="127"/>
         <source>Hearth and the iclforge library are free software under the GNU General Public License, version 3 or later; the full text is LICENSE.txt in the package. Dolby, Dolby Atmos and Dolby Digital Plus are trademarks of Dolby Laboratories; this is a clean-room implementation of published standards and is not affiliated with Dolby.</source>
         <translation>Hearth et la bibliothèque iclforge sont des logiciels libres sous licence GNU General Public License, version 3 ou ultérieure&#xa0;; le texte complet est LICENSE.txt dans le paquet. Dolby, Dolby Atmos et Dolby Digital Plus sont des marques de Dolby Laboratories&#xa0;; ceci est une implémentation clean-room de normes publiées, sans affiliation avec Dolby.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="136"/>
+        <location filename="../qml/AboutDialog.qml" line="137"/>
         <source>Licences lists the third-party code in this build with each one&apos;s licence. The package carries the same text as NOTICES.txt.</source>
         <translation>Licences énumère le code tiers de cette version avec la licence de chacun. Le paquet porte le même texte sous le nom NOTICES.txt.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="150"/>
+        <location filename="../qml/AboutDialog.qml" line="151"/>
         <source>Licences…</source>
         <translation>Licences…</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="151"/>
+        <location filename="../qml/AboutDialog.qml" line="152"/>
         <source>Close</source>
         <translation>Fermer</translation>
     </message>
@@ -4939,306 +4939,321 @@ Déposez ici des fichiers AC-3, E-AC-3 ou AC-4 (bruts, MP4, Matroska ou MPEG-TS)
 <context>
     <name>Settings</name>
     <message>
-        <location filename="../qml/Settings.qml" line="35"/>
+        <location filename="../qml/Settings.qml" line="41"/>
         <source>Save diagnostics</source>
         <translation>Enregistrer les diagnostics</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="38"/>
+        <location filename="../qml/Settings.qml" line="44"/>
         <source>Text files (*.txt)</source>
         <translation>Fichiers texte (*.txt)</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="38"/>
+        <location filename="../qml/Settings.qml" line="44"/>
         <source>All files (*)</source>
         <translation>Tous les fichiers (*)</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="67"/>
+        <location filename="../qml/Settings.qml" line="73"/>
         <source>Live diagnostics</source>
         <translation>Diagnostics en direct</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="69"/>
+        <location filename="../qml/Settings.qml" line="75"/>
         <source>LIVE DIAGNOSTICS</source>
         <translation>DIAGNOSTICS EN DIRECT</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="97"/>
+        <location filename="../qml/Settings.qml" line="103"/>
         <source>Close</source>
         <translation>Fermer</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="135"/>
+        <location filename="../qml/Settings.qml" line="141"/>
         <source>Playback</source>
         <translation>Lecture</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="141"/>
+        <location filename="../qml/Settings.qml" line="147"/>
         <source>Gapless between items</source>
         <translation>Sans interruption entre les éléments</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="142"/>
+        <location filename="../qml/Settings.qml" line="148"/>
         <source>Keeps the output open from one item to the next when both have the same sample rate and speaker layout. When either changes, the output reopens and the queue says so.</source>
         <translation>Garde la sortie ouverte d&apos;un élément au suivant lorsque les deux ont la même fréquence d&apos;échantillonnage et la même disposition de haut-parleurs. Lorsque l&apos;une des deux change, la sortie se rouvre et la file d&apos;attente l&apos;indique.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="152"/>
+        <location filename="../qml/Settings.qml" line="158"/>
         <source>Pick up the queue where it was left</source>
         <translation>Reprendre la file d&apos;attente là où elle était restée</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="153"/>
+        <location filename="../qml/Settings.qml" line="159"/>
         <source>On the next start, at the item and position playing when Hearth closed.</source>
         <translation>Au prochain démarrage, à l&apos;élément et à la position en cours de lecture à la fermeture de Hearth.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="162"/>
+        <location filename="../qml/Settings.qml" line="168"/>
         <source>An item fails</source>
         <translation>Un élément échoue</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="169"/>
+        <location filename="../qml/Settings.qml" line="175"/>
         <source>When an item fails</source>
         <translation>Lorsqu&apos;un élément échoue</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="172"/>
+        <location filename="../qml/Settings.qml" line="178"/>
         <source>Skip to the next</source>
         <translation>Passer au suivant</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="173"/>
+        <location filename="../qml/Settings.qml" line="179"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="186"/>
+        <location filename="../qml/Settings.qml" line="192"/>
         <source>Lyric delay</source>
         <translation>Décalage des paroles</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="210"/>
+        <location filename="../qml/Settings.qml" line="216"/>
         <source>%1 ms</source>
         <translation>%1 ms</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="221"/>
+        <location filename="../qml/Settings.qml" line="227"/>
         <source>Reset</source>
         <extracomment>Button: set the lyric delay back to zero.</extracomment>
         <translation>Réinitialiser</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="232"/>
+        <location filename="../qml/Settings.qml" line="238"/>
         <source>Shows the lyrics later (+) or sooner (-) than the music, on top of the timing in the lyrics file. Nudge it when the words are off against this output.</source>
         <translation>Affiche les paroles plus tard (+) ou plus tôt (-) que la musique, en plus du minutage du fichier de paroles. Ajustez-le lorsque les mots sont décalés par rapport à cette sortie.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="244"/>
+        <location filename="../qml/Settings.qml" line="250"/>
         <source>Network</source>
         <translation>Réseau</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="251"/>
-        <location filename="../qml/Settings.qml" line="262"/>
+        <location filename="../qml/Settings.qml" line="257"/>
+        <location filename="../qml/Settings.qml" line="268"/>
         <source>Name</source>
         <translation>Nom</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="284"/>
+        <location filename="../qml/Settings.qml" line="290"/>
         <source>How sinks and players show this computer.</source>
         <translation>La façon dont les lecteurs affichent cet ordinateur.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="294"/>
+        <location filename="../qml/Settings.qml" line="300"/>
         <source>Look for Sendspin players on this network</source>
         <translation>Chercher des lecteurs Sendspin sur ce réseau</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="295"/>
+        <location filename="../qml/Settings.qml" line="301"/>
         <source>Over mDNS. Off, the Network page lists only players already paired.</source>
         <translation>Via mDNS. Désactivé, la page Réseau ne liste que les lecteurs déjà appairés.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="306"/>
+        <location filename="../qml/Settings.qml" line="312"/>
         <source>PAIRING RECORDS</source>
         <translation>ENREGISTREMENTS D&apos;APPAIRAGE</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="316"/>
+        <location filename="../qml/Settings.qml" line="322"/>
         <source>No sink or player has paired with this computer yet.</source>
         <translation>Aucun lecteur ne s&apos;est encore appairé avec cet ordinateur.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="346"/>
+        <location filename="../qml/Settings.qml" line="352"/>
         <source>SINK OR PLAYER</source>
         <translation>LECTEUR</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="354"/>
+        <location filename="../qml/Settings.qml" line="360"/>
         <source>PAIRED</source>
         <translation>APPAIRÉ</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="395"/>
+        <location filename="../qml/Settings.qml" line="401"/>
         <source>paired %1</source>
         <translation>appairé le&#xa0;%1</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="406"/>
+        <location filename="../qml/Settings.qml" line="412"/>
         <source>Forget</source>
         <extracomment>Button: forget this pairing record. The sink or player must pair again.</extracomment>
         <translation>Oublier</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="407"/>
+        <location filename="../qml/Settings.qml" line="413"/>
         <source>Forgets this pairing; it has to pair again with a new code.</source>
         <translation>Oublie cet appairage&#xa0;; il devra s&apos;appairer de nouveau avec un nouveau code.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="424"/>
+        <location filename="../qml/Settings.qml" line="430"/>
         <source>Kept in this computer&apos;s settings folder, readable by your account only. Forgetting one means pairing again with a new code.</source>
         <translation>Conservés dans le dossier de réglages de cet ordinateur, lisibles uniquement par votre compte. En oublier un oblige à s&apos;appairer de nouveau avec un nouveau code.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="443"/>
+        <location filename="../qml/Settings.qml" line="449"/>
         <source>Appearance</source>
         <translation>Apparence</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="450"/>
-        <location filename="../qml/Settings.qml" line="457"/>
+        <location filename="../qml/Settings.qml" line="456"/>
+        <location filename="../qml/Settings.qml" line="463"/>
         <source>Theme</source>
         <translation>Thème</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="461"/>
-        <location filename="../qml/Settings.qml" line="488"/>
-        <location filename="../qml/Settings.qml" line="512"/>
-        <location filename="../qml/Settings.qml" line="545"/>
-        <location filename="../qml/Settings.qml" line="588"/>
+        <location filename="../qml/Settings.qml" line="467"/>
+        <location filename="../qml/Settings.qml" line="494"/>
+        <location filename="../qml/Settings.qml" line="518"/>
+        <location filename="../qml/Settings.qml" line="551"/>
+        <location filename="../qml/Settings.qml" line="594"/>
         <source>System</source>
         <extracomment>Option: follow the desktop&apos;s own setting.</extracomment>
         <translation>Système</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="462"/>
+        <location filename="../qml/Settings.qml" line="468"/>
         <source>Light</source>
         <translation>Clair</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="463"/>
+        <location filename="../qml/Settings.qml" line="469"/>
         <source>Dark</source>
         <translation>Sombre</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="472"/>
-        <location filename="../qml/Settings.qml" line="479"/>
+        <location filename="../qml/Settings.qml" line="478"/>
+        <location filename="../qml/Settings.qml" line="485"/>
         <source>Palette</source>
         <translation>Palette</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="483"/>
+        <location filename="../qml/Settings.qml" line="489"/>
         <source>Signal</source>
         <extracomment>Palette name. A product name: leave it as it is unless the language has an established rendering of its own.</extracomment>
         <translation>Signal</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="485"/>
+        <location filename="../qml/Settings.qml" line="491"/>
         <source>Ink</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>Encre</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="487"/>
+        <location filename="../qml/Settings.qml" line="493"/>
         <source>Console</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>Console</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="497"/>
-        <location filename="../qml/Settings.qml" line="505"/>
+        <location filename="../qml/Settings.qml" line="503"/>
+        <location filename="../qml/Settings.qml" line="511"/>
         <source>Text size</source>
         <translation>Taille du texte</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="523"/>
+        <location filename="../qml/Settings.qml" line="529"/>
         <source>Every size in the window follows this; 100% is the size it is drawn at. System takes the text size the desktop reports and counts 9 pt as 100%.</source>
         <translation>Toutes les tailles de la fenêtre suivent ce réglage&#xa0;; 100&#xa0;% est la taille à laquelle elle est dessinée. Système reprend la taille de texte indiquée par le bureau et compte 9 pt comme 100&#xa0;%.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="534"/>
-        <location filename="../qml/Settings.qml" line="542"/>
+        <location filename="../qml/Settings.qml" line="540"/>
+        <location filename="../qml/Settings.qml" line="548"/>
         <source>Motion</source>
         <translation>Mouvement</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="546"/>
+        <location filename="../qml/Settings.qml" line="552"/>
         <source>Reduced</source>
         <translation>Réduit</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="547"/>
+        <location filename="../qml/Settings.qml" line="553"/>
         <source>Full</source>
         <translation>Complet</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="558"/>
+        <location filename="../qml/Settings.qml" line="564"/>
         <source>Reduced draws the waiting mark as three still squares instead of a turning spinner. System follows the desktop&apos;s own setting for animation.</source>
         <translation>Réduit dessine l&apos;indicateur d&apos;attente sous la forme de trois carrés fixes au lieu d&apos;un cercle qui tourne. Système suit le réglage d&apos;animation du bureau.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="569"/>
-        <location filename="../qml/Settings.qml" line="576"/>
-        <location filename="../qml/Settings.qml" line="592"/>
+        <location filename="../qml/Settings.qml" line="575"/>
+        <location filename="../qml/Settings.qml" line="582"/>
+        <location filename="../qml/Settings.qml" line="598"/>
         <source>Language</source>
         <translation>Langue</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="620"/>
+        <location filename="../qml/Settings.qml" line="626"/>
         <source>System follows the language the desktop is set to. Applies at once. The translations are machine-made and have not been read by a speaker.</source>
         <translation>Système suit la langue configurée sur le bureau. S&apos;applique immédiatement. Les traductions sont faites par machine et n&apos;ont pas été relues par un locuteur.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="631"/>
+        <location filename="../qml/Settings.qml" line="637"/>
         <source>Diagnostics</source>
         <translation>Diagnostics</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="636"/>
+        <location filename="../qml/Settings.qml" line="642"/>
         <source>A text file of what Hearth has done: outputs opened, streams played, sinks found and paired, and every error. Pairing keys, codes and file paths are left out.</source>
         <translation>Un fichier texte de ce que Hearth a fait&#xa0;: sorties ouvertes, flux lus, lecteurs trouvés et appairés, et chaque erreur. Les clés d&apos;appairage, les codes et les chemins de fichiers en sont exclus.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="648"/>
+        <location filename="../qml/Settings.qml" line="654"/>
         <source>Save diagnostics…</source>
         <translation>Enregistrer les diagnostics…</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="649"/>
+        <location filename="../qml/Settings.qml" line="655"/>
         <source>Writes a plain-text support file where you choose. Nothing is sent anywhere.</source>
         <translation>Écrit un fichier d&apos;assistance en texte brut à l&apos;endroit que vous choisissez. Rien n&apos;est envoyé nulle part.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="657"/>
+        <location filename="../qml/Settings.qml" line="663"/>
         <source>View live…</source>
         <translation>Afficher en direct…</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="658"/>
+        <location filename="../qml/Settings.qml" line="664"/>
         <source>Opens the same report in a window that keeps itself up to date. Nothing is sent anywhere.</source>
         <translation>Ouvre le même rapport dans une fenêtre qui se met à jour d&apos;elle-même. Rien n&apos;est envoyé nulle part.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="663"/>
+        <location filename="../qml/Settings.qml" line="669"/>
         <source>Copy diagnostics</source>
         <translation>Copier les diagnostics</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="664"/>
+        <location filename="../qml/Settings.qml" line="670"/>
         <source>Copies the same report to the clipboard. Nothing is sent anywhere.</source>
         <translation>Copie le même rapport dans le presse-papiers. Rien n&apos;est envoyé nulle part.</translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="702"/>
+        <source>About</source>
+        <translation>À propos</translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="707"/>
+        <source>What this is, the version and build it came from, and the licences it carries.</source>
+        <translation>Ce qu&apos;est cette application, la version et la compilation dont elle provient, et les licences qu&apos;elle contient.</translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="714"/>
+        <source>About Hearth…</source>
+        <translation>À propos de Hearth…</translation>
     </message>
 </context>
 <context>
