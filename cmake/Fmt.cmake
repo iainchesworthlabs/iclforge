@@ -63,19 +63,19 @@ if(NOT fmt_FOUND)
     # same file can be listed more than once - through a cached fmt_DIR, and
     # through a merged-/usr distro's /lib -> /usr/lib symlink - hence REAL_PATH
     # and REMOVE_DUPLICATES.
-    set(_ac3_fmt_skipped "")
-    foreach(_ac3_fmt_config _ac3_fmt_version IN ZIP_LISTS fmt_CONSIDERED_CONFIGS fmt_CONSIDERED_VERSIONS)
-        file(REAL_PATH "${_ac3_fmt_config}" _ac3_fmt_real_config)
-        list(APPEND _ac3_fmt_skipped "\n  skipped {fmt} ${_ac3_fmt_version} (${_ac3_fmt_real_config})")
+    set(_iclforge_fmt_skipped "")
+    foreach(_iclforge_fmt_config _iclforge_fmt_version IN ZIP_LISTS fmt_CONSIDERED_CONFIGS fmt_CONSIDERED_VERSIONS)
+        file(REAL_PATH "${_iclforge_fmt_config}" _iclforge_fmt_real_config)
+        list(APPEND _iclforge_fmt_skipped "\n  skipped {fmt} ${_iclforge_fmt_version} (${_iclforge_fmt_real_config})")
     endforeach()
-    list(REMOVE_DUPLICATES _ac3_fmt_skipped)
-    list(JOIN _ac3_fmt_skipped "" _ac3_fmt_skipped)
-    unset(_ac3_fmt_real_config)
+    list(REMOVE_DUPLICATES _iclforge_fmt_skipped)
+    list(JOIN _iclforge_fmt_skipped "" _iclforge_fmt_skipped)
+    unset(_iclforge_fmt_real_config)
 
     if(NOT ICLFORGE_FETCH_FMT)
         message(FATAL_ERROR
             "{fmt} ${ICLFORGE_FMT_MINIMUM_VERSION} or newer was not found and ICLFORGE_FETCH_FMT is OFF."
-            "${_ac3_fmt_skipped}\n"
+            "${_iclforge_fmt_skipped}\n"
             "Supply it with -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake "
             "or -DCMAKE_PREFIX_PATH=<prefix>, or allow the download by setting "
             "ICLFORGE_FETCH_FMT=ON.")
@@ -83,8 +83,8 @@ if(NOT fmt_FOUND)
 
     message(STATUS
         "{fmt} ${ICLFORGE_FMT_MINIMUM_VERSION} or newer not found locally; fetching v${ICLFORGE_FMT_VERSION} "
-        "(-DICLFORGE_FETCH_FMT=OFF to require a local copy)${_ac3_fmt_skipped}")
-    unset(_ac3_fmt_skipped)
+        "(-DICLFORGE_FETCH_FMT=OFF to require a local copy)${_iclforge_fmt_skipped}")
+    unset(_iclforge_fmt_skipped)
 
     include(FetchContent)
     FetchContent_Declare(fmt
@@ -134,7 +134,7 @@ endif()
 # marks its whole installed include tree -external:W0, on top of the SYSTEM
 # marking just above) - the same "third-party header code trips a warning
 # our SYSTEM-headers rule does not actually save us from" situation
-# cmake/CompilerWarnings.cmake's own AC3_WARNINGS_OFF_FLAG comment already
+# cmake/CompilerWarnings.cmake's own ICLFORGE_WARNINGS_OFF_FLAG comment already
 # documents for Qt's generated qmlcachegen code, and the identical scoped
 # fix: disable only this one diagnostic, only for MSVC, wherever iclforge::fmt is
 # linked, rather than weakening /W4 for anything else.

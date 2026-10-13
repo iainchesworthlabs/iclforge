@@ -133,14 +133,14 @@ add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 # under the same rules as the code they measure and check.
 # ---------------------------------------------------------------------------
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set(AC3_FP_CONTRACT_FLAG "/fp:precise")
+    set(ICLFORGE_FP_CONTRACT_FLAG "/fp:precise")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND
        CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-    set(AC3_FP_CONTRACT_FLAG "/clang:-ffp-contract=off")
+    set(ICLFORGE_FP_CONTRACT_FLAG "/clang:-ffp-contract=off")
 else()
-    set(AC3_FP_CONTRACT_FLAG "-ffp-contract=off")
+    set(ICLFORGE_FP_CONTRACT_FLAG "-ffp-contract=off")
 endif()
-add_compile_options("${AC3_FP_CONTRACT_FLAG}")
+add_compile_options("${ICLFORGE_FP_CONTRACT_FLAG}")
 
 # ---------------------------------------------------------------------------
 # Options
@@ -331,11 +331,11 @@ option(ICLFORGE_BUILD_HEARTH_APPS "Build Hearth's applications (apps/hearth) whe
 # half alone (ICLFORGE_SENDSPIN_PLAYER_ONLY, set by firmware/esp-idf/iclforge/CMakeLists.txt, with the
 # minimum-footprint profile and no AC-4), and the two guards below are about the applications.
 if(ICLFORGE_BUILD_HEARTH AND ICLFORGE_BUILD_HEARTH_APPS AND NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
-    set(_ac3_hearth_apps ON)
+    set(_iclforge_hearth_apps ON)
 else()
-    set(_ac3_hearth_apps OFF)
+    set(_iclforge_hearth_apps OFF)
 endif()
-if(NOT ICLFORGE_BUILD_AC4 AND _ac3_hearth_apps)
+if(NOT ICLFORGE_BUILD_AC4 AND _iclforge_hearth_apps)
     message(FATAL_ERROR "ICLFORGE_BUILD_AC4=OFF requires ICLFORGE_BUILD_HEARTH to be OFF too, "
         "unless ICLFORGE_SENDSPIN_PLAYER_ONLY is set - Hearth's engine reads an AC-4 item's table "
         "of contents with iclforge::ac4, and its presentations and metadata with iclforge::ac4.")
@@ -359,7 +359,7 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
         endif()
     endforeach()
     # Hearth's applications link the full iclforge::ac3; a board's Sendspin player half does not.
-    if(_ac3_hearth_apps)
+    if(_iclforge_hearth_apps)
         list(APPEND _ac3_minimal_conflicts "ICLFORGE_BUILD_HEARTH")
     endif()
     if(_ac3_minimal_conflicts)
@@ -372,7 +372,7 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
     unset(_ac3_minimal_conflicts)
     unset(_ac3_minimal_message)
 endif()
-unset(_ac3_hearth_apps)
+unset(_iclforge_hearth_apps)
 
 # iclforge::minimal_profile - the compile/link options the profile above adds. Not
 # beside include(Sanitizers)/include(Coverage)/include(Tracy) up top because,

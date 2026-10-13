@@ -684,7 +684,7 @@ else()
         # SAME COMPONENT immediately before it, only on APPLE since the
         # Windows shape needs no such variable.
         if(APPLE)
-            install(CODE "set(_ac3_macos_bundle_name \"crucible\")" COMPONENT crucible)
+            install(CODE "set(_iclforge_macos_bundle_name \"crucible\")" COMPONENT crucible)
         endif()
         install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/StripQtTestDeployment.cmake"
             COMPONENT crucible)

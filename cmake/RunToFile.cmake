@@ -17,21 +17,21 @@
 # packaging step then installs is exactly the silent failure worth refusing.
 # ---------------------------------------------------------------------------
 
-if(NOT DEFINED AC3_RUN_COMMAND OR NOT DEFINED AC3_RUN_OUTPUT)
-    message(FATAL_ERROR "RunToFile.cmake needs both AC3_RUN_COMMAND and AC3_RUN_OUTPUT")
+if(NOT DEFINED ICLFORGE_RUN_COMMAND OR NOT DEFINED ICLFORGE_RUN_OUTPUT)
+    message(FATAL_ERROR "RunToFile.cmake needs both ICLFORGE_RUN_COMMAND and ICLFORGE_RUN_OUTPUT")
 endif()
 
 execute_process(
-    COMMAND ${AC3_RUN_COMMAND}
-    OUTPUT_FILE "${AC3_RUN_OUTPUT}"
-    RESULT_VARIABLE ac3_run_result
-    ERROR_VARIABLE ac3_run_stderr)
+    COMMAND ${ICLFORGE_RUN_COMMAND}
+    OUTPUT_FILE "${ICLFORGE_RUN_OUTPUT}"
+    RESULT_VARIABLE iclforge_run_result
+    ERROR_VARIABLE iclforge_run_stderr)
 
-if(NOT ac3_run_result EQUAL 0)
+if(NOT iclforge_run_result EQUAL 0)
     # Remove the partial file first: leaving it behind would let a later
     # build of the same target see an up-to-date timestamp and skip the
     # regeneration that is still needed.
-    file(REMOVE "${AC3_RUN_OUTPUT}")
+    file(REMOVE "${ICLFORGE_RUN_OUTPUT}")
     message(FATAL_ERROR
-        "command failed (${ac3_run_result}): ${AC3_RUN_COMMAND}\n${ac3_run_stderr}")
+        "command failed (${iclforge_run_result}): ${ICLFORGE_RUN_COMMAND}\n${iclforge_run_stderr}")
 endif()

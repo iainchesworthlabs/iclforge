@@ -400,7 +400,7 @@ else()
         # the SAME COMPONENT immediately before it, only on APPLE since the
         # Windows shape needs no such variable.
         if(APPLE)
-            install(CODE "set(_ac3_macos_bundle_name \"hearth\")" COMPONENT hearth)
+            install(CODE "set(_iclforge_macos_bundle_name \"hearth\")" COMPONENT hearth)
         endif()
         install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/StripQtTestDeployment.cmake"
             COMPONENT hearth)

@@ -60,21 +60,21 @@ if(ICLFORGE_ENABLE_COVERAGE)
             -fprofile-instr-generate -fcoverage-mapping /Od /Ob0)
         execute_process(
             COMMAND "${CMAKE_CXX_COMPILER}" -print-resource-dir
-            OUTPUT_VARIABLE AC3_CLANG_RESOURCE_DIR
+            OUTPUT_VARIABLE ICLFORGE_CLANG_RESOURCE_DIR
             OUTPUT_STRIP_TRAILING_WHITESPACE
             ERROR_QUIET)
-        file(TO_CMAKE_PATH "${AC3_CLANG_RESOURCE_DIR}" AC3_CLANG_RESOURCE_DIR)
-        find_library(AC3_CLANG_PROFILE_RUNTIME
+        file(TO_CMAKE_PATH "${ICLFORGE_CLANG_RESOURCE_DIR}" ICLFORGE_CLANG_RESOURCE_DIR)
+        find_library(ICLFORGE_CLANG_PROFILE_RUNTIME
             NAMES clang_rt.profile-x86_64 clang_rt.profile-aarch64
-            PATHS "${AC3_CLANG_RESOURCE_DIR}/lib/windows"
+            PATHS "${ICLFORGE_CLANG_RESOURCE_DIR}/lib/windows"
             NO_DEFAULT_PATH)
-        if(NOT AC3_CLANG_PROFILE_RUNTIME)
+        if(NOT ICLFORGE_CLANG_PROFILE_RUNTIME)
             message(FATAL_ERROR
                 "ICLFORGE_ENABLE_COVERAGE with clang-cl needs the profile runtime "
-                "(clang_rt.profile-*.lib) under ${AC3_CLANG_RESOURCE_DIR}/lib/windows; "
+                "(clang_rt.profile-*.lib) under ${ICLFORGE_CLANG_RESOURCE_DIR}/lib/windows; "
                 "it was not found.")
         endif()
-        target_link_libraries(iclforge_coverage INTERFACE "${AC3_CLANG_PROFILE_RUNTIME}")
+        target_link_libraries(iclforge_coverage INTERFACE "${ICLFORGE_CLANG_PROFILE_RUNTIME}")
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         # -fno-inline keeps line/branch attribution accurate for a Debug
         # build's already-unoptimized code; --coverage covers both -fprofile-

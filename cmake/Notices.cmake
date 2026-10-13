@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Notices.cmake
 #
-# ac3_generate_notices(<out-file>
+# iclforge_generate_notices(<out-file>
 #     FRAGMENT_DIR <dir>...    directories holding <fragment>.txt files,
 #                              searched in the order given
 #     FRAGMENTS <name>...      which fragments, in the order they appear
@@ -44,16 +44,16 @@
 # changes, so an unchanged configure does not touch the resource's mtime.
 # ---------------------------------------------------------------------------
 
-function(ac3_generate_notices out)
+function(iclforge_generate_notices out)
     cmake_parse_arguments(PARSE_ARGV 1 N "" "" "FRAGMENT_DIR;FRAGMENTS;TOKENS;FILES")
     if(N_UNPARSED_ARGUMENTS)
-        message(FATAL_ERROR "ac3_generate_notices: unexpected arguments: ${N_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "iclforge_generate_notices: unexpected arguments: ${N_UNPARSED_ARGUMENTS}")
     endif()
     if(NOT N_FRAGMENT_DIR)
-        message(FATAL_ERROR "ac3_generate_notices: FRAGMENT_DIR is required")
+        message(FATAL_ERROR "iclforge_generate_notices: FRAGMENT_DIR is required")
     endif()
     if(NOT N_FRAGMENTS)
-        message(FATAL_ERROR "ac3_generate_notices: FRAGMENTS names no fragment for ${out}")
+        message(FATAL_ERROR "iclforge_generate_notices: FRAGMENTS names no fragment for ${out}")
     endif()
 
     # 1. The fragments, in order, one blank line between them. Each name is
@@ -87,7 +87,7 @@ function(ac3_generate_notices out)
     foreach(pair IN LISTS N_FILES)
         string(FIND "${pair}" "=" eq)
         if(eq EQUAL -1)
-            message(FATAL_ERROR "ac3_generate_notices: FILES entry '${pair}' is not NAME=path")
+            message(FATAL_ERROR "iclforge_generate_notices: FILES entry '${pair}' is not NAME=path")
         endif()
         string(SUBSTRING "${pair}" 0 ${eq} name)
         math(EXPR after "${eq} + 1")
@@ -112,7 +112,7 @@ function(ac3_generate_notices out)
     foreach(pair IN LISTS N_TOKENS)
         string(FIND "${pair}" "=" eq)
         if(eq EQUAL -1)
-            message(FATAL_ERROR "ac3_generate_notices: TOKENS entry '${pair}' is not KEY=value")
+            message(FATAL_ERROR "iclforge_generate_notices: TOKENS entry '${pair}' is not KEY=value")
         endif()
         string(SUBSTRING "${pair}" 0 ${eq} key)
         math(EXPR after "${eq} + 1")
