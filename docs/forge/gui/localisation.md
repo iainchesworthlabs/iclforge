@@ -28,16 +28,16 @@ language and applies right-to-left layout mirroring for Arabic, Hebrew and Yiddi
 (`Main.qml`'s `LayoutMirroring` root, and the bundled Noto Sans Arabic/Hebrew faces those three
 scripts need — Latin has no glyph coverage for either).
 
-Preferences → Appearance → **Language** switches it live, no restart needed
+Settings → Appearance → **Language** switches it live, no restart needed
 (`languageManager.setLanguage(code)`, a plain context property `main.cpp` installs — not a
 `QML_SINGLETON` the way `EncoderController` is, since `LanguageManager` takes the application and
 the engine as constructor arguments, which a singleton factory cannot supply).
 
 ## What's translated today
 
-Every catalogue is complete. The six files carry 984 messages each, the count the pseudo-locale
+Every catalogue is complete. The six files carry 1019 messages each, the count the pseudo-locale
 `xx` below has too — the window chrome, the header buttons, the tab names, the Guided wizard, the
-whole Preferences dialog, the longer explanatory `PrefsNote` paragraphs through the
+whole Settings dialog, the longer explanatory `PrefsNote` paragraphs through the
 Format/AC-4/Objects/Coding tools/Metadata tabs, the QC, Inspect objects and Open stream dialogs,
 and the `Accessible.*` names and descriptions — and none of them is left `type="unfinished"`. That
 includes the strings the keyboard and text-size pass of 2026-09-06 added
@@ -52,7 +52,7 @@ shared six are held to and what an audit of the mechanical output found; the rev
 or replaces each rendering has not run for either app.
 
 Both windows say that in their own note under the language chooser, in the same words: `forge-gui`'s
-Preferences → Appearance note reads "The translations are machine-made and have not been read by a
+Settings → Appearance note reads "The translations are machine-made and have not been read by a
 speaker."
 
 Two checks hold the completeness above. The `[gui][translations]` case in
@@ -99,9 +99,9 @@ right-to-left half, and the gate over its catalogues — is on
 `lupdate` groups each `.ts` file's messages into a `<context><name>` block named after the
 component it came from — `AboutDialog`, `Ac4Panel`, `AssignmentPanel`, `ChannelMeter`,
 `EncoderController` (the `tr()` calls in the C++), `FirstRunScreen`, `GuidedWizard`,
-`LoudnessGroup`, `Main`, `ObjectInspectorDialog`, `PreferencesDialog`, `QcDialog`, `QcGateMeter`,
-`SoundfieldView`, `StreamPlayerDialog` and `VbrPanel` — which is how to jump straight to the right
-area of a large `.ts` file.
+`LicencesDialog`, `LoudnessGroup`, `Main`, `ObjectInspectorDialog`, `PreferencesDialog`, `QcDialog`,
+`QcGateMeter`, `SoundfieldView`, `StreamPlayerDialog` and `VbrPanel` — which is how to jump straight
+to the right area of a large `.ts` file.
 
 ## Adding a new language
 
@@ -110,7 +110,7 @@ area of a large `.ts` file.
    file and translate it as above.
 2. Add `{code, "Native name"}` to the `kLanguages` array in `apps/shared/preferences/src/language_manager.cpp`. Miss
    this and `LanguageManager::setLanguage()` rejects the code as unsupported — the language never
-   appears in Preferences' picker even with a fully-translated `.ts`/`.qm`.
+   appears in Settings' picker even with a fully-translated `.ts`/`.qm`.
 3. If the script is right-to-left, `LanguageManager` already derives layout direction from
    `QLocale(code).textDirection()` automatically — no extra code needed there. If it needs a font
    `Theme.qml`'s Archivo doesn't cover (as Arabic and Hebrew do, via the bundled Noto Sans faces),
@@ -122,7 +122,7 @@ area of a large `.ts` file.
 ## The pseudo-locale QA fixture
 
 `apps/forge/gui/assets/translations/forge_gui_xx.ts` is not a language — "xx" is not an ISO 639 code, and it
-never appears in `LanguageManager::availableLanguages()` or Preferences' picker. It exists to prove
+never appears in `LanguageManager::availableLanguages()` or Settings' picker. It exists to prove
 the extraction → compile → load pipeline works end to end without depending on any one language's
 catalogue, and to catch a string that bypasses `qsTr()` entirely.
 
@@ -134,7 +134,7 @@ pseudo-locale either never went through `qsTr()`, or was added after the fixture
 generated.
 
 The fixture is not in `AC3_TS_FILES`, so `forge-gui_lupdate` does not touch it and CI's drift check
-cannot see it going stale. It matches the six languages today, at 984 messages, and the
+cannot see it going stale. It matches the six languages today, at 1019 messages, and the
 `[gui][translations]` case above holds it to the same no-unfinished rule. Regenerate it after
 `forge-gui_lupdate` picks up new source strings:
 

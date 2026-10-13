@@ -245,7 +245,7 @@ with a **Take it back** button.
 
 ## Settings
 
-![The Settings page: playback, network, appearance, language and diagnostics](screenshots/hearth-settings.png)
+![The Settings page: playback, network, appearance, language, diagnostics and About](screenshots/hearth-settings.png)
 
 *The Settings page.*
 
@@ -260,6 +260,10 @@ with a **Take it back** button.
 - **Diagnostics**: a text file of what Hearth has done (the outputs opened, the streams played,
   the sinks found and paired, and every error), saved, copied or viewed live. Pairing keys, codes
   and file paths are left out of it.
+- **About**: **About Hearth…** opens the version and the build it came from, the licence, the
+  repository, and **Licences…**, which lists what this build carries from others with each
+  licence. The keyboard reference's **About…** (below) opens the same window; Forge and Crucible
+  reach theirs from their Settings too.
 
 ## Keyboard
 
@@ -277,7 +281,8 @@ with a **Take it back** button.
 | `Q` | In the singer view: show or hide the queue |
 
 `Tab` reaches each control in turn, and `Space` or `Return` activates the one with focus. The
-reference's **About…** button opens the version and the licences.
+reference's **About…** button opens the version and the licences, as the **About** card on
+[Settings](#settings) does.
 
 ## How the pictures were taken
 

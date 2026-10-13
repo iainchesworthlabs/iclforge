@@ -11,7 +11,7 @@ surface, reachable from the header" shape
 
 ## Opening it
 
-**Inspect objects…**, in the header beside **QC a stream…** and **Preferences**. It opens
+**Inspect objects…**, in the header beside **QC a stream…** and **Settings**. It opens
 regardless of what (if anything) is loaded in the main workbench.
 
 **Choose file…** opens a standard file picker with four filters — `*.ac3`/`*.ec3`, `*.ac4`,

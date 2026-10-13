@@ -5,13 +5,13 @@ Everything else in this guide configures and runs an **encode** — a source loa
 Encode writing a new file. QC is the opposite shape: an **already-encoded** `.ac3`, `.ec3` or
 `.ac4` file is opened, decoded and measured against its own embedded `dialnorm` (and `compr`, for
 AC-3 and E-AC-3), with no source, no plan and no encoder involved. That's why it lives as its own dialog rather than a tab — opened from a
-**QC a stream…** button in the header beside **Preferences**, the same "distinct surface,
-reachable from the header" shape [Preferences](index.md#preferences) and a run chip's own details
+**QC a stream…** button in the header beside **Settings**, the same "distinct surface,
+reachable from the header" shape [Settings](index.md#settings) and a run chip's own details
 popover use.
 
 ## Opening it
 
-**QC a stream…**, top right, next to Preferences and the Guided/Advanced/Expert control. It opens
+**QC a stream…**, top right, next to Settings and the Guided/Advanced/Expert control. It opens
 regardless of what (if anything) is loaded in the main workbench — QC-ing a finished file has
 nothing to do with whatever source is currently being configured for a new encode, and the two
 never interact.

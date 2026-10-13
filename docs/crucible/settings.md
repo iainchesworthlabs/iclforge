@@ -1,9 +1,9 @@
 # Settings
 
 `Ctrl+3`, the page switch in the header, or **Settings…** in the tray menu where there is one.
-The page is eight numbered blocks, in the order that matters on a new machine: the two things that
+The page is nine numbered blocks, in the order that matters on a new machine: the two things that
 make the whole thing work, then how it sounds, then how it looks and behaves, then the file you
-attach to a bug report, then the lyric events a rig can read. It lays out as two columns when the window is wide enough and one when it
+attach to a bug report, then the lyric events a rig can read, then About. It lays out as two columns when the window is wide enough and one when it
 is not, and every block wraps inside its column.
 
 Nothing here has an Apply button. Each control writes its setting as you change it, and the
@@ -224,3 +224,10 @@ from a socket of the operating system's choosing. UDP has no delivery: a rig tha
 loses them, and the page cannot tell. The strip's own position is what is read, so whichever
 [origin](room.md#06-lyrics) it has, a media session or Start, the events
 follow it.
+
+## 09 About
+
+**About Crucible…** opens the same About window the header's **?**, `F1` and the tray menu's
+**About…** open: what Crucible is, the version and the build it came from, the licence, the
+repository, and **Licences…**, which lists what this build carries from others with each licence.
+Forge's Settings and Hearth's Settings reach theirs the same way.

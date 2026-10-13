@@ -100,7 +100,7 @@ session always has:
 - **Record…** captures to a file (the button becomes **Stop** with a live elapsed readout). By
   default it writes straight to the output folder under a timestamped take name following the
   naming pattern — the status line and run strip say where; a
-  [capture preference](index.md#preferences) makes it ask for a filename first instead.
+  [capture setting](index.md#settings) makes it ask for a filename first instead.
 
 Setting up a *real* session — writing the take to disk, adding a receiver leg, or both, with
 either device — is not a control on this block. It happens on the **Live session** tab, whose own
