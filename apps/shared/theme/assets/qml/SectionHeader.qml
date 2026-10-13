@@ -41,6 +41,10 @@ RowLayout {
         font.bold: true
     }
 
+    // The title is the one of the three that may never be wider than the card
+    // it heads, whatever the language or the text size, so it elides before
+    // it overflows. It asks for its own width and no more; the caption beside
+    // it is elided the same way.
     Text {
         id: labelText
         color: Theme.text
@@ -48,6 +52,10 @@ RowLayout {
         font.bold: true
         font.capitalization: Font.AllUppercase
         font.letterSpacing: Theme.trackingWide
+        elide: Text.ElideRight
+        Layout.fillWidth: true
+        Layout.minimumWidth: 0
+        Layout.maximumWidth: Math.ceil(implicitWidth)
     }
 
     // Two pixels, not one: the card borders around it are single-pixel, and
@@ -59,11 +67,21 @@ RowLayout {
         color: root.rule ? Theme.divider : "transparent"
     }
 
+    // As wide as its words where the header has the room, and elided where
+    // it has not: a header that could not shrink would set the least width
+    // of the whole card under it. An elided Text asks for its whole width as
+    // its least unless it is told otherwise, so minimumWidth: 0 is what lets
+    // it go (the rule beside it asks for none, so it is this that gives way
+    // first, after the title and its number have what they need).
     Text {
         id: summaryText
         visible: text.length > 0
         color: Theme.textMuted
         font.family: Theme.monoFamily
         font.pixelSize: Theme.fontSmall
+        elide: Text.ElideRight
+        Layout.fillWidth: true
+        Layout.minimumWidth: 0
+        Layout.maximumWidth: Math.ceil(implicitWidth)
     }
 }

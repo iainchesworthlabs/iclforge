@@ -64,6 +64,18 @@ class Entries(unittest.TestCase):
         # The caller's own environment is not changed by it.
         self.assertIn("QT_QPA_FONTDIR", base)
 
+    def test_a_variable_of_the_entry_may_name_a_file_in_the_media_folder(self) -> None:
+        # Crucible's pictures show the signing key as loaded, and the key is a file the media
+        # folder holds: its path is not known until the folder is.
+        entry = {"environment": "hidden",
+                 "env": {"ICLFORGE_SIGNING_KEY_FILE": "{media}/demo-signing.key"}}
+        values = take_pictures.placeholders(Path("x.png"), Path("a folder") / "media", Path("s"))
+        env = take_pictures.environment(DOCUMENT, entry, {"PATH": "p"}, values)
+        self.assertEqual(env["ICLFORGE_SIGNING_KEY_FILE"], "a folder/media/demo-signing.key")
+        # Without values the text is left as it is, which is what a listing wants.
+        raw = take_pictures.environment(DOCUMENT, entry, {"PATH": "p"})
+        self.assertEqual(raw["ICLFORGE_SIGNING_KEY_FILE"], "{media}/demo-signing.key")
+
     def test_the_command_line_reads_as_a_person_types_it(self) -> None:
         self.assertEqual(take_pictures.command_line(DOCUMENT["pictures"][0]),
                          "hearth --smoke-shot {out} --open {media}/song.ec3")

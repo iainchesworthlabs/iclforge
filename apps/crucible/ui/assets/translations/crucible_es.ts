@@ -1169,298 +1169,298 @@
 <context>
     <name>RoomPage</name>
     <message>
-        <location filename="../qml/RoomPage.qml" line="99"/>
+        <location filename="../qml/RoomPage.qml" line="100"/>
         <source>APPLICATIONS</source>
         <translation>APLICACIONES</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="103"/>
+        <location filename="../qml/RoomPage.qml" line="104"/>
         <source>no applications</source>
         <translation>sin aplicaciones</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="191"/>
+        <location filename="../qml/RoomPage.qml" line="192"/>
         <source>Full-screen applications stay in the bed; the lock lifts when they leave full-screen.</source>
         <translation>Las aplicaciones a pantalla completa se quedan en la cama; el bloqueo se levanta cuando salen de pantalla completa.</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="225"/>
+        <location filename="../qml/RoomPage.qml" line="226"/>
         <source>ROOM</source>
         <translation>SALA</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="243"/>
+        <location filename="../qml/RoomPage.qml" line="244"/>
         <source>No signing key, so objects are off: the stream is the 5.1 bed only. Placing an application pans it between the five bed speakers; height and size have no effect, and a receiver renders nothing you place. Load a key in Settings to send objects.</source>
         <translation>Sin clave de firma no hay objetos: el flujo es solo la cama 5.1. Colocar una aplicación la reparte entre los cinco altavoces de la cama; la altura y el tamaño no tienen efecto, y un receptor no renderiza nada de lo que coloques. Carga una clave en Ajustes para enviar objetos.</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="257"/>
+        <location filename="../qml/RoomPage.qml" line="258"/>
         <source>Plan + elevation</source>
         <translation>Planta + alzado</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="257"/>
+        <location filename="../qml/RoomPage.qml" line="258"/>
         <source>3D</source>
         <translation>3D</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="259"/>
+        <location filename="../qml/RoomPage.qml" line="260"/>
         <source>Room view</source>
         <translation>Vista de la sala</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="295"/>
+        <location filename="../qml/RoomPage.qml" line="296"/>
         <source>Room (3D)</source>
         <translation>Sala (3D)</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="314"/>
+        <location filename="../qml/RoomPage.qml" line="315"/>
         <source>Plan (top-down)</source>
         <translation>Planta (vista superior)</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="315"/>
+        <location filename="../qml/RoomPage.qml" line="316"/>
         <source>drag to place</source>
         <translation>arrastra para colocar</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="333"/>
+        <location filename="../qml/RoomPage.qml" line="334"/>
         <source>Elevation (side-on)</source>
         <translation>Alzado (vista lateral)</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="334"/>
+        <location filename="../qml/RoomPage.qml" line="335"/>
         <source>drag: depth + height</source>
         <translation>arrastra: profundidad + altura</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="334"/>
+        <location filename="../qml/RoomPage.qml" line="335"/>
         <source>height: objects only</source>
         <translation>altura: solo objetos</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="348"/>
+        <location filename="../qml/RoomPage.qml" line="349"/>
         <source>Bed only: depth still pans front to rear; height is carried in object metadata, which is off.</source>
         <translation>Solo cama: la profundidad sigue repartiendo de delante a atrás; la altura va en los metadatos de objetos, que están desactivados.</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="393"/>
+        <location filename="../qml/RoomPage.qml" line="394"/>
         <source>Send to bed</source>
         <translation>Enviar a la cama</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="393"/>
+        <location filename="../qml/RoomPage.qml" line="394"/>
         <source>Place in the room</source>
         <translation>Colocar en la sala</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="395"/>
-        <location filename="../qml/RoomPage.qml" line="406"/>
-        <location filename="../qml/RoomPage.qml" line="413"/>
-        <location filename="../qml/RoomPage.qml" line="420"/>
+        <location filename="../qml/RoomPage.qml" line="396"/>
+        <location filename="../qml/RoomPage.qml" line="407"/>
+        <location filename="../qml/RoomPage.qml" line="414"/>
+        <location filename="../qml/RoomPage.qml" line="421"/>
         <source>for %1</source>
         <translation>para %1</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="404"/>
+        <location filename="../qml/RoomPage.qml" line="405"/>
         <source>Centre</source>
         <extracomment>Button: move the selected application to the centre of the room. A verb.</extracomment>
         <translation>Centrar</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="411"/>
+        <location filename="../qml/RoomPage.qml" line="412"/>
         <source>Mono</source>
         <translation>Mono</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="411"/>
+        <location filename="../qml/RoomPage.qml" line="412"/>
         <source>Split</source>
         <translation>Dividir</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="418"/>
+        <location filename="../qml/RoomPage.qml" line="419"/>
         <source>Standard stereo</source>
         <translation>Estéreo estándar</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="429"/>
+        <location filename="../qml/RoomPage.qml" line="430"/>
         <source>Put</source>
         <translation>Poner</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="433"/>
+        <location filename="../qml/RoomPage.qml" line="434"/>
         <source>in front</source>
         <extracomment>Placement button: in front of the listener</extracomment>
         <translation>delante</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="435"/>
+        <location filename="../qml/RoomPage.qml" line="436"/>
         <source>behind</source>
         <extracomment>Placement button: behind the listener</extracomment>
         <translation>detrás</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="441"/>
+        <location filename="../qml/RoomPage.qml" line="442"/>
         <source>overhead</source>
         <extracomment>Placement button: above the listener</extracomment>
         <translation>arriba</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="443"/>
+        <location filename="../qml/RoomPage.qml" line="444"/>
         <source>front left</source>
         <extracomment>Placement button: the front left corner of the room</extracomment>
         <translation>delante izquierda</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="445"/>
+        <location filename="../qml/RoomPage.qml" line="446"/>
         <source>front right</source>
         <extracomment>Placement button: the front right corner of the room</extracomment>
         <translation>delante derecha</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="447"/>
+        <location filename="../qml/RoomPage.qml" line="448"/>
         <source>rear left</source>
         <extracomment>Placement button: the rear left corner of the room</extracomment>
         <translation>detrás izquierda</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="449"/>
+        <location filename="../qml/RoomPage.qml" line="450"/>
         <source>rear right</source>
         <extracomment>Placement button: the rear right corner of the room</extracomment>
         <translation>detrás derecha</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="455"/>
+        <location filename="../qml/RoomPage.qml" line="456"/>
         <source>put %1 %2</source>
         <translation>coloca %1 %2</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="462"/>
+        <location filename="../qml/RoomPage.qml" line="463"/>
         <source>full-screen: stays in the bed</source>
         <translation>pantalla completa: se queda en la cama</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="470"/>
+        <location filename="../qml/RoomPage.qml" line="471"/>
         <source>Size</source>
         <translation>Tamaño</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="499"/>
+        <location filename="../qml/RoomPage.qml" line="500"/>
         <source>Object size</source>
         <translation>Tamaño del objeto</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="503"/>
-        <location filename="../qml/RoomPage.qml" line="526"/>
+        <location filename="../qml/RoomPage.qml" line="504"/>
+        <location filename="../qml/RoomPage.qml" line="527"/>
         <source>point</source>
         <extracomment>Object size readout: the object is a point source rather than a percentage of the room</extracomment>
         <translation>punto</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="503"/>
+        <location filename="../qml/RoomPage.qml" line="504"/>
         <source>%1%</source>
         <translation>%1%</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="529"/>
+        <location filename="../qml/RoomPage.qml" line="530"/>
         <source>extent the receiver&apos;s renderer spreads the object over; the bed hears a point</source>
         <translation>extensión sobre la que el renderizador del receptor reparte el objeto; la cama oye un punto</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="529"/>
+        <location filename="../qml/RoomPage.qml" line="530"/>
         <source>object metadata: no effect while the stream is bed only</source>
         <translation>metadatos de objeto: sin efecto mientras el flujo sea solo la cama</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="540"/>
+        <location filename="../qml/RoomPage.qml" line="541"/>
         <source>BED</source>
         <translation>CAMA</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="542"/>
+        <location filename="../qml/RoomPage.qml" line="543"/>
         <source>unplaced applications, mixed to the 5.1 bed</source>
         <translation>aplicaciones sin colocar, mezcladas en la cama 5.1</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="578"/>
+        <location filename="../qml/RoomPage.qml" line="579"/>
         <source>every application is placed</source>
         <translation>todas las aplicaciones están colocadas</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="578"/>
+        <location filename="../qml/RoomPage.qml" line="579"/>
         <source>drag one into the room to place it · drag a marker back here, or double-click it, to return it</source>
         <translation>arrastra una a la sala para colocarla · arrastra un marcador de vuelta aquí, o haz doble clic en él, para devolverla</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="617"/>
+        <location filename="../qml/RoomPage.qml" line="691"/>
         <source>SIGNING</source>
         <translation>FIRMA</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="618"/>
+        <location filename="../qml/RoomPage.qml" line="692"/>
         <source>key loaded · objects on</source>
         <translation>clave cargada · objetos activados</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="618"/>
+        <location filename="../qml/RoomPage.qml" line="692"/>
         <source>no key · 5.1 bed only</source>
         <translation>sin clave · solo cama 5.1</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="619"/>
+        <location filename="../qml/RoomPage.qml" line="693"/>
         <source>load one in Settings</source>
         <translation>carga una en Ajustes</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="620"/>
+        <location filename="../qml/RoomPage.qml" line="694"/>
         <source>LYRICS</source>
         <translation>LETRA</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="437"/>
+        <location filename="../qml/RoomPage.qml" line="438"/>
         <source>left</source>
         <extracomment>Placement button: to the listener&apos;s left</extracomment>
         <translation>a la izquierda</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="104"/>
+        <location filename="../qml/RoomPage.qml" line="105"/>
         <source>%1 applications · %2 with sound</source>
         <translation>%1 aplicaciones · %2 con sonido</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="139"/>
+        <location filename="../qml/RoomPage.qml" line="140"/>
         <source>Applications</source>
         <translation>Aplicaciones</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="158"/>
-        <location filename="../qml/RoomPage.qml" line="569"/>
+        <location filename="../qml/RoomPage.qml" line="159"/>
+        <location filename="../qml/RoomPage.qml" line="570"/>
         <source>%1 placed in the centre of the room</source>
         <translation>%1 colocada en el centro de la sala</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="190"/>
+        <location filename="../qml/RoomPage.qml" line="191"/>
         <source>The full-screen rule is off here: %1.</source>
         <translation>Aquí la regla de pantalla completa está desactivada: %1.</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="227"/>
+        <location filename="../qml/RoomPage.qml" line="228"/>
         <source>%1 of 10 slots placed</source>
         <translation>%1 de 10 ranuras colocadas</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="439"/>
+        <location filename="../qml/RoomPage.qml" line="440"/>
         <source>right</source>
         <extracomment>Placement button: to the listener&apos;s right</extracomment>
         <translation>a la derecha</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="607"/>
+        <location filename="../qml/RoomPage.qml" line="681"/>
         <source>SIGNAL PATH</source>
         <translation>RUTA DE LA SEÑAL</translation>
     </message>
     <message>
-        <location filename="../qml/RoomPage.qml" line="610"/>
+        <location filename="../qml/RoomPage.qml" line="684"/>
         <source>applications → this app → what you hear</source>
         <translation>aplicaciones → esta app → lo que oyes</translation>
     </message>
