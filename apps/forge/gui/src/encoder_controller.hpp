@@ -1185,6 +1185,13 @@ public:
     // the sources already loaded - plan::render has no notion of
     // resampling, and a silent mismatch would drift rather than error.
     Q_INVOKABLE void addSourceFile(const QUrl& url);
+    // The same, for a caller that sets the assignment of every channel itself
+    // straight after and shows no assignment table (the Karaoke flow). The
+    // status then counts the sources and stops there: the one-argument form
+    // ends "set an assignment for each channel below", which for such a
+    // caller is neither outstanding nor anywhere on the screen. Everything
+    // else - the refusals, the resampling, the routing preview - is the same.
+    Q_INVOKABLE void addSourceFile(const QUrl& url, bool assignedByCaller);
     // A per-source start offset in seconds, clamped to zero or more - all
     // of that source's channels shift together. Encoded as leading silence
     // (a read-shift before the source's own first sample, mirroring the
@@ -1542,8 +1549,9 @@ private:
     // removeSource both need after the source list changes - loadSourceFile
     // keeps its own equivalent tail untouched (see its own comments) rather
     // than sharing this, so replacing the primary source can never behave
-    // differently because of a refactor here.
-    void refreshAfterSourceListChange();
+    // differently because of a refactor here. assignedByCaller is addSourceFile's
+    // own (see there): it only changes the sentence the status ends on.
+    void refreshAfterSourceListChange(bool assignedByCaller = false);
 
     // Channels through the plan and out as AC-3 or E-AC-3. One worker for
     // both: they differ only in which encoder object runs, and everything

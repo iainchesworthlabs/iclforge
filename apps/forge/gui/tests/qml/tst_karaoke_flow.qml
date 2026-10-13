@@ -694,6 +694,40 @@ TestCase {
         compare(findByName(ctx.win, "karaokePlays-L").text, "L");
     }
 
+    // ---- The status line ------------------------------------------------------------
+    // The Save step's line and the RUNS strip at the foot of the window both read
+    // EncoderController.status. The controller's sentence for a second source is written for
+    // a table the person fills in by hand; the flow assigns every coded channel from the
+    // parts and has no table, so what it leaves there must not send anyone to one.
+    function test_theStatusAfterThePartsAreLoadedDoesNotSendAnyoneToATable() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        // Nothing is left to assign: the flow did it from the parts.
+        compare(EncoderController.unassignedWarnings.length, 0);
+        compare(EncoderController.status, "4 sources loaded.");
+        ctx.flow.currentStepKey = "save";
+        const line = findByName(ctx.win, "karaokeEncodeStatus");
+        compare(line.text, "4 sources loaded.");
+    }
+
+    // The two tiers that do have the table are told, as they always were, and so is anything
+    // else that adds a source without saying it assigns the channels itself.
+    function test_aSecondSourceStillSendsATableToItsAssignment() {
+        const sentence = "2 sources loaded — set an assignment for each channel below.";
+        EncoderController.loadSourceFile(backing);
+        compare(EncoderController.sourceModel.length, 1);
+        EncoderController.addSourceFile(melody);
+        compare(EncoderController.sourceModel.length, 2);
+        compare(EncoderController.status, sentence);
+
+        EncoderController.removeSource(0);
+        EncoderController.loadSourceFile(backing);
+        EncoderController.addSourceFile(melody, false);
+        compare(EncoderController.sourceModel.length, 2);
+        compare(EncoderController.status, sentence);
+    }
+
     // ---- Naming, the rate, edits, the preview and the lyrics ---------------------------
     function test_aKaraokeDraftIsNamedForWhatItIs() {
         const ctx = openFlow();

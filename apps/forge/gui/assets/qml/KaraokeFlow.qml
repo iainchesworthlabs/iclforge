@@ -134,9 +134,9 @@ ColumnLayout {
         return kept;
     }
 
-    // The parts, loaded into the draft in a fixed order - the first is the
-    // primary source, and loading it chooses a bed from its own layout, which
-    // this then replaces with the coding mode the parts make.
+    // The parts, loaded into the draft in a fixed order - the first is the primary source,
+    // and loading it chooses a bed from its own layout, which apply() replaces. The rest are
+    // added as assigned by this flow (apply() does it), so no status sends anyone to a table.
     function rebuild() {
         const kept = flow.keptSettings();
         flow.keptTrims = kept.trims;
@@ -167,7 +167,7 @@ ColumnLayout {
             if (before === 0) {
                 EncoderController.loadSourceFile(item.url);
             } else {
-                EncoderController.addSourceFile(item.url);
+                EncoderController.addSourceFile(item.url, true);
             }
             if (EncoderController.sourceModel.length > before) {
                 loaded.push(item);
