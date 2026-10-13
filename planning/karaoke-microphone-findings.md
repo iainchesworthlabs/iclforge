@@ -6,10 +6,11 @@
     from the source on `main`; **measured** was run on this workstation on 2026-10-12 and the
     method is given; **existing** is a number an earlier session measured, with its date;
     **general knowledge** is not from this repository and is to be checked when the step that
-    needs it starts. **The microphone was opened once**, with the owner's OK on 2026-10-12, for
-    R1 to R3 ([F2](#measured-2026-10-12-with-the-microphone-open)); every other figure was read or
-    measured without opening one. The measurements that still wait are listed in
-    [F8](#f8-the-measurements-still-to-run).
+    needs it starts. **The microphone was opened twice**, with the owner's OK: on 2026-10-12
+    for R1 to R3 ([F2](#measured-2026-10-12-with-the-microphone-open)) and on 2026-10-13 for the
+    echo-cancellation runs of [F9](#f9-what-takes-the-speakers-out-of-the-microphone-2026-10-13);
+    every other figure was read, measured without opening one, or simulated. The measurements that
+    still wait are listed in [F8](#f8-the-measurements-still-to-run).
 
 ## F1: the capture path that exists
 
@@ -347,3 +348,121 @@ R1 and R2 are done and R3 is half done (above). R4 to R7 wait for hardware, a fi
 person. **A further one, from what R1 found:** the same round trip with a **headset or an
 interface** and with **exclusive mode**, because the 130 ms is this equipment's and the plan's
 budget depends on what a singer actually uses ([plan, open question 3](karaoke-microphone.md#open-questions-for-the-owner)).
+
+## F9: what takes the speakers out of the microphone (2026-10-13)
+
+Part measured on this workstation, part simulated over its recorded noise; each section says which.
+Nothing here was stored in the repository: the recordings were kept in a scratch folder and
+the programs (`bleed_record`, `aec_probe`, `aec3_offline`, `pitch_eval`) are throwaway C++ that
+make the same WASAPI calls and use the library's own tracker, scorer and `BleedMonitor`.
+
+### What Windows offers for this microphone (measured)
+
+`aec_probe` activates an `IAudioClient` on each active capture endpoint, initialises it in shared
+mode and **never starts it** (no audio is read), then asks for `IAudioEffectsManager` (the effects
+in the stream's processing chain) and `IAcousticEchoCancellationControl` (present when the chain has
+an echo canceller that takes a render endpoint as its reference). The endpoint is "Microphone
+(Logitech StreamCam)"; the stream is the default category, and then `AudioCategory_Communications`.
+
+| Stream category | Echo cancellation | Noise suppression | Automatic gain | `IAcousticEchoCancellationControl` |
+|---|---|---|---|---|
+| Default (what `libs/audio` opens) | off | **on** | off | not available |
+| Communications | **on** | on | on | **available**; `SetEchoCancellationRenderEndpoint` accepted |
+
+So Windows has an echo canceller for this microphone, and it is switched on by opening the capture
+stream as a communications stream and naming the render endpoint to cancel. Two consequences: the
+default stream's chain already has **noise suppression on**, and the communications stream's chain
+adds gain control. `AUDCLNT_STREAMOPTIONS_RAW` asks the driver for neither.
+
+### The driver's noise suppression treats the backing as noise (measured)
+
+With the default stream and the example backing playing through the speakers, the microphone's
+level jumped from second to second between -42 and -81 dBFS (rms) with no relation to the backing,
+which a gate that opens and closes on what it decides is noise would do. The same playback
+captured with `AUDCLNT_STREAMOPTIONS_RAW` was a steady floor. A pitch tracker on the default stream
+is reading a microphone whose own processing decides when it hears anything: **the capture should
+ask for RAW where the driver supports it** (this driver did, `0x00000000`), and say so on the card
+when it does not.
+
+### The speakers did not reach the microphone in these runs (measured, unexplained)
+
+On 2026-10-12 a 1 kHz tone at -30 dBFS arrived at -37 dBFS. On 2026-10-13, in RAW and in the default
+stream, a 1 kHz tone at -29 dBFS rms and the backing at -31 dBFS rms were not above the microphone's
+floor, in the band of the tone or anywhere. Either the speakers were not playing or not audibly (the
+render endpoint was at 70 % and unmuted), or the path changed. The echo cancellers below were
+therefore **not** measured on a real echo, and the communications stream's near silence (-94 dBFS
+rms, floor -114) is a gate on a quiet room, not a cancelled echo.
+
+### A simulated room over the recorded noise (simulated)
+
+The microphone is the StreamCam's recorded noise floor (-49 dBFS rms, real), the played signal is
+the example backing with its guide melody (real, what was played), the room is a delay of 130 ms, a
+gain and three reflections up to 11 ms, and the singer is the example karaoke's synthetic lead vocal
+in time with the backing (a worst case for the monitor: it is the guide's own notes with the same
+phases). The score is the library's tracker and scorer, in percent of the tune's time within a
+semitone. "Singer vs echo" is the singer's level against the echo's.
+
+| Singer vs echo | Tracker alone | `BleedMonitor`, flagged frames withheld | WebRTC AEC3 | AEC3 then the monitor |
+|---|---|---|---|---|
+| **Transfer -7 dB** (echo -38 dBFS, 11 dB over the noise) | | | | |
+| silent | 58.4 | 6.3 | 0.0 | 0.0 |
+| 10 dB under the echo | 57.9 | 8.8 | 20.9 | 20.9 |
+| equal | 67.4 | 55.5 | 51.6 | 51.6 |
+| 10 dB over | 95.9 | 88.8 | 86.6 | 86.6 |
+| 20 dB over | 99.5 | 94.2 | 90.5 | 88.4 |
+| 30 dB over | 99.5 | 94.3 | 89.7 | 88.2 |
+| **Transfer -20 dB** (echo -51 dBFS, at the noise) | | | | |
+| silent | 47.0 | 19.9 | 0.5 | 0.5 |
+| 10 dB under the echo | 49.2 | 30.6 | 0.6 | 0.6 |
+| equal | 59.5 | 54.0 | 34.0 | 34.0 |
+| 10 dB over | 93.1 | 86.9 | 59.0 | 57.1 |
+| 20 dB over | 99.4 | 94.2 | 78.4 | 76.2 |
+| 30 dB over | 99.5 | 94.3 | 90.8 | 89.7 |
+
+- **A silent singer in front of speakers is credited 58 % of the tune by the tracker alone** (47 %
+  at a transfer of -20 dB). That is the integrity hazard of F6, on this equipment's noise.
+- **Both remedies remove most of it** (6 and 0 % at -7 dB; the monitor 20 % and AEC3 0.5 % when the
+  echo is no louder than the noise, where the frame is mostly noise and the monitor cannot say it is
+  the speakers).
+- **What each costs a singer who is singing** is where they differ. At 10 to 30 dB over the echo
+  the monitor costs 5 to 7 points whatever the echo's level. AEC3 costs 9 to 10 points when the
+  echo is strong, and **9 to 36 points when it is weak** (59 against 93 at 10 dB over): its
+  suppressor takes the voice with it when the echo is near the noise. Neither recovers a quiet voice
+  (10 dB under the echo); AEC3 keeps a fifth of it when the echo is strong.
+- **A statistic that matches the best lag near the delay flags a singer who is in tune with the
+  guide.** The first `BleedMonitor` took the best normalised correlation within a few
+  milliseconds of the delay, and a voice at the pitch the speakers are playing correlates as well
+  as the echo does, because a shift of lag matches any phase: 18 to 21 % of the frames of a singer
+  20 dB above the echo were flagged. The library now fits the room as a short filter once
+  over the last two seconds and holds it fixed per frame, which a voice is not predicted by, and
+  chooses the delay by a vote of eight segments' signed correlations, which an echo keeps and a
+  voice does not. The threshold (0.65) was chosen on this simulation and is **provisional**: it
+  needs a real singer and a real room.
+
+### WebRTC AEC3 as a dependency (built and run offline)
+
+`webrtc-audio-processing` 2.1 (the PulseAudio project's packaging of WebRTC's AudioProcessing,
+BSD-3-Clause, 0.8 MB of source) builds with vcpkg as an overlay port beside `cpp-httplib`'s: meson
+through `vcpkg-tool-meson`, abseil as a vcpkg dependency, and three things the port has to say. It
+needs **abseil 20240722.0** (the version its own wrap file pins: 2.1 uses `absl::Nullable`, which
+20260107 removed), so a manifest that adopted it would pin abseil with `overrides`; it needs
+**`/std:c++20`** under MSVC (the sources use designated initialisers while its `meson.build` asks for
+C++17); and it is **not in vcpkg's registry** (vcpkg has the full `webrtc`, `speexdsp` and `rnnoise`,
+which is a denoiser). It is a library of tens of megabytes built, and the processing wants the played
+signal at the capture's time within a few hundred milliseconds, which Hearth has (the engine knows
+what it played).
+
+### What this says (and does not)
+
+For the owner's target, **a handheld or USB/XLR microphone through speakers or a TV**, the singer is
+20 to 30 dB above the echo at the microphone, where the table says the monitor takes about five
+points from a singer who is singing and removes the silent-singer credit, and AEC3 takes ten (more
+when the echo is weak). AEC3's benefit over the monitor is a cleaner **take** through speakers,
+which the monitor cannot give and which the plan has as headphones-only (D6). The OS canceller
+exists for this microphone and is a configuration change on the capture stream (communications
+category plus a render endpoint), but it also turns on gain control and noise suppression, and its
+quality on a real echo was not measured here.
+
+Not measured, and what it needs: a real echo (speakers audible), a real voice through it (a
+person singing along: R7), a handheld microphone at the mouth, and macOS and Linux (voice
+processing I/O and PipeWire's `echo-cancel` module, which are not available on this workstation).

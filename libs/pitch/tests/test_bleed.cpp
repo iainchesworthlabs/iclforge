@@ -218,6 +218,85 @@ TEST_CASE("bleed: a voice above the speakers is not bleed, and below them is", "
     }
 }
 
+TEST_CASE("bleed: a singer in tune with the guide is not bleed", "[pitch][bleed]") {
+    // The singer sings the guide's own notes, at the pitch it is played at, and in time with it as
+    // heard. A statistic that matches the best lag within a few milliseconds sees a voice that
+    // resembles the played signal as a copy of it; the room's fitted path does not.
+    iclforge::pitch::VoiceOptions options;
+    options.sample_rate = kRate;
+    options.lead_s = 0.0;
+    options.tail_s = 0.0;
+    options.amplitude = 0.4;
+    options.seed = 51;
+    std::vector<iclforge::pitch::VoiceNote> notes;
+    for (int i = 0; i < 30; ++i) {
+        notes.push_back({0.4 * i, 0.4, 57.0 + static_cast<double>((i * 5) % 9)});
+    }
+    const std::vector<float> guide = iclforge::pitch::synthesize_voice(notes, options).samples;
+    const std::vector<float> played = guide;  // the guide alone is what plays
+    const std::vector<float> echo = room(played, 120.0, 0.2, 2);
+    // The singer: the same notes, heard in time with the guide at the microphone (the echo's own
+    // delay), a vowel apart, and 15 dB above the echo.
+    // A person's own vibrato and timing: a different rate and depth, a little more jitter, and
+    // 40 ms behind the guide (a singer is rarely on the beat to the millisecond).
+    iclforge::pitch::VoiceOptions sung = options;
+    sung.vowel = 2;
+    sung.seed = 52;
+    sung.vibrato_hz = 4.7;
+    sung.vibrato_cents = 55.0;
+    sung.jitter = 0.01;
+    const std::vector<float> voice_raw = iclforge::pitch::synthesize_voice(notes, sung).samples;
+    const auto delay_samples = static_cast<std::size_t>((120.0 + 40.0) * kRate / 1000.0);
+    std::vector<float> voice(played.size(), 0.0F);
+    for (std::size_t i = 0; i + delay_samples < voice.size() && i < voice_raw.size(); ++i) {
+        voice[i + delay_samples] = voice_raw[i];
+    }
+    const double echo_rms = rms(std::span<const float>(echo).subspan(32000, 100000));
+    const double voice_rms = rms(std::span<const float>(voice).subspan(32000, 100000));
+    const float gain = static_cast<float>(echo_rms / voice_rms * std::pow(10.0, 15.0 / 20.0));
+    const std::vector<float> mic = sum(sum(echo, voice, gain), noise(played.size(), 0.0005, 7));
+    BleedMonitor monitor;
+    const auto frames = run(monitor, played, mic);
+    CHECK(share_bleed(frames, 3.0, 11.0) < 0.05);
+
+    // And with the singer silent, the same room is flagged.
+    const std::vector<float> only_echo = sum(echo, noise(played.size(), 0.0005, 8));
+    BleedMonitor other;
+    const auto echo_frames = run(other, played, only_echo);
+    CHECK(share_bleed(echo_frames, 3.0, 11.0) > 0.9);
+}
+
+TEST_CASE("bleed: a loud stretch that resembles the played signal does not move the delay",
+          "[pitch][bleed]") {
+    // A quarter of a second, five times as loud as the echo, that is the played signal at another
+    // delay: a voice in unison with it, or a second path. The window's strongest single vote is
+    // there; the echo is the lag whose votes agree.
+    const std::vector<float> played = backing(10.0, 61, true);
+    const std::vector<float> echo = room(played, 130.0, 0.3);
+    const std::vector<float> other = room(played, 107.0, 1.5);
+    std::vector<float> mic = sum(echo, noise(played.size(), 0.04, 9));
+    const std::size_t from = 4 * kRate;
+    const std::size_t to = from + kRate / 4;
+    for (std::size_t i = from; i < to; ++i) {
+        mic[i] += other[i];
+    }
+    BleedMonitor monitor;
+    std::vector<BleedFrame> frames;
+    const std::size_t chunk = kRate / 50;
+    std::optional<double> during;
+    for (std::size_t at = 0; at + chunk <= mic.size(); at += chunk) {
+        monitor.push_played(std::span<const float>(played).subspan(at, chunk));
+        monitor.push_microphone(std::span<const float>(mic).subspan(at, chunk), frames);
+        if (at + chunk == 5 * kRate) {
+            during = monitor.delay_ms();
+        }
+    }
+    REQUIRE(during.has_value());
+    CHECK(*during == Catch::Approx(130.0).margin(1.5));
+    REQUIRE(monitor.delay_ms().has_value());
+    CHECK(*monitor.delay_ms() == Catch::Approx(130.0).margin(1.5));
+}
+
 TEST_CASE("bleed: a delay that changes is followed", "[pitch][bleed]") {
     const std::vector<float> played = backing(16.0, 21);
     // 130 ms for the first 8 s and 180 ms after.
@@ -314,7 +393,9 @@ TEST_CASE("bleed: a room with reflections is still the speakers", "[pitch][bleed
     const auto frames = run(monitor, played, mic);
     REQUIRE(monitor.delay_ms().has_value());
     CHECK(*monitor.delay_ms() == Catch::Approx(95.0).margin(3.0));
-    CHECK(share_bleed(frames, 2.0, 10.0) > 0.9);
+    // The filter reaches a millisecond: what is later than that is not predicted, and a room of
+    // reflections is flagged a little less than a dry one.
+    CHECK(share_bleed(frames, 2.0, 10.0) > 0.8);
 }
 
 TEST_CASE("bleed: speakers that play the guide give a silent singer no credit",
