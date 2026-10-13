@@ -303,6 +303,10 @@ function defaultHardware() {
         project: 'iclforge_hearth_sink',
         version: 'v0.10.0-beta.1-42-gee9cf4f',
         idf_version: 'v6.1',
+        // No PSRAM and eight 16-bit slots is the shape of none of the locked profiles
+        // (firmware/hearth-sink/profiles.json), and an image not built as one reports both empty.
+        profile: '',
+        profile_hash: '',
         capabilities: [
             '2 cores, a hardware floating-point unit',
             'Running at 240 MHz',

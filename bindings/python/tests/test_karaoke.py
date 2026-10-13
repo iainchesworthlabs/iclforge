@@ -169,7 +169,14 @@ def test_a_stream_that_is_not_karaoke_is_left_alone_whatever_was_asked() -> None
 
 # --- the lyrics reader -----------------------------------------------------------------------
 
+# Every wheel has the reader but the Intel macOS one (bindings/python/CMakeLists.txt: its deployment
+# target has no std::filesystem), where the submodule is absent and these have nothing to hold.
+needs_lyrics = pytest.mark.skipif(
+    not hasattr(ac3, "lyrics"), reason="this build of the extension has no lyrics submodule"
+)
 
+
+@needs_lyrics
 def test_the_example_lyrics_read_as_a_word_timed_song() -> None:
     text = example("auld-lang-syne", "auld-lang-syne.lrc")
     lyrics = ac3.lyrics.parse(text, 16_500)
@@ -210,6 +217,7 @@ def test_the_example_lyrics_read_as_a_word_timed_song() -> None:
     assert not lyrics.position(60_000).in_line
 
 
+@needs_lyrics
 def test_a_duet_says_who_sings_each_line() -> None:
     lyrics = ac3.lyrics.parse(example("leave-her-johnny", "leave-her-johnny.lrc"))
     assert lyrics.first_singer_name == "Shantyman"
@@ -226,6 +234,7 @@ def test_a_duet_says_who_sings_each_line() -> None:
     assert ac3.lyrics.singer_marker(ac3.lyrics.Singer.kBoth) == "V1+V2:"
 
 
+@needs_lyrics
 def test_read_and_find_file_work_beside_a_media_item() -> None:
     directory = EXAMPLES / "auld-lang-syne"
     found = ac3.lyrics.find_file(str(directory / "auld-lang-syne.ac3"))
@@ -235,12 +244,14 @@ def test_read_and_find_file_work_beside_a_media_item() -> None:
     assert ac3.lyrics.find_file(str(directory / "no-such-song.ac3")) is None
 
 
+@needs_lyrics
 def test_str_content_is_read_as_text() -> None:
     lyrics = ac3.lyrics.parse("[00:01.00]Hello\n[00:03.00]World\n")
     assert [line.text for line in lyrics.lines] == ["Hello", "World"]
     assert lyrics.lines[0].end_ms == 3_000
 
 
+@needs_lyrics
 def test_utf16_lyrics_come_back_as_utf8() -> None:
     # "shalom": what an editor saves as "Unicode", and the reason UTF-16 is read at all.
     shalom = "שלום"
@@ -250,6 +261,7 @@ def test_utf16_lyrics_come_back_as_utf8() -> None:
     assert lyrics.lines[0].text == shalom
 
 
+@needs_lyrics
 def test_bytes_that_are_not_lyrics_are_refused_with_the_reason() -> None:
     with pytest.raises(ValueError, match=r"."):
         ac3.lyrics.parse(b"")

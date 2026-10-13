@@ -2150,17 +2150,25 @@ TEST_CASE("engine: a member that shows what is playing is told the item and wher
     KaraokeGroup group("now_playing_group", kFrameCount, wanted, true, 0, {"metadata@v1"});
     group.engine->play();
     const auto shown = [&] { return group.decodes->roles().metadata; };
-    group.await([&] { return shown() && shown()->title == "Karaoke programme" && shown()->progress; });
-    const auto playing = *shown();
-    CHECK_FALSE(playing.artist.has_value());
-    CHECK_FALSE(playing.album.has_value());
-    REQUIRE(playing.progress.has_value());
-    CHECK(playing.progress->playback_speed == 1000);
+    // The state while the sound moves, kept from the one read that found it. Before the output has
+    // played anything the position is held (speed 0), and it is held again at the item's end; on a
+    // slow output (the macOS runners) the held state is the first one a reader sees.
+    auto playing = shown();
+    group.await([&] {
+        playing = shown();
+        return playing && playing->title == "Karaoke programme" && playing->progress &&
+               playing->progress->playback_speed == 1000;
+    });
+    REQUIRE(playing.has_value());
+    CHECK_FALSE(playing->artist.has_value());
+    CHECK_FALSE(playing->album.has_value());
+    REQUIRE(playing->progress.has_value());
+    CHECK(playing->progress->playback_speed == 1000);
     // The item is about two seconds long, and the position is somewhere in it.
-    CHECK(playing.progress->track_duration_ms > 1000);
-    CHECK(playing.progress->track_duration_ms < 4000);
-    CHECK(playing.progress->track_progress_ms >= 0);
-    CHECK(playing.progress->track_progress_ms <= playing.progress->track_duration_ms);
+    CHECK(playing->progress->track_duration_ms > 1000);
+    CHECK(playing->progress->track_duration_ms < 4000);
+    CHECK(playing->progress->track_progress_ms >= 0);
+    CHECK(playing->progress->track_progress_ms <= playing->progress->track_duration_ms);
     // The board that lists no metadata role is told nothing.
     CHECK_FALSE(group.legacy->roles().metadata.has_value());
 
