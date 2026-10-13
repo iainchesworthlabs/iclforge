@@ -4,57 +4,57 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="49"/>
+        <location filename="../qml/AboutDialog.qml" line="50"/>
         <source>About Crucible</source>
         <translation>וועגן Crucible</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="60"/>
+        <location filename="../qml/AboutDialog.qml" line="61"/>
         <source>Crucible</source>
         <translation>Crucible</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="61"/>
+        <location filename="../qml/AboutDialog.qml" line="62"/>
         <source>your applications, placed in the room</source>
         <translation>דײַנע אַפּליקאַציעס, געשטעלט אין צימער</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="64"/>
+        <location filename="../qml/AboutDialog.qml" line="65"/>
         <source>WHAT IT DOES</source>
         <translation>וואָס עס טוט</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="66"/>
+        <location filename="../qml/AboutDialog.qml" line="67"/>
         <source>Every application with sound becomes an object in a Dolby Atmos scene. Place it in the room; the result goes to your receiver as E-AC-3 JOC over HDMI, to a PCM or spatial endpoint, or to headphones. An ICL Forge demonstration: the encoder, the object layer and the taps are the library&apos;s; this window is the room.</source>
         <translation>יעדע אַפּליקאַציע מיט קלאַנג ווערט אַן אָביעקט אין אַ Dolby Atmos סצענע. שטעלט זי אין צימער; דער רעזולטאַט גייט צום רעסיווער ווי E-AC-3 JOC איבער HDMI, צו אַ PCM אָדער ספּייַשל ענדפּוינט, אָדער צו קאָפּהערער. אַ ICL Forge דעמאָנסטראַציע: דער ענקאָדער, די אָביעקט שיכט און די אָפּנעמערס זענען פֿון דער ביבליאָטעק; דאָס פֿענצטער איז דער צימער.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="68"/>
+        <location filename="../qml/AboutDialog.qml" line="69"/>
         <source>VERSION</source>
         <translation>ווערסיע</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="73"/>
+        <location filename="../qml/AboutDialog.qml" line="74"/>
         <source>LICENCES</source>
         <translation>ליצענזן</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="75"/>
+        <location filename="../qml/AboutDialog.qml" line="76"/>
         <source>Crucible and the iclforge library are free software under the GNU General Public License, version 3 or later; the full text is LICENSE.txt in the package. Dolby, Dolby Atmos and Dolby Digital Plus are trademarks of Dolby Laboratories; this is a clean-room implementation of published standards and is not affiliated with Dolby.</source>
         <translation>Crucible און די ביבליאָטעק iclforge זײַנען פֿרײַע סאָפֿטווער אונטער דער GNU General Public License, ווערסיע 3 אָדער שפּעטער; דער פֿולער טעקסט איז LICENSE.txt אין דעם פּעקל. Dolby, Dolby Atmos און Dolby Digital Plus זײַנען האַנדלס־מאַרקן פֿון Dolby Laboratories; דאָס איז אַ ריין־צימער־אימפּלעמענטאַציע פֿון פּובליקירטע סטאַנדאַרטן און איז נישט פֿאַרבונדן מיט Dolby.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="81"/>
+        <location filename="../qml/AboutDialog.qml" line="82"/>
         <source>What this build carries from others - Qt, the {fmt} library, the Archivo and Noto Sans typefaces, and what the silent device needs on this platform - is listed with each licence under Licences; the same text ships in the package as NOTICES.txt.</source>
         <translation>וואָס דער דאָזיקער בוי טראָגט פֿון אַנדערע - Qt, די ביבליאָטעק {fmt}, די שריפֿטן Archivo און Noto Sans, און וואָס דער שטילער מכשיר דאַרף אויף דער דאָזיקער פּלאַטפֿאָרמע - איז אויסגערעכנט מיט יעדער ליצענץ אונטער ליצענצן; דער זעלביקער טעקסט קומט מיט אין דעם פּעקל ווי NOTICES.txt.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="92"/>
+        <location filename="../qml/AboutDialog.qml" line="93"/>
         <source>Licences…</source>
         <translation>ליצענצן…</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="93"/>
+        <location filename="../qml/AboutDialog.qml" line="94"/>
         <source>Close</source>
         <translation>פֿאַרמאַכן</translation>
     </message>
@@ -1627,483 +1627,498 @@
 <context>
     <name>SettingsPage</name>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="27"/>
+        <location filename="../qml/SettingsPage.qml" line="31"/>
         <source>Choose the signing key</source>
         <translation>קלײַב אויס דעם אונטערשרײַב-שליסל</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="35"/>
+        <location filename="../qml/SettingsPage.qml" line="39"/>
         <source>Save diagnostics</source>
         <translation>היט אָפּ די דיאַגנאָסטיק</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="38"/>
+        <location filename="../qml/SettingsPage.qml" line="42"/>
         <source>Text files (*.txt)</source>
         <translation>טעקסט־טעקעס (*.txt)</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="38"/>
+        <location filename="../qml/SettingsPage.qml" line="42"/>
         <source>All files (*)</source>
         <translation>אַלע טעקעס (*)</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="121"/>
+        <location filename="../qml/SettingsPage.qml" line="125"/>
         <source>Sound takes two stages here. Applications play into the system default output; this app taps them there and sends the result to the endpoint you hear. For the first stage to be silent, the default must be a device that discards what it is given: &quot;%1&quot;. Until it is there, any silent endpoint whose name matches the filter under Advanced stands in.</source>
         <translation>דער קלאַנג גייט דאָ דורך צוויי סטאַדיעס. אַפּליקאַציעס שפּילן אַרײַן אין דעם סיסטעם־דיפֿאָלט־אַרויסגאַנג; די דאָזיקע אַפּליקאַציע נעמט זיי דאָרט אָפּ און שיקט דעם רעזולטאַט צו דעם ענדפּונקט וואָס איר הערט. כּדי די ערשטע סטאַדיע זאָל זײַן שטיל, מוז דער דיפֿאָלט זײַן אַ מכשיר וואָס וואַרפֿט אַוועק וואָס מען גיט אים: &quot;%1&quot;. ביז ער איז דאָ, שטייט אין זײַן אָרט וועלכער עס איז שטילער ענדפּונקט וואָס זײַן נאָמען פּאַסט צום פֿילטער אונטער אַוואַנסירט.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="145"/>
+        <location filename="../qml/SettingsPage.qml" line="149"/>
         <source>Applications play to it: it is the system default output.</source>
         <translation>אַפּליקאַציעס שפּילן צו אים: ער איז דער סיסטעם־דיפֿאָלט־אַרויסגאַנג.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="145"/>
+        <location filename="../qml/SettingsPage.qml" line="149"/>
         <source>Applications do not play to it yet: the system default output is %1. Send them there from the Room or Signal path page.</source>
         <translation>אַפּליקאַציעס שפּילן נאָך נישט צו אים: דער סיסטעם־דיפֿאָלט־אַרויסגאַנג איז %1. שיקט זיי אַהין פֿון דעם בלאַט צימער אָדער סיגנאַל־וועג.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="157"/>
+        <location filename="../qml/SettingsPage.qml" line="161"/>
         <source>This machine can load the silent device.</source>
         <translation>די דאָזיקע מאַשין קען לאָדן דעם שטילן מכשיר.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="181"/>
+        <location filename="../qml/SettingsPage.qml" line="185"/>
         <source>Nothing to install: this application makes the silent device itself. Create it now, or it is created when you send applications to it.</source>
         <translation>גאָרנישט צו אינסטאַלירן: די דאָזיקע אַפּליקאַציע מאַכט אַליין דעם שטילן מכשיר. שאַפֿט אים איצט, אָדער ער ווערט געשאַפֿן ווען איר שיקט צו אים אַפּליקאַציעס.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="184"/>
+        <location filename="../qml/SettingsPage.qml" line="188"/>
         <source>No built driver package in the driver folder. No download carries the driver itself, only the scripts that install it: it is test-signed only, and shipping it waits on an EV certificate and attestation. Until then it has to be built from a source tree, with Advanced pointed at the folder holding the build.</source>
         <translation>קיין געבויט דרײַווער־פּעקל אין דער דרײַווער־פּאַפּקע איז נישטאָ. קיין אַראָפּלאָדונג טראָגט נישט דעם דרײַווער אַליין, בלויז די סקריפּטן וואָס אינסטאַלירן אים: ער איז נאָר טעסט־סיגנירט, און זײַן פֿאַרשפּרייטונג וואַרט אויף אַן EV־צערטיפֿיקאַט און אויף אַטעסטאַציע. ביז דעמאָלט מוז מען אים בויען פֿון אַ מקור־בוים, מיט אַוואַנסירט אָנגעוויזן אויף דער פּאַפּקע וווּ עס ליגט דער בוי.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="189"/>
+        <location filename="../qml/SettingsPage.qml" line="193"/>
         <source>Create device</source>
         <translation>שאַפֿט מכשיר</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="190"/>
+        <location filename="../qml/SettingsPage.qml" line="194"/>
         <source>Check again</source>
         <translation>קאָנטראָלירט נאָך אַ מאָל</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="210"/>
-        <location filename="../qml/SettingsPage.qml" line="225"/>
+        <location filename="../qml/SettingsPage.qml" line="214"/>
+        <location filename="../qml/SettingsPage.qml" line="229"/>
         <source>Advanced</source>
         <translation>אַוואַנסירט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="211"/>
+        <location filename="../qml/SettingsPage.qml" line="215"/>
         <source>expanded</source>
         <translation>אויסגעשפּרייט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="211"/>
+        <location filename="../qml/SettingsPage.qml" line="215"/>
         <source>collapsed</source>
         <translation>צונויפֿגעלייגט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="244"/>
+        <location filename="../qml/SettingsPage.qml" line="248"/>
         <source>A built package is there.</source>
         <translation>אַ געבויטע פּעקל ליגט דאָרט.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="244"/>
+        <location filename="../qml/SettingsPage.qml" line="248"/>
         <source>No built package is there.</source>
         <translation>קיין געבויטע פּעקל ליגט דאָרט נישט.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="249"/>
+        <location filename="../qml/SettingsPage.qml" line="253"/>
         <source>Remove device</source>
         <translation>נעמט אַראָפּ דעם מכשיר</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="251"/>
+        <location filename="../qml/SettingsPage.qml" line="255"/>
         <source>Removes the device and the driver package this folder&apos;s remove.ps1 knows about; an installed copy of the application removes its own on uninstall.</source>
         <translation>נעמט אַראָפּ דעם מכשיר און דעם דרייווער־פּעקל וואָס דער remove.ps1 פֿון דעם טעקע־פּאַפּקע קען; אַן אינסטאַלירטע קאָפּיע פֿון דער אַפּליקאַציע נעמט אַראָפּ איר אייגענע בײַם דעאינסטאַלירן.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="251"/>
+        <location filename="../qml/SettingsPage.qml" line="255"/>
         <source>Removes this application&apos;s own silent device; it also goes when the application does.</source>
         <translation>נעמט אַראָפּ דעם אייגענעם שטילן מכשיר פֿון דער דאָזיקער אַפּליקאַציע; ער גייט אויך אַוועק ווען די אַפּליקאַציע גייט אַוועק.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="262"/>
+        <location filename="../qml/SettingsPage.qml" line="266"/>
         <source>Any endpoint whose name contains this is treated as the silent device and is never chosen as an output.</source>
         <translation>יעדער ענדפּוינט וועמענס נאָמען אַנטהאַלט דאָס ווערט באַטראַכט ווי דאָס שטיל מיטל און ווערט קיין מאָל נישט אויסגעקליבן ווי אַרויסגאַנג.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="270"/>
+        <location filename="../qml/SettingsPage.qml" line="274"/>
         <source>Objects need a signing key; without one the stream is the 5.1 bed only and placement pans within it. Only the path is remembered; the key stays in its file.</source>
         <translation>אָביעקטן דאַרפֿן אַן אונטערשריפֿט־שליסל; אָן אים איז דער סטרים בלויז דאָס 5.1 בעט און די שטעלונג פֿאַרטיילט זיך דערין. בלויז דער וועג ווערט געדענקט; דער שליסל בלײַבט אין זײַן טעקע.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="286"/>
+        <location filename="../qml/SettingsPage.qml" line="290"/>
         <source>no key file chosen</source>
         <translation>קיין שליסל־טעקע נישט אויסגעקליבן</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="301"/>
+        <location filename="../qml/SettingsPage.qml" line="305"/>
         <source>An unsigned object container would be refused outright by a validating decoder, so without a key no objects are sent.</source>
         <translation>אַן אומאונטערגעשריבענער אָביעקט־קאָנטיינער וואָלט גלײַך אָפּגעוואָרפֿן געוואָרן פֿון אַ באַשטעטיקנדיקן דעקאָדער, דעריבער אָן אַ שליסל ווערן קיין אָביעקטן נישט געשיקט.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="302"/>
+        <location filename="../qml/SettingsPage.qml" line="306"/>
         <source>With no file chosen here, the environment is honoured: ICLFORGE_SIGNING_KEY_FILE names a key file and ICLFORGE_SIGNING_KEY carries the key itself.</source>
         <translation>ווען קיין טעקע איז דאָ נישט אויסגעקליבן, גילט די סבֿיבֿה: ICLFORGE_SIGNING_KEY_FILE נעמט אָן אַ שליסל־טעקע און ICLFORGE_SIGNING_KEY טראָגט דעם שליסל אַליין.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="316"/>
+        <location filename="../qml/SettingsPage.qml" line="320"/>
         <source>LATENCY</source>
         <translation>לאַטענץ</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="318"/>
+        <location filename="../qml/SettingsPage.qml" line="322"/>
         <source>Normal · 32 ms frames</source>
         <translation>נאָרמאַל · 32 ms ראַמען</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="318"/>
+        <location filename="../qml/SettingsPage.qml" line="322"/>
         <source>Low · 5.3 ms frames</source>
         <translation>נידעריק · 5.3 ms ראַמען</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="320"/>
+        <location filename="../qml/SettingsPage.qml" line="324"/>
         <source>Latency</source>
         <translation>לאַטענץ</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="323"/>
+        <location filename="../qml/SettingsPage.qml" line="327"/>
         <source>Low latency shortens the E-AC-3 frame to one block and raises the bitrate to about 1.5 Mb/s so fifteen objects&apos; metadata still fits. The receiver&apos;s own decode delay does not change. Changing this restarts the stream.</source>
         <translation>נידעריקע לאַטענץ פֿאַרקירצט די E-AC-3 ראַם צו איין בלאָק און הייבט דעם ביטרייט צו אַרום 1.5 Mb/s אַז די מעטאַדאַטן פֿון פֿופֿצן אָביעקטן זאָלן נאָך אַרײַנפּאַסן. דעם רעסיווערס אייגענע דעקאָדיר-פֿאַרשפּעטיקונג ענדערט זיך ניט. ענדערן דאָס הייבט דעם שטראָם אָן פֿון דאָס נײַ.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="329"/>
+        <location filename="../qml/SettingsPage.qml" line="333"/>
         <source>CODEC</source>
         <translation>קאָדעק</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="331"/>
-        <location filename="../qml/SettingsPage.qml" line="337"/>
+        <location filename="../qml/SettingsPage.qml" line="335"/>
+        <location filename="../qml/SettingsPage.qml" line="341"/>
         <source>Bitrate</source>
         <translation>ביטרייט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="341"/>
+        <location filename="../qml/SettingsPage.qml" line="345"/>
         <source>automatic</source>
         <translation>אויטאָמאַטיש</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="341"/>
+        <location filename="../qml/SettingsPage.qml" line="345"/>
         <source>256 kb/s</source>
         <translation>256 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="341"/>
+        <location filename="../qml/SettingsPage.qml" line="345"/>
         <source>384 kb/s</source>
         <translation>384 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="342"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>448 kb/s</source>
         <translation>448 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="342"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>640 kb/s</source>
         <translation>640 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="342"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>1024 kb/s</source>
         <translation>1024 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="343"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>1536 kb/s</source>
         <translation>1536 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="343"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>2048 kb/s</source>
         <translation>2048 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="368"/>
+        <location filename="../qml/SettingsPage.qml" line="372"/>
         <source>E-AC-3 · 5.1 bed + up to 15 objects · automatic is 448 kb/s, or 1536 kb/s in low latency</source>
         <translation>E-AC-3 · 5.1 בעט + ביז 15 אָביעקטן · אויטאָמאַטיש איז 448 kb/s, אָדער 1536 kb/s אין נידעריקער לאַטענץ</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="370"/>
+        <location filename="../qml/SettingsPage.qml" line="374"/>
         <source>Split stereo applications into two objects</source>
         <translation>צעטיילן סטערעאָ אַפּליקאַציעס אין צוויי אָביעקטן</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="443"/>
+        <location filename="../qml/SettingsPage.qml" line="447"/>
         <source>System follows the language the desktop is set to. The translations are machine-made and have not been read by a speaker.</source>
         <translation>סיסטעם גייט נאָך דער שפּראַך אויף וועלכער דער דעסקטאָפּ איז אײַנגעשטעלט. די איבערזעצונגען זײַנען מאַשין־געמאַכט און קיין רעדער האָט זיי נישט איבערגעלייענט.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="446"/>
-        <location filename="../qml/SettingsPage.qml" line="453"/>
+        <location filename="../qml/SettingsPage.qml" line="450"/>
+        <location filename="../qml/SettingsPage.qml" line="457"/>
         <source>Text size</source>
         <translation>טעקסט־גרייס</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="456"/>
+        <location filename="../qml/SettingsPage.qml" line="460"/>
         <source>Every size in the window follows this; 100% is the size it is drawn at. System takes the text size the desktop reports and counts 9 pt as 100%, so on a desktop whose base size is larger the window starts larger too.</source>
         <translation>יעדע גרייס אין דעם פֿענצטער גייט נאָך דעם; 100% איז די גרייס אין וועלכער עס ווערט געצייכנט. סיסטעם נעמט די טעקסט־גרייס וואָס דער דעסקטאָפּ מעלדט און רעכנט 9 pt ווי 100%, אַזוי אַז אויף אַ דעסקטאָפּ מיט אַ גרעסערער יסוד־גרייס הייבט זיך דאָס פֿענצטער אויך אָן גרעסער.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="496"/>
+        <location filename="../qml/SettingsPage.qml" line="500"/>
         <source>Show applications with no audio</source>
         <translation>ווײַזן אַפּליקאַציעס אָן קלאַנג</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="497"/>
+        <location filename="../qml/SettingsPage.qml" line="501"/>
         <source>Running applications with a window but no audio session, greyed until they play. Off hides them unless they are placed.</source>
         <translation>לויפֿנדיקע אַפּליקאַציעס מיט אַ פֿענצטער אָבער אָן אַ קלאַנג־סעסיע, גראָ ביז זיי שפּילן. אָפּ באַהאַלט זיי סײַדן זיי זענען געשטעלט.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="503"/>
+        <location filename="../qml/SettingsPage.qml" line="507"/>
         <source>Show background processes in the room</source>
         <translation>ווײַזן הינטערגרונט־פּראָצעסן אין צימער</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="504"/>
+        <location filename="../qml/SettingsPage.qml" line="508"/>
         <source>Processes with sound but no window of their own (a virtual machine&apos;s backend, the text-input host). They stay in the bed either way.</source>
         <translation>פּראָצעסן מיט קלאַנג אָבער אָן אַן אייגן פֿענצטער (דער בעקענד פֿון אַ ווירטועלער מאַשין, דער טעקסט־אַרײַנגאַנג האָסט). זיי בלײַבן סײַ ווי אין בעט.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="516"/>
+        <location filename="../qml/SettingsPage.qml" line="520"/>
         <source>DIAGNOSTICS</source>
         <translation>דיאַגנאָסטיק</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="517"/>
+        <location filename="../qml/SettingsPage.qml" line="521"/>
         <source>A text file for a bug report: the version and platform, the engine&apos;s counters, the endpoints the probe found, the two devices of the signal path, this app&apos;s settings and its recent messages. It does not carry the signing key, the path to it, or any environment variable&apos;s value; it does name your audio devices and running applications, so read it before you attach it.</source>
         <translation>אַ טעקסט־טעקע פֿאַר אַ באַג־באַריכט: די ווערסיע און די פּלאַטפֿאָרמע, די ציילער פֿון דעם מאָטאָר, די ענדפּונקטן וואָס די פּראָבע האָט געפֿונען, די צוויי מכשירים פֿון דעם סיגנאַל־וועג, די אײַנשטעלונגען פֿון דער דאָזיקער אַפּליקאַציע און אירע לעצטע מעלדונגען. עס טראָגט נישט דעם סיגנירונג־שליסל, נישט דעם וועג צו אים, און נישט דעם ווערט פֿון וועלכער עס איז סבֿיבֿה־וואַריאַבל; עס דערמאָנט יאָ אײַערע אַודיאָ־מכשירים און לויפֿנדיקע אַפּליקאַציעס, טאָ לייענט עס איבער איידער איר צוגיט עס.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="521"/>
+        <location filename="../qml/SettingsPage.qml" line="525"/>
         <source>Save diagnostics…</source>
         <translation>היט אָפּ די דיאַגנאָסטיק…</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="532"/>
+        <location filename="../qml/SettingsPage.qml" line="536"/>
         <source>LYRIC EVENTS OUT</source>
         <translation>ווערטער־געשעענישן (אַרויס)</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="536"/>
+        <location filename="../qml/SettingsPage.qml" line="540"/>
         <source>Send the lyric strip&apos;s events over OSC</source>
         <translation>שיקן די געשעענישן פון דער ווערטער־שטרײַף דורך OSC</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="537"/>
+        <location filename="../qml/SettingsPage.qml" line="541"/>
         <source>The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.</source>
         <translation>די שורה און דאס וואָרט וואָס ווערן געזונגען, אלס OSC־מעלדונגען איבער UDP, פֿאַר א ליכט־ אדער שאו־קאנטראל־סיסטעם וואָס פֿאָלגט זיי. אויס ביז איר שאלט עס אָן.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="544"/>
-        <location filename="../qml/SettingsPage.qml" line="547"/>
+        <location filename="../qml/SettingsPage.qml" line="548"/>
+        <location filename="../qml/SettingsPage.qml" line="551"/>
         <source>Send to</source>
         <translation>שיקן צו</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="555"/>
-        <location filename="../qml/SettingsPage.qml" line="558"/>
+        <location filename="../qml/SettingsPage.qml" line="559"/>
+        <location filename="../qml/SettingsPage.qml" line="562"/>
         <source>Port</source>
         <translation>פּאָרט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="574"/>
+        <location filename="../qml/SettingsPage.qml" line="578"/>
         <source>Lines</source>
         <translation>שורות</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="582"/>
+        <location filename="../qml/SettingsPage.qml" line="586"/>
         <source>Words</source>
         <translation>ווערטער</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="590"/>
+        <location filename="../qml/SettingsPage.qml" line="594"/>
         <source>Position, ten times a second</source>
         <translation>פּאָזיציע, צען מאָל אין סעקונדע</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="596"/>
+        <location filename="../qml/SettingsPage.qml" line="600"/>
         <source>Each message begins with the application&apos;s name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line&apos;s number, text and times; /word the same for a word of a word-timed line; /position the song&apos;s place in milliseconds. Times are milliseconds from the start of the song.</source>
         <translation>יעדע מעלדונג הייבט אן מיטן נאמען פון דער אפליקאציע. /crucible/lyrics/state זאגט following, stopped אדער cleared; /line גיט די נומער, דעם טעקסט און די צײַטן פון דער שורה; /word דאס זעלבע פֿאַר א וואָרט פון א וואָרט־געצײַטיקטער שורה; /position דעם אָרט פון דעם ליד אין מיליסעקונדעס. צײַטן זענען מיליסעקונדעס פון אָנהייב פון ליד.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="370"/>
+        <location filename="../qml/SettingsPage.qml" line="610"/>
+        <source>ABOUT</source>
+        <translation>וועגן</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="611"/>
+        <source>What this is, the version and build it came from, and the licences it carries.</source>
+        <translation>וואָס דאָס איז, די ווערסיע און דער בוי פֿון וואַנען עס איז געקומען, און די ליצענצן וואָס עס טראָגט.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="615"/>
+        <source>About Crucible…</source>
+        <translation>וועגן Crucible…</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="374"/>
         <source>Costs two slots per application; the pair sits either side of the position you place, and an application that cannot get two free slots waits in the bed. Applies to applications the engine meets from now on; each application&apos;s row can override it.</source>
         <translation>קאָסט צוויי שטעלן פּער אַפּליקאַציע; דאָס פּאָר זיצט אויף ביידע זײַטן פֿון דער געשטעלטער פּאָזיציע, און אַן אַפּליקאַציע וואָס קען נישט קריגן צוויי פֿרײַע שטעלן וואַרט אין בעט. גילט פֿאַר אַפּליקאַציעס וואָס דער מאָטאָר טרעפֿט פֿון איצט אָן; די שורה פֿון יעדער אַפּליקאַציע קען דאָס איבערשרײַבן.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="269"/>
+        <location filename="../qml/SettingsPage.qml" line="273"/>
         <source>SIGNING KEY</source>
         <translation>אונטערשרײַב-שליסל</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="293"/>
+        <location filename="../qml/SettingsPage.qml" line="297"/>
         <source>Browse…</source>
         <translation>בלעטערן…</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="294"/>
+        <location filename="../qml/SettingsPage.qml" line="298"/>
         <source>Clear</source>
         <translation>אויסמעקן</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="189"/>
+        <location filename="../qml/SettingsPage.qml" line="193"/>
         <source>Install driver</source>
         <translation>אינסטאַלירן דרײַווער</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="249"/>
+        <location filename="../qml/SettingsPage.qml" line="253"/>
         <source>Remove driver</source>
         <translation>אַראָפּנעמען דרײַווער</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="236"/>
-        <location filename="../qml/SettingsPage.qml" line="239"/>
+        <location filename="../qml/SettingsPage.qml" line="240"/>
+        <location filename="../qml/SettingsPage.qml" line="243"/>
         <source>Driver folder</source>
         <translation>דרײַווער-פּאַפּקע</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="254"/>
-        <location filename="../qml/SettingsPage.qml" line="257"/>
+        <location filename="../qml/SettingsPage.qml" line="258"/>
+        <location filename="../qml/SettingsPage.qml" line="261"/>
         <source>Silent device</source>
         <translation>שטילער מיטל</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="376"/>
+        <location filename="../qml/SettingsPage.qml" line="380"/>
         <source>APPEARANCE</source>
         <translation>אויסזען</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="378"/>
         <location filename="../qml/SettingsPage.qml" line="382"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
         <source>Theme</source>
         <translation>טעמע</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="380"/>
-        <location filename="../qml/SettingsPage.qml" line="389"/>
-        <location filename="../qml/SettingsPage.qml" line="410"/>
-        <location filename="../qml/SettingsPage.qml" line="451"/>
+        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="393"/>
+        <location filename="../qml/SettingsPage.qml" line="414"/>
+        <location filename="../qml/SettingsPage.qml" line="455"/>
         <source>System</source>
         <translation>סיסטעם</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="380"/>
+        <location filename="../qml/SettingsPage.qml" line="384"/>
         <source>Light</source>
         <translation>ליכטיק</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="380"/>
+        <location filename="../qml/SettingsPage.qml" line="384"/>
         <source>Dark</source>
         <translation>טונקל</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="402"/>
         <location filename="../qml/SettingsPage.qml" line="406"/>
+        <location filename="../qml/SettingsPage.qml" line="410"/>
         <source>Language</source>
         <translation>שפּראַך</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="387"/>
-        <location filename="../qml/SettingsPage.qml" line="397"/>
+        <location filename="../qml/SettingsPage.qml" line="391"/>
+        <location filename="../qml/SettingsPage.qml" line="401"/>
         <source>Palette</source>
         <translation>פּאַלעטע</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="120"/>
+        <location filename="../qml/SettingsPage.qml" line="124"/>
         <source>SILENT DEVICE · WHERE APPLICATIONS PLAY</source>
         <translation>שטילער מכשיר · וווּ אַפּליקאַציעס שפּילן</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="141"/>
+        <location filename="../qml/SettingsPage.qml" line="145"/>
         <source>No silent device: nothing named like &quot;%1&quot; exists, so applications can only play to a real device and are heard directly.</source>
         <translation>קיין שטילער מכשיר: גאָרנישט מיטן נאָמען ווי „%1“ עקזיסטירט, דעריבער קענען אַפּליקאַציעס נאָר שפּילן אויף אַן אמתן מכשיר און ווערן געהערט דירעקט.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="141"/>
+        <location filename="../qml/SettingsPage.qml" line="145"/>
         <source>The silent device is installed: an endpoint named like &quot;%1&quot;.</source>
         <translation>דער שטילער מכשיר איז אינסטאַלירט: אַן ענדפּוינט מיטן נאָמען ווי „%1“.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="145"/>
+        <location filename="../qml/SettingsPage.qml" line="149"/>
         <source>not set</source>
         <translation>ניט געשטעלט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="183"/>
+        <location filename="../qml/SettingsPage.qml" line="187"/>
         <source>A built driver package is in the driver folder, ready to install.</source>
         <translation>אַ געבויטע דרייווער־פּעקל ליגט אין דעם דרייווער־פּאַפּקע, גרייט צו אינסטאַלירן.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="244"/>
+        <location filename="../qml/SettingsPage.qml" line="248"/>
         <source>Where install.ps1, remove.ps1 and the built package live: beside this app by default, or apps/crucible/windows/driver in a source tree.</source>
         <translation>וווּ install.ps1, remove.ps1 און דאָס געבויטע פּעקל ליגן: לעבן דער אַפּ דיפֿאָלט, אָדער apps/crucible/windows/driver אין אַ מקור־בוים.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="391"/>
+        <location filename="../qml/SettingsPage.qml" line="395"/>
         <source>Signal</source>
         <extracomment>Palette name. A product name: leave it as it is unless the language has an established rendering of its own.</extracomment>
         <translation>סיגנאַל</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="393"/>
+        <location filename="../qml/SettingsPage.qml" line="397"/>
         <source>Ink</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>טינט</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="395"/>
+        <location filename="../qml/SettingsPage.qml" line="399"/>
         <source>Console</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>קאָנסאָל</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="459"/>
+        <location filename="../qml/SettingsPage.qml" line="463"/>
         <source>3D layout</source>
         <translation>3D אויסלייג</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="461"/>
+        <location filename="../qml/SettingsPage.qml" line="465"/>
         <source>Auto</source>
         <translation>אויטאָ</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="463"/>
+        <location filename="../qml/SettingsPage.qml" line="467"/>
         <source>3D reference layout</source>
         <translation>3D רעפֿערענץ אויסלייג</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="466"/>
+        <location filename="../qml/SettingsPage.qml" line="470"/>
         <source>The speakers the 3D room draws for reference. Auto shows 5.1 while the stream is bed only and 7.1.4 once objects are on.</source>
         <translation>די רעדנערס וואָס דער 3D צימער צייכנט פֿאַר רעפֿערענץ. אויטאָ ווײַזט 5.1 בשעת דער סטרים איז בלויז בעט און 7.1.4 ווען אָביעקטן זענען אָן.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="473"/>
+        <location filename="../qml/SettingsPage.qml" line="477"/>
         <source>BEHAVIOUR</source>
         <translation>אויפֿפֿירונג</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="476"/>
+        <location filename="../qml/SettingsPage.qml" line="480"/>
         <source>Move the default output to the silent device on launch</source>
         <translation>באַוועג דעם סטאַנדאַרט אַרויסגאַנג צום שטילן מיטל בײַם אָנהייב</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="477"/>
+        <location filename="../qml/SettingsPage.qml" line="481"/>
         <source>Restored to the previous device on quit.</source>
         <translation>צוריקגעשטעלט צום פֿריִערדיקן מיטל בײַם אַרויסגיין.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="484"/>
+        <location filename="../qml/SettingsPage.qml" line="488"/>
         <source>Keep running in the tray when the window is closed</source>
         <translation>ווײַטער לויפֿן אין טרעי ווען דער פֿענצטער ווערט פֿאַרמאַכט</translation>
     </message>

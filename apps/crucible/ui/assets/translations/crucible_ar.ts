@@ -4,57 +4,57 @@
 <context>
     <name>AboutDialog</name>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="49"/>
+        <location filename="../qml/AboutDialog.qml" line="50"/>
         <source>About Crucible</source>
         <translation>حول Crucible</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="60"/>
+        <location filename="../qml/AboutDialog.qml" line="61"/>
         <source>Crucible</source>
         <translation>Crucible</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="61"/>
+        <location filename="../qml/AboutDialog.qml" line="62"/>
         <source>your applications, placed in the room</source>
         <translation>تطبيقاتك، موضوعة في الغرفة</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="64"/>
+        <location filename="../qml/AboutDialog.qml" line="65"/>
         <source>WHAT IT DOES</source>
         <translation>ما يفعله</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="66"/>
+        <location filename="../qml/AboutDialog.qml" line="67"/>
         <source>Every application with sound becomes an object in a Dolby Atmos scene. Place it in the room; the result goes to your receiver as E-AC-3 JOC over HDMI, to a PCM or spatial endpoint, or to headphones. An ICL Forge demonstration: the encoder, the object layer and the taps are the library&apos;s; this window is the room.</source>
         <translation>يصبح كل تطبيق له صوت كائناً في مشهد Dolby Atmos. ضعه في الغرفة؛ تذهب النتيجة إلى جهاز الاستقبال بصيغة E-AC-3 JOC عبر HDMI، أو إلى نقطة نهاية PCM أو مكانية، أو إلى سماعات الرأس. عرض توضيحي لـ ICL Forge: المشفّر وطبقة الكائنات والالتقاطات من المكتبة؛ هذه النافذة هي الغرفة.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="68"/>
+        <location filename="../qml/AboutDialog.qml" line="69"/>
         <source>VERSION</source>
         <translation>الإصدار</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="73"/>
+        <location filename="../qml/AboutDialog.qml" line="74"/>
         <source>LICENCES</source>
         <translation>التراخيص</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="75"/>
+        <location filename="../qml/AboutDialog.qml" line="76"/>
         <source>Crucible and the iclforge library are free software under the GNU General Public License, version 3 or later; the full text is LICENSE.txt in the package. Dolby, Dolby Atmos and Dolby Digital Plus are trademarks of Dolby Laboratories; this is a clean-room implementation of published standards and is not affiliated with Dolby.</source>
         <translation>يُعدّ Crucible ومكتبة iclforge برنامجين حرّين بموجب رخصة GNU General Public License، الإصدار 3 أو ما بعده؛ والنص الكامل هو LICENSE.txt في الحزمة. أما Dolby وDolby Atmos وDolby Digital Plus فهي علامات تجارية لشركة Dolby Laboratories؛ وهذا تنفيذ من غرفة نظيفة لمعايير منشورة، ولا صلة له بشركة Dolby.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="81"/>
+        <location filename="../qml/AboutDialog.qml" line="82"/>
         <source>What this build carries from others - Qt, the {fmt} library, the Archivo and Noto Sans typefaces, and what the silent device needs on this platform - is listed with each licence under Licences; the same text ships in the package as NOTICES.txt.</source>
         <translation>ما يحمله هذا البناء من أعمال الآخرين - Qt ومكتبة {fmt} وخطَّا Archivo وNoto Sans وما يحتاجه الجهاز الصامت على هذه المنصة - مذكور مع رخصة كلٍّ منها ضمن الرخص؛ والنص نفسه يُشحن في الحزمة باسم NOTICES.txt.</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="92"/>
+        <location filename="../qml/AboutDialog.qml" line="93"/>
         <source>Licences…</source>
         <translation>الرخص…</translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="93"/>
+        <location filename="../qml/AboutDialog.qml" line="94"/>
         <source>Close</source>
         <translation>إغلاق</translation>
     </message>
@@ -1627,483 +1627,498 @@
 <context>
     <name>SettingsPage</name>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="27"/>
+        <location filename="../qml/SettingsPage.qml" line="31"/>
         <source>Choose the signing key</source>
         <translation>اختيار مفتاح التوقيع</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="35"/>
+        <location filename="../qml/SettingsPage.qml" line="39"/>
         <source>Save diagnostics</source>
         <translation>حفظ التشخيصات</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="38"/>
+        <location filename="../qml/SettingsPage.qml" line="42"/>
         <source>Text files (*.txt)</source>
         <translation>ملفات نصية (*.txt)</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="38"/>
+        <location filename="../qml/SettingsPage.qml" line="42"/>
         <source>All files (*)</source>
         <translation>كل الملفات (*)</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="121"/>
+        <location filename="../qml/SettingsPage.qml" line="125"/>
         <source>Sound takes two stages here. Applications play into the system default output; this app taps them there and sends the result to the endpoint you hear. For the first stage to be silent, the default must be a device that discards what it is given: &quot;%1&quot;. Until it is there, any silent endpoint whose name matches the filter under Advanced stands in.</source>
         <translation>يمرّ الصوت هنا بمرحلتين. تُخرج التطبيقات صوتها إلى المخرج الافتراضي للنظام؛ ويلتقطها هذا البرنامج هناك ويرسل النتيجة إلى نقطة النهاية التي تسمعها. ولكي تكون المرحلة الأولى صامتة، يجب أن يكون الافتراضي جهازًا يتخلّص مما يُعطى له: &quot;%1&quot;. وإلى أن يوجد، تنوب عنه أي نقطة نهاية صامتة يطابق اسمها المرشِّح الموجود ضمن &quot;متقدم&quot;.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="145"/>
+        <location filename="../qml/SettingsPage.qml" line="149"/>
         <source>Applications play to it: it is the system default output.</source>
         <translation>تُخرج التطبيقات صوتها إليه: فهو المخرج الافتراضي للنظام.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="145"/>
+        <location filename="../qml/SettingsPage.qml" line="149"/>
         <source>Applications do not play to it yet: the system default output is %1. Send them there from the Room or Signal path page.</source>
         <translation>لا تُخرج التطبيقات صوتها إليه بعد: فالمخرج الافتراضي للنظام هو %1. أرسلها إلى هناك من صفحة الغرفة أو صفحة مسار الإشارة.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="157"/>
+        <location filename="../qml/SettingsPage.qml" line="161"/>
         <source>This machine can load the silent device.</source>
         <translation>يستطيع هذا الحاسوب تحميل الجهاز الصامت.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="181"/>
+        <location filename="../qml/SettingsPage.qml" line="185"/>
         <source>Nothing to install: this application makes the silent device itself. Create it now, or it is created when you send applications to it.</source>
         <translation>لا شيء لتنصيبه: هذا التطبيق يصنع الجهاز الصامت بنفسه. أنشئه الآن، أو سيُنشأ عندما ترسل التطبيقات إليه.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="184"/>
+        <location filename="../qml/SettingsPage.qml" line="188"/>
         <source>No built driver package in the driver folder. No download carries the driver itself, only the scripts that install it: it is test-signed only, and shipping it waits on an EV certificate and attestation. Until then it has to be built from a source tree, with Advanced pointed at the folder holding the build.</source>
         <translation>لا توجد حزمة مبنية لبرنامج التشغيل في مجلد برنامج التشغيل. ولا يحمل أي تنزيل برنامج التشغيل نفسه، بل النصوص البرمجية التي تنصّبه فقط: فهو موقَّع للاختبار فقط، وشحنه ينتظر شهادة EV والتصديق. وإلى ذلك الحين يجب بناؤه من شجرة مصدر، مع توجيه &quot;متقدم&quot; إلى المجلد الذي يحوي البناء.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="189"/>
+        <location filename="../qml/SettingsPage.qml" line="193"/>
         <source>Create device</source>
         <translation>أنشئ الجهاز</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="190"/>
+        <location filename="../qml/SettingsPage.qml" line="194"/>
         <source>Check again</source>
         <translation>تحقق مجدداً</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="210"/>
-        <location filename="../qml/SettingsPage.qml" line="225"/>
+        <location filename="../qml/SettingsPage.qml" line="214"/>
+        <location filename="../qml/SettingsPage.qml" line="229"/>
         <source>Advanced</source>
         <translation>خيارات متقدمة</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="211"/>
+        <location filename="../qml/SettingsPage.qml" line="215"/>
         <source>expanded</source>
         <translation>موسَّع</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="211"/>
+        <location filename="../qml/SettingsPage.qml" line="215"/>
         <source>collapsed</source>
         <translation>مطوي</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="244"/>
+        <location filename="../qml/SettingsPage.qml" line="248"/>
         <source>A built package is there.</source>
         <translation>توجد حزمة مبنية هناك.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="244"/>
+        <location filename="../qml/SettingsPage.qml" line="248"/>
         <source>No built package is there.</source>
         <translation>لا توجد حزمة مبنية هناك.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="249"/>
+        <location filename="../qml/SettingsPage.qml" line="253"/>
         <source>Remove device</source>
         <translation>أزل الجهاز</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="251"/>
+        <location filename="../qml/SettingsPage.qml" line="255"/>
         <source>Removes the device and the driver package this folder&apos;s remove.ps1 knows about; an installed copy of the application removes its own on uninstall.</source>
         <translation>يزيل الجهاز وحزمة برنامج التشغيل التي يعرفها remove.ps1 في هذا المجلد؛ النسخة المثبتة من التطبيق تزيل حزمتها عند إلغاء التثبيت.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="251"/>
+        <location filename="../qml/SettingsPage.qml" line="255"/>
         <source>Removes this application&apos;s own silent device; it also goes when the application does.</source>
         <translation>يزيل الجهاز الصامت الخاص بهذا التطبيق؛ وهو يزول أيضًا عندما يزول التطبيق.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="262"/>
+        <location filename="../qml/SettingsPage.qml" line="266"/>
         <source>Any endpoint whose name contains this is treated as the silent device and is never chosen as an output.</source>
         <translation>أي نقطة نهاية يحتوي اسمها على هذا تُعامل كجهاز صامت ولا تُختار إخراجاً أبداً.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="270"/>
+        <location filename="../qml/SettingsPage.qml" line="274"/>
         <source>Objects need a signing key; without one the stream is the 5.1 bed only and placement pans within it. Only the path is remembered; the key stays in its file.</source>
         <translation>تحتاج الكائنات إلى مفتاح توقيع؛ بدونه يكون البث قاعدة 5.1 فقط ويتوزع الوضع داخلها. يُحفظ المسار فقط؛ يبقى المفتاح في ملفه.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="286"/>
+        <location filename="../qml/SettingsPage.qml" line="290"/>
         <source>no key file chosen</source>
         <translation>لم يُختر ملف مفتاح</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="301"/>
+        <location filename="../qml/SettingsPage.qml" line="305"/>
         <source>An unsigned object container would be refused outright by a validating decoder, so without a key no objects are sent.</source>
         <translation>سيُرفض حاوي كائنات غير موقّع رفضاً قاطعاً من مفكك شفرة يتحقق، لذا بدون مفتاح لا تُرسل كائنات.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="302"/>
+        <location filename="../qml/SettingsPage.qml" line="306"/>
         <source>With no file chosen here, the environment is honoured: ICLFORGE_SIGNING_KEY_FILE names a key file and ICLFORGE_SIGNING_KEY carries the key itself.</source>
         <translation>بدون ملف مختار هنا، تُحترم البيئة: ICLFORGE_SIGNING_KEY_FILE يسمّي ملف مفتاح وICLFORGE_SIGNING_KEY يحمل المفتاح نفسه.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="316"/>
+        <location filename="../qml/SettingsPage.qml" line="320"/>
         <source>LATENCY</source>
         <translation>زمن الاستجابة</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="318"/>
+        <location filename="../qml/SettingsPage.qml" line="322"/>
         <source>Normal · 32 ms frames</source>
         <translation>عادي · إطارات 32 ms</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="318"/>
+        <location filename="../qml/SettingsPage.qml" line="322"/>
         <source>Low · 5.3 ms frames</source>
         <translation>منخفض · إطارات 5.3 ms</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="320"/>
+        <location filename="../qml/SettingsPage.qml" line="324"/>
         <source>Latency</source>
         <translation>زمن الاستجابة</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="323"/>
+        <location filename="../qml/SettingsPage.qml" line="327"/>
         <source>Low latency shortens the E-AC-3 frame to one block and raises the bitrate to about 1.5 Mb/s so fifteen objects&apos; metadata still fits. The receiver&apos;s own decode delay does not change. Changing this restarts the stream.</source>
         <translation>يقصّر زمن الاستجابة المنخفض إطار E-AC-3 إلى كتلة واحدة ويرفع معدل البت إلى نحو 1.5 Mb/s حتى تظل بيانات خمسة عشر كائنًا تتسع. لا يتغير تأخير فك الترميز الخاص بالمستقبل. تغيير هذا يعيد تشغيل التدفق.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="329"/>
+        <location filename="../qml/SettingsPage.qml" line="333"/>
         <source>CODEC</source>
         <translation>الترميز</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="331"/>
-        <location filename="../qml/SettingsPage.qml" line="337"/>
+        <location filename="../qml/SettingsPage.qml" line="335"/>
+        <location filename="../qml/SettingsPage.qml" line="341"/>
         <source>Bitrate</source>
         <translation>معدل البت</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="341"/>
+        <location filename="../qml/SettingsPage.qml" line="345"/>
         <source>automatic</source>
         <translation>تلقائي</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="341"/>
+        <location filename="../qml/SettingsPage.qml" line="345"/>
         <source>256 kb/s</source>
         <translation>256 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="341"/>
+        <location filename="../qml/SettingsPage.qml" line="345"/>
         <source>384 kb/s</source>
         <translation>384 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="342"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>448 kb/s</source>
         <translation>448 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="342"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>640 kb/s</source>
         <translation>640 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="342"/>
+        <location filename="../qml/SettingsPage.qml" line="346"/>
         <source>1024 kb/s</source>
         <translation>1024 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="343"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>1536 kb/s</source>
         <translation>1536 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="343"/>
+        <location filename="../qml/SettingsPage.qml" line="347"/>
         <source>2048 kb/s</source>
         <translation>2048 kb/s</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="368"/>
+        <location filename="../qml/SettingsPage.qml" line="372"/>
         <source>E-AC-3 · 5.1 bed + up to 15 objects · automatic is 448 kb/s, or 1536 kb/s in low latency</source>
         <translation>E-AC-3 · قاعدة 5.1 + حتى 15 كائنًا · التلقائي هو 448 kb/s، أو 1536 kb/s في زمن الاستجابة المنخفض</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="370"/>
+        <location filename="../qml/SettingsPage.qml" line="374"/>
         <source>Split stereo applications into two objects</source>
         <translation>تقسيم تطبيقات الاستيريو إلى كائنين</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="443"/>
+        <location filename="../qml/SettingsPage.qml" line="447"/>
         <source>System follows the language the desktop is set to. The translations are machine-made and have not been read by a speaker.</source>
         <translation>يتبع خيار النظام اللغة المضبوطة على سطح المكتب. والترجمات آلية ولم يقرأها ناطق باللغة.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="446"/>
-        <location filename="../qml/SettingsPage.qml" line="453"/>
+        <location filename="../qml/SettingsPage.qml" line="450"/>
+        <location filename="../qml/SettingsPage.qml" line="457"/>
         <source>Text size</source>
         <translation>حجم النص</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="456"/>
+        <location filename="../qml/SettingsPage.qml" line="460"/>
         <source>Every size in the window follows this; 100% is the size it is drawn at. System takes the text size the desktop reports and counts 9 pt as 100%, so on a desktop whose base size is larger the window starts larger too.</source>
         <translation>كل حجم في النافذة يتبع هذا؛ و100% هو الحجم الذي تُرسم به. ويأخذ خيار النظام حجم النص الذي يبلّغ عنه سطح المكتب ويعدّ 9 pt مساويًا لـ100%، فعلى سطح مكتب حجمه الأساسي أكبر تبدأ النافذة أكبر أيضًا.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="496"/>
+        <location filename="../qml/SettingsPage.qml" line="500"/>
         <source>Show applications with no audio</source>
         <translation>إظهار التطبيقات بلا صوت</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="497"/>
+        <location filename="../qml/SettingsPage.qml" line="501"/>
         <source>Running applications with a window but no audio session, greyed until they play. Off hides them unless they are placed.</source>
         <translation>تطبيقات قيد التشغيل لها نافذة لكن بلا جلسة صوت، رمادية حتى تشغّل. الإيقاف يخفيها ما لم تكن موضوعة.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="503"/>
+        <location filename="../qml/SettingsPage.qml" line="507"/>
         <source>Show background processes in the room</source>
         <translation>إظهار العمليات الخلفية في الغرفة</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="504"/>
+        <location filename="../qml/SettingsPage.qml" line="508"/>
         <source>Processes with sound but no window of their own (a virtual machine&apos;s backend, the text-input host). They stay in the bed either way.</source>
         <translation>عمليات لها صوت لكن بلا نافذة خاصة بها (خلفية آلة افتراضية، مضيف إدخال النص). تبقى في القاعدة على أي حال.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="516"/>
+        <location filename="../qml/SettingsPage.qml" line="520"/>
         <source>DIAGNOSTICS</source>
         <translation>التشخيصات</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="517"/>
+        <location filename="../qml/SettingsPage.qml" line="521"/>
         <source>A text file for a bug report: the version and platform, the engine&apos;s counters, the endpoints the probe found, the two devices of the signal path, this app&apos;s settings and its recent messages. It does not carry the signing key, the path to it, or any environment variable&apos;s value; it does name your audio devices and running applications, so read it before you attach it.</source>
         <translation>ملف نصي لتقرير علة: الإصدار والمنصة، وعدّادات المحرك، ونقاط النهاية التي وجدها الفحص، وجهازا مسار الإشارة، وإعدادات هذا البرنامج ورسائله الأخيرة. وهو لا يحمل مفتاح التوقيع ولا المسار إليه ولا قيمة أي متغيّر بيئة؛ لكنه يذكر أسماء أجهزة الصوت لديك والتطبيقات قيد التشغيل، فاقرأه قبل أن ترفقه.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="521"/>
+        <location filename="../qml/SettingsPage.qml" line="525"/>
         <source>Save diagnostics…</source>
         <translation>احفظ التشخيصات…</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="532"/>
+        <location filename="../qml/SettingsPage.qml" line="536"/>
         <source>LYRIC EVENTS OUT</source>
         <translation>أحداث الكلمات الصادرة</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="536"/>
+        <location filename="../qml/SettingsPage.qml" line="540"/>
         <source>Send the lyric strip&apos;s events over OSC</source>
         <translation>إرسال أحداث شريط الكلمات عبر OSC</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="537"/>
+        <location filename="../qml/SettingsPage.qml" line="541"/>
         <source>The line and the word being sung, as OSC messages over UDP, for a lighting or show-control rig that follows them. Off until you turn it on.</source>
         <translation>السطر والكلمة اللذان يُغنّيان، كرسائل OSC عبر UDP، لجهاز إضاءة أو تحكم في العروض يتابعهما. متوقف حتى تشغّله.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="544"/>
-        <location filename="../qml/SettingsPage.qml" line="547"/>
+        <location filename="../qml/SettingsPage.qml" line="548"/>
+        <location filename="../qml/SettingsPage.qml" line="551"/>
         <source>Send to</source>
         <translation>إرسال إلى</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="555"/>
-        <location filename="../qml/SettingsPage.qml" line="558"/>
+        <location filename="../qml/SettingsPage.qml" line="559"/>
+        <location filename="../qml/SettingsPage.qml" line="562"/>
         <source>Port</source>
         <translation>المنفذ</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="574"/>
+        <location filename="../qml/SettingsPage.qml" line="578"/>
         <source>Lines</source>
         <translation>الأسطر</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="582"/>
+        <location filename="../qml/SettingsPage.qml" line="586"/>
         <source>Words</source>
         <translation>الكلمات</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="590"/>
+        <location filename="../qml/SettingsPage.qml" line="594"/>
         <source>Position, ten times a second</source>
         <translation>الموضع، عشر مرات في الثانية</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="596"/>
+        <location filename="../qml/SettingsPage.qml" line="600"/>
         <source>Each message begins with the application&apos;s name. /crucible/lyrics/state says following, stopped or cleared; /line gives the line&apos;s number, text and times; /word the same for a word of a word-timed line; /position the song&apos;s place in milliseconds. Times are milliseconds from the start of the song.</source>
         <translation>تبدأ كل رسالة باسم التطبيق. يقول /crucible/lyrics/state إن المتابعة جارية أو متوقفة أو مُسحت؛ ويعطي /line رقم السطر ونصه وتوقيته؛ و/word الشيء نفسه لكلمة من سطر موقَّت الكلمات؛ و/position موضع الأغنية بالميلي ثانية. الأزمنة بالميلي ثانية من بداية الأغنية.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="370"/>
+        <location filename="../qml/SettingsPage.qml" line="610"/>
+        <source>ABOUT</source>
+        <translation>حول</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="611"/>
+        <source>What this is, the version and build it came from, and the licences it carries.</source>
+        <translation>ما هو هذا التطبيق، والإصدار والبناء الذي جاء منه، والتراخيص التي يحملها.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="615"/>
+        <source>About Crucible…</source>
+        <translation>حول Crucible…</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="374"/>
         <source>Costs two slots per application; the pair sits either side of the position you place, and an application that cannot get two free slots waits in the bed. Applies to applications the engine meets from now on; each application&apos;s row can override it.</source>
         <translation>يكلف فتحتين لكل تطبيق؛ يجلس الزوج على جانبي الموضع الذي تضعه، والتطبيق الذي لا يحصل على فتحتين حرتين ينتظر في القاعدة. ينطبق على التطبيقات التي يقابلها المحرك من الآن فصاعدًا؛ ويمكن لصف كل تطبيق تجاوزه.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="269"/>
+        <location filename="../qml/SettingsPage.qml" line="273"/>
         <source>SIGNING KEY</source>
         <translation>مفتاح التوقيع</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="293"/>
+        <location filename="../qml/SettingsPage.qml" line="297"/>
         <source>Browse…</source>
         <translation>استعراض…</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="294"/>
+        <location filename="../qml/SettingsPage.qml" line="298"/>
         <source>Clear</source>
         <translation>مسح</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="189"/>
+        <location filename="../qml/SettingsPage.qml" line="193"/>
         <source>Install driver</source>
         <translation>تثبيت برنامج التشغيل</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="249"/>
+        <location filename="../qml/SettingsPage.qml" line="253"/>
         <source>Remove driver</source>
         <translation>إزالة برنامج التشغيل</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="236"/>
-        <location filename="../qml/SettingsPage.qml" line="239"/>
+        <location filename="../qml/SettingsPage.qml" line="240"/>
+        <location filename="../qml/SettingsPage.qml" line="243"/>
         <source>Driver folder</source>
         <translation>مجلد برنامج التشغيل</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="254"/>
-        <location filename="../qml/SettingsPage.qml" line="257"/>
+        <location filename="../qml/SettingsPage.qml" line="258"/>
+        <location filename="../qml/SettingsPage.qml" line="261"/>
         <source>Silent device</source>
         <translation>جهاز صامت</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="376"/>
+        <location filename="../qml/SettingsPage.qml" line="380"/>
         <source>APPEARANCE</source>
         <translation>المظهر</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="378"/>
         <location filename="../qml/SettingsPage.qml" line="382"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
         <source>Theme</source>
         <translation>السمة</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="380"/>
-        <location filename="../qml/SettingsPage.qml" line="389"/>
-        <location filename="../qml/SettingsPage.qml" line="410"/>
-        <location filename="../qml/SettingsPage.qml" line="451"/>
+        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="393"/>
+        <location filename="../qml/SettingsPage.qml" line="414"/>
+        <location filename="../qml/SettingsPage.qml" line="455"/>
         <source>System</source>
         <translation>النظام</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="380"/>
+        <location filename="../qml/SettingsPage.qml" line="384"/>
         <source>Light</source>
         <translation>فاتح</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="380"/>
+        <location filename="../qml/SettingsPage.qml" line="384"/>
         <source>Dark</source>
         <translation>داكن</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="402"/>
         <location filename="../qml/SettingsPage.qml" line="406"/>
+        <location filename="../qml/SettingsPage.qml" line="410"/>
         <source>Language</source>
         <translation>اللغة</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="387"/>
-        <location filename="../qml/SettingsPage.qml" line="397"/>
+        <location filename="../qml/SettingsPage.qml" line="391"/>
+        <location filename="../qml/SettingsPage.qml" line="401"/>
         <source>Palette</source>
         <translation>لوحة الألوان</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="120"/>
+        <location filename="../qml/SettingsPage.qml" line="124"/>
         <source>SILENT DEVICE · WHERE APPLICATIONS PLAY</source>
         <translation>الجهاز الصامت · أين تعزف التطبيقات</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="141"/>
+        <location filename="../qml/SettingsPage.qml" line="145"/>
         <source>No silent device: nothing named like &quot;%1&quot; exists, so applications can only play to a real device and are heard directly.</source>
         <translation>لا يوجد جهاز صامت: لا شيء باسم مثل «%1»، لذا لا يمكن للتطبيقات أن تعزف إلا على جهاز حقيقي وتُسمع مباشرة.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="141"/>
+        <location filename="../qml/SettingsPage.qml" line="145"/>
         <source>The silent device is installed: an endpoint named like &quot;%1&quot;.</source>
         <translation>الجهاز الصامت مثبّت: نقطة نهاية باسم مثل «%1».</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="145"/>
+        <location filename="../qml/SettingsPage.qml" line="149"/>
         <source>not set</source>
         <translation>غير محدد</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="183"/>
+        <location filename="../qml/SettingsPage.qml" line="187"/>
         <source>A built driver package is in the driver folder, ready to install.</source>
         <translation>توجد حزمة برنامج تشغيل مبنية في مجلد برنامج التشغيل، جاهزة للتثبيت.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="244"/>
+        <location filename="../qml/SettingsPage.qml" line="248"/>
         <source>Where install.ps1, remove.ps1 and the built package live: beside this app by default, or apps/crucible/windows/driver in a source tree.</source>
         <translation>أين يوجد install.ps1 وremove.ps1 والحزمة المبنية: بجانب هذا التطبيق افتراضياً، أو apps/crucible/windows/driver في شجرة المصدر.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="391"/>
+        <location filename="../qml/SettingsPage.qml" line="395"/>
         <source>Signal</source>
         <extracomment>Palette name. A product name: leave it as it is unless the language has an established rendering of its own.</extracomment>
         <translation>إشارة</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="393"/>
+        <location filename="../qml/SettingsPage.qml" line="397"/>
         <source>Ink</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>حبر</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="395"/>
+        <location filename="../qml/SettingsPage.qml" line="399"/>
         <source>Console</source>
         <extracomment>Palette name, as &quot;Signal&quot; above.</extracomment>
         <translation>وحدة التحكم</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="459"/>
+        <location filename="../qml/SettingsPage.qml" line="463"/>
         <source>3D layout</source>
         <translation>تخطيط ثلاثي الأبعاد</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="461"/>
+        <location filename="../qml/SettingsPage.qml" line="465"/>
         <source>Auto</source>
         <translation>تلقائي</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="463"/>
+        <location filename="../qml/SettingsPage.qml" line="467"/>
         <source>3D reference layout</source>
         <translation>تخطيط مرجعي ثلاثي الأبعاد</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="466"/>
+        <location filename="../qml/SettingsPage.qml" line="470"/>
         <source>The speakers the 3D room draws for reference. Auto shows 5.1 while the stream is bed only and 7.1.4 once objects are on.</source>
         <translation>مكبرات الصوت التي ترسمها الغرفة ثلاثية الأبعاد للمرجع. يعرض التلقائي 5.1 ما دام البث قاعدة فقط و7.1.4 عند تفعيل الكائنات.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="473"/>
+        <location filename="../qml/SettingsPage.qml" line="477"/>
         <source>BEHAVIOUR</source>
         <translation>السلوك</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="476"/>
+        <location filename="../qml/SettingsPage.qml" line="480"/>
         <source>Move the default output to the silent device on launch</source>
         <translation>نقل الإخراج الافتراضي إلى الجهاز الصامت عند التشغيل</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="477"/>
+        <location filename="../qml/SettingsPage.qml" line="481"/>
         <source>Restored to the previous device on quit.</source>
         <translation>يُستعاد إلى الجهاز السابق عند الإنهاء.</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="484"/>
+        <location filename="../qml/SettingsPage.qml" line="488"/>
         <source>Keep running in the tray when the window is closed</source>
         <translation>الاستمرار في العمل في علبة النظام عند إغلاق النافذة</translation>
     </message>
