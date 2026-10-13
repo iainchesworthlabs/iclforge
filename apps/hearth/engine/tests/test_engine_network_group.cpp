@@ -1987,7 +1987,7 @@ TEST_CASE("engine: a part level changed while a karaoke item plays reaches the b
     wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
     KaraokeGroup rig("hearth_engine_group_karaoke_levels_change", kFrameCount, wanted);
     rig.engine->play();
-    REQUIRE(eventually([&] { return rig.decodes->totals().bursts >= 20; }));
+    rig.await([&] { return rig.decodes->totals().bursts >= 20; });
     CHECK(rig.decodes_log.has("applied (karaoke capable, vocals both)"));
     CHECK_FALSE(rig.decodes_log.has("melody"));
 
@@ -2025,7 +2025,7 @@ TEST_CASE("engine: a change of vocals while a karaoke item plays reaches the boa
     wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
     KaraokeGroup rig("hearth_engine_group_karaoke_change", kFrameCount, wanted);
     rig.engine->play();
-    REQUIRE(eventually([&] { return rig.decodes->totals().bursts >= 20; }));
+    rig.await([&] { return rig.decodes->totals().bursts >= 20; });
     CHECK(rig.decodes_log.has("applied (karaoke capable, vocals both)"));
     CHECK_FALSE(rig.decodes_log.has("vocals v1"));
 
