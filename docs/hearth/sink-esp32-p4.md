@@ -78,6 +78,22 @@ this silicon**: the controller has no PLL clock source before v3, and the audio 
 tops out at 125 MHz, short of the ~147 MHz a 512-bit frame needs at 48 kHz. That is a limit of the
 chip, and `GET /hardware` says so on such a board.
 
+### Karaoke on the v1.x board
+
+The board reproduces AC-3 and E-AC-3 karaoke itself at its 2.0 layout, which is the only one it
+can open. Hearth's live karaoke cases at `ICLFORGE_HEARTH_LIVE_KARAOKE_LAYOUT=2.0`, on a v1.3 board
+booted from its first slot on 2026-10-13, found the board's output levels within 0.2 dB of the
+host's decode for AC-3 and within 0.7 dB for E-AC-3, for as coded, aware, and capable with a
+vocal, with none, and with the melody and a vocal moved, with the layout, routing, trim, delay
+and crossover settings pushed as well. At 2.0 the aware reproduction is the Lo/Ro fold as coded
+already is, so the two read alike. The 3.0 layout the case uses by default needs three slots
+and cannot open here; it is not measured on a v3.x chip.
+
+One earlier run on the same image, started from the board's second slot straight after an update
+restart, played nothing and logged `burst player: a stream control message did not fit the ring`
+(the player's ring was not draining). It did not repeat in eight runs after a clean start from
+the first slot, and its cause is not known.
+
 ## On the v3.x kit
 
 !!! warning "Not run on a v3.x chip or a panel"
