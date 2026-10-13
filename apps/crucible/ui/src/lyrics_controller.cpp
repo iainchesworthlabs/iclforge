@@ -195,7 +195,8 @@ constexpr int kOscTickMs = 25;
     auto parsed = iclforge::lyrics::parse_timed_text(bytes, duration);
     if (!parsed) {
         entry.status = QStringLiteral("error");
-        entry.error_text = from_utf8(parsed.error());
+        // A file in a code page is refused by name, and says where one is made readable.
+        entry.error_text = from_utf8(iclforge::lyrics::with_code_page_remedy(parsed.error()));
         return entry;
     }
     entry.lyrics = std::move(*parsed);

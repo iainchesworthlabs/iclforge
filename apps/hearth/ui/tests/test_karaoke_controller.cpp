@@ -286,7 +286,9 @@ TEST_CASE("KaraokeController: no file, a plain file and an unreadable one each s
     controller.load(room.path("broken.ac3"), 5000);
     CHECK(controller.status().toStdString() == "error");
     CHECK(controller.fileName().toStdString() == "broken.lrc");
-    CHECK(controller.errorText().toStdString() == "The lyrics file is not UTF-8 or UTF-16.");
+    // The reader's reason, then the sentence that says where such a file is made readable.
+    CHECK(controller.errorText().toStdString().starts_with("The lyrics file is not UTF-8 or UTF-16."));
+    CHECK(controller.errorText().toStdString().find("forge lyrics-to-lrc") != std::string::npos);
     CHECK(controller.lines().isEmpty());
 
     // And the file's extension is matched in any case.
@@ -529,6 +531,7 @@ TEST_CASE("KaraokeController timing: a session that cannot open says why",
     room.write("bad.txt", QByteArray("caf\xE9\n"));
     CHECK_FALSE(controller.beginTiming(room.path("bad.txt")));
     CHECK(controller.timingError().toStdString().find("UTF-8") != std::string::npos);
+    CHECK(controller.timingError().toStdString().find("forge lyrics-to-lrc") != std::string::npos);
     CHECK_FALSE(controller.timing());
 }
 

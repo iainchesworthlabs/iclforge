@@ -258,7 +258,8 @@ void KaraokeController::load(const QString& itemPath, qlonglong durationMs) {
                 }
             } else {
                 status_ = QStringLiteral("error");
-                error_text_ = from_utf8(read.error());
+                // A file in a code page is refused by name, and says where one is made readable.
+                error_text_ = from_utf8(iclforge::lyrics::with_code_page_remedy(read.error()));
             }
             // A disc beside the lyrics is held too, and the singer chooses which is shown (the
             // words are the default, because they are what a word-by-word fill and a nudge can
@@ -389,7 +390,7 @@ bool KaraokeController::beginTiming(const QString& textFile) {
             duration_ms_ > 0 ? std::optional<std::int64_t>{duration_ms_} : std::nullopt;
         auto read = read_lyrics(std::filesystem::path(local.toStdString()), duration);
         if (!read) {
-            timing_error_ = from_utf8(read.error());
+            timing_error_ = from_utf8(iclforge::lyrics::with_code_page_remedy(read.error()));
             emit timingChanged();
             return false;
         }

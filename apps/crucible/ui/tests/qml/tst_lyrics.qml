@@ -147,6 +147,22 @@ TestCase {
         compare(CrucibleLyrics.errorText(7), "");
     }
 
+    function test_aFileInACodePageSaysWhereItIsMadeReadable() {
+        // "[00:01.00]Caf" and an e acute as the one byte E9: Latin-1, which is not UTF-8.
+        const path = TestServices.writeBinaryFile(
+            "latin1.lrc", [0x5b, 0x30, 0x30, 0x3a, 0x30, 0x31, 0x2e, 0x30, 0x30, 0x5d, 0x43, 0x61, 0x66, 0xe9, 0x0a]);
+        verify(path.length > 0);
+        compare(CrucibleLyrics.importFile(8, path), false);
+        compare(CrucibleLyrics.status(8), "error");
+        // The reader's reason, and then the sentence that names the command and its key.
+        verify(CrucibleLyrics.errorText(8).indexOf("not UTF-8") >= 0, CrucibleLyrics.errorText(8));
+        verify(CrucibleLyrics.errorText(8).indexOf("forge lyrics-to-lrc") >= 0, CrucibleLyrics.errorText(8));
+        verify(CrucibleLyrics.errorText(8).indexOf("lyrics-encoding=") >= 0, CrucibleLyrics.errorText(8));
+        // Another reason is not followed by it.
+        compare(CrucibleLyrics.importText(7, "empty.lrc", "  \n"), false);
+        compare(CrucibleLyrics.errorText(7).indexOf("forge lyrics-to-lrc"), -1);
+    }
+
     function test_applicationsAreIndependentAndLeaveWithTheirApplication() {
         verify(CrucibleLyrics.importText(7, "a.lrc", song));
         verify(CrucibleLyrics.importText(8, "b.lrc", "[00:02.00]Another song\n"));
