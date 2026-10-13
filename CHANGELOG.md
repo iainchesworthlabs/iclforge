@@ -4497,6 +4497,17 @@ The sections below contain the complete change list and fixes.
   The encoding is unchanged, held by the owner's decision; a part that should fall silent after its
   end has to be given as long as the backing.
 
+**Forge GUI Karaoke flow: the status line once the parts are loaded**
+
+- **The Save step and the RUNS strip said "4 sources loaded — set an assignment for each channel
+  below." with nothing left to assign and no table to assign it in.** The sentence is the
+  controller's for a second source and belongs to Advanced and Expert, which have the table; the
+  Karaoke flow had already given every coded channel its place from the parts, and has no table.
+  `EncoderController.addSourceFile` has a second form for a caller that assigns the channels
+  itself, and the flow uses it, so the line reads "4 sources loaded." The first form, and with it
+  what Advanced, Expert and the other flows show for a multi-source load, is as it was. Status
+  sentences are English literals throughout the controller and stay so; no catalogue changes.
+
 **Hearth: the empty queue's hint and the first-run dialog**
 
 - **The Play page's hint for an empty queue was cut off at both ends.** Its second line, "Drop AC-3,
