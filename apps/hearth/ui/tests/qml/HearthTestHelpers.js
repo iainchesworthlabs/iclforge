@@ -94,6 +94,56 @@ function textContaining(root, fragment) {
     });
 }
 
+// What under `root` is laid out or drawn past root's left or right edge, one
+// line of text for each: every visible item by its box, and a Text by what it
+// draws as well, since a Text draws past a box too narrow for it unless it
+// wraps or elides. An item that clips is taken by its own box and not looked
+// into: what it cuts off is its own business (a lyric view's long line). The
+// one that spans `root` from edge to edge is root's own viewport, a
+// ScrollView's Flickable, and what that cuts off is what is being asked.
+// Empty when `root` holds all of it, which is what a page owes its window.
+function pastTheEdges(root) {
+    const found = [];
+    const visit = function(item) {
+        if (item === null || item === undefined || !item.visible) {
+            return;
+        }
+        let left = item.mapToItem(root, 0, 0).x;
+        let right = left + item.width;
+        if (item.elide !== undefined && item.contentWidth > item.width) {
+            const spill = item.contentWidth - item.width;
+            const alignment = item.effectiveHorizontalAlignment;
+            if (alignment === Qt.AlignRight) {
+                left -= spill;
+            } else if (alignment === Qt.AlignHCenter) {
+                left -= spill / 2;
+                right += spill / 2;
+            } else {
+                right += spill;
+            }
+        }
+        if (left < -0.5 || right > root.width + 0.5) {
+            const name = item.objectName
+                ? item.objectName
+                : (typeof item.text === "string" && item.text.length > 0
+                   ? "\"" + item.text.substring(0, 32) + "\"" : String(item));
+            found.push(name + " at " + Math.round(left) + " to " + Math.round(right));
+        }
+        const viewport = left <= 0.5 && right >= root.width - 0.5;
+        if (item !== root && item.clip === true && !viewport) {
+            return;
+        }
+        const kids = item.children;
+        if (kids !== undefined) {
+            for (let i = 0; i < kids.length; ++i) {
+                visit(kids[i]);
+            }
+        }
+    };
+    visit(root);
+    return found;
+}
+
 // The non-visual QtQuick.Dialogs FileDialog/FolderDialog `owner` declares,
 // by its title (PlayPage.qml has two). A dialog is not a visual child, and a
 // ScrollView-rooted page lists it nowhere, so this asks the QObject tree

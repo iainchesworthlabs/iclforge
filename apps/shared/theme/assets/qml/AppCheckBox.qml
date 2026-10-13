@@ -53,6 +53,8 @@ Item {
             Rectangle {
                 width: 16
                 height: 16
+                // Beside a label of one line; at the top of one that has wrapped.
+                Layout.alignment: label.lineCount > 1 ? Qt.AlignTop : Qt.AlignVCenter
                 color: root.checked ? Theme.accent : "transparent"
                 border.color: Theme.divider
                 border.width: 1
@@ -82,11 +84,19 @@ Item {
                 // text would say the note had focus.
                 FocusRing { active: root.activeFocus }
             }
+            // The label wraps in a box narrower than it (a narrow card, a large
+            // text size) rather than running past the box and taking the note
+            // under it along. No wider than its words, so that it stays beside
+            // the square whichever way the row runs.
             Text {
+                id: label
                 visible: root.text.length > 0
                 text: root.text
                 color: Theme.text
                 font.pixelSize: Theme.fontNormal
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.maximumWidth: Math.ceil(implicitWidth)
             }
         }
         Text {

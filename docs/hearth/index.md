@@ -429,12 +429,14 @@ taskbar button rather than bring its window forward.
 
 A capture runs against a scratch settings store, so it neither reads nor changes a person's own
 queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
-asks for it. Its exit code is 0 for a picture saved, 2 when the picture could not be saved, and
-3 when an `--open` file did not load, or did not reach its `--seek` position, within fifteen seconds
-(with `--sing` the song takes as long again as its position is from the start), or when `--sing`'s
-file is not a WAV file or the song has no melody to score against (the picture is saved all the
-same, for what the window said about the file). A script that regenerates screenshots can stop on
-that.
+asks for it. The Karaoke page's microphone card names its takes folder under a home that is
+nobody's (`C:/Users/you/Documents/Hearth takes` on Windows), so that a picture of the page does
+not carry the name of the account it was taken under. Its exit code is 0 for a picture saved, 2
+when the picture could not be saved, and 3 when an `--open` file did not load, or did not reach
+its `--seek` position, within fifteen seconds (with `--sing` the song takes as long again as its
+position is from the start), or when `--sing`'s file is not a WAV file or the song has no melody
+to score against (the picture is saved all the same, for what the window said about the file). A
+script that regenerates screenshots can stop on that.
 
 ```sh
 QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=C:\Windows\Fonts \

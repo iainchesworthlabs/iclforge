@@ -4657,6 +4657,46 @@ The sections below contain the complete change list and fixes.
   `tools/checks/check_no_std_format.py` fails `#include <format>`, `#include <print>` and every
   `std::format`/`std::print` name in first-party C++ in the static job.
 
+**Hearth: the Karaoke page fits its window**
+
+- **The Karaoke page ran past the right edge of its window, and had no margin.** At the window's
+  own size (1280 px) the Microphone card's content was wider than the card. Its two slider rows
+  could not shrink (a 150 px label, a 220 px slider and the value, in a card with 387 px inside
+  it), and a column of rows is as wide as the row that shrinks least, so every row of the card
+  went with them: the card's opening sentence, its Refresh and Choose… buttons and the slider
+  values were cut at the window's edge. The page's two columns also began at the window's edge,
+  where every other page has a 16 px margin (the picture in `docs/karaoke/` shows that part,
+  from before the card existed). The page now has the margin, and every row can be as narrow as
+  its card: a label sits above its control in a narrow card and beside it in a wide one (in the
+  Reproduction card as well as the Microphone card), a button and its indicator wrap onto two
+  lines, a slider gives way to the value beside it, and a take's name elides. A part's name and
+  "not in this stream" wrap, the two lyrics buttons elide past a third of their row, and the
+  ribbon's "Listening…" is cut short at the ribbon's edge. Two shared controls shrink as well: a
+  checkbox's label (`AppCheckBox`) wraps in a box narrower than it, and a card header
+  (`SectionHeader`) elides its title and its caption, so that a header is never wider than the
+  card it heads. Buttons keep their whole labels at 1280 px at every text size. It holds at
+  100%, 125%, 150% and 175% at 1280 px, mirrored as a right-to-left language mirrors it, and in
+  the window's smallest width (960 px) at 100% to 175%.
+  `KaraokePage::test_nothingOnThePageRunsPastItsEdges` checks the page's edges, each card's and
+  the margin (the case for 960 px at 150% and 175% needs a typeface, and is skipped in a run
+  that has none), and the two `MicrophoneCard::test_the_rows_...` cases check the card alone,
+  with and without a microphone on: the suites' microphone is a script now, so none of them
+  lists or opens a person's. No string changed.
+- **A muted microphone never got the "No sound from the microphone" hint.** The Microphone card
+  shows it once the input has been silent for 1.5 s, and it was told the silence had grown only
+  when the level moved or when the silence differed by half a second from the reading 100 ms
+  before, which it never does. A microphone that is muted delivers digital silence, whose level
+  does not move, so the hint, whose own text says "It may be muted", was only ever shown for one
+  with noise on it. The card is told when the silence has grown by half a second since it was
+  last told.
+- **A capture names a takes folder that is nobody's.** The Microphone card says where takes go,
+  which by default is a folder under the person's own documents: right for the person, and the
+  account's name in a screenshot. `hearth --shot` and `--smoke-shot`, which already run on a
+  scratch settings store and show no first-run dialog, now start that store with a takes folder
+  under a home named for nobody (`C:/Users/you/Documents/Hearth takes` on Windows), so the page
+  can be photographed for the documentation. Nothing is made there, and an ordinary launch is
+  unchanged.
+
 **Forge GUI Karaoke flow: a part of another length**
 
 - **The Karaoke flow's warning said the shorter part "is padded with silence"; it is not.** The

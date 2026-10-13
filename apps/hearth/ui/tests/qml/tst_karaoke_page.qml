@@ -67,6 +67,7 @@ TestCase {
         settle({ karaoke: "aware", karaokeVocals: "both", stereoFold: "loro",
                  karaokeMelodyDb: 0, karaokeVocal1Db: 0, karaokeVocal2Db: 0 });
         useLayout("2.0");
+        HearthController.textScale = "100";
     }
 
     function settle(values) {
@@ -483,6 +484,135 @@ TestCase {
         compare(String(TestServices.storedSetting("karaoke/reproduction")), "capable");
         settle({ karaokeMelodyDb: 0, karaokeVocal1Db: 0, karaokeVocal2Db: 0 });
         tryVerify(function() { return Number(TestServices.storedSetting("karaoke/melodyDb")) === 0; }, 5000);
+    }
+
+    // The page fits its window: nothing on it is laid out or drawn past the page's left or right
+    // edge, each card holds what is in it, and the cards keep the margin every other page has.
+    // Returns a function that changes the window and reads the page: the window's width, the text
+    // size, and whether it is mirrored as a right-to-left language mirrors it.
+    //
+    // A row that cannot shrink sets the least width of every row of its card, which is how two
+    // sliders once pushed a whole card past the window.
+    function pageFitter(win) {
+        const page = H.find(win.contentItem, function(item) {
+            return item.lyricsFullScreenRequested !== undefined && item.reproduction !== undefined;
+        });
+        verify(page !== null, "no Karaoke page in the window");
+        const cards = H.findAll(page, function(item) {
+            return item.ordinal !== undefined && item.framed !== undefined;
+        });
+        verify(cards.length >= 7, "the page's cards were not found");
+        // The page's own edges, and each card's: a row too wide for the left-hand card runs into
+        // the card beside it long before it reaches the window's edge.
+        const spills = function() {
+            const found = H.pastTheEdges(page).map(function(what) { return "the page: " + what; });
+            for (const card of cards) {
+                for (const what of H.pastTheEdges(card)) {
+                    found.push("card " + card.ordinal + ": " + what);
+                }
+            }
+            return found;
+        };
+        return function(when, width, textScale, mirrored) {
+            HearthController.textScale = textScale;
+            win.width = width;
+            win.LayoutMirroring.enabled = mirrored;
+            tryCompare(Theme, "fontScale", Number(textScale) / 100, 2000);
+            tryCompare(page, "width", width, 5000);
+            const where = when + ", " + width + " px at " + textScale + "%"
+                          + (mirrored ? ", right to left" : "");
+            // A change reaches the layouts when they are next polished, and a text that wraps
+            // anew asks for one more: read once they have stopped asking.
+            verify(waitForPolish(win, 5000), where + ": the layouts were never polished");
+            let past = spills();
+            for (let turn = 0; turn < 30 && past.length > 0; ++turn) {
+                wait(100);
+                past = spills();
+            }
+            verify(past.length === 0,
+                   where + ": " + past.length + " past an edge, the first of them: "
+                   + past.slice(0, 6).join("; "));
+            // And that it was this layout that was read, not the one before the change: the
+            // Microphone card is on the side the direction puts it, and a label of one line is
+            // as tall as the text size makes it.
+            const microphone = named(win, "microphoneCard");
+            compare(microphone.mapToItem(page, 0, 0).x < page.width / 2, mirrored,
+                    where + ": the Microphone card is on the wrong side");
+            const label = H.textItem(microphone, qsTr("Input"));
+            verify(label !== null, where + ": no Input label");
+            verify(Math.abs(label.height - label.implicitHeight) <= 1,
+                   where + ": a label is " + label.height + " px tall, for text that needs "
+                   + label.implicitHeight);
+            // The cards, by their outer edges: the margin of the Settings and Speakers pages.
+            let left = page.width;
+            let right = 0;
+            for (const card of cards) {
+                const x = card.mapToItem(page, 0, 0).x;
+                left = Math.min(left, x);
+                right = Math.max(right, x + card.width);
+            }
+            verify(Math.abs(left - Theme.pad) <= 1, where + ": the cards start at " + left);
+            verify(Math.abs(right - (page.width - Theme.pad)) <= 1,
+                   where + ": the cards end at " + right);
+        };
+    }
+
+    // At the window's own size (1280 px), at each text size, as it is and mirrored; with nothing
+    // playing and for a stream without a second vocal, whose rows say so at length; and at the
+    // smallest it goes to (960 px) at the text size it is made for. The window starts at the
+    // largest text and is then changed as Settings changes it, so both a first layout and a
+    // second are held.
+    function test_nothingOnThePageRunsPastItsEdges() {
+        HearthController.textScale = "175";
+        const win = openPage();
+        const fits = pageFitter(win);
+
+        fits("nothing playing", 1280, "175", false);
+
+        play(karaoke21);
+        tryVerify(function() { return text(win, "partState-V2") === qsTr("not in this stream"); }, 5000);
+        fits("no second vocal", 1280, "175", false);
+        fits("no second vocal", 1280, "175", true);
+        HearthController.stop();
+        HearthController.removeAt(0);
+        tryVerify(function() { return HearthController.queue.length === 0; }, 10000);
+
+        play(karaoke);
+        tryVerify(function() { return text(win, "partState-V2") === qsTr("heard"); }, 5000);
+        for (const textScale of ["175", "150", "125", "100"]) {
+            fits("a karaoke stream", 1280, textScale, false);
+            fits("a karaoke stream", 1280, textScale, true);
+        }
+        fits("a karaoke stream", 960, "100", false);
+        fits("a karaoke stream", 960, "100", true);
+    }
+
+    // The window's smallest width at the larger text sizes: a third of 960 px is 301 px, and the
+    // text size menu goes to 175%, and "System" to 200%. Measured only with a real typeface. A run
+    // on a machine that has no font directory to give the offscreen platform (a Windows machine
+    // without QT_QPA_FONTDIR set, which is how the suites run by default here) has no font at all,
+    // and each glyph is then a square as wide as the text is tall, about twice the width of one of
+    // Archivo's: no layout is asked to hold a thirteen-letter word in 269 px at 21 px a letter,
+    // and this case would be failing for that and not for anything a person sees.
+    function test_nothingRunsPastItsEdgesInTheSmallestWindowAtLargeText() {
+        if (Qt.fontFamilies().length === 0) {
+            skip("this run has no font: glyphs are twice the width a person sees, and no layout "
+                 + "of a window this narrow at this text size holds for them (QT_QPA_FONTDIR names "
+                 + "a font directory)");
+        }
+        HearthController.textScale = "175";
+        const win = openPage();
+        const fits = pageFitter(win);
+        play(karaoke);
+        tryVerify(function() { return text(win, "partState-V2") === qsTr("heard"); }, 5000);
+        for (const textScale of ["150", "175"]) {
+            fits("a karaoke stream", 960, textScale, false);
+            fits("a karaoke stream", 960, textScale, true);
+        }
+        // A capable decoder has the rows that the others do not look at: the levels.
+        settle({ karaoke: "capable", karaokeVocals: "both" });
+        fits("capable", 960, "175", false);
+        fits("capable", 960, "175", true);
     }
 
     function test_theDecoderPageSummarisesTheChoiceAndOpensTheKaraokePage() {
