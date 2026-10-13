@@ -8131,4 +8131,61 @@ ApplicationWindow {
             }
         }
     }
+
+    // ---- --smoke-shot: a project, and a step of the Karaoke flow -----------
+    // Two more names in the prop=value vocabulary of main.cpp's
+    // apply_properties(), beside smokeScrollY and its neighbours above:
+    // "project=<file.forgeproj>" and "karaokeStep=parts|levels|hear|save".
+    // Each is a call and not a property because each can be refused, and a
+    // capture that carried on would be a picture of some other state under
+    // the name that was asked for. So each answers "" or why not; the reason
+    // goes to the run's log and the run fails.
+
+    // Opens a project as File > Open does. A project that opens with notes (a
+    // part that is not there, a setting this version sets aside) is refused
+    // as one that does not open is: the notice is over the window by then,
+    // and it is what the picture would be of.
+    function smokeOpenProject(url) {
+        // A clean open leaves the last notice's notes where they were.
+        window.projectNotes = [];
+        const opened = window.openProjectFile(url);
+        if (opened && window.projectNotes.length === 0) {
+            return "";
+        }
+        const said = window.projectNotes.map((note) => window.projectMessage(note)).join(" ");
+        return (opened ? "the project opened with notes: " : "the project was not opened: ") + said;
+    }
+
+    // Goes to a step of the Karaoke flow as its numbered dot does, which a
+    // set of parts that makes no stream does not allow past Parts.
+    function smokeKaraokeStep(key) {
+        if (window.tier !== "karaoke") {
+            return "the window is not in the Karaoke flow: give tier=karaoke, or a karaoke project=, first";
+        }
+        const keys = karaokeFlow.steps.map((step) => step.key);
+        const index = keys.indexOf(key);
+        if (index < 0) {
+            return "the Karaoke flow has no step '" + key + "': its steps are " + keys.join(", ");
+        }
+        karaokeFlow.goTo(index);
+        if (karaokeFlow.currentStepKey !== key) {
+            return "the parts loaded make no stream, so the flow stays on " + karaokeFlow.currentStepKey;
+        }
+        // Hear builds its stream on the way in, unless an encode is running.
+        if (key === "hear" && karaokeFlow.previewState === "idle") {
+            return "the Hear step did not start building its stream";
+        }
+        return "";
+    }
+
+    // Hear encodes its stream and decodes it after the step is entered. A
+    // capture waits while smokeSettled is false, and then takes no picture
+    // where smokeFault says what went wrong: neither "Building the stream…"
+    // nor "Could not build the stream" is the step that was asked for.
+    readonly property bool smokeSettled: karaokeFlow.previewState !== "encoding"
+                                         && karaokeFlow.previewState !== "decoding"
+    readonly property string smokeFault: karaokeFlow.currentStepKey === "hear"
+                                         && karaokeFlow.previewState === "failed"
+                                         ? "the Hear step could not build its stream: " + karaokeFlow.previewError
+                                         : ""
 }

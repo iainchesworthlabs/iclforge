@@ -1,3 +1,4 @@
+#include <QFileInfo>
 #include <QFont>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -42,12 +43,17 @@
 // drcIndex=2, atmosEnabled=true, containerIndex=1, and (on the window itself)
 // tier=expert; preset=7.1.4 invokes applyChannelPreset() instead - see
 // apply_properties' own comment. --smoke-shot in particular also takes
-// scrollY=<pixels> (a plain QML property on the window, Main.qml's own
-// smokeScrollY) to put a below-the-fold section - the assignment table
-// partway down the Format tab, say - into frame before the grab; there is
-// no scroll-to-item helper, just a raw pixel offset into the tab area's own
-// Flickable, so finding the right value is trial and error against a local
-// build.
+// smokeScrollY=<pixels> (a plain QML property on the window) to put a
+// below-the-fold section - the assignment table partway down the Format tab,
+// say - into frame before the grab; there is no scroll-to-item helper, just a
+// raw pixel offset into the tab area's own Flickable, so finding the right
+// value is trial and error against a local build. project=<file.forgeproj>
+// opens a project as File > Open does, and karaokeStep=parts|levels|hear|save
+// then goes to that step of the Karaoke flow (the grab waits for Hear to build
+// its stream), which is how the Karaoke flow is shot with parts in it:
+//
+//   forge-gui --smoke-shot hear.png \
+//       project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=hear
 //
 // Both --smoke and --smoke-record fail unless every channel the routing FEEDS
 // has its needle leave the floor, so --smoke-record against a silent endpoint
@@ -63,6 +69,11 @@
 // the strip would be noise the other three modes' own callers actually want.
 
 namespace {
+
+// --smoke-shot: one lap of the event loop before the grab, and how long the
+// grab waits for a window that says it has not settled.
+constexpr int kSmokeShotLapMs = 50;
+constexpr int kSmokeShotSettleMs = 120000;
 
 // Qt draws the window into an image itself, so this works under the offscreen
 // platform and cannot capture whatever happens to be in front of the app.
@@ -193,8 +204,31 @@ bool report_meters(EncoderController* controller, const MeterTrace& trace, int d
 // addSourceFile() (loading a second source is what actually populates the
 // multi-source assignment table - there is no property that does it either)
 // - the two method calls this otherwise property-only mechanism carries a
-// special case for.
+// special case for. Two more are calls on the window, because each can be
+// refused and says why: "project" is Main.qml's smokeOpenProject() and
+// "karaokeStep" its smokeKaraokeStep(). A refusal fails the run as a name
+// that is no property does.
 bool apply_properties(EncoderController* controller, QObject* root, const QStringList& tokens) {
+    // Calls a window function that answers "" or the reason it did not do what was asked.
+    const auto ask_window = [root](const char* function, const QVariant& argument,
+                                   const QString& name, const QString& text) {
+        QVariant refusal;
+        if (root == nullptr ||
+            !QMetaObject::invokeMethod(root, function, Q_RETURN_ARG(QVariant, refusal),
+                                       Q_ARG(QVariant, argument))) {
+            fmt::println(stderr, "smoke: {} needs the window, which has no {}()",
+                         name.toStdString(), function);
+            return false;
+        }
+        if (!refusal.toString().isEmpty()) {
+            fmt::println(stderr, "smoke: could not set {} to '{}': {}", name.toStdString(),
+                         text.toStdString(), refusal.toString().toStdString());
+            return false;
+        }
+        fmt::println("smoke: {} = {}", name.toStdString(), text.toStdString());
+        return true;
+    };
+
     for (const auto& token : tokens) {
         const auto eq = token.indexOf(QLatin1Char('='));
         if (eq <= 0) {
@@ -213,6 +247,20 @@ bool apply_properties(EncoderController* controller, QObject* root, const QStrin
             controller->addSourceFile(QUrl::fromLocalFile(text));
             fmt::println("smoke: src2 = {} -> {} sources loaded", text.toStdString(),
                          controller->sourceModel().size());
+            continue;
+        }
+        if (name == QLatin1String("project")) {
+            // Absolute: a project names its sources relative to its own folder.
+            const QUrl url = QUrl::fromLocalFile(QFileInfo(text).absoluteFilePath());
+            if (!ask_window("smokeOpenProject", QVariant::fromValue(url), name, text)) {
+                return false;
+            }
+            continue;
+        }
+        if (name == QLatin1String("karaokeStep")) {
+            if (!ask_window("smokeKaraokeStep", QVariant{text}, name, text)) {
+                return false;
+            }
             continue;
         }
         auto* target = static_cast<QObject*>(controller);
@@ -510,12 +558,43 @@ int run_smoke_shot(QQmlApplicationEngine& engine, const QString& shot_path,
     // but Qt Quick Layouts can still owe a polish pass, the same reason
     // tst_guided_wizard.qml's own waitForWizardLayout() waits after creating
     // a fresh window rather than grabbing on the same tick.
-    QTimer::singleShot(50, controller, [&engine, shot_path] {
-        const bool ok = save_window(engine, shot_path);
-        fmt::println("smoke: window grab -> {}",
-                     ok ? shot_path.toStdString() : std::string{"FAILED"});
-        QCoreApplication::exit(ok ? 0 : 1);
-    });
+    //
+    // More laps while the window says it has not settled (Main.qml's
+    // smokeSettled: the Karaoke flow's Hear step encodes its stream and
+    // decodes it after karaokeStep=hear put it there), and no picture at all
+    // of a step that then failed (smokeFault) or never settled.
+    auto* settle = new QTimer(controller);
+    settle->setInterval(kSmokeShotLapMs);
+    QObject::connect(settle, &QTimer::timeout, controller,
+                     [&engine, settle, shot_path, waited = 0]() mutable {
+                         QObject* const root = engine.rootObjects().first();
+                         waited += kSmokeShotLapMs;
+                         if (!root->property("smokeSettled").toBool() &&
+                             waited < kSmokeShotSettleMs) {
+                             return;
+                         }
+                         settle->stop();
+                         if (!root->property("smokeSettled").toBool()) {
+                             fmt::println(stderr, "smoke: the window had not settled after {} s",
+                                          kSmokeShotSettleMs / 1000);
+                             QCoreApplication::exit(1);
+                             return;
+                         }
+                         const QString fault = root->property("smokeFault").toString();
+                         if (!fault.isEmpty()) {
+                             fmt::println(stderr, "smoke: {}", fault.toStdString());
+                             QCoreApplication::exit(1);
+                             return;
+                         }
+                         // The lap the layout is owed, after whatever was waited for.
+                         QTimer::singleShot(kSmokeShotLapMs, settle, [&engine, shot_path] {
+                             const bool ok = save_window(engine, shot_path);
+                             fmt::println("smoke: window grab -> {}",
+                                          ok ? shot_path.toStdString() : std::string{"FAILED"});
+                             QCoreApplication::exit(ok ? 0 : 1);
+                         });
+                     });
+    settle->start();
     return QGuiApplication::exec();
 }
 
