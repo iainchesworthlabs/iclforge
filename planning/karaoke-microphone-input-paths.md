@@ -16,8 +16,8 @@
     |---|---|---|
     | 0 | The owner's answers to the first round ([below](#what-the-owner-has-said)) | **Recorded, 2026-10-13** |
     | 1 | Research, the Shield's read-only queries, the precedent in the owner's own app | **Done**, [below](#what-was-found) |
-    | 2 | The decisions D19 to D28 ([below](#decisions)) | **Proposed, each with a recommendation; the owner's yes is needed** |
-    | 3 | Spikes S1 to S8 ([below](#spikes)) | Two are cheap and need a person or a device; none is run |
+    | 2 | The decisions D19 to D28 ([below](#decisions)) | **D23 approved (a join window) and the audience answered (ad-hoc iOS is enough), 2026-10-13; the rest proposed, each with a recommendation** |
+    | 3 | Spikes S1 to S8 ([below](#spikes)) | **S2 allowed by the owner (their iPhone, their consent); S8 can be done with it, with no microphone bought** |
     | 4 | Builds N1 to N8 ([below](#build-plan)) | Not started |
 
 ## What the owner has said
@@ -42,6 +42,17 @@ All on 2026-10-13, in conversation, before this page was written:
 - The owner's own iOS app, CountdownSolver ([its release workflow](https://github.com/iainchesworth/CountdownSolver/blob/main/.github/workflows/release.yml)),
   is the precedent for shipping to a phone: see [the phone's apps](#the-phones-apps).
 - **Read-only queries to the Shield were allowed**, and were run ([below](#the-shield-pro-read-2026-10-13)).
+
+A second round, after the first version of this page, also 2026-10-13:
+
+- **The host may listen for a few minutes after "Add a microphone"** (D23, option a, approved).
+- **The audience is the owner and a few friends**, and "ostensibly this is just a fun app": an ad-hoc
+  iOS build is enough, and TestFlight becomes a thing only if the app grows (D21, D22).
+- **The browser spike may run on the owner's iPhone**; the microphone prompt is their consent (S2).
+- **Which microphone to buy has not been thought about yet**; it is a second problem, and the
+  paths that need one (S1, N3, N4) wait for it.
+- **The late voice has to go through the listening check first** (D20 and S8): no default is set
+  until the owner has heard it.
 
 ## What was found
 
@@ -316,10 +327,10 @@ tests, **L** two to four stacked). Numbered on from [the plan's D1 to D18](karao
 | # | Decision | Options | Recommendation | What it costs |
 |---|---|---|---|---|
 | D19 | **Where the voice is mixed** (revises D2 and MX1) | (a) at the device the microphone is attached to, as D2 says; (b) **at the device that drives the speakers**, by the shortest path; (c) always at the host (B) | **(b).** It is (a) wherever capture and output are one device, and it is the only rule a phone can follow. (c) is still not recommended: 0.4 s late, and a board that decodes for itself would be sent PCM | None by itself; it is what N1 to N6 follow |
-| D20 | **What "voice out loud" shows and does** | (a) a switch per microphone, **default on at a modest level, its delay on screen, a limiter**; (b) default off; (c) no control, always on | **(a).** The owner said yes; the delay figure (MO5) and a one-key off are how the singer copes with a late second voice; it may also want a trace of reverb to blend (D15 revisit, not now) | S in the card; the figure comes from the calibration |
+| D20 | **What "voice out loud" shows and does** (**the default waits for the owner's listening check, S8**) | (a) a switch per microphone, **default on at a modest level, its delay on screen, a limiter**; (b) default off; (c) no control, always on | **(a).** The owner said yes; the delay figure (MO5) and a one-key off are how the singer copes with a late second voice; it may also want a trace of reverb to blend (D15 revisit, not now) | S in the card; the figure comes from the calibration |
 | D21 | **What the phone is, and in what order** | (a) a native app on iOS and Android, and a browser page only as a test tool; (b) a browser page as the product; (c) the Hearth Android app's own microphone mode only | **(a).** The owner has no Android phone, so iOS is first for the owner to test; the browser page tests the model first and cheaply | See N1 to N5 |
 | D22 | **The phone app's technology** | (a) **one Qt 6 / QML app for iOS and Android**, the owner's CountdownSolver pipeline, with the capture and the QR scan as thin native shims; (b) native per platform (a SwiftUI app and a mode of the Kotlin Hearth app) over one C++ core; (c) the browser only | **(a), with (b)'s Android half as the fallback** if a Qt Android kit fights the lockfile as the Android plan's S5 warned. The owner has the iOS and Android jobs written; the UI is four screens; capture must be native in any case because Qt Multimedia gives no latency control (general knowledge). Qt 6.8.3 there against Hearth's 6.10.3 pin matters only if the app shares Hearth's QML | M for the app; S for each capture shim; a spike (S4) first |
-| D23 | **The host listens, for a while** (a threat-model change) | (a) **a join window**: a listener on an ephemeral port for at most 5 minutes after the person asks, closed on the first completed pairing or on timeout; (b) always listening on 8927; (c) the phone advertises and the host dials, as for a sink | **(a).** (b) widens the standing surface for no reason; (c) needs Bonjour and a multicast entitlement on iOS and a listening socket on a phone. Unpaired peers still reach the handshake and little else ([the threat model](../docs/threat-model.md)); the token is one-time; each device is allowed by name | M: `NetworkSinks` starts and stops a host with a port; a threat-model paragraph; the QR's content |
+| D23 | **The host listens, for a while** (a threat-model change; **option (a) approved by the owner, 2026-10-13**) | (a) **a join window**: a listener on an ephemeral port for at most 5 minutes after the person asks, closed on the first completed pairing or on timeout; (b) always listening on 8927; (c) the phone advertises and the host dials, as for a sink | **(a).** (b) widens the standing surface for no reason; (c) needs Bonjour and a multicast entitlement on iOS and a listening socket on a phone. Unpaired peers still reach the handshake and little else ([the threat model](../docs/threat-model.md)); the token is one-time; each device is allowed by name | M: `NetworkSinks` starts and stops a host with a port; a threat-model paragraph; the QR's content |
 | D24 | **How a phone's voice reaches a remote mixer** | (a) host-forwarded live voice message to the one mixing sink (C1); (b) the phone sends direct to the sink; (c) a phone's voice is only for the host's own mix | **(a)** after N1 to N3, since it is one more consumer of what they build; (b) makes every sink a server for sources and a relay upstream; (c) is the interim and what a PC at the TV needs | L: a message on the extension role, a revision, a jitter buffer, Android first |
 | D25 | **The board's microphone path (resolves D3)** | (a) **the P4X kit first: USB UAC host on the Type-A port**, the on-board mic for bring-up; (b) an I2S codec on S3 and C6; (c) the S3's USB host | **(a); (b) only as a hardware-in-hand follow-up; (c) not recommended** (full speed, a shared PHY, and no internal RAM). The C6 cannot host USB. Anything that touches the Sendspin firmware goes through the P4X session, with a small fixed struct for state | L, firmware: a UAC class driver in the image, an I2S RX path, a mix stage, `source@v1` upstream |
 | D26 | **The Shield Pro with a USB microphone** | (a) a capture module in the Hearth Android app, mixed in the PCM path; (b) none: the phone is the Shield's microphone | **(a)**, because the same capture module is what the Android phone mode needs, and because it is the owner's own device | M for capture; the mix lands with Android phase 4b to 4d |
@@ -350,7 +361,7 @@ without the owner saying so first.**
 | S5 | **The join window, at the library** | A host test: a `ServerHost` with a port that a client dials with a token the host made, `allow_source`, `start_source`, a stamped chunk, in process | None | D23's cost, and whether a host-made PSK needs a protocol change |
 | S6 | **A real feedback loop** | Voice out of the speakers with a phone-distance microphone on the PC: the loop's gain, with and without the checks and a canceller (F9's throwaway evaluation programs, run on a real echo this time) | The owner; the owner's speakers | D27 |
 | S7 | **A P4X with a UAC 1.0 microphone** | The `usb_host_uac` audio-player example with a microphone on the Type-A port; then the delay to the board's output (R4) | The kit (not arrived), a USB microphone, the booking checked | D25; the P2 row |
-| S8 | **The listening check** (R6) | The owner at 20, 40, 80, 150 and 250 ms with a handheld, voice out of speakers | The owner | D20: what "default on" should be |
+| S8 | **The listening check** (R6) | The owner at 20, 40, 80, 150 and 250 ms, voice out of the speakers. **No handheld is needed for a first run**: the phone of S2 is the microphone, the PC's speakers play the voice back through a delay the owner moves, and the phone measures its own mouth-to-speaker delay by a clap | The owner, the phone of S2, the PC's speakers at a low volume | D20: what "default on" should be |
 
 S3 and S5 need no person. S2 is the one that tests "the use-case model" the owner asked a browser
 version for, and it is the cheapest way to learn whether a browser page can ever be the product.
@@ -391,20 +402,23 @@ and N4 with Android phase 4. N6 and N7 wait on a person, the kit and D24.
 
 D19 to D28 are the questions. Five of them need an answer from you that I cannot reason out:
 
-1. **The listening socket (D23).** May the Hearth host listen for a few minutes after you press "Add a
-   microphone", on an ephemeral port, token-gated, closed afterwards? It is the first time it
-   would listen, and `docs/threat-model.md` will say so.
-2. **Who joins (D22).** An ad-hoc iOS build reaches only devices registered in the profile (100 a year);
-   a guest joining by QR on an iPhone needs TestFlight or the App Store. Is the audience you and a
-   few friends (ad-hoc is enough), or strangers' phones (TestFlight at least)? The browser page is the
-   no-install answer for strangers, with a certificate warning, and S2 measures whether it works.
-3. **S2 now?** It needs your iPhone, your consent to its microphone for a minute, and this
-   workstation to listen on the LAN once (a Windows firewall prompt you would click). Nothing is
+1. **The listening socket (D23).** *Answered 2026-10-13: yes.* The Hearth host listens for a few
+   minutes after you press "Add a microphone", on an ephemeral port, token-gated, closed
+   afterwards. It is the first time it would listen, and `docs/threat-model.md` will say so in
+   the PR that builds it.
+2. **Who joins (D22).** *Answered 2026-10-13: the owner and a few friends; ad-hoc is enough, and
+   TestFlight only if the app grows.* An ad-hoc iOS build reaches only devices registered in the
+   profile (100 a year), so each friend's iPhone is registered once. The browser page is the
+   no-install answer for anyone else, with a certificate warning, and S2 measures whether it works.
+3. **S2 now?** *Answered 2026-10-13: yes.* It needs your iPhone, your consent to its microphone, and
+   this workstation to listen on the LAN once (a Windows firewall prompt you click). Nothing is
    stored.
-4. **The microphone you buy.** The table above is a starting point; the one fact that matters is
-   "USB class compliant, 16-bit, 48 kHz", and one two-channel receiver if two singers share a Shield.
-5. **How much late voice you will live with (D20).** S8 is a listening check; until it is run the
-   default is a modest level, the delay on screen, and a switch.
+4. **The microphone you buy.** *Not decided; a second problem.* The table above is a starting point;
+   the one fact that matters is "USB class compliant, 16-bit, 48 kHz", and one two-channel receiver
+   if two singers share a Shield.
+5. **How much late voice you will live with (D20).** *Answered 2026-10-13: the listening check first.*
+   S8 is that check, and it can run now with a phone as the microphone and no purchase
+   ([below](#spikes)); until it is run there is no default.
 
 ## Risks
 
