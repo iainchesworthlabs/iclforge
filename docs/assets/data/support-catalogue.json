@@ -273,7 +273,7 @@
         "esp32": [
           "limited",
           "hardware",
-          "P4 only, behind a build option; real time for 2.0 only"
+          "P4 and S3, behind a build option; real time to 5.1 on the P4 and at 2.0 on the S3"
         ],
         "bare-metal": [
           "source",
@@ -742,17 +742,17 @@
         "windows": [
           "configured",
           "hardware",
-          "Qt/QML window with six pages, built and run; ZIP and installer"
+          "Qt/QML window with seven pages, built and run; ZIP and installer"
         ],
         "linux": [
           "configured",
           "ci",
-          "Qt/QML window with six pages, built in CI; TGZ, DEB and RPM"
+          "Qt/QML window with seven pages, built in CI; TGZ, DEB and RPM"
         ],
         "macos": [
           "development",
           "ci",
-          "Qt/QML window with six pages, built in CI; no macOS release package"
+          "Qt/QML window with seven pages, built in CI; no macOS release package"
         ],
         "browser": [
           "unavailable",
@@ -808,7 +808,7 @@
         "esp32": [
           "source",
           "hardware",
-          "S3 and C6 group runs, no DAC; C6 sink is stereo-only; P4 plays a paired 2.0 stream"
+          "S3 and C6 group runs, no DAC; C6 sink is stereo-only; P4 plays a paired 2.0 stream; AC-4 in a build with the decoder (P4 to 5.1, S3 at 2.0)"
         ],
         "bare-metal": [
           "unavailable",
@@ -1689,13 +1689,13 @@
           ],
           [
             "limited",
-            "emulated",
-            "behind CONFIG_ICLFORGE_AC4, state in PSRAM; six streams under QEMU, not run on a board"
+            "hardware",
+            "behind CONFIG_ICLFORGE_AC4, state in PSRAM; 2.0 in real time on a board, 5.1 slower"
           ],
           [
             "limited",
             "hardware",
-            "behind CONFIG_ICLFORGE_AC4; 2.0 in real time, wider layouts slower"
+            "behind CONFIG_ICLFORGE_AC4; 2.0 and 5.1 in real time, 5.1.4 slower"
           ],
           [
             "unavailable",
@@ -1705,7 +1705,7 @@
           [
             "unavailable",
             "not-applicable",
-            "builds in fixed point; 2.0 level with the heap free beside Wi-Fi; not run on a board"
+            "builds in fixed point; on a board no stream fits beside Wi-Fi and the Hearth sink, and a play is refused"
           ],
           [
             "unavailable",
@@ -1789,12 +1789,12 @@
           [
             "source",
             "hardware",
-            "two-board group run; no DAC connected; AC-3 and E-AC-3 only"
+            "two-board group run; no DAC connected; AC-3 and E-AC-3, and 2.0 AC-4 in a build with the decoder"
           ],
           [
             "limited",
             "hardware",
-            "paired 2.0 stream over Wi-Fi through the onboard C6; TDM not opened on v1.3 silicon; no DAC"
+            "paired 2.0 stream over Wi-Fi through the onboard C6; TDM not opened on v1.3 silicon; no DAC; AC-4 to 5.1 in a build with the decoder"
           ],
           [
             "unavailable",
@@ -1804,7 +1804,7 @@
           [
             "limited",
             "hardware",
-            "two-board group run with S3; stereo only; no DAC; CI builds it and cannot run it"
+            "two-board group run with S3; stereo only; AC-4 arrives as PCM; no DAC; CI builds it and cannot run it"
           ],
           [
             "unavailable",
@@ -1827,7 +1827,7 @@
           [
             "configured",
             "ci",
-            "packaged by CI for silicon v1.x; no release carries it yet"
+            "packaged by CI, one image for silicon v1.x and one for v3.x with a panel; no release carries it yet"
           ],
           [
             "unavailable",
@@ -1903,7 +1903,7 @@
         "Encode `bsmod=voiceover` at 3/0 to 3/2; probe; decode as an aware decoder (`karaoke`) or a capable one (`karaoke=none|v1|v2|v1+v2`)",
         "A Karaoke flow builds a stream from a backing, a guide melody and one or two vocals, and plays it under each reproduction before saving",
         "No",
-        "Desktop: the Karaoke page with the listener's choice of vocals, word-timed lyrics and a full-screen singer view"
+        "Desktop: the Karaoke page with the listener's choice of vocals, word-timed lyrics, a full-screen singer view, and a microphone with a pitch score and takes"
       ],
       [
         "AC-4 decode",
@@ -1911,7 +1911,7 @@
         "File, play and monitor: channel-based to 7.1.4 and objects (A-JOC, direct-coded), one presentation of several mixed, every output and presentation control",
         "File: QC and playback of a chosen presentation; objects shown and exported",
         "No",
-        "Desktop, channel-based and immersive to 7.1.4, full or core decoding; objects rendered to speakers; an ESP32-P4 sink built with the AC-4 option plays from an HTTP source, not in a group"
+        "Desktop, channel-based and immersive to 7.1.4, full or core decoding; objects rendered to speakers; an ESP32-P4 or ESP32-S3 sink built with the AC-4 option decodes it in a group (to 5.1, and at 2.0), and any other sink is sent PCM"
       ],
       [
         "Atmos/JOC object encode",
@@ -2078,7 +2078,7 @@
       "artifact": "ZIP, and inside the NSIS installer",
       "action": "Read Hearth status",
       "url": "hearth/",
-      "note": "Packaging is wired, but no tag has exercised this route. The Qt/QML window has six pages and runs on Windows; the installer registers it as the .ac3 and .ec3 handler."
+      "note": "Packaging is wired, but no tag has exercised this route. The Qt/QML window has seven pages and runs on Windows; the installer registers it as the .ac3 and .ec3 handler."
     },
     {
       "product": "Hearth",
@@ -2088,7 +2088,7 @@
       "artifact": "TGZ, DEB or RPM",
       "action": "Read Hearth status",
       "url": "hearth/",
-      "note": "Packaging is wired, but no tag has exercised this route. The Qt/QML window has six pages and builds in CI; it has not been run on Linux."
+      "note": "Packaging is wired, but no tag has exercised this route. The Qt/QML window has seven pages and builds in CI; it has not been run on Linux."
     },
     {
       "product": "Hearth",
@@ -2098,7 +2098,7 @@
       "artifact": "TGZ, DEB or RPM",
       "action": "Read Hearth status",
       "url": "hearth/",
-      "note": "Packaging is wired, but no tag has exercised this route. The Qt/QML window has six pages and builds in CI; it has not been run on Linux."
+      "note": "Packaging is wired, but no tag has exercised this route. The Qt/QML window has seven pages and builds in CI; it has not been run on Linux."
     },
     {
       "product": "Hearth",
@@ -2108,7 +2108,7 @@
       "artifact": "No desktop package",
       "action": "Read Hearth status",
       "url": "hearth/",
-      "note": "The Qt/QML window has six pages and builds in CI. The release DMG carries only forge and forge-gui, and the window has not been used on a Mac."
+      "note": "The Qt/QML window has seven pages and builds in CI. The release DMG carries only forge and forge-gui, and the window has not been used on a Mac."
     },
     {
       "product": "Hearth",
@@ -2135,20 +2135,20 @@
       "platform": "ESP32",
       "variant": "ESP32-P4, silicon revision v1.x",
       "state": "configured",
-      "artifact": "hearth_sink firmware image for silicon revision v1.x",
+      "artifact": "Factory and app images (hearth-sink-esp32p4-rev1)",
       "action": "Open the sink firmware guide",
       "url": "hearth/sink-firmware/",
-      "note": "The release workflow attaches the image, but no release has carried it. The board reaches Wi-Fi through its onboard ESP32-C6, and a P4 of revision v3.x needs another build. No Sendspin group run is recorded for a P4."
+      "note": "CI packages the image and the release workflow is wired to attach it, but no release has carried it yet. Wi-Fi is through the board's onboard ESP32-C6; the sink has played AC-3 and E-AC-3 in a paired 2.0 session, and TDM has not opened on v1.3 silicon. A P4 of revision v3.x takes the other image."
     },
     {
       "product": "Hearth",
       "platform": "ESP32",
-      "variant": "ESP32-P4, silicon v1.x",
+      "variant": "ESP32-P4, silicon revision v3.x, with a 7-inch panel",
       "state": "configured",
-      "artifact": "Factory and app images (hearth-sink-esp32p4-rev1)",
-      "action": "Open the sink firmware guide",
-      "url": "hearth/sink-firmware/",
-      "note": "CI packages the image and the release workflow is wired to attach it, but no release has carried it yet. Wi-Fi is through the board's onboard ESP32-C6; the sink has played a paired 2.0 stream, and TDM has not opened on v1.3 silicon. A P4 of revision v3.x needs another build."
+      "artifact": "Factory and app images (hearth-sink-esp32p4-rev3)",
+      "action": "Open the ESP32-P4 sink guide",
+      "url": "hearth/sink-esp32-p4/",
+      "note": "CI packages the image and the release workflow is wired to attach it, but no release has carried it yet. The image draws the lyric screen on the panel; it was built and drawn on a computer, and no board of this revision has run it."
     },
     {
       "product": "C++ library",

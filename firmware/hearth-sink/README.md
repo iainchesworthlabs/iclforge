@@ -1146,9 +1146,13 @@ each kind takes. The ESP32-P4 and the ESP32-S3 have played it on a board. On the
 decoder's state in PSRAM (`CONFIG_ICLFORGE_AC4_INTERNAL_BELOW`, 512 bytes on that part: [ESP32-S3](../../docs/platforms/bare-metal/esp32-s3.md#ac-4));
 it keeps up at 2.0 and, with the second core, through the converter and at E-AC-3 7.1.4 ([Playback speed](../../docs/platforms/bare-metal/esp32-s3.md#playback-speed);
 phases D14c and D14g of `planning/ac4.md`). On an ESP32-C6 the decoder builds in the fixed-point tier and does not fit beside WiFi
-([the C6 page](../../docs/platforms/bare-metal/esp32-c6.md#ac-4)). The Sendspin player advertises `ac3` and `eac3` as its
-data types and not `ac4` (`main/sendspin/player/sendspin.cpp`), so no AC-4 stream reaches a board
-from a Sendspin group (phase I6). The measurements were made with `POST /play` and a URL.
+([the C6 page](../../docs/platforms/bare-metal/esp32-c6.md#ac-4)). With the decoder built in, the Sendspin
+player lists `ac4` beside `ac3` and `eac3` where `CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_AC4` is 1 (the
+default on a P4, and on an S3 with the 64 KB data cache), and decodes an AC-4 stream a group sends
+it, to the channel count and frame rate it states (phase I6:
+[the P4](../../docs/platforms/bare-metal/esp32-p4.md#ac-4-from-a-server) and
+[the S3](../../docs/platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)). An image without the
+decoder lists none, and a server decodes AC-4 itself and sends PCM.
 
 ```bash
 idf.py -DIDF_TARGET=esp32p4   "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hw;sdkconfig.p4;sdkconfig.sendspin;sdkconfig.ac4"   -DICLFORGE_STAGE_TIMERS=ON build

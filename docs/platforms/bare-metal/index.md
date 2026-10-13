@@ -8,13 +8,14 @@ floating-point unit, the arithmetic tier the decoder runs in
 
 AC-4 is built from its own libraries (`libs/ac4`), the decoder only:
 no bare-metal build has the AC-4 encoder. The [Cortex-M3](cortex-m3.md#status) leg probes it, and the
-[ESP32-P4](esp32-p4.md#ac-4) decodes it behind `CONFIG_ICLFORGE_AC4`. The
-[ESP32-S3](esp32-s3.md#ac-4) decodes it under QEMU in CI with its state in PSRAM and has not run it
-on a board (phase D14c). The [ESP32-C6](esp32-c6.md#ac-4) and the ESP32-C3 build it in the
+[ESP32-P4](esp32-p4.md#ac-4) decodes it behind `CONFIG_ICLFORGE_AC4`, to 5.1 in real time. The
+[ESP32-S3](esp32-s3.md#ac-4) decodes it with its state in PSRAM, under QEMU in CI and on a board,
+where 2.0 keeps up (phase D14c). The [ESP32-C6](esp32-c6.md#ac-4) and the ESP32-C3 build it in the
 fixed-point tier (phase D14d of
 [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md#d14-ac-4-on-the-esp32s));
-a decode does not fit a C6 beside WiFi, and the C6 has not run it on a board.
-No ESP32 sink takes AC-4 in a Sendspin group either.
+a decode does not fit a C6 beside WiFi, and on a board the play is refused.
+A Hearth sink built with the decoder takes AC-4 in a Sendspin group on the P4 and the S3
+([Hearth](../../hearth/index.md#esp32-sinks)); the published sink images have the decoder off.
 
 The variant table keeps codec support, Hearth support, distribution and evidence separate.
 
@@ -43,8 +44,8 @@ C6 / S3 / P4 sink modules on one dual-ES9080 PCB, are on
   probe is real time on every fixture with no network, and `hearth_sink` plays a paired Sendspin
   stream over Wi-Fi through the board's onboard ESP32-C6. If the board is pre-production silicon
   like the one this was measured on, the page also has a chip-revision trap worth reading before
-  flashing anything. It decodes AC-4 behind a switch, from an HTTP source: 2.0 in SIMPLE and
-  A-SPX modes in real time, wider layouts slower ([AC-4](esp32-p4.md#ac-4)).
+  flashing anything. It decodes AC-4 behind a switch, from an HTTP source or a Sendspin group:
+  2.0 and 5.1 in real time, 5.1.4 slower ([AC-4](esp32-p4.md#ac-4)).
 - **Building with ESPHome instead of raw ESP-IDF?** [ESPHome](esphome.md) is the external
   component. It decodes AC-3 only, and it is not a `media_player` or `speaker` source.
 

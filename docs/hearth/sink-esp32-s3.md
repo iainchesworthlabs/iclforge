@@ -10,16 +10,15 @@ and the [ESP-IDF component overview](https://github.com/iainchesworthlabs/iclfor
 contain implementation details and measurements. For the stereo ESP32-C6 player, see
 [An ESP32-C6 sink](sink-esp32-c6.md).
 
-!!! note "Status as of 2026-09-30: Hearth plays to sinks; no ESP32 sink takes AC-4 in a group"
+!!! note "Status as of 2026-10-13: Hearth plays to sinks; a board built with the AC-4 decoder takes AC-4 in a group"
     The desktop app discovers sinks, pairs, plays to groups and updates firmware over the network
-    ([Hearth index](index.md)). These boards play AC-3 and E-AC-3 in a group, and the sink lists
-    `ac3` and `eac3`, not `ac4`, as the streams its Sendspin role takes. Built with
+    ([Hearth index](index.md)). These boards play AC-3 and E-AC-3 in a group, and the release
+    image lists `ac3` and `eac3`, not `ac4`, as the streams its Sendspin role takes. Built with
     `CONFIG_ICLFORGE_AC4` and the 64 KB data cache an ESP32-S3 lists `ac4` too, at 2 channels and
     25 frames a second, and decodes 2.0 AC-4 from a group in real time
-    ([ESP32-S3](../platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)); the release image has no
-    decoder and lists none;
-    an ESP32-C6 does not fit it beside Wi-Fi and refuses the play; an ESP32-P4 decodes it to 5.1 in
-    real time ([ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4)). For development without
+    ([ESP32-S3](../platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)); an ESP32-C6 does not
+    fit it beside Wi-Fi and refuses the play; an ESP32-P4 decodes it to 5.1 in real time
+    ([ESP32-P4](../platforms/bare-metal/esp32-p4.md#ac-4-from-a-server)). For development without
     Hearth, `hearth-testserver` still plays E-AC-3 to boards
     ([Play AC-3 and E-AC-3](#play-ac-3-and-e-ac-3)).
 

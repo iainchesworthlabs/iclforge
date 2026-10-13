@@ -642,9 +642,10 @@ samples and the same lines as `forge decode` and Hearth do.
 - **Knowing what a receiver does with E-AC-3.** Annex E defines no reproduction and no TV or
   receiver was tried here: Dolby's reference decoder reproduces an E-AC-3 karaoke stream, and a
   player that does not reproduce it plays the vocals from the surrounds.
-- **A microphone, scoring or recording.** A [draft plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
-  sets out the requirements and the design questions and is awaiting approval; nothing of it is
-  built.
+- **A microphone on a board or on Android.** The microphone, the pitch score and the takes are in
+  Hearth's desktop player and the browser demo ([Sing into a microphone](#sing-into-a-microphone)).
+  The board's part of the [plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-microphone.md)
+  is not built.
 
 ## How it is checked
 

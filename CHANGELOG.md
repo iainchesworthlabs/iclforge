@@ -4306,6 +4306,16 @@ The sections below contain the complete change list and fixes.
   ESP32-P4 has its row, and its page is in the navigation.
 - The front page, the README and the site description name AC-4 and say where it is and is not
   supported.
+- The pages that still said no ESP32 sink takes AC-4 in a Sendspin group say what is built: a sink
+  built with the decoder takes it on an ESP32-P4 (to 5.1) and an ESP32-S3 (at 2.0), the published
+  images have the decoder off, and a C6 is sent PCM. That is the README, the front page, Hearth's
+  page and its S3 and C6 sink guides, the sink firmware's README, the bare-metal and platform
+  indexes and the development status page, whose ESP32 figures are the current ones. The karaoke
+  guide no longer lists the microphone as unbuilt beneath the section that describes it. The
+  README names karaoke and Hearth for Android and lists the `sink`, `lyrics`, `pitch` and `device`
+  libraries. In the support catalogue Hearth's window has seven pages, the ESP32-P4 has one
+  download row for each of its two images where it had two for one, and the AC-4 cells for the
+  ESP32-S3 and C6 say what a board measured.
 - The performance and quality pages say which codecs their series cover, and name AC-4's scoring
   scripts and the local race against DEE. AC-4 joined the series afterwards (see Verification and
   CI), decode quality first.
