@@ -1,6 +1,6 @@
 # Karaoke: a microphone, scoring and recording
 
-!!! note "Status as of 2026-10-13: decisions D1 to D18 approved by the owner as recommended; the microphone measurements are run; M1 to M7 (the desktop and the browser demo) are built and merged; the board (M8 to M10) waits for D3"
+!!! note "Status as of 2026-10-13: decisions D1 to D18 approved by the owner as recommended; the microphone measurements are run; M1 to M7 (the desktop and the browser demo) are built and merged; how a microphone reaches Hearth at a TV is designed in karaoke-microphone-input-paths.md, for the owner's decisions (D19 to D28); the board (M8 to M10) waits on that"
     [Phase 1](karaoke.md) left three things out on purpose ("Microphone, scoring, recording and stem
     files as a source were **not selected**") and wrote the microphone down as "a question we need
     to understand". The owner has now asked for them, as one programme, in this order: **identify
@@ -15,7 +15,8 @@
     | 1 | Research: capture path, the Sendspin source role, references, pitch trackers, bleed | Done, in [the findings](karaoke-microphone-findings.md) |
     | 2 | Measurements that open the microphone ([R1 to R3](karaoke-microphone-findings.md#f8-the-measurements-still-to-run)) | **Run 2026-10-12 with the owner's OK**: a voice through this workstation's own path is about 130 ms ([Latency](#latency)) |
     | 3 | Design (this page, [Decisions](#decisions) D1 to D18) | **Approved by the owner on 2026-10-12, as recommended** (three of them leave something open: [below](#decisions)) |
-    | 4 | Builds, in [the order below](#build-plan), one small pull request each | **Done for the desktop and the browser demo, all merged on 2026-10-12**: M1 #1372, M2 #1378, M3 #1379 and #1385, M4 #1385 and #1397, M5 #1424, M6 #1402, M7 #1437; the board (M8 to M10) waits for D3 |
+    | 4 | Builds, in [the order below](#build-plan), one small pull request each | **Done for the desktop and the browser demo, all merged on 2026-10-12**: M1 #1372, M2 #1378, M3 #1379 and #1385, M4 #1385 and #1397, M5 #1424, M6 #1402, M7 #1437; the board (M8 to M10) waits on the input-paths design (step 5) |
+    | 5 | How a microphone's audio reaches Hearth at a TV, and where the voice is mixed ([the input-paths design](karaoke-microphone-input-paths.md)) | **Written 2026-10-13 with the owner's first answers; D19 to D28 await the owner's yes** |
 
 ## What this is
 
@@ -70,11 +71,11 @@ or laptop sounds like an ideal outcome for this with the esp32 plus a screen".
 | U4 | At a TV with an **ESP32 board that has a screen and a microphone** (the owner's picture; the P4 kit is the board in view) | On the board | The board's output | The "karaoke box": the board decodes, shows the words and mixes the voice itself |
 | U5 | At a TV with sinks around the room and a microphone on **the host** | On the host | The room | The question behind D2: should the sinks play the voice |
 | U6 | A **browser tab** (the WebAssembly demo) | The browser's | Headphones or speakers | Echo cancellation is the browser's own |
-| U7 | A **phone as the microphone** | A phone app | - | Not planned ([D17](#decisions)): no Android capture backend, and a phone app that is a microphone is a separate product from the Android player being planned in planning/hearth-android.md, still in review |
+| U7 | A **phone as the microphone** | A phone app (iOS and Android), joined by a QR | The room's speakers, through the device that mixes | **Planned** ([the input-paths design](karaoke-microphone-input-paths.md), D21 to D24): the owner asked for it on 2026-10-13, iOS first because the owner has no Android phone |
 | U8 | A **Bluetooth headset** | On the host | The headset | Bluetooth's own delay (general knowledge: of the order of 100 to 300 ms for the music profile) puts it outside monitoring and makes scoring alignment unknown |
 
-U1, U2, U4 and U6 are the targets. U3 and U5 are the cases the design has to be honest about, and
-U7 and U8 are named so that nobody expects them.
+U1, U2, U4 and U6 are the targets, and U7 since 2026-10-13. U3 and U5 are the cases the design has to be
+honest about, and U8 is named so that nobody expects it.
 
 ## Requirements
 
@@ -153,7 +154,7 @@ Each is one statement a test or a recorded check can pass or fail. The IDs are f
 
 | # | Requirement |
 |---|---|
-| PL1 | Windows first, then Linux and macOS with the same code path; the browser after; a board after the host; Android not planned |
+| PL1 | Windows first, then Linux and macOS with the same code path; the browser after; a board after the host; Android and iOS as a phone microphone and a Shield capture module ([the input-paths design](karaoke-microphone-input-paths.md)) |
 | Q1 | **No microphone in CI.** Tests use a fake capture and a synthetic voice generator (the generator is the record, as in phase 1); a hidden live test per platform with a real device is run by a person |
 | Q2 | **Cost.** The tracker is at most 3 % of one host core at 16 kHz and at most 10 % of one board core at 8 kHz, measured |
 | Q3 | **Accessible, localised.** Every new control is reachable and named from the keyboard; every string goes through `qsTr()`; the catalogues are regenerated in the same PR |
@@ -438,6 +439,13 @@ added after the measurements and is the one place they moved.
 | D17 | Android | A capture backend and an app; nothing | **Nothing in this programme.** An Android player is planned separately (planning/hearth-android.md, still in review; phase 2's D4 is lifted for it), and a microphone on it would be its own decision | - |
 | D18 | Tests without a microphone | A fake capture and a generator; a hardware rig; manual only | **A fake capture and the synthetic generator in CI**; one hidden live test per platform | The generator is a deliverable of the tracker's PR |
 
+**Revised on 2026-10-13 by [the input-paths design](karaoke-microphone-input-paths.md#decisions)**, which
+is for the owner's decision and changes three of the above if approved: **D2** becomes "mixed at the
+device that drives the speakers" (its D19; A is unchanged wherever the capture and the output are one
+device), **D3** is answered by its D25 (the P4X kit's USB audio host first, through the P4X session), and
+**D17** is replaced by its D21, D22 and D26 (a capture module in the Hearth Android app and a phone app on
+iOS and Android, joined by a QR).
+
 ### D2: where the voice is mixed
 
 [The section above](#where-the-voice-is-mixed) is the argument. The one decision the owner has to
@@ -482,9 +490,10 @@ builds, and a blank is not planned.
 | **Linux, ALSA** | Yes: `hw:` devices, 85 ms buffer asked for | Yes | Same | The buffer is large; the device is exclusive |
 | **macOS** (Hearth) | Compiled, **never run** (DR9) | Compiled, never run | After Linux | The permission prompt for an unsigned build; nobody has run the backend |
 | **Browser** (the WebAssembly demo) | Yes: `getUserMedia` in the encode demo (Chromium's fake device in CI) | Yes (Web Audio) | M7, after the host | The decode demo has no capture; echo cancellation is the browser's |
-| **ESP32-P4 kit** (the owner's panel board) | No: no I2S receive in the firmware; the kit's codec is assumed to be an ES8311 with data-in on GPIO 11 (unverified) | The firmware's own output only | M8 and M9 through the P4 session | Whose it is (D3); the kit has not arrived; no firmware mix stage |
-| **ESP32-S3 and C6** | No | No | After the P4 | No microphone fitted on a board the project owns; the S3 and C6 have no panel |
-| **Android** | No (by design) | Yes (AAudio) | Not planned | No player app |
+| **ESP32-P4 kit** (the owner's panel board) | No: no I2S receive in the firmware; the kit's codec is assumed to be an ES8311 with data-in on GPIO 11 (unverified); the kit has an on-board microphone on that codec and a high-speed USB host port (its user guide) | The firmware's own output only | M8 and M9 through the P4 session | Whose it is (D3); the kit has not arrived; no firmware mix stage |
+| **ESP32-S3 and C6** | No | No | After the P4 | No microphone fitted on a board the project owns; the S3 and C6 have no panel; the C6 has no USB host and the S3's is full speed and shares its PHY with JTAG |
+| **Android** (the Shield Pro; a phone) | No (by design); the Shield Pro's audio policy lists a USB input and it declares no microphone feature | Yes (AAudio) | **Planned**: a capture module and a phone mode (D21, D26; N3 and N4 of [the input-paths design](karaoke-microphone-input-paths.md)) | The player app is built (Hearth for Android); nothing in it captures |
+| **iOS** | No | No | **Planned**: a phone app (D21, D22; N5) | Nothing for iOS exists in this repository |
 | **Crucible** | n/a | n/a | n/a | It taps applications, not microphones |
 
 ## Build plan
@@ -503,9 +512,13 @@ and the design.
 | M5 | Scoring in Hearth: the live view, the per-line marks, the summary, the bleed checks | M to L | M1, M3, M4 | **Built for the desktop**, PR #1424 (merged): the pitch ribbon on the card and under the words in the singer view, a mark under each sung line (three levels and a percentage; "not sung" with no number; none where the tune has no notes), and a summary when it ends with its basis. The tolerance presets (50, 100 and 200 cents, kept) and "score against my key" (taken from the first sung notes, not kept) are PR #1492. Not built: the bleed check against the played signal (SC5), so the score is withheld unless the person says they wear headphones; the board's per-line result |
 | M6 | Recording: the take, the sidecar, the list, the Forge recipe in the user guide | M | M4; D11, D13 | **Built for the desktop**, PR #1402 (merged): the take as a dry-voice FLAC with its `.take.json`, the folder, show and delete for the last one. The Forge recipe (D12) is in the user guide, PR #1489: run on the example stream. The card lists the takes in the folder and removes one after asking, PR #1498, and a take the disk cannot hold ending by itself is tested, PR #1496. Not built: Hearth's own action for the recipe |
 | M7 | The browser: the tracker in WebAssembly, a microphone card in the decode demo | M | M1; D16 | **Built**, PR #1437 (merged): the decode demo's Microphone card on a karaoke stream. The tracker, the tune reader and the scorer are `libs/pitch` compiled into the demo's module (`pitch_bindings.cpp`); the microphone is the browser's, with its own echo cancellation, through an `AudioWorklet`; a ribbon of the tune with the voice over it, a score withheld until the person says they wear headphones, and a summary. Held with Chromium's fake device (no real microphone). Per-line marks (three dots and a percentage, or "not sung") are in the lyric view, PR #1485. Not built: recording (D16 leaves it out), and any check on other browsers |
-| M8 | The board as a source: I2S receive, `source@v1`, the indicator; Hearth's host side (`allow_source`, `start_source`) and scoring from a board's voice | L | The firmware owner (D3); M1, M2 | Not started: waits for D3 |
-| M9 | The board's local mix and monitor: the mix stage, `voice` and a level in the settings keys, measured sidetone | L | M8; R4 | Not started: waits for D3 and M8 |
+| M8 | The board as a source: I2S receive, `source@v1`, the indicator; Hearth's host side (`allow_source`, `start_source`) and scoring from a board's voice | L | The firmware owner (D3); M1, M2 | Not started: D3 is answered by D25 of the input-paths design (the P4X kit's USB audio host first, through the P4X session); waits on the kit |
+| M9 | The board's local mix and monitor: the mix stage, `voice` and a level in the settings keys, measured sidetone | L | M8; R4 | Not started: waits on M8 and the kit |
 | M10 | A room mix at every sink (C) | L | Only if D2 asks for it; R4, R5 | Not started: not approved (D2) |
+| M11 | The host's join window, a remote microphone as a `MicrophoneInput`, a Microphones list, and the voice out loud as a second stream | M to L | D19, D23 | Not started: for the owner's yes (N1 of [the input-paths design](karaoke-microphone-input-paths.md)) |
+| M12 | The Android capture module, and a USB microphone mixed on the Shield Pro | M, then M | D26; Android phases 4b to 4d | Not started (N3, N4) |
+| M13 | A phone app, iOS first, joined by a QR; a browser page as a test tool | M | M11; D21, D22 | Not started (N2, N5) |
+| M14 | A live voice to the one sink that mixes it (C1) | L | M11, M12; D24 | Not started: not approved |
 
 **Order and dependencies.** Desktop first: M1 and M2 are independent and can go at once, M3 needs
 M1, and M4 to M6 stack on them, so a Windows desktop has a microphone, a score and a take before a
@@ -516,7 +529,7 @@ the kit and the host's side of `source@v1`, which M8 builds first.
 
 Answered by the approval of D1 to D18 on 2026-10-12: **1** (A, and no room mix in v1), **4**
 (the microphone was opened; the results are in the findings), **5**, **6**, **7** and **8** (as
-recommended, with no echo canceller vendored). **Still open: 2 and 3.**
+recommended, with no echo canceller vendored). **Questions 2 and 3 were answered on 2026-10-13** ([the input-paths design](karaoke-microphone-input-paths.md#what-the-owner-has-said)): 2 by its D25 (the P4X kit first, through the P4X session), and 3 by the owner (a handheld or USB or XLR microphone through speakers or the TV; the webcam is the stand-in).
 
 1. **The mixing model (D2).** Is the owner's picture (a sink with a microphone mixes the voice
    locally, and other sinks play the backing alone) the one to build? And is a room mix, with the

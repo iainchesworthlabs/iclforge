@@ -3888,6 +3888,21 @@ The sections below contain the complete change list and fixes.
   `sink_output_text.hpp`, with its own test, as the Lyrics row's is; the six catalogues carry the
   new "Output" label untranslated.
 
+**Karaoke: how a microphone's audio reaches Hearth at a TV, and where the voice is mixed**
+
+- **A design for the owner's decisions** (`planning/karaoke-microphone-input-paths.md`). The
+  paths a singer's microphone can take to Hearth when the singer is at a TV: a USB microphone
+  in the Shield Pro or in the ESP32-P4X kit's Type-A port, an I2S codec on a board, the PC at the
+  TV, a phone app on iOS and Android joined by a QR, and a browser page as a test. For each: what
+  plugs into what, where the voice is captured and where it is mixed, the latency (measured
+  where it was, estimated where it was not, each marked), the echo, the effort and the
+  owner's cost. It records the owner's first answers, the Shield's read-only audio-policy
+  queries (a USB input with one stream at a time and no echo canceller), and what the ESP-IDF
+  USB audio host and the P4X kit do and do not give. It proposes decisions D19 to D28 (the voice is
+  mixed where the speakers are driven; a join window on the host for a phone's QR; a live voice
+  to one remote mixer; the board's path), eight spikes and eight build steps, and the changes it
+  asks of the microphone plan's D2, D3, D17, U7 and build table. No code changes.
+
 ### Changed
 
 **Shared code**
