@@ -1857,6 +1857,8 @@ TEST_CASE("with_code_page_remedy follows a code page refusal and nothing else", 
     REQUIRE_FALSE(empty.has_value());
     CHECK(with_code_page_remedy(empty.error()) == empty.error());
     CHECK(with_code_page_remedy("") == "");
+}
+
 // ---- a script made with Aegisub's karaoke templater --------------------------------------------
 // The templater (kara-templater.lua) takes the timed karaoke on lines whose Effect is empty or has
 // "karaoke" in it, writes its effects as Dialogue lines with Effect "fx", and keeps the line it made
