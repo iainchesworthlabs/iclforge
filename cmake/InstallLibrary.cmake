@@ -243,7 +243,8 @@ endif()
 # every installed archive whole, so a symbol that neither the package nor the
 # C/C++ runtime supplies fails there. nlohmann/json, which iclforge::objects uses to read a
 # scene file, is header-only and compiled in the same way (iclforge::json, cmake/NlohmannJson.cmake),
-# so it adds no symbol and no find_dependency() either.
+# so it adds no symbol and no find_dependency() either. The same is true of fast_float, which
+# iclforge::base uses to read decimal text (iclforge::fast_float, cmake/FastFloat.cmake).
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/iclforgeConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/iclforgeConfig.cmake"

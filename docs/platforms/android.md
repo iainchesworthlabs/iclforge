@@ -83,11 +83,14 @@ regardless (it never muxes a file).
 
 The libc++ still implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
 overloads (r28c included, measured) — a gap {fmt} does not close, since {fmt} only formats text *out*,
-the same direction `std::format` goes. Library code that has to turn text *into* a `double` therefore uses `strtod`
-instead (`libs/ac3/src/encoder/plan.cpp`, `encoder/assignment.cpp`,
-`libs/objects/src/scene_text.hpp`, which also serves the object-scene file formats' parsing —
-the write side of that same file goes through `fmt::format`, like everything else, once {fmt}
-made that safe). The macOS wheel's own deployment target has the identical `from_chars` gap
+the same direction `std::format` goes. Library code that has to turn text *into* a `double` therefore
+calls `iclforge::base::parse_double` (`libs/base/src/number_parse.cpp`), which is fast_float, the
+implementation `std::from_chars` was specified from: `libs/ac3/src/encoder/plan.cpp`,
+`encoder/assignment.cpp`, `libs/objects/src/scene_text.cpp`, which also serves the object-scene file
+formats' parsing — the write side of the scene file goes through `fmt::format`, like everything else.
+It gives the same answer on the NDK and on a desktop; `strtod` did not, for a subnormal ("4.9e-324"
+sets `ERANGE` under Windows' C runtime and not under bionic's). The macOS wheel's own deployment
+target has the identical `from_chars` gap
 (`'from_chars' is unavailable: introduced in macOS 26.0`) — {fmt}'s own vendored formatting avoids
 the matching `to_chars` gap there (`'to_chars' is unavailable: introduced in macOS 13.3`) that a
 raw `std::format` call would hit — so this leg and **Build wheels (macos-latest)** are the two

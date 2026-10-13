@@ -3902,6 +3902,32 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Reading decimal numbers: `iclforge::base::parse_double`, which is fast_float**
+
+- **Text that becomes a `double` is read by one function, in `libs/base`, and not by `strtod`.**
+  `strtod` reads the process locale's decimal point (a German `LC_NUMERIC` reads `"1.5"` as 1 and
+  `"1,5"` as 1.5), takes a leading `+`, white space and hex floats, and sets `ERANGE` by its C
+  library's own rule (a subnormal sets it on Windows and not on Android). `parse_double` is
+  [fast_float](https://github.com/fastfloat/fast_float), the library `std::from_chars` for floating
+  point was specified from (floating-point `from_chars` does not exist in the NDK's libc++, r28c
+  included, or at the macOS wheel's deployment target): exact, locale-independent, the same answer on
+  every toolchain, and the whole token or nothing. The syntax is strict, `std::from_chars`'; a
+  caller reading what a person typed passes `kUserNumber`, which also takes the leading `+` and
+  leading space `strtod` took. Overflow is a refusal; a token that rounds to zero is reported
+  (`underflowed`) for the callers that must not take it as zero. Moved onto it: the trim and
+  fraction parsers of `libs/ac3/src/encoder/{assignment,plan}.cpp`, `libs/objects`' scene reader,
+  Hearth's settings, `hearth-render`'s and the test server's command lines and Forge GUI's AC-4
+  option fields, three of which did not compile for Android (`std::from_chars` on a `double`). A hex
+  float ("0x1p3") is no longer a number anywhere that was on `strtod`.
+- **The minimum-footprint profiles take a second implementation of the same function**,
+  `libs/base/src/number_parse_libc.cpp`: they link no third-party library, so it checks the same
+  syntax by hand and hands the digits to `strtod`. `iclforge-base-tests` and
+  `iclforge-base-number-parse-libc-tests` run one table of cases against both.
+- **`libs/render/.../layout.hpp` still calls `strtod`**: the ESP-IDF firmware shares that header,
+  which allocates nothing. fast_float joins {fmt} and nlohmann/json as a header-only dependency
+  (`vcpkg.json`, `cmake/FastFloat.cmake`, `ICLFORGE_FETCH_FAST_FLOAT`, the three packaging
+  manifests and the notices).
+
 **Android: NDK r28c**
 
 - **Every Android build is pinned to NDK r28c (28.2.13676358), up from r26b (26.1.10909125).** The

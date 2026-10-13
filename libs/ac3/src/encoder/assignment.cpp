@@ -2,13 +2,13 @@
 
 #include <algorithm>
 #include <charconv>
-#include <cerrno>
 #include <cmath>
 #include <cstdlib>
 #include "iclforge/ac3/core/eac3_tables.hpp"
 #include "iclforge/ac3/core/types.hpp"
 #include "iclforge/ac3/encoder/eac3_frame.hpp"
 #include "iclforge/ac3/encoder/plan.hpp"
+#include "iclforge/base/number_parse.hpp"
 #include <optional>
 #include <span>
 #include <string>
@@ -195,24 +195,17 @@ constexpr double kMaxTrimDb = 24.0;
     return static_cast<double>(std::llround(clamped * 10.0)) / 10.0;
 }
 
-// Not std::from_chars: its floating-point overload is absent from some
-// libc++ builds this project targets (see parse_unit_double's identical
-// note in plan.cpp), so this hand-rolls the same locale-independent,
-// reject-all-trailing-garbage contract with strtod instead. strtod itself
-// is locale-sensitive; nothing in this codebase ever calls setlocale, so
-// the process locale stays "C" for its entire lifetime and this is safe in
-// practice, not just in theory.
+// iclforge::base::parse_double, in the syntax of what a person types: a "+3"
+// or a " -3" the way strtod, which this used, took them. It is locale-
+// independent, refuses all trailing garbage, and says when a token was too
+// small for a double and rounded to zero, which a trim refuses as it did
+// when strtod set ERANGE.
 [[nodiscard]] bool parse_trim(std::string_view text, double& out) {
-    if (text.empty()) {
+    const auto parsed = iclforge::base::parse_double(text, iclforge::base::kUserNumber);
+    if (!parsed || parsed->underflowed) {
         return false;
     }
-    const std::string buffer(text);
-    errno = 0;
-    char* end = nullptr;
-    const double value = std::strtod(buffer.c_str(), &end);
-    if (end != buffer.c_str() + buffer.size() || errno == ERANGE) {
-        return false;
-    }
+    const double value = parsed->value;
     // A little slack before rejecting outright: snap_trim's own clamp would
     // silently absorb a small overshoot, but a token wildly outside the
     // documented range (e.g. a stray "@240") is more likely a caller
@@ -228,7 +221,7 @@ constexpr double kMaxTrimDb = 24.0;
 // shortest exact decimal - a whole-dB trim reads as "-3", a fractional one
 // as "-3.5" - built from the same integer-tenths value snap_trim derives,
 // never printed straight from the double, so format_trim(snap_trim(x)) and
-// parse_trim's own snap_trim(strtod(...)) always agree exactly.
+// parse_trim's own snap_trim(parse_double(...)) always agree exactly.
 [[nodiscard]] std::string format_trim(double trim_db) {
     const auto tenths = std::llround(trim_db * 10.0);
     const auto whole = tenths / 10;
