@@ -68,7 +68,7 @@ exports both variants explicitly rather than a bare `iclforge::ac3` — pick the
 The package has nothing for a consumer to find: no `find_dependency()` calls, no system or
 third-party library to resolve, static or shared. The codec is not dependency-free, though —
 `iclforge::ac3` and `iclforge::containers::mp4` use {fmt} for formatting (`cmake/Fmt.cmake`, and this repo's own
-`vcpkg.json`; it stands in for `<format>`, which NDK r26's libc++ does not implement). Both
+`vcpkg.json`; it stands in for `<format>`, which NDK r26's libc++ did not implement). Both
 compile a private copy of it into their own object files (`FMT_HEADER_ONLY`, in its own inline
 namespace `fmt::ac3_private`, through the `iclforge::fmt_private` target wrapped in
 `$<BUILD_INTERFACE:...>`) and link no {fmt} library, so the export graph names none and the

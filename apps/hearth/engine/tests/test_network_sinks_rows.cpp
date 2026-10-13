@@ -362,7 +362,8 @@ TEST_CASE("network sinks rows: a sink can be set to Opus only where it lists Opu
     rig.sinks->on_client(with_opus);
 
     const auto fallback_of = [&](const std::string& id) {
-        for (const auto& sink : rig.sinks->status().sinks) {
+        const auto status = rig.sinks->status();
+        for (const auto& sink : status.sinks) {
             if (sink.id == id) {
                 return sink.opus_fallback;
             }
@@ -404,7 +405,8 @@ TEST_CASE("network sinks rows: a sink's Opus choice is read back at its first he
         return client;
     };
     const auto fallback_of = [](NetworkSinks& sinks, const std::string& id) {
-        for (const auto& sink : sinks.status().sinks) {
+        const auto status = sinks.status();
+        for (const auto& sink : status.sinks) {
             if (sink.id == id) {
                 return sink.opus_fallback;
             }
@@ -560,7 +562,8 @@ TEST_CASE("network sinks rows: a group is planned by what each member takes",
     // What the Network page shows: each member's form, in a few words, and why. The sink id is
     // the key, and the labels are the planner's own.
     const auto group_facts = [&]() -> std::optional<iclforge::hearth::GroupFacts> {
-        for (const iclforge::hearth::GroupFacts& each : rig.sinks->status().groups) {
+        const auto status = rig.sinks->status();
+        for (const iclforge::hearth::GroupFacts& each : status.groups) {
             if (each.id == group) {
                 return each;
             }

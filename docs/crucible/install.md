@@ -218,6 +218,10 @@ Developer ID certificate. On a hosted runner an unsigned binary was given a tap 
 
 ## First run
 
+![The first-run dialog, "What Crucible does to your sound settings", with its three points, the "Do this every time Crucible starts" tick and the Open Settings, Not now and send buttons](screenshots/crucible-first-run.png)
+
+*The dialog on a computer with no silent device, where the last button reads "No silent device yet".*
+
 The first time Crucible opens, a dialog says what it is about to do to your sound settings
 before it does it. It names the silent device this platform uses ("Crucible Silent Output" on
 Windows, "Crucible (silent)" on Linux), says that your default output will move to it so that every

@@ -946,47 +946,47 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="111"/>
+        <location filename="../qml/FirstRunDialog.qml" line="115"/>
         <source>It plays to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="112"/>
+        <location filename="../qml/FirstRunDialog.qml" line="116"/>
         <source>It plays to your default output</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="113"/>
-        <source>That is this computer&apos;s default output. The output name at the top right opens the list of receivers, passthrough devices and network sinks.</source>
+        <location filename="../qml/FirstRunDialog.qml" line="117"/>
+        <source>That is this computer&apos;s default output. The output name at the top of the window opens the list of receivers, passthrough devices and network sinks.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="122"/>
+        <location filename="../qml/FirstRunDialog.qml" line="126"/>
         <source>Your speakers are set per output</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="123"/>
+        <location filename="../qml/FirstRunDialog.qml" line="127"/>
         <source>The Speakers page holds each output&apos;s routing, levels, delays and bass management. Nothing in the system&apos;s own sound settings changes.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="135"/>
+        <location filename="../qml/FirstRunDialog.qml" line="139"/>
         <source>Network sinks need a group to play</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="136"/>
+        <location filename="../qml/FirstRunDialog.qml" line="140"/>
         <source>Hearth lists the Sendspin players it finds on the network. Pair one, then add it to a group on the Network page - a group of one plays to a single sink.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="148"/>
+        <location filename="../qml/FirstRunDialog.qml" line="152"/>
         <source>Not now</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/FirstRunDialog.qml" line="168"/>
+        <location filename="../qml/FirstRunDialog.qml" line="172"/>
         <source>Open Speakers</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4344,7 +4344,7 @@
     <message>
         <location filename="../qml/PlayPage.qml" line="104"/>
         <location filename="../qml/PlayPage.qml" line="150"/>
-        <location filename="../qml/PlayPage.qml" line="724"/>
+        <location filename="../qml/PlayPage.qml" line="731"/>
         <source>%1 kbit/s</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4419,216 +4419,216 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="373"/>
+        <location filename="../qml/PlayPage.qml" line="379"/>
         <source>Nothing in the queue.
 Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="397"/>
+        <location filename="../qml/PlayPage.qml" line="404"/>
         <source>Drop files or folders here to add them to the queue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="439"/>
+        <location filename="../qml/PlayPage.qml" line="446"/>
         <source>Now playing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="446"/>
+        <location filename="../qml/PlayPage.qml" line="453"/>
         <source>Nothing playing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="470"/>
+        <location filename="../qml/PlayPage.qml" line="477"/>
         <source>Levels · at play time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="479"/>
+        <location filename="../qml/PlayPage.qml" line="486"/>
         <source>%1 · %2 outputs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="475"/>
+        <location filename="../qml/PlayPage.qml" line="482"/>
         <source>No output device chosen yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="478"/>
+        <location filename="../qml/PlayPage.qml" line="485"/>
         <source>%1 · a decode made here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="485"/>
-        <location filename="../qml/PlayPage.qml" line="632"/>
-        <location filename="../qml/PlayPage.qml" line="681"/>
+        <location filename="../qml/PlayPage.qml" line="492"/>
+        <location filename="../qml/PlayPage.qml" line="639"/>
+        <location filename="../qml/PlayPage.qml" line="688"/>
         <source>Nothing playing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="581"/>
+        <location filename="../qml/PlayPage.qml" line="588"/>
         <source>CLIP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="602"/>
+        <location filename="../qml/PlayPage.qml" line="609"/>
         <source>unrouted</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="606"/>
+        <location filename="../qml/PlayPage.qml" line="613"/>
         <source>%1 %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="619"/>
+        <location filename="../qml/PlayPage.qml" line="626"/>
         <source>−60 · −48 · −36 · −24 · −12 · −6 · 0 dB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="628"/>
+        <location filename="../qml/PlayPage.qml" line="635"/>
         <source>Loudness · BS.1770-4</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="631"/>
+        <location filename="../qml/PlayPage.qml" line="638"/>
         <source>Integrated since this item started</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="640"/>
+        <location filename="../qml/PlayPage.qml" line="647"/>
         <source>Scroll for this frame, objects and signal path.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="654"/>
+        <location filename="../qml/PlayPage.qml" line="661"/>
         <source>MOMENTARY</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="654"/>
-        <location filename="../qml/PlayPage.qml" line="655"/>
-        <location filename="../qml/PlayPage.qml" line="656"/>
+        <location filename="../qml/PlayPage.qml" line="661"/>
+        <location filename="../qml/PlayPage.qml" line="662"/>
+        <location filename="../qml/PlayPage.qml" line="663"/>
         <source>LUFS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="655"/>
+        <location filename="../qml/PlayPage.qml" line="662"/>
         <source>SHORT-TERM</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="656"/>
+        <location filename="../qml/PlayPage.qml" line="663"/>
         <source>INTEGRATED</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="657"/>
+        <location filename="../qml/PlayPage.qml" line="664"/>
         <source>RANGE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="657"/>
+        <location filename="../qml/PlayPage.qml" line="664"/>
         <source>LU</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="658"/>
+        <location filename="../qml/PlayPage.qml" line="665"/>
         <source>TRUE PEAK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="658"/>
+        <location filename="../qml/PlayPage.qml" line="665"/>
         <source>dBTP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="668"/>
-        <location filename="../qml/PlayPage.qml" line="693"/>
-        <location filename="../qml/PlayPage.qml" line="699"/>
-        <location filename="../qml/PlayPage.qml" line="707"/>
-        <location filename="../qml/PlayPage.qml" line="725"/>
+        <location filename="../qml/PlayPage.qml" line="675"/>
+        <location filename="../qml/PlayPage.qml" line="700"/>
+        <location filename="../qml/PlayPage.qml" line="706"/>
+        <location filename="../qml/PlayPage.qml" line="714"/>
+        <location filename="../qml/PlayPage.qml" line="732"/>
         <source>—</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="676"/>
+        <location filename="../qml/PlayPage.qml" line="683"/>
         <source>This frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="679"/>
+        <location filename="../qml/PlayPage.qml" line="686"/>
         <source>At play time · access unit %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="691"/>
+        <location filename="../qml/PlayPage.qml" line="698"/>
         <source>DIALNORM</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="693"/>
+        <location filename="../qml/PlayPage.qml" line="700"/>
         <source>−%1 dB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="696"/>
+        <location filename="../qml/PlayPage.qml" line="703"/>
         <source>COMPR</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="698"/>
+        <location filename="../qml/PlayPage.qml" line="705"/>
         <source>%1 dB</source>
         <translation type="unfinished">%1 dB</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="702"/>
+        <location filename="../qml/PlayPage.qml" line="709"/>
         <source>DYNRNG</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="704"/>
+        <location filename="../qml/PlayPage.qml" line="711"/>
         <source>%1…%2 dB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="710"/>
+        <location filename="../qml/PlayPage.qml" line="717"/>
         <source>SHORT BLOCKS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="714"/>
+        <location filename="../qml/PlayPage.qml" line="721"/>
         <source>%1 of %2</source>
         <translation type="unfinished">%1 מתוך %2</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="716"/>
+        <location filename="../qml/PlayPage.qml" line="723"/>
         <source>n/a</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="719"/>
+        <location filename="../qml/PlayPage.qml" line="726"/>
         <source>BITRATE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="773"/>
+        <location filename="../qml/PlayPage.qml" line="780"/>
         <source>Add files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="775"/>
+        <location filename="../qml/PlayPage.qml" line="782"/>
         <source>All files (*)</source>
         <translation type="unfinished">כל הקבצים (*)</translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="775"/>
+        <location filename="../qml/PlayPage.qml" line="782"/>
         <source>AC-3 / E-AC-3 / AC-4 (*.ac3 *.ec3 *.ac4)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PlayPage.qml" line="781"/>
+        <location filename="../qml/PlayPage.qml" line="788"/>
         <source>Add folder</source>
         <translation type="unfinished"></translation>
     </message>

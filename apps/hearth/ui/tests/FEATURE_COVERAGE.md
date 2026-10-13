@@ -166,6 +166,7 @@ above.
 | PlayQueue::test_addFilesAppendsRowsWithTitleFromTheFileName | `addFiles` appends rows titled by file name |
 | PlayQueue::test_addFilesReflectedInThePageQueueList | The page's queue list follows additions and removals |
 | PlayQueue::test_playItemChangesCurrentIndex | `playItem` moves the current index and marks that row current |
+| PlayQueue::test_emptyQueueHintWrapsInsideTheQueueColumn | An empty queue's hint wraps inside the queue column, at 100% and 175% text size, left to right and mirrored. It used to keep its own width, with both ends of its second line cut off |
 | SpeakersRouting::test_setRoutingAssignmentRoundTripsThroughTheController | `setRoutingAssignment` patches one slot and unassigns it again |
 | SpeakersRouting::test_clearRoutingAndUseDeviceOrderRoundTripThroughTheController | `clearRouting` unassigns every slot and `useDeviceOrder` patches them in the device's order |
 

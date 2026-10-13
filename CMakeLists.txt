@@ -45,9 +45,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)
 
-# NDK r26's libc++ clobbers a std::expected's has-value flag when its payload has tail padding;
-# a no-op on every other toolchain. See the module's header.
-include(LibcxxExpectedLayout)
+# An Android build needs NDK r28 or later (Clang 19): an older libc++ miscompiles std::expected for
+# a payload with tail padding, among other things. A no-op on every other toolchain.
+include(AndroidNdkMinimum)
+
+# std::jthread and std::stop_token are behind libc++'s experimental switch on the NDK. Android only.
+include(AndroidExperimentalLibrary)
 
 # Empty unless -DICLFORGE_SANITIZERS=<comma-list> is set (see the *-asan-ubsan
 # presets in CMakePresets.json); a plain configure is unaffected.

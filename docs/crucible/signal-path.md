@@ -103,6 +103,10 @@ and the reason line says so.
 
 ## The Signal path page
 
+![The Signal path page: the three stations, what you hear it as, and the endpoint table with Hear it here](screenshots/crucible-signal-path.png)
+
+*The page on a computer with one output and no silent device.*
+
 The page has five blocks.
 
 | Block | What it holds |

@@ -38,6 +38,10 @@ Three sources, in this order; the first that names a language the app ships wins
 
 ## Right to left
 
+![The Room page in Arabic: the layout mirrored, the application list at the right and the signal path at the left, the speaker names and the status line still in Latin letters](screenshots/crucible-room-ar.png)
+
+*The Room page with `--language ar`.*
+
 Arabic, Hebrew and Yiddish set the application's layout direction, and the window root
 (`apps/crucible/ui/assets/qml/Main.qml`) mirrors on it: rows run right to left, anchors swap sides, the
 header title sits at the right edge, and the combo-box chevrons move to the left of their
@@ -252,7 +256,12 @@ QT_QPA_PLATFORM=offscreen crucible --language ar --page settings --shot crucible
 ```
 
 `--language` sets `ICLFORGE_GUI_LOCALE` for that run only, so a capture never moves the language the
-person chose. What to look at in the result: the header title at the right edge, the page switch
+person chose. A capture is otherwise an ordinary run of the program: it reads the person's settings
+(the Signing card shows the key file's path, and the first run after the rename copies the old
+store across), starts the engine, and lists the applications that are running. To take a picture
+that is safe to publish, give it a throwaway key with `ICLFORGE_SIGNING_KEY_FILE`, a settings
+store with no key path in it, and an otherwise quiet desktop; and take it on a platform with a
+font that has the drop-down arrow, which the offscreen platform does not. What to look at in the result: the header title at the right edge, the page switch
 and the status pill on the left, the combo-box chevrons on the left of their controls, the room
 plan's L speaker still on the left, the endpoint table's heads unclipped, and no missing-glyph
 boxes in the Arabic or Hebrew text.

@@ -48,6 +48,13 @@ C6 / S3 / P4 sink modules on one dual-ES9080 PCB, are on
   2.0 and 5.1 in real time, 5.1.4 slower ([AC-4](esp32-p4.md#ac-4)).
 - **Building with ESPHome instead of raw ESP-IDF?** [ESPHome](esphome.md) is the external
   component. It decodes AC-3 only, and it is not a `media_player` or `speaker` source.
+- **Building `hearth_sink` for a dev kit, adding a Kconfig key or changing a board's
+  configuration?** [ESP32 build profiles](build-profiles.md) has the locked configuration of each
+  board, the guard CI holds a build to, the commands to build a board from its profile, and what a
+  change to one has to carry.
+- **Changing the ESP32 firmware, or a decoder it links?**
+  [Testing and benchmarking the boards](board-bench.md) says what is tested on the host, under
+  QEMU and in CI, what needs a board, and how a board's plays are held to a recorded baseline.
 
 ## Where to go next
 
