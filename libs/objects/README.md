@@ -7,7 +7,7 @@ The object-audio model: an object's position and path over time, the placement a
 A library.
 
 - **Uses:** `base`, `dsp`
-- **Used by:** `ac3`, `ac4`, `adm`, `app-media`, `audio`, `baremetal`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `render`
+- **Used by:** `ac3`, `ac4`, `adm`, `app-media`, `audio`, `baremetal`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `render`, `sink`
 - **CI lanes:** core
 - **CMake target:** `iclforge::objects`
 

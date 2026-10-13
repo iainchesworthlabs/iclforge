@@ -2,11 +2,11 @@
 
 # sink
 
-A Sendspin sink a program runs: it listens and advertises, pairs, admits servers as the specification ranks them, keeps the identity and the pairing records, answers the roles a server lists, and hands each stream it is sent to an output the program supplies. It was Hearth's test sink, which writes WAV files; the Android app gives the receiver the bytes. Internal; never installed.
+A Sendspin sink a program runs: it listens and advertises, pairs, admits servers as the specification ranks them, keeps the identity and the pairing records, answers the roles a server lists, and hands each stream it is sent to an output the program supplies: the pass-through output hands the coded bursts on, and the decoding output (AC-3, E-AC-3, AC-4) decodes and renders them and hands the samples to a PcmSink. It was Hearth's test sink, which writes WAV files; the Android app gives the receiver the bytes. Internal; never installed.
 
 A library, internal to the repository.
 
-- **Uses:** `ac3`, `containers`, `lyrics`, `sendspin`
+- **Uses:** `ac3`, `ac4`, `containers`, `lyrics`, `objects`, `render`, `sendspin`
 - **Used by:** `hearth`, `hearth-android`
 - **CI lanes:** core
 - **CMake target:** `iclforge::sink`
