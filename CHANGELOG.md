@@ -4360,6 +4360,13 @@ The sections below contain the complete change list and fixes.
 - The Hearth page describes the desktop player as it is: it plays to network sinks, plays
   channel-based AC-4, packages for Windows, macOS and Linux, and updates a sink's firmware. The
   ESP32-P4 has its row, and its page is in the navigation.
+- A developer page, [ESP32 memory layout](docs/platforms/bare-metal/memory-layout.md), puts the
+  memory facts of the three ESP32 kits in one place: the flash map and both partition tables, the
+  internal RAM split, what lives in PSRAM, the caches and flash mode, the heap floors and how a
+  refused play is reported, and what AC-3, E-AC-3 and AC-4 cost on the S3, the C6 and the P4. One
+  table a board and one that sets them side by side, each figure with the build and date it was
+  measured on and a link to the board page that has the measurement. It ends with what to keep
+  out of internal RAM, how to measure, and the traps met on the boards.
 - The front page, the README and the site description name AC-4 and say where it is and is not
   supported.
 - The pages that still said no ESP32 sink takes AC-4 in a Sendspin group say what is built: a sink
