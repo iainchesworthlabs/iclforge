@@ -403,7 +403,8 @@ void require_change_lands_whole(const std::vector<std::vector<std::byte>>& frame
 // a second (Hearth's DecoderAc4::test_downmixIsHeardWithTheStreamsGains).
 TEST_CASE("set_output changes the downmix from the next frame, keeping the stream's own gains",
           "[ac4][decoder][api]") {
-    const auto frames = tones_with_their_own_gains(60);
+    // Encoded once for the two sections, which Catch2 enters one after the other.
+    static const auto frames = tones_with_their_own_gains(60);
     REQUIRE(frames.size() >= 60);
     // Frame 30 is between the I-frames 24 and 48, the only frames that carry
     // the gains.
