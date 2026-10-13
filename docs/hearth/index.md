@@ -158,6 +158,10 @@ gets no card.
 **Time the lyrics...** on the Lyrics card is for an item whose words have no times, or whose times
 are for lines and not words. It opens a window over the page, and the item plays as usual:
 
+![The timing window over the Karaoke page: the Lines and Words passes, Play and the position, four lines each with its time and its words, and under them Stamp again, the 10 ms nudges, the singer of a line and the reaction time](../karaoke/screenshots/hearth-timing-window.png)
+
+*The karaoke example's own file, which has its times already: `hearth --smoke-shot timing.png --page timing --setting "microphone/takesFolder=C:/Users/you/Documents/Hearth takes" --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 5200`.*
+
 1. **Lines.** Press `Space`, or the button, as each line starts. A press is taken to be the
    **reaction time** late (120 ms to start with, set in the window, kept across starts), and that is
    taken off, so that what is stored is where the sound was and not where the finger came down.
@@ -293,11 +297,11 @@ and a string with no translation shows in English.
 
 ![Hearth's Karaoke page in German](screenshots/karaoke-de.png)
 
-*The Karaoke page in German, with the duet example 6.3 s in (`ICLFORGE_GUI_LOCALE=de`). The words of the lyrics are the file's own; the header's other pages and the stream's file name are not translated.*
+*The Karaoke page in German, with the duet example 6.3 s in: `ICLFORGE_GUI_LOCALE=de hearth --smoke-shot de.png --page karaoke --open examples/karaoke/leave-her-johnny/leave-her-johnny.ac3 --seek 6300`. The words of the lyrics are the file's own; the header's other pages and the stream's file name are not translated.*
 
 ![Hearth's Karaoke page in Arabic, mirrored](screenshots/karaoke-ar.png)
 
-*The same page in Arabic: the layout mirrors, and the bundled Noto Sans Arabic face is used.*
+*The same page in Arabic (`ICLFORGE_GUI_LOCALE=ar`): the layout mirrors, and the bundled Noto Sans Arabic face is used. Both pictures are of 2026-10-12, before the page had its Microphone card.*
 
 **The translations are machine-made and no speaker of any of the six has read them.** Settings
 says so under the language chooser, as the Forge GUI and Crucible do under theirs. They reuse the

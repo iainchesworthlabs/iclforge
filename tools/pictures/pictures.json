@@ -107,6 +107,14 @@
     "39ee87f72": {
       "commit": "39ee87f72dff207165631f1fdf05ed4339b49475",
       "what": "the demo as built that day: the commit that last changed the picture, 2026-09-03"
+    },
+    "c4aa5b9bc": {
+      "commit": "c4aa5b9bc7c0f1162520abba4e40e10c040bdbfc",
+      "what": "the tree the picture was taken from on 2026-10-13: the branch that made the empty queue's hint wrap and reworded the first-run dialog, built on Windows (Release, MSVC, Qt 6.8.3)"
+    },
+    "c4fa8b161": {
+      "commit": "c4fa8b161ca4e796e338a86b1dfd407b16d095af",
+      "what": "Release build on Windows: cl.exe, Qt from C:/Qt/6.8.3/msvc2022_64, taken 2026-10-13 or after"
     }
   },
   "pictures": [
@@ -542,7 +550,7 @@
         "firstrun"
       ],
       "environment": "hidden-desktop-living-room",
-      "build": "262363c4a",
+      "build": "c4aa5b9bc",
       "note": "Names the sound output of the computer it was taken on."
     },
     {
@@ -654,7 +662,7 @@
         "1800"
       ],
       "environment": "hidden-desktop-living-room",
-      "build": "262363c4a",
+      "build": "c4fa8b161",
       "note": "Names the sound output of the computer it was taken on."
     },
     {
@@ -673,8 +681,27 @@
         "5200"
       ],
       "environment": "hidden-desktop-living-room",
-      "build": "262363c4a",
+      "build": "c4fa8b161",
       "note": "A capture draws the singer view in the window at its own size, 1280 by 800, not on the whole screen."
+    },
+    {
+      "path": "docs/karaoke/screenshots/hearth-timing-window.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "timing",
+        "--setting",
+        "microphone/takesFolder=C:/Users/you/Documents/Hearth takes",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "5200"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "c4fa8b161",
+      "note": "The Karaoke page behind the window names its takes folder, which is under the account's own documents unless it is set: --setting gives it a folder that is nobody's."
     },
     {
       "path": "docs/karaoke/screenshots/forge-karaoke-parts.png",
@@ -687,7 +714,19 @@
         "height=1100"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a"
+      "build": "c4fa8b161"
+    },
+    {
+      "path": "docs/karaoke/screenshots/forge-karaoke-levels.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj",
+        "karaokeStep=levels"
+      ],
+      "environment": "hidden-desktop",
+      "build": "c4fa8b161"
     },
     {
       "path": "docs/karaoke/screenshots/forge-karaoke-hear.png",
@@ -699,8 +738,20 @@
         "karaokeStep=hear"
       ],
       "environment": "hidden-desktop",
-      "build": "262363c4a",
+      "build": "c4fa8b161",
       "note": "The grab waits for the Hear step to build its stream and decode it. Nothing is played."
+    },
+    {
+      "path": "docs/karaoke/screenshots/forge-karaoke-save.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj",
+        "karaokeStep=save"
+      ],
+      "environment": "hidden-desktop",
+      "build": "c4fa8b161"
     },
     {
       "path": "docs/crucible/screenshots/crucible-room.png",
