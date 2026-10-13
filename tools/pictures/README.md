@@ -108,11 +108,12 @@ not need meters are parked there (`--seek 1500`).
 A picture of a **performance** (the Microphone card's ribbon, the marks under the lines sung, its
 summary) is `hearth --sing <voice.wav> --seek <ms>`, with `--finish-singing` for the summary. The
 file is the microphone and the song plays to an output that plays to nothing, so no microphone is
-opened, nothing is heard, and the run needs no sound device; it takes as long as the song takes to
-reach `--seek`, in real time (the song is heard about two seconds after it is started, which a
-voice begun with the start would be early by, and is why the file is placed by where the song is
-heard). With `QT_FORCE_STDERR_LOGGING=1` the program says in its log how much of the tune the voice
-scored and the lag it measured, which for the example's own lead vocal is about 10 ms.
+opened, nothing is heard, and the run needs no sound device. It takes as long as the song takes to
+reach `--seek`, in real time. The song is heard between a tenth of a second and two seconds after
+it is started, which a voice begun with the start would be early by, and is why the file is placed
+by where the song is heard. With `QT_FORCE_STDERR_LOGGING=1` the program says in its log how much
+of the tune the voice scored and the lag it measured, which for the example's own lead vocal is
+about 10 ms.
 
 ## Crucible
 
