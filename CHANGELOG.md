@@ -1101,8 +1101,10 @@ The sections below contain the complete change list and fixes.
   `test_translations.cpp` reads Hearth's six files with the rules it
   applies to Crucible's (nothing unfinished or dead, nothing empty, placeholders and brand terms
   kept, one source set), and a new or reworded string now fails it until its six entries are
-  filled. Six strings that English builds by gluing `s` or `ies` onto a count cannot be translated
-  as written; their renderings leave that placeholder out and the test names the six
+  filled. Ten messages that carry a count (six of them built English plurals by gluing `s` or
+  `ies` on) are plural messages, so each language has the forms it needs, six in Arabic, and
+  `1 item` and `2 items` are right in English, from a seventh file, `hearth_en.ts`, that holds only
+  those; the test no longer lets any string leave a placeholder out
   ([Languages](docs/hearth/index.md#languages)).
 - **The Network page says whether a board holds lyrics and which line it is on.** The sink report
   has a Lyrics row: "not offered" for a board that lists no lyric commands, "none held", "held,
@@ -4955,6 +4957,65 @@ The sections below contain the complete change list and fixes.
   under 4x CPU throttling and 30 of 30 with the check started 0 to 450 ms later. Against a page
   whose meter never moves, the test fails at this check. The 15 s failure itself was not seen on
   the machine this was done on: there the looks leave the silence in under 14 s.
+- **The browser demo's microphone is closed again when it could not be opened all the way.**
+  Opening it takes steps in order: the pitch tracker, the browser's microphone, the capture
+  worklet's module (loaded from a Blob), the nodes, the scorer. A session counts as on only after
+  the last of them, and closing one that is not on does nothing, so when a step failed, what the
+  steps before it had made stayed as it was, and the page dropped the session and showed the
+  error. A refused microphone left the tracker made for that press undeleted, one for each
+  refused press. A failure after the microphone had opened left its track live while the card
+  said the microphone was off, with no indicator and no button that would close it. A page
+  served with a script policy that leaves out `blob:` is one way to get there, because the
+  worklet's module is then refused: in Chromium 153 under `script-src 'self' 'unsafe-eval'`, the
+  fake microphone's track was still `live` after the card had reported the failure.
+  `MicrophoneSession.start()` now lets go of whatever it had made when any step throws (the
+  tracks ended, the nodes disconnected, the tracker and the scorer deleted) and then gives the
+  page the error it gave before. That includes the page's own callback throwing at the end, which
+  used to leave a session that was on behind a failed start. Opening and closing a microphone
+  that works is unchanged, as are the card's words. Two cases in `microphone.spec.js` hold it: a
+  session over stand-ins that fail at each step in turn, which also holds that the next press
+  opens the microphone, and the page itself under that policy with Chromium's fake device.
+  Against `mic.js` as it was, the first fails at every step from the refusal on and the second
+  finds the track `live`; with the change the eight microphone cases pass, 64 of 64 over eight
+  repeats, and so do the 19 cases of the four projects. Run in headless Chromium 153 on Windows
+  against an existing build of the module with this `mic.js` copied over the built one; the WASM
+  job does not run on pull requests.
+- **The browser demo's microphone stays closed when another stream is loaded while the browser is
+  still asking for it.** Closing a session did nothing unless it was on, and a session is on only
+  after the last step of opening, which waits first for the browser to ask the person and then
+  for the capture worklet's module. The page closes the session on every decode of another
+  stream, and while a press is opening the microphone only the microphone button is disabled, so
+  a stream loaded with the prompt still open closed nothing, and the microphone opened when the
+  person allowed it. Where the first stream had no tune to score (a karaoke stream with only L
+  and R) and the next was not karaoke, the microphone was then on behind a card that was no
+  longer shown, with no indicator and no button to close it: in Chromium 153 the fake
+  microphone's track was still `live` when the check gave up after 10 s. Where the first stream
+  had a tune, the page had deleted it by then, and the card showed the module's error, "Cannot
+  pass deleted object as a pointer of type ReferenceContour" (the microphone itself was closed,
+  by the entry above).
+  `MicrophoneSession.stop()` now ends an opening. What `start()` holds is let go at once, the
+  microphone with it when the browser had already handed it over and the worklet's module was
+  still loading; a microphone the browser hands over afterwards is closed as it arrives; and
+  `start()` resolves with the session off and throws nothing, whatever the browser answers, so
+  the page reads `on` before it says the microphone is open. A second `start()` while one is
+  opening no longer opens a second microphone. The page also counts the decodes that take the
+  microphone away, and a press that one of them overtakes opens nothing and leaves the status
+  and the button as that decode set them. That covers a stream that arrives before the browser
+  has been asked, because a press first starts the sound output and waits for it: with the
+  session's change alone, the browser was then asked and the microphone opened behind the hidden
+  card. The card's words are unchanged, as are opening and closing a microphone with no stream
+  loaded in between.
+  Three cases in `microphone.spec.js` hold it: a session over stand-ins closed at each of its two
+  waits, with the wait then ending either way, and the page twice, once with its call to the
+  browser held open in place of the prompt (Chromium's fake prompt answers at once) and once with
+  the output's start held. The repository has no karaoke stream without a tune, so the test
+  makes one from a stereo stream by setting `bsmod` to 7 and redoing both CRC words of each
+  syncframe. Against the code as it was, the first fails 17 of its checks, the second finds the
+  track `live` and then the error on the card, and the third finds the browser asked; with the
+  change the eleven microphone cases pass, 88 of 88 over eight repeats, and so do the 22 cases of
+  the four projects. Run in headless Chromium 153 on Windows against an existing build of the
+  module with this `mic.js` and `demo.js` copied over the built ones; the WASM job does not run
+  on pull requests.
 
 **Forge GUI user guide: the Karaoke page's note on the length warning**
 

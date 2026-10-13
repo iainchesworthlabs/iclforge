@@ -222,6 +222,7 @@ export class MicrophoneSession {
         this._expected = null;      // the frame number the next quantum should start at
         this._streamSamples = 0;
         this._summary = null;
+        this._opening = null;       // a start() that has not finished: { stopped }
     }
 
     get score() {
@@ -269,19 +270,47 @@ export class MicrophoneSession {
     }
 
     // Opens the microphone: a person's press, and the only thing that does. Throws with a sentence
-    // for the page when it will not open.
+    // for the page when it will not open, and then nothing is left open: opening takes its steps in
+    // order and any of them can fail (the person refuses, or the page may not load a worklet from a
+    // Blob), so what the steps before it made is let go here. A microphone that had opened is
+    // closed, as the page will say it is.
+    //
+    // Opening can take as long as a person likes: the browser asks them, and waits. stop() in that
+    // time ends it, and then this resolves with the session off and throws nothing, whatever the
+    // browser goes on to answer, because closing it is what was asked for. So once this has
+    // returned, `on` says whether the microphone is open. A call while one is already opening
+    // does nothing: there is one microphone to open.
     async start({ deviceId } = {}) {
-        if (this.on) {
+        if (this.on || this._opening) {
             return;
         }
         this._summary = null;
+        const opening = { stopped: false };
+        this._opening = opening;
+        try {
+            await this._open(deviceId, opening);
+        } catch (err) {
+            // stop() came while it was opening and let go of what there was: what is held by now
+            // may be a later start()'s. What went wrong after that is not the page's to hear.
+            if (opening.stopped) {
+                return;
+            }
+            this._opening = null;
+            this.on = false;
+            this._release();
+            throw err;
+        }
+    }
+
+    // The steps of start(), which lets go of what they made when one of them throws. After each
+    // wait, `opening.stopped` says that stop() came during it: stop() let go of what was held
+    // then, so all that is left is what the wait itself handed over.
+    async _open(deviceId, opening) {
         this._tracker = new this.module.PitchTracker(this.ctx.sampleRate);
         if (!this._tracker.valid()) {
-            this._tracker.delete();
-            this._tracker = null;
             throw new Error(`This browser's audio runs at ${this.ctx.sampleRate} Hz, which the pitch tracker cannot follow.`);
         }
-        this._stream = await this.mediaDevices.getUserMedia({
+        const stream = await this.mediaDevices.getUserMedia({
             audio: {
                 ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
                 channelCount: { ideal: 1 },
@@ -292,6 +321,15 @@ export class MicrophoneSession {
                 autoGainControl: false,
             },
         });
+        if (opening.stopped) {
+            // The microphone the browser has just handed over: nothing else has hold of it, and
+            // nothing would ever close it.
+            for (const track of stream.getTracks?.() ?? []) {
+                track.stop();
+            }
+            return;
+        }
+        this._stream = stream;
         const settings = this._stream.getAudioTracks()[0]?.getSettings?.() ?? {};
         if (typeof settings.latency === 'number' && settings.latency > 0) {
             this.inputLatencySec = settings.latency;
@@ -302,6 +340,9 @@ export class MicrophoneSession {
             await this.ctx.audioWorklet.addModule(url);
         } finally {
             URL.revokeObjectURL(url);
+        }
+        if (opening.stopped) {
+            return;
         }
         this._source = this.ctx.createMediaStreamSource(this._stream);
         this._node = this.createCaptureNode(this.ctx);
@@ -320,18 +361,36 @@ export class MicrophoneSession {
         this._expected = null;
         this._streamSamples = 0;
         this.trace = [];
+        this._opening = null;
         this.on = true;
         this._node.port.onmessage = (event) => this.onQuantum(event.data);
         this.onUpdate();
     }
 
-    // Closes it and keeps what it came to (when the headphones answer was given).
+    // Closes it and keeps what it came to (when the headphones answer was given). One that is
+    // still opening is ended here: what start() holds so far is let go at once, the microphone
+    // with it when the browser had already handed it over, and start() closes one that the
+    // browser hands over later. It was never on, so there is nothing to keep and nothing new for
+    // the page to draw.
     stop() {
+        if (this._opening) {
+            this._opening.stopped = true;
+            this._opening = null;
+            this._release();
+            return;
+        }
         if (!this.on) {
             return;
         }
         this._summary = this._takeSummary();
         this.on = false;
+        this._release();
+        this.onUpdate();
+    }
+
+    // Lets go of whatever is held, which after a start that failed part-way is only some of it: the
+    // nodes out of the graph, the microphone's tracks ended, the module's objects deleted.
+    _release() {
         if (this._node) {
             this._node.port.onmessage = null;
             this._node.disconnect();
@@ -348,7 +407,6 @@ export class MicrophoneSession {
         this._scorer = null;
         this.level = 0;
         this.live = { voiced: false, hz: 0, itemMs: null, cents: null };
-        this.onUpdate();
     }
 
     _takeSummary() {

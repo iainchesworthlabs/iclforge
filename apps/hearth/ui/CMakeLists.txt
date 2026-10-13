@@ -259,6 +259,14 @@ else()
     # An entry marked unfinished is what Qt calls an untranslated message, and
     # what it does with one is fall back to the English source.
     #
+    # hearth_en.ts is the seventh file and a different kind: English has no
+    # catalogue of its own for ordinary strings (the source is the English), but
+    # a plural message needs one, because Qt picks the singular or the plural
+    # form from the catalogue and the source holds only one of them. PLURALS_TS_FILE
+    # makes the lupdate target keep it: it carries the plural messages and
+    # nothing else (lconvert -pluralonly), two forms each, and main.cpp installs
+    # the compiled hearth_en.qm underneath the language the person chose.
+    #
     # apps/crucible/ui/tests/test_translations.cpp holds these six files to the
     # rules it holds Crucible's to: nothing unfinished or dead, nothing empty,
     # placeholders and brand terms kept, one source set across the six. So a new
@@ -283,6 +291,7 @@ else()
         IMMEDIATE_CALL
         SOURCE_TARGETS hearth
         TS_FILES ${ICLFORGE_HEARTH_TS_FILES}
+        PLURALS_TS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/hearth_en.ts"
         LUPDATE_OPTIONS -no-obsolete
         LUPDATE_TARGET hearth_lupdate
         LRELEASE_TARGET hearth_lrelease)

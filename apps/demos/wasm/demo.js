@@ -696,6 +696,7 @@ let micNotes = [];
 let micRange = { low: 55, high: 79 };
 let micPartText = '';
 let micDrawScheduled = false;
+let micStreams = 0;            // how many times a decode has taken the microphone and the tune away
 
 function micStatus(text, isError) {
     const status = el('micStatus');
@@ -713,13 +714,24 @@ function micClearReference() {
     micPartText = '';
 }
 
+// What a decode of another stream does to the card: the microphone goes off and the tune goes.
+// A press may still be on its way to opening the microphone, because the browser asks the person
+// and waits for as long as they like: stop() ends an opening that has got as far as the session,
+// and the count tells the press, wherever it has got to, that the stream it was for has gone
+// (toggleMicrophone). Without that, the microphone would open behind a card that is no longer
+// there, or with a tune that has been deleted.
+function micLeaveStream() {
+    micStreams += 1;
+    micSession?.stop();
+    micClearReference();
+}
+
 // Called with every decode. A stream that is not karaoke has no tune and no card; a karaoke stream
 // of the same bytes (a change of the vocals decodes it again) keeps the tune it has.
 async function prepareMicrophone(result, bytes) {
     const panel = el('micPanel');
     if (!result.karaoke) {
-        micSession?.stop();
-        micClearReference();
+        micLeaveStream();
         panel.style.display = 'none';
         return;
     }
@@ -727,8 +739,7 @@ async function prepareMicrophone(result, bytes) {
     if (micReferenceBytes === bytes && micReference) {
         return;
     }
-    micSession?.stop();
-    micClearReference();
+    micLeaveStream();
     el('micToggle').disabled = true;
     micModule = micModule ?? await loadModule();
 
@@ -786,34 +797,51 @@ async function toggleMicrophone() {
         return;
     }
     el('micToggle').disabled = true;
+    // A decode of another stream that comes before the microphone is open overtakes this press
+    // (micLeaveStream). The card is then that stream's, or gone: the press opens nothing, and
+    // leaves the status and the button as the decode set them.
+    const forStream = micStreams;
+    const overtaken = () => forStream !== micStreams;
     try {
         // The context is the one playback uses: the voice and the sound it sings along to share a clock.
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         await audioCtx.resume();
         micModule = micModule ?? await loadModule();
-        micSession = new MicrophoneSession({
+        if (overtaken()) {
+            return;
+        }
+        const session = new MicrophoneSession({
             module: micModule,
             reference: micReference,
             audioContext: audioCtx,
             playback: () => ({ playing, startCtxTime: playStartCtxTime }),
             onUpdate: scheduleMicDraw,
         });
-        micSession.headphones = el('micHeadphones').checked;
-        micSession.offsetMs = Number(el('micOffset').value);
-        await micSession.start();
-        // The track's own figure, when the browser gives one, is where the delay slider starts.
-        if (micSession.inputLatencySec > 0) {
-            el('micDelay').value = String(Math.round(micSession.inputLatencySec * 1000));
-        } else {
-            micSession.inputLatencySec = Number(el('micDelay').value) / 1000;
+        micSession = session;
+        session.headphones = el('micHeadphones').checked;
+        session.offsetMs = Number(el('micOffset').value);
+        await session.start();
+        // Stopped while it was opening: it is off, and nothing went wrong.
+        if (!session.on) {
+            return;
         }
-        el('micDelayText').textContent = `${Math.round(micSession.inputLatencySec * 1000)} ms`;
+        // The track's own figure, when the browser gives one, is where the delay slider starts.
+        if (session.inputLatencySec > 0) {
+            el('micDelay').value = String(Math.round(session.inputLatencySec * 1000));
+        } else {
+            session.inputLatencySec = Number(el('micDelay').value) / 1000;
+        }
+        el('micDelayText').textContent = `${Math.round(session.inputLatencySec * 1000)} ms`;
         micStatus(micPartText ? `Scored against ${micPartText}.` : 'Showing your pitch.', false);
     } catch (err) {
-        micSession = null;
-        micStatus(micMessage(err), true);
+        if (!overtaken()) {
+            micSession = null;
+            micStatus(micMessage(err), true);
+        }
     } finally {
-        el('micToggle').disabled = false;
+        if (!overtaken()) {
+            el('micToggle').disabled = false;
+        }
         scheduleMicDraw();
     }
 }

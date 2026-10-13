@@ -304,7 +304,7 @@ builds without it and says so in a warning.
 | repository variable `GATE_RUNNER_JSON` | Runner labels for the gate's Linux and control jobs, e.g. `["self-hosted","Linux","X64"]`. Unset means `ubuntu-latest`. Fork pull requests stay hosted regardless. |
 | repository variable `GATE_WINDOWS_RUNNER_JSON` | Runner labels for the Windows job. Unset means `windows-latest`. |
 | repository variable `GATE_COMPARE_RUNNER_JSON` | Runner labels for the queue's performance and memory comparisons. Unset means `GATE_RUNNER_JSON`, then `ubuntu-latest`. They time two builds against each other, which a dedicated fleet machine does with less noise. |
-| repository variable `CONTROL_RUNNER_JSON` | Control jobs of `ci.yml`, as before. |
+| repository variable `CONTROL_RUNNER_JSON` | Control jobs of `ci.yml`, as before, and the `Scan dependency diff` check of `dependency-review.yml`, which every pull request and every queue entry waits on. |
 | repository variable `PAUSE_NONESSENTIAL_CI` | `true` skips the pull-request runs of OSV-Scanner, Zizmor and Fuzz Regress, which are not required checks, to free hosted runners for the ones that gate merging; runs on main and scheduled runs are unaffected. It has been set to `true` since 2026-09-25. |
 | `pr-gate.yml` input `windows` | Adds Windows MSVC to a dispatched run. |
 | `pr-gate.yml` input `save_cache` | Saves the compiler caches from a dispatched run. |

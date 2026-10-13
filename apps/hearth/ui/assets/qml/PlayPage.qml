@@ -76,7 +76,7 @@ Item {
         for (var i = 0; i < queue.length; i++) {
             totalMs += queue[i].durationMs || 0;
         }
-        var parts = [qsTr("%1 items").arg(queue.length)];
+        var parts = [qsTr("%n items", "", queue.length)];
         if (totalMs > 0) {
             parts.push(root.formatDuration(totalMs));
         }
@@ -134,7 +134,7 @@ Item {
         var programme = (media.programmes ?? [])[0];
         if (programme !== undefined) {
             parts.push(programme.layoutLabel + (objectCount !== undefined
-                        ? qsTr(" bed + %1 objects").arg(objectCount) : ""));
+                        ? qsTr(" bed + %n objects", "", objectCount) : ""));
         }
         // An AC-4 item's layout is its presentation's: the one the decoder
         // chose with no preferences, which the media information describes.
