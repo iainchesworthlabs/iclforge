@@ -135,7 +135,18 @@ placed or scored while the item is not playing.
 - the score is withheld until the headphones answer is given, and a performance made without it has no
   summary;
 - nothing is sent: a request that is not a plain GET of the page's own files fails the test;
-- closing it ends every track it opened and the capture port.
+- closing it ends every track it opened and the capture port;
+- one that could not be opened all the way is not left open: whichever step fails (the person refuses,
+  or the page is served with a script policy that leaves out the `blob:` the capture worklet is loaded
+  from), the tracks that had opened are ended and the module's tracker and scorer are deleted;
+- one that is closed while it is still opening never opens. The browser asks the person for the
+  microphone and waits for as long as they leave the question, and another stream can be loaded in that
+  time. Its decode ends the press: the tracker is deleted at once, the microphone is closed as soon as
+  the browser hands it over (at once, if it already had), and the card, where the new stream has one,
+  shows that stream's words and no error. A press that the new stream overtakes before the browser
+  has been asked does not ask. (Chromium's fake prompt answers at once, so the tests hold the page's
+  call to the browser open in its place, and a stream with no tune to score is made by relabelling a
+  stereo one as karaoke.)
 
 The arithmetic is held with synthetic voices: the tracker finds a vibrato tone at 48 kHz and follows 44.1,
 48 and 96 kHz; a
@@ -495,7 +506,7 @@ would never trigger a redeploy at all, and the live demo would silently drift fr
     through the bound `Encoder`, measures it with `QcMeter`, asserts the true peak and every preset
     verdict land where that known signal predicts, and round-trips the result through the decode
     module. A regression in any of those numbers now fails CI rather than waiting for the next
-    manual pass. The `microphone` project (`microphone.spec.js`, five tests, the decode demo's own
+    manual pass. The `microphone` project (`microphone.spec.js`, eleven tests, the decode demo's own
     directory with Chromium's fake device) holds the pitch bindings and the microphone card.
 
 !!! note "Verified locally while building the push-frame decoder package (this repository's own Windows host, Emscripten 6.0.6)"

@@ -43,10 +43,9 @@ ColumnLayout {
         Layout.minimumWidth: 0
         ordinal: "01"
         label: qsTr("On this network")
-        summary: qsTr("%1 found · %2 group%3")
+        //: Beside the heading 'On this network'. %1 is how many sinks were found on it; %n counts the groups made of them.
+        summary: qsTr("%1 found · %n groups", "", NetworkController.groupCount)
                  .arg(NetworkController.discoveredCount)
-                 .arg(NetworkController.groupCount)
-                 .arg(NetworkController.groupCount === 1 ? "" : "s")
     }
 
     RowLayout {
