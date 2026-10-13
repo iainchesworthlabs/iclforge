@@ -64,10 +64,6 @@ project(iclforge_hearth_android_jni LANGUAGES CXX)
 # the desktop programs and their tests, and Hearth's own applications, whose notices and packaging
 # take this wrapper's directory for the repository root (ICLFORGE_BUILD_HEARTH_APPS, the root's).
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
-# NDK r26's libc++ clobbers a std::expected's has-value flag when its payload has tail padding. The
-# option has to reach this wrapper's own targets as well as the root's, so it is included here and
-# not only by the root (cmake/LibcxxExpectedLayout.cmake).
-include("${ICLFORGE_REPO_ROOT}/cmake/LibcxxExpectedLayout.cmake")
 set(ICLFORGE_BUILD_CLI OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_GUI OFF CACHE BOOL "" FORCE)
 set(ICLFORGE_BUILD_TESTS OFF CACHE BOOL "" FORCE)

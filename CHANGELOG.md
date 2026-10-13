@@ -3902,6 +3902,24 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Android: NDK r28c**
+
+- **Every Android build is pinned to NDK r28c (28.2.13676358), up from r26b (26.1.10909125).** The
+  two Gradle apps' `ndkVersion`, the four `sdkmanager` installs and the `ANDROID_NDK_HOME` of
+  `_build.yml` and `codeql.yml`, `tools/ci/regenerate_android_locks.sh`, the preset's text and
+  docs/platforms/android.md. r26's libc++ (LLVM 17) was what put a `std::expected` payload's
+  has-value flag in the payload's tail padding and then copied the payload over it
+  (llvm-project#68552 and #70494, android/ndk#1963: r27 has half the fix, r28 both), answered true
+  from `std::ranges::binary_search` for every value between the first element and the last
+  (llvm-project#61160), and ended a range-for's temporaries before its first iteration; r28c's
+  clang 19.0.1 and libc++ 19 have all three right. `cmake/LibcxxExpectedLayout.cmake`, the header
+  it force-included and the three `include()` lines that named them are removed, and
+  `cmake/AndroidNdkMinimum.cmake` makes an Android Clang older than 19 a configure error
+  (`-DICLFORGE_ALLOW_OLD_NDK=ON` to override), so an old NDK in `ANDROID_NDK_HOME` fails at
+  configure and not on a device. What r28c adds is measured in docs/platforms/android.md; what it
+  still lacks is floating-point `from_chars` (`strtod` stays) and `std::jthread`/`std::stop_token`
+  without `-fexperimental-library`. {fmt} stays the one formatting library on every toolchain.
+
 **Shared code**
 
 - **The picture of a CD+G disc is shared code, `apps/shared/cdg-picture`.** Hearth's picture item
@@ -4412,21 +4430,21 @@ The sections below contain the complete change list and fixes.
 **Android: `std::expected` no longer loses a payload that has tail padding**
 
 - **NDK r26's libc++ overwrote the has-value flag of a `std::expected` whose payload is trivially
-  copyable and has tail padding; the build now keeps the flag out of the padding.** libc++ 17
+  copyable and has tail padding; the build kept the flag out of the padding until the pin moved to
+  r28c (see "Android: NDK r28c" under Changed).** libc++ 17
   puts the flag in the payload's tail padding and then copies `sizeof(T)` bytes, padding included,
   over it, so `return meta;` came back as "no value, error 0" and an error whose padding held a
   non-zero byte came back as a value. On a Shield that was `read_frame_metadata()`,
   `edit_stream_metadata()` and `insert_stream_metadata()` (ten `iclforge-ac3-tests` cases);
   nothing on a desktop shows it. llvm-project#68552 and #70494, android/ndk#1963: NDK r27 has half
   the fix and r28 both, and none of r26's point releases has either.
-  `cmake/LibcxxExpectedLayout.cmake`, which the root and both Gradle wrappers include, adds
-  `cmake/toolchains/android.libcxx17-expected-layout.h` to every C++ translation unit of an Android
-  build with a Clang older than 19, and checks at configure time that the layout changed. The
-  audit of what was exposed (39 of 227 `std::expected` specializations the Android-reachable
+  `cmake/LibcxxExpectedLayout.cmake` added a header to every C++ translation unit of an Android
+  build with a Clang older than 19 and checked at configure time that the layout changed; r28c
+  made it unnecessary and it is gone. The audit of what was exposed (39 of 227 `std::expected` specializations the Android-reachable
   libraries instantiate had the flag in padding; eight, in seven payload types, were trivially
   copyable) and the way to repeat it are in docs/platforms/android.md. `iclforge-base-tests`
-  gains the `[expected]` cases, which fail on r26 without the option; `build-android-arm64` links
-  that binary now. Delete the module with the NDK r26 pin.
+  gains the `[expected]` cases, which failed on r26 without the option; `build-android-arm64`
+  links that binary.
 - **Two other r26 gaps the same device run found.** `std::ranges::binary_search` in r26's libc++
   answers true for every value between the first and last element (llvm-project#61160), which made
   every frame between the first named AC-4 I-frame and the last an I-frame:
