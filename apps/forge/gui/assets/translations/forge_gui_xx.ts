@@ -1049,10 +1049,6 @@
             <translation>[À bàckîng àlõné îs stéréõ, wîth nõthîng tõ sîng àlõng tõ. Àdd à mélõdy gûîdé õr à võcàl. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
-            <source>%1 is %2 and the backing is %3: the shorter part is padded with silence.</source>
-            <translation>[%1 îs %2 ànd thé bàckîng îs %3: thé shõrtér pàrt îs pàddéd wîth sîléncé. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
-        </message>
-        <message>
             <source>%1 is %2 kHz and the backing is %3 kHz: it is resampled to the backing's rate.</source>
             <translation>[%1 îs %2 kHz ànd thé bàckîng îs %3 kHz: ît îs résàmpléd tõ thé bàckîng's ràté. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
@@ -1283,6 +1279,10 @@
         <message>
             <source>The lyrics file could not be read, so none was put beside the stream: %1</source>
             <translation>[Thé lyrîcs fîlé cõûld nõt bé réàd, sõ nõné wàs pût bésîdé thé stréàm: %1 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
+            <source>%1 is %2 and the backing is %3: the shorter part holds its last sample for the rest of the programme.</source>
+            <translation>[%1 îs %2 ànd thé bàckîng îs %3: thé shõrtér pàrt hõlds îts làst sàmplé fõr thé rést õf thé prõgràmmé. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
             <source>How loud do the melody and the vocals sit?</source>

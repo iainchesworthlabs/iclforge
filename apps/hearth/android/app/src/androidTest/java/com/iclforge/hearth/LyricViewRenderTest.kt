@@ -274,4 +274,41 @@ class LyricViewRenderTest : RenderTestBase() {
         assertTrue("the title left the margins", titled.left >= stage.left && titled.right <= stage.right)
         assertTrue("the header of an item with no name drew something", inked(without, header) == null)
     }
+
+    @Test
+    fun anItemWithNoLyricsShowsTheServersClockInTheHeaderAndItsProgressOnTheHairline() {
+        // The frame the sink answers for a stream with no document when metadata@v1 says where the item is.
+        val frame = LyricFrame.parse(
+            ("""{"item":-1,"streaming":true,"mode":"none","position_ms":60000,"length_ms":240000,""" +
+                """"progress":true}""").toByteArray(Charsets.UTF_8),
+        )
+        assertTrue(frame.progress)
+        assertEquals(60_000L, frame.positionMs)
+        assertEquals(240_000L, frame.lengthMs)
+        // A frame from a document has no such key, and reads as false.
+        assertFalse(
+            LyricFrame.parse("""{"item":3,"streaming":true,"mode":"line"}""".toByteArray(Charsets.UTF_8)).progress,
+        )
+        val u = height / 600f
+        val headerTop = stage.top - (Tokens.HEADER_U * u).toInt()
+        // The right-hand part of the header's text row, where the time is, and the hairline under it.
+        val clock = Rect(stage.left + (stage.width() * 0.7f).toInt(), headerTop, stage.right, stage.top - (4 * u).toInt())
+        val hairline = Rect(stage.left, stage.top - (3 * u).toInt(), stage.right, stage.top)
+        val shown = render("s7-clock", frame)
+        val hidden = render("s7-no-clock", frame.copy(progress = false))
+        val clockInk = inked(shown, clock)
+        assertNotNull("no time in the header", clockInk)
+        assertTrue("the time is too small to be one", clockInk!!.width() > 20)
+        assertTrue("the header drew a time with no progress", inked(hidden, clock) == null)
+        // A quarter of the item is gone: a quarter of the hairline is the accent (a little either way for
+        // the margins), and none of it without the progress.
+        val run = longestRun(shown, hairline, Tokens.ACCENT)
+        assertTrue(
+            "the hairline's fill is $run of ${stage.width()}",
+            run > stage.width() * 0.2f && run < stage.width() * 0.3f,
+        )
+        assertEquals(0, longestRun(hidden, hairline, Tokens.ACCENT))
+        // The poll's rate is the activity's to raise, not the token's: the token stays at 1 for it.
+        assertEquals(1, Tokens.framesPerSecond(frame))
+    }
 }

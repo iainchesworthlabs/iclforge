@@ -407,7 +407,8 @@ ColumnLayout {
             return qsTr("A backing alone is stereo, with nothing to sing along to. Add a melody guide "
                         + "or a vocal.");
         case "length-differs":
-            return qsTr("%1 is %2 and the backing is %3: the shorter part is padded with silence.")
+            return qsTr("%1 is %2 and the backing is %3: the shorter part holds its last sample "
+                        + "for the rest of the programme.")
                 .arg(a[0]).arg(a[1]).arg(a[2]);
         case "rate-differs":
             return qsTr("%1 is %2 kHz and the backing is %3 kHz: it is resampled to the backing's rate.")

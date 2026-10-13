@@ -1857,4 +1857,153 @@ TEST_CASE("with_code_page_remedy follows a code page refusal and nothing else", 
     REQUIRE_FALSE(empty.has_value());
     CHECK(with_code_page_remedy(empty.error()) == empty.error());
     CHECK(with_code_page_remedy("") == "");
+// ---- a script made with Aegisub's karaoke templater --------------------------------------------
+// The templater (kara-templater.lua) takes the timed karaoke on lines whose Effect is empty or has
+// "karaoke" in it, writes its effects as Dialogue lines with Effect "fx", and keeps the line it made
+// them from as a comment with Effect "karaoke". Template and code lines are comments of its own.
+
+namespace {
+
+// A script in the shape the templater leaves: its definitions, the original timed line as a comment,
+// and one effect line per syllable.
+constexpr const char* kTemplatedScript = R"ass([Script Info]
+ScriptType: v4.00+
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Comment: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,template syl all,{\pos($x,$y)\fad(50,50)}
+Comment: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,code once,count = 0
+Comment: 1,0:00:01.00,0:00:04.00,Default,,0,0,0,karaoke,{\k50}Hel{\k50}lo {\k100}world
+Dialogue: 2,0:00:00.50,0:00:01.50,Default,,0,0,0,fx,{\pos(100,100)\fad(50,50)}Hel
+Dialogue: 2,0:00:01.00,0:00:02.00,Default,,0,0,0,fx,{\pos(140,100)\fad(50,50)}lo
+Dialogue: 2,0:00:02.00,0:00:04.50,Default,,0,0,0,fx,{\pos(180,100)\fad(50,50)}world
+)ass";
+
+}  // namespace
+
+TEST_CASE("ass templater: the commented karaoke line is the lyric, and its effect lines are not",
+          "[lyrics][ass]") {
+    const auto lyrics = iclforge::lyrics::parse_ass(kTemplatedScript);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    const auto& line = lyrics->lines[0];
+    CHECK(line.text == "Hello world");
+    CHECK(line.start_ms == 1000);
+    CHECK(line.end_ms == 4000);
+    REQUIRE(line.words.size() == 3);
+    CHECK(line.words[0].text == "Hel");
+    CHECK(line.words[0].start_ms == 1000);
+    CHECK(line.words[0].end_ms == 1500);
+    CHECK(line.words[2].text == "world");
+    CHECK(line.words[2].start_ms == 2000);
+}
+
+TEST_CASE("ass templater: other dialogue stays, and other comments and definitions are not read",
+          "[lyrics][ass]") {
+    // A title card with no effect is a line of its own; a note commented out with no effect is not.
+    const std::string text = std::string(kTemplatedScript) +
+                             "Dialogue: 0,0:00:05.00,0:00:06.00,Default,,0,0,0,,Thanks for singing\n"
+                             "Comment: 0,0:00:07.00,0:00:08.00,Default,,0,0,0,,A note to the author\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 2);
+    CHECK(lyrics->lines[0].text == "Hello world");
+    CHECK(lyrics->lines[1].text == "Thanks for singing");
+}
+
+TEST_CASE("ass templater: effect lines with no source to be made from are read as they always were",
+          "[lyrics][ass]") {
+    // Nothing is left to prefer, so the effect lines are the lines: as before this rule.
+    const std::string text =
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,fx,One\n"
+        "Dialogue: 0,0:00:03.00,0:00:04.00,Default,,0,0,0,fx,Two\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 2);
+    CHECK(lyrics->lines[0].text == "One");
+    CHECK(lyrics->lines[1].text == "Two");
+}
+
+TEST_CASE("ass templater: a source still on a dialogue line is read and its effects are not",
+          "[lyrics][ass]") {
+    // Not yet commented out (Aegisub does that once a template has applied): Effect "Karaoke", in any
+    // case, marks the source, and "FX" the effects.
+    const std::string text =
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Dialogue: 1,0:00:01.00,0:00:03.00,Default,,0,0,0,Karaoke,{\\k100}Sing {\\k100}along\n"
+        "Dialogue: 2,0:00:01.00,0:00:02.00,Default,,0,0,0,FX,{\\pos(10,10)}Sing\n"
+        "Dialogue: 2,0:00:02.00,0:00:03.00,Default,,0,0,0,FX,{\\pos(90,10)}along\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "Sing along");
+    CHECK(lyrics->lines[0].words.size() == 2);
+}
+
+TEST_CASE("ass templater: a definition is never the source, whatever its effect says",
+          "[lyrics][ass]") {
+    // "template" and "code" and "mixin" are the templater's own words for a comment, even when the
+    // rest of the effect mentions karaoke; the file's one real line is the Dialogue with no effect.
+    const std::string text =
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Comment: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,template karaoke all,{\\fad(10,10)}\n"
+        "Comment: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,code karaoke,x = 1\n"
+        "Comment: 0,0:00:00.00,0:00:00.00,Default,,0,0,0,mixin karaoke,{\\blur2}\n"
+        "Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,Just a line\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "Just a line");
+}
+
+TEST_CASE("ass templater: a script whose format names no effect column reads as it always did",
+          "[lyrics][ass]") {
+    // Without an Effect column nothing can be told, so a comment is a comment and nothing is dropped.
+    const std::string text =
+        "[Events]\n"
+        "Format: Start, End, Text\n"
+        "Comment: 0:00:01.00,0:00:02.00,Not read\n"
+        "Dialogue: 0:00:03.00,0:00:04.00,Read\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "Read");
+}
+
+TEST_CASE("ass templater: parse_timed_text reads a templated script by what is in it", "[lyrics][ass]") {
+    const auto lyrics = iclforge::lyrics::parse_timed_text(kTemplatedScript);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "Hello world");
+}
+
+TEST_CASE("ass templater: with no Format line the Effect is the v4+ order's ninth column",
+          "[lyrics][ass]") {
+    const std::string text =
+        "[Events]\n"
+        "Comment: 1,0:00:01.00,0:00:03.00,Default,,0,0,0,karaoke,{\\k100}No {\\k100}format\n"
+        "Dialogue: 2,0:00:01.00,0:00:02.00,Default,,0,0,0,fx,{\\pos(10,10)}No\n"
+        "Dialogue: 2,0:00:02.00,0:00:03.00,Default,,0,0,0,fx,{\\pos(90,10)}format\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "No format");
+}
+
+TEST_CASE("ass templater: an effect that only has karaoke in it is a source, as Aegisub reads it",
+          "[lyrics][ass]") {
+    const std::string text =
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Comment: 1,0:00:01.00,0:00:03.00,Default,,0,0,0,syl karaoke line,{\\k100}Any {\\k100}effect\n"
+        "Dialogue: 2,0:00:01.00,0:00:02.00,Default,,0,0,0,fx,{\\pos(10,10)}Any\n"
+        "Dialogue: 2,0:00:02.00,0:00:03.00,Default,,0,0,0,fx,{\\pos(90,10)}effect\n";
+    const auto lyrics = iclforge::lyrics::parse_ass(text);
+    REQUIRE(lyrics.has_value());
+    REQUIRE(lyrics->lines.size() == 1);
+    CHECK(lyrics->lines[0].text == "Any effect");
 }

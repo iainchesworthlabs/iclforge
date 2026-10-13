@@ -110,6 +110,7 @@ std::expected<void, std::string> TakeRecorder::begin(const fs::path& file,
         fs::remove(file, ec);
         return std::unexpected(std::string{"The take's file could not be written."});
     }
+    written_ = header.size();
     encoder_ = std::make_unique<Encoder>();
     encoder_->encoder = std::move(made);
     path_ = file;
@@ -132,10 +133,23 @@ bool TakeRecorder::write(std::span<const float> mono) {
         return false;
     }
     for (const auto& unit : *units) {
-        out_.write(reinterpret_cast<const char*>(unit.bytes.data()),
-                   static_cast<std::streamsize>(unit.bytes.size()));
+        if (!append(unit.bytes)) {
+            break;
+        }
     }
     frames_ += mono.size();
+    return static_cast<bool>(out_);
+}
+
+bool TakeRecorder::append(std::span<const std::uint8_t> bytes) {
+    if (limit_bytes_ != 0 && written_ + bytes.size() > limit_bytes_) {
+        // As a full disk does: this write and every later one fails, and what is in the file stays.
+        out_.setstate(std::ios::failbit);
+        return false;
+    }
+    out_.write(reinterpret_cast<const char*>(bytes.data()),
+               static_cast<std::streamsize>(bytes.size()));
+    written_ += bytes.size();
     return static_cast<bool>(out_);
 }
 
@@ -146,8 +160,9 @@ std::expected<TakeInfo, std::string> TakeRecorder::finish(const TakeMetadata& me
     const auto last = encoder_->encoder->finish();
     if (last) {
         for (const auto& unit : *last) {
-            out_.write(reinterpret_cast<const char*>(unit.bytes.data()),
-                       static_cast<std::streamsize>(unit.bytes.size()));
+            if (!append(unit.bytes)) {
+                break;
+            }
         }
     }
     // The duration into STREAMINFO.

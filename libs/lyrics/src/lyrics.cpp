@@ -814,8 +814,9 @@ struct AssText {
     return out;
 }
 
-// One Dialogue event, with the two fields that decide who sings it and which of the lines that share
-// a time is read: its Style, and its Name (the actor).
+// One event, with the two fields that decide who sings it and which of the lines that share a time is
+// read: its Style, and its Name (the actor); and what its Effect column makes of it where the script
+// came from Aegisub's karaoke templater (see classify_ass_effect).
 struct AssEvent {
     std::int64_t start = 0;
     std::int64_t end = 0;
@@ -823,7 +824,37 @@ struct AssEvent {
     std::string style;
     std::string actor;
     Singer singer = Singer::kUnmarked;
+    // A `Comment:` event, which is not read unless it is `source`.
+    bool comment = false;
+    // The timed karaoke the templater was given: Effect "karaoke" (Aegisub's `[Kk]araoke`), which the
+    // templater leaves behind as a comment once it has made its effects from it.
+    bool source = false;
+    // A line the templater made: a Dialogue with Effect exactly "fx". The sung words are in the
+    // source, not in the one-per-syllable decorations made from them.
+    bool generated = false;
 };
+
+// What the Effect column of an event says of it, for a script made with Aegisub's karaoke templater
+// (kara-templater.lua; the manual's "Karaoke Templater" pages): the templater's input is a line whose
+// Effect is empty or has "karaoke" in it, its output is Dialogue lines with Effect "fx", and the input
+// line it made them from is kept as a comment with Effect "karaoke". A comment whose first word is
+// "template", "code" or "mixin" is a definition for the templater and is none of these.
+void classify_ass_effect(std::string_view effect_column, AssEvent& event) {
+    const std::string effect = lowercase(trim(effect_column));
+    if (effect.empty()) {
+        return;
+    }
+    const std::size_t space = effect.find_first_of(" \t");
+    const std::string_view first = std::string_view{effect}.substr(0, space);
+    if (first == "template" || first == "code" || first == "mixin") {
+        return;
+    }
+    if (effect == "fx") {
+        event.generated = !event.comment;
+    } else if (effect.find("karaoke") != std::string::npos) {
+        event.source = true;
+    }
+}
 
 [[nodiscard]] bool same_ass_syllables(const AssText& a, const AssText& b) {
     if (a.karaoke != b.karaoke || a.syllables.size() != b.syllables.size()) {
@@ -1328,6 +1359,8 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
     constexpr std::size_t kNoColumn = static_cast<std::size_t>(-1);
     std::size_t style_column = 3;
     std::size_t actor_column = 4;
+    // The Effect column, the v4+ order's ninth.
+    std::size_t effect_column = 8;
     bool in_events = false;
     std::vector<AssEvent> events;
     std::size_t begin = 0;
@@ -1354,6 +1387,7 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
             std::size_t column = 0;
             style_column = kNoColumn;
             actor_column = kNoColumn;
+            effect_column = kNoColumn;
             std::string_view rest = line.substr(7);
             std::size_t from = 0;
             while (from <= rest.size()) {
@@ -1375,6 +1409,8 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
                     style_column = column;
                 } else if (name == "name" || name == "actor") {
                     actor_column = column;
+                } else if (name == "effect") {
+                    effect_column = column;
                 }
                 ++column;
                 from = comma + 1;
@@ -1383,11 +1419,12 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
             static_cast<void>(found);
             continue;
         }
-        if (!starts_with_nocase(line, "Dialogue:")) {
+        const bool is_comment = starts_with_nocase(line, "Comment:");
+        if (!is_comment && !starts_with_nocase(line, "Dialogue:")) {
             continue;
         }
         // The fields to the Text column; the text is the rest of the line, commas and all.
-        std::string_view rest = line.substr(9);
+        std::string_view rest = line.substr(is_comment ? 8 : 9);
         std::vector<std::string_view> fields;
         std::size_t from = 0;
         while (fields.size() + 1 < columns) {
@@ -1421,8 +1458,20 @@ std::expected<Lyrics, std::string> parse_ass(std::string_view text,
         if (actor_column != kNoColumn && actor_column < fields.size()) {
             event.actor = std::string{trim(fields[actor_column])};
         }
+        event.comment = is_comment;
+        if (effect_column != kNoColumn && effect_column < fields.size()) {
+            classify_ass_effect(fields[effect_column], event);
+        }
         events.push_back(std::move(event));
     }
+    // A script the templater made: the timed karaoke it was given is read where it was left (a
+    // comment), and the effects made from it are not lines. Any other comment is not read, and a
+    // script with no templater source in it reads exactly as a Dialogue-only one always did.
+    const bool has_source = std::any_of(events.begin(), events.end(),
+                                        [](const AssEvent& event) { return event.source; });
+    std::erase_if(events, [has_source](const AssEvent& event) {
+        return (event.comment && !event.source) || (has_source && event.generated);
+    });
     if (events.empty()) {
         return std::unexpected(std::string{"The subtitle file has no dialogue in it."});
     }

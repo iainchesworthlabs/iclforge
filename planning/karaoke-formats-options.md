@@ -80,13 +80,15 @@ translation with no words); a duet of two styles and two actors reads with no si
 | D. Positions for a screen | A line carries its alignment, margins and `\pos`, with the script's play resolution | **M** for the model and the parser; the screen is **M to L** more | No view uses positions today. Hearth's lyric view is a list, Crucible's is a strip, a CD+G is its own picture. It would serve a full-screen stage view or the parked P4 panel ([W12](karaoke-phase2.md#w12-the-esp32-p4-with-a-panel)), and it is a second layout engine |
 | E. Draw it with libass | Render the script to bitmaps with a library built for it (ISC licence, needs FreeType, HarfBuzz and a bidi library; *to verify*) | **L**, a new third-party dependency in the notices and the ABI of the app | Desktop only; not the firmware, the browser build or Android without more work; and the words move to a picture, so the view's fill and delay control would not drive it |
 
-*Also to verify, and worth a real file before B is built:* scripts made with Aegisub's karaoke
-templater (general knowledge) keep the original lines as `Comment:` events with the effect
-`karaoke` and write the generated effects as one `Dialogue:` event per syllable with the effect
-`fx`. If that is so, the reader today skips the real lines and shows the effects as lines (a
-script of that shape, built for the probe, reads as its two `fx` events and not as the line they
-decorate), and the fix is to read the `karaoke` comments and skip the `fx` events, which is a rule
-on the Effect column, not styling.
+*The templater's shape, settled (2026-10-13), and built:* scripts made with Aegisub's karaoke
+templater keep the original lines as `Comment:` events with the effect `karaoke` and write the
+generated effects as one `Dialogue:` event per syllable with the effect `fx`. This is not general
+knowledge any longer: it is the templater's own code (`kara-templater.lua`: its input is a line
+whose Effect is empty or matches `[Kk]araoke`, its output has `newline.effect = "fx"`, and the
+line it made them from is kept as a comment with `l.effect = "karaoke"`) and its manual. The reader
+used to skip the real lines and show the effects as lines, and now it reads the `karaoke` source
+(comment or not) and skips the `fx` events: a rule on the Effect column, not styling, built to
+that shape with tests. It has not met a real exported script yet; one is still worth having.
 
 **Recommendation.** A until a real duet script is in hand, then B with its "mark nothing unless
 clear" rule and B2's single-style choice; leave C, D and E. Positions earn their cost only with a

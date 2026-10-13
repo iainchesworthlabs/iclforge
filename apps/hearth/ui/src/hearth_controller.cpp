@@ -806,6 +806,51 @@ bool write_kept_karaoke(QSettings& store, const iclforge::hearth::DecoderSetting
     return true;
 }
 
+// A sink's request for the singer's karaoke choice (D8) as the map setDecoderSettings() takes: only
+// the keys it asked for, in the page's own names (the reproduction "off" is "asCoded" here). Empty
+// for a request with none, which is nothing to apply.
+[[nodiscard]] QVariantMap decoder_map_from_request(const iclforge::sendspin::player::Request& request) {
+    namespace sp = iclforge::sendspin::player;
+    const sp::DecoderSettings& asked = request.decoder;
+    QVariantMap map;
+    if (asked.karaoke) {
+        const iclforge::ac3::KaraokeReproduction mode =
+            *asked.karaoke == sp::Karaoke::kOff       ? iclforge::ac3::KaraokeReproduction::kOff
+            : *asked.karaoke == sp::Karaoke::kCapable ? iclforge::ac3::KaraokeReproduction::kCapable
+                                                      : iclforge::ac3::KaraokeReproduction::kAware;
+        map[QStringLiteral("karaoke")] = karaoke_name(mode);
+    }
+    if (asked.karaoke_vocals) {
+        const iclforge::ac3::KaraokeVocals vocals =
+            *asked.karaoke_vocals == sp::KaraokeVocals::kNone ? iclforge::ac3::KaraokeVocals::kNone
+            : *asked.karaoke_vocals == sp::KaraokeVocals::kV1 ? iclforge::ac3::KaraokeVocals::kV1
+            : *asked.karaoke_vocals == sp::KaraokeVocals::kV2 ? iclforge::ac3::KaraokeVocals::kV2
+                                                              : iclforge::ac3::KaraokeVocals::kBoth;
+        map[QStringLiteral("karaokeVocals")] = karaoke_vocals_name(vocals);
+    }
+    if (asked.karaoke_melody_db) {
+        map[QStringLiteral("karaokeMelodyDb")] = *asked.karaoke_melody_db;
+    }
+    if (asked.karaoke_vocal1_db) {
+        map[QStringLiteral("karaokeVocal1Db")] = *asked.karaoke_vocal1_db;
+    }
+    if (asked.karaoke_vocal2_db) {
+        map[QStringLiteral("karaokeVocal2Db")] = *asked.karaoke_vocal2_db;
+    }
+    return map;
+}
+
+// What a pending request changes, given the group this computer plays to: only a member of that
+// group changes what it plays, so a request from a sink in another group, or in none, changes
+// nothing, and neither does any request while no group is the output.
+[[nodiscard]] QVariantMap decoder_changes_from_sink_request(
+    const NetworkOutputStatus::PendingRequest& pending, const QString& output_group) {
+    if (output_group.isEmpty() || pending.group_id != output_group.toStdString()) {
+        return {};
+    }
+    return decoder_map_from_request(pending.request);
+}
+
 [[nodiscard]] QString dual_mono_name(iclforge::hearth::DualMonoChoice choice) {
     switch (choice) {
         case iclforge::hearth::DualMonoChoice::kFirst:
@@ -1611,6 +1656,16 @@ void HearthController::poll() {
     ICLFORGE_ZONE_SCOPED_N("hearth poll");
     if (!engine_) {
         return;
+    }
+    // What a network sink's own control asked for since the last tick (D8): the singer's choice is
+    // held here, so a request is applied as the Karaoke page's own change is, and persisted with it.
+    // Only a member of the group this computer plays to changes what it plays; a request from a
+    // sink in another group, or in none, is not the singer's.
+    for (const NetworkOutputStatus::PendingRequest& pending : NetworkOutputStatus::instance().take_requests()) {
+        const QVariantMap map = decoder_changes_from_sink_request(pending, output_group_name_);
+        if (!map.isEmpty()) {
+            setDecoderSettings(map);
+        }
     }
     // A pinned group's readiness is live (a member can connect or drop at
     // any time, independently of anything this controller's own commands

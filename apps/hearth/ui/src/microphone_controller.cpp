@@ -6,6 +6,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMetaObject>
 #include <QPointer>
 #include <QSettings>
@@ -48,6 +50,8 @@ constexpr int kLevelMid = 45;
 constexpr int kLevelHigh = 75;
 // A line the singer was voiced for less than this share of its notes' time is "not sung".
 constexpr double kNotSungCoverage = 0.2;
+// The takes the card lists: the newest of what is in the folder.
+constexpr int kMaxTakesListed = 50;
 
 [[nodiscard]] std::int64_t steady_now_ns() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -378,6 +382,7 @@ void MicrophoneController::remember_take(const iclforge::hearth::TakeInfo& info)
     take.insert(QStringLiteral("folder"), QFileInfo(path).absolutePath());
     take.insert(QStringLiteral("seconds"), info.seconds);
     last_take_ = take;
+    refreshTakes();
 }
 
 bool MicrophoneController::deleteLastTake() {
@@ -392,7 +397,94 @@ bool MicrophoneController::deleteLastTake() {
     ok = QFile::remove(sidecar) && ok;
     last_take_.clear();
     emit recordingChanged();
+    refreshTakes();
     return ok;
+}
+
+void MicrophoneController::refreshTakes() {
+    struct Row {
+        QString created;
+        QString name;
+        QVariantMap take;
+    };
+    std::vector<Row> rows;
+    const QDir folder(takes_folder_);
+    const QFileInfoList sidecars =
+        folder.entryInfoList({QStringLiteral("*.take.json")}, QDir::Files | QDir::Readable);
+    for (const QFileInfo& sidecar : sidecars) {
+        QFile file(sidecar.absoluteFilePath());
+        if (!file.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+        const QJsonDocument document = QJsonDocument::fromJson(file.read(64 * 1024));
+        if (!document.isObject()) {
+            continue;
+        }
+        const QJsonObject object = document.object();
+        if (object.value(QStringLiteral("format")).toString() != QLatin1String("iclforge-take-1")) {
+            continue;
+        }
+        // The audio is a name in this folder: a description that points elsewhere is not a take
+        // of this folder, and is not offered for removal.
+        const QString audio = object.value(QStringLiteral("audio")).toString();
+        if (audio.isEmpty() || audio != QFileInfo(audio).fileName()) {
+            continue;
+        }
+        const QString path = folder.filePath(audio);
+        if (!QFileInfo::exists(path)) {
+            continue;
+        }
+        const QJsonObject item = object.value(QStringLiteral("item")).toObject();
+        const QJsonValue start = object.value(QStringLiteral("item_start_ms"));
+        QVariantMap take;
+        take.insert(QStringLiteral("path"), path);
+        take.insert(QStringLiteral("name"), audio);
+        take.insert(QStringLiteral("folder"), folder.absolutePath());
+        take.insert(QStringLiteral("seconds"), object.value(QStringLiteral("seconds")).toDouble());
+        take.insert(QStringLiteral("created"),
+                    object.value(QStringLiteral("created_utc")).toString());
+        take.insert(QStringLiteral("title"), item.value(QStringLiteral("title")).toString());
+        take.insert(QStringLiteral("startMs"),
+                    start.isDouble() ? static_cast<qlonglong>(start.toDouble()) : qlonglong{-1});
+        rows.push_back({object.value(QStringLiteral("created_utc")).toString(), audio, take});
+    }
+    // Newest first; the name settles takes made in the same second.
+    std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
+        return a.created != b.created ? a.created > b.created : a.name > b.name;
+    });
+    QVariantList listed;
+    for (const Row& row : rows) {
+        if (listed.size() >= kMaxTakesListed) {
+            break;
+        }
+        listed.append(row.take);
+    }
+    if (listed != takes_) {
+        takes_ = listed;
+        emit takesChanged();
+    }
+}
+
+bool MicrophoneController::deleteTake(const QString& path) {
+    const QString wanted = QDir::cleanPath(path);
+    for (const QVariant& entry : std::as_const(takes_)) {
+        const QString listed = entry.toMap().value(QStringLiteral("path")).toString();
+        if (QDir::cleanPath(listed) != wanted) {
+            continue;
+        }
+        bool ok = QFile::remove(listed);
+        QString sidecar = listed;
+        sidecar.chop(5);  // ".flac"
+        sidecar += QStringLiteral(".take.json");
+        ok = QFile::remove(sidecar) && ok;
+        if (QDir::cleanPath(last_take_.value(QStringLiteral("path")).toString()) == wanted) {
+            last_take_.clear();
+            emit recordingChanged();
+        }
+        refreshTakes();
+        return ok;
+    }
+    return false;
 }
 
 void MicrophoneController::showTakes() {
@@ -411,6 +503,11 @@ void MicrophoneController::setTakesFolder(const QString& urlOrPath) {
     takes_folder_ = QDir::toNativeSeparators(path);
     kept().setValue(QStringLiteral("microphone/takesFolder"), takes_folder_);
     emit takesFolderChanged();
+    refreshTakes();
+}
+
+void MicrophoneController::limit_take_bytes_for_test(std::uint64_t bytes) {
+    state_data_->session.limit_take_bytes(bytes);
 }
 
 void MicrophoneController::restartScore() {
