@@ -512,3 +512,28 @@ There is no umbrella workflow that dispatches every scheduled workflow at once. 
 the "Run workflow" button on its Actions page); `ci.yml`'s nightly run is dispatched the same
 way. An umbrella would only save running nine dispatches instead of one, and would mean
 maintaining a list of security-sensitive workflows in a further file.
+
+## Cache hygiene
+
+The repository's Actions cache quota is 10 GB, and GitHub evicts the least
+recently used entries once it is exceeded, with no regard for which of them took
+an hour to build. A cache entry is readable only from its own ref, a pull
+request's base and the default branch, so an entry whose ref is gone can never
+be restored. `cache-hygiene.yml` runs `tools/ci/prune-actions-cache.sh` when a
+pull request closes and after each post-merge `CI` or `PR Gate` run on `main`,
+and removes:
+
+- entries of a closed pull request, a deleted branch, or a merge-queue entry
+  that has landed (a queue ref saves its own Qt install and vcpkg set, 450-530
+  MB each, that nothing but that entry can read);
+- superseded generations: per ref and cache version, the newest of each
+  family (`ccache-<job>-<os>-<arch>-<sha>`, `vcpkg[-downloads]-<os>-<arch>-<pin>-<manifest>[-<suffix>]`,
+  the Qt installs) is kept and older ones go, unless something read them in the
+  last 20 minutes.
+
+On 2026-10-13 that was 10 of 31 entries and 5.1 of 11.2 GB, mostly the previous
+commit's two ccache entries (1.1 and 1.9 GB). A manual dispatch is a dry run
+unless `dry_run` is unticked, and `purge` takes a key prefix to reset one cache
+(for example `vcpkg-Windows-`); the next run on it builds from cold. The same
+script and workflow shape are used by cubeulator, aqualink-automate and
+CountdownSolver.
