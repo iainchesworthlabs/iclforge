@@ -248,6 +248,32 @@ struct Placement {
                                             std::optional<std::int64_t> duration_ms = std::nullopt,
                                             const TextEncoding& encoding = {});
 
+// Writes `lyrics_file` as UTF-8 LRC at `out_path`, whatever format and (with `encoding`) code page it
+// is in: the same text place_lyrics_beside() writes (a duet's singers, word times, the gaps between a
+// subtitle file's cues marked), to a path of the caller's choosing. An existing file is left as it
+// was and reported as kExists unless `replace`; the file being read is never the file written
+// (kFailed, with the reason), so that a conversion cannot lose its own source. The result is
+// written beside the target and moved into place, as place_lyrics_beside()'s is.
+[[nodiscard]] Placement convert_lyrics_file(const std::filesystem::path& lyrics_file,
+                                            const std::filesystem::path& out_path,
+                                            std::optional<std::int64_t> duration_ms = std::nullopt,
+                                            const TextEncoding& encoding = {}, bool replace = false);
+
+// Whether `reason`, an error of the readers above, is the refusal of text that is in a code page
+// because no decoder was given: the one that naming the page (a TextEncoding) answers. False for
+// any other reason, and for text that did not read in the page it was given.
+[[nodiscard]] bool is_code_page_refusal(std::string_view reason) noexcept;
+
+// One sentence for a player to put after such a refusal: what answers it, in Forge (`forge
+// lyrics-to-lrc <file> <out.lrc> lyrics-encoding=<page>`). The players have no code page of their
+// own to choose, and say where the file can be made one every player reads.
+[[nodiscard]] std::string_view code_page_remedy() noexcept;
+
+// `reason` as a player shows it: where it is the refusal of text in a code page
+// (is_code_page_refusal), followed by code_page_remedy() as a sentence of its own; any other reason
+// unchanged.
+[[nodiscard]] std::string with_code_page_remedy(std::string reason);
+
 // Whether any line has a singer: the file is a duet and a view shows who sings what.
 [[nodiscard]] bool has_singers(const Lyrics& lyrics);
 

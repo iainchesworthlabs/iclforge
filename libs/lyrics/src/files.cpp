@@ -56,15 +56,24 @@ std::expected<Lyrics, std::string> read_lyrics(const std::filesystem::path& file
     return parse_timed_text(bytes, duration_ms, encoding);
 }
 
-Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
-                              const std::filesystem::path& stream_path,
-                              std::optional<std::int64_t> duration_ms, const TextEncoding& encoding) {
+namespace {
+
+// `lyrics_file` read and written as UTF-8 LRC at `target`, through `target`.part and a rename, so
+// that a write that stops part way never leaves a short file under the name a player looks for.
+[[nodiscard]] Placement write_converted(const std::filesystem::path& lyrics_file,
+                                        const std::filesystem::path& target,
+                                        std::optional<std::int64_t> duration_ms,
+                                        const TextEncoding& encoding, bool replace) {
     Placement out;
-    std::filesystem::path target = stream_path;
-    target.replace_extension(".lrc");
     out.path = target;
     std::error_code error;
-    if (std::filesystem::exists(target, error)) {
+    const bool there = std::filesystem::exists(target, error);
+    if (there && std::filesystem::equivalent(lyrics_file, target, error)) {
+        out.status = PlacementStatus::kFailed;
+        out.error = "The output is the file being read: write the converted lyrics under another name.";
+        return out;
+    }
+    if (there && !replace) {
         out.status = PlacementStatus::kExists;
         return out;
     }
@@ -75,8 +84,6 @@ Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
         return out;
     }
     const std::string text = write_lrc(*read, LrcWriteOptions{.mark_gaps = true});
-    // Written beside the target and moved into place, so that a write that stops part way never
-    // leaves a short file under the name a player looks for.
     std::filesystem::path partial = target;
     partial += ".part";
     {
@@ -97,6 +104,31 @@ Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
     }
     out.status = PlacementStatus::kWritten;
     return out;
+}
+
+}  // namespace
+
+Placement place_lyrics_beside(const std::filesystem::path& lyrics_file,
+                              const std::filesystem::path& stream_path,
+                              std::optional<std::int64_t> duration_ms, const TextEncoding& encoding) {
+    std::filesystem::path target = stream_path;
+    target.replace_extension(".lrc");
+    // Beside a stream an existing lyrics file is never replaced, and is not an error to find there.
+    std::error_code error;
+    if (std::filesystem::exists(target, error)) {
+        Placement out;
+        out.path = target;
+        out.status = PlacementStatus::kExists;
+        return out;
+    }
+    return write_converted(lyrics_file, target, duration_ms, encoding, false);
+}
+
+Placement convert_lyrics_file(const std::filesystem::path& lyrics_file,
+                              const std::filesystem::path& out_path,
+                              std::optional<std::int64_t> duration_ms, const TextEncoding& encoding,
+                              bool replace) {
+    return write_converted(lyrics_file, out_path, duration_ms, encoding, replace);
 }
 
 std::optional<std::filesystem::path> find_lyrics_file(const std::string& item_path) {

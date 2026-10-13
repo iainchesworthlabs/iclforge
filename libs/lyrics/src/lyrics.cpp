@@ -383,6 +383,13 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
     }
 }
 
+// The reasons text in a code page is refused with where no decoder was given, kept here so that
+// is_code_page_refusal() recognises exactly what the readers say.
+constexpr std::string_view kNotUtf8Reason = "The lyrics file is not UTF-8 or UTF-16.";
+constexpr std::string_view kMidiNotUtf8Reason =
+    "The words of the MIDI file are not UTF-8: they are probably in a code page, which is not read. "
+    "Save them as UTF-8.";
+
 // Bytes in a code page as the UTF-8 the program's decoder says they are, or nothing where it says the
 // page does not have them (or hands back something that is not UTF-8, which is no better).
 [[nodiscard]] std::optional<std::string> decode_legacy(const TextEncoding& encoding, std::string_view bytes) {
@@ -419,7 +426,7 @@ void build_words(const std::vector<Segment>& segments, std::int64_t first, LineP
     }
     if (!valid_utf8(text)) {
         if (encoding.decoder == nullptr) {
-            return std::unexpected(std::string{"The lyrics file is not UTF-8 or UTF-16."});
+            return std::unexpected(std::string{kNotUtf8Reason});
         }
         auto legacy = decode_legacy(encoding, text);
         if (!legacy) {
@@ -1319,6 +1326,22 @@ std::expected<Lyrics, std::string> parse_subrip(std::string_view text,
     return lyrics;
 }
 
+bool is_code_page_refusal(std::string_view reason) noexcept {
+    return reason == kNotUtf8Reason || reason == kMidiNotUtf8Reason;
+}
+
+std::string_view code_page_remedy() noexcept {
+    return "Forge can convert it: forge lyrics-to-lrc <file> <out.lrc> lyrics-encoding=<page>.";
+}
+
+std::string with_code_page_remedy(std::string reason) {
+    if (is_code_page_refusal(reason)) {
+        reason += ' ';
+        reason += code_page_remedy();
+    }
+    return reason;
+}
+
 std::expected<Lyrics, std::string> parse_ass(std::string_view text,
                                              std::optional<std::int64_t> duration_ms,
                                              const TextEncoding& encoding) {
@@ -1688,8 +1711,7 @@ std::expected<Lyrics, std::string> parse_midi_karaoke(std::string_view bytes,
         std::string decoded;
         if (!valid_utf8(event.text)) {
             if (encoding.decoder == nullptr) {
-                return std::unexpected(std::string{"The words of the MIDI file are not UTF-8: they are probably in a "
-                                                   "code page, which is not read. Save them as UTF-8."});
+                return std::unexpected(std::string{kMidiNotUtf8Reason});
             }
             auto legacy = decode_legacy(encoding, event.text);
             if (!legacy) {

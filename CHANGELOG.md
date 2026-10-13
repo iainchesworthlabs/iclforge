@@ -401,6 +401,13 @@ The sections below contain the complete change list and fixes.
   the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
   it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
   GUI's picker links as well.
+- **`forge lyrics-to-lrc <in> <out.lrc>` writes a lyrics file as UTF-8 LRC with no stream.** The
+  conversion `lyrics=` does at an encode, for a stream that already exists: a `.kar`, `.srt`,
+  `.ass`, or an `.lrc` in a code page (`lyrics-encoding=<page>`), written with a duet's singers,
+  word times and the gaps between cues marked. The file read is never written over (`overwrite=1`
+  replaces some other file at the output). In the library, `convert_lyrics_file()` does it and
+  `is_code_page_refusal()` says whether a reader's error is the one a page answers; a refusal in
+  `forge` now names `lyrics-encoding=` by that, not by matching its text.
 - **The Forge GUI's Lyrics row offers a code page for a file that is not UTF-8 or UTF-16.** A
   **Code page** list appears under the problem line, with no page chosen and none guessed; the
   page chosen reads the file, the first lines are shown as it reads them, and the stream is saved

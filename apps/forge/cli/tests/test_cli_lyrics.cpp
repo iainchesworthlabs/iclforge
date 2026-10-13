@@ -271,3 +271,81 @@ TEST_CASE("eac3-encode and ac4-encode take lyrics= too", "[cli][lyrics]") {
                     log) == 0);
     CHECK(fs::exists(dir / "next.lrc"));
 }
+
+TEST_CASE("lyrics-to-lrc writes a lyrics file as UTF-8 LRC, read in the page named", "[cli][lyrics]") {
+    const auto dir = scratch_dir() / "to_lrc";
+    fs::create_directories(dir);
+    const auto log = dir / "log.txt";
+
+    SECTION("a file in a code page is refused with the hint, and read once the page is named") {
+        const auto latin = write_file(dir / "cafe.lrc", "[00:01.00]Caf\xE9 cr\xE8me\n");
+        const auto out = dir / "cafe-utf8.lrc";
+        CHECK(run_cli("lyrics-to-lrc " + quoted(latin) + " " + quoted(out), log) == 2);
+        const auto text = read_file(log);
+        INFO(text);
+        CHECK(text.find("lyrics-encoding=") != std::string::npos);
+        CHECK_FALSE(fs::exists(out));
+
+        REQUIRE(run_cli("lyrics-to-lrc " + quoted(latin) + " " + quoted(out) +
+                            " lyrics-encoding=windows-1252",
+                        log) == 0);
+        INFO(read_file(log));
+        CHECK(read_file(out) == "[00:01.00]Caf\xC3\xA9 cr\xC3\xA8me\n");
+        // What was read is left as it was.
+        CHECK(read_file(latin) == "[00:01.00]Caf\xE9 cr\xE8me\n");
+    }
+
+    SECTION("a SubRip file becomes LRC with the silence between its cues marked") {
+        const auto srt = write_file(dir / "words.srt", kSubRip);
+        const auto out = dir / "words.lrc";
+        REQUIRE(run_cli("lyrics-to-lrc " + quoted(srt) + " " + quoted(out), log) == 0);
+        INFO(read_file(log));
+        CHECK(read_file(out) == "[00:01.00]Should auld acquaintance\n[00:03.00]\n[00:05.00]Be forgot\n");
+    }
+
+    SECTION("a file that is there is left alone unless overwrite=1 says otherwise") {
+        const auto srt = write_file(dir / "again.srt", kSubRip);
+        const auto mine = write_file(dir / "mine.lrc", "[00:00.00]Mine\n");
+        CHECK(run_cli("lyrics-to-lrc " + quoted(srt) + " " + quoted(mine), log) == 3);
+        const auto text = read_file(log);
+        INFO(text);
+        CHECK(text.find("overwrite=1") != std::string::npos);
+        CHECK(read_file(mine) == "[00:00.00]Mine\n");
+
+        REQUIRE(run_cli("lyrics-to-lrc " + quoted(srt) + " " + quoted(mine) + " overwrite=1", log) == 0);
+        CHECK(read_file(mine) == "[00:01.00]Should auld acquaintance\n[00:03.00]\n[00:05.00]Be forgot\n");
+    }
+
+    SECTION("the file read is never the file written, even with overwrite=1") {
+        const auto source = write_file(dir / "same.lrc", "[00:01.00]Caf\xE9\n");
+        CHECK(run_cli("lyrics-to-lrc " + quoted(source) + " " + quoted(source) +
+                          " lyrics-encoding=windows-1252 overwrite=1",
+                      log) == 3);
+        const auto text = read_file(log);
+        INFO(text);
+        CHECK(text.find("another name") != std::string::npos);
+        CHECK(read_file(source) == "[00:01.00]Caf\xE9\n");
+    }
+
+    SECTION("a file that is not lyrics is the input exit code, and nothing is written") {
+        const auto out = dir / "nothing.lrc";
+        CHECK(run_cli("lyrics-to-lrc " + quoted(dir / "missing.lrc") + " " + quoted(out), log) == 2);
+        CHECK_FALSE(fs::exists(out));
+    }
+
+    SECTION("standard input and output have no name to read or write: a usage error") {
+        CHECK(run_cli("lyrics-to-lrc - " + quoted(dir / "x.lrc"), log) == 1);
+        CHECK(run_cli("lyrics-to-lrc " + quoted(dir / "x.srt") + " -", log) == 1);
+    }
+
+    SECTION("the keys belong to it: an unknown page lists the pages, and overwrite= is for it alone") {
+        const auto srt = write_file(dir / "keys.srt", kSubRip);
+        CHECK(run_cli("lyrics-to-lrc " + quoted(srt) + " " + quoted(dir / "k.lrc") +
+                          " lyrics-encoding=klingon",
+                      log) == 1);
+        CHECK(read_file(log).find("shift-jis") != std::string::npos);
+        CHECK(run_cli("decode " + quoted(dir / "x.ac3") + " " + quoted(dir / "x.wav") + " overwrite=1",
+                      log) == 1);
+        CHECK(read_file(log).find("overwrite= goes with lyrics-to-lrc") != std::string::npos);
+    }
+}

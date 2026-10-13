@@ -29,4 +29,14 @@ namespace forge_cli::commands {
 // an output error when it could not be written.
 [[nodiscard]] int place_lyrics_option(const Options& meta, std::string_view out_path);
 
+// `forge lyrics-to-lrc <in> <out.lrc>`: the same conversion as lyrics=, with no stream and no
+// encode, to a path of the caller's choosing, so that a lyrics file in a code page (or an .srt, an
+// .ass, a .kar) already beside a stream a player has can be made the UTF-8 LRC every player reads.
+// `lyrics-encoding=` names the page; the file written is never the file read, and one that is
+// already there is replaced only with `overwrite=1`. kExitOk, or a usage error for standard input
+// or output (there is no name to read or write), an input error for a file that is not lyrics and
+// an output error for a file that could not be written or is there.
+[[nodiscard]] int run_lyrics_convert(std::string_view in_path, std::string_view out_path,
+                                     const Options& meta);
+
 }  // namespace forge_cli::commands
