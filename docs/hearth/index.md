@@ -385,7 +385,7 @@ taskbar button rather than bring its window forward.
 
 A capture runs against a scratch settings store, so it neither reads nor changes a person's own
 queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
-asks for it. The store starts empty; `--setting` is how a capture shows what a person chose once. Its exit code is 0 for a picture saved, 2 when the picture could not be saved, and
+asks for it. Its exit code is 0 for a picture saved, 2 when the picture could not be saved, and
 3 when an `--open` file did not load, or did not reach its `--seek` position, within fifteen seconds
 (the picture is saved all the same, for what the window said about the file). A script that
 regenerates screenshots can stop on that.
