@@ -4317,8 +4317,8 @@ The sections below contain the complete change list and fixes.
   the Service and production card, which had no section.
 - The same fourteen Forge GUI screenshots were taken once more after the rename, since each showed
   "ac3forge" in the header and `ac3cli` on the command-line chip; they show Forge, the Karaoke
-  control and the Project… menu. The Karaoke page has a picture of the flow's first step. The three
-  live-capture pictures are still of the earlier build, and say so under them.
+  control and the Project… menu, and so are the three live-capture pictures. The Karaoke page has a
+  picture of the flow's first step.
 - The Hearth page describes the desktop player as it is: it plays to network sinks, plays
   channel-based AC-4, packages for Windows, macOS and Linux, and updates a sink's firmware. The
   ESP32-P4 has its row, and its page is in the navigation.
