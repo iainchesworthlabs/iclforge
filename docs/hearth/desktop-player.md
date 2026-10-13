@@ -95,8 +95,22 @@ output picker, which has three sections:
   use says *playing here* while a bitstream goes out.
 - **Network · Sendspin.** The groups made on the Network page.
 
-Choose a row and press **Play here**, and playback moves there. Until you choose one the window
-decodes to the computer's default output, and it starts there again the next time it is opened.
+Choose a row and press **Play here**, and playback moves there. The choice is kept: the window
+plays there again the next time it is opened, before anything plays. Until you choose one the
+window decodes to the computer's default output.
+
+An output or group that is not there when the window opens does not change what is kept, and it
+is not played to:
+
+- A **passthrough** row whose output the computer does not list now, such as a receiver that is
+  switched off or unplugged, starts as a decode to the default output. Nothing is sent as a
+  bitstream to some other output that takes one. The receiver is played to again at the next start
+  it is listed for, unless another row is chosen first.
+- A **This computer · PCM** row whose output is not there starts as a decode to the default output.
+- A **network group** is played to once it is ready. The network is found after the window opens,
+  so for the first moments the group is not ready, and the header says so instead of playing the
+  item on this computer; a group that has been removed is refused the same way until another row
+  is chosen.
 
 While a bitstream goes out, the receiver decodes it with its own settings and plays it on its own
 speakers. The signal path says *sent as it is* and *Not rendered here*, the Decoder page says its
