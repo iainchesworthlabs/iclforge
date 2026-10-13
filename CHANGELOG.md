@@ -4362,6 +4362,31 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Android: `std::expected` no longer loses a payload that has tail padding**
+
+- **NDK r26's libc++ overwrote the has-value flag of a `std::expected` whose payload is trivially
+  copyable and has tail padding; the build now keeps the flag out of the padding.** libc++ 17
+  puts the flag in the payload's tail padding and then copies `sizeof(T)` bytes, padding included,
+  over it, so `return meta;` came back as "no value, error 0" and an error whose padding held a
+  non-zero byte came back as a value. On a Shield that was `read_frame_metadata()`,
+  `edit_stream_metadata()` and `insert_stream_metadata()` (ten `iclforge-ac3-tests` cases);
+  nothing on a desktop shows it. llvm-project#68552 and #70494, android/ndk#1963: NDK r27 has half
+  the fix and r28 both, and none of r26's point releases has either.
+  `cmake/LibcxxExpectedLayout.cmake`, which the root and both Gradle wrappers include, adds
+  `cmake/toolchains/android.libcxx17-expected-layout.h` to every C++ translation unit of an Android
+  build with a Clang older than 19, and checks at configure time that the layout changed. The
+  audit of what was exposed (39 of 227 `std::expected` specializations the Android-reachable
+  libraries instantiate had the flag in padding; eight, in seven payload types, were trivially
+  copyable) and the way to repeat it are in docs/platforms/android.md. `iclforge-base-tests`
+  gains the `[expected]` cases, which fail on r26 without the option; `build-android-arm64` links
+  that binary now. Delete the module with the NDK r26 pin.
+- **Two other r26 gaps the same device run found.** `std::ranges::binary_search` in r26's libc++
+  answers true for every value between the first and last element (llvm-project#61160), which made
+  every frame between the first named AC-4 I-frame and the last an I-frame:
+  `ac4::Encoder` uses `std::binary_search`, the same answer everywhere else. And Clang 17 ends a
+  range-for's temporaries before its first iteration (P2718R0 is Clang 19), which left eleven
+  `iclforge-containers-tests` cases iterating a freed vector: the test binds the optional first.
+
 **Forge GUI Karaoke flow: a part of another length**
 
 - **The Karaoke flow's warning said the shorter part "is padded with silence"; it is not.** The
