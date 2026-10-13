@@ -63,7 +63,7 @@ if(WIN32)
         # user looks - the Start Menu folder CPack always makes held nothing
         # but the Uninstall shortcut, so an installed copy was reachable only
         # by browsing to the folder it went into. The Linux .deb has had a
-        # menu entry (apps/forge/gui/packaging/linux/forge-gui.desktop);
+        # menu entry (apps/forge/gui/packaging/linux/com.iainchesworthlabs.forge-gui.desktop);
         # Windows had never been given the same thing.
         #
         # CPACK_PACKAGE_EXECUTABLES is the shape CPack's NSIS generator wants:

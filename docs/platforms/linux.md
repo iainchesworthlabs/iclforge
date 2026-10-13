@@ -258,13 +258,22 @@ PipeWire pass. v0.10.0-beta.1, the latest release, has the first three for both 
 and the x86_64 AppImage; the Hearth and Crucible packages are in no release yet. See
 [Packaging](../building.md#packaging).
 
-A GUI-enabled package also installs `forge-gui.desktop` (`Exec=forge-gui %F`), an AppStream metainfo
-file, and a shared-mime-info fragment declaring the two media types (`audio/ac3` and
+A GUI-enabled package also installs `com.iainchesworthlabs.forge-gui.desktop` (`Exec=forge-gui %F`), an
+AppStream metainfo file, and a shared-mime-info fragment declaring the two media types (`audio/ac3` and
 `audio/eac3`) against `*.ac3`/`*.ec3` — `apps/forge/gui/packaging/linux/`, wired into `install()`
-behind `if(LINUX)` in `apps/forge/gui/CMakeLists.txt`. `forge-gui.desktop` claims no media type, because
-Hearth is the default handler: `hearth.desktop` in the `iclforge-hearth` package
-(`apps/hearth/ui/packaging/linux/`) carries `MimeType=audio/ac3;audio/eac3;`. Nothing declares or
-claims AC-4. Configure/build-verified only: nobody has installed the resulting `.deb`/`.rpm` on a
+behind `if(LINUX)` in `apps/forge/gui/CMakeLists.txt`. `com.iainchesworthlabs.forge-gui.desktop` claims
+no media type, because Hearth is the default handler: `com.iainchesworthlabs.hearth.desktop` in the
+`iclforge-hearth` package (`apps/hearth/ui/packaging/linux/`) carries `MimeType=audio/ac3;audio/eac3;`.
+Nothing declares or claims AC-4.
+
+The desktop file names, the AppStream ids and the window's application id (what Wayland calls its
+`app_id`, set with `QGuiApplication::setDesktopFileName()`) are `com.iainchesworthlabs.<program>`:
+`com.iainchesworthlabs.forge-gui`, `com.iainchesworthlabs.hearth` and `com.iainchesworthlabs.crucible`,
+the repository's account, as the macOS bundle ids are. Each `.desktop` file also names the window class
+the program's X11 windows have (`StartupWMClass=`), which is what ties a running window to its launcher
+there. Before any release carried them they were `forge-gui.desktop`, `hearth.desktop` and
+`crucible.desktop`; the only desktop file a release has carried is `ac3gui.desktop`, in
+v0.10.0-beta.1's AppImage. Configure/build-verified only: nobody has installed the resulting `.deb`/`.rpm` on a
 desktop and double-clicked an `.ac3` file to confirm the launcher fires.
 
 ## AppImage
@@ -299,7 +308,7 @@ cmake --install build/config-linux-gcc --prefix AppDir/usr --component runtime
 # linux-appimage CI job for the check.
 linuxdeploy-x86_64.AppImage --appdir AppDir \
   --executable AppDir/usr/bin/forge-gui \
-  --desktop-file AppDir/usr/share/applications/forge-gui.desktop \
+  --desktop-file AppDir/usr/share/applications/com.iainchesworthlabs.forge-gui.desktop \
   --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/forge-gui.png \
   --plugin qt --output appimage
 ```

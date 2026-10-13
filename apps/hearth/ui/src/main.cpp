@@ -227,6 +227,11 @@ int main(int argc, char** argv) {
     QGuiApplication::setApplicationName(QStringLiteral("Hearth"));
     QGuiApplication::setOrganizationName(QStringLiteral("iclforge"));
     QGuiApplication::setApplicationDisplayName(QStringLiteral("Hearth"));
+    // The id the desktop knows this program by: the name of its .desktop file
+    // (packaging/linux/com.iainchesworthlabs.hearth.desktop) without the suffix, which a Wayland
+    // compositor is also told is the window's application. The macOS bundle identifier is the
+    // same string. Nothing on Windows reads it.
+    QGuiApplication::setDesktopFileName(QStringLiteral("com.iainchesworthlabs.hearth"));
 
     QIcon app_icon;
     app_icon.addFile(QStringLiteral(":/icons/iclforge-32.png"));

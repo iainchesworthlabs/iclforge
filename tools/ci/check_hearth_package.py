@@ -94,8 +94,8 @@ FORBIDDEN_WINDOWS_QT_TEST_DLLS = ("qt6test.dll", "qt6testd.dll",
 NOTICES_LINUX_MEMBER = "share/doc/iclforge-hearth/NOTICES.txt"
 REQUIRED_LINUX = (
     "bin/hearth",
-    "share/applications/hearth.desktop",
-    "share/metainfo/hearth.metainfo.xml",
+    "share/applications/com.iainchesworthlabs.hearth.desktop",
+    "share/metainfo/com.iainchesworthlabs.hearth.metainfo.xml",
     "share/icons/hicolor/256x256/apps/hearth.png",
     "share/icons/hicolor/32x32/apps/hearth.png",
     NOTICES_LINUX_MEMBER,

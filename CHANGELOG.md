@@ -4023,6 +4023,27 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Identifiers follow the repository's account: `com.iainchesworthlabs.<program>`**
+
+- **The two Android applications are `com.iainchesworthlabs.hearth` and
+  `com.iainchesworthlabs.shield`**, the application id (`applicationId`, which is also the data
+  directory and the instrumentation package). The code's package, which the native names spell,
+  stays `com.iclforge.hearth` and `com.iclforge.shield`: the application id and the package were one
+  string and are two now, and `tools/checks/check_android_jni.py` holds the id to the account
+  instead of to the package. Hearth for Android has not been released, and no release carried
+  `com.iclforge.shield` (the pre-releases are `com.ac3forge.shield`, which stays installed beside
+  the new app and is not upgraded), so no install of either is orphaned that was not already.
+  `adb shell am start` names the Shield activity by its full class
+  (`com.iainchesworthlabs.shield/com.iclforge.shield.MainActivity`).
+- **The Linux desktop file names and AppStream ids are `com.iainchesworthlabs.forge-gui`,
+  `com.iainchesworthlabs.hearth` and `com.iainchesworthlabs.crucible`**, the names the macOS
+  bundles already had, and each program tells the window system it is that
+  (`QGuiApplication::setDesktopFileName()`); each `.desktop` file names its window class
+  (`StartupWMClass=`) so that a running window keeps its launcher. They were `forge-gui.desktop`,
+  `hearth.desktop` and `crucible.desktop`, none of which a release carried (the AppImage of
+  v0.10.0-beta.1 has `ac3gui.desktop`).
+- **Crucible's macOS bundle has an identifier**, `com.iainchesworthlabs.crucible`; it had none set.
+
 **Reading decimal numbers: `iclforge::base::parse_double`, which is fast_float**
 
 - **Text that becomes a `double` is read by one function, in `libs/base`, and not by `strtod`.**

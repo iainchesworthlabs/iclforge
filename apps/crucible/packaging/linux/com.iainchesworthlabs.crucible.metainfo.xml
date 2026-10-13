@@ -2,11 +2,13 @@
 <!--
   AppStream metainfo for Crucible (Crucible cross-platform promotion) - what puts it in a
   Linux desktop's application menu and software centre, alongside
-  crucible.desktop. <id> matches the .desktop file's own basename, which
-  the launchable requires to associate the two. Same shape as forge-gui's.
+  com.iainchesworthlabs.crucible.desktop. <id> is the .desktop file's basename without the
+  suffix, and the launchable names the file: AppStream requires that to associate the two.
+  The id follows the repository's account, as the macOS bundle id does; it was crucible.desktop
+  before any release carried it. Same shape as forge-gui's.
 -->
 <component type="desktop-application">
-  <id>crucible.desktop</id>
+  <id>com.iainchesworthlabs.crucible</id>
   <name>Crucible</name>
   <summary>Capture each application separately and place it as an object in a live Dolby Atmos scene</summary>
   <metadata_license>CC0-1.0</metadata_license>
@@ -30,7 +32,7 @@
       clean-room implementation of published standards and is not affiliated with Dolby.
     </p>
   </description>
-  <launchable type="desktop-id">crucible.desktop</launchable>
+  <launchable type="desktop-id">com.iainchesworthlabs.crucible.desktop</launchable>
   <url type="homepage">https://github.com/iainchesworthlabs/iclforge</url>
   <url type="help">https://iainchesworthlabs.github.io/iclforge/crucible/</url>
   <provides>

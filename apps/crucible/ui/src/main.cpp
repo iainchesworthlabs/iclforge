@@ -147,6 +147,11 @@ int main(int argc, char** argv) {
     g_previous_handler = qInstallMessageHandler(forward_to_diagnostics);
     QGuiApplication::setApplicationName(QStringLiteral("Crucible"));
     QGuiApplication::setOrganizationName(QStringLiteral("iclforge"));
+    // The id the desktop knows this program by: the name of its .desktop file
+    // (packaging/linux/com.iainchesworthlabs.crucible.desktop) without the suffix, which a Wayland
+    // compositor is also told is the window's application. The macOS bundle identifier is the
+    // same string. Nothing on Windows reads it.
+    QGuiApplication::setDesktopFileName(QStringLiteral("com.iainchesworthlabs.crucible"));
     // The window and taskbar icon; the .exe's own icon comes from the
     // resource script CMake generates.
     QIcon app_icon;

@@ -634,10 +634,10 @@ endif()
 # built-in, true only on Linux).
 # ---------------------------------------------------------------------------
 if(LINUX)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/forge-gui.desktop"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.forge-gui.desktop"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
         COMPONENT runtime)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/forge-gui.metainfo.xml"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.forge-gui.metainfo.xml"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo"
         COMPONENT runtime)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/forge-gui-mime.xml"

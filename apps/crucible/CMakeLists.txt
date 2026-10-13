@@ -560,6 +560,10 @@ else()
         set_target_properties(crucible PROPERTIES
             MACOSX_BUNDLE ON
             MACOSX_BUNDLE_BUNDLE_NAME "Crucible"
+            # The repository's account, as forge-gui's and Hearth's bundles have it
+            # (com.iainchesworthlabs.forge-gui, com.iainchesworthlabs.hearth). Unset, the plist
+            # carried no identifier of this program's own.
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.iainchesworthlabs.crucible"
             MACOSX_BUNDLE_ICON_FILE "iclforge.icns")
     endif()
 
@@ -734,9 +738,9 @@ elseif(LINUX)
     # package (cmake/Packaging.cmake). No driver scripts: Linux needs no
     # driver, and a PowerShell script in a .deb is a mistake waiting for a
     # reader.
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/crucible.desktop"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.crucible.desktop"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications" COMPONENT crucible)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/crucible.metainfo.xml"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.crucible.metainfo.xml"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo" COMPONENT crucible)
     install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"

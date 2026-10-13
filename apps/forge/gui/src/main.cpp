@@ -607,6 +607,11 @@ int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("forge-gui"));
     QGuiApplication::setOrganizationName(QStringLiteral("iclforge"));
+    // The id the desktop knows this program by: the name of its .desktop file
+    // (packaging/linux/com.iainchesworthlabs.forge-gui.desktop) without the suffix, which a Wayland
+    // compositor is also told is the window's application. The macOS bundle identifier is the
+    // same string. Nothing on Windows reads it.
+    QGuiApplication::setDesktopFileName(QStringLiteral("com.iainchesworthlabs.forge-gui"));
     QGuiApplication::setApplicationVersion(
         QString::fromUtf8(iclforge::ac3::version_string.data(), static_cast<qsizetype>(iclforge::ac3::version_string.size())));
 
