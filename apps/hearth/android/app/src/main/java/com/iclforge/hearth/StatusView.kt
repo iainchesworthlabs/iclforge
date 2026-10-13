@@ -38,6 +38,11 @@ class StatusView(context: Context) : View(context) {
         val error: String?,
         /** A small muted line (counters, the advertiser's trouble). */
         val note: String?,
+        /**
+         * This sink has never played a stream: a paired sink says what to do next, which is to add it to a
+         * group (the desktop's first-run dialog says the same).
+         */
+        val firstRun: Boolean = false,
     )
 
     private val fonts = Fonts(context.assets)
@@ -270,6 +275,10 @@ class StatusView(context: Context) : View(context) {
                 if (content.formats.isNotEmpty()) {
                     put(layoutOf(context.getString(R.string.passes_through, content.formats.joinToString(" · ")),
                         Tokens.SMALL_U * 1.25f, u, widthPx, 400, Tokens.MUTED, 2), 12f)
+                }
+                if (content.firstRun) {
+                    put(layoutOf(context.getString(R.string.group_hint),
+                        Tokens.SMALL_U * 1.25f, u, widthPx, 400, Tokens.MUTED, 3), 12f)
                 }
             }
             else -> {

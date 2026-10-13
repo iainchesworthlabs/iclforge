@@ -18,7 +18,7 @@ are the common design, and a pairing code the server asks for in its QR form is 
 the server for the singer's karaoke choice (D8).
 
 What it does not do yet: decode locally for karaoke (phase 4), and play `player@v1`'s PCM, FLAC and
-Opus (5): a stream of those is accepted and dropped. A first-run screen is not built. AC-4 is not listed: nothing has shown a receiver decoding it over
+Opus (5): a stream of those is accepted and dropped. AC-4 is not listed: nothing has shown a receiver decoding it over
 this route. Phases 4 and 5 are planned in
 [`planning/hearth-android-phases-4-5.md`](../../../planning/hearth-android-phases-4-5.md).
 
@@ -87,6 +87,17 @@ comes from the core and no longer from reading the log. **Quit** is the screen's
 family's focus ring, and the D-pad's centre presses it; the foot also carries a small muted note
 (the advertiser's trouble, when it has one). Not here: the layout line (a pass-through sink has none);
 the QR for a server that asks for it is described below.
+
+**The first run.** There is no welcome screen: the idle screen already is what a person who has just
+installed the app sees, so it says what to do next. A sink with no pairing says "Not paired yet. In
+Hearth, open the Network page and choose this sink: a code appears here." and shows the code when a
+server asks; a sink that is paired and **has never played a stream** says under "Paired with ..." that
+"To play, add this sink to a group on Hearth's Network page: a group of one plays to a single sink" (the
+desktop's first-run dialog says the same, because a paired sink alone is not something Hearth plays to).
+The first stream ends it for good, by one flag in the app's preferences (`has_played`), set the first time
+the sink streams, so a long-time sink's idle screen is not nagging. It is held by `StatusScreenTest`.
+
+![A paired sink that has never played: "To play, add this sink to a group on Hearth's Network page" under the formats it passes through](../../../docs/hearth/screenshots/android-idle-first-run.png)
 
 ![The idle screen: the sink's name, its address, the code a server asked for in the accent, and Quit](../../../docs/hearth/screenshots/android-status-idle-code.png)
 ![The starting screen: the name and what it is waiting for](../../../docs/hearth/screenshots/android-status-starting.png)

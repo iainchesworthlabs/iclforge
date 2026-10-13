@@ -199,10 +199,10 @@ These are not phase 4, and they go first because each is a day of work, not a we
 
 | # | What | Where it stands |
 |---|---|---|
-| 1 | **The vocals request: "Both" asks `aware`; V1, V2 and None ask `capable` with the vocals** (the owner's call, 2026-10-13) | The remote always sends `capable`; one function and its test |
-| 2 | **The header's time, position and length for an item with no lyrics**: from `metadata@v1`'s progress, which the sink core already holds | The lyric view's header is blank for a track with no document |
+| 1 | **The vocals request: "Both" asks `aware`; V1, V2 and None ask `capable` with the vocals** (the owner's call, 2026-10-13) | **Built**: `sink::vocals_request`, held by a host case (#1490) |
+| 2 | **The header's time, position and length for an item with no lyrics**: from `metadata@v1`'s progress, which the sink core already holds | **Built**: the frame carries `progress` and the header shows the server's clock (#1490) |
 | 3 | **The `format` chip**: "Dolby Digital 5.1 passing through", from the decoder report | **Built**: the status carries the `DecoderReport` (`Sink::Status::Peer::decoder`, written by `sink::status_json`), and the footer's chip joins `StreamFormat.name` to the route |
-| 4 | **A first-run screen**: what the app is, how to pair, the controls | Not designed anywhere; a short screen with a one-time flag |
+| 4 | **A first run**: what a person does next | **Built, with no separate screen**: the idle screen already is what a new person sees, so it says where to pair ("Not paired yet. In Hearth, open the Network page and choose this sink") and, for a paired sink that has never played, to add it to a group (the desktop's first-run dialog's step 3), until the first stream sets one flag |
 | 5 | **The README's state line, and the plan's and the spec's "built" rows** | This page's PR |
 | 6 | **Two quirks to root-cause**: re-pairing the same server identity times out; an AC-3 stream shows 2 to 3 late bursts at about 9.2 s | Need Shield runs with the receiver on; not yet explained |
 

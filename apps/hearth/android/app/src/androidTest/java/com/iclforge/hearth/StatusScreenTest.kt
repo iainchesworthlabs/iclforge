@@ -118,6 +118,7 @@ class StatusScreenTest : RenderTestBase() {
         status: SinkStatus = SinkStatus.EMPTY,
         formats: List<String> = listOf("Dolby Digital", "Dolby Digital Plus"),
         error: String? = null,
+        firstRun: Boolean = false,
     ) = StatusView.Content(
         choice = choice,
         name = "Hearth on SHIELD",
@@ -126,6 +127,7 @@ class StatusScreenTest : RenderTestBase() {
         formats = formats,
         error = error,
         note = "1 connection · 0 streams",
+        firstRun = firstRun,
     )
 
     private fun draw(name: String, content: StatusView.Content, overLyrics: Boolean = false, focused: Boolean = false): Bitmap {
@@ -200,6 +202,31 @@ class StatusScreenTest : RenderTestBase() {
             "a card for a token that is too long",
             count(long, right, Tokens.TEXT, tolerance = 3) < side * side / 8,
         )
+    }
+
+    @Test
+    fun aPairedSinkThatHasNeverPlayedSaysWhatToDoNext() {
+        val paired = SinkStatus(
+            listOf(SinkStatus.Peer(1, "192.168.1.87:60507", "Hearth on DESKTOP", "playback", false)), null, 1,
+        )
+        val idle = StatusScreens.Choice(StatusScreens.Kind.IDLE)
+        val used = draw("s1-idle-paired-used", content(idle, paired, firstRun = false))
+        val first = draw("s1-idle-paired-first-run", content(idle, paired, firstRun = true))
+        val usedInk = inked(used, stage)
+        val firstInk = inked(first, stage)
+        assertNotNull(usedInk)
+        assertNotNull(firstInk)
+        // The hint is more muted text under the "Paired with" line: the ink reaches further down, and the
+        // first lines are where they were.
+        assertTrue(
+            "the first-run hint added no lines: ${usedInk!!.bottom} against ${firstInk!!.bottom}",
+            firstInk.bottom > usedInk.bottom + 30,
+        )
+        assertEquals(usedInk.top, firstInk.top)
+        assertTrue("the hint is wider than the screen", firstInk.right <= stage.right)
+        // A sink that has never been paired says where to start, whatever the flag is.
+        val unpaired = draw("s1-idle-unpaired", content(idle, SinkStatus.EMPTY, firstRun = true))
+        assertNotNull(inked(unpaired, stage))
     }
 
     @Test
