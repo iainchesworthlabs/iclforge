@@ -73,11 +73,11 @@ Card {
             Text {
                 Layout.fillWidth: true
                 visible: HearthController.thisFrame.dialnorm !== undefined
-                text: qsTr("dialnorm −%1: %2 dB down%3")
+                text: Theme.ltrNumbers(qsTr("dialnorm −%1: %2 dB down%3")
                           .arg(HearthController.thisFrame.dialnorm)
                           .arg((31 - HearthController.thisFrame.dialnorm).toFixed(1))
                           .arg(HearthController.hasObjectMetadata
-                               ? qsTr(" · %1 objects").arg(HearthController.objectsPlaced) : "")
+                               ? qsTr(" · %1 objects").arg(HearthController.objectsPlaced) : ""))
                 color: Theme.textMuted
                 font.pixelSize: Theme.fontSmall
                 wrapMode: Text.WordWrap

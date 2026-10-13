@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 
 import Hearth
+import HearthLanguage
 import HearthTest
 
 import "HearthTestHelpers.js" as H
@@ -45,7 +46,16 @@ TestCase {
                "fixtures were not staged");
     }
 
+    property string startLanguage: ""
+
+    function cleanup() {
+        if (startLanguage.length > 0 && LanguageManager.currentLanguage !== startLanguage) {
+            LanguageManager.setLanguage(startLanguage);
+        }
+    }
+
     function init() {
+        startLanguage = LanguageManager.currentLanguage;
         HearthController.stop();
         for (let i = HearthController.queue.length - 1; i >= 0; --i) {
             HearthController.removeAt(i);
@@ -69,6 +79,33 @@ TestCase {
         const found = H.find(page, function(item) { return item.text === text && item.clicked !== undefined; });
         verify(found !== null, "no \"" + text + "\" button");
         return found;
+    }
+
+    // A negative number in right-to-left text: a minus sign is a bidi neutral, and next to Arabic or
+    // Hebrew words it lands after the digits ("3.0-" for -3.0). The levels the page works out are set in
+    // a left-to-right isolate when the window reads right to left, and are the text they always were
+    // when it does not (no control character in it for a copy, a test or a screen reader).
+    function test_mixLevelsKeepTheirSignInARightToLeftWindow() {
+        HearthController.addFiles([shortAc3]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000);
+        HearthController.inspectItem(0);
+        tryVerify(function() { return HearthController.inspectedMedia.probe !== undefined; }, 10000);
+        const page = makePage();
+        tryVerify(function() { return H.negativeDecimals(page).length > 0; }, 10000,
+                  "the page shows no mix level");
+        compare(Qt.application.layoutDirection, Qt.LeftToRight);
+        compare(H.isolated(page).length, 0, "a left-to-right window got isolates");
+
+        LanguageManager.setLanguage("he");
+        compare(Qt.application.layoutDirection, Qt.RightToLeft);
+        tryVerify(function() { return H.isolated(page).length > 0; }, 5000, "no level was isolated");
+        const bare = H.bareNegativeDecimals(page).map(function(item) { return item.text; });
+        compare(bare.length, 0, "negative numbers outside an isolate: " + bare.join(" | "));
+
+        // And back: the same page, with its text as it was.
+        LanguageManager.setLanguage(startLanguage);
+        tryVerify(function() { return H.isolated(page).length === 0; }, 5000);
+        verify(H.negativeDecimals(page).length > 0);
     }
 
     function test_showingPickerInspectsAnotherItem() {

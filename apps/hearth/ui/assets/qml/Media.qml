@@ -84,7 +84,7 @@ Item {
             return qsTr("not carried");
         }
         const n = digits === undefined ? 1 : digits;
-        return (value >= 0 ? "+" : "") + value.toFixed(n) + " dB";
+        return Theme.ltr((value >= 0 ? "+" : "") + value.toFixed(n) + " dB");
     }
     function formatDuration(seconds) {
         if (!seconds && seconds !== 0) {
@@ -778,7 +778,7 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: root.ac4Metadata.dialnormDbfs !== undefined
-                                      ? qsTr("dialnorm %1 dBFS").arg(Number(root.ac4Metadata.dialnormDbfs).toFixed(2))
+                                      ? qsTr("dialnorm %1 dBFS").arg(Theme.ltr(Number(root.ac4Metadata.dialnormDbfs).toFixed(2)))
                                       : qsTr("not carried")
                                 color: Theme.text
                             }
@@ -786,9 +786,9 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: root.ac4Metadata.integratedLkfs !== undefined
-                                      ? qsTr("%1 LKFS integrated").arg(Number(root.ac4Metadata.integratedLkfs).toFixed(1))
+                                      ? qsTr("%1 LKFS integrated").arg(Theme.ltr(Number(root.ac4Metadata.integratedLkfs).toFixed(1)))
                                         + (root.ac4Metadata.truePeakDbtp !== undefined
-                                           ? qsTr(" · true peak %1 dBTP").arg(Number(root.ac4Metadata.truePeakDbtp).toFixed(1))
+                                           ? qsTr(" · true peak %1 dBTP").arg(Theme.ltr(Number(root.ac4Metadata.truePeakDbtp).toFixed(1)))
                                            : "")
                                       : qsTr("not carried")
                                 color: Theme.text

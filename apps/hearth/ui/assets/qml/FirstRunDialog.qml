@@ -17,6 +17,8 @@ Dialog {
     modal: true
     anchors.centerIn: parent
     width: Math.min(640, parent ? parent.width - 60 : 640)
+    // The window's height at most; the body above the buttons scrolls for the rest.
+    height: Math.min(implicitHeight, parent ? parent.height - 60 : implicitHeight)
     padding: Theme.pad * 1.5
     title: ""
     closePolicy: Popup.CloseOnEscape
@@ -86,60 +88,69 @@ Dialog {
         Accessible.role: Accessible.Dialog
         Accessible.name: qsTr("Before you play anything")
 
-        Text {
-            text: qsTr("FIRST RUN")
-            font.pixelSize: Theme.fontMicro
-            font.bold: true
-            font.letterSpacing: 1.2
-            color: Theme.accentInk
-        }
-        Text {
-            Layout.fillWidth: true
-            text: qsTr("Before you play anything")
-            wrapMode: Text.WordWrap
-            font.pixelSize: Theme.fontTitle
-            font.bold: true
-            color: Theme.text
-        }
+        Keys.onPressed: function(event) { scroll.handleKey(event); }
 
-        // 01. Where it plays. deviceName is the same fact the Speakers page
-        // heads itself with, so both agree on what "the default output" is.
-        // The body names no side for the output name: the header has it
-        // beside the title, before the page buttons, which is the left of the
-        // window in a language read left to right and the right of it in
-        // Arabic, Hebrew and Yiddish (Main.qml's LayoutMirroring).
-        Step {
-            objectName: "firstRunOutputRow"
-            ordinal: "01"
-            heading: HearthController.deviceName.length > 0
-                ? qsTr("It plays to %1").arg(HearthController.deviceName)
-                : qsTr("It plays to your default output")
-            body: qsTr("That is this computer's default output. The output name at the top "
-                      + "of the window opens the list of receivers, passthrough devices and "
-                      + "network sinks.")
-        }
+        // Everything above the buttons: scrolls when the dialog is taller than the window.
+        DialogScroll {
+            id: scroll
+            objectName: "firstRunScroll"
+            spacing: Theme.gap
 
-        // 02. Where per-output setup lives - real, on the Speakers page
-        // already (routing, trim, delay, crossover).
-        Step {
-            ordinal: "02"
-            heading: qsTr("Your speakers are set per output")
-            body: qsTr("The Speakers page holds each output's routing, levels, delays and bass "
-                      + "management. Nothing in the system's own sound settings changes.")
-        }
+            Text {
+                text: qsTr("FIRST RUN")
+                font.pixelSize: Theme.fontMicro
+                font.bold: true
+                font.letterSpacing: 1.2
+                color: Theme.accentInk
+            }
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("Before you play anything")
+                wrapMode: Text.WordWrap
+                font.pixelSize: Theme.fontTitle
+                font.bold: true
+                color: Theme.text
+            }
 
-        // 03. Network sinks need pairing AND a group before they play - a
-        // paired sink alone is not yet something Hearth can play to
-        // (hearth-followups-group-ux-and-live-diagnostics-2026-09-26: this
-        // step used to stop at "paired", which is why a paired-but-ungrouped
-        // sink's first Play fell back to the local output with nothing
-        // having told the user a group was still needed).
-        Step {
-            ordinal: "03"
-            heading: qsTr("Network sinks need a group to play")
-            body: qsTr("Hearth lists the Sendspin players it finds on the network. Pair one, "
-                      + "then add it to a group on the Network page - a group of one plays to "
-                      + "a single sink.")
+            // 01. Where it plays. deviceName is the same fact the Speakers page
+            // heads itself with, so both agree on what "the default output" is.
+            // The body names no side for the output name: the header has it
+            // beside the title, before the page buttons, which is the left of the
+            // window in a language read left to right and the right of it in
+            // Arabic, Hebrew and Yiddish (Main.qml's LayoutMirroring).
+            Step {
+                objectName: "firstRunOutputRow"
+                ordinal: "01"
+                heading: HearthController.deviceName.length > 0
+                    ? qsTr("It plays to %1").arg(HearthController.deviceName)
+                    : qsTr("It plays to your default output")
+                body: qsTr("That is this computer's default output. The output name at the top "
+                          + "of the window opens the list of receivers, passthrough devices and "
+                          + "network sinks.")
+            }
+
+            // 02. Where per-output setup lives - real, on the Speakers page
+            // already (routing, trim, delay, crossover).
+            Step {
+                ordinal: "02"
+                heading: qsTr("Your speakers are set per output")
+                body: qsTr("The Speakers page holds each output's routing, levels, delays and bass "
+                          + "management. Nothing in the system's own sound settings changes.")
+            }
+
+            // 03. Network sinks need pairing AND a group before they play - a
+            // paired sink alone is not yet something Hearth can play to
+            // (hearth-followups-group-ux-and-live-diagnostics-2026-09-26: this
+            // step used to stop at "paired", which is why a paired-but-ungrouped
+            // sink's first Play fell back to the local output with nothing
+            // having told the user a group was still needed).
+            Step {
+                ordinal: "03"
+                heading: qsTr("Network sinks need a group to play")
+                body: qsTr("Hearth lists the Sendspin players it finds on the network. Pair one, "
+                          + "then add it to a group on the Network page - a group of one plays to "
+                          + "a single sink.")
+            }
         }
 
         RowLayout {

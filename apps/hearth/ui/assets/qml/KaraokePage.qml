@@ -168,7 +168,7 @@ ScrollView {
         if (db <= root.minLevelDb) {
             return qsTr("off");
         }
-        return qsTr("%1 dB").arg((db > 0 ? "+" : "") + Math.round(db));
+        return qsTr("%1 dB").arg(Theme.ltr((db > 0 ? "+" : "") + Math.round(db)));
     }
 
     // Whether a part of the stream is heard under the current choice.

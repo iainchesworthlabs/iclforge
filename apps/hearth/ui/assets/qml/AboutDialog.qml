@@ -23,6 +23,8 @@ Dialog {
     onOpened: aboutCloseButton.forceActiveFocus()
     anchors.centerIn: parent
     width: Math.min(560, parent ? parent.width - 60 : 560)
+    // The window's height at most; the body above the buttons scrolls for the rest.
+    height: Math.min(implicitHeight, parent ? parent.height - 60 : implicitHeight)
     padding: Theme.space6
     title: ""
     background: Rectangle {
@@ -79,58 +81,67 @@ Dialog {
         Accessible.role: Accessible.Dialog
         Accessible.name: qsTr("About Hearth")
 
-        RowLayout {
-            spacing: Theme.space3
-            Image {
-                source: "qrc:/icons/iclforge-256.png"
-                sourceSize: Qt.size(40, 40)
-                Layout.preferredWidth: 40
-                Layout.preferredHeight: 40
+        Keys.onPressed: function(event) { scroll.handleKey(event); }
+
+        // Everything above the buttons: scrolls when the dialog is taller than the window.
+        DialogScroll {
+            id: scroll
+            objectName: "aboutScroll"
+            spacing: Theme.space2
+
+            RowLayout {
+                spacing: Theme.space3
+                Image {
+                    source: "qrc:/icons/iclforge-256.png"
+                    sourceSize: Qt.size(40, 40)
+                    Layout.preferredWidth: 40
+                    Layout.preferredHeight: 40
+                }
+                Text {
+                    text: qsTr("Hearth")
+                    color: Theme.text
+                    font.family: Theme.headingFamily
+                    font.pixelSize: Theme.fontTitle
+                    font.weight: Font.Bold
+                }
             }
-            Text {
-                text: qsTr("Hearth")
-                color: Theme.text
-                font.family: Theme.headingFamily
-                font.pixelSize: Theme.fontTitle
-                font.weight: Font.Bold
+
+            Kicker { text: qsTr("WHAT IT DOES") }
+            Body {
+                text: qsTr("Plays AC-3, E-AC-3 and E-AC-3 JOC to a device on this computer, as a "
+                            + "bitstream to a receiver, or to Hearth sinks and Sendspin players on the "
+                            + "network, and shows what the decoder did with each stream. Part of the "
+                            + "ICL Forge project: the decoder, the renderer and the Sendspin "
+                            + "implementation are the library's.")
             }
-        }
 
-        Kicker { text: qsTr("WHAT IT DOES") }
-        Body {
-            text: qsTr("Plays AC-3, E-AC-3 and E-AC-3 JOC to a device on this computer, as a "
-                        + "bitstream to a receiver, or to Hearth sinks and Sendspin players on the "
-                        + "network, and shows what the decoder did with each stream. Part of the "
-                        + "ICL Forge project: the decoder, the renderer and the Sendspin "
-                        + "implementation are the library's.")
-        }
+            Kicker { text: qsTr("VERSION") }
+            Body {
+                font.family: Theme.monoFamily
+                text: compactVersion(HearthController.versionDetails)
+            }
 
-        Kicker { text: qsTr("VERSION") }
-        Body {
-            font.family: Theme.monoFamily
-            text: compactVersion(HearthController.versionDetails)
-        }
-
-        Kicker { text: qsTr("LICENCES") }
-        Body {
-            text: qsTr("Hearth and the iclforge library are free software under the GNU "
-                        + "General Public License, version 3 or later; the full text is LICENSE.txt "
-                        + "in the package. Dolby, Dolby Atmos and Dolby Digital Plus are trademarks "
-                        + "of Dolby Laboratories; this is a clean-room implementation of published "
-                        + "standards and is not affiliated with Dolby.")
-        }
-        // No component is named here: what this build carries from others
-        // differs by platform and by build, and the notices file generated
-        // for it (notices/) is the one place that says.
-        Body {
-            text: qsTr("Licences lists the third-party code in this build with each one's licence. "
-                        + "The package carries the same text as NOTICES.txt.")
-        }
-        Body {
-            Layout.topMargin: Theme.space2
-            text: "<a href=\"https://github.com/iainchesworthlabs/iclforge\">github.com/iainchesworthlabs/iclforge</a>"
-            textFormat: Text.RichText
-            linkColor: Theme.accent
+            Kicker { text: qsTr("LICENCES") }
+            Body {
+                text: qsTr("Hearth and the iclforge library are free software under the GNU "
+                            + "General Public License, version 3 or later; the full text is LICENSE.txt "
+                            + "in the package. Dolby, Dolby Atmos and Dolby Digital Plus are trademarks "
+                            + "of Dolby Laboratories; this is a clean-room implementation of published "
+                            + "standards and is not affiliated with Dolby.")
+            }
+            // No component is named here: what this build carries from others
+            // differs by platform and by build, and the notices file generated
+            // for it (notices/) is the one place that says.
+            Body {
+                text: qsTr("Licences lists the third-party code in this build with each one's licence. "
+                            + "The package carries the same text as NOTICES.txt.")
+            }
+            Body {
+                Layout.topMargin: Theme.space2
+                text: "<a href=\"https://github.com/iainchesworthlabs/iclforge\">github.com/iainchesworthlabs/iclforge</a>"
+                textFormat: Text.RichText
+                linkColor: Theme.accent
+            }
         }
 
         RowLayout {

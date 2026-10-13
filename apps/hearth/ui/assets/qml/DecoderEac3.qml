@@ -64,10 +64,10 @@ ScrollView {
             const lo = Math.min(root.probe.dialnormDb, root.probe.dialnormMaxDb);
             const hi = Math.max(root.probe.dialnormDb, root.probe.dialnormMaxDb);
             return qsTr("dialnorm %1 to %2, so %3 to %4 dB down")
-                       .arg(lo).arg(hi)
+                       .arg(Theme.ltr(lo)).arg(Theme.ltr(hi))
                        .arg(Number(31 + lo).toFixed(1)).arg(Number(31 + hi).toFixed(1));
         }
-        return qsTr("dialnorm %1, so %2 dB down").arg(root.probe.dialnormDb)
+        return qsTr("dialnorm %1, so %2 dB down").arg(Theme.ltr(root.probe.dialnormDb))
                    .arg(Number(31 + root.probe.dialnormDb).toFixed(1));
     }
 
@@ -211,7 +211,7 @@ ScrollView {
                             Layout.fillWidth: true
                             enabled: root.settings.mode === "custom"
                             text: qsTr("Dialogue normalisation")
-                            note: qsTr("Brings dialogue to −31 dBFS and never raises it. Line and RF turn it on.")
+                            note: Theme.ltrNumbers(qsTr("Brings dialogue to −31 dBFS and never raises it. Line and RF turn it on."))
                             checked: root.settings.normaliseDialogue ?? true
                             onToggled: function(on) { root.set("normaliseDialogue", on); }
                         }
@@ -391,10 +391,10 @@ ScrollView {
                             Layout.fillWidth: true
                             text: root.bitstream.mixLevels !== undefined
                                   ? qsTr("centre %1 dB · surround %2 dB%3")
-                                        .arg(Number(root.bitstream.mixLevels.centreDb).toFixed(1))
-                                        .arg(Number(root.bitstream.mixLevels.surroundDb).toFixed(1))
+                                        .arg(Theme.ltr(Number(root.bitstream.mixLevels.centreDb).toFixed(1)))
+                                        .arg(Theme.ltr(Number(root.bitstream.mixLevels.surroundDb).toFixed(1)))
                                         .arg(root.bitstream.mixLevels.lfeDb !== undefined
-                                             ? qsTr(" · LFE %1 dB").arg(Number(root.bitstream.mixLevels.lfeDb).toFixed(1))
+                                             ? qsTr(" · LFE %1 dB").arg(Theme.ltr(Number(root.bitstream.mixLevels.lfeDb).toFixed(1)))
                                              : "")
                                   : qsTr("not carried")
                             color: Theme.text

@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 
 import Hearth
+import HearthLanguage
 import HearthTest
 
 import "HearthTestHelpers.js" as H
@@ -42,7 +43,16 @@ TestCase {
         verify(shortAc3.length > 0);
     }
 
+    property string startLanguage: ""
+
+    function init() {
+        startLanguage = LanguageManager.currentLanguage;
+    }
+
     function cleanup() {
+        if (startLanguage.length > 0 && LanguageManager.currentLanguage !== startLanguage) {
+            LanguageManager.setLanguage(startLanguage);
+        }
         HearthController.stop();
         for (let i = HearthController.queue.length - 1; i >= 0; --i) {
             HearthController.removeAt(i);
@@ -121,6 +131,59 @@ TestCase {
                   "the RF ceiling never reached the engine: " + setting("rfCeilingDb"));
         click(H.segment(page, "Mode", "line"), "Line");
         tryVerify(function() { return !field.enabled; }, 10000);
+    }
+
+    // The text of a field with a unit starts at one end of the box and the unit is at the other, the
+    // way the window reads: neither is over the other, and both are inside the box.
+    function checkUnitBesideTheNumber(field, mirrored) {
+        compare(field.layoutMirrored, mirrored);
+        const unit = H.textItem(field, field.unit);
+        verify(unit !== null, "the field draws no unit");
+        const right = field.effectiveHorizontalAlignment === TextInput.AlignRight;
+        compare(right, mirrored, "the number starts at the wrong end of the box");
+        const from = right ? field.width - field.rightPadding - field.contentWidth : field.leftPadding;
+        const to = from + field.contentWidth;
+        verify(unit.x >= 0 && unit.x + unit.width <= field.width,
+               "the unit is outside the box: " + unit.x + " + " + unit.width + " in " + field.width);
+        if (mirrored) {
+            verify(unit.x + unit.width <= from, "the unit (" + unit.x + ".." + (unit.x + unit.width)
+                   + ") is over the number (" + from + ".." + to + ")");
+        } else {
+            verify(to <= unit.x, "the number (" + from + ".." + to + ") runs into the unit (" + unit.x + ")");
+        }
+    }
+
+    // The report: in Arabic, Hebrew and Yiddish "dBFS" was drawn over the RF ceiling's number.
+    function test_theUnitInTheRfCeilingFieldNeverCoversTheNumber() {
+        const page = makePage();
+        const field = H.byAccessibleName(page, "RF ceiling, dBFS");
+        verify(field !== null);
+        checkUnitBesideTheNumber(field, false);
+
+        // The window mirrors itself for these languages (Main.qml); a bare page is mirrored by hand.
+        LanguageManager.setLanguage("he");
+        page.LayoutMirroring.enabled = true;
+        page.LayoutMirroring.childrenInherit = true;
+        tryVerify(function() { return field.layoutMirrored; }, 5000);
+        checkUnitBesideTheNumber(field, true);
+    }
+
+    // The mix levels of the stream playing: negative numbers inside a sentence (see
+    // MediaPage::test_mixLevelsKeepTheirSignInARightToLeftWindow for why they are isolated).
+    function test_mixLevelsKeepTheirSignInARightToLeftWindow() {
+        const page = makePage();
+        HearthController.addFiles([shortAc3]);
+        tryVerify(function() { return HearthController.queue.length === 1; }, 10000);
+        HearthController.play();
+        tryCompare(HearthController, "state", "playing", 10000);
+        tryVerify(function() { return H.negativeDecimals(page).length > 0; }, 10000,
+                  "the This stream card shows no mix level");
+        compare(H.isolated(page).length, 0);
+
+        LanguageManager.setLanguage("he");
+        tryVerify(function() { return H.isolated(page).length > 0; }, 5000, "no level was isolated");
+        const bare = H.bareNegativeDecimals(page).map(function(item) { return item.text; });
+        compare(bare.length, 0, "negative numbers outside an isolate: " + bare.join(" | "));
     }
 
     function test_stereoAndTransformCheckboxes() {

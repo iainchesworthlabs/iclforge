@@ -180,6 +180,11 @@ Item {
         return out;
     }
     readonly property bool currentWordTimed: root.currentRow >= 0 && root.lines[root.currentRow].wordTimed
+    // The words of a line are set out in the line's own direction, by its first strong letter, and
+    // not in the window's: a window mirrored for Arabic or Hebrew still reads an English line from
+    // its left, and a window that is not still reads a Hebrew one from its right.
+    readonly property bool currentRtl: root.currentRow >= 0
+                                       && KaraokeController.isRightToLeft(root.lines[root.currentRow].text)
     readonly property var currentWords: root.currentWordTimed ? root.lines[root.currentRow].words : []
     // For a summary elsewhere: "line 3 of 8", with 0 before the first line.
     readonly property int lineNumber: root.status === "timed" ? root.currentLine + 1 : 0
@@ -330,6 +335,10 @@ Item {
                 y: currentBox.tagHeight
                 width: parent.width - currentBox.indent
                 spacing: 0
+                // The window's mirroring is turned off here: the direction below is the line's, so it
+                // is the physical one, and a mirrored window would turn it round again.
+                LayoutMirroring.enabled: false
+                layoutDirection: root.currentRtl ? Qt.RightToLeft : Qt.LeftToRight
 
                 Repeater {
                     model: root.currentWords
@@ -340,25 +349,35 @@ Item {
                         readonly property real fill: (root.cursor.fills && word.index < root.cursor.fills.length)
                                                      ? root.cursor.fills[word.index] : 0
                         readonly property bool being: word.index === root.cursor.word
+                        // Where the word itself sits in its item: the space that follows it (a word
+                        // has the spacing written after it) is on the far side of it from the next
+                        // word, which is the right in a line that reads left to right and the left
+                        // in one that reads right to left.
+                        readonly property real labelX: root.currentRtl ? word.width - label.implicitWidth : 0
                         objectName: "lyricWord-" + word.index
                         implicitWidth: label.implicitWidth + (word.modelData.gap ? spaceMetrics.advanceWidth : 0)
                         implicitHeight: label.implicitHeight
 
                         Text {
                             id: label
+                            objectName: "lyricWordText"
+                            x: word.labelX
                             text: word.modelData.text
                             color: word.being ? root.currentColor : root.restColor
                             font.pixelSize: root.currentSize
                             font.bold: true
                         }
                         // The sung part: the same word in the sung colour,
-                        // cut off at the fraction of its width.
+                        // cut off at the fraction of its width, from the side
+                        // the word begins at.
                         Item {
                             objectName: "lyricWordFill"
+                            x: word.labelX + (root.currentRtl ? label.implicitWidth * (1 - word.fill) : 0)
                             width: label.implicitWidth * word.fill
                             height: word.height
                             clip: true
                             Text {
+                                x: word.labelX - parent.x
                                 text: word.modelData.text
                                 color: root.sungColor
                                 font.pixelSize: root.currentSize
@@ -368,7 +387,7 @@ Item {
                         Rectangle {
                             objectName: "lyricWordUnderline"
                             visible: word.being
-                            x: 0
+                            x: word.labelX
                             y: label.implicitHeight - Math.max(2, Math.round(root.currentSize / 12))
                             width: label.implicitWidth
                             height: Math.max(2, Math.round(root.currentSize / 12))
