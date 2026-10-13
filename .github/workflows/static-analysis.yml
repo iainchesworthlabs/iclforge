@@ -158,10 +158,20 @@ jobs:
         # <library>/src, and the pattern says so; the containers' parts are under
         # libs/containers/src since planning/consolidation.md's C3, and dsp's tiered kernels
         # (libs/dsp/src/tiered, AC-4's until C5) are outside the scope, as AC-4's code is.
+        #
+        # libs/base/src/number_parse.cpp is out of it too: it is a call of fast_float::from_chars
+        # and forty lines around it. The static analyzer enters fast_float's headers from that call
+        # and reports from inside them (an index into power_of_five_128 that fast_float's own
+        # range checks keep in bounds, and the flag combinations of its chars_format enum); a
+        # report is shown while any of its notes is in a file of the scope, so neither
+        # HeaderFilterRegex nor a NOLINT in this tree can reach it, and the header is not ours to
+        # annotate. The case table of libs/base/tests/test_number_parse.cpp holds the file to what
+        # it promises, and number_parse_libc.cpp, its twin for the minimum-footprint profiles, is
+        # analysed as before. The negative look-ahead is Python's re, which run-clang-tidy uses.
         run: |
           "run-clang-tidy-${LLVM_VERSION}" -j "$(nproc)" -p build/config-linux-llvm-debug \
             -warnings-as-errors='*' \
-            '(libs/(ac3|base|objects|render)/src/.*|libs/dsp/src/[^/]*|libs/containers/src/(iec61937|matroska|mp4|mpegts)/.*|apps/forge/cli/src/.*)\.cpp'
+            '(libs/(ac3|objects|render)/src/.*|libs/base/src/(?!number_parse\.cpp).*|libs/dsp/src/[^/]*|libs/containers/src/(iec61937|matroska|mp4|mpegts)/.*|apps/forge/cli/src/.*)\.cpp'
 
       # Saved even when a step above failed, so the packages vcpkg had already
       # built survive for the next attempt (actions/cache's own post-job save

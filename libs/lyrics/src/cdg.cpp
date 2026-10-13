@@ -4,6 +4,7 @@
 #include <cctype>
 #include <fstream>
 #include <system_error>
+#include <vector>
 
 namespace iclforge::lyrics {
 
@@ -233,7 +234,9 @@ void CdgScreen::scroll(const CdgPacket& packet, bool copy) {
     if (dx == 0 && dy == 0) {
         return;
     }
-    const auto before = screen_;
+    // On the heap: the screen is 64,800 bytes, which a stack copy would add to the frame of every
+    // caller (PREfast's C6262), and a scroll command is a few a second at most.
+    const std::vector<std::uint8_t> before(screen_.begin(), screen_.end());
     for (int y = 0; y < kCdgHeight; ++y) {
         for (int x = 0; x < kCdgWidth; ++x) {
             int sx = x - dx;

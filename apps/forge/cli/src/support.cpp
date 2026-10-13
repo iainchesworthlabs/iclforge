@@ -61,6 +61,7 @@
 #include "iclforge/ac3/quality/distortion.hpp"
 #include "iclforge/ac3/signing/emdf_atmos_signer.hpp"
 #include "iclforge/base/crypto/signing_key.hpp"
+#include "iclforge/base/karaoke.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"

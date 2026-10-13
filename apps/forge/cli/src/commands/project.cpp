@@ -1,12 +1,13 @@
 #include "project.hpp"
 
-#include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fmt/base.h>
 #include <fmt/format.h>
 #include <fstream>
 #include <ios>
+#include <random>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -123,10 +124,13 @@ int run_project(std::string_view project_path, std::string_view out, bool print,
                                                 out.size()}};
     }
     std::error_code error;
-    // A folder of its own in the temporary one, named for this run so that two do not share it.
-    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    // A folder of its own in the temporary one, named for this run so that two do not share it, and
+    // by 64 bits from the system's entropy, so that no other user of a shared temporary folder can
+    // have made it first (it is made below with create_directory, which says when it was there).
+    std::random_device entropy;
+    const std::uint64_t stamp = (static_cast<std::uint64_t>(entropy()) << 32U) | entropy();
     const fs::path scratch =
-        fs::temp_directory_path(error) / ("forge-project-" + std::to_string(stamp));
+        fs::temp_directory_path(error) / fmt::format("forge-project-{:016x}", stamp);
     request.scratch = scratch;
 
     const auto plan = project::command_plan(opened->project, request);
@@ -150,12 +154,15 @@ int run_project(std::string_view project_path, std::string_view out, bool print,
         return kExitOk;
     }
 
-    fs::create_directories(scratch, error);
-    if (error) {
+    // A folder that was there already is not ours to write into: false from create_directory.
+    const bool made = fs::create_directory(scratch, error);
+    if (error || !made) {
         fmt::println(stderr, "error: cannot make a folder for the intermediate files in {}",
                      scratch.string());
         return kExitOutput;
     }
+    // Only its owner reads what is in it (best effort: a file system with no such thing says no).
+    fs::permissions(scratch, fs::perms::owner_all, fs::perm_options::replace, error);
     int result = kExitOk;
     for (const auto& [path, text] : plan->files) {
         std::ofstream stream{path, std::ios::binary | std::ios::trunc};

@@ -2,9 +2,7 @@
 
 #include <array>
 #include <cassert>
-#include <cmath>
 #include <cstddef>
-#include <numbers>
 #include <span>
 #include <type_traits>
 

@@ -51,8 +51,11 @@ std::expected<std::unique_ptr<Sink>, std::string> Sink::start(SinkOptions option
     options.crossover_hz = {render::LayoutRenderer::kMinCrossoverHz, render::LayoutRenderer::kMaxCrossoverHz};
 
     std::unique_ptr<Sink> sink(new Sink(std::make_unique<FileOutputs>(options.output_directory, *layout)));
+    // The core takes the base: the output directory and the layout are this program's own, and are
+    // not sliced off by a parameter of the base's type but named as the base being passed.
     std::expected<std::unique_ptr<iclforge::sink::Sink>, std::string> core =
-        iclforge::sink::Sink::start(std::move(options), *sink->outputs_, log);
+        iclforge::sink::Sink::start(std::move(static_cast<iclforge::sink::Options&>(options)),
+                                    *sink->outputs_, log);
     if (!core) {
         return std::unexpected(std::move(core.error()));
     }
