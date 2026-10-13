@@ -23,6 +23,7 @@
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/metadata_edit.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/render/layout.hpp"
 #include "ac3_transcoder.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
@@ -342,6 +343,29 @@ Units numbered_eac3_units(int count, int numblkscod) {
         const std::vector<float> samples(static_cast<std::size_t>(encoder.samples_per_frame()),
                                          0.05F);
         const std::vector<std::span<const float>> views(2, samples);
+        auto frame = encoder.encode_frame(views);
+        REQUIRE(frame.has_value());
+        out.push_back(std::move(*frame));
+    }
+    return out;
+}
+
+// `count` AC-3 frames of an Annex C karaoke programme: 3/2 with an LFE,
+// flagged bsmod 7 - L, M, R, V1 and V2.
+Units karaoke_ac3_units(int count) {
+    iclforge::ac3::EncoderConfig config;
+    config.bitrate_kbps = 448;
+    config.acmod = iclforge::ac3::Acmod::k3_2;
+    config.lfe = true;
+    config.info.bsmod = iclforge::ac3::meta::BitstreamMode::kVoiceOverOrKaraoke;
+    iclforge::ac3::FrameEncoder encoder{config};
+    Units out;
+    for (int f = 0; f < count; ++f) {
+        std::vector<float> samples(iclforge::ac3::kSamplesPerFrame);
+        for (std::size_t n = 0; n < samples.size(); ++n) {
+            samples[n] = 0.1F * static_cast<float>((static_cast<int>(n) + f * 31) % 60 - 30) / 30.0F;
+        }
+        const std::vector<std::span<const float>> views(6, samples);
         auto frame = encoder.encode_frame(views);
         REQUIRE(frame.has_value());
         out.push_back(std::move(*frame));
@@ -1206,6 +1230,133 @@ TEST_CASE("bitstream: another programme of a stream is decoded, and the reason s
     REQUIRE(rig.play_out());
 }
 
+TEST_CASE("bitstream: a karaoke item is decoded for a reproduction, and sent as it is as coded",
+          "[hearth][player][bitstream][karaoke]") {
+    const Units song = karaoke_ac3_units(30);
+    Library library;
+    library.files["song.ac3"] = {.bytes = joined(song)};
+    DecoderSettings coded;
+    coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+
+    // As coded, the stream is the receiver's to decode: it goes out untouched.
+    {
+        Rig sent{library, /*with_link=*/true, coded};
+        sent.player->queue().add(item("song.ac3"));
+        sent.player->play();
+        REQUIRE(sent.policy->asked.size() == 1);
+        CHECK(sent.policy->asked.front().stream == BitstreamFormat::kAc3);
+        REQUIRE(sent.play_out());
+        CHECK(sent.link->bursts == expected_bursts(song, BitstreamFormat::kAc3));
+        CHECK(sent.pcm->opens == 0);
+    }
+
+    // With a reproduction chosen - the default is an aware decoder's - it is
+    // decoded here: only this decoder makes one, and a receiver sent the
+    // stream plays the vocals from its surround speakers.
+    Rig rig{library};
+    rig.player->queue().add(item("song.ac3"));
+    rig.player->play();
+    // Asked as if the stream could not be sent at all, and once more as it
+    // is, for what the reason says.
+    REQUIRE(rig.policy->asked.size() == 2);
+    CHECK(rig.policy->asked[0].karaoke);
+    CHECK_FALSE(rig.policy->asked[0].stream.has_value());
+    CHECK(rig.policy->asked[1].stream == BitstreamFormat::kAc3);
+    CHECK(rig.player->transport().open_format().mode == OutputMode::kLocalPcm);
+    CHECK(rig.player->output_choice().reason ==
+          "Decoding here and playing PCM to \"Speakers\". The karaoke reproduction chosen is made "
+          "here; sent as a bitstream, the receiver would play the stream as coded.");
+    CHECK(rig.link->opens == 0);
+    CHECK(rig.player->settings_note().empty());
+
+    rig.player->pump();
+    rig.advance(2 * iclforge::ac3::kSamplesPerFrame);
+    rig.player->pump();
+    REQUIRE(rig.player->position().heard == std::chrono::milliseconds{64});
+
+    // "As coded" chosen while it plays: the item goes to the receiver from
+    // the frame being heard.
+    rig.player->set_decoder_settings(coded);
+    CHECK(rig.pcm->closes == 1);
+    CHECK(rig.link->opens == 1);
+    CHECK(rig.link->endpoints == std::vector<std::string>{"hdmi"});
+    CHECK(rig.player->transport().open_format().mode == OutputMode::kBitstream);
+    CHECK(rig.player->position().heard == std::chrono::milliseconds{64});
+    CHECK(rig.player->transport().state() == TransportState::kPlaying);
+    CHECK_FALSE(rig.player->settings_note().empty());
+    CHECK(has_note(rig.notes(),
+                   "output changed: Bitstreaming to \"HDMI\" over IEC 61937, untouched."));
+    // What it is sent from there on is the file's own frames.
+    rig.player->pump();
+    REQUIRE_FALSE(rig.link->bursts.empty());
+    {
+        const auto third = iclforge::containers::iec61937::wrap_frame(song[2]);
+        REQUIRE(third.has_value());
+        CHECK(rig.link->bursts.front() == *third);
+    }
+
+    // A reproduction again, and it is decoded again. Paused, it moves paused.
+    rig.player->pause();
+    DecoderSettings capable;
+    capable.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
+    rig.player->set_decoder_settings(capable);
+    CHECK(rig.link->closes == 1);
+    CHECK(rig.pcm->opens == 2);
+    CHECK(rig.pcm->paused);
+    CHECK(rig.player->transport().open_format().mode == OutputMode::kLocalPcm);
+    CHECK(rig.player->transport().state() == TransportState::kPaused);
+
+    // Another choice of vocals is the same decision: nothing reopens.
+    capable.karaoke_vocals = iclforge::ac3::KaraokeVocals::kNone;
+    rig.player->set_decoder_settings(capable);
+    CHECK(rig.pcm->opens == 2);
+    CHECK(rig.link->opens == 1);
+
+    rig.player->play();
+    REQUIRE(rig.play_out());
+    CHECK(rig.link->opens == 1);
+}
+
+TEST_CASE("bitstream: a karaoke choice decides the next item again, and leaves others alone",
+          "[hearth][player][bitstream][karaoke]") {
+    const Units plain = ac3_units(6);
+    const Units song = karaoke_ac3_units(6);
+    Library library;
+    library.files["plain.ac3"] = {.bytes = joined(plain)};
+    library.files["song.ac3"] = {.bytes = joined(song)};
+    Rig rig{library};
+    rig.player->queue().add(item("plain.ac3"));
+    rig.player->queue().add(item("song.ac3"));
+    rig.player->play();
+    // An item that is not karaoke is sent whatever the choice.
+    CHECK(rig.player->transport().open_format().mode == OutputMode::kBitstream);
+    // The whole of it reaches the link before any is heard, and the item
+    // after it is decided: karaoke, with the default reproduction, so a
+    // decode, which does not join a link.
+    for (int step = 0; step < 4; ++step) {
+        rig.player->pump();
+    }
+    REQUIRE(rig.policy->asked.size() >= 2);
+    CHECK(rig.policy->asked[1].karaoke);
+    CHECK_FALSE(rig.policy->asked[1].stream.has_value());
+    CHECK(rig.player->queue().current_index() == 0);
+
+    // "As coded" chosen while the first item is still being heard. It does
+    // not move, and the karaoke item is decided again: as coded it is sent,
+    // so it joins on the link.
+    DecoderSettings coded;
+    coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
+    rig.player->set_decoder_settings(coded);
+    CHECK(rig.link->opens == 1);
+    CHECK(rig.pcm->opens == 0);
+    REQUIRE(rig.play_out());
+    CHECK(rig.link->opens == 1);
+    CHECK(rig.pcm->opens == 0);
+    Units both = plain;
+    both.insert(both.end(), song.begin(), song.end());
+    CHECK(rig.link->bursts == expected_bursts(both, BitstreamFormat::kAc3));
+}
+
 TEST_CASE("bitstream: a decision the player has no sink for stops playback",
           "[hearth][player][bitstream]") {
     Library library;
@@ -1357,6 +1508,83 @@ TEST_CASE("bitstream: an engine decides from its endpoints and follows their cha
     owned.sync();
     CHECK(owned.status().note == "This engine's outputs are chosen by its owner, not here.");
     CHECK_FALSE(owned.status().output_preferences.pinned.has_value());
+}
+
+TEST_CASE("bitstream: an engine decodes until an endpoint is chosen as a receiver, then sends to it",
+          "[hearth][player][bitstream][concurrency]") {
+    // The choices Hearth's window posts (HearthController): a decode to the
+    // default output until a person picks a row in the output picker, a
+    // passthrough row as an endpoint with no mode, a PCM row as a decode
+    // pinned to its endpoint.
+    Library library;
+    library.files["a.ac3"] = {.bytes = joined(ac3_units(30))};
+    auto link = std::make_shared<FakeLink::Log>();
+    auto pcm = std::make_shared<FakePcm::Log>();
+    const auto layout = iclforge::render::OutputLayout::parse("2.0");
+    REQUIRE(layout.has_value());
+
+    {
+        iclforge::hearth::EngineOutputs outputs;
+        outputs.pcm = std::make_unique<FakePcm>(pcm);
+        outputs.bitstream = std::make_unique<FakeLink>(link);
+        outputs.endpoints = [](std::uint32_t) {
+            iclforge::hearth::EndpointReading speakers;
+            speakers.device.id = "speakers";
+            speakers.device.name = "Speakers";
+            speakers.device.is_default = true;
+            speakers.device.channels = 2;
+            iclforge::hearth::EndpointReading receiver;
+            receiver.device.id = "hdmi";
+            receiver.device.name = "HDMI";
+            receiver.device.supports_ac3_passthrough = true;
+            receiver.device.channels = 8;
+            return std::vector<iclforge::hearth::EndpointReading>{speakers, receiver};
+        };
+        iclforge::hearth::Engine engine{std::move(outputs), library.loader(), *layout};
+        // Where the window starts: nothing is sent as a bitstream unasked,
+        // though an endpoint would take it.
+        engine.set_output_preferences(iclforge::hearth::OutputPreferences{
+            .pinned = OutputMode::kLocalPcm, .endpoint_id = {}, .follow_sink = true});
+        engine.add({item("a.ac3")});
+        engine.play();
+        engine.sync();
+        auto status = engine.status();
+        CHECK(status.output.mode == OutputMode::kLocalPcm);
+        CHECK(status.output_reason.starts_with("Decoding here and playing PCM to \"Speakers\""));
+        CHECK(status.settings_note.empty());
+
+        // The receiver's passthrough row: the item moves to its link, and
+        // the device named is the endpoint the link is open on.
+        engine.set_output_preferences(iclforge::hearth::OutputPreferences{
+            .pinned = std::nullopt, .endpoint_id = "hdmi", .follow_sink = true});
+        engine.sync();
+        status = engine.status();
+        CHECK(status.output.mode == OutputMode::kBitstream);
+        CHECK(status.output.stream == BitstreamFormat::kAc3);
+        CHECK(status.output_reason.starts_with(
+            "Bitstreaming AC-3 to \"HDMI\" over IEC 61937, untouched."));
+        CHECK(status.device_id == "hdmi");
+        CHECK(status.device_name == "HDMI");
+        CHECK(status.routing.outputs() == 0);
+        CHECK_FALSE(status.settings_note.empty());
+
+        // The same endpoint's PCM row: decoded, to that endpoint.
+        engine.set_output_preferences(iclforge::hearth::OutputPreferences{
+            .pinned = OutputMode::kLocalPcm, .endpoint_id = "hdmi", .follow_sink = true});
+        engine.sync();
+        status = engine.status();
+        CHECK(status.output.mode == OutputMode::kLocalPcm);
+        CHECK(status.output_reason.starts_with("Decoding here and playing PCM to \"HDMI\""));
+        CHECK(status.settings_note.empty());
+
+        engine.stop();
+        engine.sync();
+        CHECK(engine.status().device_id.empty());
+    }
+    // Read once the engine thread has gone.
+    CHECK(link->opens == 1);
+    CHECK(link->endpoints == std::vector<std::string>{"hdmi"});
+    CHECK(pcm->opens == 2);
 }
 
 TEST_CASE("bitstream: the engine publishes the stream, the reason and the settings note",
