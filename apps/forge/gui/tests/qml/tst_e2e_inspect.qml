@@ -17,6 +17,14 @@ import ForgeGui
 // so the Play/Audition cases assert whichever honest outcome the machine
 // gives: the dialog's own error line naming the output it could not open, or
 // a real playing state that the same button then stops. Neither is faked.
+//
+// An audition is not waited for by its state. The worker queues the object's
+// samples into the output and is done as soon as the last one is taken, and
+// the output's queue holds a second: a clip that short is over, and
+// auditioningIndex back at -1, within a few milliseconds of the press, before
+// a loaded test thread has looked. What is waited for is the press's answer,
+// which stays true: the controller said its audition changed state twice (it
+// began and it ended), is still auditioning, or says why it could not.
 TestCase {
     id: testCase
     name: "E2eInspect"
@@ -26,6 +34,7 @@ TestCase {
         id: mainWindowComponent
         Main {}
     }
+    Component { id: spyComponent; SignalSpy {} }
 
     readonly property url ac3StreamUrl:
         Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.ac3")
@@ -101,6 +110,20 @@ TestCase {
         dialog.accepted();  // see pickFile
         dialog.close();
         tryCompare(dialog, "visible", false, 5000);
+    }
+
+    // A spy on the controller's audition state, made before the press it is to watch.
+    function auditionSpy() {
+        return createTemporaryObject(spyComponent, testCase,
+                                     { target: ObjectDecodeController, signalName: "auditionChanged" });
+    }
+
+    // Whether an Audition press has been answered. Two changes mean it began and has ended; one
+    // is either its beginning, which index 0 then says is still going, or the end of an earlier
+    // audition coming in late, which is not an answer.
+    function auditionAnswered(spy) {
+        return spy.count >= 2 || ObjectDecodeController.auditioningIndex === 0
+               || ObjectDecodeController.error.length > 0;
     }
 
     function openFromHeader(win, buttonName, dialog) {
@@ -363,17 +386,21 @@ TestCase {
         // centre lands on the modal dimmer (see
         // test_auditionButtonsFitInsideTheInspectorDialog below).
         const audition = findByName(dialog.contentItem, "oiAuditionButton-0");
+        const spy = auditionSpy();
         focusIn(audition);
         keyClick(Qt.Key_Space);
-        tryVerify(() => ObjectDecodeController.auditioningIndex === 0
-                        || ObjectDecodeController.error.length > 0, 5000);
+        tryVerify(() => auditionAnswered(spy), 5000, "the press was never answered");
         if (ObjectDecodeController.error.length > 0) {
             verify(ObjectDecodeController.error.indexOf("Could not open the audition output") === 0,
                    ObjectDecodeController.error);
             tryCompare(findByName(dialog.contentItem, "oiErrorText"), "visible", true);
         } else {
-            focusIn(audition);
-            keyClick(Qt.Key_Space);
+            // Begun. A press while it is still going stops it; one that has already ended by
+            // itself is not pressed again, which would begin another. Either way it settles.
+            if (ObjectDecodeController.auditioningIndex === 0) {
+                focusIn(audition);
+                keyClick(Qt.Key_Space);
+            }
             tryCompare(ObjectDecodeController, "auditioningIndex", -1, 5000);
         }
         click(findByName(dialog.contentItem, "oiCloseButton"));
@@ -402,13 +429,13 @@ TestCase {
         verify(right <= dialogRight,
                "Audition button's right edge at " + right + "px, dialog ends at "
                + dialogRight + "px");
+        const spy = auditionSpy();
         click(audition);
-        tryVerify(() => ObjectDecodeController.auditioningIndex === 0
-                        || ObjectDecodeController.error.length > 0, 5000);
+        tryVerify(() => auditionAnswered(spy), 5000, "the click was never answered");
         if (ObjectDecodeController.auditioningIndex === 0) {
             click(audition);
-            tryCompare(ObjectDecodeController, "auditioningIndex", -1, 5000);
         }
+        tryCompare(ObjectDecodeController, "auditioningIndex", -1, 5000);
         dialog.close();
     }
 }
