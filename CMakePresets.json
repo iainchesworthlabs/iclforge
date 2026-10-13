@@ -192,7 +192,7 @@
     {
       "name": "android-arm64",
       "hidden": true,
-      "description": "Android arm64-v8a through vcpkg's own arm64-android triplet, with the NDK's CMake toolchain (ANDROID_NDK_HOME, NDK r26.1 as apps/demos/android pins) chained behind vcpkg's. This is not the Shield app, which is Gradle's: its wrapper add_subdirectory()s the repo root and leaves ICLFORGE_BUILD_HEARTH off, because libs/sendspin needs the vcpkg 'hearth' feature and that wrapper has no vcpkg. This preset has one, and builds what Hearth for Android links (planning/hearth-android.md, phase 0c) under the NDK: libs/lyrics, libs/sendspin and libs/sink with cpp-httplib, mbedTLS, libFLAC, Opus and mdns. CMAKE_CXX_SCAN_FOR_MODULES is off because the NDK ships no clang-scan-deps. A Catch2 test binary cannot be listed by the host that builds it, so discovery runs when ctest runs (PRE_TEST) and the build only compiles and links them.",
+      "description": "Android arm64-v8a through vcpkg's own arm64-android triplet, with the NDK's CMake toolchain (ANDROID_NDK_HOME, NDK r26.1 as apps/demos/android pins) chained behind vcpkg's. This is not the Shield app, which is Gradle's: its wrapper add_subdirectory()s the repo root and leaves ICLFORGE_BUILD_HEARTH off, because libs/sendspin needs the vcpkg 'hearth' feature and that wrapper has no vcpkg. This preset has one, and builds what Hearth for Android links (planning/hearth-android.md, phase 0c) under the NDK: libs/lyrics, libs/sendspin and libs/sink with cpp-httplib, mbedTLS, libFLAC, Opus and mdns. CMAKE_CXX_SCAN_FOR_MODULES is off because the NDK ships no clang-scan-deps. cmake/LibcxxExpectedLayout.cmake (the root includes it) makes r26's std::expected safe for a payload with tail padding, and iclforge-base-tests holds it to that on a device. A Catch2 test binary cannot be listed by the host that builds it, so discovery runs when ctest runs (PRE_TEST) and the build only compiles and links them.",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "arm64-android",
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
@@ -617,7 +617,7 @@
       "name": "build-android-arm64",
       "configurePreset": "config-android-arm64",
       "displayName": "Android arm64-v8a Release (libs/lyrics, libs/sendspin and libs/sink, for Hearth for Android)",
-      "targets": [ "iclforge_lyrics", "iclforge_sendspin", "iclforge_sink", "iclforge-lyrics-tests", "iclforge-sendspin-tests", "iclforge-sink-tests" ]
+      "targets": [ "iclforge_lyrics", "iclforge_sendspin", "iclforge_sink", "iclforge-lyrics-tests", "iclforge-sendspin-tests", "iclforge-sink-tests", "iclforge-base-tests" ]
     },
     {
       "name": "build-linux-llvm-asan-ubsan",

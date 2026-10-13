@@ -100,6 +100,69 @@ arm64, and building the other ABIs would only slow local iteration for targets t
 the app. The debug build type also builds `x86_64`, for the emulator the CI tests run on (see
 [Automated in CI](#what-has-and-has-not-been-verified)); the release build is `arm64-v8a` only.
 
+### `std::expected` and tail padding
+
+NDK r26's libc++ is LLVM 17's, and its `std::expected<T, E>` keeps the has-value flag in the tail
+padding of the payload when the ABI lets it: a trivially copyable `T` (or `E`) with a byte or more
+of padding after its last member that is not a POD for the purpose of layout, which a default
+member initialiser or a `std::optional` member is enough to make it. The converting constructor
+sets the flag and then copies the payload in, `sizeof(T)` bytes, padding included, over it. So
+`return meta;` hands back "no value, error 0", and an error whose padding holds a non-zero byte
+comes back as a value. A Shield showed it: `std::expected<FrameMetadata, EditError>`, what
+`read_frame_metadata()` and the metadata editor return, lost its value in ten `iclforge-ac3-tests`
+cases, and, through `AnimatedValue`, in five `iclforge-containers-tests` ones (IAMF parameter
+blocks); nothing on a desktop did, where the library is LLVM 18 or later or libstdc++.
+
+| | |
+|---|---|
+| Upstream | [llvm-project#68552](https://github.com/llvm/llvm-project/issues/68552) (the flag is overwritten; fixed by #68733, merged 2023-10-30) and [#70494](https://github.com/llvm/llvm-project/issues/70494) (operations overwrite unrelated bytes; fixed by #69673, merged 2024-01-22) |
+| The NDK's own record | [android/ndk#1963](https://github.com/android/ndk/issues/1963): not cherry-picked onto r26 (it did not apply), landed in r27 |
+| r26 (clang-r487747c to e, every point release) | both bugs |
+| r27 (clang-r522817) | the flag is set after the value, which cures the lost value; the type still reuses the padding |
+| r28 (clang-r530567) | both fixed; `expected` has no tail padding of its own |
+
+The build therefore turns the attribute that causes it into a no-op, for an Android build with a
+Clang older than 19: `cmake/LibcxxExpectedLayout.cmake` adds
+`cmake/toolchains/android.libcxx17-expected-layout.h` to every C++ translation unit, which empties
+libc++'s `_LIBCPP_NO_UNIQUE_ADDRESS`, so the flag sits after the union. The root `CMakeLists.txt`
+includes the module, and so do the two Gradle wrappers (the root's `add_subdirectory()` does not
+reach a wrapper's own targets, and an inline function that returns a `std::expected` is compiled
+into every translation unit that calls it, so a call site without the option would lay the type
+out another way than the library does). The configure step asks the compiler whether the option
+took, and fails when it did not. Every other toolchain returns from the module at once.
+
+What it holds the tree to is `iclforge-base-tests`'s `[expected]` cases, which build a payload in
+storage whose padding is set to `0x00` and to `0xFF` and return it, copy it, assign it, swap it
+and emplace it. Built for arm64 and pushed to a device they fail without the option and pass with
+it; `build-android-arm64` links the binary, so CI sees the configure check and not the run.
+
+How the set of affected types was found, for the next toolchain: compile with
+`-Xclang -fdump-record-layouts`, take each `std::expected<...>` record, and look at where
+`__has_val_` falls. Inside the union's size, it is in the payload's padding. Under r26 that was 39
+of the 227 specializations the Android-reachable libraries and tests instantiate; 31 of those hold a
+vector, a string or a smart pointer, so are not trivially copyable and are copied member by member,
+and eight, in seven payload types, are the ones at risk: `io::FrameMetadata`, `ac4::FrameInfo`, `containers::iamf::AnimatedValue`,
+`sendspin::BurstChunk` and `sendspin::pairing_messages::ClientPairInit`, and three that are private
+to a translation unit (`io::Ac3Syncinfo`, `PresentationShape`, `base::detail::WavFormat`). With the
+option applied none is.
+
+Delete the module, the header and the three `include()` lines that name them when the NDK pin
+reaches r28.
+
+The same device run found two more gaps that are not `std::expected`, and that are corrected in the
+source and not by an option:
+
+- **`std::ranges::binary_search` answers true for every value between the first element and the
+  last** (r26 only; [llvm-project#61160](https://github.com/llvm/llvm-project/issues/61160), a
+  `*__first` where `*__ret` was meant, fixed in March 2023 and in r27). The AC-4 encoder asked it
+  whether a frame was a named I-frame, so every frame from the first named one to the last was an
+  I-frame (`test_frame_rates.cpp`). `ac4::Encoder` uses `std::binary_search`, which is right here.
+- **A range-for's temporaries end before its first iteration** (Clang before 19, which is
+  P2718R0's). `for (const auto& s : iamf::layout_info(layout)->substreams)` iterated a freed
+  vector, and eleven `iclforge-containers-tests` cases read the wrong channel names. The optional
+  is bound before the loop now. `for (... : ac4::scan(bytes).frames)` is the same shape in four
+  `iclforge-ac4-tests` files and has not failed there, which is luck and not safety.
+
 ## Audio backend: AAudio for monitor, JNI-bridged `AudioTrack` for passthrough
 
 The original plan for this app was "native AAudio engine … using the existing IEC 61937
