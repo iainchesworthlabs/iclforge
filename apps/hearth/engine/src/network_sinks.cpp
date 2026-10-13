@@ -1059,6 +1059,15 @@ void NetworkSinks::apply_lyrics(const std::string& group_id, const LyricsUpdate&
             if (sink == sinks_.end() || !sink->second.client.has_value() || sink->second.client_id.empty()) {
                 continue;
             }
+            // A member the programme's plan sends PCM is on player@v1, which has no lyric commands
+            // (planning/hearth-sendspin-extension.md, Lyrics). plan_group() only asks the host to
+            // move it there (use_pcm()), and the host's thread does that a moment later: until
+            // then the member is still on the extension role, which would take them, so the role it
+            // is on is not what says it is not sent any.
+            if (const auto planned = entry.planned.find(sink_id);
+                planned != entry.planned.end() && planned->second.form == "pcm") {
+                continue;
+            }
             members.push_back({.sink_id = sink_id,
                                .client_id = sink->second.client_id,
                                .facts = facts_locked(sink_id, sink->second)});
