@@ -3147,7 +3147,15 @@ jobs:
       # to it before anything is packaged: the fragments it was given, every locked key, any size
       # or placement key nobody placed, the image and the static internal RAM. The repository
       # variable ESP32_PROFILE_GUARD=warn turns a finding into an annotation.
+      # The profile guard (sink_profile.py defaults/identity/verify, and the packaging that refuses
+      # an image that is not its profile) is not a footprint check and must not be skipped by one:
+      # a step after a failed step is skipped by default, and on `main` the minimum-footprint
+      # probes above and below failed first, so no sink build was ever held to its profile and the
+      # C6's static RAM budget was wrong for hours (planning/esp32-platform-profiles.md, "Where each
+      # check runs"). Every step that runs the guard, or carries an image to the packager, is
+      # `!cancelled()`: it runs after an earlier failure and reports its own.
       - name: Build the S3 board's Sendspin player and package its image
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3174,6 +3182,7 @@ jobs:
             --out "$GITHUB_WORKSPACE/esp32-firmware"
 
       - name: Upload the S3 board's image for packaging
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: esp32-firmware-esp32s3
@@ -3187,6 +3196,7 @@ jobs:
       # step builds it, so its decode stack in PSRAM, its 64 KB data cache and its heap are
       # otherwise only what a bench board last ran.
       - name: Build the S3 with the AC-4 decoder and hold it to its profile
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
@@ -3223,6 +3233,7 @@ jobs:
       # What it does not hold: heap. QEMU has no Wi-Fi, so its internal RAM is some 130 KB larger
       # than a board's with the network up, and the board suite owns that budget.
       - name: Play the S3 board's release shape over QEMU's Ethernet
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
@@ -3714,6 +3725,7 @@ jobs:
       # (planning/esp32-ota.md, O8), packaged as build-esp32s3 packages the S3
       # board's; the step after this one builds the 16 MB table's.
       - name: Build hearth_sink's Sendspin player for the ESP32-C6 (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3745,6 +3757,7 @@ jobs:
       # the network. Built for publishing alone: the 4 MB build above already
       # holds that the C6 player compiles.
       - name: Build hearth_sink's Sendspin player for a 16 MB ESP32-C6
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3781,6 +3794,7 @@ jobs:
       # It is also the image the releases publish for a P4 of silicon revision v1.x (O8):
       # sdkconfig.p4's revision settings admit v1.x and nothing newer.
       - name: Build hearth_sink's Sendspin player for the ESP32-P4 (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3817,6 +3831,7 @@ jobs:
       # the profile p4-rev3's (firmware/hearth-sink/profiles.json) and the build is held to it, as
       # the boards' are; the screen's own keys are locked in it by hand, since no board has run them.
       - name: Build hearth_sink's Sendspin player with the panel for an ESP32-P4 of revision v3.x (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3866,6 +3881,7 @@ jobs:
       # and that the option's build leaves the step above's alone. No image is packaged from
       # it: it is a measurement build, and the release images have the decoder off.
       - name: Build hearth_sink with the AC-4 decoder for the ESP32-P4 (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
@@ -3887,6 +3903,7 @@ jobs:
             --github "${guard[@]}"
 
       - name: Upload the C6 and P4 images for packaging
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: esp32-firmware-riscv
@@ -3923,7 +3940,9 @@ jobs:
   package-esp32-firmware:
     name: Package the sink firmware
     needs: [check-runners, build-esp32s3, build-esp32c3]
-    if: inputs.run_esp
+    # `!cancelled()`, so that a footprint failure in a job it needs does not skip the check that
+    # every image is its profile (see build-esp32s3's guard steps); a missing image fails it.
+    if: ${{ !cancelled() && inputs.run_esp }}
     runs-on: ${{ fromJSON(needs.check-runners.outputs.linux_runner_6) }}
     # Newest main commit only when it lands on the GitHub-hosted fallback, as
     # build-esp32s3's leg does (its concurrency comment).
