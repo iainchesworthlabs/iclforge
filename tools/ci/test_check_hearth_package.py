@@ -272,6 +272,42 @@ class NoticesContentTest(unittest.TestCase):
             self.assertEqual(code, 0, out)
             self.assertIn("no Qt Test", out)
 
+    def test_windows_zip_must_not_carry_quick3d_leftovers(self):
+        # Measured in the Qt 6.12.0 Hearth zip before
+        # cmake/StripQtTestDeployment.cmake learned to take them out: the
+        # Quick 3D profiler's backend (deployed with the rest of
+        # plugins/qmltooling) and the utility library it imports, which holds
+        # meshoptimizer and xatlas. Each separately, so a removal that took
+        # only the plugin, leaving the library nothing imports, still fails.
+        payloads = (
+            "plugins/qmltooling/qmldbg_quick3dprofiler.dll",
+            "bin/Qt6Quick3DUtils.dll",
+        )
+        for payload in payloads:
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as directory:
+                code, out = run(windows_zip(directory, WINDOWS_NOTICES, extra=(payload,)))
+                self.assertEqual(code, 1)
+                self.assertIn("carries Quick 3D's leftovers", out)
+                self.assertIn(payload, out)
+        # The other qmltooling plugins carry no third-party code and are not
+        # this rule's business: one of them alone passes.
+        with tempfile.TemporaryDirectory() as directory:
+            code, out = run(windows_zip(directory, WINDOWS_NOTICES,
+                                        extra=("plugins/qmltooling/qmldbg_server.dll",)))
+            self.assertEqual(code, 0, out)
+
+    def test_macos_zip_must_not_carry_quick3d_leftovers(self):
+        payloads = (
+            "hearth.app/Contents/PlugIns/qmltooling/libqmldbg_quick3dprofiler.dylib",
+            "hearth.app/Contents/Frameworks/QtQuick3DUtils.framework/QtQuick3DUtils",
+        )
+        for payload in payloads:
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as directory:
+                code, out = run(macos_zip(directory, MACOS_NOTICES, extra=(payload,)))
+                self.assertEqual(code, 1)
+                self.assertIn("carries Quick 3D's leftovers", out)
+                self.assertIn(payload, out)
+
     def test_dispatch_is_by_bundle_content_not_filename(self):
         # Windows and macOS packages are both iclforge-hearth-<version>-
         # <system>.zip (cmake/Packaging.cmake) - main() tells them apart by
