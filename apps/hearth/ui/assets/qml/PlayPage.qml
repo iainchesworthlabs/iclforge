@@ -365,7 +365,13 @@ Item {
                 }
 
                 Text {
+                    objectName: "queueEmptyHint"
                     anchors.centerIn: parent
+                    // As wide as the list and no wider, so the second line
+                    // wraps inside the queue column: left to its own width it
+                    // is one line longer than the column, and the list clips
+                    // both of its ends.
+                    width: queueList.width
                     visible: queueList.count === 0
                     // Names what item_loader.cpp reads: AC-3, E-AC-3 and
                     // AC-4, raw or in an MP4, Matroska or MPEG-TS file, and
@@ -374,6 +380,7 @@ Item {
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontBody
                     horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
                 }
             }
 

@@ -28,9 +28,73 @@ TestCase {
     height: 620
 
     Component { id: playPageComponent; PlayPage { width: 960; height: 620 } }
+    // The page as Main.qml holds it in a language written right to left:
+    // under a mirrored root whose children inherit it.
+    Component {
+        id: mirroredPlayPageComponent
+        Item {
+            width: 960
+            height: 620
+            LayoutMirroring.enabled: true
+            LayoutMirroring.childrenInherit: true
+            PlayPage { anchors.fill: parent }
+        }
+    }
 
     function init() {
         HearthController.start();
+    }
+
+    // Theme is one singleton for the whole process: a case that changed the
+    // text size puts it back, whether or not it passed.
+    function cleanup() {
+        Theme.fontScale = 1.0;
+    }
+
+    function test_emptyQueueHintWrapsInsideTheQueueColumn_data() {
+        return [
+            { tag: "100%", scale: 1.0, mirrored: false },
+            { tag: "175%", scale: 1.75, mirrored: false },
+            { tag: "100%, right to left", scale: 1.0, mirrored: true },
+            { tag: "175%, right to left", scale: 1.75, mirrored: true }
+        ];
+    }
+
+    // The hint an empty queue shows names every kind of file the queue takes,
+    // which makes its second line longer than the queue column is wide. It
+    // wraps inside the list; it used to keep its own width, centred on the
+    // list, with both ends cut off.
+    function test_emptyQueueHintWrapsInsideTheQueueColumn(data) {
+        // Whatever an earlier case left (alphabetical order, see this file's
+        // header) goes first: the hint is only there for an empty queue.
+        removeAllWithPaths(HearthController.queue.map(function(item) { return item.path; }));
+        tryVerify(function() { return HearthController.queue.length === 0; }, 15000,
+                  "the queue never emptied");
+
+        Theme.fontScale = data.scale;
+        const holder = createTemporaryObject(data.mirrored ? mirroredPlayPageComponent : playPageComponent,
+                                             testCase.parent);
+        verify(holder !== null);
+        waitForRendering(holder);
+        const queueList = findChild(holder, "queueList");
+        verify(queueList !== null, "PlayPage carries no queueList child");
+        const hint = findChild(holder, "queueEmptyHint");
+        verify(hint !== null, "PlayPage carries no queueEmptyHint child");
+        tryVerify(function() { return queueList.count === 0 && hint.visible; }, 15000,
+                  "an empty queue does not show its hint");
+        tryVerify(function() { return queueList.width > 0 && hint.width > 0; }, 5000);
+
+        const origin = hint.mapToItem(queueList, 0, 0);
+        verify(origin.x >= 0 && origin.x + hint.width <= queueList.width,
+               "the hint spans " + origin.x + " to " + (origin.x + hint.width) + " of a list "
+               + queueList.width + " wide");
+        verify(hint.contentWidth <= queueList.width,
+               "the hint's text is " + hint.contentWidth + " wide in a list " + queueList.width + " wide");
+        verify(origin.y >= 0 && origin.y + hint.height <= queueList.height,
+               "the hint spans " + origin.y + " to " + (origin.y + hint.height) + " of a list "
+               + queueList.height + " high");
+        // "Nothing in the queue." and then a sentence too long for one line.
+        verify(hint.lineCount > 2, "the hint's second line did not wrap: " + hint.lineCount + " lines");
     }
 
     // Removes every queue row whose path is in `paths`, by PATH rather than

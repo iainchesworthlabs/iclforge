@@ -4398,6 +4398,19 @@ The sections below contain the complete change list and fixes.
   The encoding is unchanged, held by the owner's decision; a part that should fall silent after its
   end has to be given as long as the backing.
 
+**Hearth: the empty queue's hint and the first-run dialog**
+
+- **The Play page's hint for an empty queue was cut off at both ends.** Its second line, "Drop AC-3,
+  E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here.", is longer than the queue
+  column is wide, and the text kept its own width, centred on the list, which clips it: "E-AC-3 or
+  AC-4 files (raw, MP4, Matroska or MPEG-T" was what showed in a window of the default size. The
+  hint is now as wide as the list and wraps inside it, at every text size and with the window
+  mirrored for a language written right to left.
+- **The first-run dialog said the output name is "at the top right"; it is beside the title, before
+  the page buttons**, which is the left of the window, and the right of it only in Arabic, Hebrew
+  and Yiddish, where the window is mirrored. The dialog now says "at the top of the window", which
+  holds in both. The six catalogues carry the new sentence; none had a translation of the old one.
+
 **Footprint probes: the E-AC-3 fold fixtures expect the -3 dB levels**
 
 - **`kEac3FoldRms`, `kEac3714FoldRms` and the fixed-tier pins `eac3_fold` and `eac3_714_fold` are
