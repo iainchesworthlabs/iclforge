@@ -17,6 +17,10 @@ deleted.
 tick, and the silent device's name. The engine stops and starts again, which is a gap in the
 sound, and the status strip says where it ended up.
 
+![The Settings page: the silent device block with its warnings, the signing key, latency, codec, appearance and behaviour](screenshots/crucible-settings.png)
+
+*The page with no silent device installed and the signing key taken from the environment.*
+
 ## 01 Silent device — where applications play
 
 This is the block that makes the rest of the window mean anything, and it is the one that differs

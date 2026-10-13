@@ -29,6 +29,10 @@ into two objects. Output follows the selected audio device.
    renderer, where there is one and a signing key is loaded. Plugging or unplugging switches
    modes without a restart.
 
+![Crucible's Room page with two applications placed: the application list on the left, the plan and elevation in the centre, and the signal path on the right](screenshots/crucible-room.png)
+
+*Hearth and Microsoft Edge playing, each placed in a slot. This computer has no silent device installed, so the signal path says so.*
+
 Anything you have not placed, and whichever application is full-screen in front, is mixed into
 the 5.1 bed.
 
