@@ -24,6 +24,16 @@ target_link_libraries(iclforge_sink PUBLIC iclforge::sendspin iclforge::lyrics)
 # archive.
 target_link_libraries(iclforge_sink PRIVATE iclforge::warnings iclforge::coverage)
 
+# The decoding output (include/iclforge/sink/decoding_output.hpp): a burst output that decodes AC-3,
+# E-AC-3 and AC-4 and renders to a speaker layout, and hands the samples to a PcmSink. A target of
+# its own for the reason the pass-through output is: a program that only hands bytes on does not
+# link three codecs and a renderer.
+add_library(iclforge_sink_decode STATIC src/decoding_output.cpp)
+add_library(iclforge::sink_decode ALIAS iclforge_sink_decode)
+target_link_libraries(iclforge_sink_decode PUBLIC iclforge::sink iclforge::ac3 iclforge::ac4
+                                                  iclforge::containers iclforge::objects iclforge::render)
+target_link_libraries(iclforge_sink_decode PRIVATE iclforge::warnings iclforge::coverage)
+
 # The pass-through output (include/iclforge/sink/passthrough.hpp): a burst output that rebuilds each
 # Sendspin burst chunk into the IEC 61937 burst it came from and keeps a link alive with null
 # bursts. A target of its own, so that a program that decodes its streams (hearth-testsink) or

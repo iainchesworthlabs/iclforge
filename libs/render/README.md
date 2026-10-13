@@ -7,7 +7,7 @@ From what a decoder produced to what the speakers want: layouts and their text f
 A library.
 
 - **Uses:** `base`, `objects`
-- **Used by:** `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink`
+- **Used by:** `ac3`, `ac4`, `app-media`, `audio`, `baremetal`, `esp-idf`, `examples`, `forge`, `hearth`, `hearth-sink`, `sink`
 - **CI lanes:** core
 - **CMake target:** `iclforge::render`
 
