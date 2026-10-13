@@ -217,6 +217,7 @@ ScrollView {
                         }
                         AppButton {
                             objectName: "settingsLyricDelayReset"
+                            //: Button: set the lyric delay back to zero.
                             text: qsTr("Reset")
                             enabled: KaraokeController.delayMs !== 0
                             onClicked: KaraokeController.delayMs = 0
@@ -401,6 +402,7 @@ ScrollView {
                                             AppButton {
                                                 objectName: "pairingForget-" + pairingRow.index
                                                 Layout.preferredWidth: Math.round(64 * Theme.fontScale)
+                                                //: Button: forget this pairing record. The sink or player must pair again.
                                                 text: qsTr("Forget")
                                                 Accessible.description: qsTr("Forgets this pairing; it has to pair again with a new code.")
                                                 onClicked: HearthController.forgetPairing(pairingRow.modelData.id)
@@ -455,6 +457,7 @@ ScrollView {
                             accessibleName: qsTr("Theme")
                             currentValue: HearthController.theme
                             model: [
+                                //: Option: follow the desktop's own setting.
                                 { value: "system", label: qsTr("System") },
                                 { value: "light", label: qsTr("Light") },
                                 { value: "dark", label: qsTr("Dark") }

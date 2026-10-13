@@ -71,6 +71,7 @@
     <message>
         <location filename="../qml/DecoderAc4.qml" line="50"/>
         <source>main</source>
+        <extracomment>Audio service type of a presentation: the main audio. Not the main window.</extracomment>
         <translation>הויפּט</translation>
     </message>
     <message>
@@ -217,6 +218,7 @@
     <message>
         <location filename="../qml/DecoderAc4.qml" line="247"/>
         <source>Enhancement</source>
+        <extracomment>Dialogue enhancement, the stream&apos;s data for raising the dialogue. A noun.</extracomment>
         <translation>פֿאַרבעסערונג</translation>
     </message>
     <message>
@@ -371,6 +373,7 @@
     <message>
         <location filename="../qml/DecoderAc4.qml" line="537"/>
         <source>Mute</source>
+        <extracomment>Option for a frame that will not decode: play silence in its place. Not a volume mute switch.</extracomment>
         <translation>שטום</translation>
     </message>
     <message>
@@ -467,6 +470,7 @@
         <location filename="../qml/DecoderAc4.qml" line="369"/>
         <location filename="../qml/DecoderAc4.qml" line="379"/>
         <source>Device</source>
+        <extracomment>The kind of playback device a compression curve is for: home theatre, flat panel TV, portable speakers or portable headphones. Not an audio device.</extracomment>
         <translation>מכשיר־סאָרט</translation>
     </message>
     <message>
@@ -535,6 +539,7 @@
         <location filename="../qml/DecoderEac3.qml" line="41"/>
         <location filename="../qml/DecoderEac3.qml" line="104"/>
         <source>Line</source>
+        <extracomment>Dolby&apos;s line mode, beside RF and Custom. Keep it as it is unless the language has an established term for it.</extracomment>
         <translation>Line</translation>
     </message>
     <message>
@@ -575,6 +580,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="128"/>
         <source>Cut</source>
+        <extracomment>Dynamic range scaling in percent: how far the loud parts are cut. A noun, not a verb.</extracomment>
         <translation>אַראָפּלאָזן</translation>
     </message>
     <message>
@@ -586,6 +592,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="164"/>
         <source>Boost</source>
+        <extracomment>Dynamic range scaling in percent: how far the quiet parts are boosted. A noun, not a verb.</extracomment>
         <translation>הייבן</translation>
     </message>
     <message>
@@ -798,12 +805,14 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="489"/>
         <source>Both</source>
+        <extracomment>Dual mono: play both of the stream&apos;s two programmes, one to each side.</extracomment>
         <translation>ביידע</translation>
     </message>
     <message>
         <location filename="../qml/DecoderEac3.qml" line="504"/>
         <location filename="../qml/DecoderEac3.qml" line="507"/>
         <source>Reconstruct</source>
+        <extracomment>Setting: whether the decoder reconstructs the objects of a JOC stream from its bed. A verb used as a label; the choices are Auto, Always and Never.</extracomment>
         <translation>איבערבויען</translation>
     </message>
     <message>
@@ -830,6 +839,7 @@
         <location filename="../qml/DecoderEac3.qml" line="527"/>
         <location filename="../qml/DecoderEac3.qml" line="530"/>
         <source>Domain</source>
+        <extracomment>The signal domain the objects are reconstructed in: QMF or MDCT band.</extracomment>
         <translation>דאָמען</translation>
     </message>
     <message>
@@ -871,6 +881,7 @@
     <message>
         <location filename="../qml/DecoderEac3.qml" line="565"/>
         <source>Mute</source>
+        <extracomment>Option for a frame that will not decode: play silence in its place. Not a volume mute switch.</extracomment>
         <translation>שטום</translation>
     </message>
     <message>
@@ -1843,16 +1854,19 @@
     <message>
         <location filename="../qml/Main.qml" line="268"/>
         <source>Page</source>
+        <extracomment>Accessible name of the control that switches between the pages.</extracomment>
         <translation>בלאַט</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="271"/>
         <source>Play</source>
+        <extracomment>Name of the page that plays the queue. Not the verb: the Play button is in the transport bar.</extracomment>
         <translation>שפּילן</translation>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="272"/>
         <source>Media</source>
+        <extracomment>Name of the page that shows what a media file contains: its streams, presentations and metadata.</extracomment>
         <translation>מעדיע</translation>
     </message>
     <message>
@@ -2131,6 +2145,7 @@
         <location filename="../qml/Media.qml" line="226"/>
         <location filename="../qml/Media.qml" line="239"/>
         <source>Showing</source>
+        <extracomment>Label before a drop-down that chooses what the page shows: which stream or track of the file.</extracomment>
         <translation>ווײַזט</translation>
     </message>
     <message>
@@ -2168,6 +2183,7 @@
     <message>
         <location filename="../qml/Media.qml" line="324"/>
         <source>Track</source>
+        <extracomment>A track of an MP4 file.</extracomment>
         <translation>שפּור</translation>
     </message>
     <message>
@@ -2183,6 +2199,7 @@
     <message>
         <location filename="../qml/Media.qml" line="335"/>
         <source>Edit list</source>
+        <extracomment>The elst box of an MP4 track: a list of edits that trim or shift it. Not a playlist.</extracomment>
         <translation>רעדאַקטירן־רשימה</translation>
     </message>
     <message>
@@ -2279,6 +2296,7 @@
     <message>
         <location filename="../qml/Media.qml" line="478"/>
         <source>Service</source>
+        <extracomment>The audio service type of an AC-3 or E-AC-3 stream (bsmod), such as main or music and effects.</extracomment>
         <translation>סערוויס</translation>
     </message>
     <message>
@@ -2494,6 +2512,7 @@
     <message>
         <location filename="../qml/Media.qml" line="600"/>
         <source>Splices</source>
+        <extracomment>Splice points of an AC-4 stream: where two streams were joined.</extracomment>
         <translation>צוזאַמענקלעפּונגען</translation>
     </message>
     <message>
@@ -2749,6 +2768,7 @@
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="214"/>
         <source>Record a take</source>
+        <extracomment>A take is one recording of the singer&apos;s voice.</extracomment>
         <translation>אויפֿנעמען אַן אויפֿנאַמע</translation>
     </message>
     <message>
@@ -2759,6 +2779,7 @@
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="253"/>
         <source>Takes go to</source>
+        <extracomment>A take is one recording of the singer&apos;s voice. The folder that takes are saved in follows.</extracomment>
         <translation>אויפֿנאַמעס גייען אין</translation>
     </message>
     <message>
@@ -2804,6 +2825,7 @@
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="348"/>
         <source>Keep</source>
+        <extracomment>Button shown beside &quot;Delete for good&quot; once Delete is pressed: do not delete this take (a recording of the singer&apos;s voice), keep it.</extracomment>
         <translation>האַלטן</translation>
     </message>
     <message>
@@ -2909,6 +2931,7 @@
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="544"/>
         <source>Score against my key</source>
+        <extracomment>The key is the song&apos;s musical key (its tonality), not a cryptographic key.</extracomment>
         <translation>אָפּשאַצן לויט מײַן טאָנאַרט</translation>
     </message>
     <message>
@@ -2919,6 +2942,7 @@
     <message>
         <location filename="../qml/MicrophoneCard.qml" line="557"/>
         <source>Waiting for a few sung notes to find your key.</source>
+        <extracomment>The key is the singer&apos;s musical key (tonality), not a cryptographic key.</extracomment>
         <translation>וואַרט אויף עטלעכע געזונגענע טענער כּדי צו געפֿינען אײַער טאָנאַרט.</translation>
     </message>
     <message>
@@ -2930,6 +2954,7 @@
         <location filename="../qml/MicrophoneCard.qml" line="560"/>
         <location filename="../qml/MicrophoneCard.qml" line="618"/>
         <source>sharp of</source>
+        <extracomment>&apos;sharp of&apos; and &apos;flat of&apos; fill %2 of &quot;you are about %1 cents %2 the tune&apos;s&quot;: higher than, lower than. Fragments, not sentences.</extracomment>
         <translation>העכער ווי</translation>
     </message>
     <message>
@@ -3015,6 +3040,7 @@
     <message>
         <location filename="../qml/Network.qml" line="121"/>
         <source>Take it back</source>
+        <extracomment>Button: make this sink play from Hearth again instead of from the other server that holds it now. &apos;It&apos; is the sink.</extracomment>
         <translation>צוריקנעמען</translation>
     </message>
     <message>
@@ -3129,11 +3155,13 @@
     <message>
         <location filename="../qml/NetworkGroupEdit.qml" line="107"/>
         <source>MEMBER</source>
+        <extracomment>Column heading: a sink or player that belongs to the group.</extracomment>
         <translation>מיטגליד</translation>
     </message>
     <message>
         <location filename="../qml/NetworkGroupEdit.qml" line="108"/>
         <source>GETS</source>
+        <extracomment>Column heading: the form of the stream the group sends this member, for example E-AC-3 or PCM.</extracomment>
         <translation>באַקומט</translation>
     </message>
     <message>
@@ -3224,6 +3252,7 @@
     <message>
         <location filename="../qml/NetworkGroupEdit.qml" line="330"/>
         <source>Lead time</source>
+        <extracomment>How far ahead of playback the group sends audio to its members.</extracomment>
         <translation>פֿאָרויס־צײַט</translation>
     </message>
     <message>
@@ -3235,6 +3264,7 @@
     <message>
         <location filename="../qml/NetworkGroupEdit.qml" line="338"/>
         <source>Late chunks</source>
+        <extracomment>The count of audio chunks that reached a member after they were due.</extracomment>
         <translation>פֿאַרשפּעטיקטע שטיקער</translation>
     </message>
 </context>
@@ -3485,16 +3515,19 @@
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="33"/>
         <source>Running</source>
+        <extracomment>Row: the firmware image the sink is running now.</extracomment>
         <translation>לויפֿט</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="34"/>
         <source>Other slot</source>
+        <extracomment>Row: the sink&apos;s other firmware slot (an OTA partition), which holds the image from before or the next one. Not an audio slot.</extracomment>
         <translation>אַנדערער שטעל</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="35"/>
         <source>This app</source>
+        <extracomment>Row: the build of the firmware app that is running.</extracomment>
         <translation>די דאָזיקע אַפּליקאַציע</translation>
     </message>
     <message>
@@ -3505,6 +3538,7 @@
     <message>
         <location filename="../qml/NetworkSinkFirmware.qml" line="37"/>
         <source>Trial</source>
+        <extracomment>Row: a newly installed image is on trial, and the sink keeps it only once it has held healthy.</extracomment>
         <translation>פּרוּוו</translation>
     </message>
     <message>
@@ -3512,6 +3546,7 @@
         <location filename="../qml/NetworkSinkFirmware.qml" line="107"/>
         <location filename="../qml/NetworkSinkFirmware.qml" line="323"/>
         <source>Update</source>
+        <extracomment>Row: the progress of the update being sent to the sink. Also a button label elsewhere in this file.</extracomment>
         <translation>דערהײַנטיקונג</translation>
     </message>
     <message>
@@ -3543,6 +3578,7 @@
         <location filename="../qml/NetworkSinkFirmware.qml" line="174"/>
         <location filename="../qml/NetworkSinkFirmware.qml" line="324"/>
         <source>Roll back</source>
+        <extracomment>Button: return the sink to the firmware image it ran before.</extracomment>
         <translation>צוריקדרייען</translation>
     </message>
     <message>
@@ -3657,6 +3693,7 @@
     <message>
         <location filename="../qml/NetworkSinkInfo.qml" line="24"/>
         <source>Kind</source>
+        <extracomment>Row: what kind of sink this is, a Hearth sink or a standard Sendspin player.</extracomment>
         <translation>סאָרט</translation>
     </message>
     <message>
@@ -3667,11 +3704,13 @@
     <message>
         <location filename="../qml/NetworkSinkInfo.qml" line="26"/>
         <source>Roles</source>
+        <extracomment>Row: the Sendspin roles the sink announces, such as player and metadata.</extracomment>
         <translation>ראָלעס</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkInfo.qml" line="27"/>
         <source>Takes</source>
+        <extracomment>Row: the stream forms the sink takes, that is accepts, for example E-AC-3 or PCM. A verb, not a noun.</extracomment>
         <translation>נעמט אָן</translation>
     </message>
     <message>
@@ -3758,6 +3797,7 @@
     <message>
         <location filename="../qml/NetworkSinkOnlyOnSink.qml" line="21"/>
         <source>Slot width</source>
+        <extracomment>Row: the width in bits of one slot of the sink&apos;s I2S frame. Not a firmware slot.</extracomment>
         <translation>שטעל־ברייט</translation>
     </message>
     <message>
@@ -4022,21 +4062,25 @@
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="456"/>
         <source>SPK</source>
+        <extracomment>Narrow column heading: short for SPEAKER.</extracomment>
         <translation>הילכ&apos;</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="457"/>
         <source>OUT</source>
+        <extracomment>Narrow column heading: short for OUTPUT, the sink&apos;s audio slot the speaker goes to.</extracomment>
         <translation>אַרויס</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="458"/>
         <source>SIZE</source>
+        <extracomment>Column heading: a speaker&apos;s size for bass management, Large or Small.</extracomment>
         <translation>גרייס</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="462"/>
         <source>TRIM</source>
+        <extracomment>Column heading: a level adjustment for the speaker, in dB.</extracomment>
         <translation>טרים</translation>
     </message>
     <message>
@@ -4047,6 +4091,7 @@
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="472"/>
         <source>IDENTIFY</source>
+        <extracomment>Column heading of the buttons that play pink noise on one speaker, to hear which it is.</extracomment>
         <translation>אידענטיפֿיצירן</translation>
     </message>
     <message>
@@ -4057,11 +4102,13 @@
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="528"/>
         <source>Large</source>
+        <extracomment>A speaker&apos;s size: a large speaker plays the full range.</extracomment>
         <translation>גרויס</translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="529"/>
         <source>Small</source>
+        <extracomment>A speaker&apos;s size: a small speaker&apos;s bass goes to the LFE output instead.</extracomment>
         <translation>קליין</translation>
     </message>
     <message>
@@ -4102,6 +4149,7 @@
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="650"/>
         <source>Identify</source>
+        <extracomment>Button: play pink noise on this speaker&apos;s output, to hear which speaker it is.</extracomment>
         <translation>אידענטיפֿיצירן</translation>
     </message>
 </context>
@@ -4300,21 +4348,25 @@
     <message>
         <location filename="../qml/PlayObjectsCard.qml" line="89"/>
         <source>object</source>
+        <extracomment>Legend of the object plot: the marker of an object at ear level. A noun.</extracomment>
         <translation>אָביעקט</translation>
     </message>
     <message>
         <location filename="../qml/PlayObjectsCard.qml" line="97"/>
         <source>raised</source>
+        <extracomment>Legend of the object plot: a hollow marker is an object that is raised, above ear level.</extracomment>
         <translation>אויפֿגעהויבן</translation>
     </message>
     <message>
         <location filename="../qml/PlayObjectsCard.qml" line="105"/>
         <source>speaker</source>
+        <extracomment>Legend of the object plot: the marker of a speaker at ear level.</extracomment>
         <translation>הילכער</translation>
     </message>
     <message>
         <location filename="../qml/PlayObjectsCard.qml" line="113"/>
         <source>height</source>
+        <extracomment>Legend of the object plot: a hollow marker is a height speaker, one above ear level.</extracomment>
         <translation>הייך</translation>
     </message>
 </context>
@@ -4470,11 +4522,13 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlayPage.qml" line="588"/>
         <source>CLIP</source>
+        <extracomment>Clip indicator of a level meter: lit when the signal reached full scale.</extracomment>
         <translation>אָפּשניט</translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="609"/>
         <source>unrouted</source>
+        <extracomment>A speaker that goes to no output.</extracomment>
         <translation>נישט געראָוטעט</translation>
     </message>
     <message>
@@ -4527,6 +4581,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlayPage.qml" line="664"/>
         <source>RANGE</source>
+        <extracomment>Loudness range (LRA), one of the loudness figures beside MOMENTARY and SHORT-TERM.</extracomment>
         <translation>באַרייך</translation>
     </message>
     <message>
@@ -4679,6 +4734,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/PlaySignalPathCard.qml" line="66"/>
         <source>stream</source>
+        <extracomment>Shown when the kind of the stream is not known, as in &apos;stream · RF mode&apos;. The stream itself.</extracomment>
         <translation>סטרים</translation>
     </message>
     <message>
@@ -4969,6 +5025,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="220"/>
         <source>Reset</source>
+        <extracomment>Button: set the lyric delay back to zero.</extracomment>
         <translation>צוריקשטעלן</translation>
     </message>
     <message>
@@ -5030,6 +5087,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Settings.qml" line="404"/>
         <source>Forget</source>
+        <extracomment>Button: forget this pairing record. The sink or player must pair again.</extracomment>
         <translation>פֿאַרגעסן</translation>
     </message>
     <message>
@@ -5059,6 +5117,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../qml/Settings.qml" line="509"/>
         <location filename="../qml/Settings.qml" line="550"/>
         <source>System</source>
+        <extracomment>Option: follow the desktop&apos;s own setting.</extracomment>
         <translation>סיסטעם</translation>
     </message>
     <message>
@@ -5399,6 +5458,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Speakers.qml" line="287"/>
         <source>Heights</source>
+        <extracomment>Section: the height speakers, those above ear level.</extracomment>
         <translation>הייכן</translation>
     </message>
     <message>
@@ -5444,6 +5504,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Speakers.qml" line="493"/>
         <source>front</source>
+        <extracomment>Direction label on the speaker plan: the front of the room.</extracomment>
         <translation>פֿאָרנט</translation>
     </message>
     <message>
@@ -5484,6 +5545,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Speakers.qml" line="769"/>
         <source>Clear</source>
+        <extracomment>Button: remove every speaker-to-output assignment.</extracomment>
         <translation>אויסמעקן</translation>
     </message>
     <message>
@@ -5499,11 +5561,13 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Speakers.qml" line="813"/>
         <source>SIZE</source>
+        <extracomment>Column heading: a speaker&apos;s size for bass management, Large or Small.</extracomment>
         <translation>גרייס</translation>
     </message>
     <message>
         <location filename="../qml/Speakers.qml" line="818"/>
         <source>TRIM</source>
+        <extracomment>Column heading: a level adjustment for the speaker, in dB.</extracomment>
         <translation>טרים</translation>
     </message>
     <message>
@@ -5514,6 +5578,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Speakers.qml" line="829"/>
         <source>IDENTIFY</source>
+        <extracomment>Column heading of the buttons that play pink noise on one speaker, to hear which it is.</extracomment>
         <translation>אידענטיפֿיצירן</translation>
     </message>
     <message>
@@ -5524,11 +5589,13 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     <message>
         <location filename="../qml/Speakers.qml" line="884"/>
         <source>Large</source>
+        <extracomment>A speaker&apos;s size: a large speaker plays the full range.</extracomment>
         <translation>גרויס</translation>
     </message>
     <message>
         <location filename="../qml/Speakers.qml" line="885"/>
         <source>Small</source>
+        <extracomment>A speaker&apos;s size: a small speaker&apos;s bass goes to the LFE output instead.</extracomment>
         <translation>קליין</translation>
     </message>
     <message>
@@ -5575,6 +5642,7 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../qml/Speakers.qml" line="1009"/>
         <location filename="../qml/Speakers.qml" line="1092"/>
         <source>Identify</source>
+        <extracomment>Button: play pink noise on this speaker&apos;s output, to hear which speaker it is.</extracomment>
         <translation>אידענטיפֿיצירן</translation>
     </message>
     <message>

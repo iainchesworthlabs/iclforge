@@ -101,6 +101,7 @@ ScrollView {
                             accessibleName: qsTr("Mode")
                             currentValue: root.settings.mode ?? "line"
                             model: [
+                                //: Dolby's line mode, beside RF and Custom. Keep it as it is unless the language has an established term for it.
                                 { value: "line", label: qsTr("Line") },
                                 { value: "rf", label: qsTr("RF") },
                                 { value: "custom", label: qsTr("Custom") }
@@ -125,6 +126,7 @@ ScrollView {
                         // design dims a disabled slider but keeps its label
                         // at full strength (measured on decoder-ac3-eac3.png
                         // with mode = Line).
+                        //: Dynamic range scaling in percent: how far the loud parts are cut. A noun, not a verb.
                         Text { text: qsTr("Cut"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         AppSlider {
@@ -161,6 +163,7 @@ ScrollView {
                         // design dims a disabled slider but keeps its label
                         // at full strength (measured on decoder-ac3-eac3.png
                         // with mode = Line).
+                        //: Dynamic range scaling in percent: how far the quiet parts are boosted. A noun, not a verb.
                         Text { text: qsTr("Boost"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         AppSlider {
@@ -486,6 +489,7 @@ ScrollView {
                             model: [
                                 { value: "first", label: qsTr("Channel 1") },
                                 { value: "second", label: qsTr("Channel 2") },
+                                //: Dual mono: play both of the stream's two programmes, one to each side.
                                 { value: "both", label: qsTr("Both") }
                             ]
                             onSelected: function(value) { root.set("dualMono", value); }
@@ -501,6 +505,7 @@ ScrollView {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.gap
+                        //: Setting: whether the decoder reconstructs the objects of a JOC stream from its bed. A verb used as a label; the choices are Auto, Always and Never.
                         Text { text: qsTr("Reconstruct"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         SegmentedControl {
@@ -524,6 +529,7 @@ ScrollView {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.gap
+                        //: The signal domain the objects are reconstructed in: QMF or MDCT band.
                         Text { text: qsTr("Domain"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         SegmentedControl {
@@ -562,6 +568,7 @@ ScrollView {
                             model: [
                                 { value: "stop", label: qsTr("Stop") },
                                 { value: "repeatFade", label: qsTr("Repeat and fade") },
+                                //: Option for a frame that will not decode: play silence in its place. Not a volume mute switch.
                                 { value: "mute", label: qsTr("Mute") }
                             ]
                             onSelected: function(value) { root.set("concealment", value); }

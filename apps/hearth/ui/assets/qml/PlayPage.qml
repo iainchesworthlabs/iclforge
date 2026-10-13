@@ -585,6 +585,7 @@ Item {
 
                                     Text {
                                         anchors.centerIn: parent
+                                        //: Clip indicator of a level meter: lit when the signal reached full scale.
                                         text: qsTr("CLIP")
                                         font.pixelSize: Theme.fontMicro
                                         font.bold: true
@@ -606,6 +607,7 @@ Item {
                                     // own comment).
                                     text: {
                                         if (levelRow.routedTo < 0) {
+                                            //: A speaker that goes to no output.
                                             return qsTr("unrouted");
                                         }
                                         const name = HearthController.outputNames[levelRow.routedTo] ?? "";
@@ -661,6 +663,7 @@ Item {
                                 { key: "momentary", label: qsTr("MOMENTARY"), unit: qsTr("LUFS") },
                                 { key: "shortTerm", label: qsTr("SHORT-TERM"), unit: qsTr("LUFS") },
                                 { key: "integrated", label: qsTr("INTEGRATED"), unit: qsTr("LUFS") },
+                                //: Loudness range (LRA), one of the loudness figures beside MOMENTARY and SHORT-TERM.
                                 { key: "range", label: qsTr("RANGE"), unit: qsTr("LU") },
                                 { key: "truePeak", label: qsTr("TRUE PEAK"), unit: qsTr("dBTP") }
                             ]
