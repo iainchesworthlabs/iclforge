@@ -6,7 +6,10 @@ import ForgeGui
 // The family's flat bordered button, as the design system draws it
 // (docs/hearth/design/screenshots/components.png, "BUTTONS · REST, PRIMARY,
 // DISABLED, KEYBOARD FOCUS"): 30 px tall, a 1 px divider border, accent fill
-// when primary, dimmed when disabled, focus ring outside the border.
+// when primary, dimmed when disabled, focus ring outside the border. The
+// primary fill is Theme.accentFill, not the brand accent: it is the colour
+// that carries the label at 4.5:1 (Theme.qml says how each palette gets
+// there).
 //
 // A plain Rectangle rather than a QQC2 Button: Basic's own Button draws a
 // flat FILLED background from palette.button with no border at all, which is
@@ -27,7 +30,7 @@ Rectangle {
     // label clipped inside a fixed box.
     implicitHeight: Math.max(30, row.implicitHeight + 12)
     implicitWidth: row.implicitWidth + 24
-    color: primary ? Theme.accent : "transparent"
+    color: primary ? Theme.accentFill : "transparent"
     border.color: Theme.divider
     border.width: 1
     opacity: enabled ? 1.0 : 0.45
@@ -72,12 +75,13 @@ Rectangle {
         }
         Text {
             id: label
+            objectName: "appButtonLabel"
             Layout.fillWidth: true
             horizontalAlignment: root.glyph.length > 0 ? Text.AlignLeft : Text.AlignHCenter
             elide: Text.ElideRight
             text: root.text
-            // On an accent fill, whichever end of the palette reads better on
-            // it (Theme.accentText); plain text otherwise.
+            // On the accent fill, the label colour that goes with it
+            // (Theme.accentText); plain text otherwise.
             color: root.primary ? Theme.accentText : Theme.text
             font.pixelSize: Theme.fontBody
         }

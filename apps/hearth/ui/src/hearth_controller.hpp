@@ -320,6 +320,11 @@ class HearthController : public QObject {
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY settingsChanged)
     Q_PROPERTY(QString palette READ palette WRITE setPalette NOTIFY settingsChanged)
     Q_PROPERTY(QString textScale READ textScale WRITE setTextScale NOTIFY settingsChanged)
+    // "system" (the default), "reduced" or "full": whether the window cuts
+    // back its animation. System follows the operating system's own request;
+    // the other two are the person's answer and win over it. Stored under
+    // appearance/motion; Main.qml hands it to Theme.motionChoice.
+    Q_PROPERTY(QString motion READ motion WRITE setMotion NOTIFY settingsChanged)
 
     // The outcome of the last diagnostics export (the Settings page's "Save
     // diagnostics").
@@ -546,6 +551,8 @@ public:
     void setPalette(const QString& palette);
     [[nodiscard]] QString textScale() const;
     void setTextScale(const QString& scale);
+    [[nodiscard]] QString motion() const;
+    void setMotion(const QString& motion);
 
     // The diagnostics file: the report as text, composed from named facts
     // and never from a pairing key, a pairing code or a queued item's path

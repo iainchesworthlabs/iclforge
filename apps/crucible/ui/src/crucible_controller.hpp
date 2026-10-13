@@ -100,6 +100,12 @@ class CrucibleController : public QObject {
     // turns the choice into Theme.fontScale, and every size in the window is
     // a multiple of that (docs/crucible/accessibility.md).
     Q_PROPERTY(QString textScale READ textScale WRITE setTextScale NOTIFY settingsChanged)
+    // How much the window moves: "system" (the default) follows the operating
+    // system's own request to cut back animation, "reduced" and "full" are
+    // the person's answer and win over it. Stored under appearance/motion;
+    // Main.qml hands it to Theme.motionChoice, which every animation's
+    // duration goes through (docs/crucible/accessibility.md).
+    Q_PROPERTY(QString motion READ motion WRITE setMotion NOTIFY settingsChanged)
     Q_PROPERTY(bool keepRunningWhenClosed READ keepRunningWhenClosed WRITE setKeepRunningWhenClosed NOTIFY settingsChanged)
     // Background processes with audio sessions (no visible window, not a
     // packaged app) are hidden from the rail unless this is on.
@@ -249,6 +255,8 @@ public:
     void setRoomView(const QString& view);
     [[nodiscard]] QString textScale() const;
     void setTextScale(const QString& scale);
+    [[nodiscard]] QString motion() const;
+    void setMotion(const QString& motion);
     [[nodiscard]] bool keepRunningWhenClosed() const;
     void setKeepRunningWhenClosed(bool on);
     [[nodiscard]] bool moveDefaultOnLaunch() const;

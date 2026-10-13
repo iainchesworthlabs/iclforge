@@ -33,6 +33,7 @@ TestCase {
         CrucibleController.theme = "system";
         CrucibleController.palette = "signal";
         CrucibleController.textScale = "100";
+        CrucibleController.motion = "system";
         CrucibleController.roomLayout = "auto";
         CrucibleController.moveDefaultOnLaunch = false;
         CrucibleController.nullSinkName = "Crucible Silent Output";
@@ -180,12 +181,19 @@ TestCase {
         pick(page, "3D reference layout", "7.1.4");
         compare(CrucibleController.roomLayout, "7.1.4");
         compare(stored("appearance/roomLayout"), "7.1.4");
+        // Motion: System until the person says otherwise, then stored under
+        // appearance/motion like the choices around it.
+        compare(segments(page, "Motion").currentValue, "system");
+        pick(page, "Motion", "reduced");
+        compare(CrucibleController.motion, "reduced");
+        compare(stored("appearance/motion"), "reduced");
 
         const again = makePage();
         compare(segments(again, "Theme").currentValue, "dark");
         compare(segments(again, "Palette").currentValue, "console");
         compare(segments(again, "Text size").currentValue, "150");
         compare(segments(again, "3D reference layout").currentValue, "7.1.4");
+        compare(segments(again, "Motion").currentValue, "reduced");
 
         // The newer page is the one on top, so it is the one clicked.
         pick(again, "Theme", "light");

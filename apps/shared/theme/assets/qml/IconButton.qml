@@ -4,8 +4,8 @@ import ForgeGui
 
 // A square button whose whole label is one icon glyph - the design system's
 // transport row (docs/hearth/design/screenshots/components.png, "TRANSPORT"):
-// the same 30 px box, 1 px divider border and accent-when-primary fill
-// AppButton draws, sized square and lettered from Theme.iconFamily instead of
+// the same 30 px box, 1 px divider border and accent-fill-when-primary
+// (Theme.accentFill) AppButton draws, sized square and lettered from Theme.iconFamily instead of
 // carrying a word.
 //
 // `glyph` is one of Theme's own icon tokens (Theme.iconPlayArrow and the
@@ -24,7 +24,7 @@ Rectangle {
     // when the person's text size does.
     implicitHeight: Math.max(30, label.implicitHeight + 12)
     implicitWidth: implicitHeight
-    color: primary ? Theme.accent : "transparent"
+    color: primary ? Theme.accentFill : "transparent"
     border.color: Theme.divider
     border.width: 1
     opacity: enabled ? 1.0 : 0.45

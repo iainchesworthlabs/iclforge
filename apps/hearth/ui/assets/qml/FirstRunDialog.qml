@@ -173,7 +173,7 @@ Dialog {
                 padding: Theme.pad
                 onClicked: { root.close(); root.openSpeakers(); }
                 background: Rectangle {
-                    color: Theme.accent
+                    color: Theme.accentFill
                     radius: Theme.radius
                 }
                 contentItem: Text {

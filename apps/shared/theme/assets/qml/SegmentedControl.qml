@@ -5,7 +5,8 @@ import ForgeGui
 // A small horizontal group of mutually exclusive text options - the
 // ".seg"/".seg-opt" pattern the handoff uses throughout (Basic/Advanced,
 // File/Live capture, Coded/Rendered, Author a path/Drive it live). Zero
-// radius, one active fill in accent, everything else reads as plain text.
+// radius, one active fill in the accent fill (Theme.accentFill, with
+// Theme.accentText on it), everything else reads as plain text.
 Row {
     id: root
 
@@ -89,7 +90,7 @@ Row {
             // rather than clipping the label inside it.
             height: Math.max(root.segHeight, label.implicitHeight + 8)
             implicitWidth: label.implicitWidth + 18
-            color: active ? Theme.accent : "transparent"
+            color: active ? Theme.accentFill : "transparent"
             border.color: Theme.divider
             // The chosen segment carries no outline of its own - the accent
             // block runs edge to edge, and the rule you see beside it is its
@@ -112,6 +113,7 @@ Row {
 
             Text {
                 id: label
+                objectName: "segLabel"
                 anchors.centerIn: parent
                 text: modelData.label
                 color: seg.active ? Theme.accentText : Theme.text

@@ -60,9 +60,9 @@ RowLayout {
 
                 Layout.fillWidth: true
                 Layout.preferredHeight: 52
-                color: modelData.primary ? Theme.accent
+                color: modelData.primary ? Theme.accentFill
                                          : (firstRunHover.hovered ? Theme.neutral200 : "transparent")
-                border.color: modelData.primary ? Theme.accent : Theme.divider
+                border.color: modelData.primary ? Theme.accentFill : Theme.divider
                 border.width: 1
 
                 // A Rectangle+TapHandler "button" - see ChannelMeter's CLIP
@@ -85,7 +85,7 @@ RowLayout {
                     text: modelData.label
                     font.pixelSize: Theme.fontHeading
                     font.weight: Font.DemiBold
-                    color: modelData.primary ? Theme.bg : Theme.text
+                    color: modelData.primary ? Theme.accentText : Theme.text
                 }
                 HoverHandler { id: firstRunHover }
                 TapHandler {

@@ -994,408 +994,408 @@
 <context>
     <name>KaraokePage</name>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="90"/>
+        <location filename="../qml/KaraokePage.qml" line="112"/>
         <source>The lines are marked for %1 and for %2.</source>
         <translation>השורות מסומנות עבור %1 ועבור %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="93"/>
+        <location filename="../qml/KaraokePage.qml" line="115"/>
         <source>Both vocals play, so %1 and %2 are both in the mix.</source>
         <translation>שתי השירות מושמעות, ולכן %1 ו-%2 שניהם בתמהיל.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="96"/>
+        <location filename="../qml/KaraokePage.qml" line="118"/>
         <source>No vocal plays: you sing the lines of %1 and of %2.</source>
         <translation>אף שירה אינה מושמעת: אתם שרים את השורות של %1 ושל %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="99"/>
-        <location filename="../qml/KaraokePage.qml" line="100"/>
+        <location filename="../qml/KaraokePage.qml" line="121"/>
+        <location filename="../qml/KaraokePage.qml" line="122"/>
         <source>The vocal of %1 plays: you sing the lines of %2.</source>
         <translation>השירה של %1 מושמעת: אתם שרים את השורות של %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="147"/>
+        <location filename="../qml/KaraokePage.qml" line="169"/>
         <source>off</source>
         <translation>כבוי</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="149"/>
+        <location filename="../qml/KaraokePage.qml" line="171"/>
         <source>%1 dB</source>
         <translation>%1 dB</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="260"/>
+        <location filename="../qml/KaraokePage.qml" line="282"/>
         <source>the LFE, as coded</source>
         <translation>ה-LFE, כפי שמקודד</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="264"/>
+        <location filename="../qml/KaraokePage.qml" line="286"/>
         <source>silent</source>
         <translation>שקט</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="297"/>
+        <location filename="../qml/KaraokePage.qml" line="321"/>
         <source>Karaoke</source>
         <translation>קריוקי</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="303"/>
+        <location filename="../qml/KaraokePage.qml" line="327"/>
         <source>Nothing is playing</source>
         <translation>שום דבר לא מושמע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="314"/>
+        <location filename="../qml/KaraokePage.qml" line="338"/>
         <source>Add a karaoke stream to the queue and play it. What you choose here applies to it.</source>
         <translation>הוסיפו זרם קריוקי לתור והשמיעו אותו. מה שתבחרו כאן יחול עליו.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="318"/>
+        <location filename="../qml/KaraokePage.qml" line="342"/>
         <source>Karaoke, %1 coded: %2</source>
         <translation>קריוקי, %1 מקודד: %2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="328"/>
+        <location filename="../qml/KaraokePage.qml" line="352"/>
         <source>An AC-3 stream, but not a karaoke one: its service is %1.</source>
         <translation>זרם AC-3, אך לא זרם קריוקי: השירות שלו הוא %1.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="346"/>
+        <location filename="../qml/KaraokePage.qml" line="371"/>
         <source>Reproduction</source>
         <translation>שחזור</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="347"/>
+        <location filename="../qml/KaraokePage.qml" line="372"/>
         <source>Annex C, ETSI TS 102 366</source>
         <translation>נספח C, ETSI TS 102 366</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="353"/>
-        <location filename="../qml/KaraokePage.qml" line="357"/>
+        <location filename="../qml/KaraokePage.qml" line="389"/>
+        <location filename="../qml/KaraokePage.qml" line="396"/>
         <source>Decoder</source>
         <translation>מפענח</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="361"/>
+        <location filename="../qml/KaraokePage.qml" line="400"/>
         <source>As coded</source>
         <translation type="unfinished">כפי שקודד</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="362"/>
+        <location filename="../qml/KaraokePage.qml" line="401"/>
         <source>Aware</source>
         <translation>מודע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="363"/>
+        <location filename="../qml/KaraokePage.qml" line="402"/>
         <source>Capable</source>
         <translation>בעל יכולת</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="371"/>
+        <location filename="../qml/KaraokePage.qml" line="410"/>
         <source>The channels as the stream codes them: the vocals come from the surround speakers.</source>
         <translation>הערוצים כפי שהזרם מקודד אותם: השירה יוצאת מהרמקולים ההיקפיים.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="374"/>
+        <location filename="../qml/KaraokePage.qml" line="413"/>
         <source>L, C and R, with the vocals at the level the programme set (Table C.2.2).</source>
         <translation>L, C ו-R, כשהשירה ברמה שקבעה התוכנית (טבלה C.2.2).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="376"/>
+        <location filename="../qml/KaraokePage.qml" line="415"/>
         <source>L, C and R, with the vocals you choose (Table C.2.3).</source>
         <translation>L, C ו-R, עם השירה שתבחרו (טבלה C.2.3).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="385"/>
-        <location filename="../qml/KaraokePage.qml" line="389"/>
+        <location filename="../qml/KaraokePage.qml" line="426"/>
+        <location filename="../qml/KaraokePage.qml" line="432"/>
         <source>Vocals</source>
         <translation>שירה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="393"/>
+        <location filename="../qml/KaraokePage.qml" line="436"/>
         <source>None</source>
         <translation>ללא</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="394"/>
+        <location filename="../qml/KaraokePage.qml" line="437"/>
         <source>V1</source>
         <translation>V1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="395"/>
+        <location filename="../qml/KaraokePage.qml" line="438"/>
         <source>V2</source>
         <translation>V2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="396"/>
+        <location filename="../qml/KaraokePage.qml" line="439"/>
         <source>Both</source>
         <translation>שתיהן</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="406"/>
+        <location filename="../qml/KaraokePage.qml" line="449"/>
         <source>Melody</source>
         <translation>מנגינה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="427"/>
+        <location filename="../qml/KaraokePage.qml" line="481"/>
         <source>%1 level, dB</source>
         <translation>רמת %1, דציבלים</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="454"/>
+        <location filename="../qml/KaraokePage.qml" line="509"/>
         <source>Each part&apos;s level against Table C.2.3: 0 dB is the table, and the bottom of the control is off. Raising one part far enough lowers the others, so that no speaker is driven past full scale. The capable decoder only.</source>
         <translation>הרמה של כל חלק ביחס לטבלה C.2.3: 0 dB הוא הטבלה, וקצהו התחתון של הפקד פירושו כבוי. הגברת חלק אחד מספיק מורידה את האחרים, כך שאף רמקול לא יידחף מעבר לסולם המלא. במפענח בעל היכולת בלבד.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="464"/>
+        <location filename="../qml/KaraokePage.qml" line="519"/>
         <source>Reset levels</source>
         <translation>איפוס הרמות</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="478"/>
+        <location filename="../qml/KaraokePage.qml" line="533"/>
         <source>These controls do not apply to the stream that is playing.</source>
         <translation>הפקדים האלה אינם חלים על הזרם שמושמע כעת.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="505"/>
+        <location filename="../qml/KaraokePage.qml" line="560"/>
         <source>Choose output…</source>
         <translation>בחרו פלט…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="514"/>
+        <location filename="../qml/KaraokePage.qml" line="569"/>
         <source>This is going to a network group. A sink that takes the karaoke settings decodes the stream itself and reproduces it as chosen here; one that does not is sent PCM with the reproduction applied, so the group plays one reproduction. The Network page says which each sink was sent.</source>
         <translation>זה נשלח לקבוצת רשת. נגן שמקבל את הגדרות הקריוקי מפענח את הזרם בעצמו ומשחזר אותו כפי שנבחר כאן; נגן שאינו מקבל אותן מקבל PCM כשהשחזור כבר הוחל, כך שהקבוצה משמיעה שחזור אחד. דף הרשת מציג מה נשלח לכל נגן.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="531"/>
+        <location filename="../qml/KaraokePage.qml" line="586"/>
         <source>The stereo fold is Lt/Rt. Annex C defines no Lt/Rt reproduction, so the stream plays as its Lt/Rt fold and the choice above has no effect. The Lo/Ro fold reproduces karaoke.</source>
         <translation>מיקס הסטריאו הוא Lt/Rt. נספח C אינו מגדיר שחזור Lt/Rt, ולכן הזרם מושמע כמיקס ה-Lt/Rt שלו והבחירה שלמעלה אינה משפיעה. מיקס Lo/Ro משחזר קריוקי.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="540"/>
+        <location filename="../qml/KaraokePage.qml" line="595"/>
         <source>Use Lo/Ro</source>
         <translation>השתמשו ב-Lo/Ro</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="549"/>
+        <location filename="../qml/KaraokePage.qml" line="604"/>
         <source>Lyrics</source>
         <translation>מילות השיר</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="551"/>
+        <location filename="../qml/KaraokePage.qml" line="606"/>
         <source>%1 · line %2 of %3</source>
         <translation>%1 · שורה %2 מתוך %3</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="573"/>
+        <location filename="../qml/KaraokePage.qml" line="637"/>
         <source>, word-timed</source>
         <translation>, בתזמון לפי מילה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="574"/>
+        <location filename="../qml/KaraokePage.qml" line="638"/>
         <source>, line-timed</source>
         <translation>, בתזמון לפי שורה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="584"/>
+        <location filename="../qml/KaraokePage.qml" line="649"/>
         <source>Time the lyrics…</source>
         <translation>סנכרון המילים…</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="589"/>
+        <location filename="../qml/KaraokePage.qml" line="655"/>
         <source>Full screen · F11</source>
         <translation>מסך מלא · F11</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="605"/>
-        <location filename="../qml/KaraokePage.qml" line="613"/>
+        <location filename="../qml/KaraokePage.qml" line="671"/>
+        <location filename="../qml/KaraokePage.qml" line="679"/>
         <source>Show</source>
         <translation>הצגה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="616"/>
+        <location filename="../qml/KaraokePage.qml" line="682"/>
         <source>Words</source>
         <translation>מילים</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="617"/>
+        <location filename="../qml/KaraokePage.qml" line="683"/>
         <source>Picture</source>
         <translation>תמונה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="639"/>
+        <location filename="../qml/KaraokePage.qml" line="705"/>
         <source>This is the picture of the CD+G disc beside the lyrics. Its words are part of the picture; choose Words to follow the lyrics file.</source>
         <translation>זו התמונה של דיסק ה-CD+G שלצד המילים. המילים שלה הן חלק מהתמונה; בחרו „מילים” כדי לעקוב אחרי קובץ המילים.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="643"/>
+        <location filename="../qml/KaraokePage.qml" line="709"/>
         <source>These lyrics have no times, so they are shown whole and not followed.</source>
         <translation>למילים האלה אין זמנים, ולכן הן מוצגות במלואן ואינן נעקבות.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="835"/>
+        <location filename="../qml/KaraokePage.qml" line="910"/>
         <source>%1 karaoke, %2: not reproduced (see the notice).</source>
         <translation>קריוקי %1, %2: לא משוחזר (ראו את ההודעה).</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="837"/>
+        <location filename="../qml/KaraokePage.qml" line="912"/>
         <source>%1 karaoke, %2.</source>
         <translation>קריוקי %1, %2.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="636"/>
+        <location filename="../qml/KaraokePage.qml" line="702"/>
         <source>This is the picture of a CD+G disc. Its words are part of the picture, so there is no text to follow.</source>
         <translation>זו התמונה של דיסק CD+G. המילים שלו הן חלק מהתמונה, ולכן אין טקסט לעקוב אחריו.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="645"/>
+        <location filename="../qml/KaraokePage.qml" line="711"/>
         <source>This file times lines, not words: a whole line is emphasised as it is sung.</source>
         <translation>הקובץ הזה מתזמן שורות, לא מילים: שורה שלמה מודגשת בזמן שהיא מושרת.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="665"/>
+        <location filename="../qml/KaraokePage.qml" line="731"/>
         <source>First singer</source>
         <translation>זמר ראשון</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="674"/>
+        <location filename="../qml/KaraokePage.qml" line="740"/>
         <source>Name of the first singer (V1)</source>
         <translation>שם הזמר הראשון (V1)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="681"/>
+        <location filename="../qml/KaraokePage.qml" line="747"/>
         <source>Second singer</source>
         <translation>זמר שני</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="690"/>
+        <location filename="../qml/KaraokePage.qml" line="756"/>
         <source>Name of the second singer (V2)</source>
         <translation>שם הזמר השני (V2)</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="734"/>
+        <location filename="../qml/KaraokePage.qml" line="800"/>
         <source>The stream</source>
         <translation>הזרם</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="739"/>
+        <location filename="../qml/KaraokePage.qml" line="805"/>
         <source>Backing left</source>
         <translation>ליווי שמאל</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="740"/>
+        <location filename="../qml/KaraokePage.qml" line="806"/>
         <source>Backing right</source>
         <translation>ליווי ימין</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="741"/>
+        <location filename="../qml/KaraokePage.qml" line="807"/>
         <source>Melody guide</source>
         <translation>מנגינת הנחיה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="407"/>
-        <location filename="../qml/KaraokePage.qml" line="742"/>
+        <location filename="../qml/KaraokePage.qml" line="450"/>
+        <location filename="../qml/KaraokePage.qml" line="808"/>
         <source>Vocal 1</source>
         <translation>שירה 1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="323"/>
+        <location filename="../qml/KaraokePage.qml" line="347"/>
         <source>Flagged karaoke, but this %1 programme has a dependent substream or objects, which Annex C has no vocals for: it plays as coded.</source>
         <translation>מסומן כקריוקי, אך לתוכנית %1 הזו יש תת־זרם תלוי או עצמים שאין להם קולות בנספח C: היא מושמעת כפי שהיא מקודדת.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="332"/>
+        <location filename="../qml/KaraokePage.qml" line="356"/>
         <source>An E-AC-3 stream, but not a karaoke one: its service is %1.</source>
         <translation>זרם E-AC-3, אך לא זרם קריוקי: השירות שלו הוא %1.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="335"/>
+        <location filename="../qml/KaraokePage.qml" line="359"/>
         <source>Karaoke is an AC-3 and E-AC-3 mode (Annex C of ETSI TS 102 366). This is neither.</source>
         <translation>קריוקי הוא מצב של AC-3 ושל E-AC-3 (נספח C של ETSI TS 102 366). זה אינו אף אחד מהם.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="408"/>
-        <location filename="../qml/KaraokePage.qml" line="743"/>
+        <location filename="../qml/KaraokePage.qml" line="451"/>
+        <location filename="../qml/KaraokePage.qml" line="809"/>
         <source>Vocal 2</source>
         <translation>שירה 2</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="494"/>
+        <location filename="../qml/KaraokePage.qml" line="549"/>
         <source>Played as coded, this goes to the receiver as a bitstream and the receiver decodes it. Unless the receiver is karaoke-capable, V1 and V2 play from its surround speakers. Choose Aware or Capable above and it is decoded here instead, on the same output.</source>
         <translation>כשהוא מנוגן כפי שקודד, זה עובר למקלט כזרם סיביות והמקלט מפענח אותו. אלא אם המקלט מסוגל לקריוקי, V1 ו-V2 מושמעים מהרמקולים ההיקפיים שלו. בחרו ״מודע״ או ״בעל יכולת״ למעלה, והוא יפוענח כאן במקום זאת, באותו פלט.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="760"/>
+        <location filename="../qml/KaraokePage.qml" line="831"/>
         <source>not in this stream</source>
         <translation>לא בזרם הזה</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="761"/>
+        <location filename="../qml/KaraokePage.qml" line="832"/>
         <source>heard</source>
         <translation>נשמע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="761"/>
+        <location filename="../qml/KaraokePage.qml" line="832"/>
         <source>muted</source>
         <translation>מושתק</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="771"/>
+        <location filename="../qml/KaraokePage.qml" line="844"/>
         <source>What plays</source>
         <translation>מה מושמע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="809"/>
+        <location filename="../qml/KaraokePage.qml" line="883"/>
         <source>Nothing karaoke is playing.</source>
         <translation>לא מושמע קריוקי.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="817"/>
+        <location filename="../qml/KaraokePage.qml" line="892"/>
         <source>Signal path</source>
         <translation>נתיב האות</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="825"/>
+        <location filename="../qml/KaraokePage.qml" line="900"/>
         <source>Decoded as the stream says.</source>
         <translation>מפוענח כפי שהזרם קובע.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="828"/>
+        <location filename="../qml/KaraokePage.qml" line="903"/>
         <source>as coded</source>
         <translation>כפי שמקודד</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="829"/>
+        <location filename="../qml/KaraokePage.qml" line="904"/>
         <source>aware</source>
         <translation>מודע</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="830"/>
+        <location filename="../qml/KaraokePage.qml" line="905"/>
         <source>capable, vocals: %1</source>
         <translation>בעל יכולת, שירה: %1</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="831"/>
+        <location filename="../qml/KaraokePage.qml" line="906"/>
         <source>none</source>
         <translation>ללא</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="832"/>
+        <location filename="../qml/KaraokePage.qml" line="907"/>
         <source>both</source>
         <translation>שתיהן</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="849"/>
+        <location filename="../qml/KaraokePage.qml" line="924"/>
         <source>Nothing is playing.</source>
         <translation>שום דבר לא מושמע.</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="853"/>
+        <location filename="../qml/KaraokePage.qml" line="928"/>
         <source>%1 · a bitstream at %2 Hz</source>
         <translation>%1 · זרם סיביות ב-%2 הרץ</translation>
     </message>
     <message>
-        <location filename="../qml/KaraokePage.qml" line="856"/>
+        <location filename="../qml/KaraokePage.qml" line="931"/>
         <source>%1 · %2 ch at %3 Hz</source>
         <translation>%1 · %2 ערוצים ב-%3 הרץ</translation>
     </message>
@@ -1826,62 +1826,62 @@
     <name>Main</name>
     <message>
         <location filename="../qml/Main.qml" line="22"/>
-        <location filename="../qml/Main.qml" line="186"/>
+        <location filename="../qml/Main.qml" line="194"/>
         <source>Hearth</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="215"/>
+        <location filename="../qml/Main.qml" line="223"/>
         <source>Opens where Hearth plays</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="243"/>
+        <location filename="../qml/Main.qml" line="251"/>
         <source>no output chosen yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="268"/>
+        <location filename="../qml/Main.qml" line="276"/>
         <source>Page</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="271"/>
+        <location filename="../qml/Main.qml" line="279"/>
         <source>Play</source>
         <translation type="unfinished">נגנו</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="272"/>
+        <location filename="../qml/Main.qml" line="280"/>
         <source>Media</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="273"/>
+        <location filename="../qml/Main.qml" line="281"/>
         <source>Speakers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="274"/>
+        <location filename="../qml/Main.qml" line="282"/>
         <source>Decoder</source>
         <translation type="unfinished">מפענח</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="275"/>
+        <location filename="../qml/Main.qml" line="283"/>
         <source>Network</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="276"/>
+        <location filename="../qml/Main.qml" line="284"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="277"/>
+        <location filename="../qml/Main.qml" line="285"/>
         <source>Karaoke</source>
         <translation>קריוקי</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="289"/>
+        <location filename="../qml/Main.qml" line="297"/>
         <source>Keyboard shortcuts</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2667,335 +2667,336 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="97"/>
+        <location filename="../qml/MicrophoneCard.qml" line="121"/>
         <source>in tune</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="99"/>
+        <location filename="../qml/MicrophoneCard.qml" line="123"/>
         <source>%1 cents sharp</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="99"/>
+        <location filename="../qml/MicrophoneCard.qml" line="123"/>
         <source>%1 cents flat</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="105"/>
+        <location filename="../qml/MicrophoneCard.qml" line="129"/>
         <source>You are about %1 ms behind the tune.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="106"/>
+        <location filename="../qml/MicrophoneCard.qml" line="130"/>
         <source>You are about %1 ms ahead of the tune.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="113"/>
+        <location filename="../qml/MicrophoneCard.qml" line="137"/>
         <source>Sing along and see how close your pitch is to the tune. The microphone is off until you turn it on, nothing is recorded, and nothing leaves this computer.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="125"/>
+        <location filename="../qml/MicrophoneCard.qml" line="151"/>
         <source>Input</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="136"/>
+        <location filename="../qml/MicrophoneCard.qml" line="167"/>
         <source>The default input</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="139"/>
+        <location filename="../qml/MicrophoneCard.qml" line="170"/>
         <source>Microphone input</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="155"/>
+        <location filename="../qml/MicrophoneCard.qml" line="187"/>
         <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="163"/>
+        <location filename="../qml/MicrophoneCard.qml" line="196"/>
         <source>I am wearing headphones</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="164"/>
+        <location filename="../qml/MicrophoneCard.qml" line="197"/>
         <source>Through open speakers the microphone hears the backing as well as you, and the score can read as nearly perfect for no singing. The score is shown only when you say you are wearing headphones.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="177"/>
+        <location filename="../qml/MicrophoneCard.qml" line="214"/>
         <source>Turn the microphone off</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="177"/>
+        <location filename="../qml/MicrophoneCard.qml" line="214"/>
         <source>Turn the microphone on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="195"/>
+        <location filename="../qml/MicrophoneCard.qml" line="233"/>
         <source>Microphone on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="214"/>
+        <location filename="../qml/MicrophoneCard.qml" line="254"/>
         <source>Stop recording</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="214"/>
+        <location filename="../qml/MicrophoneCard.qml" line="254"/>
         <source>Record a take</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="231"/>
+        <location filename="../qml/MicrophoneCard.qml" line="272"/>
         <source>Recording %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="253"/>
+        <location filename="../qml/MicrophoneCard.qml" line="295"/>
         <source>Takes go to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="269"/>
+        <location filename="../qml/MicrophoneCard.qml" line="317"/>
         <source>Choose…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="275"/>
+        <location filename="../qml/MicrophoneCard.qml" line="324"/>
         <source>Where takes are kept</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="285"/>
+        <location filename="../qml/MicrophoneCard.qml" line="339"/>
         <source>Saved %1 (%2)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="292"/>
+        <location filename="../qml/MicrophoneCard.qml" line="356"/>
         <source>Show in folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="297"/>
+        <location filename="../qml/MicrophoneCard.qml" line="363"/>
         <source>Delete this take</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="312"/>
+        <location filename="../qml/MicrophoneCard.qml" line="379"/>
         <source>Your takes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="336"/>
+        <location filename="../qml/MicrophoneCard.qml" line="419"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="342"/>
+        <location filename="../qml/MicrophoneCard.qml" line="427"/>
         <source>Delete for good</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="348"/>
+        <location filename="../qml/MicrophoneCard.qml" line="435"/>
         <source>Keep</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="357"/>
+        <location filename="../qml/MicrophoneCard.qml" line="445"/>
         <source>and %1 more in the folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="365"/>
+        <location filename="../qml/MicrophoneCard.qml" line="454"/>
         <source>A take is your voice alone, not the backing: a lossless file with a small description beside it saying where in the song it began. Through speakers the backing is in it too.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="389"/>
+        <location filename="../qml/MicrophoneCard.qml" line="480"/>
         <source>Level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="408"/>
+        <location filename="../qml/MicrophoneCard.qml" line="504"/>
         <source>Microphone level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="413"/>
+        <location filename="../qml/MicrophoneCard.qml" line="510"/>
         <source>Too loud</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="422"/>
+        <location filename="../qml/MicrophoneCard.qml" line="521"/>
         <source>No sound from the microphone. It may be muted, or the wrong input is chosen.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="433"/>
+        <location filename="../qml/MicrophoneCard.qml" line="532"/>
         <source>Scored against %1.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="436"/>
+        <location filename="../qml/MicrophoneCard.qml" line="535"/>
         <source>No melody to score against: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="450"/>
+        <location filename="../qml/MicrophoneCard.qml" line="549"/>
         <source>Listening…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="453"/>
+        <location filename="../qml/MicrophoneCard.qml" line="552"/>
         <source>%1 · %2 Hz</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="455"/>
+        <location filename="../qml/MicrophoneCard.qml" line="554"/>
         <source>%1 · %2</source>
         <translation type="unfinished">%1 · %2</translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="482"/>
+        <location filename="../qml/MicrophoneCard.qml" line="582"/>
         <source>Say you are wearing headphones to see a score.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="485"/>
+        <location filename="../qml/MicrophoneCard.qml" line="585"/>
         <source>Sing a few notes to get a score.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="488"/>
+        <location filename="../qml/MicrophoneCard.qml" line="588"/>
         <source>Pitch score so far: %1 %</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="499"/>
+        <location filename="../qml/MicrophoneCard.qml" line="599"/>
         <source>It counts how much of the tune&apos;s time your pitch was within %1 cents of it, in any octave. It hears pitch only, not timing, words or feeling.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="512"/>
+        <location filename="../qml/MicrophoneCard.qml" line="614"/>
         <source>How close counts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="522"/>
+        <location filename="../qml/MicrophoneCard.qml" line="626"/>
         <source>Close: within half a semitone (50 cents)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="523"/>
+        <location filename="../qml/MicrophoneCard.qml" line="627"/>
         <source>A semitone (100 cents)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="524"/>
+        <location filename="../qml/MicrophoneCard.qml" line="628"/>
         <source>Loose: within a whole tone (200 cents)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="528"/>
+        <location filename="../qml/MicrophoneCard.qml" line="632"/>
         <source>How close your pitch must be to the tune to count</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="544"/>
+        <location filename="../qml/MicrophoneCard.qml" line="648"/>
         <source>Score against my key</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="545"/>
+        <location filename="../qml/MicrophoneCard.qml" line="649"/>
         <source>If you sing the whole song a little sharp or flat of the tune, judge the shape of your melody instead: your own key is taken from your first sung notes and allowed for. It is off each time Hearth starts, and the card says when it is in use.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="557"/>
+        <location filename="../qml/MicrophoneCard.qml" line="661"/>
         <source>Waiting for a few sung notes to find your key.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="558"/>
+        <location filename="../qml/MicrophoneCard.qml" line="662"/>
         <source>Scored against your key: you are about %1 cents %2 the tune&apos;s, and that is allowed for.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="560"/>
-        <location filename="../qml/MicrophoneCard.qml" line="618"/>
+        <location filename="../qml/MicrophoneCard.qml" line="664"/>
+        <location filename="../qml/MicrophoneCard.qml" line="724"/>
         <source>sharp of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="560"/>
-        <location filename="../qml/MicrophoneCard.qml" line="618"/>
+        <location filename="../qml/MicrophoneCard.qml" line="664"/>
+        <location filename="../qml/MicrophoneCard.qml" line="724"/>
         <source>flat of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="611"/>
+        <location filename="../qml/MicrophoneCard.qml" line="717"/>
         <source>Compared with %1, within %2 cents, in any octave%3. Lines the tune has no notes in were not scored. It is shown here and kept nowhere.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="616"/>
+        <location filename="../qml/MicrophoneCard.qml" line="722"/>
         <source>, against your own key (about %1 cents %2 the tune&apos;s)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="576"/>
+        <location filename="../qml/MicrophoneCard.qml" line="681"/>
         <source>Last performance</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="584"/>
+        <location filename="../qml/MicrophoneCard.qml" line="690"/>
         <source>Pitch score: %1 %</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="593"/>
+        <location filename="../qml/MicrophoneCard.qml" line="699"/>
         <source>You sang for %1 % of the tune&apos;s voiced time.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="596"/>
+        <location filename="../qml/MicrophoneCard.qml" line="702"/>
         <source>On average you were %1.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="631"/>
+        <location filename="../qml/MicrophoneCard.qml" line="741"/>
         <source>Microphone delay</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="646"/>
+        <location filename="../qml/MicrophoneCard.qml" line="762"/>
         <source>Microphone delay, milliseconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="655"/>
-        <location filename="../qml/MicrophoneCard.qml" line="690"/>
+        <location filename="../qml/MicrophoneCard.qml" line="65"/>
+        <location filename="../qml/MicrophoneCard.qml" line="772"/>
+        <location filename="../qml/MicrophoneCard.qml" line="818"/>
         <source>%1 ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="666"/>
+        <location filename="../qml/MicrophoneCard.qml" line="787"/>
         <source>Move your timing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="681"/>
+        <location filename="../qml/MicrophoneCard.qml" line="808"/>
         <source>Move your timing, milliseconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MicrophoneCard.qml" line="699"/>
+        <location filename="../qml/MicrophoneCard.qml" line="829"/>
         <source>A microphone&apos;s sound reaches the program a little after it was sung, and some take a tenth of a second or more. If you are told you are behind the tune when you are not, raise the delay.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4249,7 +4250,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PitchRibbon.qml" line="178"/>
+        <location filename="../qml/PitchRibbon.qml" line="183"/>
         <source>Listening…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5056,7 +5057,8 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../qml/Settings.qml" line="458"/>
         <location filename="../qml/Settings.qml" line="485"/>
         <location filename="../qml/Settings.qml" line="509"/>
-        <location filename="../qml/Settings.qml" line="550"/>
+        <location filename="../qml/Settings.qml" line="542"/>
+        <location filename="../qml/Settings.qml" line="585"/>
         <source>System</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5107,53 +5109,74 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="531"/>
-        <location filename="../qml/Settings.qml" line="538"/>
-        <location filename="../qml/Settings.qml" line="554"/>
+        <location filename="../qml/Settings.qml" line="539"/>
+        <source>Motion</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="543"/>
+        <source>Reduced</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="544"/>
+        <source>Full</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="555"/>
+        <source>Reduced draws the waiting mark as three still squares instead of a turning spinner. System follows the desktop&apos;s own setting for animation.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Settings.qml" line="566"/>
+        <location filename="../qml/Settings.qml" line="573"/>
+        <location filename="../qml/Settings.qml" line="589"/>
         <source>Language</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="582"/>
+        <location filename="../qml/Settings.qml" line="617"/>
         <source>System follows the language the desktop is set to. Applies at once. The Karaoke page, the lyrics and the singer view are translated; the other pages are not yet, so their words stay in English while the layout direction and the typeface follow the language chosen. The translations are machine-made and have not been read by a speaker.</source>
         <translation>מערכת עוקבת אחר השפה ששולחן העבודה מוגדר אליה. חל מיד. דף הקריוקי, המילים ותצוגת הזמר מתורגמים; שאר הדפים עדיין לא, ולכן המילים בהם נשארות באנגלית בעוד כיוון הפריסה והגופן עוקבים אחר השפה שנבחרה. התרגומים נוצרו במכונה ולא נקראו בידי דובר.</translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="596"/>
+        <location filename="../qml/Settings.qml" line="631"/>
         <source>Diagnostics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="601"/>
+        <location filename="../qml/Settings.qml" line="636"/>
         <source>A text file of what Hearth has done: outputs opened, streams played, sinks found and paired, and every error. Pairing keys, codes and file paths are left out.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="613"/>
+        <location filename="../qml/Settings.qml" line="648"/>
         <source>Save diagnostics…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="614"/>
+        <location filename="../qml/Settings.qml" line="649"/>
         <source>Writes a plain-text support file where you choose. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="622"/>
+        <location filename="../qml/Settings.qml" line="657"/>
         <source>View live…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="623"/>
+        <location filename="../qml/Settings.qml" line="658"/>
         <source>Opens the same report in a window that keeps itself up to date. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="628"/>
+        <location filename="../qml/Settings.qml" line="663"/>
         <source>Copy diagnostics</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Settings.qml" line="629"/>
+        <location filename="../qml/Settings.qml" line="664"/>
         <source>Copies the same report to the clipboard. Nothing is sent anywhere.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5699,17 +5722,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::HearthController</name>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="1461"/>
+        <location filename="../../src/hearth_controller.cpp" line="1534"/>
         <source>This build carries no embedded notices file (:/notices/NOTICES.txt was not compiled in); the NOTICES.txt beside the application and the repository&apos;s LICENSE say what it ships.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2569"/>
+        <location filename="../../src/hearth_controller.cpp" line="2707"/>
         <source>saved to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/hearth_controller.cpp" line="2572"/>
+        <location filename="../../src/hearth_controller.cpp" line="2710"/>
         <source>could not write %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5717,27 +5740,27 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
 <context>
     <name>iclforge::hearth::ui::MicrophoneController</name>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="397"/>
+        <location filename="../../src/microphone_controller.cpp" line="414"/>
         <source>Turn the microphone on first.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="657"/>
+        <location filename="../../src/microphone_controller.cpp" line="701"/>
         <source>Nothing is playing.</source>
         <translation type="unfinished">שום דבר לא מושמע.</translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="664"/>
+        <location filename="../../src/microphone_controller.cpp" line="708"/>
         <source>Reading the melody…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="745"/>
+        <location filename="../../src/microphone_controller.cpp" line="789"/>
         <source>The microphone went away. Plug it in again and turn it back on.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/microphone_controller.cpp" line="749"/>
+        <location filename="../../src/microphone_controller.cpp" line="793"/>
         <source>The microphone stopped delivering audio. It may have been disconnected.</source>
         <translation type="unfinished"></translation>
     </message>

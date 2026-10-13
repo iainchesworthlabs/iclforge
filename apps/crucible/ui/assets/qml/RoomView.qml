@@ -177,8 +177,8 @@ Item {
                     x: dragging ? dragX : (sideDragging >= 0 ? (sideDragX + otherX) / 2 : engineX)
                     y: dragging ? dragY : (sideDragging >= 0 ? (sideDragY + otherY) / 2 : engineY)
                     z: selected ? 2 : 1
-                    Behavior on gx { enabled: !marker.snap && !marker.dragging && marker.sideDragging < 0; NumberAnimation { duration: 90 } }
-                    Behavior on gy { enabled: !marker.snap && !marker.dragging && marker.sideDragging < 0; NumberAnimation { duration: 90 } }
+                    Behavior on gx { enabled: !marker.snap && !marker.dragging && marker.sideDragging < 0; NumberAnimation { duration: Theme.motionDuration(90) } }
+                    Behavior on gy { enabled: !marker.snap && !marker.dragging && marker.sideDragging < 0; NumberAnimation { duration: Theme.motionDuration(90) } }
 
                     // Elevation: a stem down to ear level.
                     Rectangle {
@@ -230,8 +230,8 @@ Item {
                             x: (dragging ? dragX : fieldX + nudge) - marker.x
                             y: (dragging ? dragY : fieldY) - marker.y
                             z: 3
-                            Behavior on gx { enabled: !satellite.snap && !satellite.dragging; NumberAnimation { duration: 90 } }
-                            Behavior on gy { enabled: !satellite.snap && !satellite.dragging; NumberAnimation { duration: 90 } }
+                            Behavior on gx { enabled: !satellite.snap && !satellite.dragging; NumberAnimation { duration: Theme.motionDuration(90) } }
+                            Behavior on gy { enabled: !satellite.snap && !satellite.dragging; NumberAnimation { duration: Theme.motionDuration(90) } }
                             Rectangle {
                                 x: -5; y: -5
                                 width: 10; height: 10; radius: 5

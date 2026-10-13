@@ -3444,6 +3444,22 @@
             <translation>[Évéry sîzé în thé wîndõw fõllõws thîs; 100% îs thé sîzé ît îs dràwn àt. Systém tàkés thé téxt sîzé thé désktõp répõrts ànd cõûnts 9 pt às 100%, sõ õn à désktõp whõsé bàsé sîzé îs làrgér thé wîndõw stàrts làrgér tõõ. Sõmé pànéls stîll hõld théîr cõntrõls àt à fîxéd héîght ànd càn clîp thé làrgést sîzés — dõcs/fõrgé/gûî/àccéssîbîlîty.md sàys whîch. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
         </message>
         <message>
+            <source>Motion</source>
+            <translation>[Mõtîõn ~~]</translation>
+        </message>
+        <message>
+            <source>Reduced</source>
+            <translation>[Rédûcéd ~~~]</translation>
+        </message>
+        <message>
+            <source>Full</source>
+            <translation>[Fûll ~~]</translation>
+        </message>
+        <message>
+            <source>Reduced draws the waiting mark as three still squares instead of a turning spinner, and holds the Guided wizard's movement preview still. System follows the desktop's own setting for animation.</source>
+            <translation>[Rédûcéd dràws thé wàîtîng màrk às thréé stîll sqûàrés înstéàd õf à tûrnîng spînnér, ànd hõlds thé Gûîdéd wîzàrd's mõvémént prévîéw stîll. Systém fõllõws thé désktõp's õwn séttîng fõr ànîmàtîõn. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]</translation>
+        </message>
+        <message>
             <source>Palette</source>
             <translation>[Pàlétté ~~~]</translation>
         </message>

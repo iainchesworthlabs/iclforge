@@ -261,6 +261,8 @@ objects `forge atmos-encode … codec=ac4` writes, so **Before** reads "new".
 | Preferences Save / Cancel | UI | UI | TiersAndFlows::test_preferencesDialogSavesOnSaveAndDiscardsOnCancel |
 | Palette / theme | logic | logic | ThemePalettes::* (sets the dialog's choice, then presses Save) |
 | Text size | logic | logic | Keyboard::test_textSizeSettingReachesTheTheme |
+| Motion (System / Reduced / Full): working copy, Save applies it to Theme, Cancel discards it, the choice wins over the system's | none | UI | ThemePalettes::test_prefsMotionRoundTripsAndAppliesOnSave |
+| Accent fill and its label reach 4.5:1 in every palette; the window's selection colours use the pair | none | logic | ThemePalettes::test_accentFillCarriesItsLabelAndTheSelectionUsesThePair |
 | Explanations toggle, CLI visible, codec warning, defaults | logic | logic | TiersAndFlows::test_explanationsToggle…, test_preferencesDefaultsApply… |
 | Language combo switches the window immediately | logic | UI | E2eSettings::test_preferencesLanguageComboSwitchesTheWindowImmediately |
 | Language manager (available, persist, RTL) | logic | logic | LanguageManager::* |

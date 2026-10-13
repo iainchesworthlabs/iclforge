@@ -108,6 +108,10 @@ else()
         "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frames.hpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_picture.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_picture.hpp")
+    # Whether the operating system has been asked to cut back animation, which Theme.reducedMotion
+    # binds to: SystemMotion and the platform file that answers it (cmake/SystemMotion.cmake).
+    include(SystemMotion)
+    iclforge_add_system_motion(hearth)
     target_include_directories(hearth PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src"

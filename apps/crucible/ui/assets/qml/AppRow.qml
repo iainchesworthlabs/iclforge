@@ -106,13 +106,15 @@ Rectangle {
                 height: 4
                 color: Theme.neutral300
                 Rectangle {
+                    objectName: "levelBar"
                     height: 4
                     // -60 dBFS .. 0 dBFS across the bar.
                     width: parent.width * Math.max(0, Math.min(1, (root.app.level + 60) / 60))
                     color: Theme.accent700
                     // Linear over one poll, so successive readings join into
-                    // one motion rather than easing to a stop at each.
-                    Behavior on width { NumberAnimation { duration: 60; easing.type: Easing.Linear } }
+                    // one motion rather than easing to a stop at each. With
+                    // motion reduced the bar takes each reading as it comes.
+                    Behavior on width { NumberAnimation { duration: Theme.motionDuration(60); easing.type: Easing.Linear } }
                 }
             }
         }

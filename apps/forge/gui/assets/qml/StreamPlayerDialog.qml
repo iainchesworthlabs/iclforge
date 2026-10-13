@@ -123,7 +123,7 @@ Dialog {
                 font.pixelSize: Theme.fontSmall
                 font.family: Theme.monoFamily
             }
-            BusyIndicator {
+            BusyMark {
                 objectName: "spBusyIndicator"
                 visible: StreamPlayerController.busy
                 running: StreamPlayerController.busy
@@ -319,7 +319,7 @@ Dialog {
                         enabled: !StreamPlayerController.exporting
                         onClicked: spExportObjectsDialog.open()
                     }
-                    BusyIndicator {
+                    BusyMark {
                         objectName: "spExportBusyIndicator"
                         visible: StreamPlayerController.exporting
                         running: StreamPlayerController.exporting

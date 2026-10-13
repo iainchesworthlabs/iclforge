@@ -678,9 +678,9 @@ ColumnLayout {
                     objectName: "karaokeStepDot-" + stepEntry.modelData.key
                     width: 22
                     height: 22
-                    color: stepEntry.current ? Theme.accent
+                    color: stepEntry.current ? Theme.accentFill
                            : stepEntry.completed ? Theme.text : "transparent"
-                    border.color: stepEntry.current ? Theme.accent : Theme.divider
+                    border.color: stepEntry.current ? Theme.accentFill : Theme.divider
                     border.width: 1
 
                     Text {
@@ -688,7 +688,8 @@ ColumnLayout {
                         text: stepEntry.index + 1
                         font.pixelSize: Theme.fontMono
                         font.family: Theme.monoFamily
-                        color: stepEntry.current || stepEntry.completed ? Theme.bg : Theme.text
+                        color: stepEntry.current ? Theme.accentText
+                               : stepEntry.completed ? Theme.bg : Theme.text
                     }
                     Accessible.role: Accessible.PageTab
                     Accessible.name: stepEntry.modelData.label

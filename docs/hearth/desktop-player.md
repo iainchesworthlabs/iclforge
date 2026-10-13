@@ -253,7 +253,10 @@ with a **Take it back** button.
   next start, whether a file that fails is skipped or stops the queue, and the lyric delay.
 - **Network**: the name sinks and players show for this computer, whether Hearth looks for
   Sendspin players, and the pairing records, each with **Forget**.
-- **Appearance**: the theme, the palette and the text size.
+- **Appearance**: the theme, the palette, the text size and motion. Motion is System, Reduced or
+  Full: System follows the desktop's own request to cut back animation, and Reduced draws the
+  waiting mark as three still squares instead of a turning spinner
+  ([Motion](../crucible/accessibility.md#motion) says how each platform's setting is read).
 - **Language**: English, German, Spanish, French, Arabic, Hebrew or Yiddish. The words of the
   Karaoke page, the lyric views and the singer view are translated; the other pages are in English
   in every language ([Languages](index.md#languages)).

@@ -109,6 +109,7 @@ Status:
 | 82 | Settings | Look for Sendspin players checkbox | none | UI | SettingsPage::test_networkNameAndDiscovery |
 | 83 | Settings | Pairing records list and Forget | none | UI | NetworkPairing::test_pairingRecordShowsInSettingsAndForgetRemovesIt (after a real pairing) |
 | 84 | Settings | Theme / palette / text size | none | UI | SettingsPage::test_appearanceThemePaletteAndTextSize |
+| 84a | Settings | Motion (System / Reduced / Full): stored, an unknown value reads as System, applied to Theme at start and on change | none | UI | SettingsPage::test_appearanceMotion, Shell::test_motionFollowsTheSetting |
 | 85 | Settings | Language | none | UI | SettingsPage::test_languageChoice |
 | 86 | Settings | Save diagnostics.../Copy diagnostics | none | UI | SettingsPage::test_saveDiagnosticsWritesTheReport (file read back), SettingsPage::test_copyDiagnosticsPutsTheReportOnTheClipboard |
 | 87 | Dialogs | Keyboard shortcuts dialog, About... chain, Close | none | UI | Dialogs::test_shortcutsAboutLicencesChain |

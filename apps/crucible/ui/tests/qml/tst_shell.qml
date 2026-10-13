@@ -25,6 +25,7 @@ TestCase {
         CrucibleController.stop();
         CrucibleController.theme = "system";
         CrucibleController.palette = "signal";
+        CrucibleController.motion = "system";
         CrucibleController.keepRunningWhenClosed = true;
         CrucibleController.moveDefaultOnLaunch = false;
         // The plan rather than the elevation: the right-to-left case below
@@ -73,6 +74,25 @@ TestCase {
         compare(Theme.paletteChoice, "console");
         CrucibleController.theme = "light";
         tryCompare(Theme, "preference", "light");
+    }
+
+    // The same for motion: the window hands the stored choice to Theme at
+    // start and again whenever it changes, and "reduced" is what turns every
+    // duration to zero.
+    function test_motionFollowsTheSetting() {
+        CrucibleController.motion = "reduced";
+        const window = createTemporaryObject(shell, testCase);
+        verify(window);
+        tryCompare(window, "visible", true);
+        compare(Theme.motionChoice, "reduced");
+        compare(Theme.reducedMotion, true);
+        compare(Theme.motionDuration(90), 0);
+        CrucibleController.motion = "full";
+        tryCompare(Theme, "motionChoice", "full");
+        compare(Theme.reducedMotion, false);
+        compare(Theme.motionDuration(90), 90);
+        CrucibleController.motion = "system";
+        tryCompare(Theme, "motionChoice", "system");
     }
 
     function test_statusStripReportsTheEngine() {

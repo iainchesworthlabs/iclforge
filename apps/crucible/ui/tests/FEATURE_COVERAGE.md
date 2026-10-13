@@ -159,6 +159,10 @@ A headless session never shows the menu, so each entry is fired through its
 | 87 | Show silent apps / Show background processes checks | None | UI | roomworkflow::test_silentAndBackgroundApplicationsFollowTheirSettings |
 | 88 | Save diagnostics… → dialog → file written or reason shown | Logic (`exportDiagnostics`) | UI | settingsdialogs::test_saveDiagnosticsWritesTheFileThePageSuggests; settings::test_exportWritesAFile, settings::test_diagnosticsReportWithholdsTheKeyPath |
 | 89 | Settings persist to the store a relaunch reads | Logic (controller getters) | UI | every `settingsworkflow`/`signalpath`/`roomworkflow` case that reads `TestServices.storedSetting` |
+| 90 | Motion segment (System / Reduced / Full); stored as `appearance/motion`; applied to Theme at start and on change; an unknown stored value reads as System | None | UI | settingsworkflow::test_appearanceChoicesAreStoredAndApplied; shell::test_motionFollowsTheSetting |
+| 91 | The person's Motion choice wins over the operating system's request, in both directions | None | UI | motion::test_theSystemAnswersWhenThePersonHasNotChosen, motion::test_thePersonsOwnChoiceWinsOverTheSystem |
+| 92 | Room markers and level bars glide only when motion is full; reduced they take the engine's value at once | None | UI | motion::test_theMarkerGlidesWhenMotionIsFull, motion::test_theMarkerJumpsWhenMotionIsReduced, motion::test_theLevelBarEasesWhenMotionIsFull, motion::test_theLevelBarTakesTheReadingAtOnceWhenMotionIsReduced |
+| 93 | The waiting mark is three still squares while motion is reduced | None | UI | motion::test_theWaitingMarkStopsTurningWhenMotionIsReduced |
 
 ## Cases without a feature row of their own
 
@@ -177,7 +181,11 @@ belongs to one platform skips on the others.
 | accessibility::test_listAndControlsCarryNames | The applications list has the List role and a name. The pin, bitrate and language boxes are named. The driver folder field is named by its row's label, and the Advanced toggle is a Button whose description changes with its state. |
 | accessibility::test_sizeSliderReportsARange | The size track has the Slider role, runs 0 to 1 in steps of 0.05, and with nothing selected is out of the tab chain and has no description. |
 | accessibility::test_announceKeepsTheLastMessageAndTicksItsSerial | An empty announcement says nothing. Each announcement keeps the last message and moves the serial, including the same text twice. It is polite unless it is asked to interrupt. |
-| accessibility::test_themePalettesMeetTheContrastFloors | For each of the three palettes in light and dark, text on the background is at least 7:1. Muted text, accent ink, the focus ring and control borders are at least 4.5:1, 4.5:1, 3:1 and 3:1 on both the background and the surface. The label on an accent fill is at least 3:1 and is the better of the palette's two ends. |
+| accessibility::test_themePalettesMeetTheContrastFloors | For each of the three palettes in light and dark, text on the background is at least 7:1. Muted text, accent ink, the focus ring and control borders are at least 4.5:1, 4.5:1, 3:1 and 3:1 on both the background and the surface. The label on the accent fill (`accentText` on `accentFill`) is at least 4.5:1, and the fill and the brand accent are at least 3:1 against the background (the fill against the surface too). |
+| accessibility::test_theFillIsTheAccentWhereTheAccentAlreadyCarriesItsLabel | The fill is the accent itself in every palette and mode but Signal light, which is `#b82009` under white; Ink light keeps the background colour as its label. |
+| accessibility::test_systemPaletteFillCarriesItsLabelForAnyDesktopAccent | Across 1,440 desktop accents in both modes the derived fill and its label are at least 4.5:1 and the fill keeps the accent's hue; the desktop's own accent on this machine passes too. |
+| accessibility::test_filledControlsDrawTheFillAndItsLabel | A primary button, an icon button, the chosen segment and a ticked box are filled with `accentFill` and lettered in `accentText`; a plain button is not filled. |
+| motion::test_aChoiceTheWindowDoesNotKnowReadsAsTheSystem | A motion choice the window has no name for follows the system's answer. |
 | accessibility::test_contrastCompositesTheAlphaItIsGiven | The contrast function composites a colour's alpha before it measures, so muted text scores lower than solid text. |
 | icons::test_iconNameResolvesThroughTheTheme | An icon name resolves through the fixture theme (Linux only). |
 | icons::test_desktopEntryByExec | With no icon name and no application id, the .desktop entry whose Exec names the binary supplies the icon, ahead of a NoDisplay entry with the same Exec (Linux only). |

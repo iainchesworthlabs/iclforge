@@ -83,7 +83,7 @@ RowLayout {
                 visible: root.step === "requested"
                 spacing: Theme.gap
 
-                BusyIndicator {
+                BusyMark {
                     implicitWidth: 24
                     implicitHeight: 24
                     running: visible

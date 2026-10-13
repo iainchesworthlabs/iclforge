@@ -60,8 +60,13 @@ ApplicationWindow {
     palette.button: Theme.surface
     palette.buttonText: Theme.text
     palette.brightText: Theme.text
-    palette.highlight: Theme.accent
-    palette.highlightedText: Theme.bg
+    // A selection is a filled accent carrying text, so it takes the fill and
+    // the label that reach 4.5:1 together (Theme.accentFill / accentText),
+    // not the brand accent under the background colour (3.8:1 in Signal
+    // light). The same palette role colours the style's progress and slider
+    // fills, which follow it to the deeper red there.
+    palette.highlight: Theme.accentFill
+    palette.highlightedText: Theme.accentText
     palette.light: Theme.neutral100
     palette.midlight: Theme.neutral200
     palette.mid: Theme.neutral400
@@ -87,6 +92,11 @@ ApplicationWindow {
         // and a person who has set one is not surprised by the other.
         // applyTextScale() below is what turns it into Theme.fontScale.
         property string textScale: "100"
+        // "system" (the operating system's own request to cut back
+        // animation), "reduced" or "full": Theme.motionChoice. Kept beside the
+        // other appearance choices, under workbench/ like them; Crucible and
+        // Hearth keep the same three values under appearance/motion.
+        property string motion: "system"
         property string controlsOnOpen: "guided"
         property string lastTier: "guided"
         property string meterMode: "coded"
@@ -178,6 +188,7 @@ ApplicationWindow {
     Component.onCompleted: {
         Theme.preference = appSettings.theme;
         Theme.paletteChoice = appSettings.palette;
+        Theme.motionChoice = appSettings.motion;
         window.applyTextScale();
         meterMode = appSettings.meterMode;
         tier = appSettings.controlsOnOpen === "last"
@@ -1614,6 +1625,7 @@ ApplicationWindow {
         onApplied: {
             Theme.preference = appSettings.theme;
             Theme.paletteChoice = appSettings.palette;
+            Theme.motionChoice = appSettings.motion;
             window.applyTextScale();
             window.meterMode = appSettings.meterMode;
             EncoderController.keepPartialOutput = appSettings.keepPartial;
@@ -3213,14 +3225,14 @@ ApplicationWindow {
                                     visible: tabItem.modelData.badge.length > 0
                                     implicitWidth: Math.max(16, badgeText.implicitWidth + 8)
                                     implicitHeight: 14
-                                    color: Theme.accent
+                                    color: Theme.accentFill
                                     Text {
                                         id: badgeText
                                         anchors.centerIn: parent
                                         text: tabItem.modelData.badge
                                         font.pixelSize: Theme.fontMicro
                                         font.family: Theme.monoFamily
-                                        color: Theme.bg
+                                        color: Theme.accentText
                                     }
                                 }
                             }

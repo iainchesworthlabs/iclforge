@@ -524,6 +524,41 @@ ScrollView {
                             wrapMode: Text.WordWrap
                         }
                     }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.gap
+                        Text {
+                            text: qsTr("Motion")
+                            color: Theme.text
+                            font.pixelSize: Theme.fontNormal
+                            elide: Text.ElideRight
+                            Layout.preferredWidth: root.labelWidth
+                        }
+                        SegmentedControl {
+                            objectName: "settingsMotion"
+                            accessibleName: qsTr("Motion")
+                            currentValue: HearthController.motion
+                            model: [
+                                { value: "system", label: qsTr("System") },
+                                { value: "reduced", label: qsTr("Reduced") },
+                                { value: "full", label: qsTr("Full") }
+                            ]
+                            onSelected: function(value) { HearthController.motion = value; }
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.gap
+                        Item { Layout.preferredWidth: root.labelWidth }
+                        Text {
+                            Layout.fillWidth: true
+                            text: qsTr("Reduced draws the waiting mark as three still squares instead of a turning spinner. "
+                                      + "System follows the desktop's own setting for animation.")
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSmall
+                            wrapMode: Text.WordWrap
+                        }
+                    }
                 }
 
                 Card {

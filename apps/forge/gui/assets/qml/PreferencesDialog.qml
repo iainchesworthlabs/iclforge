@@ -35,6 +35,7 @@ Dialog {
     // The working copy.
     property string themeChoice: "system"
     property string textScaleChoice: "100"
+    property string motionChoice: "system"
     property string paletteChoice: "signal"
     property string controlsChoice: "guided"
     property string meterChoice: "coded"
@@ -58,6 +59,7 @@ Dialog {
     onAboutToShow: {
         themeChoice = settings.theme;
         textScaleChoice = settings.textScale;
+        motionChoice = settings.motion;
         paletteChoice = settings.palette;
         controlsChoice = settings.controlsOnOpen;
         meterChoice = settings.meterMode;
@@ -184,6 +186,24 @@ Dialog {
                 }
                 PrefsNote {
                     text: qsTr("Every size in the window follows this; 100% is the size it is drawn at. System takes the text size the desktop reports and counts 9 pt as 100%, so on a desktop whose base size is larger the window starts larger too. Some panels still hold their controls at a fixed height and can clip the largest sizes — docs/forge/gui/accessibility.md says which.")
+                }
+
+                Item { Layout.preferredHeight: Theme.space2 }
+
+                PrefsLabel { text: qsTr("Motion") }
+                SegmentedControl {
+                    objectName: "prefsMotion"
+                    accessibleName: qsTr("Motion")
+                    model: [
+                        { value: "system", label: qsTr("System") },
+                        { value: "reduced", label: qsTr("Reduced") },
+                        { value: "full", label: qsTr("Full") },
+                    ]
+                    currentValue: root.motionChoice
+                    onSelected: (value) => root.motionChoice = value
+                }
+                PrefsNote {
+                    text: qsTr("Reduced draws the waiting mark as three still squares instead of a turning spinner, and holds the Guided wizard's movement preview still. System follows the desktop's own setting for animation.")
                 }
 
                 Item { Layout.preferredHeight: Theme.space2 }
@@ -568,6 +588,7 @@ Dialog {
                 onClicked: {
                     settings.theme = root.themeChoice;
                     settings.textScale = root.textScaleChoice;
+                    settings.motion = root.motionChoice;
                     settings.palette = root.paletteChoice;
                     settings.controlsOnOpen = root.controlsChoice;
                     settings.meterMode = root.meterChoice;

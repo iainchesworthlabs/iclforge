@@ -158,7 +158,7 @@ Dialog {
                 font.pixelSize: Theme.fontSmall
                 font.family: Theme.monoFamily
             }
-            BusyIndicator {
+            BusyMark {
                 objectName: "oiBusyIndicator"
                 visible: ObjectDecodeController.busy
                 running: ObjectDecodeController.busy

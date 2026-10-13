@@ -1,6 +1,6 @@
 # Copies the family's shared QML components (apps/shared/theme/assets/qml/*.qml: Theme, Card,
 # SectionHeader, StatTile, AppButton, AppCheckBox, IconButton, AppSlider, AppTextField, AppComboBox, RailBlock,
-# SegmentedControl, FocusRing) into a Qt
+# SegmentedControl, FocusRing, BusyMark) into a Qt
 # application's own assets/qml/shared/ directory, rewriting `import ForgeGui` to that
 # application's own module URI (Forge GUI's own is ForgeGui, so its copies are the sources byte
 # for byte) - generated INTO the source tree (ignored by
@@ -41,7 +41,8 @@
 #                list of generated file paths
 function(iclforge_stage_shared_qml module_uri out_dir out_files_var)
     set(names Theme.qml Card.qml SectionHeader.qml StatTile.qml AppButton.qml AppCheckBox.qml
-              IconButton.qml AppSlider.qml AppTextField.qml AppComboBox.qml RailBlock.qml SegmentedControl.qml FocusRing.qml)
+              IconButton.qml AppSlider.qml AppTextField.qml AppComboBox.qml RailBlock.qml SegmentedControl.qml FocusRing.qml
+              BusyMark.qml)
     file(MAKE_DIRECTORY "${out_dir}")
     get_property(tracked GLOBAL PROPERTY ICLFORGE_SHARED_QML_CONFIGURE_DEPENDS)
     set(generated)

@@ -35,7 +35,7 @@ the engine as constructor arguments, which a singleton factory cannot supply).
 
 ## What's translated today
 
-Every catalogue is complete. The six files carry 984 messages each, the count the pseudo-locale
+Every catalogue is complete. The six files carry 1,017 messages each, the count the pseudo-locale
 `xx` below has too — the window chrome, the header buttons, the tab names, the Guided wizard, the
 whole Preferences dialog, the longer explanatory `PrefsNote` paragraphs through the
 Format/AC-4/Objects/Coding tools/Metadata tabs, the QC, Inspect objects and Open stream dialogs,
