@@ -32,6 +32,10 @@
       "commit": "262363c4a59fee83ae61b6a922d6a9b7a055a66f",
       "what": "Release build on Windows from cmake --preset config-windows-msvc (MSVC, Ninja) with Qt 6.8.3 msvc2022_64: forge, forge-gui, hearth and crucible, built and used on 2026-10-13"
     },
+    "f8bcff0e6": {
+      "commit": "f8bcff0e655c23a7335345385c9737fecf018a6c",
+      "what": "Release build on Windows from cmake --preset config-windows-msvc (MSVC, Ninja) with Qt 6.8.3 msvc2022_64: crucible, built from this commit and used on 2026-10-13"
+    },
     "6c14c0b96": {
       "commit": "6c14c0b96b78d4f8be3c6db5cfc86ec1ea87e087",
       "what": "the tree the picture was last taken from, on 2026-10-12, with the offscreen platform plugin (QT_QPA_PLATFORM=offscreen, the system fonts on QT_QPA_FONTDIR)"
@@ -788,6 +792,12 @@
       "program": "crucible",
       "by_hand": "crucible --shot <png> --page room --language ar --place \"Hearth=0.2,0.15,0.6\" --place \"Microsoft Edge=0.85,0.7,0.0\", staged as tools/pictures/README.md says under \"Crucible\". Not taken by the script: the capture reads the person's own settings, starts the engine and lists what is running.",
       "build": "262363c4a"
+    },
+    {
+      "path": "docs/crucible/screenshots/crucible-lyrics.png",
+      "program": "crucible",
+      "by_hand": "crucible --shot <png> --page room --size 1480x1280 --place \"Hearth=0.2,0.15,0.6\" --place \"Microsoft Edge=0.85,0.7,0.0\" --lyrics \"Hearth=examples/karaoke/auld-lang-syne/auld-lang-syne.lrc@00:05.75\", run from the repository's root and staged as tools/pictures/README.md says under \"Crucible\", except that step 3 starts hearth with the example's song six times over (examples/karaoke/auld-lang-syne/auld-lang-syne.ac3) in place of night-garden.ec3, so that it is still playing when the capture is taken, and that the throwaway settings key also holds behaviour/showSilentApps = false. Hearth publishes no media session, so the strip is started by hand and the song is at 5.75 s when the window is grabbed (\"brought\" is the word being sung). Not taken by the script: the capture reads the person's own settings, starts the engine and lists what is running, and every application with an audio session on the computer is listed, so a chat client's idle session shows through.",
+      "build": "f8bcff0e6"
     },
     {
       "path": "docs/hearth/screenshots/android-idle-first-run.png",

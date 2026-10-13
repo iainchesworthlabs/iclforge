@@ -44,6 +44,27 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Crucible: a capture can show the lyric strip, and the Room page's guide has a picture of it**
+
+- **`crucible --shot <png> --lyrics "Name=<file>[@<time>]"` imports a lyrics file against a listed
+  application and selects that application in the room.** With a time (`5.75` seconds, or `0:05.75`
+  as an `.lrc` writes it) the strip is started by hand so that the song is at that time when the
+  window is grabbed, which is what a picture of the line being sung needs. Without one the strip
+  follows the application's media session, whatever that says. A capture whose lyrics cannot be
+  shown (no application of that name after six seconds, a file that cannot be read, a time given
+  to a file with no times) takes no picture and exits with code 3, so a picture is never taken of
+  what was not asked for. The window gained `selectApplication()` for it, and the option's parsing
+  and the clock's start are held by Catch2 cases (`test_capture_lyrics.cpp`).
+  [The pictures' README](tools/pictures/README.md#crucible) lists the options of a capture.
+- **`crucible --size <width>x<height>` opens the window at that size**, for a capture of a page that
+  runs on below the 1480 by 820 it opens at: the Room's right rail does not scroll, and its Lyrics
+  block starts below the fold of the default window.
+- **The Room page's guide shows the lyric strip.** "Auld Lang Syne" from the karaoke example,
+  imported against Hearth and started by hand at 5.75 s, because Hearth publishes no media session
+  to follow. It is taken by hand like Crucible's other pictures: the capture reads the person's
+  settings, starts the engine and needs the application it shows to be running. The karaoke guide
+  links to it.
+
 **Karaoke in E-AC-3: what the boards do, and the pages that said otherwise**
 
 - **The Hearth sink pages say what each board does with a karaoke stream.** The S3 reproduces
@@ -4498,6 +4519,15 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**Crucible: the lyric strip no longer makes the Room's right rail wider than the window**
+
+- **The strip's buttons wrap.** Start, Stop, Follow the media session and the nudge were one row that
+  could not be narrower than all of them side by side, so with timed lyrics imported the strip made
+  the rail, and every card in it, wider than the window, cut off at its right edge. They are a
+  flowing row now, and the nudge's three move together. Found taking the picture of the strip; the
+  Qt Quick cases had given the strip a free 320 pixels, and one now holds the column to the
+  strip's own width.
 
 **Android: `std::expected` no longer loses a payload that has tail padding**
 

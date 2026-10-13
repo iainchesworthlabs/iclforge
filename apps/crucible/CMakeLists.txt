@@ -392,6 +392,8 @@ else()
 
     qt_add_executable(crucible
         ui/src/main.cpp
+        ui/src/capture_lyrics.cpp
+        ui/src/capture_lyrics.hpp
         ui/src/crucible_controller.cpp
         ui/src/crucible_controller.hpp
         ui/src/lyric_osc.cpp

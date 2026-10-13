@@ -265,3 +265,7 @@ font that has the drop-down arrow, which the offscreen platform does not. What t
 and the status pill on the left, the combo-box chevrons on the left of their controls, the room
 plan's L speaker still on the left, the endpoint table's heads unclipped, and no missing-glyph
 boxes in the Arabic or Hebrew text.
+
+The other options of a capture are `--page`, `--place`, `--lyrics` and `--size`.
+[The pictures' README](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/pictures/README.md#crucible)
+says what each does and how the program's own pictures are taken.
