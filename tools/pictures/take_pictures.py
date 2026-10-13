@@ -57,20 +57,33 @@ import make_media  # noqa: E402
 TIMEOUT_S = 180
 
 
+def placeholders(out: Path, media: Path, scratch: Path) -> dict[str, str]:
+    """What each placeholder stands for: where the picture goes, the media folder and a folder
+    for what the run writes besides. A media path is written with forward slashes, which every
+    program here takes and which is what a settings value shows."""
+    return {"out": str(out), "media": media.as_posix(), "scratch": scratch.as_posix()}
+
+
+def fill(text: str, values: dict[str, str]) -> str:
+    return check_doc_pictures.PLACEHOLDER.sub(lambda m: values[m.group(1)], text)
+
+
 def expand(args: list[str], out: Path, media: Path, scratch: Path) -> list[str]:
-    """The arguments with their placeholders filled: where the picture goes, the media folder
-    and a folder for what the run writes besides. A media path is written with forward slashes,
-    which every program here takes and which is what a settings value shows."""
-    values = {"out": str(out), "media": media.as_posix(), "scratch": scratch.as_posix()}
-    return [check_doc_pictures.PLACEHOLDER.sub(lambda m: values[m.group(1)], arg) for arg in args]
+    """The arguments with their placeholders filled."""
+    values = placeholders(out, media, scratch)
+    return [fill(arg, values) for arg in args]
 
 
-def environment(document: dict, entry: dict, base: dict[str, str]) -> dict[str, str]:
-    """This process's environment, as the entry's environment and then the entry change it."""
+def environment(document: dict, entry: dict, base: dict[str, str],
+                values: dict[str, str] | None = None) -> dict[str, str]:
+    """This process's environment, as the entry's environment and then the entry change it. The
+    entry's own variables may name a file in the media folder (a signing key a picture is to
+    show as loaded), so their placeholders are filled from `values` when it is given."""
     named = document["environments"][entry["environment"]]
     env = {k: v for k, v in base.items() if k not in set(named.get("unset", []))}
     env.update(named.get("set", {}))
-    env.update(entry.get("env", {}))
+    env.update({k: fill(v, values) if values is not None else v
+                for k, v in entry.get("env", {}).items()})
     return env
 
 
@@ -172,9 +185,10 @@ def take(document: dict, entries: list[dict], build: Path, media: Path,
             shot = scratch / (Path(entry["path"]).stem + ".png")
             log = scratch / (Path(entry["path"]).stem + ".log")
             shot.unlink(missing_ok=True)
+            values = placeholders(shot, media, scratch)
             code = desktop.run(
                 [str(program), *expand(entry["args"], shot, media, scratch)],
-                environment(document, entry, dict(os.environ)), ROOT,
+                environment(document, entry, dict(os.environ), values), ROOT,
                 entry.get("timeout_s", TIMEOUT_S), log)
             if code != 0 or not shot.is_file():
                 failed.append(entry["path"])
