@@ -11,7 +11,8 @@
 // The outputs HearthController::start() and refreshOutputDevices() use in
 // place of this machine's own, set only through
 // HearthController::set_test_outputs() - the Qt Quick suites'
-// qml_test_main.cpp, never the shipped window. The same seam shape
+// qml_test_main.cpp, and the capture that plays to nothing (`hearth --sing`,
+// silent_outputs.hpp), never a window a person runs. The same seam shape
 // CrucibleController::set_test_services() gives the Crucible suites, for the
 // same reason: a headless runner has no audio device to play into (no
 // PipeWire daemon on a CI container, and a developer's own machine should

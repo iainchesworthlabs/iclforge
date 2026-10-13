@@ -79,6 +79,11 @@ class MicrophoneSession {
 
     [[nodiscard]] std::vector<InputDevice> devices() { return input_->devices(); }
 
+    // Takes another input in place of the one it was made with, which is closed first and kept
+    // nowhere: for a capture whose microphone is a recording (VoiceFileInput), never for a person's
+    // own run. What the singer did is forgotten with the old input.
+    void use_input(std::unique_ptr<MicrophoneInput> input);
+
     // Opens `device_id` (empty: the default input). The error is a sentence for the page.
     [[nodiscard]] std::expected<void, std::string> start(const std::string& device_id);
     // Closes it and forgets what the singer did; the reference stays.

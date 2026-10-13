@@ -149,6 +149,13 @@ class MicrophoneController : public QObject {
     // A test seam: a take's file may hold this many bytes, and the take then ends by itself as
     // it does when a disk fills. 0 is none; nothing but the tests sets it.
     void limit_take_bytes_for_test(std::uint64_t bytes);
+    // A capture's microphone (main.cpp's `--sing <file>`, which a person never gets): the WAV file
+    // at `path` stands in for the input, sung along to the item as the item is heard
+    // (VoiceFileInput), so that a picture can show a performance on a machine with no singer. No
+    // device is opened, so MI2 holds as it does for the tests: a microphone is still only ever
+    // opened by a person's press on a real one, and here there is none to open. Closes the
+    // microphone first. False, and `why` says so, for a file that is not a WAV file.
+    [[nodiscard]] bool use_voice_file(const QString& path, QString* why = nullptr);
     void setInputDelayMs(int ms);
     void setOffsetMs(int ms);
     [[nodiscard]] double level() const { return level_; }
@@ -157,6 +164,9 @@ class MicrophoneController : public QObject {
     [[nodiscard]] double silentSeconds() const { return silent_seconds_; }
     [[nodiscard]] QString referenceStatus() const { return reference_status_; }
     [[nodiscard]] QString referenceText() const { return reference_text_; }
+    // The item it was last asked to load (load()), which is not the item playing until the page
+    // has said so: "" before that, and when nothing is.
+    [[nodiscard]] QString itemPath() const { return item_path_; }
     [[nodiscard]] QVariantMap live() const { return live_; }
     [[nodiscard]] QVariantMap score() const { return score_; }
     [[nodiscard]] int scoreRevision() const { return score_revision_; }

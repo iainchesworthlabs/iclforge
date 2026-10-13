@@ -27,6 +27,7 @@ add_library(hearth_engine STATIC
     src/reference_melody.cpp
     src/session.cpp
     src/settings_model.cpp
+    src/silent_sink.cpp
     src/sink_form.cpp
     src/stream_decoder.cpp
     src/take_recorder.cpp

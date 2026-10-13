@@ -446,6 +446,16 @@ Two things on the card change what "within" means, and the card says when either
   lines with no notes were not scored. It stays until you turn the microphone on again or choose
   another song. It is shown there and kept nowhere: nothing is ranked, named or sent.
 
+![The singer view part way through the last word of the example's last line, sung along to: the two lines before it each marked with three dots and a percentage, the line being sung large with its word part way through its fill, and under the words the pitch ribbon, the tune as bars and the singer's line over them on the same notes, with a mark for now](screenshots/hearth-singer-view-singing.png)
+
+*The singer view 14.9 s into the example, with the performance going on: the marks under the lines
+already sung, and the ribbon with the voice on the tune. `hearth --smoke-shot singing.png --page
+singer --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --sing
+examples/karaoke/auld-lang-syne/parts/vocal-1-lead.wav --seek 14900` ([Hearth's command
+line](../hearth/index.md#command-line)). There is no singer: the example's own lead vocal is the
+microphone, sung along to the song as the song is heard, and the song goes to an output that plays
+to nothing, so the picture is taken with no microphone opened and no sound made.*
+
 A song you sang only part of scores low as a whole, because the score is over all of the tune's
 time. The marks say which lines were the ones.
 
