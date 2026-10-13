@@ -82,7 +82,8 @@ A state the program cannot be put in from its command line needs the program to 
 harness: `forge-gui --smoke-shot` takes `prop=value` for every property of its controller and its
 window, `project=<file.forgeproj>` and `karaokeStep=<step>`
 (`apps/forge/gui/src/main.cpp`), and `hearth --smoke-shot` takes `--page`, `--open`, `--seek`,
-`--size` and `--setting` ([Hearth's command line](../../docs/hearth/index.md#command-line)).
+`--size`, `--setting`, and `--sing` with `--finish-singing`
+([Hearth's command line](../../docs/hearth/index.md#command-line)).
 
 ## The environment
 
@@ -103,6 +104,15 @@ network for sinks, which on Windows asks for a firewall rule with a UAC prompt.
 `hearth --seek` starts the item to show a position, which is a moment of sound at the computer's
 output. The files `make_media.py` writes are silent from 0.8 s to 2.4 s, and the pictures that do
 not need meters are parked there (`--seek 1500`).
+
+A picture of a **performance** (the Microphone card's ribbon, the marks under the lines sung, its
+summary) is `hearth --sing <voice.wav> --seek <ms>`, with `--finish-singing` for the summary. The
+file is the microphone and the song plays to an output that plays to nothing, so no microphone is
+opened, nothing is heard, and the run needs no sound device; it takes as long as the song takes to
+reach `--seek`, in real time (the song is heard about two seconds after it is started, which a
+voice begun with the start would be early by, and is why the file is placed by where the song is
+heard). With `QT_FORCE_STDERR_LOGGING=1` the program says in its log how much of the tune the voice
+scored and the lag it measured, which for the example's own lead vocal is about 10 ms.
 
 ## Crucible
 

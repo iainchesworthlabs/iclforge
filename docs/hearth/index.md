@@ -363,6 +363,8 @@ at start, and take screenshots of the window with nobody at the machine.
 | `--open <file>` | A file named as an option, once for each `--open`, in the order given with any others: it cannot be read as anything else, so it is the form to write in a script. It queues and plays as a file on its own does; a capture or `--seek` cues the first file instead (loaded, not playing), so the Play, Media and Karaoke pages show it |
 | `--seek <ms>` | Starts the first file at that position in milliseconds and holds it paused there, so a lyric view shows a word part way through (a stopped item has no position to show). It plays a moment of sound at the output it goes to, and needs a file |
 | `--page <name>` | Opens on a page (`play`, `media`, `speakers`, `decoder`, `network`, `settings` or `karaoke`), on a dialog over the Play page (`firstrun`, `shortcuts`, `about` or `licences`), or on the Karaoke page with the singer view open (`singer`) or the window that times the lyrics (`timing`, which opens once a file is loaded). A capture draws the singer view in the window at its own size, not on the whole screen, so that the picture does not depend on the monitor |
+| `--sing <file.wav>` | A capture of a performance: the file is the singer, and the microphone is the file. The first file plays from its start to the `--seek` position with the Microphone card on, in real time, and the picture is taken as it gets there, with the pitch ribbon, the marks under the lines sung and the score as they are while somebody sings. The file is sung along to the song as the song is heard, so a recording that is in time with it reads as in time whatever the output adds. **No microphone is opened and nothing is played**: the song goes to an output that plays to nothing (the window calls it "Speakers"), so a capture is silent and runs on a computer with no sound device, and the rule that only a person's press opens a microphone is not bent, because no microphone is there to open. The headphones answer is taken as yes, since a file has no room for the backing to leak into. It needs `--smoke-shot` or `--shot`, a file, `--seek` and `--page karaoke` or `--page singer`, and without them it is not used, and the log says which |
+| `--finish-singing` | With `--sing`: holds the song at the `--seek` position and ends the performance before the picture, as a person's press on **Turn off** does, so that the Microphone card shows its **Last performance** |
 | `--decoder-format <eac3\|ac4>` | Which tab the Decoder page opens on |
 | `--open-output-picker` | Opens the output picker over the page |
 | `--size <width>x<height>` | Opens the window at that size in pixels, as `--size 1280x1400`, for a picture of a page whose cards run on below the size the window opens at. A window is not made taller than the screen it is on |
@@ -387,8 +389,10 @@ A capture runs against a scratch settings store, so it neither reads nor changes
 queue, devices or pairings, and it does not show the first-run dialog unless `--page firstrun`
 asks for it. Its exit code is 0 for a picture saved, 2 when the picture could not be saved, and
 3 when an `--open` file did not load, or did not reach its `--seek` position, within fifteen seconds
-(the picture is saved all the same, for what the window said about the file). A script that
-regenerates screenshots can stop on that.
+(with `--sing` the song takes as long again as its position is from the start), or when `--sing`'s
+file is not a WAV file or the song has no melody to score against (the picture is saved all the
+same, for what the window said about the file). A script that regenerates screenshots can stop on
+that.
 
 ```sh
 QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=C:\Windows\Fonts \

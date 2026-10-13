@@ -62,6 +62,18 @@ struct CommandLine {
     // longer than the window opens at (the Karaoke page's cards run on below it). The system
     // still has its say: a window is not made taller than the screen it is on.
     std::optional<std::pair<int, int>> size;
+    // --sing <file>: a WAV file as the singer, for a capture of a performance. The microphone is
+    // the file, sung along to the first item as it is heard (VoiceFileInput), from its start to
+    // --seek, and the sound goes to no output at all, so a picture of the Microphone card's
+    // ribbon, a line's mark or the summary needs no singer, no microphone and no speaker.
+    // Nothing a person can reach opens a microphone but their press on the card (MI2); this opens
+    // none, so it never bends that, and it is dropped, and said so, wherever it would: without a
+    // capture, a file to sing along to, a --seek to sing to, or a page that has the card
+    // (karaoke or singer).
+    QString sing_file;
+    // --finish-singing: end the performance before the picture, as a person's press on "Turn
+    // off" does, so that the card shows the summary ("Last performance"). Needs --sing.
+    bool finish_singing = false;
     // What was not understood, for the log.
     QStringList warnings;
 
@@ -79,6 +91,7 @@ struct CommandLine {
     // A bare flag, not a "--name value" pair: checked separately so it can be the last
     // argument with nothing following it.
     out.open_output_picker = args.contains(QLatin1String("--open-output-picker"));
+    out.finish_singing = args.contains(QLatin1String("--finish-singing"));
     // After a bare "--" every argument is a file, whatever it looks like (a file called
     // `--page`, or `-x.ac3`).
     bool files_only = false;
@@ -145,6 +158,12 @@ struct CommandLine {
                 out.warnings.push_back(
                     QStringLiteral("--size takes <width>x<height> in pixels, as 1280x1400"));
             }
+        } else if (arg == QLatin1String("--sing")) {
+            if (!has_value) {
+                out.warnings.push_back(QStringLiteral("--sing needs a WAV file"));
+            } else {
+                out.sing_file = args[i + 1];
+            }
         } else if (arg == QLatin1String("--setting")) {
             const qsizetype eq = has_value ? args[i + 1].indexOf(QLatin1Char('=')) : -1;
             if (eq <= 0) {
@@ -170,6 +189,29 @@ struct CommandLine {
         out.warnings.push_back(QStringLiteral(
             "--setting is for a capture's scratch settings (--shot or --smoke-shot), and is not used"));
         out.settings.clear();
+    }
+    if (!out.sing_file.isEmpty()) {
+        // Each reason alone is enough to drop it, and the first that holds is the one said.
+        QString why;
+        if (out.shot_path.isEmpty()) {
+            why = QStringLiteral("--sing is for a capture (--shot or --smoke-shot)");
+        } else if (out.open_files.isEmpty()) {
+            why = QStringLiteral("--sing has nothing to sing along to without a file");
+        } else if (!out.seek_ms) {
+            why = QStringLiteral(
+                "--sing needs --seek <ms>, how far into the song the voice sings before the picture");
+        } else if (out.page != QLatin1String("karaoke") && out.page != QLatin1String("singer")) {
+            why = QStringLiteral(
+                "--sing is for --page karaoke or --page singer, which have the Microphone card");
+        }
+        if (!why.isEmpty()) {
+            out.warnings.push_back(why + QStringLiteral(", and is not used"));
+            out.sing_file.clear();
+        }
+    }
+    if (out.finish_singing && out.sing_file.isEmpty()) {
+        out.warnings.push_back(QStringLiteral("--finish-singing ends what --sing begins, and there is no --sing in use"));
+        out.finish_singing = false;
     }
     return out;
 }
