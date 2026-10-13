@@ -13,7 +13,7 @@
 # the distributed package. It listens and takes threads, so a board's build (the player half of
 # libs/sendspin alone) and a core-only build leave it out (the root CMakeLists.txt).
 # ---------------------------------------------------------------------------
-add_library(iclforge_sink STATIC src/sink.cpp src/store.cpp src/lyric_frame.cpp)
+add_library(iclforge_sink STATIC src/sink.cpp src/store.cpp src/lyric_frame.cpp src/status_json.cpp)
 add_library(iclforge::sink ALIAS iclforge_sink)
 target_include_directories(iclforge_sink PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")

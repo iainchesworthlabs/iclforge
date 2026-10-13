@@ -489,6 +489,9 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
             peer.activity = activity_;
             peer.streaming = streaming_;
             peer.output = output_now();
+            if (burst_taken_) {
+                peer.decoder = bursts_->decoder();
+            }
             return peer;
         });
     }
