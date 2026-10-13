@@ -111,9 +111,10 @@ choice does not apply:
   applied; unless it is karaoke-capable, V1 and V2 play from its surround speakers. The page has a
   button to choose another output.
 - The output is a **network group**: a sink that lists the karaoke settings (and, for an E-AC-3
-  stream, `eac3` among the codecs it reproduces karaoke for) is sent the stream as it is and told
-  your choice, and decodes it itself; one that does not is sent PCM that Hearth has decoded with
-  the choice applied. Every member plays one reproduction, at the same levels (see
+  stream, `eac3` among the codecs it reproduces karaoke for) and decodes as many channels as the
+  stream has is sent the stream as it is and told your choice, and decodes it itself; one that
+  does not (an ESP32-C6 decodes two channels) is sent PCM that Hearth has decoded with the
+  choice applied. Every member plays one reproduction, at the same levels (see
   [the Hearth page](../hearth/index.md#karaoke)).
 - The stereo fold is **Lt/Rt**, for which Annex C defines no reproduction. The page has a button to
   use Lo/Ro, which does.

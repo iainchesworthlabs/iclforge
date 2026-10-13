@@ -1114,3 +1114,70 @@ TEST_CASE("sink_output_text: a sink says whether it passes the bits on or decode
     facts.iclforge_state->decoder.reset();
     CHECK(text() == "decoded by the sink");
 }
+
+// ---- a network sink's request for the singer's karaoke choice (D8) --------------------------------
+
+TEST_CASE("decoder_map_from_request: a sink's request is the page's own settings keys, and only those it asked for",
+          "[hearth][network][karaoke]") {
+    namespace sp = iclforge::sendspin::player;
+    sp::Request request;
+    // Nothing asked for is nothing to apply.
+    CHECK(iclforge::hearth::ui::decoder_map_from_request(request).isEmpty());
+
+    request.decoder.karaoke = sp::Karaoke::kOff;
+    request.decoder.karaoke_vocals = sp::KaraokeVocals::kV2;
+    request.decoder.karaoke_vocal1_db = -6.0;
+    const QVariantMap map = iclforge::hearth::ui::decoder_map_from_request(request);
+    CHECK(map.size() == 3);
+    // The page calls "no reproduction" asCoded.
+    CHECK(map.value(QStringLiteral("karaoke")).toString() == QStringLiteral("asCoded"));
+    CHECK(map.value(QStringLiteral("karaokeVocals")).toString() == QStringLiteral("v2"));
+    CHECK(map.value(QStringLiteral("karaokeVocal1Db")).toDouble() == -6.0);
+
+    // Applied the way setDecoderSettings() does, onto what is set: the keys asked for move, the
+    // rest do not.
+    iclforge::hearth::DecoderSettings base;
+    base.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    base.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
+    base.karaoke_melody_db = 3.0;
+    base.karaoke_vocal2_db = -2.0;
+    const iclforge::hearth::DecoderSettings next = iclforge::hearth::ui::decoder_settings_from_map(map, base);
+    CHECK(next.karaoke == iclforge::ac3::KaraokeReproduction::kOff);
+    CHECK(next.karaoke_vocals == iclforge::ac3::KaraokeVocals::kV2);
+    CHECK(next.karaoke_vocal1_db == -6.0);
+    CHECK(next.karaoke_melody_db == 3.0);
+    CHECK(next.karaoke_vocal2_db == -2.0);
+
+    // The other names of each enumeration.
+    sp::Request other;
+    other.decoder.karaoke = sp::Karaoke::kCapable;
+    other.decoder.karaoke_vocals = sp::KaraokeVocals::kNone;
+    const QVariantMap again = iclforge::hearth::ui::decoder_map_from_request(other);
+    CHECK(again.value(QStringLiteral("karaoke")).toString() == QStringLiteral("capable"));
+    CHECK(again.value(QStringLiteral("karaokeVocals")).toString() == QStringLiteral("none"));
+    other.decoder.karaoke = sp::Karaoke::kAware;
+    other.decoder.karaoke_vocals = sp::KaraokeVocals::kBoth;
+    const QVariantMap last = iclforge::hearth::ui::decoder_map_from_request(other);
+    CHECK(last.value(QStringLiteral("karaoke")).toString() == QStringLiteral("aware"));
+    CHECK(last.value(QStringLiteral("karaokeVocals")).toString() == QStringLiteral("both"));
+}
+
+TEST_CASE("decoder_changes_from_sink_request: only a member of the group being played to changes the choice",
+          "[hearth][network][karaoke]") {
+    namespace ui = iclforge::hearth::ui;
+    ui::NetworkOutputStatus::PendingRequest pending;
+    pending.group_id = "g1";
+    pending.sink_name = "Kitchen";
+    pending.request.decoder.karaoke_vocals = iclforge::sendspin::player::KaraokeVocals::kV1;
+
+    // The group this computer plays to: its member's request is the singer's.
+    const QVariantMap changes = ui::decoder_changes_from_sink_request(pending, QStringLiteral("g1"));
+    REQUIRE(changes.size() == 1);
+    CHECK(changes.value(QStringLiteral("karaokeVocals")).toString() == QStringLiteral("v1"));
+
+    // Another group's member, a sink in no group, and no group being played to: nothing.
+    CHECK(ui::decoder_changes_from_sink_request(pending, QStringLiteral("g2")).isEmpty());
+    CHECK(ui::decoder_changes_from_sink_request(pending, QString()).isEmpty());
+    pending.group_id.clear();
+    CHECK(ui::decoder_changes_from_sink_request(pending, QStringLiteral("g1")).isEmpty());
+}
