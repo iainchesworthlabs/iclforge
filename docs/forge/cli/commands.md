@@ -1,6 +1,6 @@
 # Commands
 
-The command list from the usage text, reproduced rather than paraphrased — 45 commands, as
+The command list from the usage text, reproduced rather than paraphrased — 46 commands, as
 a Windows build without `-DICLFORGE_BUILD_ADM=ON` prints them. The two ADM commands read
 `UNAVAILABLE HERE` because that flag is off; `spatial` does not, because Windows is the one
 platform with a spatial backend. Nothing in the build compares this block against the binary, so
@@ -21,6 +21,7 @@ Usage:
   forge atmos-adm     <in.adm.wav> <out.ec3|out.ac4> [bitrate_kbps] [programme_id] (UNAVAILABLE HERE)
   forge atmos-iab     <in.iab|in.mxf> <out.ec3|out.ac4> [bitrate_kbps] (UNAVAILABLE HERE)
   forge atmos-cbi     <in.wav> <out.ec3> [bitrate_kbps] [layout] (a channel-based-immersive bed (Dolby's dee_ddpjoc_encoder --input-format cbi_wav shape) straight to DD+ JOC E-AC-3 with program.bed != 0 and 0 dynamic objects; layout is one of 5.1.4, 7.1.4, 9.1.6 (default: inferred from the file's channel count))
+  forge lyrics-to-lrc <in.lrc|in.srt|in.ass|in.kar> <out.lrc> (write a lyrics file as the UTF-8 LRC every player reads, whatever its format, with a duet's singers, word times and the gaps between cues; lyrics-encoding=<page> reads a file in a code page (windows-1252, shift-jis, gbk, ...). Never over the file it reads, and over another file only with overwrite=1)
   forge strip-objects <in.ec3> <out.ec3>                     (remove the JOC/OAMD object layer from a DD+ stream, leaving a bit-identical 5.1 bed)
   forge record        <out.ac3|out.ec3|out.ac4> [seconds] [bitrate_kbps] [device_index] (capture straight to a file; layout=/codec=/container= decide its shape, codec=ac4 encoding AC-4)
   forge live          <out.ac3|out.ec3|out.ac4> <capture_device> [seconds] [bitrate_kbps] [monitor_device] [passthrough_device] [mode] (capture -> encode -> live monitor and/or passthrough; codec=ac4 encodes AC-4, which its monitor decodes and a receiver gets as a 5.1 AC-3 leg)
@@ -394,6 +395,27 @@ forge encode backing.wav sing-along.ac3 384 L,C,R,Cs lyrics=words-jp.lrc lyrics-
 forge encode backing.wav sing-along.ac3 384 L,C,R,Cs src=melody.wav src=lead.wav \
     map=0.0:L,0.1:R,1.0:C,2.0:Cs bsmod=voiceover lyrics=words.srt
 # writes sing-along.ac3 and sing-along.lrc
+```
+
+### A lyrics file as UTF-8 LRC: `lyrics-to-lrc`
+
+`forge lyrics-to-lrc <in> <out.lrc>` is the conversion `lyrics=` does, with no stream and no encode,
+to a path you choose. Use it where the stream already exists and its lyrics file is the problem: a
+karaoke `.kar` or an `.lrc` in a code page that Hearth or Crucible refuses by name, an `.srt` or
+`.ass` you want as the one format every player reads. What is written is UTF-8 LRC with a duet's
+`V1:`/`V2:` markers and names, word times where the file has them, and a time with no text where a
+cue ends before the next begins; styling and positions are not carried.
+
+`lyrics-encoding=<page>` names the code page of an input that is not UTF-8 or UTF-16, from the same
+list `lyrics=` takes (see above), and without it such a file is refused with the exit code 2 and
+the page to name. The file read is never the file written, even with `overwrite=1`, so a code-page
+`song.lrc` is converted to another name and then moved over it when you are satisfied; a file that
+is already at the output is left as it was (exit code 3) unless `overwrite=1` is given. Standard
+input and output are refused (exit code 1): there is no name to read or write.
+
+```bash
+forge lyrics-to-lrc song.lrc song.utf8.lrc lyrics-encoding=windows-1251
+forge lyrics-to-lrc duet.kar duet.lrc lyrics-encoding=shift-jis
 ```
 
 ### ADM ingest — professional master files (opt-in)

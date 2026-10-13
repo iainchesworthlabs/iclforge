@@ -1740,6 +1740,125 @@ TEST_CASE("encoding: read_lyrics and place_lyrics_beside take the decoder, and w
     CHECK(read_text_file(placed.path) == "[00:01.00]Caf\xC3\xA9\n");
 }
 
+// ---- a lyrics file converted to UTF-8 LRC where the caller says (convert_lyrics_file) ------------
+
+TEST_CASE("convert_lyrics_file writes UTF-8 LRC from a file in a code page, read in the page named",
+          "[lyrics][convert]") {
+    const Folder folder;
+    const fs::path latin1 = folder.write("cafe.lrc", "[00:01.00]Caf\xE9\n[00:03.00]Cr\xE8me\n");
+    const fs::path out = folder.path() / "cafe-utf8.lrc";
+    int calls = 0;
+    const iclforge::lyrics::TextEncoding encoding{.decoder = latin1_decoder, .context = &calls};
+
+    // Without the page it is refused by name, and nothing is written.
+    const auto refused = iclforge::lyrics::convert_lyrics_file(latin1, out);
+    CHECK(refused.status == iclforge::lyrics::PlacementStatus::kUnreadable);
+    CHECK(iclforge::lyrics::is_code_page_refusal(refused.error));
+    CHECK_FALSE(fs::exists(out));
+    CHECK_FALSE(fs::exists(folder.path() / "cafe-utf8.lrc.part"));
+
+    const auto written = iclforge::lyrics::convert_lyrics_file(latin1, out, std::nullopt, encoding);
+    REQUIRE(written.status == iclforge::lyrics::PlacementStatus::kWritten);
+    CHECK(written.path == out);
+    CHECK(read_text_file(out) == "[00:01.00]Caf\xC3\xA9\n[00:03.00]Cr\xC3\xA8me\n");
+    CHECK(calls > 0);
+    // The file converted is left as it was.
+    CHECK(read_text_file(latin1) == "[00:01.00]Caf\xE9\n[00:03.00]Cr\xE8me\n");
+}
+
+TEST_CASE("convert_lyrics_file leaves a file there alone unless told to replace it",
+          "[lyrics][convert]") {
+    const Folder folder;
+    const fs::path srt = folder.write("words.srt", "1\n00:00:01,000 --> 00:00:03,000\nNew\n");
+    const fs::path existing = folder.write("mine.lrc", "[00:00.00]Mine\n");
+
+    const auto kept = iclforge::lyrics::convert_lyrics_file(srt, existing);
+    CHECK(kept.status == iclforge::lyrics::PlacementStatus::kExists);
+    CHECK(read_text_file(existing) == "[00:00.00]Mine\n");
+
+    const auto replaced = iclforge::lyrics::convert_lyrics_file(srt, existing, std::nullopt, {}, true);
+    CHECK(replaced.status == iclforge::lyrics::PlacementStatus::kWritten);
+    CHECK(read_text_file(existing) == "[00:01.00]New\n");
+}
+
+TEST_CASE("convert_lyrics_file never writes over the file it reads, even when told to replace",
+          "[lyrics][convert]") {
+    const Folder folder;
+    const fs::path source = folder.write("song.lrc", "[00:01.00]Caf\xE9\n");
+    int calls = 0;
+    const iclforge::lyrics::TextEncoding encoding{.decoder = latin1_decoder, .context = &calls};
+
+    const auto same = iclforge::lyrics::convert_lyrics_file(source, source, std::nullopt, encoding, true);
+    CHECK(same.status == iclforge::lyrics::PlacementStatus::kFailed);
+    CHECK_FALSE(same.error.empty());
+    CHECK(read_text_file(source) == "[00:01.00]Caf\xE9\n");
+    CHECK_FALSE(fs::exists(folder.path() / "song.lrc.part"));
+}
+
+TEST_CASE("convert_lyrics_file says a file that is not there is not lyrics, and writes nothing",
+          "[lyrics][convert]") {
+    const Folder folder;
+    const fs::path out = folder.path() / "out.lrc";
+    const auto missing = iclforge::lyrics::convert_lyrics_file(folder.path() / "nothing.lrc", out);
+    CHECK(missing.status == iclforge::lyrics::PlacementStatus::kUnreadable);
+    CHECK_FALSE(missing.error.empty());
+    CHECK_FALSE(fs::exists(out));
+}
+
+TEST_CASE("is_code_page_refusal is the refusal for want of a page, and nothing else",
+          "[lyrics][convert]") {
+    using iclforge::lyrics::is_code_page_refusal;
+    // A text file in a code page, an ASS script and a MIDI karaoke file, none given a decoder.
+    const auto lrc = iclforge::lyrics::parse_lyrics("[00:01.00]Caf\xE9\n");
+    REQUIRE_FALSE(lrc.has_value());
+    CHECK(is_code_page_refusal(lrc.error()));
+
+    const auto ass = iclforge::lyrics::parse_ass(
+        "[Events]\nFormat: Start, End, Text\nDialogue: 0:00:01.00,0:00:02.00,Caf\xE9\n");
+    REQUIRE_FALSE(ass.has_value());
+    CHECK(is_code_page_refusal(ass.error()));
+
+    const auto midi = iclforge::lyrics::parse_midi_karaoke(
+        midi_file({midi_words_track(midi_text(100, "Caf" + midi_byte(0xE9)))}));
+    REQUIRE_FALSE(midi.has_value());
+    CHECK(is_code_page_refusal(midi.error()));
+
+    // Not that: empty, or text that did not read in the page it was given.
+    const auto empty = iclforge::lyrics::parse_lyrics("   \n");
+    REQUIRE_FALSE(empty.has_value());
+    CHECK_FALSE(is_code_page_refusal(empty.error()));
+
+    const iclforge::lyrics::TextEncoding refusing{.decoder = refusing_decoder, .context = nullptr};
+    const auto wrong_page = iclforge::lyrics::parse_lyrics("[00:01.00]Caf\xE9\n", std::nullopt, refusing);
+    REQUIRE_FALSE(wrong_page.has_value());
+    CHECK_FALSE(is_code_page_refusal(wrong_page.error()));
+
+    CHECK_FALSE(is_code_page_refusal(""));
+}
+
+TEST_CASE("code_page_remedy names the command and the key that answer a code page", "[lyrics][convert]") {
+    const std::string_view remedy = iclforge::lyrics::code_page_remedy();
+    CHECK(remedy.find("forge lyrics-to-lrc") != std::string_view::npos);
+    CHECK(remedy.find("lyrics-encoding=") != std::string_view::npos);
+    // A sentence of its own, to follow a refusal's.
+    CHECK(remedy.ends_with('.'));
+}
+
+TEST_CASE("with_code_page_remedy follows a code page refusal and nothing else", "[lyrics][convert]") {
+    using iclforge::lyrics::with_code_page_remedy;
+    const auto refused = iclforge::lyrics::parse_lyrics("[00:01.00]Caf\xE9\n");
+    REQUIRE_FALSE(refused.has_value());
+    const std::string shown = with_code_page_remedy(refused.error());
+    CHECK(shown.starts_with(refused.error()));
+    CHECK(shown.size() > refused.error().size());
+    CHECK(shown.ends_with(std::string{iclforge::lyrics::code_page_remedy()}));
+
+    const auto empty = iclforge::lyrics::parse_lyrics("   \n");
+    REQUIRE_FALSE(empty.has_value());
+    CHECK(with_code_page_remedy(empty.error()) == empty.error());
+    CHECK(with_code_page_remedy("") == "");
+}
+
 // ---- a script made with Aegisub's karaoke templater --------------------------------------------
 // The templater (kara-templater.lua) takes the timed karaoke on lines whose Effect is empty or has
 // "karaoke" in it, writes its effects as Dialogue lines with Effect "fx", and keeps the line it made

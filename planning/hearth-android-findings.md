@@ -498,3 +498,30 @@ says otherwise.
 | D7's source | The engine feeds `metadata@v1` to a group's members; the sink prefers it and falls back to the document's tags | #1468, #1469 |
 | D8's wire form | A `client/command` carrying an `_iclforge_player` object `{"command":"decoder","decoder":{...}}`; **advice, with no reply**; the server cuts it to the keys the sink lists under `requests`; the host applies it for the group being played to, last request winning | #1471, #1473 |
 | Which vocals request | "Both" asks `aware`; V1, V2 and None ask `capable` with the vocals (the owner, 2026-10-13) | the phase 4 and 5 page |
+
+## F14: the codecs on the Shield (phase 4-0 and spike P1, 2026-10-13)
+
+The renderer, the AC-3 and AC-4 libraries and the test server were cross-built for `arm64-android` with
+the NDK r26.1 through `config-android-arm64` and run on the Shield by `adb` (CPU only: no HDMI, and the
+receiver's state does not matter). **Measured** unless a line says otherwise.
+
+| What | Result |
+|---|---|
+| `iclforge-render-tests` | 65 of 65 cases, 2,883 assertions |
+| `iclforge-ac3-tests` | 991 of 1,011 pass in 28 s; 10 skipped (x86 AVX2 tiers); **10 fail, all one cause, below** |
+| `iclforge-ac4-tests` | 543 of 550 pass in 559 s; 4 skipped; 3 fail: two read a text fixture whose line ends were converted to CRLF by the checkout on the machine that pushed it, and one (`I-frames fall where the caller names them`, an encoder test) is not understood and may be the same cause as the ten |
+| Decode, one core, a quiet device ([`iclforge-perf`](../tests/performance/test_performance.cpp)) | AC-3 5.1: 0.34 ms a 32 ms frame (**94 times real time**); E-AC-3 5.1: 0.40 ms (80x); Atmos/JOC with four objects: 1.30 ms (**25x**); AC-4 stereo: 0.74 ms a 42.7 ms frame (58x); **AC-4 5.1: 2.23 ms (19x)**. Decode only: the renderer's cost and the app's drawing are on top |
+| The test sink's decode on the Shield against the host's (MSVC), nine programmes through a reference sink in the arm64 test server | **AC-3 5.1 to 2.0 and 5.1, E-AC-3 5.1 to 5.1 and 2.0, JOC 5.1.4 and 7.1.4 to 2.0, and a karaoke AC-3: the WAV files are bit-identical.** AC-4 5.1 and 2.0: identical except **96 frames at the start** where the values are at most 1.8e-27 (below any audible level, and the delay-compensated SNR `compare_wav.py` reads is infinite): not bit-exact, equal to better than -500 dB |
+
+**A toolchain bug that is not the library's.** With NDK r26's libc++ (17), a `std::expected<T, E>` whose
+`T` is a trivially copyable struct with tail padding reports `has_value() == false` right after
+`return value;`: `struct { int a; bool b; }` and `std::expected<S, std::uint8_t>` reproduce it in a
+five-line test. The library's `FrameMetadata` (trivially copyable, 104 bytes) is such a type, which is the
+ten failures: `read_frame_metadata` and the metadata edits. The decoders return types with vectors, which
+are not affected, and the decode tests pass, but nothing proves no other `expected` in the Android build
+is affected. A task is open to audit and mitigate it (it is not part of this phase).
+
+What this settles for [the phase 4 plan](hearth-android-phases-4-5.md): AR5's "bit-equal if the library
+is bit-exact across arm64 and the host" holds for the AC-3 family and, to -500 dB, for AC-4; spike P1's
+number is that CPU is not the limit; and **the decode half is not built for a second time**: it is the
+test sink's, extracted.

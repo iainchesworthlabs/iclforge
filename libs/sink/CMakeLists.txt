@@ -13,7 +13,7 @@
 # the distributed package. It listens and takes threads, so a board's build (the player half of
 # libs/sendspin alone) and a core-only build leave it out (the root CMakeLists.txt).
 # ---------------------------------------------------------------------------
-add_library(iclforge_sink STATIC src/sink.cpp src/store.cpp src/lyric_frame.cpp)
+add_library(iclforge_sink STATIC src/sink.cpp src/store.cpp src/lyric_frame.cpp src/status_json.cpp)
 add_library(iclforge::sink ALIAS iclforge_sink)
 target_include_directories(iclforge_sink PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
@@ -23,6 +23,16 @@ target_link_libraries(iclforge_sink PUBLIC iclforge::sendspin iclforge::lyrics)
 # which measure them, and --coverage is compile-time, not inherited from whatever later links this
 # archive.
 target_link_libraries(iclforge_sink PRIVATE iclforge::warnings iclforge::coverage)
+
+# The decoding output (include/iclforge/sink/decoding_output.hpp): a burst output that decodes AC-3,
+# E-AC-3 and AC-4 and renders to a speaker layout, and hands the samples to a PcmSink. A target of
+# its own for the reason the pass-through output is: a program that only hands bytes on does not
+# link three codecs and a renderer.
+add_library(iclforge_sink_decode STATIC src/decoding_output.cpp)
+add_library(iclforge::sink_decode ALIAS iclforge_sink_decode)
+target_link_libraries(iclforge_sink_decode PUBLIC iclforge::sink iclforge::ac3 iclforge::ac4
+                                                  iclforge::containers iclforge::objects iclforge::render)
+target_link_libraries(iclforge_sink_decode PRIVATE iclforge::warnings iclforge::coverage)
 
 # The pass-through output (include/iclforge/sink/passthrough.hpp): a burst output that rebuilds each
 # Sendspin burst chunk into the IEC 61937 burst it came from and keeps a link alive with null

@@ -212,13 +212,13 @@ int run_words(const std::vector<std::string>& words) {
     return run_main(static_cast<int>(pointers.size()), pointers.data());
 }
 
-// 45 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
+// 46 commands, always - including atmos-adm and atmos-iab, whether or not ICLFORGE_BUILD_ADM
 // linked iclforge::adm into this particular build (see Needs::kAdm/unmet()
 // above and run_atmos_adm's own comment): a command this build cannot run is listed with Needs
 // gating it, never sized out of the table entirely - the identical "listed, not hidden" treatment
 // kCapture/kPassthrough/kMonitor commands already get (see print_usage()'s own comment below on
 // why hiding would be a lie about a command that exists and would work elsewhere).
-constexpr std::array<Command, 45> kCommands{{
+constexpr std::array<Command, 46> kCommands{{
     {"silence", 2, "<out.ac3> [seconds] [bitrate_kbps]", "", topic::kNone,
      Needs::kNothing,
      [](const Args& x) {
@@ -301,6 +301,14 @@ constexpr std::array<Command, 45> kCommands{{
      [](const Args& x) {
          return run_atmos_cbi(x.str(1), x.str(2), x.u32(3, 448), x.str(4), x.meta);
      }},
+    {"lyrics-to-lrc", 3, "<in.lrc|in.srt|in.ass|in.kar> <out.lrc>",
+     "write a lyrics file as the UTF-8 LRC every player reads, whatever its format, with a duet's "
+     "singers, word times and the gaps between cues; lyrics-encoding=<page> reads a file in a code "
+     "page (windows-1252, shift-jis, gbk, ...). Never over the file it reads, and over another "
+     "file only with overwrite=1",
+     topic::kLyricsConvert,
+     Needs::kNothing,
+     [](const Args& x) { return run_lyrics_convert(x.str(1), x.str(2), x.meta); }},
     {"strip-objects", 3, "<in.ec3> <out.ec3>",
      "remove the JOC/OAMD object layer from a DD+ stream, leaving a bit-identical 5.1 bed",
      topic::kStdio | topic::kMeta,
@@ -780,8 +788,11 @@ int run_main(int argc, char** argv) {
         // stream once it is written (the output is the second argument of the encoders that take
         // the key, which parse_options refuses it on otherwise).
         const std::string_view lyrics_out = args.size() > 2 ? std::string_view{args[2]} : std::string_view{};
-        if (const int refused = check_lyrics_option(meta, lyrics_out); refused != kExitOk) {
-            return refused;
+        // lyrics-to-lrc takes lyrics-encoding= for its own input, and has no lyrics= to read it for.
+        if (command != "lyrics-to-lrc") {
+            if (const int refused = check_lyrics_option(meta, lyrics_out); refused != kExitOk) {
+                return refused;
+            }
         }
         const int code = c->run(Args{args, meta, couple_flag});
         if (code != kExitOk) {

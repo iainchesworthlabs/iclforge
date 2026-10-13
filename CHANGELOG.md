@@ -322,6 +322,16 @@ The sections below contain the complete change list and fixes.
   the hairline under it fills by it. A host case holds the position, the pause and the document's own
   length winning; `LyricViewRenderTest` holds the pixels.
 
+**The lyric screen names the stream**
+
+- **The footer's chip says the format with the route.** "Dolby Digital 5.1 · Passing through",
+  "Dolby Digital Plus 5.1 + objects · Decoded here": the Android sink's footer named only how a stream
+  leaves the sink. The output's decoder report (the codec, the coding mode, the LFE, the objects) is now in
+  the sink's status, per connection, and `sink::status_json` in `libs/sink` writes that status for the
+  app's JNI, so the writer is held by a host case and not only on a device. The name is the codec, the
+  front channels and the LFE from the coding mode, "1+1" for two programmes, and "+ objects" for a
+  stream that carries them.
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
@@ -353,6 +363,27 @@ The sections below contain the complete change list and fixes.
   comment or not, the `fx` lines are not read, and the templater's own `template`, `code` and
   `mixin` comments never are. A script without such a line reads as before. Built to the
   templater's own source and manual, not yet to a real exported script.
+
+**Hearth for Android, phase 4: the decode a sink plays is the test sink's**
+
+- **`iclforge::sink::DecodingBurstOutput` (`libs/sink`, target `iclforge::sink_decode`): a burst output
+  that decodes and renders, handing the samples to a `PcmSink`.** It is the test sink's `BurstOutput`
+  (AC-3, E-AC-3 with an object layer, and AC-4, rendered to a speaker layout) with the WAV file and the
+  play-time log behind an interface: the sink is opened for the stream's rate and slots, told when each
+  burst is due and the frames it stands for, handed the interleaved frames, told of a clear and closed.
+  The test sink's `BurstOutput` is that output with a `WavPcmSink`, so the decode a program plays and
+  the one the test sink's suites hold are one piece of code. Nine programmes (AC-3, E-AC-3, JOC and a
+  karaoke stream, to stereo and to their own layouts, and AC-4) give byte-equal WAV files and the same
+  frame columns in the log before and after.
+- **The renderer and the AC-3 and AC-4 libraries run on the Shield.** Cross-built for `arm64-android`
+  and run there: the renderer's tests pass, the AC-3 and AC-4 decodes are bit-identical to the host's
+  (AC-4's differ only at 1e-27 in 96 frames of leading silence), and the decoders run 19 to 94 times
+  real time on one core. Ten AC-3 tests fail there on an NDK r26 libc++ bug in `std::expected` (a
+  trivially copyable payload with tail padding reports no value), which a task is open to audit.
+- **The Android preset configures again, and builds the AC-3 tests.** `apps/shared/text-encoding` found
+  no `iconv` below API 28 and stopped `config-android-arm64` configuring (the leg that holds it is
+  `continue-on-error`, so nothing said so); Android now has its own platform file with no conversion. One
+  AC-3 encoder test used `std::ranges::contains`, which NDK r26's libc++ has not.
 
 **Forge writes the lyrics beside the stream it encodes**
 
@@ -388,6 +419,13 @@ The sections below contain the complete change list and fixes.
   the operating system's (MultiByteToWideChar on Windows, `iconv` elsewhere), so no table is carried;
   it is a new internal project, `apps/shared/text-encoding` (`app-text-encoding`), which the Forge
   GUI's picker links as well.
+- **`forge lyrics-to-lrc <in> <out.lrc>` writes a lyrics file as UTF-8 LRC with no stream.** The
+  conversion `lyrics=` does at an encode, for a stream that already exists: a `.kar`, `.srt`,
+  `.ass`, or an `.lrc` in a code page (`lyrics-encoding=<page>`), written with a duet's singers,
+  word times and the gaps between cues marked. The file read is never written over (`overwrite=1`
+  replaces some other file at the output). In the library, `convert_lyrics_file()` does it and
+  `is_code_page_refusal()` says whether a reader's error is the one a page answers; a refusal in
+  `forge` now names `lyrics-encoding=` by that, not by matching its text.
 - **The Forge GUI's Lyrics row offers a code page for a file that is not UTF-8 or UTF-16.** A
   **Code page** list appears under the problem line, with no page chosen and none guessed; the
   page chosen reads the file, the first lines are shown as it reads them, and the stream is saved

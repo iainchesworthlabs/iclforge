@@ -7,7 +7,7 @@ The AC-4 decoder and encoder, with the sync frames, table of contents and presen
 A library.
 
 - **Uses:** `base`, `dsp`, `objects`, `render`
-- **Used by:** `app-media`, `baremetal`, `capi`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `tests`
+- **Used by:** `app-media`, `baremetal`, `capi`, `crucible`, `demo-wasm`, `esp-idf`, `examples`, `forge`, `hearth`, `python`, `sink`, `tests`
 - **CI lanes:** core
 - **CMake target:** `iclforge::ac4`
 

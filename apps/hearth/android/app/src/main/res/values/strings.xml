@@ -25,6 +25,8 @@
     <!-- The footer's route chip (D6): how the stream leaves this sink. -->
     <string name="route_passthrough">Passing through</string>
     <string name="route_pcm">Decoded here</string>
+    <!-- The footer's chip when the stream's format is known: "Dolby Digital 5.1 · Passing through". -->
+    <string name="format_route">%1$s · %2$s</string>
     <!-- The controls sheet's vocals row (D8): asked of the server, which decides. -->
     <string name="sheet_vocals">Vocals</string>
     <string name="vocals_both">Both</string>
