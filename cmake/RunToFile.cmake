@@ -10,7 +10,7 @@
 # Used by apps/forge/cli/CMakeLists.txt to generate the man page and the four shell
 # completion scripts from `forge man` / `forge completions <shell>`.
 #
-#   cmake -DAC3_RUN_COMMAND=<exe>;<arg>... -DAC3_RUN_OUTPUT=<path>
+#   cmake -DICLFORGE_RUN_COMMAND=<exe>;<arg>... -DICLFORGE_RUN_OUTPUT=<path>
 #         -P cmake/RunToFile.cmake
 #
 # A non-zero exit is a hard error: a half-written or empty man page that the
