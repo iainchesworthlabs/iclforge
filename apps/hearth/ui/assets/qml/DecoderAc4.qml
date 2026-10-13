@@ -47,6 +47,7 @@ ScrollView {
     // ac4_member_token()).
     function contentLabel(tokens) {
         const names = {
+            //: Audio service type of a presentation: the main audio. Not the main window.
             "main": qsTr("main"),
             "musicAndEffects": qsTr("music and effects"),
             "dialogue": qsTr("dialogue"),
@@ -101,7 +102,7 @@ ScrollView {
     }
     function signedDb(value) {
         const n = Number(value ?? 0);
-        return (n > 0 ? "+" : (n < 0 ? "−" : "")) + Math.abs(n).toFixed(0);
+        return Theme.ltr((n > 0 ? "+" : (n < 0 ? "−" : "")) + Math.abs(n).toFixed(0));
     }
     function drcModeName(id) {
         switch (id) {
@@ -244,6 +245,7 @@ ScrollView {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.gap
+                        //: Dialogue enhancement, the stream's data for raising the dialogue. A noun.
                         Text { text: qsTr("Enhancement"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         AppSlider {
@@ -366,6 +368,7 @@ ScrollView {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.gap
+                        //: The kind of playback device a compression curve is for: home theatre, flat panel TV, portable speakers or portable headphones. Not an audio device.
                         Text { text: qsTr("Device"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         AppComboBox {
@@ -388,9 +391,9 @@ ScrollView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: qsTr("AC-4 carries a compression curve for each kind of device; this picks which "
+                        text: Theme.ltrNumbers(qsTr("AC-4 carries a compression curve for each kind of device; this picks which "
                                   + "one applies. Automatic takes the one for the output level: home theatre "
-                                  + "to −27 dBFS, flat panel TV to −17, portable above that.")
+                                  + "to −27 dBFS, flat panel TV to −17, portable above that."))
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
                         wrapMode: Text.WordWrap
@@ -437,7 +440,7 @@ ScrollView {
                         visible: root.metadata.dialnormDbfs !== undefined || root.metadata.drcModes !== undefined
                         text: (root.metadata.dialnormDbfs !== undefined
                                ? qsTr("This stream's dialogue is at %1 dBFS.")
-                                     .arg(Number(root.metadata.dialnormDbfs).toFixed(2).replace("-", "−"))
+                                     .arg(Theme.ltr(Number(root.metadata.dialnormDbfs).toFixed(2).replace("-", "−")))
                                : "")
                               + (root.metadata.drcModes !== undefined
                                  ? " " + qsTr("It carries compression for: %1.")
@@ -534,6 +537,7 @@ ScrollView {
                     model: [
                         { value: "stop", label: qsTr("Stop") },
                         { value: "repeatFade", label: qsTr("Repeat and fade") },
+                        //: Option for a frame that will not decode: play silence in its place. Not a volume mute switch.
                         { value: "mute", label: qsTr("Mute") }
                     ]
                     onSelected: function(value) { root.set("concealment", value); }

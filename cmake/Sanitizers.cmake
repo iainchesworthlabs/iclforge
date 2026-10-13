@@ -24,13 +24,13 @@ if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "
         "the active compiler is ${CMAKE_CXX_COMPILER_ID}.")
 endif()
 
-set(_AC3_SANITIZE_FLAGS
+set(_ICLFORGE_SANITIZE_FLAGS
     "-fsanitize=${ICLFORGE_SANITIZERS}"
     -fno-sanitize-recover=all
     -fno-omit-frame-pointer)
 
-add_compile_options(${_AC3_SANITIZE_FLAGS})
-add_link_options(${_AC3_SANITIZE_FLAGS})
+add_compile_options(${_ICLFORGE_SANITIZE_FLAGS})
+add_link_options(${_ICLFORGE_SANITIZE_FLAGS})
 
 message(STATUS "Sanitizers enabled: ${ICLFORGE_SANITIZERS}")
-unset(_AC3_SANITIZE_FLAGS)
+unset(_ICLFORGE_SANITIZE_FLAGS)

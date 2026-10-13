@@ -64,10 +64,10 @@ ScrollView {
             const lo = Math.min(root.probe.dialnormDb, root.probe.dialnormMaxDb);
             const hi = Math.max(root.probe.dialnormDb, root.probe.dialnormMaxDb);
             return qsTr("dialnorm %1 to %2, so %3 to %4 dB down")
-                       .arg(lo).arg(hi)
+                       .arg(Theme.ltr(lo)).arg(Theme.ltr(hi))
                        .arg(Number(31 + lo).toFixed(1)).arg(Number(31 + hi).toFixed(1));
         }
-        return qsTr("dialnorm %1, so %2 dB down").arg(root.probe.dialnormDb)
+        return qsTr("dialnorm %1, so %2 dB down").arg(Theme.ltr(root.probe.dialnormDb))
                    .arg(Number(31 + root.probe.dialnormDb).toFixed(1));
     }
 
@@ -101,6 +101,7 @@ ScrollView {
                             accessibleName: qsTr("Mode")
                             currentValue: root.settings.mode ?? "line"
                             model: [
+                                //: Dolby's line mode, beside RF and Custom. Keep it as it is unless the language has an established term for it.
                                 { value: "line", label: qsTr("Line") },
                                 { value: "rf", label: qsTr("RF") },
                                 { value: "custom", label: qsTr("Custom") }
@@ -125,6 +126,7 @@ ScrollView {
                         // design dims a disabled slider but keeps its label
                         // at full strength (measured on decoder-ac3-eac3.png
                         // with mode = Line).
+                        //: Dynamic range scaling in percent: how far the loud parts are cut. A noun, not a verb.
                         Text { text: qsTr("Cut"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         AppSlider {
@@ -161,6 +163,7 @@ ScrollView {
                         // design dims a disabled slider but keeps its label
                         // at full strength (measured on decoder-ac3-eac3.png
                         // with mode = Line).
+                        //: Dynamic range scaling in percent: how far the quiet parts are boosted. A noun, not a verb.
                         Text { text: qsTr("Boost"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         AppSlider {
@@ -211,7 +214,7 @@ ScrollView {
                             Layout.fillWidth: true
                             enabled: root.settings.mode === "custom"
                             text: qsTr("Dialogue normalisation")
-                            note: qsTr("Brings dialogue to −31 dBFS and never raises it. Line and RF turn it on.")
+                            note: Theme.ltrNumbers(qsTr("Brings dialogue to −31 dBFS and never raises it. Line and RF turn it on."))
                             checked: root.settings.normaliseDialogue ?? true
                             onToggled: function(on) { root.set("normaliseDialogue", on); }
                         }
@@ -391,10 +394,10 @@ ScrollView {
                             Layout.fillWidth: true
                             text: root.bitstream.mixLevels !== undefined
                                   ? qsTr("centre %1 dB · surround %2 dB%3")
-                                        .arg(Number(root.bitstream.mixLevels.centreDb).toFixed(1))
-                                        .arg(Number(root.bitstream.mixLevels.surroundDb).toFixed(1))
+                                        .arg(Theme.ltr(Number(root.bitstream.mixLevels.centreDb).toFixed(1)))
+                                        .arg(Theme.ltr(Number(root.bitstream.mixLevels.surroundDb).toFixed(1)))
                                         .arg(root.bitstream.mixLevels.lfeDb !== undefined
-                                             ? qsTr(" · LFE %1 dB").arg(Number(root.bitstream.mixLevels.lfeDb).toFixed(1))
+                                             ? qsTr(" · LFE %1 dB").arg(Theme.ltr(Number(root.bitstream.mixLevels.lfeDb).toFixed(1)))
                                              : "")
                                   : qsTr("not carried")
                             color: Theme.text
@@ -486,6 +489,7 @@ ScrollView {
                             model: [
                                 { value: "first", label: qsTr("Channel 1") },
                                 { value: "second", label: qsTr("Channel 2") },
+                                //: Dual mono: play both of the stream's two programmes, one to each side.
                                 { value: "both", label: qsTr("Both") }
                             ]
                             onSelected: function(value) { root.set("dualMono", value); }
@@ -501,6 +505,7 @@ ScrollView {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.gap
+                        //: Setting: whether the decoder reconstructs the objects of a JOC stream from its bed. A verb used as a label; the choices are Auto, Always and Never.
                         Text { text: qsTr("Reconstruct"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         SegmentedControl {
@@ -524,6 +529,7 @@ ScrollView {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.gap
+                        //: The signal domain the objects are reconstructed in: QMF or MDCT band.
                         Text { text: qsTr("Domain"); color: Theme.text; font.pixelSize: Theme.fontNormal
                                elide: Text.ElideRight; Layout.preferredWidth: root.labelWidth }
                         SegmentedControl {
@@ -562,6 +568,7 @@ ScrollView {
                             model: [
                                 { value: "stop", label: qsTr("Stop") },
                                 { value: "repeatFade", label: qsTr("Repeat and fade") },
+                                //: Option for a frame that will not decode: play silence in its place. Not a volume mute switch.
                                 { value: "mute", label: qsTr("Mute") }
                             ]
                             onSelected: function(value) { root.set("concealment", value); }

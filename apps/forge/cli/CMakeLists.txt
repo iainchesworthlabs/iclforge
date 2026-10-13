@@ -238,8 +238,8 @@ else()
     add_custom_command(
         OUTPUT "${ICLFORGE_CLI_DOC_DIR}/forge.1"
         COMMAND "${CMAKE_COMMAND}"
-                "-DAC3_RUN_COMMAND=$<TARGET_FILE:forge>;man"
-                "-DAC3_RUN_OUTPUT=${ICLFORGE_CLI_DOC_DIR}/forge.1"
+                "-DICLFORGE_RUN_COMMAND=$<TARGET_FILE:forge>;man"
+                "-DICLFORGE_RUN_OUTPUT=${ICLFORGE_CLI_DOC_DIR}/forge.1"
                 -P "${PROJECT_SOURCE_DIR}/cmake/RunToFile.cmake"
         DEPENDS forge
         COMMENT "Generating forge.1 from forge's own command table"
@@ -267,8 +267,8 @@ else()
         add_custom_command(
             OUTPUT "${ICLFORGE_CLI_DOC_DIR}/${completion_file}"
             COMMAND "${CMAKE_COMMAND}"
-                    "-DAC3_RUN_COMMAND=$<TARGET_FILE:forge>;completions;${shell}"
-                    "-DAC3_RUN_OUTPUT=${ICLFORGE_CLI_DOC_DIR}/${completion_file}"
+                    "-DICLFORGE_RUN_COMMAND=$<TARGET_FILE:forge>;completions;${shell}"
+                    "-DICLFORGE_RUN_OUTPUT=${ICLFORGE_CLI_DOC_DIR}/${completion_file}"
                     -P "${PROJECT_SOURCE_DIR}/cmake/RunToFile.cmake"
             DEPENDS forge
             COMMENT "Generating ${shell} completions for forge"

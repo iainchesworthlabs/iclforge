@@ -329,17 +329,14 @@ fewer as its bed, as an E-AC-3 stream is.
 
 The window ships in English and in German, Spanish, French, Arabic, Hebrew and Yiddish, chosen in
 Settings. A language switches the layout direction (Arabic, Hebrew and Yiddish read right to
-left) and the typeface for every page; **the words are translated for the Karaoke page, the lyric
-views and the singer view, the timing window, the lyric delay and the shortcuts that go with them,
-and are English elsewhere**, apart from the fourteen strings another page shares with those
-(Play, Pause, Close, Decoder and the like), which take the same rendering as a suggestion
-(below). The catalogues are
-`apps/hearth/ui/assets/translations/hearth_<code>.ts`; every string of the window is in them,
-and a string with no translation shows in English.
+left), the typeface and the words of every page. The catalogues are
+`apps/hearth/ui/assets/translations/hearth_<code>.ts`; each holds all 1101 strings of the window,
+every one with a rendering. A string a catalogue lacks would show in English, which is what Qt does
+with a message it has no entry for.
 
 ![Hearth's Karaoke page in German](screenshots/karaoke-de.png)
 
-*The Karaoke page in German, with the duet example 6.3 s in: `ICLFORGE_GUI_LOCALE=de hearth --smoke-shot de.png --page karaoke --open examples/karaoke/leave-her-johnny/leave-her-johnny.ac3 --seek 6300`. The words of the lyrics are the file's own; the header's other pages and the stream's file name are not translated.*
+*The Karaoke page in German, with the duet example 6.3 s in: `ICLFORGE_GUI_LOCALE=de hearth --smoke-shot de.png --page karaoke --open examples/karaoke/leave-her-johnny/leave-her-johnny.ac3 --seek 6300`. The words of the lyrics are the file's own, and so is the stream's file name. The picture was taken before the rest of the window had its translations, so the header's page names are still English in it.*
 
 ![Hearth's Karaoke page in Arabic, mirrored](screenshots/karaoke-ar.png)
 
@@ -348,10 +345,13 @@ and a string with no translation shows in English.
 **The translations are machine-made and no speaker of any of the six has read them.** Settings
 says so under the language chooser, as the Forge GUI and Crucible do under theirs. They reuse the
 renderings those apps already have for the words they share (Aware, Capable, Vocals, Melody
-guide, Lyrics and the rest of the Forge GUI's Karaoke flow), so one term reads one way in all
-three, and they take their address forms: *Sie* in German, *tú* in Spanish, *vous* in French, the
-masculine singular imperative in Arabic, the plural in Hebrew and *איר* in Yiddish. The terms a
-review by a speaker has to settle:
+guide, Lyrics and the rest of the Forge GUI's Karaoke flow, and the glossary on
+[Crucible's languages page](../crucible/localisation.md): receiver, passthrough, slot, bed,
+object, underrun and the rest), so one term reads one way in all three, and they take their
+address forms: *Sie* in German, *tú* in Spanish, *vous* in French, the masculine singular
+imperative in Arabic, the plural in Hebrew and *איר* in Yiddish. Names that are not translated:
+Hearth, Sendspin, ICL Forge, Dolby, Atmos, AC-3, E-AC-3, AC-4, JOC, PCM, Opus, IEC 61937, MP4,
+Matroska, MPEG-TS, mDNS and WiFi. The terms a review by a speaker has to settle:
 
 | Term | de | es | fr | ar | he | yi |
 |---|---|---|---|---|---|---|
@@ -364,12 +364,32 @@ review by a speaker has to settle:
 | singer | Stimme | cantante | chanteur | المغنّي | זמר | זינגער |
 | queue | Warteschlange | cola | file d'attente | قائمة الانتظار | תור | ריי |
 | speakers (surround) | Surround-Lautsprecher | altavoces envolventes | haut-parleurs surround | مكبرات الصوت المحيطية | רמקולים היקפיים | סראַונד־הילכערס |
+| sink (a Hearth sink, any Sendspin player) | Wiedergabegerät | reproductor | lecteur | مشغّل | נגן | שפּילער |
+| pair, pairing | koppeln, Kopplung | emparejar, emparejamiento | appairer, appairage | إقران | צימוד | פּאָרן, פּאָרונג |
+| passthrough | Passthrough | paso directo | transmission directe | تمرير مباشر | מעבר ישיר | דורכלאָז |
+| bitstream | Bitstream | flujo de bits | bitstream | تدفّق بتّات | זרם סיביות | ביטסטרים |
+| burst (an IEC 61937 burst) | Burst | burst | burst | دفعة | פרץ | בורסט |
+| take (a recording of your singing) | Aufnahme | toma | prise | تسجيل | הקלטה | אויפֿנאַמע |
+| pitch (how near the tune) | Tonhöhe | afinación | justesse | طبقة الصوت | גובה צליל | טאָן־הייך |
 
 The open points: the German *fähig* and *tauglich* are the Forge GUI's choice for aware and
 capable and may read the wrong way round to a German speaker; *aware* stays English in French there,
 as it does here; Yiddish has two words for a loudspeaker in the family's catalogues, and the one
 here (*הילכערס*) is Crucible's; "stamp" is a verb for giving a line its time, which no language
-has one word for.
+has one word for. The Karaoke page's own entries call a sink a *player* (the word a Sendspin
+player is also called), and the pages added since follow that, so a Hearth sink and a Sendspin
+player read alike and differ only by the name before them. Where Crucible's and the Forge GUI's
+catalogues differ, these pages take the rendering the finished Karaoke entries already use:
+*Close* in Hebrew is *סגירה* here and in the Forge GUI, *סגור* in Crucible; *Speakers* in Yiddish
+is *הילכער*, as the Karaoke entries have it, where the Forge GUI's wizard has *רעדער*, which is
+also the plural of *ראָד* (a wheel).
+
+Six messages cannot be translated as they are written. English makes their plural by appending
+a suffix a placeholder carries (`%1 entr%2` with *y* or *ies*, `%2 group%3`, `Slot%1 %2 %3
+silent`), and no other language does. Their renderings are written without the suffix
+(*Gruppen: %2*, *groupes : %2*), leave that placeholder out, and the gate lets exactly these
+six do so. The cure is in the QML and C++: a `%n` message gives each language the plural forms it
+needs, and the six leave that list when they are written that way.
 
 **Adding a string.** `hearth_lupdate` (the CI step "Check the Hearth translations are up to date"
 runs the same target) adds it to the six catalogues as an empty `type="unfinished"` entry, and
@@ -378,6 +398,15 @@ a suggestion, which the window shows until a person confirms or replaces it. Fil
 Linguist or by hand, and remove the `type` attribute once the entry has a rendering you are
 willing to ship. Run `hearth_lupdate` once more after filling by hand: it adds the suggestions
 the new renderings make, and the committed files are what a further run leaves unchanged.
+
+**What fails.** The `[hearth][translations]` cases of
+`apps/crucible/ui/tests/test_translations.cpp` read the six files and fail on an entry left
+unfinished, on a dead one (`vanished`, `obsolete`), on an empty rendering, on a placeholder
+(`%1` to `%9`, `%n`) a rendering drops or invents, on a plural form left empty, on a name from
+the list above that a rendering loses, and on one language holding a string the others do not.
+So a change that adds or rewords a `qsTr()` string in the window fills the six entries in the
+same pull request. The rules are the ones
+[Crucible's languages page](../crucible/localisation.md#what-the-gate-checks) lists.
 
 ### Diagnostics
 
@@ -410,7 +439,7 @@ at start, and take screenshots of the window with nobody at the machine.
 | `--decoder-format <eac3\|ac4>` | Which tab the Decoder page opens on |
 | `--open-output-picker` | Opens the output picker over the page |
 | `--size <width>x<height>` | Opens the window at that size in pixels, as `--size 1280x1400`, for a picture of a page whose cards run on below the size the window opens at. A window is not made taller than the screen it is on |
-| `--setting <key>=<value>` | Puts a value in a capture's settings before the window reads them, once for each `--setting`: `microphone/takesFolder=<folder>` for where the Microphone card looks for takes, `appearance/textScale=150` for the text size. It needs `--smoke-shot` or `--shot`; without one it is not used, and the log says so, so it never changes a person's own settings |
+| `--setting <key>=<value>` | Puts a value in a capture's settings before the window reads them, once for each `--setting`: `microphone/takesFolder=<folder>` for where the Microphone card looks for takes, `appearance/textScale=150` for the text size, `window/geometry=100,100,1100,700` for a window that was left there (a capture opens at its own size otherwise, because its store is empty). It needs `--smoke-shot` or `--shot`; without one it is not used, and the log says so, so it never changes a person's own settings |
 | `--smoke-shot <png>` | Saves the window to a PNG once it has settled, and quits, **with network discovery off**: nothing browses the network, so there is no firewall prompt and no sink from the network in the picture. This is the one to put in a script |
 | `--shot <png>` | The same capture with network discovery on, as the window runs. On Windows that asks for a Windows Firewall rule (a UAC prompt), so run it where somebody can answer it |
 

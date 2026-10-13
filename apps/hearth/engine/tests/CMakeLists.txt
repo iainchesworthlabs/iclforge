@@ -169,7 +169,7 @@ if(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
         endforeach()
         if(ICLFORGE_HEARTH_CTRLTEST_GENERATED_SOURCES)
             set_source_files_properties(${ICLFORGE_HEARTH_CTRLTEST_GENERATED_SOURCES}
-                PROPERTIES COMPILE_OPTIONS "${AC3_WARNINGS_OFF_FLAG}")
+                PROPERTIES COMPILE_OPTIONS "${ICLFORGE_WARNINGS_OFF_FLAG}")
         endif()
         catch_discover_tests(hearth_controller_tests ADD_TAGS_AS_LABELS)
     else()

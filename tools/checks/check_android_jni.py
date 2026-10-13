@@ -5,11 +5,14 @@ The app is built in CI only (Gradle and the NDK), and a JNI name that one end sp
 from the other does not fail a build: the native function is simply not found, and the first call
 from Kotlin throws UnsatisfiedLinkError at run time. The package has been renamed once (N1A took
 com.ac3forge.shield to com.iclforge.shield), and the Java_... names of about forty native functions
-are that package written into the C++. This reads the files and checks, without a device:
+are that package written into the C++. The application id is not the package and none of the
+names above read it: it was made the repository's own (com.iainchesworthlabs.shield) before any
+release carried it, so the package stayed. This reads the files and checks, without a device:
 
-  (a) apps/demos/android/app/build.gradle.kts gives one name to `namespace` and to
-      `applicationId`, every Kotlin source of the app's main and androidTest source sets declares
-      that package, and sits in the directory the package names;
+  (a) apps/demos/android/app/build.gradle.kts sets `namespace` (the package the code is in) and
+      `applicationId` (what the app is installed as, which follows the repository's account,
+      com.iainchesworthlabs.<app>, and is not the package), every Kotlin source of the app's main
+      and androidTest source sets declares the namespace, and sits in the directory it names;
   (b) every `external fun` of a Kotlin class has a native definition whose name is the mangled
       package, class and function (Java_com_iclforge_shield_NativeBridge_nativeGetScene), and every
       native definition of that class has an `external fun`: a function on one side only is the
@@ -36,6 +39,9 @@ from pathlib import Path
 # definitions, its library. A second app (planning/hearth-android.md) is one more entry here.
 APPS = ("apps/demos/android/app", "apps/hearth/android/app")
 APP = APPS[0]
+# What an application id of this repository starts with: its GitHub account, the one the macOS
+# bundle ids (com.iainchesworthlabs.hearth) and the Linux desktop ids already follow.
+APPLICATION_ID_ROOT = "com.iainchesworthlabs."
 # The native code besides an app's own that a JNI name could be defined in. The audio backend
 # defines none since its registration became two plain C++ functions the app calls
 # (libs/audio/src/backend/android/passthrough_bridge.hpp), so a definition found there is a name
@@ -123,11 +129,12 @@ def check(root: Path, app: str = APP) -> list[Problem]:
     if set(names) != {"namespace", "applicationId"}:
         return [Problem(rel_gradle, "namespace and applicationId must both be set")]
     namespace, application = names["namespace"][0], names["applicationId"][0]
-    if namespace != application:
+    if not application.startswith(APPLICATION_ID_ROOT):
         problems.append(
             Problem(
                 f"{rel_gradle}:{names['applicationId'][1]}",
-                f'applicationId "{application}" is not the namespace "{namespace}" the code is in',
+                f'applicationId "{application}" is not under {APPLICATION_ID_ROOT}, the '
+                "repository's account (an identifier follows the account)",
             )
         )
     package = namespace

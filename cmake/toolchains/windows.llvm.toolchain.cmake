@@ -38,7 +38,7 @@ unset(_LLVM_BIN_HINTS)
 # cannot shadow it.
 find_program(CMAKE_LINKER
     NAMES link.exe
-    PATHS "${AC3_MSVC_TOOLS_DIR}/bin/Hostx64/x64"
+    PATHS "${ICLFORGE_MSVC_TOOLS_DIR}/bin/Hostx64/x64"
     NO_DEFAULT_PATH
     REQUIRED)
 

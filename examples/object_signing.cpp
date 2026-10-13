@@ -61,7 +61,7 @@ int main() {
         stream.insert(stream.end(), unit->bytes.begin(), unit->bytes.end());
     }
 
-    const iclforge::base::crypto::SigningKey key{as_bytes("ac3forge-example-key-DO-NOT-USE")};
+    const iclforge::base::crypto::SigningKey key{as_bytes("iclforge-example-key-DO-NOT-USE")};
     const int signed_count = iclforge::ac3::signing::sign_atmos_stream(stream, key);
 
     fmt::printf("signed %d of %d frames (%zu bytes)\n", signed_count, kFrames, stream.size());

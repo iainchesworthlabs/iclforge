@@ -98,6 +98,12 @@ else()
         # shared by the three programs the same way.
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.hpp"
+        # Where the window opens and what it remembers (size, position, maximised), shared by the
+        # three programs the same way.
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_memory.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_memory.hpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_placement.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_placement.hpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp"
         # The picture of a CD+G disc, shared with Crucible's lyric strip and the Forge GUI's
@@ -157,6 +163,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkGroupEdit.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlaceholderPage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Settings.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DialogScroll.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ShortcutsDialog.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/TransportBar.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AboutDialog.qml"
@@ -243,19 +250,19 @@ else()
     # whose source string is gone is kept as translation memory otherwise,
     # and git history is that memory.
     #
-    # They carry every source string and NO assets/translations yet - each entry is
-    # marked unfinished, which is what Qt calls an untranslated message, and
-    # what it does with one is fall back to the English source. So choosing a
-    # language today changes the layout direction and the font (which is why
-    # the two Noto faces are bundled above) but leaves the words in English
-    # until a translator fills these in. That is a content task, not a build
-    # one; the machinery is what was missing.
+    # They are filled: every entry has a rendering. The renderings are machine
+    # drafts that no speaker has read (the language note in Settings says so).
+    # An entry marked unfinished is what Qt calls an untranslated message, and
+    # what it does with one is fall back to the English source.
     #
-    # Deliberately no test asserting the catalogues are complete, unlike
-    # apps/crucible/ui/tests/test_translations.cpp: Crucible's are filled, and
-    # holding these to the same bar would fail from the first commit.
+    # apps/crucible/ui/tests/test_translations.cpp holds these six files to the
+    # rules it holds Crucible's to: nothing unfinished or dead, nothing empty,
+    # placeholders and brand terms kept, one source set across the six. So a new
+    # or reworded string arrives unfinished from hearth_lupdate, and that case
+    # fails until the entry has a rendering in all six - fill it in the same
+    # change (docs/crucible/localisation.md, "Regenerating the catalogues").
     #
-    # CI does check that they match the sources: the windows-msvc leg
+    # CI also checks that they match the sources: the windows-msvc leg
     # reruns hearth_lupdate and fails if the result differs from what is
     # committed in anything but <location> lines
     # (.github/workflows/_ci-windows.yml, "Check the Hearth assets/translations are
@@ -401,7 +408,7 @@ else()
         # the SAME COMPONENT immediately before it, only on APPLE since the
         # Windows shape needs no such variable.
         if(APPLE)
-            install(CODE "set(_ac3_macos_bundle_name \"hearth\")" COMPONENT hearth)
+            install(CODE "set(_iclforge_macos_bundle_name \"hearth\")" COMPONENT hearth)
         endif()
         install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/StripQtTestDeployment.cmake"
             COMPONENT hearth)
@@ -440,9 +447,9 @@ else()
         # anything, so this component only CLAIMS the types (.desktop's
         # MimeType=, this metainfo.xml's <provides><mediatype>), which is
         # this package's own thing to state.
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/hearth.desktop"
+        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.hearth.desktop"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/applications" COMPONENT hearth)
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/hearth.metainfo.xml"
+        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.hearth.metainfo.xml"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo" COMPONENT hearth)
         install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"

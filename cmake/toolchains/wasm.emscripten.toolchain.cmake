@@ -28,16 +28,16 @@ if(NOT DEFINED ENV{EMSDK})
         "Windows) in the configuring shell before using this preset.")
 endif()
 
-set(AC3_EMSCRIPTEN_TOOLCHAIN "$ENV{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake")
-if(NOT EXISTS "${AC3_EMSCRIPTEN_TOOLCHAIN}")
-    message(FATAL_ERROR "Emscripten.cmake not found at '${AC3_EMSCRIPTEN_TOOLCHAIN}' - "
+set(ICLFORGE_EMSCRIPTEN_TOOLCHAIN "$ENV{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake")
+if(NOT EXISTS "${ICLFORGE_EMSCRIPTEN_TOOLCHAIN}")
+    message(FATAL_ERROR "Emscripten.cmake not found at '${ICLFORGE_EMSCRIPTEN_TOOLCHAIN}' - "
         "is $EMSDK activated (`emsdk install latest && emsdk activate latest`)?")
 endif()
 
 # Does the real work: sets CMAKE_SYSTEM_NAME Emscripten, CMAKE_C(XX)_COMPILER
 # to emcc/em++, the sysroot, EMSCRIPTEN==TRUE, etc. Everything below only adds
 # to what it sets, never overrides it.
-include("${AC3_EMSCRIPTEN_TOOLCHAIN}")
-unset(AC3_EMSCRIPTEN_TOOLCHAIN)
+include("${ICLFORGE_EMSCRIPTEN_TOOLCHAIN}")
+unset(ICLFORGE_EMSCRIPTEN_TOOLCHAIN)
 
 message(STATUS "Using Emscripten at: ${CMAKE_CXX_COMPILER}")

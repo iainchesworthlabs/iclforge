@@ -37,7 +37,13 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.iclforge.shield"
+        // What the app is installed as, and so the name of its data directory and of its
+        // instrumentation package (<id>.test). It follows the repository's account, as the macOS
+        // bundle ids and the Linux desktop ids do, and is not the package of the code: the
+        // namespace above stays com.iclforge.shield, which the JNI names of the native code spell
+        // (tools/checks/check_android_jni.py). No release has carried this id: v0.10.0-beta.1's
+        // APK is com.ac3forge.shield, so there is no install of it to upgrade.
+        applicationId = "com.iainchesworthlabs.shield"
         // 26 (Oreo): the floor for AAudio, which monitor.cpp depends on
         // outright - there is no lower-API fallback path for it. Real Shield
         // TV hardware (2017 model onward) ships well above this.

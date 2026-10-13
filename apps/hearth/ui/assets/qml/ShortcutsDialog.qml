@@ -24,6 +24,8 @@ Dialog {
     onOpened: shortcutsCloseButton.forceActiveFocus()
     anchors.centerIn: parent
     width: Math.min(480, parent ? parent.width - 60 : 480)
+    // The window's height at most; the body above the buttons scrolls for the rest.
+    height: Math.min(implicitHeight, parent ? parent.height - 60 : implicitHeight)
     padding: Theme.space6
     title: ""
     background: Rectangle {
@@ -57,66 +59,75 @@ Dialog {
         Accessible.role: Accessible.Dialog
         Accessible.name: qsTr("Keyboard shortcuts")
 
-        Text {
-            text: qsTr("Keyboard shortcuts")
-            color: Theme.text
-            font.family: Theme.headingFamily
-            font.pixelSize: Theme.fontTitle
-            font.weight: Font.Bold
-        }
+        Keys.onPressed: function(event) { scroll.handleKey(event); }
 
-        Kicker { text: qsTr("PAGES") }
-        GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            columnSpacing: Theme.space4
-            rowSpacing: Theme.space1
-            Key { text: "Ctrl+1" }
-            Action { text: qsTr("Play") }
-            Key { text: "Ctrl+2" }
-            Action { text: qsTr("Media information") }
-            Key { text: "Ctrl+3" }
-            Action { text: qsTr("Speakers") }
-            Key { text: "Ctrl+4" }
-            Action { text: qsTr("Decoder") }
-            Key { text: "Ctrl+5" }
-            Action { text: qsTr("Network") }
-            Key { text: "Ctrl+6" }
-            Action { text: qsTr("Settings") }
-            Key { text: "Ctrl+7" }
-            Action { text: qsTr("Karaoke") }
-        }
+        // Everything above the buttons: scrolls when the dialog is taller than the window.
+        DialogScroll {
+            id: scroll
+            objectName: "shortcutsScroll"
+            columnSpacing: Theme.space2
 
-        Kicker { text: qsTr("TRANSPORT AND QUEUE") }
-        Action {
-            text: qsTr("Previous, Play/Pause, Stop, Next and Gapless are in the transport bar at the bottom of every page; Add files… and the queue are on Play. Tab reaches each control in turn, and Space or Return activates whichever one has focus.")
-        }
+            Text {
+                text: qsTr("Keyboard shortcuts")
+                color: Theme.text
+                font.family: Theme.headingFamily
+                font.pixelSize: Theme.fontTitle
+                font.weight: Font.Bold
+            }
 
-        Kicker { text: qsTr("THIS WINDOW") }
-        GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            columnSpacing: Theme.space4
-            rowSpacing: Theme.space1
-            Key { text: "F1" }
-            Action { text: qsTr("Open this reference") }
-            Key { text: "F11" }
-            Action { text: qsTr("Lyrics in full screen; Esc leaves it") }
-        }
+            Kicker { text: qsTr("PAGES") }
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: Theme.space4
+                rowSpacing: Theme.space1
+                Key { text: "Ctrl+1" }
+                Action { text: qsTr("Play") }
+                Key { text: "Ctrl+2" }
+                Action { text: qsTr("Media information") }
+                Key { text: "Ctrl+3" }
+                Action { text: qsTr("Speakers") }
+                Key { text: "Ctrl+4" }
+                Action { text: qsTr("Decoder") }
+                Key { text: "Ctrl+5" }
+                Action { text: qsTr("Network") }
+                Key { text: "Ctrl+6" }
+                Action { text: qsTr("Settings") }
+                Key { text: "Ctrl+7" }
+                Action { text: qsTr("Karaoke") }
+            }
 
-        // The singer view's own keys (LyricScreen.qml), which only act while it is open.
-        Kicker { text: qsTr("SINGER VIEW") }
-        GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            columnSpacing: Theme.space4
-            rowSpacing: Theme.space1
-            Key { text: "Space" }
-            Action { text: qsTr("Pause or play") }
-            Key { text: "Left, Right" }
-            Action { text: qsTr("Back or forward five seconds") }
-            Key { text: "Q" }
-            Action { text: qsTr("Show or hide the queue") }
+            Kicker { text: qsTr("TRANSPORT AND QUEUE") }
+            Action {
+                text: qsTr("Previous, Play/Pause, Stop, Next and Gapless are in the transport bar at the bottom of every page; Add files… and the queue are on Play. Tab reaches each control in turn, and Space or Return activates whichever one has focus.")
+            }
+
+            Kicker { text: qsTr("THIS WINDOW") }
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: Theme.space4
+                rowSpacing: Theme.space1
+                Key { text: "F1" }
+                Action { text: qsTr("Open this reference") }
+                Key { text: "F11" }
+                Action { text: qsTr("Lyrics in full screen; Esc leaves it") }
+            }
+
+            // The singer view's own keys (LyricScreen.qml), which only act while it is open.
+            Kicker { text: qsTr("SINGER VIEW") }
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: Theme.space4
+                rowSpacing: Theme.space1
+                Key { text: "Space" }
+                Action { text: qsTr("Pause or play") }
+                Key { text: "Left, Right" }
+                Action { text: qsTr("Back or forward five seconds") }
+                Key { text: "Q" }
+                Action { text: qsTr("Show or hide the queue") }
+            }
         }
 
         RowLayout {

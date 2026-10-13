@@ -78,7 +78,7 @@ endif()
 string(REGEX MATCH "^[0-9]+\\.[0-9]+" ICLFORGE_CRUCIBLE_QT_SERIES "${Qt6_VERSION}")
 
 set(ICLFORGE_CRUCIBLE_NOTICES_FILE "${CMAKE_CURRENT_BINARY_DIR}/notices/NOTICES.txt")
-ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
+iclforge_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
     FRAGMENT_DIR "${CMAKE_SOURCE_DIR}/notices/fragments"
     FRAGMENTS ${ICLFORGE_CRUCIBLE_NOTICE_FRAGMENTS}
     TOKENS
@@ -102,7 +102,7 @@ ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
         # sentences of the shared qt-bundled fragment that are the platform's
         # to write, set by platform/<os>/components.cmake. Empty on Linux,
         # whose package bundles no Qt and therefore carries no such fragment -
-        # ac3_generate_notices ignores a token no fragment mentions, which is
+        # iclforge_generate_notices ignores a token no fragment mentions, which is
         # why this is passed unconditionally.
         "QT_PAYLOAD=${ICLFORGE_CRUCIBLE_QT_PAYLOAD}"
         "QT_LOOKUP=${ICLFORGE_CRUCIBLE_QT_LOOKUP}"

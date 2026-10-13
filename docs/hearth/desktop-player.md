@@ -34,6 +34,13 @@ Every page has the same frame. The header holds the output strip, the seven page
 bottom has previous, play or pause, stop and next, the position with a scrubber, the item's length,
 the **Gapless** toggle and the volume.
 
+Hearth opens where you left it. The window's size, its position and whether it was maximised are
+kept with the other settings (`window/geometry` and `window/maximised`) and restored on the next
+start. The window is never smaller than 960×620, and a remembered position that is on no connected
+screen any more, such as a monitor that has been unplugged, is ignored: the window opens at its
+remembered size where the system puts it. The first start opens at 1280×800. The lyrics in full
+screen are not remembered as the window's state; leaving them returns the window as it was.
+
 ## Play
 
 ![The Play page with three files in the queue: the queue on the left, the item playing with its levels, loudness and frame metadata in the middle, and the Objects card and the signal path on the right](screenshots/hearth-play.png)
@@ -254,9 +261,9 @@ with a **Take it back** button.
 - **Network**: the name sinks and players show for this computer, whether Hearth looks for
   Sendspin players, and the pairing records, each with **Forget**.
 - **Appearance**: the theme, the palette and the text size.
-- **Language**: English, German, Spanish, French, Arabic, Hebrew or Yiddish. The words of the
-  Karaoke page, the lyric views and the singer view are translated; the other pages are in English
-  in every language ([Languages](index.md#languages)).
+- **Language**: English, German, Spanish, French, Arabic, Hebrew or Yiddish. Every page is
+  translated; the translations are machine-made and no speaker has read them
+  ([Languages](index.md#languages)).
 - **Diagnostics**: a text file of what Hearth has done (the outputs opened, the streams played,
   the sinks found and paired, and every error), saved, copied or viewed live. Pairing keys, codes
   and file paths are left out of it.

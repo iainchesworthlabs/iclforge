@@ -30,11 +30,16 @@ ScrollView {
 
     // Only the rows the sink has something to say in.
     readonly property var rows: [
+        //: Row: the firmware image the sink is running now.
         { label: qsTr("Running"), value: root.firmware.runningText ?? "" },
+        //: Row: the sink's other firmware slot (an OTA partition), which holds the image from before or the next one. Not an audio slot.
         { label: qsTr("Other slot"), value: root.firmware.otherText ?? "" },
+        //: Row: the build of the firmware app that is running.
         { label: qsTr("This app"), value: root.firmware.buildText ?? "" },
         { label: qsTr("Mode"), value: root.firmware.modeText ?? "" },
+        //: Row: a newly installed image is on trial, and the sink keeps it only once it has held healthy.
         { label: qsTr("Trial"), value: root.firmware.trialText ?? "" },
+        //: Row: the progress of the update being sent to the sink. Also a button label elsewhere in this file.
         { label: qsTr("Update"), value: root.firmware.uploadText ?? "" },
         { label: qsTr("Last update"), value: root.firmware.lastUpdateText ?? "" },
         { label: qsTr("Last crash"), value: root.firmware.crashText ?? "" }
@@ -171,6 +176,7 @@ ScrollView {
                 AppButton {
                     objectName: "sinkFirmwareRollback"
                     enabled: root.firmware.canRollback === true
+                    //: Button: return the sink to the firmware image it ran before.
                     text: qsTr("Roll back")
                     onClicked: root.ask("rollback")
                 }

@@ -24,11 +24,11 @@ runs:
       # self-hosted runner image does not ship.
       shell: powershell
       env:
-        AC3_MSVC_ARCH: ${{ inputs.arch }}
+        ICLFORGE_MSVC_ARCH: ${{ inputs.arch }}
       run: |
         $ErrorActionPreference = 'Stop'
 
-        $msvcArch = $env:AC3_MSVC_ARCH
+        $msvcArch = $env:ICLFORGE_MSVC_ARCH
         if ([string]::IsNullOrWhiteSpace($msvcArch)) { $msvcArch = 'x64' }
 
         # Locate the VS install (the VS Installer always ships vswhere.exe here).

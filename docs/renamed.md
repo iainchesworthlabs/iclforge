@@ -44,9 +44,13 @@ clones and its release URLs. It does not redirect the old documentation address,
 | `ac3tests`, `ac3probe`, `ac3perf`, `ac3bench`, `ac3membench`, `ac3kernelbench`, `ac3fuzz`, `ac3test` (built from the tree, not released) | `iclforge-tests`, `iclforge-probe`, `iclforge-perf`, `iclforge-bench`, `iclforge-membench`, `iclforge-kernelbench`, `iclforge-fuzz`, `iclforge-test` |
 
 What each program registers follows its name: the man page (`forge.1`), the completions for four
-shells (`_forge` for zsh), the desktop entries and AppStream ids, the macOS bundle identifiers
-(`com.iainchesworthlabs.forge-gui`, `com.iainchesworthlabs.hearth`), the Windows file type
-(`AC3Forge.Stream` is `IclForge.Stream`) and winget's command aliases. `forge --version` prints
+shells (`_forge` for zsh), the Windows file type (`AC3Forge.Stream` is `IclForge.Stream`) and
+winget's command aliases. Its identifiers follow the repository's account instead:
+`com.iainchesworthlabs.forge-gui`, `com.iainchesworthlabs.hearth` and `com.iainchesworthlabs.crucible`
+are the macOS bundle identifiers, the Linux desktop file names (`<id>.desktop`) and the AppStream ids,
+and the two Android apps are `com.iainchesworthlabs.shield` and `com.iainchesworthlabs.hearth`. None
+of them was ever released under another name but the Shield app's, below, and the Linux desktop file
+of the AppImage, `ac3gui.desktop`. `forge --version` prints
 `iclforge <version>`, the library's version line, where `ac3cli --version` printed
 `ac3forge <version>`.
 
@@ -142,8 +146,13 @@ Windows Firewall rule per executable, named from the executable (`... (ac3hearth
 `Get-NetFirewallRule -DisplayName '*(ac3hearth*'` lists them for removal. The first start of
 `hearth.exe` asks for its own rule, as the first start of `ac3hearth.exe` did.
 
-**Android.** The Shield app's application id is `com.iclforge.shield`, so a pre-release APK of
-`com.ac3forge.shield` stays installed beside the new app and is not upgraded. Uninstall the old one.
+**Android.** The Shield app's application id is `com.iainchesworthlabs.shield`, so a pre-release
+APK of `com.ac3forge.shield` (every release from `v0.3.0-beta.1` to `v0.10.0-beta.1` carries one)
+stays installed beside the new app and is not upgraded. Uninstall the old one. The application id
+is not the code's package, which is `com.iclforge.shield` (it is in the stack traces and the
+`adb shell am start` line names its activity by it). `com.iclforge.shield` was the application id
+for the weeks between the rename and the change to the repository's account, and no release carried
+it.
 
 **Homebrew.** Once a release made after the rename is in the tap, `brew install ac3forge` and
 `brew install --cask ac3gui` are redirected by the tap's migration map to the new formula and cask.

@@ -133,7 +133,7 @@ foreach(source IN LISTS ICLFORGE_HEARTH_QMLTEST_SOURCES)
 endforeach()
 if(ICLFORGE_HEARTH_QMLTEST_GENERATED_SOURCES)
     set_source_files_properties(${ICLFORGE_HEARTH_QMLTEST_GENERATED_SOURCES}
-        PROPERTIES COMPILE_OPTIONS "${AC3_WARNINGS_OFF_FLAG}")
+        PROPERTIES COMPILE_OPTIONS "${ICLFORGE_WARNINGS_OFF_FLAG}")
 endif()
 
 # Into bin/ beside hearth.exe, whose windeployqt step puts the Qt runtime
