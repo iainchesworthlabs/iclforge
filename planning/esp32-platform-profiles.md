@@ -691,6 +691,19 @@ The recorded 6,836 is the least of five and was not seen again in nine single pl
 18,936 and up; the row's tolerance on it is 3,072 bytes, so a play that took the room back to
 where it was (916 to 4,496) fails.
 
+**After PR 1494** (the decoder holds the spectra of the streams a frame codes, not of seven: 79,069 -> 54,083 bytes live for this stream on the host's fixed tier, and 24,576 less on the board; the image `v0.10.0-beta.1-4738-g357812dae`, profile hash `0021e64331a6`, same board and sequence, 2026-10-13):
+
+| | before | after |
+|---|---|---|
+| `eac3-2.0-sendspin`: permille, glitched of 5, least heap (the least of five) | 743, 1, 6,836 | 756, 0, 25,836 |
+| single E-AC-3 plays after AC-3 streams, least heap | 30,920, 18,936, 26,144, 24,868, 23,288, 27,732 | 53,772, 52,968, 55,532, 28,748, 44,712, 48,836, 57,648 |
+| E-AC-3 plays that ran dry, over the plays made | 3 of 14 | 0 of 15 |
+| `ac3-2.0-sendspin`: permille, glitched of 5, least heap | 658, 0, 53,536 | 660, 0, 56,104 |
+
+The median of the single plays moved by 27 KB and the dips, which are the network's (Wi-Fi's
+receive buffers and lwIP take what is free in a burst), moved with it. The record's own figure is
+the least of five and is the noisier one; the tolerance on it (3,072) is the same.
+
 **What the E-AC-3 stream's plays were before** (kept for what it measured, 2026-10-12):
 
 The same board played the E-AC-3 stream through Sendspin with almost no internal heap spare,
