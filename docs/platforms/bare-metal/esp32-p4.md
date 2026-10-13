@@ -1231,12 +1231,39 @@ decode and render per burst with the sink's time left out):
 
 Every output's RMS over a play is the host decoder's to 0.01 dB (0.23 dB under on `ac4-stereo-64`,
 whose first second was silent: the player had dropped its first chunk as late, and the decoder waits
-for an I-frame after one; a late AC-4 chunk is decoded and discarded now where that loses less, which
-an S3 measured at 0.0 to 0.1 s lost in place of 0.9 to 1.0 s at 23.44 fps, and a P4 has not been run
-since). The converter stream's worst burst, 229 ms, came within its first 125
+for an I-frame after one; a late AC-4 chunk is decoded and discarded now where that loses less,
+[below](#a-late-chunk)). The converter stream's worst burst, 229 ms, came within its first 125
 chunks and not again; the ring held it and nothing ran dry. E-AC-3 plays on the same image are unchanged (`dee-eac3-51` 5.1 0.18,
 internal RAM free 211 to 218 KB), and a player switched from E-AC-3 to AC-4 and back plays each as it
 did alone: the decoders go in turn, and the AC-4 one's 286 KB with them.
+
+### A late chunk
+
+An AC-4 frame depends on the ones before it back to the last I-frame, so a chunk dropped for being
+late costs the stream everything up to the next one. A P4's first chunks were late in 2 and 4 of the
+14 plays of each image, where an S3's were in most. Measured 2026-10-13 on board 1 over Sendspin (null sink, lane on), two plays of each stream with the image that drops a
+late chunk and the one that keeps it where that loses less audio (`kExpectedIFrameWaitUs`, the S3
+section's rule), by `lost_frames`, the stream's frames never handed to the sink:
+
+| Stream | Chunks late, dropped (2 plays) | Lost, dropped | Chunks late, kept | Lost, kept |
+|---|---|---|---|---|
+| `ac4-stereo-64` | 0, 0 | 0, 0 s | 3, 0 | 0.13, 0 s |
+| `ac4-20-music-192` | 0, 0 | 0, 0 s | 0, 0 | 0, 0 s |
+| `ac4-ims-film-96-24` (24 fps) | 0, 0 | 0, 0 s | 0, 0 | 0, 0 s |
+| `ac4-ims-music-128-25` (25 fps) | 0, 0 | 0, 0 s | 0, 0 | 0, 0 s |
+| `ac4-ims-music-64-2997` (29.97 fps) | 0, 3 | 0, 0.97 s | 0, 4 | 0, 0.13 s |
+| `ac4-51-music-128` | 0, 3 | 0, 0.98 s | 0, 18 | 0, 0.77 s |
+| `ac4-51-film-96` | 0, 0 | 0, 0 s | 2, 0 | 0.09, 0 s |
+
+Where a P4 had late chunks at a play's start, keeping them lost 0.09 to 0.13 s in place of 0.97 s,
+except for the 5.1 stream with 18 late, which lost 0.77 s: its decode takes 0.67 of a frame, so
+each chunk decoded recovers a third of one. A stall made with `hearth-testserver --stall-after 5
+--stall-ms N` on `ac4-20-music-192` lost 1.62 s at 2.2 s and 1.62 s at 3.2 s dropped, and 0.77 s and
+1.92 s kept: a P4 decodes 0.18 of a frame's time, so every late chunk is kept, which at the longer
+stall loses a little more than waiting for an I-frame that was close. One play of each, so the
+difference between 1.62 and 1.92 s is inside what the position of the I-frame makes. A play's x real
+time is what the table above says, with the same internal RAM at its least (2 to 42 KB), and no
+play had an invalid chunk.
 
 A presentation that has objects beside a 5.1 bed is played as the bed, and the decoder does not
 reconstruct the objects (`Ac4Stream::Config::skip_objects`, on by default: the board places none and
