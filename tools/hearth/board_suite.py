@@ -607,6 +607,7 @@ def run_sendspin_play(
         "timeout_s": context.timeout,
         "relay_every": context.relay_every,
         "log_wait_s": context.log_wait_s,
+        "seconds": spec.get("sendspin_seconds"),
     }
     if context.popen is not None:
         options["popen"] = context.popen
@@ -993,7 +994,9 @@ def compare(
             # Plays that glitched, of the plays made: the C6 runs a 30 s AC-3 stream dry in about
             # one in seven, so none is not the figure. One more than the baseline had is allowed
             # (the tolerance's glitched_plays), which five plays a row make a real margin.
-            allowed = int(tolerance.get("glitched_plays", 1))
+            # one number for every row, or a number by row id (one more for the rest)
+            configured = tolerance.get("glitched_plays", 1)
+            allowed = int(configured.get(play, 1) if isinstance(configured, dict) else configured)
             now_glitched = int(now.get("glitched_plays") or 0)
             base_glitched = int(base.get("glitched_plays") or 0)
             if now_glitched > base_glitched + allowed:

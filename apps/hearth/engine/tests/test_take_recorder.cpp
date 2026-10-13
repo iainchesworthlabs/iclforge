@@ -232,6 +232,53 @@ TEST_CASE("take recorder: what cannot be done is said", "[take]") {
     CHECK(again.error().find("already") != std::string::npos);
 }
 
+TEST_CASE("take recorder: a file that cannot go on says so, and what was written is a take",
+          "[take]") {
+    Folder folder;
+    const fs::path file = folder.path() / "full.flac";
+    TakeRecorder recorder;
+    recorder.limit_bytes(20000);
+    REQUIRE(recorder.begin(file, kRate).has_value());
+
+    const std::vector<float> samples = tone(440.0, 10.0);
+    bool failed = false;
+    for (std::size_t at = 0; at < samples.size() && !failed; at += 480) {
+        const std::size_t n = std::min<std::size_t>(480, samples.size() - at);
+        failed = !recorder.write(std::span<const float>(samples).subspan(at, n));
+    }
+    REQUIRE(failed);
+    // Every write after it fails too, and the take can still be ended.
+    CHECK(!recorder.write(tone(440.0, 0.1)));
+    CHECK(recorder.recording());
+    const auto info = recorder.finish({});
+    REQUIRE(info.has_value());
+    CHECK(!recorder.recording());
+    CHECK(fs::file_size(file) <= 20000);
+    CHECK(fs::file_size(file) > 42);
+    CHECK(fs::exists(info->sidecar));
+
+    // What is in the file is the start of what went in.
+    const auto bytes = read_all(file);
+    iclforge::sendspin::messages::PlayerStream stream;
+    stream.format.codec = iclforge::sendspin::messages::Codec::kFlac;
+    stream.format.channels = 1;
+    stream.format.sample_rate = static_cast<std::int32_t>(kRate);
+    stream.format.bit_depth = 24;
+    stream.codec_header.assign(bytes.begin(), bytes.begin() + 42);
+    auto decoder = iclforge::sendspin::codec::make_decoder(stream);
+    REQUIRE(decoder != nullptr);
+    const auto decoded =
+        decoder->decode(std::vector<std::uint8_t>(bytes.begin() + 42, bytes.end()));
+    REQUIRE(decoded.has_value());
+    REQUIRE(!decoded->empty());
+    REQUIRE(decoded->size() < samples.size());
+    std::size_t differing = 0;
+    for (std::size_t i = 0; i < decoded->size(); ++i) {
+        differing += (*decoded)[i] != quantised(samples[i]) ? 1U : 0U;
+    }
+    CHECK(differing == 0);
+}
+
 TEST_CASE("take recorder: samples beyond full scale are clipped, not wrapped", "[take]") {
     Folder folder;
     const fs::path file = folder.path() / "seven.flac";

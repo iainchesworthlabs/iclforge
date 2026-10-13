@@ -55,6 +55,8 @@ the surrounds would be; the repository's `examples/karaoke/` has two) and the pa
   for no singing. The browser's own echo cancellation is asked for either way.
 - **It counts how much of the tune's time your pitch was within a semitone of it, in any octave.**
   It hears pitch only, not timing, words or feeling.
+- **Each line gets a small mark when you have sung it**: three dots and a percentage, or "not sung"
+  where you did not. A line the tune has no notes in has none.
 - **A delay and a timing slider** are for the rest: the microphone's own latency (the browser's
   figure where it gives one) and where you want to move your timing.
 

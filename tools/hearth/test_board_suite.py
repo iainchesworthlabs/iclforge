@@ -257,16 +257,22 @@ class Suite(unittest.TestCase):
                     row.get("via", "play"), ("play", "sendspin"), f"{profile}/{row['id']}"
                 )
 
-    def test_a_sendspin_row_s_stream_states_how_many_bursts_it_is(self) -> None:
-        # The bursts the board played are held to it, as a /play's units are.
+    def test_a_sendspin_row_s_stream_says_how_many_bursts_it_is_or_how_long_it_loops(self) -> None:
+        # The bursts the board accounted for are held to it, as a /play's units are: a file
+        # states its count, and a short one that the server plays over and over says for how
+        # long (the server's report then says how many it sent) and what its burst period is.
         for profile, spec in self.suite["profiles"].items():
             for row in spec["plays"]:
-                if row.get("via") == "sendspin":
-                    stream = self.suite["streams"][row["stream"]]
+                if row.get("via") != "sendspin":
+                    continue
+                stream = self.suite["streams"][row["stream"]]
+                where = f"{profile}/{row['id']}"
+                if stream.get("sendspin_seconds"):
+                    self.assertIsInstance(stream["sendspin_seconds"], int, where)
+                    self.assertIsInstance(stream.get("period_us"), int, where)
+                else:
                     self.assertIsInstance(
-                        stream.get("sendspin_units", stream.get("units")),
-                        int,
-                        f"{profile}/{row['id']}",
+                        stream.get("sendspin_units", stream.get("units")), int, where
                     )
 
     def test_a_committed_baseline_is_for_a_profile_and_holds_exactly_its_rows(self) -> None:
@@ -294,6 +300,38 @@ class Suite(unittest.TestCase):
             # the compare's boot ratchet reads.
             for key in ("internal_free", "largest"):
                 self.assertIsInstance(record["boot"].get(key), int, f"{path.name}: boot {key}")
+
+    def test_a_baseline_is_under_the_profiles_hash_or_the_pr_that_moved_it_accepts_it(self) -> None:
+        """A baseline carries the hash of the profile it was recorded under, and the hash moves
+        whenever the profile is edited. A PR that edits a profile has to *decide* about every
+        baseline it moves, here and not on `main`: a locked value that changed carries a re-record,
+        and a key added at the value it already had keeps the baseline and says so, against the
+        profile's new hash, in suite.json (`baseline_accepted`). The acceptance names the hash it
+        was made against, so the next edit of the profile asks again."""
+        data = sink_profile.load()
+        for path in sorted(bs.BASELINES.glob("*.json")):
+            record = json.loads(path.read_text("utf-8"))
+            profile = record["profile"]
+            current = sink_profile.profile_hash(data, profile)
+            accepted = self.suite["profiles"][profile].get("baseline_accepted")
+            if record["profile_hash"] == current:
+                self.assertIsNone(
+                    accepted,
+                    f"{profile}: baseline_accepted is dead: the baseline is under the profile's "
+                    "hash, so the acceptance is removed",
+                )
+                continue
+            how = (
+                f"{profile}: the profile is {current} and its baseline was recorded under "
+                f"{record['profile_hash']}. A locked value that changed carries its re-record "
+                "(board_suite.py run --record); a key added at the value it already had keeps the "
+                f"baseline: set profiles.{profile}.baseline_accepted in suite.json to "
+                f'{{"profile_hash": "{current}", "why": "..."}} '
+                "(planning/esp32-platform-profiles.md, 'Changing a profile')"
+            )
+            self.assertIsNotNone(accepted, how)
+            self.assertEqual(accepted.get("profile_hash"), current, how)
+            self.assertTrue(str(accepted.get("why", "")).strip(), how)
 
     def test_a_pin_layout_belongs_to_a_stream_that_has_a_pin(self) -> None:
         for name, spec in self.suite["streams"].items():

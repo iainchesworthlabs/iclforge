@@ -95,7 +95,10 @@ class FakeProcess:
 
 
 def report(
-    failure: str | None = None, player_failure: str | None = None, **counters: Any
+    failure: str | None = None,
+    player_failure: str | None = None,
+    sent: int = 938,
+    **counters: Any,
 ) -> dict[str, Any]:
     """The report the real server writes: a run-level failure is the top-level `result`
     ("failed: C6 ran out of audio 1 time(s)", main.cpp finish()), and a player's own `failure`
@@ -103,7 +106,7 @@ def report(
     return {
         "server": {"name": ss.SERVER_NAME, "id": "SUITEID"},
         "result": "pass" if failure is None else f"failed: {failure}",
-        "programme": {"codec": "AC-3", "bursts": 938},
+        "programme": {"codec": "AC-3", "bursts": sent},
         "players": [
             {
                 "label": "C6",
@@ -200,6 +203,11 @@ class Command(unittest.TestCase):
         self.assertEqual(argv[argv.index("--state") + 1], str(STATE))
         self.assertEqual(argv[argv.index("--name") + 1], ss.SERVER_NAME)
         self.assertEqual(argv[argv.index("--play") + 1], str(PROGRAMME))
+
+    def test_a_short_file_is_played_over_and_over_for_so_long(self) -> None:
+        argv = self.argv(seconds=20)
+        self.assertEqual(argv[argv.index("--seconds") + 1], "20")
+        self.assertNotIn("--seconds", self.argv())
 
     def test_a_board_that_holds_the_record_is_not_asked_to_pair_and_the_board_is_not_polled(
         self,
@@ -386,6 +394,24 @@ class Judging(unittest.TestCase):
         self.assertIn("170 bursts played, expected 938", ss.judge(run, {"units": 938}))
         gone = self.run_of(code=3, line=None, failure="C6 went away")
         self.assertTrue(any("went away" in f for f in ss.judge(gone, {"units": 938})))
+
+    def test_a_looped_stream_is_held_to_the_bursts_the_server_sent(self) -> None:
+        # a three-frame AC-4 file played for 20 s: how many bursts that is, is the report's
+        spec = {"units": 3, "sendspin_seconds": 20}
+        board = StubBoard(log_text=STREAM_LINE.replace("bursts=938", "bursts=470") + "\n")
+        run = ss.run_row(
+            board, SERVER, STATE, PROGRAMME, "S3a",
+            popen=fake_popen(report(sent=470), 0), relay_every=0.01, log_wait_s=0.0,
+            seconds=20,
+        )  # fmt: skip
+        self.assertEqual(ss.judge(run, spec), [])
+        short = StubBoard(log_text=STREAM_LINE.replace("bursts=938", "bursts=460") + "\n")
+        run = ss.run_row(
+            short, SERVER, STATE, PROGRAMME, "S3a",
+            popen=fake_popen(report(sent=470), 0), relay_every=0.01, log_wait_s=0.0,
+            seconds=20,
+        )  # fmt: skip
+        self.assertIn("460 bursts played, expected 470", ss.judge(run, spec))
 
     def test_late_bursts_are_accounted_for_and_a_lost_one_is_not(self) -> None:
         # P4a, 2026-10-12: 932 played and 6 late of 938 sent, the server's own "did not play every
@@ -593,6 +619,35 @@ class InTheSuite(unittest.TestCase):
         self.assertEqual(figures["via"], "sendspin")
         self.assertEqual(figures["play_heap_free"], 52560)
 
+    def test_a_row_with_seconds_asks_the_server_to_loop_it(self) -> None:
+        board = StubBoard(log_text=STREAM_LINE.replace("bursts=938", "bursts=470") + "\n")
+        seen: list[dict[str, Any]] = []
+        row = {
+            "id": "ac4-20-music-sendspin",
+            "stream": "ac4-20-music",
+            "via": "sendspin",
+            "stream_spec": {
+                "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-192-3frames.ac4",
+                "codec": "AC-4",
+                "units": 3,
+                "sendspin_seconds": 20,
+                "period_us": 42667,
+            },
+        }
+        result, _ = bs.run_sendspin_play(
+            board,
+            row,
+            self.suite,
+            self.context(board, fake_popen(report(sent=470), 0, seen)),
+            None,  # type: ignore[arg-type]
+        )
+        argv = seen[0]["argv"]
+        self.assertEqual(argv[argv.index("--seconds") + 1], "20")
+        self.assertEqual(result.findings, [])
+        self.assertEqual(result.lines.units, 470)
+        # 21,111 us of a burst against the stream's own 42,667 us period
+        self.assertEqual(result.decoder_permille, round(21111 * 1000 / 42667))
+
     def test_a_row_that_rebooted_the_board_is_failed(self) -> None:
         board = StubBoard(log_offsets=(500, 120))
         result, _ = bs.run_sendspin_play(
@@ -675,6 +730,19 @@ class Comparing(unittest.TestCase):
         self.assertTrue(any("3 of 5 plays glitched, the baseline's 1 of 5" in f for f in found))
         found, _ = bs.compare(run, base, {"glitched_plays": 0})
         self.assertTrue(found)
+
+    def test_the_glitch_allowance_can_be_named_by_row(self) -> None:
+        base = json.loads(json.dumps(self.BASE))
+        for play in ("ac3-2.0-sendspin", "eac3-2.0-sendspin"):
+            base["plays"][play].update({"via": "sendspin", "plays": 5, "glitched_plays": 2})
+        run = json.loads(json.dumps(base))
+        for play in ("ac3-2.0-sendspin", "eac3-2.0-sendspin"):
+            run["plays"][play]["glitched_plays"] = 4
+        tolerance = {"glitched_plays": {"eac3-2.0-sendspin": 2}}
+        found, _ = bs.compare(run, base, tolerance)
+        # E-AC-3 may have two more (4 of 5 is inside); AC-3 has the default one more (4 is not)
+        self.assertEqual(len(found), 1)
+        self.assertIn("ac3-2.0-sendspin: 4 of 5 plays glitched", found[0])
 
     def test_a_sendspin_row_s_stream_underruns_are_not_a_plays_underruns(self) -> None:
         run = json.loads(json.dumps(self.BASE))

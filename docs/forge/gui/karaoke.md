@@ -57,7 +57,8 @@ through (L, C, R and then the LFE, scaled down with them), and a stereo fold lea
   not one channel, a vocal 2 without a vocal 1, a backing with nothing to sing along to, or a
   multichannel file that does not say which speakers it has.
 - A part at another sample rate or of another length is a **warning** that says what will happen:
-  it is resampled to the backing's rate, or the shorter part is padded with silence.
+  it is resampled to the backing's rate, or the shorter part holds its last sample for the rest of
+  the programme.
 - Next stays off until the parts can be built.
 
 **2 · Levels.** The two levels Annex C reads from the stream: the **centre level** (`cmixlev`),

@@ -29,6 +29,35 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: what the boards do, and the pages that said otherwise**
+
+- **The Hearth sink pages say what each board does with a karaoke stream.** The S3 reproduces
+  AC-3 and E-AC-3 karaoke itself (levels within 0.25 dB of the host's decode in Hearth's live
+  case). The C6 decodes two channels, so Hearth decodes a 5.1 karaoke stream for it and sends 2.0
+  PCM, for both codecs, and the live case skips it with the reason. A v1.x P4 reproduces both at
+  its 2.0 layout (within 0.2 dB for AC-3 and 0.7 dB for E-AC-3), and cannot open the 3.0 layout
+  the case uses by default. One earlier run on that board, started from its second slot after an
+  update restart, played nothing and is recorded as not explained.
+- **`docs/verification.md` and the development-status row no longer say no outside decoder
+  reproduces karaoke.** Dolby's reference decoder does, for AC-3 and for E-AC-3
+  (`tools/checks/verify_karaoke_oracle.py`, local only); the E-AC-3 row says what is reproduced.
+- **The Hearth page and the Karaoke guide say a sink is sent PCM when it decodes fewer channels of
+  the codec than the stream has**, as well as when it does not list the codec for karaoke. The
+  ROADMAP row and the plan's board cells say what was run.
+
+**Karaoke in E-AC-3: the live karaoke cases take a layout, and skip a board that is not the one decoding**
+
+- **`network sinks live: a karaoke stream is reproduced by the board that decodes it` and its E-AC-3
+  twin read two options.** `ICLFORGE_HEARTH_LIVE_KARAOKE_LAYOUT` sets the layout the board is
+  given (3.0 by default; a v1.x ESP32-P4 cannot open three slots and takes 2.0), and
+  `ICLFORGE_HEARTH_LIVE_KARAOKE_PUSH` names which of routing, trim, delay and crossover are sent
+  with it (all four by default; `none` sends the layout alone).
+- **A board that decodes fewer channels of the codec than the programme has is skipped, with the
+  reason.** The ESP32-C6 decodes two, so Hearth decodes the stream for it and sends PCM, and the
+  case failed at the board's levels, which a PCM player does not report.
+- **"The choice made a difference" compares every reproduction with as-coded.** At a stereo layout
+  aware is the Lo/Ro fold as-coded already is, so comparing those two alone failed there.
+
 **Hearth tells a group's members what is playing**
 
 - **The engine sets `metadata@v1` for a group.** A member that lists the role gets the item's title
@@ -260,6 +289,21 @@ The sections below contain the complete change list and fixes.
   were given.
   This is a move: no message, log line or file the test sink writes is different.
 
+**Hearth for Android: two leftovers of the metadata and the request path**
+
+- **"Both" asks the server for the aware reproduction.** The controls sheet's vocals row sent the
+  capable reproduction for every choice; the owner's call of 2026-10-13 is that "Both" asks for
+  `aware`, which plays both voices as the song's mix does, and V1, V2 and None ask for `capable` with
+  that choice, the only reproduction that has them. The rule is one function, `sink::vocals_request`,
+  and a host case holds the four choices.
+- **An item with no lyrics shows the server's clock in the lyric screen's header.** The header drew a
+  time only for a document's line. `Sink::lyric_frame()` now takes the position and length from the
+  server's `metadata@v1` progress, at the sink's own time on the server's clock (a pause keeps it), for
+  an item with no document or a plain one, and the length for a timed document that names none; the
+  frame says `progress` when the position is the server's. The header's right side shows the time and
+  the hairline under it fills by it. A host case holds the position, the pause and the document's own
+  length winning; `LyricViewRenderTest` holds the pixels.
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
@@ -284,6 +328,13 @@ The sections below contain the complete change list and fixes.
   dropped, and with no sung line the file's commonest style is read. Lines in one style at one time
   are all read. The reader no longer shows a doubled line or an interleaved translation for such a
   script (planning/karaoke-formats-options.md, D14).
+- **A script made with Aegisub's karaoke templater reads as its lyrics, not as its effects.** The
+  templater keeps the timed karaoke as a `Comment:` with the Effect `karaoke` and writes
+  one `Dialogue:` with the Effect `fx` for each syllable or decoration, so the reader showed the
+  effects and skipped the lyrics. A line whose Effect has `karaoke` in it is now read as sung,
+  comment or not, the `fx` lines are not read, and the templater's own `template`, `code` and
+  `mixin` comments never are. A script without such a line reads as before. Built to the
+  templater's own source and manual, not yet to a real exported script.
 
 **Forge writes the lyrics beside the stream it encodes**
 
@@ -425,6 +476,15 @@ The sections below contain the complete change list and fixes.
 
 **Hearth: a singer can keep a take of their voice**
 
+- **The card lists the takes in the folder** (the microphone, scoring and recording programme, M6:
+  "a list of takes"). "Your takes" shows the newest five with how long each is and how many more
+  there are; each has **Delete**, which asks again before it removes the file and its description.
+  The list is read from the `.take.json` descriptions, so listing opens no audio: a FLAC with no
+  description, a description of a file that is not there, one that is not JSON and one that names a
+  file outside the folder are not takes, and `deleteTake` refuses a path that is not in the list.
+  The controller gains `takes`, `refreshTakes()` and `deleteTake()`; the list is read again when a
+  take is kept or deleted and when the folder is changed. Fifteen mutants (eleven of the
+  controller, four of the card's asking and counting) were applied and all killed.
 - **"Record a take" keeps the singer's voice from the microphone, and only when pressed** (the
   microphone, scoring and recording programme, M6). The Microphone card gains **Record a take** and
   **Stop recording**, a **Recording** indicator with the elapsed time (a second sign beside
@@ -432,6 +492,12 @@ The sections below contain the complete change list and fixes.
   **Choose…**, and **Show in folder** and **Delete this take** for the last one. A take stops when the
   microphone goes off, the page is left, the item ends, the device goes away or the disk fails, and
   says why. Turning the microphone on never starts one.
+- **A take the disk cannot hold is tested.** `TakeRecorder::limit_bytes()` (a test seam; 0, the
+  default, is no limit) makes the file refuse a write past a number of bytes, as a full disk does,
+  and the session's and the controller's handling of it, which had no test, is held: the take ends
+  by itself, the microphone stays on, the person is told it was the disk, and what was written is a
+  take with its description, handed over once (`take_ended_by_itself`). Six mutants applied, all
+  killed.
 - **A take is the voice alone, lossless, with a description beside it.** One mono 24-bit FLAC at the
   microphone's rate through the existing encoder, and a `.take.json` that says which item it was,
   where in the item the first sample was sung (the heard position when the sound reached the
@@ -441,6 +507,15 @@ The sections below contain the complete change list and fixes.
   made until the first take, and a take begun in the same second as another is numbered, not
   written over it. `TakeRecorder` in the engine is Qt-free and is tested with no device.
   Hearth's user guide has a section on it.
+- **The user guide says how to turn a take into a karaoke stream with the singer's voice in it**
+  (the plan's D12, the recipe first). The Forge's Karaoke flow takes the take as Vocal 1 with its
+  start offset, or `forge decode`, `ffmpeg` and `forge encode` do the same from a stream; the page
+  says what a take needs first (FLAC to WAV, the microphone's rate to the backing's, where it
+  starts, and made as long as the backing) and the commands were run on the repository's example
+  stream: the voice starts where `item_start_ms` says and is silent after it. A found difference:
+  `forge encode` and the Forge GUI hold a shorter part's last sample past its end, which is not
+  silence, and the Forge GUI's warning and the page for it said it was padded with silence; the
+  page now says what is done.
 
 **Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
 
@@ -1155,9 +1230,18 @@ The sections below contain the complete change list and fixes.
   a voice placed at where the sound it sang along to was (with the microphone's and the output's
   latency and the person's timing), a dropped stretch of quanta, nothing scored while paused. Thirteen
   mutants of `mic.js` were applied and all killed.
-- **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
-  microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
+- **Not in the browser:** recording a take (the plan leaves it out, D16), and a real microphone's
+  echo cancellation, which is the browser's own. The decode page's files are re-copied
   into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
+- **The decode demo marks each line the singer has sung.** Three dots and a percentage after a
+  line, or **not sung** with no number where the voice was voiced for under a fifth of the line's
+  notes' time; none for a line the tune has no notes in, with the microphone off, or without the
+  headphones answer. The percentage is the scorer's share for the line's stretch of the item, the
+  lyrics' own times moved by the lyrics' nudge; 75 % and over is three dots, 45 % and over two,
+  under that one (Hearth's bands). `MicrophoneSession.lineResult(startMs, endMs)` is the call. The
+  `microphone` project holds the three levels with a synthetic voice, the no-note line, the
+  not-sung line and the withheld case; five mutants of `lineResult` and `levelFor` were applied
+  and all killed.
 
 **Hearth: a singer sees the tune as a ribbon, how each line went, and a summary**
 
@@ -3636,6 +3720,18 @@ The sections below contain the complete change list and fixes.
   dropped: a Shield whose HDMI link dropped every 20 s played a quarter fewer bursts than were sent and
   reported none dropped.
 
+**Hearth applies a sink's request for the karaoke choice**
+
+- **A request from a member of the group Hearth plays to changes the singer's choice.** The vocals,
+  the reproduction and the levels a sink asked for (the protocol of the entry below) are applied as the
+  Karaoke page's own change is: kept across starts, and reaching every member that decodes for itself
+  through the settings it is sent, so the server's screens and the other members move together. A
+  request from a sink in another group, or in none, changes nothing; two sinks asking at once are
+  decided by the last. Nothing sends a request yet: the Android remote and the panel's touch control
+  are the next changes. Held by a case on a real group (the host's event reaches the application with
+  the group and the sink's name, cut to what the sink listed), and by cases for the map a request
+  makes and for the group it must come from.
+
 **A burst rebuilt from its parts, and a null burst**
 
 - **`iec61937::burst_from_parts`, `burst_period_bytes` and `null_burst`.** A sink that bitstreams a
@@ -4182,6 +4278,28 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Forge GUI Karaoke flow: a part of another length**
+
+- **The Karaoke flow's warning said the shorter part "is padded with silence"; it is not.** The
+  window and `forge encode` fill a source past its end with its last sample, held, in one function
+  (`fill_source_frame`, chosen by W1 of the karaoke phase 2 plan so that the two cannot differ):
+  `forge encode` with a 6 s 24-bit mono part ending at -0.25 under a 16.5 s backing decodes that
+  channel at a constant -0.2499 to the end, where silence would be 0. The warning now reads "the
+  shorter part holds its last sample for the rest of the programme", in the seven catalogues too.
+  The encoding is unchanged, held by the owner's decision; a part that should fall silent after its
+  end has to be given as long as the backing.
+
+**Footprint probes: the E-AC-3 fold fixtures expect the -3 dB levels**
+
+- **`kEac3FoldRms`, `kEac3714FoldRms` and the fixed-tier pins `eac3_fold` and `eac3_714_fold` are
+  re-measured.** They were taken before an E-AC-3 stream with no `mixmdate` folded at -3 dB centre
+  and -3 dB surround (#1420, D10), so the arm-none-eabi, ESP32-C3 and ESP32-S3 footprint probes
+  failed their level checks on every push since (the 5.1 fold 107,353 / 106,212 to 95,687 / 94,353
+  and the 7.1.4 fold 62,837 / 61,994 to 55,509 / 55,002 per million; the fixed-tier hashes
+  `63f6da64fcb14557` and `3c068ffd950a7e63`). Values are from `forge decode downmix=loro
+  drcmode=line` of the embedded streams and from the fixed-tier probe run natively; no other
+  fixture moved.
+
 **WebAssembly demo: the lyrics test**
 
 - **The browser demo's "follows a lyrics file" test failed against the example it loads, and had
@@ -4198,6 +4316,13 @@ The sections below contain the complete change list and fixes.
   The page and the module are unchanged. Run against a build of the module in headless Chromium,
   the five cases of `decode.spec.js` pass; a page that drops its document on a refused file fails
   the new seek check.
+
+**Forge GUI user guide: the Karaoke page's note on the length warning**
+
+- **The Karaoke page no longer says the window's warning reads "padded with silence".** The
+  note was added with the take recipe, while the warning said a shorter part is padded with
+  silence and the window and `forge encode` hold its last sample. The warning now says what is
+  done, so the page's bullet states the behaviour and nothing else.
 
 **Lyrics on a board**
 
