@@ -45,6 +45,10 @@ why, and a list of checks. Or choose **One multichannel file** whose speakers ar
 channel mask (`L R C`, `L R S`, `L R C S`, `L R Ls Rs` or `L R C Ls Rs`, each with an `LFE` if it
 has one).
 
+![The Karaoke flow's Parts step before any file is chosen: rows for the backing, the melody guide, two vocals and the LFE, and the coding mode under them](screenshots/karaoke-parts-empty.png)
+
+*The Parts step as the flow opens. [The karaoke guide](../../karaoke/index.md#make-one-in-the-forge-gui) has it with the example's parts loaded.*
+
 The **LFE** part is the stream's low-frequency effects channel. It chooses no mode (a backing and
 an LFE are still nothing to sing along to) and it is coded after the full-bandwidth channels, so a
 3/2 stream with one is a 5.1 bed. The window band-limits it with a 120 Hz low-pass, as it does any

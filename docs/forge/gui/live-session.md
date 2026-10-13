@@ -27,6 +27,8 @@ The Card has two states:
 ![The idle Live session card — receiver, monitor, write-to-disk and the highlighted Start session
 button](screenshots/live-session-idle.png)
 
+*The two pictures on this page are of an earlier build: the header reads "ac3forge" and has no Karaoke control. The Live session card is unchanged.*
+
 Starting a *real* session — a take on disk or a receiver leg wanted — focuses the tab; Monitor,
 however it is started, never steals the tab you are configuring.
 
