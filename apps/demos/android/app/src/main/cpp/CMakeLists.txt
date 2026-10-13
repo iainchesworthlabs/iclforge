@@ -30,6 +30,11 @@ project(iclforge_shield_jni LANGUAGES CXX)
 # explicitly, scoped to this Android wrapper project only.
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+# NDK r26's libc++ clobbers a std::expected's has-value flag when its payload has tail padding. The
+# option has to reach this wrapper's own targets as well as the root's, so it is included here and
+# not only by the root (cmake/LibcxxExpectedLayout.cmake).
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../../cmake/LibcxxExpectedLayout.cmake")
+
 # Pre-seed the repo root's option()s before pulling it in: option() only sets
 # a cache variable if one is not already present, so FORCE-ing these first
 # means the root CMakeLists.txt's own `option(ICLFORGE_BUILD_CLI ... ON)`

@@ -1,10 +1,13 @@
 # Hearth
 
-Hearth plays AC-3, E-AC-3, E-AC-3 with Atmos objects, and AC-4 through local speakers, an HDMI or
-S-PDIF receiver, or synchronised network sinks. The desktop player, `hearth`, decodes a stream
-for its local outputs, passes AC-3 and E-AC-3 to a receiver that accepts them, and plays a stream
-to a group of network sinks over Sendspin, a protocol for synchronised network audio.
-`hearth_sink` is the firmware for the ESP32 boards that join such a group.
+Hearth plays AC-3, E-AC-3, E-AC-3 with Atmos objects, and AC-4 through this computer's outputs or
+synchronised network sinks. The desktop player, `hearth`, decodes a stream for its local outputs
+and plays a stream to a group of network sinks over Sendspin, a protocol for synchronised network
+audio. `hearth_sink` is the firmware for the ESP32 boards that join such a group, and
+[Hearth for Android](android.md) is a sink for Android TV that hands the stream to an AV receiver.
+
+[Using the desktop player](desktop-player.md) walks through the window with a picture of each
+page. This page is the reference.
 
 ## The desktop player
 
@@ -31,6 +34,8 @@ The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 The header says where playback goes. Clicking it, or **Choose…** in the signal path, opens the
 output picker: this computer's outputs for decoded audio, the outputs that take AC-3 and E-AC-3 as
 a bitstream, and the network groups. Its **Play here** button moves playback to the row chosen.
+The window decodes every stream itself: it lists the outputs that take a bitstream and does not
+play to them as one ([What it does not do](#what-it-does-not-do)).
 A network sink that another server holds, such as one Music Assistant holds, shows as in use by
 another server, with a **Take it back** button. From a paired ESP32 sink's settings page the app
 updates that sink's firmware. The engine and the Sendspin protocol are tested in CI, including
@@ -423,11 +428,21 @@ ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4 programmes a
 | [ESP32-C6](../platforms/bare-metal/esp32-c6.md) | Fixed-point decoder; `hearth_sink`'s Sendspin player, stereo only | All decode fixtures run on a board; a stereo Sendspin group with an ESP32-S3 played ten minutes with no underruns on either board ([setup guide](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#on-the-esp32-c6)). CI builds the Sendspin player for this part, for the 4 MB and the 16 MB flash layouts, and does not run it: ESP-IDF's RISC-V QEMU emulates the ESP32-C3 and no other part |
 | [ESPHome](../platforms/bare-metal/esphome.md) | An external component wrapping the ESP32-S3 decoder | Config-checked in CI against the manifest; not yet a `media_player` or `speaker` source |
 | Windows, Linux and macOS | `hearth` (the desktop window, Qt 6.8+) with its engine and Network page; `hearth-testsink`, `hearth-testserver` and `hearth-render` development tools | Engine and Sendspin interoperability tests run in CI, and the window builds there on all three platforms; each committed AC-4 test stream that the decoder accepts plays through the engine sample for sample as the library decodes it |
+| Android TV | [Hearth for Android](android.md), a Sendspin sink that passes AC-3 and E-AC-3 to the receiver on its HDMI output | One recorded run on an NVIDIA Shield TV (2019) into an Onkyo TX-RZ740: AC-3 5.1 and E-AC-3 5.1 for two minutes each with no underrun, sent by the test server. CI builds a debug APK and runs its tests on an emulator |
 
-The desktop player's passthrough design uses the same path as `forge play`. That command has
-played the AC-3, E-AC-3 and signed Atmos stream shapes listed there to a receiver through a
-Raspberry Pi 4B without an underrun. See
-[Raspberry Pi passthrough](../platforms/raspberry-pi.md#live-hdmi-passthrough-to-a-real-receiver).
+The engine's passthrough uses the same path as `forge play`. That command has played the AC-3,
+E-AC-3 and signed Atmos stream shapes listed there to a receiver through a Raspberry Pi 4B without
+an underrun
+([Raspberry Pi passthrough](../platforms/raspberry-pi.md#live-hdmi-passthrough-to-a-real-receiver)).
+The window does not use it yet.
+
+## Hearth for Android
+
+Hearth for Android is a Sendspin sink for Android TV. It pairs with the desktop player, passes the
+AC-3 or E-AC-3 stream it is sent to the AV receiver on the box's HDMI output, and shows a karaoke
+item's lyrics in time. It is built from source; no release carries it, and it does not decode on
+the device, so a stream that reaches it as PCM is not heard. [Hearth for Android](android.md) has
+the build, the pairing, the screens and what has been run.
 
 ## What it does not do
 
@@ -445,11 +460,16 @@ Raspberry Pi 4B without an underrun. See
   stream carries object metadata without listing it.
 - **Remove an item from the queue.** The window has no control for it.
 - **Trim the AC-4 decoder's delay** at the start of an item (see above).
-- **Come with a user guide.** This page and the sink guides are the Hearth documentation. The
-  [design record](design/player-appliance.md) explains the decisions behind the app.
+- **Pass AC-3 or E-AC-3 to a receiver as a bitstream.** The engine has the path, the one
+  `forge play` uses, and its tests bitstream through it. The window gives the engine no bitstream
+  output, so every stream is decoded here and leaves as PCM; the output picker lists the outputs
+  that would take a bitstream and says that choosing one has no effect.
 
 ## Where to go next
 
+- [Using the desktop player](desktop-player.md) — the window, page by page, with pictures.
+- [Hearth for Android](android.md) — the sink for Android TV.
+- [Karaoke](../karaoke/index.md) — playing, timing, singing and making karaoke streams.
 - [An ESP32-S3 sink](sink-esp32-s3.md) — build, flash, configure, and pair a board.
 - [An ESP32-C6 sink](sink-esp32-c6.md) — the stereo player on a part with no PSRAM.
 - [An ESP32-P4 sink](sink-esp32-p4.md) — the best tier, its two silicon generations and two images,

@@ -13,14 +13,29 @@ See [README.md](README.md) for the project overview and
 This release adds:
 
 - an AC-4 decoder and encoder, written from ETSI TS 103 190-1 and -2, with A-JOC and direct-coded
-  objects, in `ac3cli`, the Forge GUI and Hearth's desktop player, and in the C API, Python, Rust
-  and WebAssembly bindings; AC-4 in MP4, CMAF, MPEG-TS and IEC 61937-14 bursts; AC-4 on the
-  ESP32-P4; and Android building the AC-4 libraries;
-- Hearth's desktop player, with its network sinks on the ESP32-S3, ESP32-C6 and ESP32-P4, firmware
-  updates over the network, and diagnostics;
-- fixed-point decoding for ESP32-C3 and ESP32-C6, with real-time ESP32-S3 work;
+  objects, in `forge`, the Forge GUI and Hearth's desktop player, and in the C API, Python, Rust
+  and WebAssembly bindings; AC-4 in MP4, CMAF, MPEG-TS and IEC 61937-14 bursts; and the AC-4
+  decoder on the ESP32-P4 and the ESP32-S3;
+- Hearth: the desktop player; its network sinks on the ESP32-S3, ESP32-C6 and ESP32-P4, with
+  firmware updates over the network and diagnostics; Hearth for Android, a sink for Android TV
+  that passes AC-3 and E-AC-3 to a receiver; and the Sendspin sink library the test sink and the
+  Android app are built on;
+- karaoke: AC-3's Annex C streams, and the same reproduction for E-AC-3, in the decoder, in
+  `forge`, in a Karaoke flow in the Forge GUI and on a Karaoke page in Hearth, with timed lyrics
+  from `.lrc`, SubRip, Advanced SubStation Alpha and MIDI karaoke files, a microphone with a pitch
+  score, lyrics on the network sinks and in Crucible, and a browser demo;
+- new names: the family is ICL Forge, its programs are `forge`, `forge-gui`, `hearth` and
+  `crucible`, its libraries are `iclforge::<library>`, and the repository is a tree of
+  self-contained projects under `libs/`, `apps/`, `bindings/` and `firmware/`
+  ([Renamed](docs/renamed.md) puts each old name beside its new one);
+- IAMF v2.0 reading and writing, an IAB (SMPTE ST 2098-2) writer and lossless audio, more of ADM,
+  object signing with several keys and a licensed gate, and an associated E-AC-3 service mixed
+  into the main;
+- fixed-point decoding for ESP32-C3 and ESP32-C6, with real-time ESP32-S3 work, and one locked
+  build profile for each board;
 - Crucible on Windows and Linux, with macOS code built and tested in CI;
-- per-channel quality gates and continued performance, quality, and memory histories;
+- per-channel quality gates and continued performance, quality, and memory histories, with AC-4
+  in them;
 - wider WebAssembly encoding, microphone capture, and expanded Rust bindings;
 - a pull-request gate, a verified branch and a nightly run in place of the full CI matrix on
   every change.
@@ -89,7 +104,6 @@ The sections below contain the complete change list and fixes.
   been read. The reference is read on a worker thread and cancelled when the item changes.
   Hearth's user guide has a section on it.
 
-**Hearth: what a singer's performance is scored against, and how**
 **Karaoke in E-AC-3: the documentation says what the decoder does**
 
 - **The user guide, Hearth's page and the plan stop saying "E-AC-3 has no karaoke mode, this is
@@ -236,16 +250,7 @@ The sections below contain the complete change list and fixes.
   to 90 %, and 78 % when the echo is as weak as the noise. Held with synthetic rooms and eight
   mutants, all killed. The threshold is provisional (it needs a real room and a real singer), and
   nothing in Hearth calls it yet.
-**Audio: when a packet was captured**
 
-- **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
-  programme, M2). `Capture::stamps()` is a second lock-free ring of `CaptureStamp`s (the packet's
-  first frame in the stream, and its time in nanoseconds on `std::chrono::steady_clock`'s clock);
-  `CaptureTimeline` fits a line through the last 64 and gives the time of any frame, the frame at a
-  time, and the device's measured rate; `Capture::start()` takes `CaptureOptions` with a requested
-  packet period (the engine's shared-mode period nearest it, through `IAudioClient3`), and
-  `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
-  consumer must treat as "no time", and a caller that does not use any of it sees no change.
 **Karaoke in E-AC-3 and AC-4: the evidence, a support matrix and a plan**
 
 - **The specifications and a real decoder, read.** E-AC-3 carries karaoke's signalling field for
@@ -451,14 +456,6 @@ The sections below contain the complete change list and fixes.
   with the words beside it as UTF-8 LRC (the same conversion as `lyrics-encoding=`). Choosing
   another file forgets the page. The page names' language groups are translated in the six
   catalogues.
-
-  refused by name. Nothing supplies one yet: the platform's conversion and a choice in Forge follow.
-- **The Forge GUI's Karaoke flow does the same on its Lyrics row.** A lyrics file of the backing's
-  name beside it is offered whether it is an `.lrc`, an `.srt`, an `.ass` or a `.kar`; the file
-  dialog lists all four; and the stream is saved with `<stream>.lrc` beside it as UTF-8 LRC
-  (`place_lyrics_beside()`), where it copied an `.lrc` byte for byte before. A file in a code page
-  is named on the row when it is chosen, and none is written. The row's strings are translated in
-  the six catalogues.
 
 **Hearth opens MP4, Matroska and MPEG-TS files**
 
@@ -4316,6 +4313,10 @@ The sections below contain the complete change list and fixes.
 - The Forge GUI screenshots were taken again from a current build (14 of 17): the header gained
   Inspect objects, Open stream and About, and the preset row lost 5.2. The Metadata page describes
   the Service and production card, which had no section.
+- The same fourteen Forge GUI screenshots were taken once more after the rename, since each showed
+  "ac3forge" in the header and `ac3cli` on the command-line chip; they show Forge, the Karaoke
+  control and the Project… menu. The Karaoke page has a picture of the flow's first step. The three
+  live-capture pictures are still of the earlier build, and say so under them.
 - The Hearth page describes the desktop player as it is: it plays to network sinks, plays
   channel-based AC-4, packages for Windows, macOS and Linux, and updates a sink's firmware. The
   ESP32-P4 has its row, and its page is in the navigation.
@@ -4346,6 +4347,16 @@ The sections below contain the complete change list and fixes.
   P4 panel and the sync measurement pages, the consolidation, monorepo and layout plans under
   built work with their pull request, and the state of each plan that had merged since its row was
   written; the AC-4 plan's state table carries the pull request of each ESP32 phase and of I6.
+- **Hearth has a user guide.** [Using the desktop player](docs/hearth/desktop-player.md) walks
+  through the window page by page, with a picture of each page, the first-run dialog, the output
+  picker and the keyboard reference, taken from a build of main with `--smoke-shot`.
+  [Hearth for Android](docs/hearth/android.md) is the page for the Android TV sink: what it needs,
+  building it, pairing, what it plays, the lyric screen and its controls, what has been run and what
+  it does not do. The support catalogue and the platform tables have rows for it.
+- **Hearth's pages no longer say the desktop player passes AC-3 and E-AC-3 to a receiver.** The
+  engine has that path and tests it; the window gives the engine no bitstream output, so every
+  stream is decoded and leaves as PCM, which the output picker has said all along. The Hearth page,
+  the README, ROADMAP.md, the Hearth plan and the application table say so.
 
 **Release engineering**
 
@@ -4386,6 +4397,31 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**Android: `std::expected` no longer loses a payload that has tail padding**
+
+- **NDK r26's libc++ overwrote the has-value flag of a `std::expected` whose payload is trivially
+  copyable and has tail padding; the build now keeps the flag out of the padding.** libc++ 17
+  puts the flag in the payload's tail padding and then copies `sizeof(T)` bytes, padding included,
+  over it, so `return meta;` came back as "no value, error 0" and an error whose padding held a
+  non-zero byte came back as a value. On a Shield that was `read_frame_metadata()`,
+  `edit_stream_metadata()` and `insert_stream_metadata()` (ten `iclforge-ac3-tests` cases);
+  nothing on a desktop shows it. llvm-project#68552 and #70494, android/ndk#1963: NDK r27 has half
+  the fix and r28 both, and none of r26's point releases has either.
+  `cmake/LibcxxExpectedLayout.cmake`, which the root and both Gradle wrappers include, adds
+  `cmake/toolchains/android.libcxx17-expected-layout.h` to every C++ translation unit of an Android
+  build with a Clang older than 19, and checks at configure time that the layout changed. The
+  audit of what was exposed (39 of 227 `std::expected` specializations the Android-reachable
+  libraries instantiate had the flag in padding; eight, in seven payload types, were trivially
+  copyable) and the way to repeat it are in docs/platforms/android.md. `iclforge-base-tests`
+  gains the `[expected]` cases, which fail on r26 without the option; `build-android-arm64` links
+  that binary now. Delete the module with the NDK r26 pin.
+- **Two other r26 gaps the same device run found.** `std::ranges::binary_search` in r26's libc++
+  answers true for every value between the first and last element (llvm-project#61160), which made
+  every frame between the first named AC-4 I-frame and the last an I-frame:
+  `ac4::Encoder` uses `std::binary_search`, the same answer everywhere else. And Clang 17 ends a
+  range-for's temporaries before its first iteration (P2718R0 is Clang 19), which left eleven
+  `iclforge-containers-tests` cases iterating a freed vector: the test binds the optional first.
 
 **Forge GUI Karaoke flow: a part of another length**
 
