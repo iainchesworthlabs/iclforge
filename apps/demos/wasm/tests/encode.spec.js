@@ -319,7 +319,7 @@ test('records from the (fake) microphone through the page UI', async ({ page }) 
     await expect(page.locator('#status')).toContainText('Ready', { timeout: 15_000 });
 
     // Chromium's --use-fake-device-for-media-stream supplies a synthetic
-    // tone as the microphone and --use-fake-ui-for-media-stream grants the
+    // beep as the microphone and --use-fake-ui-for-media-stream grants the
     // permission prompt (see playwright.config.js), so this drives the real
     // getUserMedia -> AudioWorklet -> Encoder path.
     await page.click('#micBtn');
