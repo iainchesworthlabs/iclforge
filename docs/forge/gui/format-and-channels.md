@@ -82,8 +82,6 @@ selected** (IEC 61937 passthrough bursts are fixed-size per access unit — see
 
 ![The rate-mode panel absent while a live source is selected](screenshots/format-vbr.png)
 
-*This picture is of an earlier build: the header reads "ac3forge" and has no Karaoke control. The panel it shows is unchanged.*
-
 **Constant** (the default) is the plain **Bit rate** dropdown above. **Variable** adds a
 **Quality** slider, 0 (smallest) to 100 (best) — encoder-relative, not a fixed target, and *not*
 linear in bit cost: cost rises steeply above roughly half the range, so a high quality with no
