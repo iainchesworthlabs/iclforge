@@ -141,6 +141,9 @@ target_link_libraries(iclforge-crucible-tests
 # source-tree path, because ctest runs the binary from the build tree.
 target_compile_definitions(iclforge-crucible-tests
     PRIVATE "ICLFORGE_CRUCIBLE_TS_DIR=\"${CMAKE_SOURCE_DIR}/apps/crucible/ui/assets/translations\""
+    # Hearth's six, read the same way and held to the same rules as Crucible's. The files are in
+    # the source tree whether or not Hearth is configured, so this needs no guard.
+    PRIVATE "ICLFORGE_HEARTH_TS_DIR=\"${CMAKE_SOURCE_DIR}/apps/hearth/ui/assets/translations\""
     # The GUI's seven catalogues are held to the same two rules as Crucible's
     # six, from the same parser. They were filled on 2026-09-06 and a rule
     # that holds them there belongs beside the one that holds Crucible's,

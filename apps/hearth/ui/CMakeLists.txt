@@ -236,19 +236,19 @@ else()
     # whose source string is gone is kept as translation memory otherwise,
     # and git history is that memory.
     #
-    # They carry every source string and NO assets/translations yet - each entry is
-    # marked unfinished, which is what Qt calls an untranslated message, and
-    # what it does with one is fall back to the English source. So choosing a
-    # language today changes the layout direction and the font (which is why
-    # the two Noto faces are bundled above) but leaves the words in English
-    # until a translator fills these in. That is a content task, not a build
-    # one; the machinery is what was missing.
+    # They are filled: every entry has a rendering. The renderings are machine
+    # drafts that no speaker has read (the language note in Settings says so).
+    # An entry marked unfinished is what Qt calls an untranslated message, and
+    # what it does with one is fall back to the English source.
     #
-    # Deliberately no test asserting the catalogues are complete, unlike
-    # apps/crucible/ui/tests/test_translations.cpp: Crucible's are filled, and
-    # holding these to the same bar would fail from the first commit.
+    # apps/crucible/ui/tests/test_translations.cpp holds these six files to the
+    # rules it holds Crucible's to: nothing unfinished or dead, nothing empty,
+    # placeholders and brand terms kept, one source set across the six. So a new
+    # or reworded string arrives unfinished from hearth_lupdate, and that case
+    # fails until the entry has a rendering in all six - fill it in the same
+    # change (docs/crucible/localisation.md, "Regenerating the catalogues").
     #
-    # CI does check that they match the sources: the windows-msvc leg
+    # CI also checks that they match the sources: the windows-msvc leg
     # reruns hearth_lupdate and fails if the result differs from what is
     # committed in anything but <location> lines
     # (.github/workflows/_ci-windows.yml, "Check the Hearth assets/translations are
