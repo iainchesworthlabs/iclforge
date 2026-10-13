@@ -694,6 +694,40 @@ TestCase {
         compare(findByName(ctx.win, "karaokePlays-L").text, "L");
     }
 
+    // ---- The status line ------------------------------------------------------------
+    // The Save step's line and the RUNS strip at the foot of the window both read
+    // EncoderController.status. The controller's sentence for a second source is written for
+    // a table the person fills in by hand; the flow assigns every coded channel from the
+    // parts and has no table, so what it leaves there must not send anyone to one.
+    function test_theStatusAfterThePartsAreLoadedDoesNotSendAnyoneToATable() {
+        const ctx = openFlow();
+        useParts(ctx, { backing: backing, melody: melody, vocal1: lead, vocal2: harmony });
+        tryCompare(ctx.flow.plan, "mode", "3/2", 5000);
+        // Nothing is left to assign: the flow did it from the parts.
+        compare(EncoderController.unassignedWarnings.length, 0);
+        compare(EncoderController.status, "4 sources loaded.");
+        ctx.flow.currentStepKey = "save";
+        const line = findByName(ctx.win, "karaokeEncodeStatus");
+        compare(line.text, "4 sources loaded.");
+    }
+
+    // The two tiers that do have the table are told, as they always were, and so is anything
+    // else that adds a source without saying it assigns the channels itself.
+    function test_aSecondSourceStillSendsATableToItsAssignment() {
+        const sentence = "2 sources loaded — set an assignment for each channel below.";
+        EncoderController.loadSourceFile(backing);
+        compare(EncoderController.sourceModel.length, 1);
+        EncoderController.addSourceFile(melody);
+        compare(EncoderController.sourceModel.length, 2);
+        compare(EncoderController.status, sentence);
+
+        EncoderController.removeSource(0);
+        EncoderController.loadSourceFile(backing);
+        EncoderController.addSourceFile(melody, false);
+        compare(EncoderController.sourceModel.length, 2);
+        compare(EncoderController.status, sentence);
+    }
+
     // ---- Naming, the rate, edits, the preview and the lyrics ---------------------------
     function test_aKaraokeDraftIsNamedForWhatItIs() {
         const ctx = openFlow();
@@ -951,5 +985,120 @@ TestCase {
             verify(cliRunner.sameBytes(out, Qt.resolvedUrl("_test_output/tst_karaoke_flow_long_cli/out.ac3")),
                    "the command line wrote different bytes than the window did for a partial last frame");
         }
+    }
+
+    // ---- a capture's project and step ------------------------------------------------
+    // `forge-gui --smoke-shot <png> project=<file.forgeproj> karaokeStep=<step>` (main.cpp's
+    // apply_properties) is two calls on the window, each answering "" or why not, and a grab that
+    // waits while the window's smokeSettled is false. Held here and not in tst_projects.qml because
+    // Hear writes its stream to one file in the temporary folder, and this is the suite that
+    // builds it: two suites doing so at once would write over each other.
+    function karaokeProject(name, sources) {
+        const file = audioFixtures.writeText(name, JSON.stringify({
+            format: "iclforge-project", version: 1, flow: "karaoke", sources: sources }));
+        verify(file.toString().length > 0, "the project could not be written");
+        return file;
+    }
+
+    function openWindow() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        tryCompare(win, "visible", true);
+        return win;
+    }
+
+    function test_aCaptureOpensAProjectAndReachesEachStepOfTheFlow() {
+        const file = karaokeProject("kb-capture.forgeproj", [
+            { path: "kb-backing.wav", part: "backing" },
+            { path: "kb-melody.wav", part: "melody" },
+            { path: "kb-lead.wav", part: "vocal1" },
+            { path: "kb-harmony.wav", part: "vocal2" }]);
+        const win = openWindow();
+        compare(win.smokeOpenProject(file), "");
+        compare(win.tier, "karaoke");
+        const flow = findByName(win, "karaokeFlow");
+        compare(flow.plan.mode, "3/2");
+        compare(flow.currentStepKey, "parts");
+        compare(win.smokeSettled, true);
+
+        compare(win.smokeKaraokeStep("levels"), "");
+        compare(flow.currentStepKey, "levels");
+        compare(findByName(win, "karaokeLevelsStep").visible, true);
+        compare(win.smokeSettled, true);
+
+        // Hear builds its stream after it is entered: the capture waits for that, and the
+        // picture is then of the step with the stream in it.
+        compare(win.smokeKaraokeStep("hear"), "");
+        compare(flow.currentStepKey, "hear");
+        compare(win.smokeSettled, false);
+        tryCompare(win, "smokeSettled", true, 60000);
+        compare(win.smokeFault, "");
+        compare(flow.previewState, "ready");
+        compare(findByName(win, "karaokePreviewStatus").visible, false);
+        compare(findByName(win, "karaokeListening").visible, true);
+
+        compare(win.smokeKaraokeStep("save"), "");
+        compare(flow.currentStepKey, "save");
+        compare(findByName(win, "karaokeSaveStep").visible, true);
+        compare(win.smokeSettled, true);
+
+        compare(win.smokeKaraokeStep("parts"), "");
+        compare(flow.currentStepKey, "parts");
+    }
+
+    function test_aCaptureIsRefusedAStepTheFlowCannotShow() {
+        const win = openWindow();
+        // Not in the Karaoke flow at all.
+        const outside = win.smokeKaraokeStep("hear");
+        verify(outside.indexOf("not in the Karaoke flow") >= 0, outside);
+
+        win.tier = "karaoke";
+        const flow = findByName(win, "karaokeFlow");
+        // A step the flow does not have, and the ones it has.
+        const unknown = win.smokeKaraokeStep("mix");
+        verify(unknown.indexOf("no step 'mix'") >= 0, unknown);
+        verify(unknown.indexOf("parts, levels, hear, save") >= 0, unknown);
+        compare(flow.currentStepKey, "parts");
+
+        // Nothing loaded makes no stream: Parts is the only step there is to show.
+        for (const key of ["levels", "hear", "save"]) {
+            const refused = win.smokeKaraokeStep(key);
+            verify(refused.indexOf("make no stream") >= 0, key + ": " + refused);
+            compare(flow.currentStepKey, "parts");
+        }
+        compare(win.smokeKaraokeStep("parts"), "");
+        compare(win.smokeSettled, true);
+        compare(win.smokeFault, "");
+    }
+
+    function test_aCaptureIsRefusedAProjectThatDoesNotOpenAsItStands() {
+        const win = openWindow();
+        // Not a project: what the window's own notice says is the reason.
+        const prose = audioFixtures.writeText("kb-capture-prose.forgeproj", "not json at all");
+        const notOpened = win.smokeOpenProject(prose);
+        verify(notOpened.indexOf("was not opened") >= 0, notOpened);
+        verify(notOpened.indexOf("not a JSON document") >= 0, notOpened);
+        compare(EncoderController.sourceModel.length, 0);
+
+        // A part that is not there: the rest opens, the notice is over the window, and a
+        // picture of that is not what was asked for.
+        const missing = karaokeProject("kb-capture-missing.forgeproj", [
+            { path: "kb-backing.wav", part: "backing" },
+            { path: "kb-gone.wav", part: "melody" },
+            { path: "kb-lead.wav", part: "vocal1" }]);
+        const withNotes = win.smokeOpenProject(missing);
+        verify(withNotes.indexOf("opened with notes") >= 0, withNotes);
+        verify(withNotes.indexOf("kb-gone.wav") >= 0, withNotes);
+        const dialog = findByName(win, "projectNoticeDialog");
+        tryCompare(dialog, "visible", true, 5000);
+        mouseClick(findByName(win, "projectNoticeClose"));
+        tryCompare(dialog, "visible", false, 5000);
+
+        // A project that opens cleanly after one that did not says nothing of the earlier one.
+        const whole = karaokeProject("kb-capture-whole.forgeproj", [
+            { path: "kb-backing.wav", part: "backing" },
+            { path: "kb-lead.wav", part: "vocal1" }]);
+        compare(win.smokeOpenProject(whole), "");
+        compare(findByName(win, "karaokeFlow").plan.mode, "2/1");
     }
 }

@@ -44,6 +44,27 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Crucible: a capture can show the lyric strip, and the Room page's guide has a picture of it**
+
+- **`crucible --shot <png> --lyrics "Name=<file>[@<time>]"` imports a lyrics file against a listed
+  application and selects that application in the room.** With a time (`5.75` seconds, or `0:05.75`
+  as an `.lrc` writes it) the strip is started by hand so that the song is at that time when the
+  window is grabbed, which is what a picture of the line being sung needs. Without one the strip
+  follows the application's media session, whatever that says. A capture whose lyrics cannot be
+  shown (no application of that name after six seconds, a file that cannot be read, a time given
+  to a file with no times) takes no picture and exits with code 3, so a picture is never taken of
+  what was not asked for. The window gained `selectApplication()` for it, and the option's parsing
+  and the clock's start are held by Catch2 cases (`test_capture_lyrics.cpp`).
+  [The pictures' README](tools/pictures/README.md#crucible) lists the options of a capture.
+- **`crucible --size <width>x<height>` opens the window at that size**, for a capture of a page that
+  runs on below the 1480 by 820 it opens at: the Room's right rail does not scroll, and its Lyrics
+  block starts below the fold of the default window.
+- **The Room page's guide shows the lyric strip.** "Auld Lang Syne" from the karaoke example,
+  imported against Hearth and started by hand at 5.75 s, because Hearth publishes no media session
+  to follow. It is taken by hand like Crucible's other pictures: the capture reads the person's
+  settings, starts the engine and needs the application it shows to be running. The karaoke guide
+  links to it.
+
 **Karaoke in E-AC-3: what the boards do, and the pages that said otherwise**
 
 - **The Hearth sink pages say what each board does with a karaoke stream.** The S3 reproduces
@@ -1090,6 +1111,18 @@ The sections below contain the complete change list and fixes.
   second process ends before it has a window. A launch with no file, with `--seek`, or a capture
   runs on its own, and a Hearth that does not answer is not waited for. Hearth now links Qt
   Network for it (`QLocalServer`).
+- **A capture can be put where a picture needs it.** `forge-gui --smoke-shot <png>
+  project=<file.forgeproj> karaokeStep=parts|levels|hear|save` opens a project as **Project…**,
+  **Open** does and goes to a step of the Karaoke flow, which `tier=karaoke` alone opened empty.
+  The grab waits for the Hear step to build its stream, and the run fails with the reason for a
+  project that does not open as it stands, a step the flow has not got or cannot show, and, as
+  before, a name that is no property. `hearth --smoke-shot` takes `--page singer` (the singer
+  view, drawn in the window at its own size and not on the whole screen), `--page timing` (the
+  window that times the lyrics, opened once the file is loaded), `--size <width>x<height>`, and
+  `--setting <key>=<value>`, which puts a value in the capture's scratch settings store and is
+  dropped, with a line in the log, when there is no capture. What a launch hands to a running
+  Hearth has its `--page` applied as a launch's own is
+  ([Hearth's command line](docs/hearth/index.md#command-line)).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
@@ -3900,7 +3933,68 @@ The sections below contain the complete change list and fixes.
   to one remote mixer; the board's path), eight spikes and eight build steps, and the changes it
   asks of the microphone plan's D2, D3, D17, U7 and build table. No code changes.
 
+**Hearth: a capture of a sung performance, with no singer, no microphone and no sound**
+
+- **`hearth --smoke-shot x.png --page karaoke --open <song> --sing <voice.wav> --seek <ms>` takes a
+  picture of a performance, and `--finish-singing` takes the summary.** The WAV file is the
+  microphone: the first `--open` item plays from its start to the position in real time with the
+  Microphone card on, and the picture is taken as it gets there, with the pitch ribbon, the marks
+  under the lines sung and the score so far as they are while somebody sings; with
+  `--finish-singing` the item is held there and the performance ended, as turning the microphone
+  off ends one, so that the card has its **Last performance**. Those states exist only while the
+  microphone is on and voiced frames arrive, which no capture could reach without a singer.
+  The parser drops `--sing`, and says why in the log, without a capture, a file to sing along to,
+  a `--seek` or a page that has the card (`karaoke` or `singer`), and `--finish-singing` without
+  a `--sing`; a file that is not a WAV file, or a stream with no melody to score against, ends
+  the run with exit code 3.
+- **No microphone is opened and nothing is played**, so the rule that only a person's press opens
+  a microphone (MI2) is not bent. The file is a `MicrophoneInput` of its own (`VoiceFileInput`,
+  `apps/hearth/engine`), and the song goes to `make_silent_sink`, a `PcmSink` that takes the
+  blocks at the rate of the clock and plays them to nothing, handed to
+  `HearthController::set_test_outputs()` as the Qt Quick suites hand it a fake room. The capture is
+  silent, and runs on a computer with no sound output (the window names the output "Speakers").
+- **The file is sung along to the song as the song is heard, not started with it.** Measured on
+  this workstation, the item is heard between 70 ms and 2 s after it is started (the 2 s was a
+  cold start), so a file begun with `play()` would have been early by that much, which a pitch
+  score takes for a flat singer. The session tells its input where the item is heard to be
+  (`MicrophoneInput::heard_position()`, on every anchor), and `VoiceFileInput` places each sample
+  of the file where the item's own time reaches it; held, before the item is heard, or past the
+  end of the file, what arrives is silence, so that the stream is never taken for a stalled
+  device. The example's own lead vocal against its melody guide read a lag of 0 to 10 ms and, over
+  the whole song, a pitch score of 93 %.
+- 18 engine cases (`test_voice_file_input.cpp`, `test_silent_sink.cpp`: where each sample lands,
+  a seek, a report that is late, a held item, the end of the file, a session scoring a voice
+  against a start 380 ms late and not stalling when held; the sink's clock, its capacity, an
+  underrun, a flush and a pause), 3 for the parser, and 2 for the controller (the example sung
+  through, each of its four lines marked at the top level; a file that is not a WAV file).
+
 ### Changed
+
+**Reading decimal numbers: `iclforge::base::parse_double`, which is fast_float**
+
+- **Text that becomes a `double` is read by one function, in `libs/base`, and not by `strtod`.**
+  `strtod` reads the process locale's decimal point (a German `LC_NUMERIC` reads `"1.5"` as 1 and
+  `"1,5"` as 1.5), takes a leading `+`, white space and hex floats, and sets `ERANGE` by its C
+  library's own rule (a subnormal sets it on Windows and not on Android). `parse_double` is
+  [fast_float](https://github.com/fastfloat/fast_float), the library `std::from_chars` for floating
+  point was specified from (floating-point `from_chars` does not exist in the NDK's libc++, r28c
+  included, or at the macOS wheel's deployment target): exact, locale-independent, the same answer on
+  every toolchain, and the whole token or nothing. The syntax is strict, `std::from_chars`'; a
+  caller reading what a person typed passes `kUserNumber`, which also takes the leading `+` and
+  leading space `strtod` took. Overflow is a refusal; a token that rounds to zero is reported
+  (`underflowed`) for the callers that must not take it as zero. Moved onto it: the trim and
+  fraction parsers of `libs/ac3/src/encoder/{assignment,plan}.cpp`, `libs/objects`' scene reader,
+  Hearth's settings, `hearth-render`'s and the test server's command lines and Forge GUI's AC-4
+  option fields, three of which did not compile for Android (`std::from_chars` on a `double`). A hex
+  float ("0x1p3") is no longer a number anywhere that was on `strtod`.
+- **The minimum-footprint profiles take a second implementation of the same function**,
+  `libs/base/src/number_parse_libc.cpp`: they link no third-party library, so it checks the same
+  syntax by hand and hands the digits to `strtod`. `iclforge-base-tests` and
+  `iclforge-base-number-parse-libc-tests` run one table of cases against both.
+- **`libs/render/.../layout.hpp` still calls `strtod`**: the ESP-IDF firmware shares that header,
+  which allocates nothing. fast_float joins {fmt} and nlohmann/json as a header-only dependency
+  (`vcpkg.json`, `cmake/FastFloat.cmake`, `ICLFORGE_FETCH_FAST_FLOAT`, the three packaging
+  manifests and the notices).
 
 **Android: NDK r28c**
 
@@ -3916,9 +4010,12 @@ The sections below contain the complete change list and fixes.
   it force-included and the three `include()` lines that named them are removed, and
   `cmake/AndroidNdkMinimum.cmake` makes an Android Clang older than 19 a configure error
   (`-DICLFORGE_ALLOW_OLD_NDK=ON` to override), so an old NDK in `ANDROID_NDK_HOME` fails at
-  configure and not on a device. What r28c adds is measured in docs/platforms/android.md; what it
-  still lacks is floating-point `from_chars` (`strtod` stays) and `std::jthread`/`std::stop_token`
-  without `-fexperimental-library`. {fmt} stays the one formatting library on every toolchain.
+  configure and not on a device. What r28c adds is measured in docs/platforms/android.md.
+  `cmake/AndroidExperimentalLibrary.cmake` passes `-fexperimental-library` on Android, which is what
+  libc++ 19 gates `std::jthread` and `std::stop_token` behind: the translation units that do not
+  build for Android go from 25 to the 3 that use floating-point `from_chars`, and
+  `iclforge-audio-tests`, `-dsp-tests`, `-app-media-tests` and `-crucible-tests` now link and run on
+  a Shield. {fmt} stays the one formatting library on every toolchain.
 
 **Shared code**
 
@@ -4336,6 +4433,14 @@ The sections below contain the complete change list and fixes.
   rows, and four stale claims corrected.
 - The CLI reference lists all forty-two commands, including the previously-undocumented
   `spatial`.
+- **The locked ESP32 build profiles have a developer page.**
+  [ESP32 build profiles](docs/platforms/bare-metal/build-profiles.md) covers
+  `firmware/hearth-sink/profiles.json`: the seven profiles and their fragments in order, what
+  `locked`, `budget`, `watch` and `free` hold, the guard and where CI runs it, the rule that a new
+  Kconfig key is placed in the profiles at the pull request, how to read a board's profile from
+  `GET /hardware`, the commands that build a board from its profile in WSL and on Windows, and
+  what a change to a profile has to carry. Until now this was written down only in a planning
+  note.
 - The threat model, the WebAssembly page, the ADM page and the building guide no longer describe
   the codec libraries as free of third-party dependencies. {fmt} is compiled into `ac3::forge`
   and `mp4::mp4`.
@@ -4349,6 +4454,13 @@ The sections below contain the complete change list and fixes.
 - The Hearth page describes the desktop player as it is: it plays to network sinks, plays
   channel-based AC-4, packages for Windows, macOS and Linux, and updates a sink's firmware. The
   ESP32-P4 has its row, and its page is in the navigation.
+- A developer page, [ESP32 memory layout](docs/platforms/bare-metal/memory-layout.md), puts the
+  memory facts of the three ESP32 kits in one place: the flash map and both partition tables, the
+  internal RAM split, what lives in PSRAM, the caches and flash mode, the heap floors and how a
+  refused play is reported, and what AC-3, E-AC-3 and AC-4 cost on the S3, the C6 and the P4. One
+  table a board and one that sets them side by side, each figure with the build and date it was
+  measured on and a link to the board page that has the measurement. It ends with what to keep
+  out of internal RAM, how to measure, and the traps met on the boards.
 - The front page, the README and the site description name AC-4 and say where it is and is not
   supported.
 - The pages that still said no ESP32 sink takes AC-4 in a Sendspin group say what is built: a sink
@@ -4374,6 +4486,19 @@ The sections below contain the complete change list and fixes.
 - CONTRIBUTING.md lists the four AC-4 directories and their header layout. The file I/O, Rust API
   and signing pages were checked against their headers and corrected.
 - ROADMAP.md lists the Hearth work as it stands and the gaps found in the documentation.
+- **Every picture in the documentation says how it was made, and the karaoke guide's can be taken
+  again.** `tools/pictures/pictures.json` has an entry for each picture a page shows: the program,
+  the command line and environment that make it, and the build it was last taken from.
+  `tools/pictures/take_pictures.py` takes the ones that are command lines again from a build, on a
+  Windows desktop nobody sees, and `tools/checks/check_doc_pictures.py` fails a page that embeds a
+  PNG with no entry. The [karaoke guide](docs/karaoke/index.md)'s pictures of the Forge GUI were
+  from a harness that was thrown away and showed the program under its old name: they are taken
+  again with the example's parts loaded, at Parts (with its LFE row), Levels, Hear and Save. Its
+  pictures of Hearth's Play page and singer view are taken again, and it has one of the window
+  that times the lyrics. Each caption gives the command that took its picture. The four pictures
+  of Hearth's Karaoke page (two in the guide, and the German and Arabic ones on the Hearth page)
+  are still of 2026-10-12, before the page had its Microphone card, and their captions say so:
+  they wait for the page to fit its window at that width.
 - ROADMAP.md and the plan index were checked against the tree on 2026-10-13. The Hearth table had
   two rows twice over and now has one each, with a row for Hearth for Android; the AC-4 table says
   the decoder runs on the ESP32-P4, ESP32-S3 and (as fixed point) the C6 and that a sink built with
@@ -4389,10 +4514,12 @@ The sections below contain the complete change list and fixes.
   [Hearth for Android](docs/hearth/android.md) is the page for the Android TV sink: what it needs,
   building it, pairing, what it plays, the lyric screen and its controls, what has been run and what
   it does not do. The support catalogue and the platform tables have rows for it.
-- **Hearth's pages no longer say the desktop player passes AC-3 and E-AC-3 to a receiver.** The
-  engine has that path and tests it; the window gives the engine no bitstream output, so every
-  stream is decoded and leaves as PCM, which the output picker has said all along. The Hearth page,
-  the README, ROADMAP.md, the Hearth plan and the application table say so.
+- **The karaoke guide shows a performance.** Its "What you see while you sing" has a picture of the
+  singer view part way through the example's last word, taken with `--sing` (no singer, no
+  microphone, no sound): the marks under the lines already sung and the ribbon with the voice on
+  the tune, with the command that took it and an entry for it in `tools/pictures/pictures.json`.
+  The same two options are in [Hearth's command line](docs/hearth/index.md#command-line), and in
+  the picture tooling's README, which says what a run takes and what its log reports.
 
 **Release engineering**
 
@@ -4433,6 +4560,15 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**Crucible: the lyric strip no longer makes the Room's right rail wider than the window**
+
+- **The strip's buttons wrap.** Start, Stop, Follow the media session and the nudge were one row that
+  could not be narrower than all of them side by side, so with timed lyrics imported the strip made
+  the rail, and every card in it, wider than the window, cut off at its right edge. They are a
+  flowing row now, and the nudge's three move together. Found taking the picture of the strip; the
+  Qt Quick cases had given the strip a free 320 pixels, and one now holds the column to the
+  strip's own width.
 
 **Android: `std::expected` no longer loses a payload that has tail padding**
 
@@ -4518,6 +4654,17 @@ The sections below contain the complete change list and fixes.
   shorter part holds its last sample for the rest of the programme", in the seven catalogues too.
   The encoding is unchanged, held by the owner's decision; a part that should fall silent after its
   end has to be given as long as the backing.
+
+**Forge GUI Karaoke flow: the status line once the parts are loaded**
+
+- **The Save step and the RUNS strip said "4 sources loaded — set an assignment for each channel
+  below." with nothing left to assign and no table to assign it in.** The sentence is the
+  controller's for a second source and belongs to Advanced and Expert, which have the table; the
+  Karaoke flow had already given every coded channel its place from the parts, and has no table.
+  `EncoderController.addSourceFile` has a second form for a caller that assigns the channels
+  itself, and the flow uses it, so the line reads "4 sources loaded." The first form, and with it
+  what Advanced, Expert and the other flows show for a multi-source load, is as it was. Status
+  sentences are English literals throughout the controller and stay so; no catalogue changes.
 
 **Hearth: the empty queue's hint and the first-run dialog**
 
@@ -5679,6 +5826,27 @@ The sections below contain the complete change list and fixes.
 
 **Hearth**
 
+- **Hearth's window passes AC-3 and E-AC-3 to a receiver.** It was designed to and never did. The
+  window gave its engine no passthrough output (`EngineOutputs::bitstream` had been empty since the
+  window was built), so every output read as taking no bitstream and every item was decoded, while
+  the output picker listed the outputs that take one and said that choosing a row had no effect.
+  The window now opens the engine's passthrough sink, the one `forge play` sends through, and a
+  row in the picker's passthrough section is a choice like any other. An AC-3 or E-AC-3 item the
+  output takes goes to it as IEC 61937 bursts, its access units unchanged (E-AC-3 transcoded to
+  AC-3 for a receiver that takes AC-3 only), and items in one format join on the link without a
+  gap. What a receiver does not take is decoded and played to the same output: an AC-4 item, a
+  programme other than a stream's first, and a karaoke stream with a reproduction chosen, which
+  the engine now decides as a decode (`Player::decide()`); played as coded it is sent, and a
+  change of that choice while it plays moves it. Until a row is chosen the window decodes to the
+  default output, so no output is taken exclusively unasked. While a bitstream goes out, the
+  header's sentence, the signal path, the Decoder and Speakers pages and the volume control, which
+  is closed, say that the receiver decodes and renders it, and `EngineStatus` names the endpoint
+  the link is open on. Opening the picker now has the engine read the outputs again, which it had
+  never been asked to do after its first item, so a receiver switched on since then is one it can
+  be told to play to. The engine's tests cover the karaoke decision and the choices the window
+  posts; the window's own suite plays into a stand-in link that reads each burst back as a
+  receiver would and holds what it carried to the files byte for byte. The window has not yet
+  been run into a receiver.
 - **Hearth's engine plays a 9.X.4 presentation instead of refusing it.** The 9.0.4 and 9.1.4 modes'
   screen pair (Lscr, Rscr) has no location in A/52 Table E2.5, so the engine refused every frame of
   such a presentation when it was asked for the channels as coded. It now reads the selected
@@ -5756,6 +5924,19 @@ The sections below contain the complete change list and fixes.
   for a sink the host has just moved to PCM` fails without the change, the moved sink holding
   9,600 of 14,400 frames each of three times. The karaoke group cases' waits for a board's
   totals now report what each board holds and what both sides logged when they expire.
+- **The group could still begin its timeline without a board it was waiting for, when the board's
+  state arrived while the group was starting its members.** The wait looked at each board a
+  second time, after the members had been passed over, to see whether one was still moving: a
+  board whose `client/state` arrived in between was found on `player@v1` with its state, taken
+  for one that was not moving, and left behind; it was started on the next block and missed the
+  first 4,800 frames of the item. The window is the time the group takes to start the members
+  that are ready, so it grows with the number of boards and with a busy machine. The group now
+  notes whether a board is moving from the one look it started or passed the board over by, and
+  the wait goes by that. `group: a programme waits for a sink the host has just moved to PCM`
+  failed in the nightly ASan+UBSan leg this way on 2026-10-12 (and on a rerun), and reproduces
+  on a machine limited to two busy cores in 4 runs of 8 without the change and none in 25 with
+  it; `group: a moved sink whose state arrives as the timeline would begin is waited for` holds
+  the board's reply between the two looks and fails without the change every time.
 
 **ESP32-C6 internal RAM**
 

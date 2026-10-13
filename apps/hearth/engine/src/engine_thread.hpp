@@ -120,7 +120,9 @@ struct EngineStatus {
     // sized to the layout this engine was built with. routing, device_name
     // and speaker_mask are PcmSink's own (pcm_sink.hpp): a default-
     // constructed Routing, an empty name and a zero mask where there is no
-    // PCM sink or nothing is open.
+    // PCM sink or nothing is open. While a bitstream goes out (`output`'s
+    // mode), device_name and device_id are the endpoint its link is open on,
+    // and the routing and the mask are empty: nothing is rendered here.
     std::vector<double> trim_db{};
     std::vector<double> delay_ms{};
     double crossover_hz = render::LayoutRenderer::kDefaultCrossoverHz;

@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <bit>
-#include <cerrno>
 #include <charconv>
 #include <cmath>
 #include <cstddef>
@@ -27,6 +26,7 @@
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"
+#include "iclforge/base/number_parse.hpp"
 #include "iclforge/render/spatial.hpp"
 
 namespace iclforge::ac3::plan {
@@ -866,28 +866,19 @@ namespace {
 
 [[nodiscard]] bool parse_unit_double(std::string_view text, double& out) {
     // Not std::from_chars: its floating-point overload is absent from some
-    // libc++ builds this project targets (NDK r26's bundled libc++ only
+    // libc++ builds this project targets (NDK r28's bundled libc++ still only
     // implements <charconv>'s integer overloads, not double - see
-    // docs/platforms/android.md), so this hand-rolls the same
-    // locale-independent, reject-all-trailing-garbage contract with strtod
-    // instead, for the floating-point case only (parse_kbps below keeps
-    // std::from_chars - the integer overload IS available everywhere).
-    // strtod itself is locale-sensitive; nothing in this codebase ever
-    // calls setlocale, so the process locale stays "C" for its entire
-    // lifetime and this is safe in practice, not just in theory.
-    if (text.empty()) {
+    // docs/platforms/android.md), so this reads the number with
+    // iclforge::base::parse_double, which is locale-independent and refuses
+    // trailing garbage, in the syntax of what a person types on a command
+    // line (a "+0.5" as strtod, which this used, took it). parse_kbps below
+    // keeps std::from_chars - the integer overload IS available everywhere.
+    const auto parsed = iclforge::base::parse_double(text, iclforge::base::kUserNumber);
+    // A token too small for a double is refused, as it was when strtod set ERANGE.
+    if (!parsed || parsed->underflowed || parsed->value < 0.0 || parsed->value > 1.0) {
         return false;
     }
-    // strtod needs a NUL-terminated buffer; text is a view into someone
-    // else's storage (typically a CLI argument), not necessarily one.
-    const std::string buffer(text);
-    errno = 0;
-    char* end = nullptr;
-    const double value = std::strtod(buffer.c_str(), &end);
-    if (end != buffer.c_str() + buffer.size() || errno == ERANGE || value < 0.0 || value > 1.0) {
-        return false;
-    }
-    out = value;
+    out = parsed->value;
     return true;
 }
 

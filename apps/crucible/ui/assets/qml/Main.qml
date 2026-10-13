@@ -357,7 +357,7 @@ ApplicationWindow {
     StackLayout {
         anchors.fill: parent
         currentIndex: window.page === "room" ? 0 : window.page === "output" ? 1 : 2
-        RoomPage { threeD: window.roomThreeD || CrucibleController.roomView === "3d"; onOpenOutput: window.page = "output" }
+        RoomPage { id: roomPage; threeD: window.roomThreeD || CrucibleController.roomView === "3d"; onOpenOutput: window.page = "output" }
         OutputPage {}
         SettingsPage {}
     }
@@ -487,4 +487,10 @@ ApplicationWindow {
             Platform.MenuItem { text: qsTr("Quit"); onTriggered: CrucibleController.quit() }
         }
     }
+
+    // Selects an application in the Room, as a click on its row does: the card and the lyric
+    // strip then follow it. For main.cpp's `--lyrics` capture option, which has the
+    // application's id and no handle on the page. Last in the file so that no string above it
+    // moves, which the catalogues' line numbers would say.
+    function selectApplication(app) { roomPage.selectedApp = app; }
 }

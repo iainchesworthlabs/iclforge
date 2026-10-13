@@ -192,7 +192,7 @@ ColumnLayout {
         visible: root.appId >= 0
         spacing: Theme.space3
 
-        RowLayout {
+        Flow {
             Layout.fillWidth: true
             spacing: Theme.space2
             CrucibleButton {
@@ -224,7 +224,11 @@ ColumnLayout {
             wrapMode: Text.WordWrap
         }
 
-        RowLayout {
+        // A Flow, so that the buttons wrap onto a second line in the rail's 280 to 320 pixels: a
+        // row of them cannot be narrower than all of them side by side, and a layout that cannot
+        // fit its rail makes the rail, and every card in it, wider than the window.
+        Flow {
+            objectName: "lyricsControls"
             Layout.fillWidth: true
             visible: root.followable
             spacing: Theme.space2
@@ -245,26 +249,30 @@ ColumnLayout {
                 text: qsTr("Follow the media session")
                 onClicked: CrucibleLyrics.useSession(root.appId)
             }
-            Item { Layout.fillWidth: true }
-            CrucibleButton {
-                objectName: "lyricsEarlier"
-                text: "−" + (root.nudgeStep / 1000).toFixed(1) + " s"
-                Accessible.name: qsTr("Show the words earlier")
-                onClicked: CrucibleLyrics.nudge(root.appId, -root.nudgeStep)
-            }
-            Text {
-                objectName: "lyricsNudge"
-                text: root.nudgeText(root.nudge)
-                color: Theme.textMuted
-                font.family: Theme.monoFamily
-                font.pixelSize: Theme.fontMono
-                Accessible.name: qsTr("Words shifted by %1").arg(root.nudgeText(root.nudge))
-            }
-            CrucibleButton {
-                objectName: "lyricsLater"
-                text: "+" + (root.nudgeStep / 1000).toFixed(1) + " s"
-                Accessible.name: qsTr("Show the words later")
-                onClicked: CrucibleLyrics.nudge(root.appId, root.nudgeStep)
+            // The nudge is one unit: it moves to the next line whole, and its three keep their
+            // vertical centre.
+            RowLayout {
+                spacing: Theme.space2
+                CrucibleButton {
+                    objectName: "lyricsEarlier"
+                    text: "−" + (root.nudgeStep / 1000).toFixed(1) + " s"
+                    Accessible.name: qsTr("Show the words earlier")
+                    onClicked: CrucibleLyrics.nudge(root.appId, -root.nudgeStep)
+                }
+                Text {
+                    objectName: "lyricsNudge"
+                    text: root.nudgeText(root.nudge)
+                    color: Theme.textMuted
+                    font.family: Theme.monoFamily
+                    font.pixelSize: Theme.fontMono
+                    Accessible.name: qsTr("Words shifted by %1").arg(root.nudgeText(root.nudge))
+                }
+                CrucibleButton {
+                    objectName: "lyricsLater"
+                    text: "+" + (root.nudgeStep / 1000).toFixed(1) + " s"
+                    Accessible.name: qsTr("Show the words later")
+                    onClicked: CrucibleLyrics.nudge(root.appId, root.nudgeStep)
+                }
             }
         }
 

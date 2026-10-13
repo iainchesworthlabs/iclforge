@@ -188,11 +188,19 @@ ScrollView {
             Layout.topMargin: Theme.pad
             Layout.leftMargin: Theme.pad
             Layout.rightMargin: Theme.pad
-            text: HearthController.deviceName.length > 0
-                  ? qsTr("Setup for %1 · %2 outputs").arg(HearthController.deviceName).arg(root.outputs)
-                  : qsTr("No output device chosen yet")
+            objectName: "speakersSetupFor"
+            // A receiver sent a bitstream renders it on its own speakers:
+            // this setup is kept and applies again to the next item decoded.
+            text: HearthController.deviceName.length === 0
+                  ? qsTr("No output device chosen yet")
+                  : (HearthController.outputFormat.mode === "bitstream"
+                     || HearthController.outputFormat.mode === "bitstreamAsAc3")
+                    ? qsTr("%1 is sent a bitstream and renders it on its own speakers, so this "
+                           + "setup is not applied to what is playing.").arg(HearthController.deviceName)
+                    : qsTr("Setup for %1 · %2 outputs").arg(HearthController.deviceName).arg(root.outputs)
             color: Theme.textMuted
             font.pixelSize: Theme.fontSmall
+            wrapMode: Text.WordWrap
         }
 
         Card {

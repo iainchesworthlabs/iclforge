@@ -366,8 +366,11 @@ TestCase {
     }
 
     function test_aBitstreamOutputSaysTheReceiverDecodes() {
-        // The room has no receiver that takes a bitstream, so the page's output
-        // mode is set to what one would give: the notice is the page's own.
+        // Nothing here plays to the room's receiver, so the page's output mode
+        // is set to what a karaoke stream played as coded to one gives: the
+        // notice is the page's own. (That the engine sends it only as coded,
+        // and decodes it for a reproduction, is OutputPicker's
+        // test_receiverGetsADecodeOfAKaraokeReproduction.)
         play(karaoke, "5.1");
         const page = createTemporaryObject(pageComponent, testCase.parent);
         verify(page !== null);
@@ -375,6 +378,9 @@ TestCase {
         compare(named(page, "bitstreamNotice").visible, false);
         page.outputMode = "bitstream";
         tryCompare(named(page, "bitstreamNotice"), "visible", true, 5000);
+        // It names the way out that needs no other output: a reproduction.
+        verify(H.textContaining(named(page, "bitstreamNotice"), "Choose Aware or Capable above") !== null,
+               "the notice does not say a reproduction is decoded here");
         compare(named(page, "groupNotice").visible, false);
         // Its button asks for the output picker, which Main.qml opens.
         let asked = 0;

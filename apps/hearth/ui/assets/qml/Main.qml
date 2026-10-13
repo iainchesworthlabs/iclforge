@@ -125,6 +125,10 @@ ApplicationWindow {
         }
     }
 
+    // The window that times the lyrics, which the Karaoke page's "Time the
+    // lyrics…" opens; `--page timing` (main.cpp) is the other way to it.
+    function openLyricTiming() { karaokePage.openTiming(); }
+
     // The one place that opens the output picker: the header's own summary
     // below, main.cpp's `--open-output-picker` debug flag (there is no
     // other way to drive a mouse click headlessly for a screenshot), and -
@@ -317,6 +321,7 @@ ApplicationWindow {
         Network { }
         Settings { }
         KaraokePage {
+            id: karaokePage
             onOutputPickerRequested: window.openOutputPicker()
             onLyricsFullScreenRequested: window.openLyricScreen()
         }

@@ -2,8 +2,8 @@
 // main() itself is the entry point of `hearth` alone and is linked into no test, so what the
 // options mean is held here: --shot and --smoke-shot are the same capture and only the second
 // is safe to run unattended, --open queues a file (and so does an argument on its own, which
-// is all the shell's "%1" is), --seek cues it, and nothing a launcher adds ever stops the
-// window from opening.
+// is all the shell's "%1" is), --seek cues it, --setting is a capture's alone, and nothing a
+// launcher adds ever stops the window from opening.
 
 #include <QString>
 #include <QStringList>
@@ -34,6 +34,8 @@ TEST_CASE("an ordinary launch asks for nothing", "[hearth][command-line]") {
     CHECK_FALSE(cli.open_output_picker);
     CHECK(cli.open_files.isEmpty());
     CHECK_FALSE(cli.seek_ms.has_value());
+    CHECK(cli.settings.isEmpty());
+    CHECK_FALSE(cli.size.has_value());
     CHECK(cli.warnings.isEmpty());
 }
 
@@ -199,6 +201,80 @@ TEST_CASE("the flags and values that were there before still read as they did", 
     CHECK_FALSE(cli.smoke);
 }
 
+TEST_CASE("the --setting option seeds a capture's settings, each key and its value, in order",
+          "[hearth][command-line]") {
+    const CommandLine cli = parse({"--smoke-shot", "x.png", "--setting", "microphone/takesFolder=D:/a folder/takes",
+                                   "--setting", "appearance/textScale=150", "--setting", "karaoke/note="});
+    REQUIRE(cli.settings.size() == 3);
+    CHECK(cli.settings[0].first == QStringLiteral("microphone/takesFolder"));
+    CHECK(cli.settings[0].second == QStringLiteral("D:/a folder/takes"));
+    CHECK(cli.settings[1].first == QStringLiteral("appearance/textScale"));
+    CHECK(cli.settings[1].second == QStringLiteral("150"));
+    // An empty value is a value; only the first = divides, so a value may hold one.
+    CHECK(cli.settings[2].second.isEmpty());
+    CHECK(parse({"--shot", "x.png", "--setting", "a/b=c=d"}).settings[0].second == QStringLiteral("c=d"));
+    CHECK(cli.warnings.isEmpty());
+    // The value is the option's own, not a file to open.
+    CHECK(cli.open_files.isEmpty());
+}
+
+TEST_CASE("the --setting option is dropped without a capture, and says so", "[hearth][command-line]") {
+    // A capture runs against a scratch settings store. Any other launch has the person's own,
+    // which a command line must never write to.
+    for (const QStringList& args : {QStringList{"--setting", "microphone/headphones=true"},
+                                    QStringList{"song.ac3", "--setting", "firstRun/seen=true", "--page", "karaoke"}}) {
+        const CommandLine cli = parse(args);
+        CHECK(cli.settings.isEmpty());
+        REQUIRE(cli.warnings.size() == 1);
+        CHECK(cli.warnings[0].contains(QStringLiteral("--setting")));
+    }
+    // The rest of the launch is as it was.
+    CHECK(parse({"song.ac3", "--setting", "a/b=c"}).plays_at_launch());
+}
+
+TEST_CASE("a --setting that is not key=value is said so and not used", "[hearth][command-line]") {
+    for (const char* bad : {"novalue", "=value", ""}) {
+        const CommandLine cli = parse({"--smoke-shot", "x.png", "--setting", QString::fromLatin1(bad)});
+        CHECK(cli.settings.isEmpty());
+        REQUIRE(cli.warnings.size() == 1);
+        CHECK(cli.warnings[0].contains(QStringLiteral("--setting")));
+        CHECK(cli.smoke);
+    }
+    const CommandLine last = parse({"--smoke-shot", "x.png", "--setting"});
+    CHECK(last.settings.isEmpty());
+    REQUIRE(last.warnings.size() == 1);
+}
+
+TEST_CASE("the --size option is the window's width and height in pixels", "[hearth][command-line]") {
+    const CommandLine cli = parse({"--smoke-shot", "x.png", "--size", "1280x1400", "--page", "karaoke"});
+    REQUIRE(cli.size.has_value());
+    CHECK(cli.size->first == 1280);
+    CHECK(cli.size->second == 1400);
+    CHECK(cli.page == QStringLiteral("karaoke"));
+    CHECK(cli.warnings.isEmpty());
+    // Not only a capture's: it is where a window opens, and writes nothing anywhere.
+    CHECK(parse({"--size", "900x700"}).size.has_value());
+}
+
+TEST_CASE("a --size that is not one is said so and not used", "[hearth][command-line]") {
+    for (const char* bad : {"1280", "1280x", "x800", "0x800", "1280x-5", "wide x tall", "1280x800x2", ""}) {
+        const CommandLine cli = parse({"--size", QString::fromLatin1(bad), "song.ac3"});
+        CHECK_FALSE(cli.size.has_value());
+        REQUIRE(cli.warnings.size() == 1);
+        CHECK(cli.warnings[0].contains(QStringLiteral("--size")));
+        // The value was the option's own, and the file after it is still opened.
+        REQUIRE(cli.open_files.size() == 1);
+        CHECK(cli.open_files[0] == QStringLiteral("song.ac3"));
+    }
+    REQUIRE(parse({"--size"}).warnings.size() == 1);
+}
+
+TEST_CASE("the singer view and the timing window are named as pages are", "[hearth][command-line]") {
+    // main() opens each over the Karaoke page; here they are a --page like any other.
+    CHECK(parse({"--page", "singer", "song.ac3"}).page == QStringLiteral("singer"));
+    CHECK(parse({"--smoke-shot", "x.png", "--page", "timing", "--open", "song.ac3"}).page == QStringLiteral("timing"));
+}
+
 TEST_CASE("an argument nobody here knows is skipped", "[hearth][command-line]") {
     // Not Qt's own options (-platform, -style, ...): QGuiApplication takes those, and their
     // values, out of the argument list before main() reads it.
@@ -207,4 +283,84 @@ TEST_CASE("an argument nobody here knows is skipped", "[hearth][command-line]") 
     CHECK(cli.smoke);
     CHECK(cli.open_files.isEmpty());
     CHECK(cli.warnings.isEmpty());
+}
+
+TEST_CASE("the --sing option names the voice of a performance, sung to the --seek position",
+          "[hearth][command-line]") {
+    const CommandLine cli = parse({"--smoke-shot", "x.png", "--page", "karaoke", "--open", "song.ac3",
+                                   "--sing", "voice.wav", "--seek", "11000"});
+    CHECK(cli.sing_file == QStringLiteral("voice.wav"));
+    CHECK_FALSE(cli.finish_singing);
+    REQUIRE(cli.seek_ms.has_value());
+    CHECK(*cli.seek_ms == 11000);
+    CHECK(cli.warnings.isEmpty());
+    // The value is the option's own: a file after it is still a file, and a capture never plays
+    // at launch, so a performance is not one more reason to start it.
+    CHECK_FALSE(cli.plays_at_launch());
+    const CommandLine singer = parse({"--smoke-shot", "x.png", "--page", "singer", "--sing", "voice.wav",
+                                      "--seek", "9000", "song.ac3", "--finish-singing"});
+    CHECK(singer.sing_file == QStringLiteral("voice.wav"));
+    CHECK(singer.finish_singing);
+    REQUIRE(singer.open_files.size() == 1);
+    CHECK(singer.open_files[0] == QStringLiteral("song.ac3"));
+    CHECK(singer.warnings.isEmpty());
+}
+
+TEST_CASE("the --sing option is dropped where it could not run, each time saying why",
+          "[hearth][command-line]") {
+    struct Case {
+        QStringList args;
+        const char* said;
+    };
+    const Case cases[] = {
+        // No capture: nothing a person runs may play to nothing, or take a microphone's place.
+        {{"--page", "karaoke", "--open", "song.ac3", "--sing", "voice.wav", "--seek", "9000"},
+         "a capture"},
+        {{"--smoke-shot", "x.png", "--page", "karaoke", "--sing", "voice.wav", "--seek", "9000"},
+         "without a file"},
+        {{"--smoke-shot", "x.png", "--page", "karaoke", "--open", "song.ac3", "--sing", "voice.wav"},
+         "--seek"},
+        // The pages with the Microphone card are the Karaoke page and the singer view over it.
+        {{"--smoke-shot", "x.png", "--open", "song.ac3", "--sing", "voice.wav", "--seek", "9000"},
+         "--page karaoke"},
+        {{"--smoke-shot", "x.png", "--page", "play", "--open", "song.ac3", "--sing", "voice.wav",
+          "--seek", "9000"},
+         "--page karaoke"},
+    };
+    for (const Case& c : cases) {
+        const CommandLine cli = parse(c.args);
+        INFO(c.said);
+        CHECK(cli.sing_file.isEmpty());
+        // The first reason that holds is the one said: --seek with no file is said for itself too.
+        REQUIRE_FALSE(cli.warnings.isEmpty());
+        CHECK(cli.warnings.back().contains(QStringLiteral("--sing")));
+        CHECK(cli.warnings.back().contains(QString::fromLatin1(c.said)));
+        CHECK(cli.warnings.back().endsWith(QStringLiteral("and is not used")));
+    }
+    // A --sing with no value says so, and the file after it is not taken for its value.
+    const CommandLine bare = parse({"--smoke-shot", "x.png", "--sing"});
+    CHECK(bare.sing_file.isEmpty());
+    REQUIRE(bare.warnings.size() == 1);
+    CHECK(bare.warnings[0].contains(QStringLiteral("--sing needs a WAV file")));
+}
+
+TEST_CASE("the --finish-singing option ends a performance, and is dropped without one",
+          "[hearth][command-line]") {
+    const CommandLine alone = parse({"--smoke-shot", "x.png", "--page", "karaoke", "--open", "song.ac3",
+                                     "--seek", "9000", "--finish-singing"});
+    CHECK_FALSE(alone.finish_singing);
+    REQUIRE(alone.warnings.size() == 1);
+    CHECK(alone.warnings[0].contains(QStringLiteral("--finish-singing")));
+    // And a --sing that was dropped takes it with it.
+    const CommandLine dropped = parse({"--page", "karaoke", "--open", "song.ac3", "--sing", "voice.wav",
+                                       "--seek", "9000", "--finish-singing"});
+    CHECK(dropped.sing_file.isEmpty());
+    CHECK_FALSE(dropped.finish_singing);
+    REQUIRE(dropped.warnings.size() == 2);
+    // It is a flag: it takes no value, so what follows it is read as it always was.
+    const CommandLine flag = parse({"--smoke-shot", "x.png", "--page", "karaoke", "--sing", "voice.wav",
+                                    "--seek", "9000", "--finish-singing", "song.ac3"});
+    CHECK(flag.finish_singing);
+    REQUIRE(flag.open_files.size() == 1);
+    CHECK(flag.open_files[0] == QStringLiteral("song.ac3"));
 }

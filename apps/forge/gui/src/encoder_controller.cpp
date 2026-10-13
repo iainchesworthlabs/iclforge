@@ -6942,7 +6942,7 @@ QStringList EncoderController::unassignedWarnings() const {
     return out;
 }
 
-void EncoderController::refreshAfterSourceListChange() {
+void EncoderController::refreshAfterSourceListChange(bool assignedByCaller) {
     const auto shapes = sourceShapes();
     recomputeObjectCount();
     emit sourceChanged();
@@ -6957,11 +6957,21 @@ void EncoderController::refreshAfterSourceListChange() {
     // render until an assignment exists - routingForSources refuses to guess
     // at a multi-source blend - so the bars sit silent on the plan's labels
     // and this status line is the immediate, honest summary.
+    if (assignedByCaller) {
+        // A caller that assigns every channel itself has no table to be sent
+        // to, and nothing it still has to set; the count is all that is true.
+        setStatus(QStringLiteral("%1 sources loaded.").arg(static_cast<int>(shapes.size())));
+        return;
+    }
     setStatus(QStringLiteral("%1 sources loaded — set an assignment for each channel below.")
                   .arg(static_cast<int>(shapes.size())));
 }
 
 void EncoderController::addSourceFile(const QUrl& url) {
+    addSourceFile(url, false);
+}
+
+void EncoderController::addSourceFile(const QUrl& url, bool assignedByCaller) {
     if (!source_) {
         // No primary yet - the first file loaded through either entry point
         // becomes it, so a caller offering one "add a source" affordance
@@ -7010,7 +7020,7 @@ void EncoderController::addSourceFile(const QUrl& url) {
     extra_sources_.push_back(std::make_shared<Source>(Source{std::move(*wav), path}));
     extra_source_offsets_seconds_.push_back(0.0);
     extra_source_original_rates_.push_back(original_rate);
-    refreshAfterSourceListChange();
+    refreshAfterSourceListChange(assignedByCaller);
 }
 
 void EncoderController::setSourceOffset(int index, double seconds) {

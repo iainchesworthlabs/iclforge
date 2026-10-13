@@ -4,13 +4,15 @@
 #include <memory>
 
 #include "iclforge/audio/passthrough.hpp"
+#include "bitstream_sink.hpp"
 #include "output_selector.hpp"
 #include "pcm_sink.hpp"
 
 // The outputs HearthController::start() and refreshOutputDevices() use in
 // place of this machine's own, set only through
 // HearthController::set_test_outputs() - the Qt Quick suites'
-// qml_test_main.cpp, never the shipped window. The same seam shape
+// qml_test_main.cpp, and the capture that plays to nothing (`hearth --sing`,
+// silent_outputs.hpp), never a window a person runs. The same seam shape
 // CrucibleController::set_test_services() gives the Crucible suites, for the
 // same reason: a headless runner has no audio device to play into (no
 // PipeWire daemon on a CI container, and a developer's own machine should
@@ -29,6 +31,11 @@ namespace iclforge::hearth::ui {
 struct TestOutputs {
     // Builds the engine's PCM sink - called once, from start().
     std::function<std::unique_ptr<iclforge::hearth::PcmSink>()> make_pcm;
+    // Builds the engine's passthrough sink, in place of
+    // make_passthrough_sink() - called once, from start(). Unset, the engine
+    // is given none and decodes everything, whatever the endpoints say they
+    // take.
+    std::function<std::unique_ptr<iclforge::hearth::BitstreamSink>()> make_bitstream;
     // The render endpoints the engine's output decision reads
     // (EngineOutputs::endpoints), in place of device_endpoints().
     iclforge::hearth::EndpointSource endpoints;

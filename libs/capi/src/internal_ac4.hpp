@@ -16,8 +16,6 @@
 // touches stays an incomplete pointer, which is all a NULL comparison or a
 // pass-through needs.
 
-#include <cstring>
-
 #include "internal.hpp"
 
 #include "iclforge/ac4/core/toc.hpp"
@@ -291,24 +289,11 @@ namespace iclforge_c {
     return static_cast<iclforge_ac4_additional_pair_t>(pair);
 }
 
-// The int an enumeration-typed C field stores. A C caller can store any int
-// there, and loading a value the enumeration does not name is undefined in C++
-// (Clang's -fsanitize=enum reports it), so the checks below read the bytes and
-// never the enumeration. The underlying type of these enumerations is unsigned
-// on some compilers, where `>= 0` on it is a -Wtype-limits finding: the int
-// is compared instead.
-template <typename E>
-[[nodiscard]] inline int stored_value(const E& value) {
-    static_assert(sizeof(E) == sizeof(int));
-    int out = 0;
-    std::memcpy(&out, &value, sizeof out);
-    return out;
-}
-
 // The new enumerations' values as iclforge.h defines them, for the boundary
 // checks ac4_encoder.cpp makes on what a caller hands in: a C enumeration can
 // hold any int, and the encoder's own refusal_reason() speaks only of
-// configurations it can be asked about.
+// configurations it can be asked about. They read the stored int and never the
+// enumeration (internal.hpp's stored_value()).
 [[nodiscard]] inline bool valid(const iclforge_ac4_bed_channel_t& channel) {
     // Table 66's codes: 3 is not a loudspeaker a bed object can name.
     const int code = stored_value(channel);

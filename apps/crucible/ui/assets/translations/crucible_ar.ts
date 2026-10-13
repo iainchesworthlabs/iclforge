@@ -414,42 +414,42 @@
         <translation>%1 · بلا توقيت، لذا تُعرض كاملة ولا تُتابَع</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="233"/>
+        <location filename="../qml/LyricStrip.qml" line="237"/>
         <source>Start again</source>
         <translation>ابدأ من جديد</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="233"/>
+        <location filename="../qml/LyricStrip.qml" line="237"/>
         <source>Start</source>
         <translation>بدء</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="238"/>
+        <location filename="../qml/LyricStrip.qml" line="242"/>
         <source>Stop</source>
         <translation>إيقاف</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="245"/>
+        <location filename="../qml/LyricStrip.qml" line="249"/>
         <source>Follow the media session</source>
         <translation>تابع جلسة الوسائط</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="252"/>
+        <location filename="../qml/LyricStrip.qml" line="259"/>
         <source>Show the words earlier</source>
         <translation>عرض الكلمات أبكر</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="261"/>
+        <location filename="../qml/LyricStrip.qml" line="268"/>
         <source>Words shifted by %1</source>
         <translation>الكلمات مزاحة بمقدار %1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="266"/>
+        <location filename="../qml/LyricStrip.qml" line="273"/>
         <source>Show the words later</source>
         <translation>عرض الكلمات لاحقًا</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="401"/>
+        <location filename="../qml/LyricStrip.qml" line="409"/>
         <source>CD+G picture</source>
         <translation>صورة CD+G</translation>
     </message>

@@ -106,7 +106,8 @@ Outcome split(std::span<const std::byte> stream, std::size_t piece,
 
 std::vector<Split> scanned(std::span<const std::byte> stream, std::size_t shift = 0) {
     std::vector<Split> out;
-    for (const iclforge::ac4::SyncFrame& frame : iclforge::ac4::scan(stream).frames) {
+    const auto scan_result = iclforge::ac4::scan(stream);
+    for (const iclforge::ac4::SyncFrame& frame : scan_result.frames) {
         out.push_back(Split{.offset = frame.offset + shift,
                             .sync_word = frame.sync_word,
                             .raw = {frame.raw_ac4_frame.begin(), frame.raw_ac4_frame.end()},

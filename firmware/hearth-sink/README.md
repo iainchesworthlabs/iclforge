@@ -1200,7 +1200,10 @@ stream is the WASM page's demo: E-AC-3 5.1 with JOC objects, 448 kbit/s, 250
 access units. On 2026-09-10 the run fetched and decoded all 250 with zero
 resynchronised bytes, and its per-channel levels matched the host's
 `forge decode demo.ec3 out.wav downmix=loro drcmode=line` to the digit —
-56,673 and 47,346 — which is the check CI holds it to. Three `E (esp_eth)`
+56,673 and 47,346 then — which is the check CI holds it to. The host's figures
+have been 60,906 and 52,119 since 2026-10-12, when an E-AC-3 stream that sends
+no mixmdate began to fold at -3 dB for the centre and the surrounds, and those
+are the ones CI holds now. Three `E (esp_eth)`
 lines about multicast filters print at start-up: the emulated MAC has no
 filter, IDF says so, and nothing depends on one. What QEMU cannot say is
 anything about WiFi, or about time: its `realtime_permille` is shape only.

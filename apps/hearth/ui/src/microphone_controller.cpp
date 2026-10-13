@@ -612,6 +612,23 @@ void MicrophoneController::limit_take_bytes_for_test(std::uint64_t bytes) {
     state_data_->session.limit_take_bytes(bytes);
 }
 
+bool MicrophoneController::use_voice_file(const QString& path, QString* why) {
+    auto recording = iclforge::hearth::read_voice_file(std::filesystem::path(path.toStdU16String()));
+    if (!recording) {
+        if (why != nullptr) {
+            *why = QString::fromStdString(recording.error());
+        }
+        return false;
+    }
+    stop();
+    // The clock the controller runs by, so that the file is sung against the time the session is
+    // told the position in.
+    state_data_->session.use_input(std::make_unique<iclforge::hearth::VoiceFileInput>(
+        std::move(*recording), state_data_->clock));
+    refreshDevices();
+    return true;
+}
+
 void MicrophoneController::restartScore() {
     state_data_->session.clear_singer();
     publish(true);

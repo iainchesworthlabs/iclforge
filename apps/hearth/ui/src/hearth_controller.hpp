@@ -247,10 +247,16 @@ class HearthController : public QObject {
     Q_PROPERTY(bool hasObjectMetadata READ hasObjectMetadata NOTIFY monitorChanged)
     // sampleRate, channels and mode ("pcm"/"bitstream"/"bitstreamAsAc3"/
     // "networkGroup"/"none") - EngineStatus::output, named for the Signal
-    // path panel's "you hear it on" stage. Polled with output_reason (both
+    // path panel's "you hear it on" stage - and, for the two bitstream
+    // modes, stream: what the link carries ("AC-3" or "E-AC-3"; a
+    // transcode's is the AC-3 it sends). Polled with output_reason (both
     // change together, at an open or a reopen), so this shares stateChanged
     // rather than adding a signal nothing else would use.
     Q_PROPERTY(QVariantMap outputFormat READ outputFormat NOTIFY stateChanged)
+    // Why the decoder settings are not what is heard, or empty when they
+    // are (EngineStatus::settings_note): a receiver sent a bitstream decodes
+    // it with its own. The Decoder page shows it above its controls.
+    Q_PROPERTY(QString decoderSettingsNote READ decoderSettingsNote NOTIFY stateChanged)
 
     // --- output picker (Main.qml's header, OutputPicker.qml) -------------
     // This machine's own render endpoints, refreshed on request rather than
@@ -261,9 +267,16 @@ class HearthController : public QObject {
     // names, "" for "not reported"), sampleRates (a list of Hz, empty for
     // "not reported"), supportsAc3, supportsEac3 (bool, iclforge::audio::
     // RenderDeviceInfo's own probe of IEC 61937 passthrough in exclusive
-    // mode - read here, not acted on: no passthrough sink is wired into this
-    // engine yet).
+    // mode: the picker's passthrough section lists the rows with either,
+    // and selectPassthroughDevice() plays to one).
     Q_PROPERTY(QVariantList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
+    // The endpoint a person chose in the picker's passthrough section
+    // (selectPassthroughDevice()'s own id), or empty for a decode to a
+    // device, a group or no choice yet. It is the choice, not what the item
+    // playing is doing: an item the receiver does not take is decoded to the
+    // same endpoint while this stays set, and outputFormat.mode says which
+    // of the two is happening now.
+    Q_PROPERTY(QString passthroughDeviceId READ passthroughDeviceId NOTIFY stateChanged)
     // The network group pinned as output (selectOutputGroup()'s own id),
     // or empty for none/a local device - what the output picker compares
     // NetworkController's own group rows' id against, the same way
@@ -422,6 +435,7 @@ public:
     [[nodiscard]] int objectsPlaced() const { return objects_placed_; }
     [[nodiscard]] bool hasObjectMetadata() const { return has_object_metadata_; }
     [[nodiscard]] QVariantMap outputFormat() const { return output_format_; }
+    [[nodiscard]] QString decoderSettingsNote() const { return decoder_settings_note_; }
 
     Q_INVOKABLE void setTrimDb(int slot, double db);
     Q_INVOKABLE void setDelayMs(int slot, double ms);
@@ -445,7 +459,10 @@ public:
     // the calling (GUI) thread and can probe each endpoint in turn
     // (iclforge::audio::enumerate_render_devices's own comment), so it is not
     // bound to a poll tick; a dialog open is an occasional, deliberate ask,
-    // not a per-frame one.
+    // not a per-frame one. The engine is told to read its outputs again as
+    // well (Engine::refresh_outputs()), so that a row chosen from this list
+    // is decided against the machine as the list shows it; the item playing
+    // moves only if its own answer changed.
     Q_INVOKABLE void refreshOutputDevices();
     // Pins playback to `deviceId` (one of outputDevices()'s own "id"
     // fields) and decodes to it - the picker's "Play here" on a "this
@@ -453,6 +470,16 @@ public:
     // it is not already (Engine::set_output_preferences's own comment);
     // what changed, or why nothing did, shows up in noteText().
     Q_INVOKABLE void selectOutputDevice(const QString& deviceId);
+    [[nodiscard]] QString passthroughDeviceId() const { return passthrough_device_id_; }
+    // Plays to `deviceId` as a receiver - the picker's "Play here" on a
+    // passthrough row. An AC-3 or E-AC-3 item the endpoint takes goes to it
+    // as IEC 61937 bursts, untouched (E-AC-3 transcoded to AC-3 where the
+    // receiver takes AC-3 only); every other item is decoded and played to
+    // the same endpoint as PCM: AC-4, a programme other than a stream's
+    // first, a karaoke item with a reproduction chosen, and anything while
+    // the receiver says it takes neither format. The engine decides item by
+    // item and outputReason says which and why.
+    Q_INVOKABLE void selectPassthroughDevice(const QString& deviceId);
 
     [[nodiscard]] QString outputGroupName() const { return output_group_name_; }
     // Pins playback to the network group named `groupId` (one of
@@ -603,6 +630,7 @@ private:
     bool gapless_ = true;
     double volume_db_ = 0.0;
     QString output_reason_;
+    QString decoder_settings_note_;
     QString note_;
     QString error_;
 
@@ -648,6 +676,10 @@ private:
     // NetworkOutputStatus disagrees rather than every tick regardless.
     QString output_group_name_;
     bool output_group_ready_ = false;
+    // The endpoint chosen as a receiver, empty for none
+    // (selectPassthroughDevice()'s own store, as output_group_name_ is
+    // selectOutputGroup()'s).
+    QString passthrough_device_id_;
     QVariantList speaker_is_lfe_;
     QString layout_text_;
     bool layout_has_height_ = false;

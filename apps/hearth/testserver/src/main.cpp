@@ -34,6 +34,7 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac4/core/toc.hpp"
 #include "iclforge/ac4/io/elementary.hpp"
+#include "iclforge/base/number_parse.hpp"
 #include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/sendspin/handshake.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
@@ -1045,14 +1046,15 @@ int main(int argc, char** argv) {
                 std::string_view list = value;
                 while (!list.empty()) {
                     const std::size_t comma = list.find(',');
-                    const std::string item(list.substr(0, comma));
-                    char* end = nullptr;
-                    const double trim = std::strtod(item.c_str(), &end);
-                    if (item.empty() || end != item.c_str() + item.size()) {
+                    // A dB figure typed on a command line: a "+3" is fine, and a locale's comma is
+                    // not a decimal point (iclforge::base::parse_double reads like std::from_chars).
+                    const auto trim = iclforge::base::parse_double(
+                        list.substr(0, comma), iclforge::base::kUserNumber);
+                    if (!trim) {
                         std::cerr << "--trim-db takes numbers of dB separated by commas\n";
                         return kExitUsage;
                     }
-                    trims.push_back(trim);
+                    trims.push_back(trim->value);
                     list = comma == std::string_view::npos ? std::string_view{} : list.substr(comma + 1);
                 }
                 spec->trim_db = std::move(trims);

@@ -218,6 +218,51 @@ public:
                 {QStringLiteral("peak"), reading.peak}};
     }
 
+    // What the room's IEC 61937 link - the output "Test receiver" takes a
+    // bitstream on - has been asked to do: { open, paused, endpoint, format,
+    // sampleRate, opens, bursts, badBursts, framesHeard, dataType,
+    // payloadBytes } (test_room.hpp's LinkReading) - empty before
+    // useFakeRoom().
+    Q_INVOKABLE QVariantMap link() const {
+        if (!room_) {
+            return {};
+        }
+        const iclforge::hearth::uitest::LinkReading reading =
+            iclforge::hearth::uitest::read_link(*room_);
+        return {{QStringLiteral("open"), reading.open},
+                {QStringLiteral("paused"), reading.paused},
+                {QStringLiteral("endpoint"), QString::fromStdString(reading.endpoint)},
+                {QStringLiteral("format"), QString::fromStdString(reading.format)},
+                {QStringLiteral("sampleRate"), reading.sample_rate},
+                {QStringLiteral("opens"), reading.opens},
+                {QStringLiteral("bursts"), static_cast<double>(reading.bursts)},
+                {QStringLiteral("badBursts"), static_cast<double>(reading.bad_bursts)},
+                {QStringLiteral("framesHeard"), static_cast<double>(reading.frames_heard)},
+                {QStringLiteral("dataType"), QString::fromStdString(reading.data_type)},
+                {QStringLiteral("payloadBytes"), static_cast<double>(reading.payload_bytes)}};
+    }
+
+    // Whether what the link has carried since it last opened is the start of
+    // the files at `paths`, one after another, byte for byte - or, with
+    // `whole`, every byte of them (test_room.hpp's link_carried()).
+    Q_INVOKABLE bool linkCarried(const QStringList& paths, bool whole = false) const {
+        if (!room_) {
+            return false;
+        }
+        std::vector<std::string> files;
+        files.reserve(static_cast<std::size_t>(paths.size()));
+        for (const QString& path : paths) {
+            files.push_back(path.toStdString());
+        }
+        return iclforge::hearth::uitest::link_carried(*room_, files, whole);
+    }
+
+    // Whether the room's endpoint `id` says it takes a bitstream from here on
+    // (test_room.hpp's set_passthrough()): a receiver switched on, or off.
+    Q_INVOKABLE bool setEndpointPassthrough(const QString& id, bool takes) {
+        return room_ && iclforge::hearth::uitest::set_passthrough(*room_, id.toStdString(), takes);
+    }
+
     // The frames toneLevelDb() reads over (test_room.hpp's kToneWindow).
     Q_INVOKABLE double toneWindowFrames() const {
         return static_cast<double>(iclforge::hearth::uitest::kToneWindow);

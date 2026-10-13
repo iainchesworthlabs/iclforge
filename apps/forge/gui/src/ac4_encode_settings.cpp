@@ -1,5 +1,6 @@
 #include "ac4_encode_settings.hpp"
 #include "iclforge/ac4/io/carriage.hpp"
+#include "iclforge/base/number_parse.hpp"
 
 #include <charconv>
 #include <cmath>
@@ -156,18 +157,15 @@ std::optional<std::size_t> choice_of(const std::array<Ac4Choice, N>& choices,
 }
 
 // A decimal number, read without the process's locale (strtod would read "0.5" as 0 under one that
-// writes a comma, which Qt sets from the user's).
+// writes a comma, which Qt sets from the user's) by iclforge::base::parse_double, which is
+// std::from_chars' reader on every toolchain, the NDK's and the macOS wheel's included. It is text a
+// person typed into an option, so the syntax is theirs: a leading '+' and leading space are fine.
 std::optional<double> number_of(std::string_view text) {
-    if (text.empty()) {
+    const auto parsed = iclforge::base::parse_double(text, iclforge::base::kUserNumber);
+    if (!parsed || !std::isfinite(parsed->value)) {
         return std::nullopt;
     }
-    double value = 0.0;
-    const char* const end = text.data() + text.size();
-    const auto [at, error] = std::from_chars(text.data(), end, value);
-    if (error != std::errc{} || at != end || !std::isfinite(value)) {
-        return std::nullopt;
-    }
-    return value;
+    return parsed->value;
 }
 
 std::optional<int> whole_of(std::string_view text) {

@@ -31,6 +31,7 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/base/number_parse.hpp"
 #include "iclforge/render/layout.hpp"
 #include "decoder_settings.hpp"
 #include "pcm_sink.hpp"
@@ -144,13 +145,13 @@ std::expected<LoadedItem, std::string> load(const std::string& path) {
     return item;
 }
 
+// A command-line number, in the syntax of what a person types (a "+3" is fine).
 std::optional<double> number(std::string_view text) {
-    double value = 0.0;
-    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-    if (error != std::errc{} || end != text.data() + text.size()) {
+    const auto parsed = iclforge::base::parse_double(text, iclforge::base::kUserNumber);
+    if (!parsed) {
         return std::nullopt;
     }
-    return value;
+    return parsed->value;
 }
 
 std::optional<bool> switched(std::string_view text) {
