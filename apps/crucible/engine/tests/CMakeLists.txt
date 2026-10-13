@@ -53,6 +53,7 @@ iclforge_add_test_binary(iclforge-crucible-tests PROJECT crucible SOURCES
     test_platform_seams.cpp
     test_diagnostics.cpp
     ../../ui/tests/test_capture_lyrics.cpp
+    ../../ui/tests/test_scripted_machine.cpp
     ../../ui/tests/test_desktop_entries.cpp
     ../../ui/tests/test_lyric_osc.cpp
     ../../ui/tests/test_media_session.cpp
@@ -71,6 +72,7 @@ iclforge_add_test_binary(iclforge-crucible-tests PROJECT crucible SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/signing_hook.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/engine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/capture_lyrics.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/scripted_machine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/desktop_entries.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/lyric_osc.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../ui/src/media_session.cpp")

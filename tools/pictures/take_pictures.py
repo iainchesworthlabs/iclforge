@@ -7,7 +7,8 @@ puts the picture where the pages embed it:
 
     python3 tools/pictures/take_pictures.py --build <build tree> [--only <part of a path> ...]
 
-    --build   a build tree of THIS checkout with the programs in bin/ (forge, forge-gui, hearth)
+    --build   a build tree of THIS checkout with the programs in bin/ (forge, forge-gui, hearth,
+              crucible)
     --only    only the pictures whose path contains one of these
     --out     write them under this folder instead of over the committed ones, to look first
     --media   where the files the pictures play are kept (default: <build>/pictures-media);
@@ -23,8 +24,7 @@ that matter are QT_QPA_PLATFORM=windows:darkmode=0, the light theme whatever the
 to, and QSG_DISTANCEFIELD_ANTIALIASING=gray, without which the text has coloured subpixel edges.
 
 An entry with `by_hand` is not taken here: it needs something a desk does not have (an Android
-device, a virtual machine with a driver in it) or is not safe to run unasked (Crucible's capture
-reads the person's settings and starts the engine). `--list` prints how each was made.
+device, a virtual machine with a driver in it). `--list` prints how each was made.
 
 A picture is taken into a scratch folder first and replaces the committed one only when the
 program said it had drawn what was asked for (exit code 0). A failed capture prints what the
@@ -32,7 +32,9 @@ program wrote and leaves the picture as it was, and the run ends with exit code 
 
 The machine shows through in three ways, which is why a retake is looked at before it is
 committed: the monospaced face is the system's own, a window is no taller than the screen it is
-on, and the Forge GUI's live-capture pictures list the machine's capture devices.
+on, and the Forge GUI's live-capture pictures list the machine's capture devices. Crucible's
+pictures are over a scripted machine on a settings store of their own: nothing of the computer is
+in them.
 """
 
 from __future__ import annotations
@@ -57,20 +59,33 @@ import make_media  # noqa: E402
 TIMEOUT_S = 180
 
 
+def placeholders(out: Path, media: Path, scratch: Path) -> dict[str, str]:
+    """What each placeholder stands for: where the picture goes, the media folder and a folder
+    for what the run writes besides. A media path is written with forward slashes, which every
+    program here takes and which is what a settings value shows."""
+    return {"out": str(out), "media": media.as_posix(), "scratch": scratch.as_posix()}
+
+
+def fill(text: str, values: dict[str, str]) -> str:
+    return check_doc_pictures.PLACEHOLDER.sub(lambda m: values[m.group(1)], text)
+
+
 def expand(args: list[str], out: Path, media: Path, scratch: Path) -> list[str]:
-    """The arguments with their placeholders filled: where the picture goes, the media folder
-    and a folder for what the run writes besides. A media path is written with forward slashes,
-    which every program here takes and which is what a settings value shows."""
-    values = {"out": str(out), "media": media.as_posix(), "scratch": scratch.as_posix()}
-    return [check_doc_pictures.PLACEHOLDER.sub(lambda m: values[m.group(1)], arg) for arg in args]
+    """The arguments with their placeholders filled."""
+    values = placeholders(out, media, scratch)
+    return [fill(arg, values) for arg in args]
 
 
-def environment(document: dict, entry: dict, base: dict[str, str]) -> dict[str, str]:
-    """This process's environment, as the entry's environment and then the entry change it."""
+def environment(document: dict, entry: dict, base: dict[str, str],
+                values: dict[str, str] | None = None) -> dict[str, str]:
+    """This process's environment, as the entry's environment and then the entry change it. The
+    entry's own variables may name a file in the media folder (a signing key a picture is to
+    show as loaded), so their placeholders are filled from `values` when it is given."""
     named = document["environments"][entry["environment"]]
     env = {k: v for k, v in base.items() if k not in set(named.get("unset", []))}
     env.update(named.get("set", {}))
-    env.update(entry.get("env", {}))
+    env.update({k: fill(v, values) if values is not None else v
+                for k, v in entry.get("env", {}).items()})
     return env
 
 
@@ -172,9 +187,10 @@ def take(document: dict, entries: list[dict], build: Path, media: Path,
             shot = scratch / (Path(entry["path"]).stem + ".png")
             log = scratch / (Path(entry["path"]).stem + ".log")
             shot.unlink(missing_ok=True)
+            values = placeholders(shot, media, scratch)
             code = desktop.run(
                 [str(program), *expand(entry["args"], shot, media, scratch)],
-                environment(document, entry, dict(os.environ)), ROOT,
+                environment(document, entry, dict(os.environ), values), ROOT,
                 entry.get("timeout_s", TIMEOUT_S), log)
             if code != 0 or not shot.is_file():
                 failed.append(entry["path"])

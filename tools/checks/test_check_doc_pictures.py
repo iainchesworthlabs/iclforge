@@ -205,6 +205,14 @@ class DocPictures(unittest.TestCase):
         self.manifest["pictures"][0]["args"].append("--open={repo}/song.ac3")
         self.assert_fails_saying("{repo} is not a placeholder")
 
+    def test_a_variable_may_name_a_file_in_the_media_folder_and_no_other_placeholder(self) -> None:
+        picture = self.manifest["pictures"][0]
+        picture["env"] = {"ICLFORGE_SIGNING_KEY_FILE": "{media}/demo-signing.key"}
+        code, out = self.run_check()
+        self.assertEqual(code, 0, out)
+        picture["env"] = {"ICLFORGE_SIGNING_KEY_FILE": "{repo}/demo-signing.key"}
+        self.assert_fails_saying("{repo} in \"env\" is not a placeholder")
+
     def test_the_arguments_and_the_environment_are_text(self) -> None:
         self.manifest["pictures"][0]["args"].append(1500)
         self.manifest["pictures"][0]["env"] = {"ICLFORGE_GUI_LOCALE": 1}
@@ -266,7 +274,7 @@ class TheRepositorysOwnManifest(unittest.TestCase):
         document = check_doc_pictures.load(root)
         for entry in document["pictures"]:
             if "args" in entry:
-                self.assertIn(entry["program"], {"forge-gui", "hearth"}, entry["path"])
+                self.assertIn(entry["program"], {"forge-gui", "hearth", "crucible"}, entry["path"])
 
 
 if __name__ == "__main__":
