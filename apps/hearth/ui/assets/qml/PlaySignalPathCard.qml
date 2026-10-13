@@ -25,6 +25,14 @@ Card {
     readonly property bool hasUnusedPairedSink: NetworkController.sinks.some((s) => s.badge === "paired")
                                                  && HearthController.outputGroupName.length === 0
 
+    // The item is going to a receiver as a bitstream (as it is, or E-AC-3
+    // transcoded to AC-3): nothing is decoded for the output or rendered
+    // here, and each stage below says so in place of what a decode would. A
+    // suite may set the mode, as KaraokePage.qml's own is set.
+    property string outputMode: HearthController.outputFormat.mode ?? "none"
+    readonly property bool transcoded: root.outputMode === "bitstreamAsAc3"
+    readonly property bool receiverDecodes: root.outputMode === "bitstream" || root.transcoded
+
     Rectangle {
         Layout.fillWidth: true
         Layout.preferredHeight: decodeCol.implicitHeight + Theme.pad * 2
@@ -43,12 +51,17 @@ Card {
                 color: Theme.textMuted; font.pixelSize: Theme.fontMicro; font.bold: true
             }
             Text {
+                objectName: "signalPathDecode"
                 Layout.fillWidth: true
                 text: {
                     if (HearthController.currentIndex < 0) return qsTr("Nothing playing");
                     var kind = HearthController.queue[HearthController.currentIndex].streamKind;
                     var modeName = HearthController.decoderSettings.mode;
-                    var mode = modeName === "rf" ? qsTr("RF mode")
+                    // The dynamic range mode is this decoder's; a receiver
+                    // sent the stream applies its own.
+                    var mode = root.transcoded ? qsTr("transcoded to AC-3")
+                             : root.receiverDecodes ? qsTr("sent as it is")
+                             : modeName === "rf" ? qsTr("RF mode")
                              : modeName === "custom" ? qsTr("custom mode") : qsTr("line mode");
                     return (kind.length > 0 ? kind : qsTr("stream")) + " · " + mode;
                 }
@@ -96,11 +109,14 @@ Card {
                 color: Theme.textMuted; font.pixelSize: Theme.fontMicro; font.bold: true
             }
             Text {
+                objectName: "signalPathRender"
                 Layout.fillWidth: true
-                text: HearthController.layoutText.length > 0
-                      ? qsTr("%1 onto %2 outputs").arg(HearthController.layoutText)
-                                                   .arg(HearthController.routingOutputs)
-                      : qsTr("Not rendering")
+                text: root.receiverDecodes
+                      ? qsTr("Not rendered here")
+                      : HearthController.layoutText.length > 0
+                        ? qsTr("%1 onto %2 outputs").arg(HearthController.layoutText)
+                                                     .arg(HearthController.routingOutputs)
+                        : qsTr("Not rendering")
                 color: Theme.text
                 font.bold: true
                 font.pixelSize: Theme.fontBody
@@ -109,6 +125,10 @@ Card {
             Text {
                 Layout.fillWidth: true
                 text: {
+                    if (root.receiverDecodes) {
+                        return qsTr("the receiver decodes it for its own speakers · the levels "
+                                    + "show a decode made here");
+                    }
                     var small = [];
                     for (var i = 0; i < HearthController.speakerSmall.length; i++) {
                         if (HearthController.speakerSmall[i]) {
@@ -152,6 +172,7 @@ Card {
                 color: Theme.textMuted; font.pixelSize: Theme.fontMicro; font.bold: true
             }
             Text {
+                objectName: "signalPathOutput"
                 Layout.fillWidth: true
                 text: HearthController.deviceName.length > 0
                       ? HearthController.deviceName : qsTr("No output chosen")
@@ -161,15 +182,22 @@ Card {
                 wrapMode: Text.WordWrap
             }
             Text {
+                objectName: "signalPathOutputFormat"
                 Layout.fillWidth: true
                 visible: HearthController.outputFormat.channels > 0
-                text: qsTr("%1 ch %2 at %3 kHz")
-                          .arg(HearthController.outputFormat.channels)
-                          .arg(HearthController.outputFormat.mode === "pcm"
-                               ? qsTr("PCM") : qsTr("bitstream"))
-                          .arg(Number(HearthController.outputFormat.sampleRate / 1000).toFixed(1))
+                // A bitstream link's two channels are its carrier's, and say
+                // nothing of the programme: what it carries is named instead.
+                text: root.receiverDecodes
+                      ? qsTr("%1 bitstream over IEC 61937 at %2 kHz")
+                            .arg(HearthController.outputFormat.stream ?? "")
+                            .arg(Number(HearthController.outputFormat.sampleRate / 1000).toFixed(1))
+                      : qsTr("%1 ch %2 at %3 kHz")
+                            .arg(HearthController.outputFormat.channels)
+                            .arg(root.outputMode === "pcm" ? qsTr("PCM") : qsTr("bitstream"))
+                            .arg(Number(HearthController.outputFormat.sampleRate / 1000).toFixed(1))
                 color: Theme.textMuted
                 font.pixelSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
             }
 
             RowLayout {

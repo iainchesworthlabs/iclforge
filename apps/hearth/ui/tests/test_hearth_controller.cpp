@@ -8,6 +8,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
@@ -731,6 +732,139 @@ TEST_CASE("output_format_to_map: sample rate, channels and every OutputMode name
     format.mode = iclforge::hearth::OutputMode::kNone;
     CHECK(iclforge::hearth::ui::output_format_to_map(format).value(QStringLiteral("mode"))
               .toString().toStdString() == "none");
+}
+
+TEST_CASE("output_format_to_map: a bitstream link names what it carries, and no other output does",
+          "[hearth][hearth-controller]") {
+    iclforge::hearth::OpenOutputFormat format;
+    format.sample_rate = 48000;
+    format.channels = 2;
+    format.mode = iclforge::hearth::OutputMode::kBitstream;
+    format.stream = iclforge::audio::BitstreamFormat::kEac3;
+    QVariantMap map = iclforge::hearth::ui::output_format_to_map(format);
+    CHECK(map.value(QStringLiteral("mode")).toString().toStdString() == "bitstream");
+    CHECK(map.value(QStringLiteral("stream")).toString().toStdString() == "E-AC-3");
+
+    // A transcode's link carries the AC-3 it sends.
+    format.mode = iclforge::hearth::OutputMode::kBitstreamAsAc3;
+    format.stream = iclforge::audio::BitstreamFormat::kAc3;
+    map = iclforge::hearth::ui::output_format_to_map(format);
+    CHECK(map.value(QStringLiteral("stream")).toString().toStdString() == "AC-3");
+
+    // A decode carries none, and a group's members each take their own form:
+    // the stream a group was opened with is not what "the output" carries.
+    format.mode = iclforge::hearth::OutputMode::kLocalPcm;
+    format.stream = std::nullopt;
+    CHECK_FALSE(iclforge::hearth::ui::output_format_to_map(format).contains(QStringLiteral("stream")));
+    format.mode = iclforge::hearth::OutputMode::kNetworkGroup;
+    format.stream = iclforge::audio::BitstreamFormat::kEac3;
+    CHECK_FALSE(iclforge::hearth::ui::output_format_to_map(format).contains(QStringLiteral("stream")));
+}
+
+// --- keep_held_link_marks() --------------------------------------------------
+
+namespace {
+
+QVariantMap picker_row(const char* id, bool ac3, bool eac3) {
+    return {{QStringLiteral("id"), QString::fromLatin1(id)},
+            {QStringLiteral("supportsAc3"), ac3},
+            {QStringLiteral("supportsEac3"), eac3}};
+}
+
+bool takes(const QVariantList& rows, int index, const char* key) {
+    return rows[index].toMap().value(QString::fromLatin1(key)).toBool();
+}
+
+}  // namespace
+
+TEST_CASE("keep_held_link_marks: the endpoint a bitstream is open on stays listed for passthrough",
+          "[hearth][hearth-controller]") {
+    using iclforge::hearth::ui::keep_held_link_marks;
+    // The enumeration while "hdmi" is held exclusively: its probe says it
+    // takes neither format, which is the hold talking.
+    const QVariantList probed{picker_row("speakers", false, false), picker_row("hdmi", false, false)};
+    const QVariantMap sending{{QStringLiteral("mode"), QStringLiteral("bitstream")},
+                              {QStringLiteral("stream"), QStringLiteral("E-AC-3")}};
+
+    SECTION("it keeps the marks it had when it was last listed") {
+        const QVariantList before{picker_row("speakers", false, false), picker_row("hdmi", true, true)};
+        QVariantList rows = probed;
+        keep_held_link_marks(rows, before, QStringLiteral("hdmi"), sending);
+        CHECK(takes(rows, 1, "supportsAc3"));
+        CHECK(takes(rows, 1, "supportsEac3"));
+        // No other row is touched.
+        CHECK_FALSE(takes(rows, 0, "supportsAc3"));
+        CHECK_FALSE(takes(rows, 0, "supportsEac3"));
+    }
+
+    SECTION("never listed before, it has the one mark its open link proves") {
+        QVariantList rows = probed;
+        keep_held_link_marks(rows, {}, QStringLiteral("hdmi"), sending);
+        CHECK(takes(rows, 1, "supportsEac3"));
+        CHECK_FALSE(takes(rows, 1, "supportsAc3"));
+
+        // A transcode's link carries AC-3.
+        rows = probed;
+        keep_held_link_marks(rows, {}, QStringLiteral("hdmi"),
+                             {{QStringLiteral("mode"), QStringLiteral("bitstreamAsAc3")},
+                              {QStringLiteral("stream"), QStringLiteral("AC-3")}});
+        CHECK(takes(rows, 1, "supportsAc3"));
+        CHECK_FALSE(takes(rows, 1, "supportsEac3"));
+    }
+
+    SECTION("a decode holds nothing, so the probe stands") {
+        const QVariantList before{picker_row("speakers", false, false), picker_row("hdmi", true, true)};
+        QVariantList rows = probed;
+        keep_held_link_marks(rows, before, QStringLiteral("hdmi"),
+                             {{QStringLiteral("mode"), QStringLiteral("pcm")}});
+        CHECK(rows == probed);
+        keep_held_link_marks(rows, before, QString(), sending);
+        CHECK(rows == probed);
+        // An endpoint the enumeration no longer lists is not put back.
+        QVariantList gone{picker_row("speakers", false, false)};
+        keep_held_link_marks(gone, before, QStringLiteral("hdmi"), sending);
+        CHECK(gone.size() == 1);
+    }
+}
+
+// --- decode_to_default() ---------------------------------------------------
+
+TEST_CASE("decode_to_default: playback starts as a decode to the default output, never a bitstream",
+          "[hearth][hearth-controller]") {
+    // What start() posts before anything can play, and what giving a group
+    // up goes back to: with the mode left automatic instead, the engine would
+    // send an AC-3 item to whichever endpoint takes one, unasked.
+    const iclforge::hearth::OutputPreferences start = iclforge::hearth::ui::decode_to_default();
+    CHECK(start.pinned == iclforge::hearth::OutputMode::kLocalPcm);
+    CHECK(start.endpoint_id.empty());
+    CHECK(start.follow_sink);
+    CHECK(start.group_name.empty());
+
+    // Decided against a default pair of speakers and a receiver that takes
+    // AC-3 and E-AC-3: the speakers, decoded.
+    iclforge::hearth::EndpointFacts speakers;
+    speakers.id = "speakers";
+    speakers.name = "Speakers";
+    speakers.is_default = true;
+    speakers.accepts_pcm = true;
+    speakers.channels = 2;
+    iclforge::hearth::EndpointFacts receiver;
+    receiver.id = "hdmi";
+    receiver.name = "Receiver";
+    receiver.accepts_ac3 = true;
+    receiver.accepts_eac3 = true;
+    receiver.accepts_pcm = true;
+    receiver.channels = 8;
+    const std::array<iclforge::hearth::EndpointFacts, 2> endpoints{speakers, receiver};
+    iclforge::hearth::OutputRequest request;
+    request.endpoints = endpoints;
+    request.stream = iclforge::audio::BitstreamFormat::kEac3;
+    request.pinned = start.pinned;
+    request.preferred_endpoint_id = start.endpoint_id;
+    request.follow_sink = start.follow_sink;
+    const iclforge::hearth::OutputChoice choice = iclforge::hearth::choose_output(request);
+    CHECK(choice.mode == iclforge::hearth::OutputMode::kLocalPcm);
+    CHECK(choice.endpoint_id == "speakers");
 }
 
 // --- output_device_row() --------------------------------------------------

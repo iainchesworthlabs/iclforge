@@ -1278,7 +1278,8 @@ std::expected<SessionOutput, Refusal> ServerSession::cancel_pairing() {
     }
     SessionOutput out;
     if (attempt_) {
-        for (const std::string& message : attempt_->cancel().messages) {
+        const auto step = attempt_->cancel();
+        for (const std::string& message : step.messages) {
             if (!seal_json(message, out)) {
                 return refuse(Refusal::kCrypto);
             }

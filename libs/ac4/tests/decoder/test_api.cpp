@@ -77,7 +77,8 @@ std::vector<std::byte> read_file(const fs::path& path) {
 std::vector<std::vector<std::byte>> frames_of(const fs::path& path) {
     const std::vector<std::byte> bytes = read_file(path);
     std::vector<std::vector<std::byte>> frames;
-    for (const iclforge::ac4::SyncFrame& frame : iclforge::ac4::scan(bytes).frames) {
+    const auto scanned = iclforge::ac4::scan(bytes);
+    for (const iclforge::ac4::SyncFrame& frame : scanned.frames) {
         frames.emplace_back(frame.raw_ac4_frame.begin(), frame.raw_ac4_frame.end());
     }
     return frames;

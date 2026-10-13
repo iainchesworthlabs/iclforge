@@ -72,11 +72,13 @@ A change confined to `apps/demos/android/` runs `build-android` after a merge an
 
 `package-macos-universal` needs `build-macos` and runs only for a release (`do_package`).
 `quality-trend` needs `[build-windows, build-linux, build-macos]` and runs only when
-`persist_quality_trend` is true, which is true for a push to `main` and for the nightly run. The
+`persist_quality_trend` is true, which is true for a run that records the trend (after a merge,
+nightly, or a dispatch on `main`: docs/ci-agentic.md, "Which runs record the trend"). The
 nightly run forces every `run_<lane>` true, but the run after a merge takes its lanes from the
 files merged since the last verified commit, so one of the three `needs:` can be skipped for a
-lane reason. The job accepts a skipped platform as long as one of the three ran and passed, since
-with none there is no artifact to record. See that job's own comment in `_build.yml`.
+lane reason. The job runs when at least one of the three ran, passed or failed, and records the
+legs whose own gates passed: a leg uploads its results only after them. See that job's own
+comment in `_build.yml`.
 
 ## The core lane
 
@@ -101,15 +103,14 @@ because it needs the Windows, Linux and macOS build calls and their gold-referen
 hard trailing-regression failure therefore surfaces as `_build.yml`'s `Publish quality trend` job,
 inside `build-and-test`, not as an `_ci-core.yml` result.
 
-**Not moved: `persist-performance-trend` and `performance-trend-arm64`.** Both `needs:
-build-and-test` - `_build.yml`'s own call, a *different* reusable workflow - to know the whole
-matrix passed before recording a trend point. `needs:` cannot cross a `workflow_call` boundary
-the way it crosses between two jobs in the same file, so this dependency can only be expressed by
-gating the *entire* `core` call on `build-and-test`'s result - which would serialise the core
-jobs behind the full build matrix. Both jobs only ever fire on a direct push to `main`, where the
-extra wait costs nothing, so they stay in `ci.yml` (still `needs: [build-and-test,
-toolchain-versions, ...]`), which keeps the parallelism and avoids plumbing a cross-file
-dependency for a two-job, push-only edge case.
+**Not moved: `persist-performance-trend` and `performance-trend-arm64`.** They stayed in
+`ci.yml` because both needed `build-and-test` - `_build.yml`'s own call, a *different* reusable
+workflow - and `needs:` cannot cross a `workflow_call` boundary the way it crosses between two
+jobs in the same file. They no longer need it: each builds the benchmarks and measures them
+itself, and waiting for the whole matrix to pass meant that a red job anywhere in it left the
+speed and memory series without a record (docs/ci-agentic.md, "Which runs record the trend").
+They stay in `ci.yml` (`needs: [changes, toolchain-versions, ...]`), where `ci-status` names the
+performance publisher among its own `needs`.
 
 ### Keeping the per-job breakdown in `Verify Status`
 

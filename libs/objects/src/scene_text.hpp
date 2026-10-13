@@ -27,6 +27,8 @@ namespace iclforge::objects::oba {
 // The whole of `token` as a double, or false: no leading/trailing spaces, no
 // trailing characters, no out-of-range magnitude. A leading '+' is accepted,
 // which the keyframe grammar's original istringstream extraction also was.
+// Read by iclforge::base::parse_double, so the process's locale is not
+// consulted and a hex float ("0x1p3") is not a number here.
 [[nodiscard]] bool read_double(std::string_view token, double& out);
 
 }  // namespace iclforge::objects::oba

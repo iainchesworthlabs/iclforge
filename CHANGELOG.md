@@ -3914,6 +3914,32 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Reading decimal numbers: `iclforge::base::parse_double`, which is fast_float**
+
+- **Text that becomes a `double` is read by one function, in `libs/base`, and not by `strtod`.**
+  `strtod` reads the process locale's decimal point (a German `LC_NUMERIC` reads `"1.5"` as 1 and
+  `"1,5"` as 1.5), takes a leading `+`, white space and hex floats, and sets `ERANGE` by its C
+  library's own rule (a subnormal sets it on Windows and not on Android). `parse_double` is
+  [fast_float](https://github.com/fastfloat/fast_float), the library `std::from_chars` for floating
+  point was specified from (floating-point `from_chars` does not exist in the NDK's libc++, r28c
+  included, or at the macOS wheel's deployment target): exact, locale-independent, the same answer on
+  every toolchain, and the whole token or nothing. The syntax is strict, `std::from_chars`'; a
+  caller reading what a person typed passes `kUserNumber`, which also takes the leading `+` and
+  leading space `strtod` took. Overflow is a refusal; a token that rounds to zero is reported
+  (`underflowed`) for the callers that must not take it as zero. Moved onto it: the trim and
+  fraction parsers of `libs/ac3/src/encoder/{assignment,plan}.cpp`, `libs/objects`' scene reader,
+  Hearth's settings, `hearth-render`'s and the test server's command lines and Forge GUI's AC-4
+  option fields, three of which did not compile for Android (`std::from_chars` on a `double`). A hex
+  float ("0x1p3") is no longer a number anywhere that was on `strtod`.
+- **The minimum-footprint profiles take a second implementation of the same function**,
+  `libs/base/src/number_parse_libc.cpp`: they link no third-party library, so it checks the same
+  syntax by hand and hands the digits to `strtod`. `iclforge-base-tests` and
+  `iclforge-base-number-parse-libc-tests` run one table of cases against both.
+- **`libs/render/.../layout.hpp` still calls `strtod`**: the ESP-IDF firmware shares that header,
+  which allocates nothing. fast_float joins {fmt} and nlohmann/json as a header-only dependency
+  (`vcpkg.json`, `cmake/FastFloat.cmake`, `ICLFORGE_FETCH_FAST_FLOAT`, the three packaging
+  manifests and the notices).
+
 **Android: NDK r28c**
 
 - **Every Android build is pinned to NDK r28c (28.2.13676358), up from r26b (26.1.10909125).** The
@@ -3928,9 +3954,12 @@ The sections below contain the complete change list and fixes.
   it force-included and the three `include()` lines that named them are removed, and
   `cmake/AndroidNdkMinimum.cmake` makes an Android Clang older than 19 a configure error
   (`-DICLFORGE_ALLOW_OLD_NDK=ON` to override), so an old NDK in `ANDROID_NDK_HOME` fails at
-  configure and not on a device. What r28c adds is measured in docs/platforms/android.md; what it
-  still lacks is floating-point `from_chars` (`strtod` stays) and `std::jthread`/`std::stop_token`
-  without `-fexperimental-library`. {fmt} stays the one formatting library on every toolchain.
+  configure and not on a device. What r28c adds is measured in docs/platforms/android.md.
+  `cmake/AndroidExperimentalLibrary.cmake` passes `-fexperimental-library` on Android, which is what
+  libc++ 19 gates `std::jthread` and `std::stop_token` behind: the translation units that do not
+  build for Android go from 25 to the 3 that use floating-point `from_chars`, and
+  `iclforge-audio-tests`, `-dsp-tests`, `-app-media-tests` and `-crucible-tests` now link and run on
+  a Shield. {fmt} stays the one formatting library on every toolchain.
 
 **Shared code**
 
@@ -4348,6 +4377,14 @@ The sections below contain the complete change list and fixes.
   rows, and four stale claims corrected.
 - The CLI reference lists all forty-two commands, including the previously-undocumented
   `spatial`.
+- **The locked ESP32 build profiles have a developer page.**
+  [ESP32 build profiles](docs/platforms/bare-metal/build-profiles.md) covers
+  `firmware/hearth-sink/profiles.json`: the seven profiles and their fragments in order, what
+  `locked`, `budget`, `watch` and `free` hold, the guard and where CI runs it, the rule that a new
+  Kconfig key is placed in the profiles at the pull request, how to read a board's profile from
+  `GET /hardware`, the commands that build a board from its profile in WSL and on Windows, and
+  what a change to a profile has to carry. Until now this was written down only in a planning
+  note.
 - The threat model, the WebAssembly page, the ADM page and the building guide no longer describe
   the codec libraries as free of third-party dependencies. {fmt} is compiled into `ac3::forge`
   and `mp4::mp4`.
@@ -4361,6 +4398,13 @@ The sections below contain the complete change list and fixes.
 - The Hearth page describes the desktop player as it is: it plays to network sinks, plays
   channel-based AC-4, packages for Windows, macOS and Linux, and updates a sink's firmware. The
   ESP32-P4 has its row, and its page is in the navigation.
+- A developer page, [ESP32 memory layout](docs/platforms/bare-metal/memory-layout.md), puts the
+  memory facts of the three ESP32 kits in one place: the flash map and both partition tables, the
+  internal RAM split, what lives in PSRAM, the caches and flash mode, the heap floors and how a
+  refused play is reported, and what AC-3, E-AC-3 and AC-4 cost on the S3, the C6 and the P4. One
+  table a board and one that sets them side by side, each figure with the build and date it was
+  measured on and a link to the board page that has the measurement. It ends with what to keep
+  out of internal RAM, how to measure, and the traps met on the boards.
 - The front page, the README and the site description name AC-4 and say where it is and is not
   supported.
 - The pages that still said no ESP32 sink takes AC-4 in a Sendspin group say what is built: a sink
@@ -4414,10 +4458,6 @@ The sections below contain the complete change list and fixes.
   [Hearth for Android](docs/hearth/android.md) is the page for the Android TV sink: what it needs,
   building it, pairing, what it plays, the lyric screen and its controls, what has been run and what
   it does not do. The support catalogue and the platform tables have rows for it.
-- **Hearth's pages no longer say the desktop player passes AC-3 and E-AC-3 to a receiver.** The
-  engine has that path and tests it; the window gives the engine no bitstream output, so every
-  stream is decoded and leaves as PCM, which the output picker has said all along. The Hearth page,
-  the README, ROADMAP.md, the Hearth plan and the application table say so.
 
 **Release engineering**
 
@@ -5664,6 +5704,27 @@ The sections below contain the complete change list and fixes.
 
 **Hearth**
 
+- **Hearth's window passes AC-3 and E-AC-3 to a receiver.** It was designed to and never did. The
+  window gave its engine no passthrough output (`EngineOutputs::bitstream` had been empty since the
+  window was built), so every output read as taking no bitstream and every item was decoded, while
+  the output picker listed the outputs that take one and said that choosing a row had no effect.
+  The window now opens the engine's passthrough sink, the one `forge play` sends through, and a
+  row in the picker's passthrough section is a choice like any other. An AC-3 or E-AC-3 item the
+  output takes goes to it as IEC 61937 bursts, its access units unchanged (E-AC-3 transcoded to
+  AC-3 for a receiver that takes AC-3 only), and items in one format join on the link without a
+  gap. What a receiver does not take is decoded and played to the same output: an AC-4 item, a
+  programme other than a stream's first, and a karaoke stream with a reproduction chosen, which
+  the engine now decides as a decode (`Player::decide()`); played as coded it is sent, and a
+  change of that choice while it plays moves it. Until a row is chosen the window decodes to the
+  default output, so no output is taken exclusively unasked. While a bitstream goes out, the
+  header's sentence, the signal path, the Decoder and Speakers pages and the volume control, which
+  is closed, say that the receiver decodes and renders it, and `EngineStatus` names the endpoint
+  the link is open on. Opening the picker now has the engine read the outputs again, which it had
+  never been asked to do after its first item, so a receiver switched on since then is one it can
+  be told to play to. The engine's tests cover the karaoke decision and the choices the window
+  posts; the window's own suite plays into a stand-in link that reads each burst back as a
+  receiver would and holds what it carried to the files byte for byte. The window has not yet
+  been run into a receiver.
 - **Hearth's engine plays a 9.X.4 presentation instead of refusing it.** The 9.0.4 and 9.1.4 modes'
   screen pair (Lscr, Rscr) has no location in A/52 Table E2.5, so the engine refused every frame of
   such a presentation when it was asked for the channels as coded. It now reads the selected

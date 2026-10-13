@@ -49,6 +49,9 @@ include(CompilerWarnings)
 # a payload with tail padding, among other things. A no-op on every other toolchain.
 include(AndroidNdkMinimum)
 
+# std::jthread and std::stop_token are behind libc++'s experimental switch on the NDK. Android only.
+include(AndroidExperimentalLibrary)
+
 # Empty unless -DICLFORGE_SANITIZERS=<comma-list> is set (see the *-asan-ubsan
 # presets in CMakePresets.json); a plain configure is unaffected.
 set(ICLFORGE_SANITIZERS "" CACHE STRING "Comma-separated -fsanitize= value, e.g. address,undefined")
@@ -410,6 +413,11 @@ if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
     # graph names it; it is resolved wherever iclforge::objects is built, which is everywhere this
     # block is reached.
     include(NlohmannJson)
+    # iclforge::fast_float - fast_float (cmake/FastFloat.cmake), iclforge::base::parse_double's
+    # reader of decimal text (libs/base/src/number_parse.cpp). Header-only and PRIVATE to
+    # iclforge::base through $<BUILD_INTERFACE:...>, like the two above. The minimum-footprint builds
+    # skip it with them and take libs/base/src/number_parse_libc.cpp instead.
+    include(FastFloat)
 endif()
 
 # iclforge::adm (libs/adm) is a READER, not a writer like the three container modules above -

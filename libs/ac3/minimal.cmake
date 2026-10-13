@@ -154,6 +154,11 @@ target_sources(iclforge_ac3_minimal
         src/encoder/bandwidth.cpp   # §7.2.2's coded bandwidth
         src/encoder/transient.cpp   # block-switch detection
         src/encoder/silent_frame.cpp
+        # plan.cpp and assignment.cpp read decimal text (a trim, a fraction) through
+        # iclforge::base::parse_double. This profile links no third-party library, so it takes
+        # the implementation that is strtod behind the same syntax checks and not fast_float
+        # (libs/base/CMakeLists.txt builds that one).
+        "${PROJECT_SOURCE_DIR}/libs/base/src/number_parse_libc.cpp"
         # --- what the encoders call into ---------------------------------
         src/meta/bsi.cpp            # valid_bsi_info/valid_alternate_bsi, which
                                     # encode_frame checks its config against.

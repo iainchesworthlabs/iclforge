@@ -231,6 +231,22 @@ class MainTests(unittest.TestCase):
         self.assertEqual(verdict, "hard_regression=false\n")
         self.assertIn("::warning title=Memory trend regression::", out)
 
+    def test_a_commit_already_recorded_is_not_recorded_again(self):
+        """A second run of a commit (the nightly, a dispatch on main) leaves its one record."""
+        self.write_result(67.0)
+        self.run_main()
+        self.write_result(200.0)
+        rc, out, verdict = self.run_main()
+        self.assertEqual(rc, 0)
+        lines = (self.hist / "memory-feat_x.jsonl").read_text().splitlines()
+        self.assertEqual([json.loads(line)["allocs_per_frame"] for line in lines], [67.0])
+        self.assertIn("Appended 0 record(s)", out)
+        self.assertIn("(1 already recorded for c)", out)
+        # Judged against what came before the commit, which is nothing: 200 against its own
+        # 67 is not the +199% hard regression it would be against that record. The output file
+        # holds a line for each of the two runs: the last is this one's.
+        self.assertEqual(verdict.splitlines()[-1], "hard_regression=false")
+
     def test_emit_output_noop(self):
         with mock.patch.dict(self.os.environ, {}, clear=True):
             amh.emit_github_output("a", "b")

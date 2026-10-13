@@ -97,6 +97,10 @@ class IclforgeConan(ConanFile):
         # iclforge::objects, linked through $<BUILD_INTERFACE:iclforge::json> so no export names
         # it. 3.12.0 is the floor (JSON_DIAGNOSTIC_POSITIONS; cmake/NlohmannJson.cmake).
         self.requires("nlohmann_json/3.12.0", visible=False)
+        # fast_float - reads a decimal number from text (iclforge::base::parse_double,
+        # libs/base/src/number_parse.cpp). Header-only and private on the same terms as the two
+        # above; 8.2.10 is the version vcpkg.json's baseline resolves (cmake/FastFloat.cmake).
+        self.requires("fast_float/8.2.10", visible=False)
 
     def layout(self):
         cmake_layout(self)

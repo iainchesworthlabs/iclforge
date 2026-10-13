@@ -56,14 +56,50 @@ struct RoomReading {
     double peak = 0.0;
 };
 
+// What the room's IEC 61937 link has been asked to do so far: the output an
+// endpoint with `passthrough` set takes a bitstream on, in place of decoded
+// audio. Read by a suite to prove the window sent a receiver the stream.
+struct LinkReading {
+    bool open = false;
+    bool paused = false;
+    std::string endpoint;
+    // What the link was opened to carry, "AC-3" or "E-AC-3"; empty while closed.
+    std::string format;
+    std::uint32_t sample_rate = 0;
+    std::uint32_t opens = 0;
+    // Bursts the engine has handed the link, every open together, and how
+    // many of them were not a burst of the open format's length that reads
+    // back as IEC 61937.
+    std::uint64_t bursts = 0;
+    std::uint64_t bad_bursts = 0;
+    // Content frames the link's clock has played, every open together.
+    std::uint64_t frames_heard = 0;
+    // Since the link last opened: the data type its bursts' preambles named
+    // ("AC-3", "E-AC-3"), empty before the first, and the bytes of elementary
+    // stream they carried.
+    std::string data_type;
+    std::uint64_t payload_bytes = 0;
+};
+
 class FakeRoom;
 
 [[nodiscard]] std::shared_ptr<FakeRoom> make_room(std::vector<FakeEndpoint> endpoints);
 // The TestOutputs over `room` - one PCM sink whose open() plays into
-// whichever endpoint the engine's output decision names.
+// whichever endpoint the engine's output decision names, and one passthrough
+// sink whose open() is the room's link on an endpoint that takes a bitstream.
 [[nodiscard]] std::shared_ptr<iclforge::hearth::ui::TestOutputs> outputs_for(const std::shared_ptr<FakeRoom>& room);
 [[nodiscard]] RoomReading read(const FakeRoom& room);
+[[nodiscard]] LinkReading read_link(const FakeRoom& room);
+// Whether the elementary stream the link has carried since it last opened is
+// the start of the files at `paths`, one after another, byte for byte - or,
+// with `whole`, every byte of them: the streams were sent as they are, and
+// joined on the one link. False with nothing carried yet, and for a file that
+// cannot be read.
+[[nodiscard]] bool link_carried(const FakeRoom& room, const std::vector<std::string>& paths, bool whole);
 void reset_peak(FakeRoom& room);
+// Whether endpoint `id` says it takes AC-3 and E-AC-3 as a bitstream from here
+// on, as a receiver switched on or off does. False for an id the room lacks.
+bool set_passthrough(FakeRoom& room, const std::string& id, bool takes);
 // The device clock's rate against real time (1.0 = real time).
 void set_speed(FakeRoom& room, double speed);
 // The level of the tone at `hz` in rendered slot `slot`, in dB against full

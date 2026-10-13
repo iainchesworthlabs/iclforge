@@ -56,14 +56,13 @@ on:
         default: 1
       persist_quality_trend:
         description: >-
-          After the gold-reference gate passes on every leg, append this run's SNR results to the
-          quality-history branch (see docs/quality-trend.md). Computed and set by ci.yml only for
-          direct pushes to main and the nightly run of main - never for a PR, so unmerged work
-          never pollutes the trend - and left false by release.yml's call, which is tag-triggered,
-          not a push at all. A plain boolean input rather than this job re-deriving
-          github.event_name/github.ref itself: those reflect the reusable workflow's own call
-          context, and computing the condition once at the unambiguous caller site is simpler
-          than relying on exactly how that context propagates through workflow_call.
+          Append the SNR results of every leg whose gold-reference gates passed to the
+          quality-history branch (see docs/quality-trend.md). Set by ci.yml from its `changes`
+          job's record_trend: true for a run of main's own matrix (after a merge, nightly, or a
+          dispatch on main that names no legs) - never for a PR or a branch, so unmerged work
+          never pollutes the trend - and left false by release.yml's call, which is tag-triggered.
+          A plain boolean input rather than this job re-deriving github.event_name/github.ref
+          itself: the rule is decided once, in ci.yml, and every publisher reads it.
         type: boolean
         default: false
       quality_trend_branch:
@@ -2707,8 +2706,12 @@ jobs:
       #
       # The levels are held against the host's
       #   forge decode apps/demos/wasm/assets/demo.ec3 out.wav downmix=loro drcmode=line
-      # 56,673 and 47,346 (x 1e6), which the float32 target reproduced to the
-      # digit on 2026-09-10. Same tolerance as the steps above.
+      # 60,906 and 52,119 (x 1e6). They were 56,673 and 47,346, which the
+      # float32 target reproduced to the digit on 2026-09-10, until 91d7a5904
+      # (2026-10-12) folded an E-AC-3 stream that sends no mixmdate at -3 dB for
+      # the centre and the surrounds, as Dolby's decoder does: the fold is louder
+      # by design, and the board read 60,906 on the first run after it. Same
+      # tolerance as the steps above.
       #
       # QEMU is stopped as soon as the verdict prints rather than left to a
       # timeout: the application returns from app_main into an idle FreeRTOS
@@ -2782,8 +2785,8 @@ jobs:
           if [ "${units:-0}" != "250" ] || [ "${resync:-1}" != "0" ]; then
             fail "expected 250 access units and 0 resynchronised bytes, got ${units:-none} and ${resync:-none}"
           fi
-          check_rms 0 56673
-          check_rms 1 47346
+          check_rms 0 60906
+          check_rms 1 52119
 
           # The control surface, through the port forward. /status must know
           # the run ended; /volume and /play must be taken; the replay must
@@ -2801,9 +2804,9 @@ jobs:
             sleep 5
           done
           [ "$(grep -c '^result=pass' qemu-http.txt)" -ge 2 ] || fail "the replay did not report result=pass"
-          # Half of 56,673 and 47,346; measured 28,336 and 23,673 on 2026-09-10.
-          check_rms 0 28336
-          check_rms 1 23673
+          # Half of 60,906 and 52,119.
+          check_rms 0 30453
+          check_rms 1 26059
           curl -s -m 10 -X POST http://127.0.0.1:8080/stop | grep -q '^stopped' || fail "POST /stop was not accepted"
 
           # Then the console, once the part has nothing left to do. /stop is
@@ -2890,10 +2893,10 @@ jobs:
           (cd "$GITHUB_WORKSPACE/apps/demos/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ CI=1 npm run test:board) || fail "the page did not drive the board (Playwright's output is above)"
 
           # The play the test started, at the volume it set: a quarter of the
-          # boot play's levels, 56,673 and 47,346.
+          # boot play's levels, 60,906 and 52,119.
           [ "$(grep -c '^result=pass' qemu-ui.txt)" -ge 2 ] || fail "the play the test started did not report result=pass"
-          check_rms 0 14168
-          check_rms 1 11837
+          check_rms 0 15227
+          check_rms 1 13030
 
           # Then the console, once the part has nothing left to do: /status
           # reads "stopped" only after app_main has taken the page's Stop, and
@@ -3333,7 +3336,7 @@ jobs:
           # and no resynchronised byte. The levels check_stream_set.py holds are for the 7.1.4
           # shapes' twelve slots; this shape plays 2.0, so the demo's two are the host's
           # `forge decode demo.ec3 --downmix loro --drc line` figures the HTTP step above holds
-          # (56,673 and 47,346), to the same tolerance.
+          # (60,906 and 52,119), to the same tolerance.
           play() {
             local name="$1" units="$2" before after code
             before=$(grep -c '^result=' "$console" || true)
@@ -3361,8 +3364,8 @@ jobs:
           play ac3-20.ac3 16
           play layout-20.ec3 32
           play demo.ec3 250
-          check_rms 0 56673
-          check_rms 1 47346
+          check_rms 0 60906
+          check_rms 1 52119
 
           # Where the profile put its rings and stacks, as the console says it did.
           python3 "$profile" expect-console s3-n16r8 | while IFS= read -r line; do
@@ -4217,35 +4220,32 @@ jobs:
   # Persists this run's gold-reference SNR numbers (docs/quality-trend.md) so
   # they outlive the CI run that produced them, instead of only ever living in
   # a log that ages out. One job, not one push per leg: `needs:` waits for
-  # every platform's build-<os> job-call, so this both (a) only runs when the
-  # hard gate passed everywhere - a leg failing fails its platform's job-call
-  # outright, which skips this job by its default `if` (needing all three to
-  # succeed is GitHub Actions' own default for a job with `needs:` and no
-  # `always()`/`failure()` override - unchanged by the CI lane partitions
-  # split, just now checked per-platform instead of via one cross-OS job) -
-  # and (b) writes one commit per CI run instead of up to five racing to push
-  # at once. gold_reference is not set on linux-llvm-asan-ubsan, so it never
-  # contributes an artifact; `download-artifact` only requires that at least
-  # the pattern's namespace exist, not every leg specifically.
+  # every platform's build-<os> job-call, so this writes one commit per CI run
+  # instead of up to five racing to push at once.
   #
-  # `needs: [build-windows, build-linux, build-macos]` rather than a narrower
-  # list: `if: inputs.persist_quality_trend` is only true for a direct push to
-  # `main` and for the nightly run (see that input's own description). The
-  # nightly run lights every lane, but the run after a merge lights only the
-  # lanes the merges touched, so a platform's job-call can be skipped, and
-  # that is accepted below as long as one of the three ran and passed: with
-  # none, there is no artifact to record. A skip that is not for a lane reason
-  # still means what it always has: something upstream did not run clean.
+  # What it records is the legs whose own gates passed, and only those. A leg
+  # uploads its gold-reference-<preset> artifact in the step after its gates,
+  # under the default `if` (everything before it passed), so the artifact
+  # exists exactly when that leg built, tested and passed every gold-reference
+  # gate it has. No figure of a broken leg can reach the history, which
+  # matters because the per-channel floors are derived from it
+  # (tools/checks/derive_channel_floors.py). gold_reference is not set on
+  # linux-llvm-asan-ubsan, so it never contributes one.
   #
-  # The one exception: on a push to main a GitHub-hosted leg (both macOS
-  # legs, the arm64 legs, any leg on its hosted fallback) can give way to a
-  # newer main run - docs/ci-lanes.md, "Only the newest main commit runs the
-  # hosted jobs" - leaving its platform's job-call "cancelled" rather than
-  # failed. This merge's self-hosted numbers are still published then, and
-  # the hosted legs' series just have a gap - append_quality_history.py
-  # records whichever legs' artifacts exist. A leg that failed still skips
-  # the publish: a job-call with a failed leg reads "failure" even when
-  # another of its legs was cancelled.
+  # So this job runs when at least one platform's job-call ran, whatever the
+  # other legs did, and append_quality_history.py records whichever legs'
+  # artifacts exist: a leg that failed, was cancelled or was not lit has a gap
+  # in its series for this commit. It used to need every job-call to pass (or
+  # be cancelled or skipped), which made one failed leg anywhere cost every
+  # other leg its record: from 2026-10-12 15:20Z a Hearth test on the macOS
+  # leg kept the Linux and Windows figures of every later merge off the trend,
+  # with their own gates green. With no artifact at all (every leg failed)
+  # the steps after the download do nothing.
+  #
+  # `inputs.persist_quality_trend` is true on the runs that record the trend
+  # (see that input's own description). The nightly run lights every lane, but
+  # the run after a merge lights only the lanes the merges touched, so a
+  # platform's job-call can be skipped: one that ran is enough.
   #
   # This job itself has no such group, though it is GitHub-hosted: it
   # publishes the self-hosted legs' numbers too, so giving way to a newer
@@ -4256,11 +4256,9 @@ jobs:
     needs: [build-windows, build-linux, build-macos]
     if: >-
       ${{ !cancelled() && inputs.persist_quality_trend
-      && contains(fromJSON('["success","cancelled","skipped"]'), needs.build-windows.result)
-      && contains(fromJSON('["success","cancelled","skipped"]'), needs.build-linux.result)
-      && contains(fromJSON('["success","cancelled","skipped"]'), needs.build-macos.result)
-      && (needs.build-windows.result == 'success' || needs.build-linux.result == 'success'
-          || needs.build-macos.result == 'success') }}
+      && (contains(fromJSON('["success","failure"]'), needs.build-windows.result)
+          || contains(fromJSON('["success","failure"]'), needs.build-linux.result)
+          || contains(fromJSON('["success","failure"]'), needs.build-macos.result)) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -4308,8 +4306,11 @@ jobs:
             git commit -q --allow-empty -m "Initialize quality-history branch"
           fi
 
+      # Only with something to append: a run whose every leg failed has no
+      # artifact, and then this step and the push below have nothing to do.
       - name: Append quality-trend history
         id: append
+        if: hashFiles('results/**/*.json') != ''
         shell: bash
         env:
           # Env, not interpolated straight into the script: zizmor's
@@ -4334,6 +4335,7 @@ jobs:
             --commit-date "$commit_date"
 
       - name: Commit and push quality-history update
+        if: hashFiles('results/**/*.json') != ''
         shell: bash
         env:
           BRANCH: ${{ inputs.quality_trend_branch }}

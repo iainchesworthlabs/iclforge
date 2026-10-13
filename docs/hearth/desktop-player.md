@@ -88,11 +88,23 @@ output picker, which has three sections:
 - **This computer · PCM.** Each output of the computer, with its channels and the sample rates it
   takes. Hearth decodes the stream and sends it PCM. The one in use says *playing here*.
 - **Passthrough · the receiver decodes.** The outputs that say they accept AC-3 and E-AC-3 as a
-  bitstream. The list is for information: this build of the window decodes every stream itself, so
-  choosing a row here changes nothing, and the dialog says so.
+  bitstream, each with a mark for the formats it takes. Choose one to play to it as a receiver: an
+  AC-3 or E-AC-3 item it takes is sent to it untouched, as IEC 61937 bursts, and the receiver
+  decodes it. Anything else is decoded here and played to the same output as PCM: an AC-4 item, a
+  karaoke stream with a reproduction chosen, a programme other than a stream's first. The row in
+  use says *playing here* while a bitstream goes out.
 - **Network · Sendspin.** The groups made on the Network page.
 
-Choose a row and press **Play here**, and playback moves there.
+Choose a row and press **Play here**, and playback moves there. Until you choose one the window
+decodes to the computer's default output, and it starts there again the next time it is opened.
+
+While a bitstream goes out, the receiver decodes it with its own settings and plays it on its own
+speakers. The signal path says *sent as it is* and *Not rendered here*, the Decoder page says its
+controls reach only the meters, the Speakers page says its setup is not applied, and the volume
+in the transport bar is closed: the receiver's volume is the one that acts. The levels and the
+loudness on the Play page are of a decode made here beside the stream. Sending a bitstream holds
+the output, so other programs on the computer are silent through it meanwhile.
+[Passthrough to a receiver](index.md#passthrough-to-a-receiver) has the rest.
 
 ## Media
 

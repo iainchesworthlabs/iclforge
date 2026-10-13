@@ -7,6 +7,7 @@
 // declarations in iclforge_c/iclforge.h.
 
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <new>
 #include <vector>
@@ -235,6 +236,20 @@ namespace iclforge_c {
 // only allocation failure should reach the catch clauses; the catch-all is
 // the backstop that turns a missed check into ICLFORGE_ERROR_INTERNAL rather
 // than into an exception crossing the C boundary.
+// The int an enumeration-typed C field stores. A C caller can store any int
+// there, and loading a value the enumeration does not name is undefined in C++
+// (Clang's -fsanitize=enum reports it), so a check on what a caller handed in
+// reads the bytes and never the enumeration. The underlying type of these
+// enumerations is unsigned on some compilers, where `>= 0` on it is a
+// -Wtype-limits finding: the int is compared instead.
+template <typename E>
+[[nodiscard]] inline int stored_value(const E& value) {
+    static_assert(sizeof(E) == sizeof(int));
+    int out = 0;
+    std::memcpy(&out, &value, sizeof out);
+    return out;
+}
+
 template <class F>
 [[nodiscard]] iclforge_status_t guard(F&& body) noexcept {
     try {

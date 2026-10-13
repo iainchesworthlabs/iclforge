@@ -365,7 +365,8 @@ TEST_CASE("crucible engine: no application is tapped while the output stage has 
     const auto counted = census(*rig.devices);
     CHECK(counted.created == 0);
     CHECK(counted.live == 0);
-    for (const auto& app : engine.status().apps) {
+    const auto status = engine.status();
+    for (const auto& app : status.apps) {
         CHECK_FALSE(app.tapped);
     }
     engine.stop();
@@ -394,7 +395,8 @@ TEST_CASE("crucible engine: taps open with an endpoint and are released when it 
     // however many session refreshes go by.
     run_on(engine, 8);
     CHECK(census(*rig.devices).created == 2);
-    for (const auto& app : engine.status().apps) {
+    const auto status = engine.status();
+    for (const auto& app : status.apps) {
         CHECK_FALSE(app.tapped);
     }
 

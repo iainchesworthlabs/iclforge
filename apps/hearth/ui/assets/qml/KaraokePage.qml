@@ -510,9 +510,14 @@ ScrollView {
                         spacing: Theme.gap
                         Text {
                             Layout.fillWidth: true
-                            text: qsTr("This is going out as a bitstream, so the receiver decodes it and "
-                                       + "the choice above is not applied. Unless the receiver is "
-                                       + "karaoke-capable, V1 and V2 play from its surround speakers.")
+                            // Only "As coded" sends a karaoke stream to a
+                            // receiver: with a reproduction chosen the engine
+                            // decodes it here, on the same output.
+                            text: qsTr("Played as coded, this goes to the receiver as a bitstream and "
+                                       + "the receiver decodes it. Unless the receiver is "
+                                       + "karaoke-capable, V1 and V2 play from its surround speakers. "
+                                       + "Choose Aware or Capable above and it is decoded here "
+                                       + "instead, on the same output.")
                             color: Theme.text
                             font.pixelSize: Theme.fontSmall
                             wrapMode: Text.WordWrap
@@ -864,6 +869,11 @@ ScrollView {
                             const format = HearthController.outputFormat;
                             if (root.outputMode === "none" || format.channels === undefined) {
                                 return qsTr("Nothing is playing.");
+                            }
+                            // A bitstream link's two channels are its carrier's.
+                            if (root.bitstreamOutput) {
+                                return qsTr("%1 · a bitstream at %2 Hz").arg(HearthController.deviceName)
+                                           .arg(format.sampleRate);
                             }
                             return qsTr("%1 · %2 ch at %3 Hz").arg(HearthController.deviceName)
                                        .arg(format.channels).arg(format.sampleRate);

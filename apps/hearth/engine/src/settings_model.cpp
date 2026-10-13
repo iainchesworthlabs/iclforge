@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/base/number_parse.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
 
@@ -100,22 +101,19 @@ constexpr std::string_view kSpeakersRoutingOutputs = "speakers/routingOutputs";
 // A signed decimal number, read the same locale-independent way as
 // number_of() above - not strtod, whose result depends on the process
 // locale, which Qt sets from the user's (iclforge::sendspin::json's own header
-// comment). std::from_chars for floating point is unavailable only on
-// Android and at the macOS wheel's deployment target (CONTRIBUTING.md) -
-// neither is a target apps/hearth's CMakeLists.txt builds for (WIN32 OR
-// APPLE OR LINUX, desktop only), the same platform set apps/forge/cli/src/support.cpp
-// already relies on this for.
+// comment). iclforge::base::parse_double is std::from_chars' reader on every
+// toolchain (the NDK's libc++ and the macOS wheel's deployment target have no
+// floating-point from_chars, CONTRIBUTING.md). What is read here was written
+// by this program into its own settings, so the syntax is the strict one.
 [[nodiscard]] std::optional<double> double_of(const std::optional<std::string>& text) {
-    if (!text || text->empty()) {
+    if (!text) {
         return std::nullopt;
     }
-    double value = 0.0;
-    const char* const end = text->data() + text->size();
-    const auto [at, error] = std::from_chars(text->data(), end, value);
-    if (error != std::errc{} || at != end) {
+    const auto parsed = iclforge::base::parse_double(*text);
+    if (!parsed) {
         return std::nullopt;
     }
-    return value;
+    return parsed->value;
 }
 
 // QSettings' own array layout: counted from 1.
