@@ -22,7 +22,7 @@
 # ---------------------------------------------------------------------------
 
 set(CPACK_PACKAGE_NAME "iclforge")
-set(CPACK_PACKAGE_VENDOR "Iain Chesworth")
+set(CPACK_PACKAGE_VENDOR "Iain Chesworth Labs")
 set(CPACK_PACKAGE_CONTACT "Iain Chesworth")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
 set(CPACK_PACKAGE_HOMEPAGE_URL "${PROJECT_HOMEPAGE_URL}")
