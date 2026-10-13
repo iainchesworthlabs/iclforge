@@ -20,6 +20,10 @@ if(WIN32)
     # MultiByteToWideChar / WideCharToMultiByte: Windows carries the tables of every page here.
     target_sources(iclforge_app_text_encoding PRIVATE src/platform/windows/code_page_convert.cpp)
     target_compile_definitions(iclforge_app_text_encoding PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+elseif(ANDROID)
+    # Bionic has iconv from API 28 and the Android builds are for API 26: no conversion, said as such
+    # (src/platform/android/code_page_convert.cpp). find_package(Iconv) would find no library.
+    target_sources(iclforge_app_text_encoding PRIVATE src/platform/android/code_page_convert.cpp)
 else()
     # iconv: in the C library on Linux (glibc, musl) and in libiconv on macOS, which
     # find_package(Iconv) links.

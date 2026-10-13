@@ -52,6 +52,11 @@ struct LyricFrame {
     // The file has times (S2 to S5), or is plain text (S6).
     bool timed = false;
     std::optional<std::int64_t> length_ms{};
+    // The sink holds no document for the item and the server's metadata@v1 says where it is:
+    // `position_ms` is that progress then, and `length_ms` its duration (D7, planning/hearth-android.md),
+    // for the header's time. Written to the JSON only when set, so a frame from a document is the
+    // line it was.
+    bool has_progress = false;
 
     // kLine: the line being sung, and its words with the spacing written after each, which joined
     // are its text. `words` is empty for a line-timed one (S5): nothing is invented for it.

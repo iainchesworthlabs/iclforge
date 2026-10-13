@@ -668,7 +668,9 @@ if(ICLFORGE_BUILD_TESTS)
     endif()
     add_subdirectory(apps/shared/media/tests)
     add_subdirectory(apps/shared/cdg-picture/tests)
-    if(TARGET iclforge::app_text_encoding)
+    # Not on Android: its conversion is the stub that says no page is installed, and these tests hold
+    # what the operating system makes of known bytes in each page.
+    if(TARGET iclforge::app_text_encoding AND NOT ANDROID)
         add_subdirectory(apps/shared/text-encoding/tests)
     endif()
     add_subdirectory(apps/shared/preferences/tests)

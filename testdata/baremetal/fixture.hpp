@@ -8711,7 +8711,7 @@ inline constexpr std::array<std::int32_t, 2> kAc3FoldRms{{
 // Per-channel RMS x 1e6, in the decoder's own output order
 // (Table 5.8 acmod 2: L, R) - see LAYOUTS in the generator.
 inline constexpr std::array<std::int32_t, 2> kEac3FoldRms{{
-    107353, 106212
+    95687, 94353
 }};
 
 // the E-AC-3 7.1.4 stream folded to Lo/Ro in line mode (§7.8.1 + §5.4.2.8): kEac3714Stream decoded with
@@ -8719,7 +8719,7 @@ inline constexpr std::array<std::int32_t, 2> kEac3FoldRms{{
 // Per-channel RMS x 1e6, in the decoder's own output order
 // (Table 5.8 acmod 2: L, R) - see LAYOUTS in the generator.
 inline constexpr std::array<std::int32_t, 2> kEac3714FoldRms{{
-    62837, 61994
+    55509, 55002
 }};
 
 // the dynrng-carrying E-AC-3 5.1 stream in line mode, not folded (§7.7.1 + §5.4.2.8): kEac3DrcStream decoded with
