@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "iclforge/sendspin/iclforge_player.hpp"
 #include "network_group_sink.hpp"
 
 namespace iclforge::sendspin {
@@ -131,6 +132,29 @@ public:
         }
     }
 
+    // What the singer's karaoke choice is asked to become by a member's own control (D8): the other
+    // direction, from the sinks to the application. The host reports a request on its own thread, and
+    // the singer's settings are HearthController's, on the GUI thread, which takes what is waiting at
+    // each poll() as it reads the groups. At most kMaxRequests wait; a newer one pushes out the oldest.
+    struct PendingRequest {
+        // The group the sink is a member of (NetworkSinks' id), empty for none, and the sink's name.
+        std::string group_id;
+        std::string sink_name;
+        sendspin::player::Request request;
+    };
+    static constexpr std::size_t kMaxRequests = 16;
+    void push_request(PendingRequest request) {
+        const std::lock_guard lock(mutex_);
+        if (requests_.size() == kMaxRequests) {
+            requests_.erase(requests_.begin());
+        }
+        requests_.push_back(std::move(request));
+    }
+    [[nodiscard]] std::vector<PendingRequest> take_requests() {
+        const std::lock_guard lock(mutex_);
+        return std::exchange(requests_, {});
+    }
+
 private:
     NetworkOutputStatus() = default;
 
@@ -139,6 +163,7 @@ private:
     iclforge::hearth::MemberPlanner planner_;
     iclforge::hearth::KaraokeApplier karaoke_applier_;
     iclforge::hearth::LyricsApplier lyrics_applier_;
+    std::vector<PendingRequest> requests_;
 };
 
 }  // namespace iclforge::hearth::ui

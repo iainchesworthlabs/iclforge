@@ -142,8 +142,9 @@ still nudge the delay by 50 ms and up and down scroll a file with no times.
 **The vocals row (D8).** While a stream is open the sheet has a row between the delay and the size: Both,
 V1, V2 and None. The centre on one asks the server for it (`NativeSink.requestVocals`, a `client/command`
 request, [the spec's Requests](../../../planning/hearth-sendspin-extension.md#requests)), as the capable
-reproduction with those vocals, since the choice of vocals is read by that reproduction alone. It is
-advice with no answer: the row fills what was asked and not what is playing, and **this sink hands the
+reproduction with those vocals for V1, V2 and None, since the choice of vocals is read by that
+reproduction alone, and as the aware reproduction for Both, which plays both voices as the song's mix
+does (`sink::vocals_request`, the owner's call of 2026-10-13). It is advice with no answer: the row fills what was asked and not what is playing, and **this sink hands the
 receiver the coded bits, so it plays every vocal whatever the server decides** (the spec's SS7). What a
 press changes is what the server's own screens show and what the group's decoding members play, and it
 changes nothing this TV hears until the app decodes for itself (phase 4); the row says so beside the
@@ -231,6 +232,17 @@ document's, and the document's once the server clears it) and the header by `Lyr
 real server's `metadata@v1` to a Shield has not been run.
 
 ![An item with no lyrics, named in the header by what the server says is playing, over the sentence](../../../docs/hearth/screenshots/android-lyric-no-lyrics-titled.png)
+
+**Its time, too.** The same `metadata@v1` says where the item is: the sink computes the position at the
+sink's own time on the server's clock (`metadata::position_ms`, a pause keeps it), and for an item with no
+document, or one that is plain text, the header draws that time and the item's length at the right and the
+hairline under it fills by it, as it does for a timed document. A timed document keeps its own playhead;
+the server's length fills the one a file does not name with `[length:]`. The frame carries `progress` when
+the position is the server's, which the screen reads, and the view polls twice a second while it is, so a
+second is neither shown twice nor skipped. Nothing is drawn before the sink's clock has converged on the
+server's, which is a few seconds after the stream starts.
+
+![An item with no lyrics, with the server's clock in the header, 1:00 of 4:00, and a quarter of the hairline filled](../../../docs/hearth/screenshots/android-lyric-no-lyrics-clock.png)
 
 To see it live, `hearth-testserver --lyrics examples/karaoke/auld-lang-syne/auld-lang-syne.lrc
 --play examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --player ws://<the Shield>:8928/sendspin ...`

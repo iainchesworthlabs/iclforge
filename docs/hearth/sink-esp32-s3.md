@@ -216,6 +216,20 @@ The server pairs with the board, gives it the layout, plays the file, and prints
 reported. `--code-log FILE` pairs by code instead: it reads the code from a file the board's
 console is being written to. `--help` lists the rest.
 
+## Karaoke
+
+A karaoke stream, AC-3 or E-AC-3 flagged `bsmod` 7 above 1/0, goes to the board undecoded, and
+the board reproduces it itself under Hearth's karaoke setting: as coded, aware, or capable with
+the listener's vocals and the three part levels ([Karaoke](../karaoke/index.md)). The board says
+which codecs it does this for (`karaoke_codecs`), and this one lists AC-3 and E-AC-3. Checked on
+an S3 over Wi-Fi on 2026-10-12 with Hearth's live karaoke cases, which play a 3/2 stream with a
+tone in each channel to the board at a 3.0 layout once per reproduction and compare the levels
+the board reports at its outputs with the same stream decoded on the host: they followed it
+within 0.25 dB for as coded, aware, and capable with a vocal, with none, and with the melody
+and a vocal moved. One E-AC-3 run of three missed the part-level case and is not explained.
+Run it with `ICLFORGE_HEARTH_LIVE_KARAOKE_SINK=<the board's mDNS name>` and the tests named
+`network sinks live: ... karaoke stream is reproduced by the board that decodes it`.
+
 ## Groups
 
 A group is every player a server plays one programme to. Each board decodes and renders the

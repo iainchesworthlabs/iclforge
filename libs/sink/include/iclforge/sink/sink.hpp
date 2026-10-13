@@ -263,6 +263,12 @@ class Outputs {
     [[nodiscard]] virtual std::unique_ptr<BurstStreamOutput> bursts(std::uint64_t connection) = 0;
 };
 
+// The request a sink's remote makes when the singer picks a vocals choice (D8,
+// planning/hearth-android.md). "Both" asks for the aware reproduction, which plays both voices as
+// the song's mix does; the others ask for the capable one with that choice, the only reproduction
+// that has them. The owner's call, 2026-10-13. Advice only: see Sink::send_request.
+[[nodiscard]] sendspin::player::Request vocals_request(sendspin::player::KaraokeVocals vocals);
+
 class Connection;
 
 class Sink {

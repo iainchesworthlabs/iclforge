@@ -98,7 +98,8 @@ TEST_CASE("rendered channel counts match what a decoder gets back") {
         const auto coded = iclforge::ac3::plan::coded_channels(info.id);
         std::vector<Location> distinct;
         for (const auto& channel : coded) {
-            if (!std::ranges::contains(distinct, channel.location)) {
+            // std::ranges::find, not contains: NDK r26's libc++ has no ranges::contains.
+            if (std::ranges::find(distinct, channel.location) == distinct.end()) {
                 distinct.push_back(channel.location);
             }
         }

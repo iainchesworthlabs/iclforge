@@ -394,7 +394,19 @@ TEST_CASE("network sinks live: the sinks on this network are found, paired, play
 //
 //   ICLFORGE_HEARTH_LIVE_KARAOKE_SINK  the board's mDNS instance name (hearth-eb2c64); the case is
 //                                      skipped without it
+//   ICLFORGE_HEARTH_LIVE_KARAOKE_LAYOUT  the output layout the board is set to (default 3.0, which the
+//                                      reproduction lays out as). A board whose silicon reaches two
+//                                      channels only (an ESP32-P4 below v3.0) takes 2.0, and the
+//                                      reproduction is then its 2/0 form on both sides
+//   ICLFORGE_HEARTH_LIVE_KARAOKE_PUSH  which settings fields are sent with the layout: any of routing,
+//                                      trim, delay and crossover, comma separated (default all four;
+//                                      "none" sends the layout alone). It names a field that a board's
+//                                      player cannot apply
 //   ICLFORGE_HEARTH_LIVE_SECONDS       how long each play runs (default 10)
+//
+// A board that decodes fewer channels of the codec than the programme has (the C6 decodes two) is
+// sent PCM the host decoded, so there is no reproduction of the board's own to measure: the case
+// is skipped, with that said.
 
 namespace {
 
@@ -517,27 +529,49 @@ void live_karaoke(const std::string& id, int seconds,
         REQUIRE(std::find(takes.begin(), takes.end(), key) != takes.end());
     }
     const std::size_t outputs = static_cast<std::size_t>(support_facts.iclforge_support->outputs.count);
-    REQUIRE(outputs >= 3);
+    const std::string layout_text =
+        environment("ICLFORGE_HEARTH_LIVE_KARAOKE_LAYOUT").value_or(std::string("3.0"));
+    const std::string push_text =
+        environment("ICLFORGE_HEARTH_LIVE_KARAOKE_PUSH").value_or(std::string("routing,trim,delay,crossover"));
+    const auto pushes = [&push_text](const char* field) { return push_text.find(field) != std::string::npos; };
+    std::printf("settings pushed: layout %s + %s; the board lists %zu outputs\n", layout_text.c_str(),
+                push_text.c_str(), outputs);
+    const auto layout = iclforge::render::OutputLayout::parse(layout_text);
+    REQUIRE(layout.has_value());
+    REQUIRE(outputs >= layout->slots());
     // The board says it reproduces karaoke for this codec: a sink that lists none is taken for
     // AC-3's alone (planning/karaoke-eac3.md, D6), and one that lists the codec is sent the stream
     // as it is, which is what this case is about.
     REQUIRE(support_facts.iclforge_support->reproduces_karaoke(type));
+    // The programme's coded channels are the 3/2 bed and the LFE. A board that decodes fewer of this
+    // codec is sent PCM (choose_sink_form), so what it reports is not a reproduction of its own.
+    constexpr std::uint8_t kProgrammeChannels = 6;
+    const std::uint8_t decodes = support_facts.iclforge_support->max_coded_channels_of(type);
+    if (decodes != 0 && decodes < kProgrammeChannels) {
+        SKIP("the board decodes at most " << static_cast<int>(decodes) << " coded channels of this codec and the "
+             << "programme has " << static_cast<int>(kProgrammeChannels)
+             << ": Hearth decodes it for the board and sends PCM");
+    }
 
-    // A 3.0 layout, so that the board does not fold and lays out from the reproduction.
-    const auto layout = iclforge::render::OutputLayout::parse("3.0");
-    REQUIRE(layout.has_value());
+    // A 3.0 layout by default, so that the board does not fold and lays out from the reproduction.
     ss::player::Settings base;
-    base.layout = "3.0";
-    if (support_facts.iclforge_support->management.routing) {
+    base.layout = layout_text;
+    if (pushes("routing") && support_facts.iclforge_support->management.routing) {
         std::array<char, iclforge::render::Routing::kTextBytes> text{};
         const auto identity_routing = iclforge::render::Routing::identity(layout->slots(), outputs);
         REQUIRE(identity_routing.has_value());
         REQUIRE(identity_routing->format(text) > 0);
         base.routing = std::string(text.data());
     }
-    base.trim_db = std::vector<double>(outputs, 0.0);
-    base.delay_ms = std::vector<double>(outputs, 0.0);
-    base.crossover_hz = 80.0;
+    if (pushes("trim")) {
+        base.trim_db = std::vector<double>(outputs, 0.0);
+    }
+    if (pushes("delay")) {
+        base.delay_ms = std::vector<double>(outputs, 0.0);
+    }
+    if (pushes("crossover")) {
+        base.crossover_hz = 80.0;
+    }
     REQUIRE(sinks.push_sink_settings(id, base));
 
     const std::string group_id = sinks.create_group("Live karaoke");
@@ -685,11 +719,15 @@ void live_karaoke(const std::string& id, int seconds,
         board_results.push_back(board);
     }
 
-    // Reproducing it made a difference the board's outputs show.
+    // The choice made a difference the board's outputs show: some reproduction moves some output
+    // from where as-coded has it. (Aware against as-coded is not it at a stereo layout, where aware
+    // is the Lo/Ro fold as-coded already is.)
     REQUIRE(board_results.size() == cases.size());
     double moved = 0.0;
-    for (std::size_t slot = 0; slot < layout->slots(); ++slot) {
-        moved = std::max(moved, std::abs(board_results[0][slot] - board_results[1][slot]));
+    for (std::size_t c = 1; c < board_results.size(); ++c) {
+        for (std::size_t slot = 0; slot < layout->slots(); ++slot) {
+            moved = std::max(moved, std::abs(board_results[0][slot] - board_results[c][slot]));
+        }
     }
     CHECK(moved > 1.0);
 }

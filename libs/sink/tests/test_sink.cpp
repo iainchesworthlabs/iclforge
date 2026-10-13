@@ -771,6 +771,93 @@ TEST_CASE("sink: what the server says is playing names an item with no lyrics, a
     CHECK(frame.album.empty());
 }
 
+TEST_CASE("sink: the server's progress is the header's time for an item with no lyrics, and fills a missing length",
+          "[sink][websocket]") {
+    const fs::path dir = scratch("progress");
+    Recording recording;
+    FakeOutputs outputs(recording);
+    Lines log;
+    iclforge::sink::Options options = options_in(dir);
+    options.lyrics_max_bytes = ac::kMaxLyricsBytes;
+    options.other_roles = {"metadata@v1"};
+    auto sink = iclforge::sink::Sink::start(std::move(options), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole), "metadata@v1"}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    CHECK(log.wait("burst stream AC-3 48000 Hz"));
+
+    // The item is 30 s in at the server's clock now, and 4 minutes long.
+    const auto say = [&](std::int64_t progress_ms, std::int32_t speed) {
+        iclforge::sendspin::metadata::State playing;
+        playing.title = "Spring";
+        playing.timestamp = server.clock.now_us();
+        playing.progress = iclforge::sendspin::metadata::Progress{
+            .track_progress_ms = progress_ms, .track_duration_ms = 240'000, .playback_speed = speed};
+        REQUIRE(server.call([&] { return server.server.send_state({.metadata = playing}); }));
+    };
+    say(30'000, 1000);
+
+    // Once the sink's clock has converged on the server's the frame carries the progress; before
+    // that there is no position to say.
+    iclforge::sink::LyricFrame frame;
+    const auto deadline = std::chrono::steady_clock::now() + 30s;
+    while (std::chrono::steady_clock::now() < deadline) {
+        frame = (*sink)->lyric_frame();
+        if (frame.has_progress) {
+            break;
+        }
+        std::this_thread::sleep_for(50ms);
+    }
+    REQUIRE(frame.has_progress);
+    CHECK(frame.mode == iclforge::lyrics::StageMode::kNoLyrics);
+    CHECK(frame.position_ms >= 30'000);
+    CHECK(frame.position_ms < 90'000);
+    REQUIRE(frame.length_ms.has_value());
+    CHECK(*frame.length_ms == 240'000);
+    CHECK(iclforge::sink::lyric_frame_json(frame).find("\"progress\":true") != std::string::npos);
+
+    // Paused: the position stays where the server put it.
+    say(50'000, 0);
+    const auto paused_by = std::chrono::steady_clock::now() + 15s;
+    while (std::chrono::steady_clock::now() < paused_by) {
+        frame = (*sink)->lyric_frame();
+        if (frame.position_ms == 50'000) {
+            break;
+        }
+        std::this_thread::sleep_for(20ms);
+    }
+    CHECK(frame.position_ms == 50'000);
+    std::this_thread::sleep_for(200ms);
+    CHECK((*sink)->lyric_frame().position_ms == 50'000);
+
+    // A timed document has its own playhead, and its own length when it names one; the server's
+    // length is the fallback for a file that has none. Neither is the "progress" of an item with none.
+    say(30'000, 1000);
+    ac::CommandMessage document;
+    document.command = ac::Command::kLyrics;
+    document.lyrics = {.item = 7, .text = "[00:00.00]First line\n[00:04.00]Second line\n"};
+    REQUIRE(server.call([&] { return server.server.iclforge_command(document); }));
+    CHECK(log.wait("lyrics for item 7: held"));
+    frame = (*sink)->lyric_frame();
+    CHECK_FALSE(frame.has_progress);
+    REQUIRE(frame.length_ms.has_value());
+    CHECK(*frame.length_ms == 240'000);
+
+    document.lyrics = {.item = 8, .text = "[length:01:00]\n[00:00.00]First line\n[00:04.00]Second line\n"};
+    REQUIRE(server.call([&] { return server.server.iclforge_command(document); }));
+    CHECK(log.wait("lyrics for item 8: held"));
+    frame = (*sink)->lyric_frame();
+    CHECK_FALSE(frame.has_progress);
+    REQUIRE(frame.length_ms.has_value());
+    CHECK(*frame.length_ms == 60'000);
+}
+
 TEST_CASE("sink: the status says who is connected, for what, and the code a server asked by",
           "[sink][websocket]") {
     const fs::path dir = scratch("status");
@@ -926,6 +1013,22 @@ TEST_CASE("sink: the store keeps the identity, the pairing PSK and the records b
         auto store = iclforge::sink::Store::open(dir);
         REQUIRE(store.has_value());
         CHECK((*store)->records() == 1);
+    }
+}
+
+TEST_CASE("sink: a vocals choice asks for the aware reproduction when it is both, and the capable one otherwise",
+          "[sink][request]") {
+    namespace sp = iclforge::sendspin::player;
+    // "Both" is what the song's mix plays: the aware reproduction, which has no vocals to choose.
+    const sp::Request both = iclforge::sink::vocals_request(sp::KaraokeVocals::kBoth);
+    CHECK(both.decoder.karaoke == sp::Karaoke::kAware);
+    CHECK(both.decoder.karaoke_vocals == sp::KaraokeVocals::kBoth);
+    // The others are the capable reproduction's own choices.
+    for (const sp::KaraokeVocals vocals :
+         {sp::KaraokeVocals::kNone, sp::KaraokeVocals::kV1, sp::KaraokeVocals::kV2}) {
+        const sp::Request request = iclforge::sink::vocals_request(vocals);
+        CHECK(request.decoder.karaoke == sp::Karaoke::kCapable);
+        CHECK(request.decoder.karaoke_vocals == vocals);
     }
 }
 

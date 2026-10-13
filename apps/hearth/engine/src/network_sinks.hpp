@@ -276,6 +276,22 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // know, and no sink is made to wait: the commands are sent as they are.
     void apply_lyrics(const std::string& group_id, const LyricsUpdate& update);
 
+    // A member's request for the singer's karaoke choice (D8, planning/hearth-android.md), as the
+    // host heard it: the sink asked through its own control (a remote, a touch screen), and the keys
+    // are cut to the ones it listed. The singer's choice is the application's to hold, so this class
+    // only says who asked, in which group: `group_id` is the group the sink is a member of, empty
+    // for none.
+    struct SinkRequest {
+        std::string group_id;
+        std::string sink_id;
+        std::string sink_name;
+        sendspin::player::Request request;
+    };
+    using SinkRequestHandler = std::function<void(const SinkRequest& request)>;
+    // Called on the host's own thread, with none of this class's locks held, and not at all while
+    // none is set. Setting it again replaces it; an empty one clears it.
+    void set_request_handler(SinkRequestHandler handler);
+
     // The host's own trail (ServerHostEvents::on_log()) since the last call,
     // oldest first: what was dialled, what each sink was given, and why a
     // connection ended. At most kLogLines are kept between calls; older ones
@@ -307,6 +323,8 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     void on_pairing_ended(const std::string& client_id,
                           std::optional<sendspin::pairing_messages::AbortReason> reason) override;
     void on_log(std::string_view line) override;
+    void on_sink_request(const std::string& group_id, const std::string& client_id,
+                         const sendspin::player::Request& request) override;
 
    private:
     // Sends sink `sink_id` the karaoke settings `choice` is, merged onto the settings last sent it
@@ -442,6 +460,10 @@ class NetworkSinks final : private sendspin::discovery::BrowseListener, private 
     // inside mutex_ (group_facts_locked), and the trail guarded by mutex_ made those two a deadlock
     // that stopped the engine when a member came back to a group that was playing.
     std::mutex log_mutex_;
+    // The application's handler for a member's request, under its own lock so that it is read and
+    // replaced without taking the sinks' (the host calls it from its own thread).
+    std::mutex request_mutex_;
+    SinkRequestHandler request_handler_;
     std::vector<std::string> log_;
 
     // Keyed by iclforge::sendspin::Group::id() - already unique per host, so
