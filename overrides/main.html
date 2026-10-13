@@ -17,7 +17,7 @@
         <p class="ac3f-lede">A clean-room AC-3, E-AC-3, AC-4 and Dolby Atmos codec, written from the
           published standards in C++23 — <strong>Library</strong> — with <strong>Forge</strong>,
           the CLI and GUI; <strong>Crucible</strong>, a desktop per-application Atmos mixer; and
-          <strong>Hearth</strong>, the player and its network sinks.</p>
+          <strong>Hearth</strong>, the player, its network sinks and karaoke.</p>
         <div class="ac3f-cta-row">
           <a class="ac3f-btn ac3f-btn-primary" href="{{ 'quickstart/'|url }}">Getting started</a>
           <a class="ac3f-btn ac3f-btn-ghost" href="{{ 'library/'|url }}">Browse the reference</a>
@@ -32,7 +32,7 @@
     <section class="ac3f-hero-section">
       <div class="ac3f-family-grid">
         <a class="ac3f-fam-card" href="{{ 'library/'|url }}">
-          <span class="ac3f-fam-tag">iclforge::ac3</span>
+          <span class="ac3f-fam-tag">iclforge::ac3 &middot; iclforge::ac4</span>
           <h3>Library</h3>
           <p>Encodes and decodes AC-3 and E-AC-3, including Atmos objects via Joint Object
             Coding, and decodes and encodes AC-4. C++23, with C, Python, Rust and WebAssembly
@@ -44,7 +44,8 @@
           <h3>Forge</h3>
           <p><code>forge</code> and <code>forge-gui</code> are one product: they build together,
             ship together, and the GUI shows the equivalent CLI command live at the bottom of
-            its window. Both read and write AC-4.</p>
+            its window. Both read and write AC-4, and both build karaoke streams: the GUI in a
+            Karaoke flow with project files, the CLI with lyrics written beside the stream.</p>
           <span class="ac3f-fam-go">Read the Forge docs &rarr;</span>
         </a>
         <a class="ac3f-fam-card" href="{{ 'crucible/'|url }}">
@@ -53,16 +54,17 @@
           <p>Captures each application separately and places it in an Atmos scene: drag one into
             position, and whatever is not placed stays in the 5.1 bed. The output follows the
             hardware, E-AC-3 with the objects to an Atmos receiver and AC-3 5.1 to a Dolby
-            Digital one. Windows and Linux run it; the macOS half compiles but has never been
-            launched.</p>
+            Digital one. It can show the lyrics of the application you select. Windows and
+            Linux run it; the macOS half compiles but has never been launched.</p>
           <span class="ac3f-fam-go">Read the Crucible docs &rarr;</span>
         </a>
         <a class="ac3f-fam-card" href="{{ 'hearth/'|url }}">
-          <span class="ac3f-fam-tag">desktop &middot; ESP32</span>
+          <span class="ac3f-fam-tag">desktop &middot; ESP32 &middot; Android TV</span>
           <h3>Hearth</h3>
-          <p>Plays through local speakers, a receiver, or synchronised ESP32 network sinks.
-            The desktop player finds sinks on the network, plays to them, and plays AC-4; sink
-            firmware is built for the ESP32-S3, ESP32-C6 and ESP32-P4.</p>
+          <p>Plays through this computer's outputs or synchronised network sinks. The desktop
+            player finds sinks on the network, plays to them, plays AC-4, and has a Karaoke page
+            with timed lyrics and a microphone pitch score; sink firmware is built for the
+            ESP32-S3, ESP32-C6 and ESP32-P4, and Hearth for Android is a sink for Android TV.</p>
           <span class="ac3f-fam-go">Read the Hearth docs &rarr;</span>
         </a>
       </div>
@@ -112,13 +114,14 @@
     <section class="ac3f-hero-section">
       <div class="ac3f-block-head">
         <h2>Demos &amp; examples</h2>
-        <p class="ac3f-kicker">browser, Android, C++</p>
+        <p class="ac3f-kicker">browser, Android, karaoke, C++</p>
       </div>
       <div class="ac3f-demo-grid">
         <a class="ac3f-demo-card" href="{{ 'wasm-demo/'|url }}">
           <span class="ac3f-demo-tag">Browser</span>
           <h3>Live decode</h3>
-          <p>Decodes an AC-3/E-AC-3 stream in a tab — WebAssembly, nothing to install.</p>
+          <p>Decodes an AC-3/E-AC-3 stream in a tab — WebAssembly, nothing to install — and
+            reproduces a karaoke stream with a pitch score from your microphone.</p>
         </a>
         <a class="ac3f-demo-card" href="{{ 'wasm-encode-demo/'|url }}">
           <span class="ac3f-demo-tag">Browser</span>
@@ -130,6 +133,12 @@
           <h3>Shield</h3>
           <p>Encodes Atmos/JOC live from a controller moving objects, and plays it out over
             HDMI passthrough — confirmed on real 2017 Shield hardware.</p>
+        </a>
+        <a class="ac3f-demo-card" href="{{ 'karaoke/'|url }}">
+          <span class="ac3f-demo-tag">Karaoke</span>
+          <h3>Karaoke guide</h3>
+          <p>Play a karaoke stream, time its lyrics, sing against its melody and make one in
+            the Forge GUI.</p>
         </a>
         <a class="ac3f-demo-card" href="{{ 'library/examples/'|url }}">
           <span class="ac3f-demo-tag">C++</span>

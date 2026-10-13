@@ -4299,6 +4299,10 @@ The sections below contain the complete change list and fixes.
 
 **Documentation**
 
+- The home page names what the release holds: the Hearth card has the karaoke page, the microphone
+  score and the Android TV sink, the Forge card the Karaoke flow and project files, the Crucible
+  card its lyrics, the library card both codecs' namespaces, and the demos have a karaoke entry.
+  Hearth's card no longer says it plays to a receiver, which the window does not do yet.
 - The Crucible guide gained its two missing pages ([The room](docs/crucible/room.md),
   [Settings](docs/crucible/settings.md)).
 - The Forge page, the Crucible page and the quick start name what they did not: karaoke streams,
