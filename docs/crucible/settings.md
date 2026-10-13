@@ -13,6 +13,13 @@ settings live in Qt's own per-user store — the registry on Windows, an INI fil
 Crucible starts with nothing of its own, and the demo's tree is left where it is rather than
 deleted.
 
+The window itself is kept in the same store, and is not a setting you change here: its size, its
+position and whether it was maximised (`window/geometry` and `window/maximised`) are written as you
+move it and read on the next start. A remembered position that is on no connected screen any more,
+such as a monitor that has been unplugged, is ignored, and the window opens at its remembered size
+wherever the system puts it. It is never smaller than 960×620, and a window hidden to the tray comes
+back where it was. The first start opens at 1480×820.
+
 **Four of these restart the stream** when you change them: latency, bitrate, the split-by-default
 tick, and the silent device's name. The engine stops and starts again, which is a gap in the
 sound, and the status strip says where it ended up.

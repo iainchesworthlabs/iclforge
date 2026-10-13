@@ -945,97 +945,97 @@
     {
       "path": "docs/hearth/screenshots/android-idle-first-run.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "1fdad58ae"
     },
     {
       "path": "docs/hearth/screenshots/android-idle-qr.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "b973dbf7d"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-count-in.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "c56dc0192"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-duet.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "c56dc0192"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-format.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "a71adcc49"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-hebrew.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "c56dc0192"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-no-lyrics-clock.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "24d51df67"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-no-lyrics-titled.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "5bd59a2ce"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-route.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "68e1d670e"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-scripts.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "da375d5cd"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-sheet-vocals.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "2868404eb"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-sheet.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "5a89f61fa"
     },
     {
       "path": "docs/hearth/screenshots/android-lyric-singing.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "c56dc0192"
     },
     {
       "path": "docs/hearth/screenshots/android-status-attention.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "54fd33f78"
     },
     {
       "path": "docs/hearth/screenshots/android-status-idle-code.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "54fd33f78"
     },
     {
       "path": "docs/hearth/screenshots/android-status-starting.png",
       "program": "the Hearth for Android app's instrumented tests",
-      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iainchesworthlabs.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iainchesworthlabs.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
       "build": "54fd33f78"
     },
     {

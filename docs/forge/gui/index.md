@@ -24,7 +24,7 @@ is not recognised there: dropped or named on the command line it is read as a so
 so open one with **Open stream…**, whose file picker has an AC-4 filter. `forge-gui` claims no file
 type with the desktop, so a double-click in the file manager does not reach it:
 
-- On Linux `forge-gui.desktop` has no `MimeType=` line, and the `forge-gui-mime.xml` fragment the package
+- On Linux `com.iainchesworthlabs.forge-gui.desktop` has no `MimeType=` line, and the `forge-gui-mime.xml` fragment the package
   installs only declares the `audio/ac3` and `audio/eac3` types with their `*.ac3` and `*.ec3`
   globs.
 - On macOS `Info.plist` carries no document types.
@@ -37,7 +37,13 @@ See [Loading a source](loading-a-source.md#01-input).
 
 ## The window
 
-Minimum size 1280×900. Two panes, divided by a vertical rule:
+Minimum size 1280×900. Forge opens where you left it: the size, the position and whether the window
+was maximised are kept with the other preferences (`window/geometry` and `window/maximised`, under
+the organisation `iclforge` and the application `forge-gui`) and restored on the next start. A
+remembered position that is on no connected screen any more, such as a monitor that has been
+unplugged, is ignored, and the window opens at its remembered size wherever the system puts it. A
+remembered size below the minimum is raised to it. The very first start opens at 1280×900. Two
+panes, divided by a vertical rule:
 
 ![The workbench: a 5.1 source loaded, Advanced tier](screenshots/overview-default.png)
 

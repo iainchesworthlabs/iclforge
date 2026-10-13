@@ -11,7 +11,7 @@ message(STATUS "Configuring Windows Toolchain (MSVC Variant)")
 
 include("${CMAKE_CURRENT_LIST_DIR}/windows.msvc.environment.cmake")
 
-# AC3_MSVC_TARGET_ARCH ("x64" or "arm64") is resolved by
+# ICLFORGE_MSVC_TARGET_ARCH ("x64" or "arm64") is resolved by
 # windows.msvc.environment.cmake, shared with windows.llvm.toolchain.cmake, so
 # the vcvarsall import above and the compiler/linker directories picked below
 # always agree on which architecture they mean.
@@ -27,14 +27,14 @@ include("${CMAKE_CURRENT_LIST_DIR}/windows.msvc.environment.cmake")
 # in the order given and returns the first match, so listing the native
 # directory first gets it for free when it exists, without a separate EXISTS
 # probe - try native first (no emulation), fall back to cross.
-if(AC3_MSVC_TARGET_ARCH STREQUAL "arm64")
+if(ICLFORGE_MSVC_TARGET_ARCH STREQUAL "arm64")
     set(CMAKE_SYSTEM_PROCESSOR "ARM64")
     set(_MSVC_BIN_CANDIDATES
-        "${AC3_MSVC_TOOLS_DIR}/bin/Hostarm64/arm64"
-        "${AC3_MSVC_TOOLS_DIR}/bin/Hostx64/arm64")
+        "${ICLFORGE_MSVC_TOOLS_DIR}/bin/Hostarm64/arm64"
+        "${ICLFORGE_MSVC_TOOLS_DIR}/bin/Hostx64/arm64")
 else()
     set(CMAKE_SYSTEM_PROCESSOR "AMD64")
-    set(_MSVC_BIN_CANDIDATES "${AC3_MSVC_TOOLS_DIR}/bin/Hostx64/x64")
+    set(_MSVC_BIN_CANDIDATES "${ICLFORGE_MSVC_TOOLS_DIR}/bin/Hostx64/x64")
 endif()
 
 find_program(CMAKE_C_COMPILER

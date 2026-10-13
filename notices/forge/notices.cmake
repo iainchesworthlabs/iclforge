@@ -141,7 +141,7 @@ endif()
 string(REGEX MATCH "^[0-9]+\\.[0-9]+" ICLFORGE_NOTICES_QT_SERIES "${ICLFORGE_GUI_QT_VERSION}")
 
 set(ICLFORGE_NOTICES_FILE "${CMAKE_BINARY_DIR}/notices/NOTICES.txt")
-ac3_generate_notices("${ICLFORGE_NOTICES_FILE}"
+iclforge_generate_notices("${ICLFORGE_NOTICES_FILE}"
     # One directory of fragments for all three programs: fmt, fonts and
     # trademarks are the same paragraphs for every one of them, while
     # forge-header, forge-windows-runtime and the Qt sections describe what

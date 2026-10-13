@@ -98,6 +98,12 @@ else()
         # shared by the three programs the same way.
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.hpp"
+        # Where the window opens and what it remembers (size, position, maximised), shared by the
+        # three programs the same way.
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_memory.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_memory.hpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_placement.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_placement.hpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp"
         # The picture of a CD+G disc, shared with Crucible's lyric strip and the Forge GUI's
@@ -402,7 +408,7 @@ else()
         # the SAME COMPONENT immediately before it, only on APPLE since the
         # Windows shape needs no such variable.
         if(APPLE)
-            install(CODE "set(_ac3_macos_bundle_name \"hearth\")" COMPONENT hearth)
+            install(CODE "set(_iclforge_macos_bundle_name \"hearth\")" COMPONENT hearth)
         endif()
         install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/StripQtTestDeployment.cmake"
             COMPONENT hearth)
@@ -441,9 +447,9 @@ else()
         # anything, so this component only CLAIMS the types (.desktop's
         # MimeType=, this metainfo.xml's <provides><mediatype>), which is
         # this package's own thing to state.
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/hearth.desktop"
+        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.hearth.desktop"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/applications" COMPONENT hearth)
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/hearth.metainfo.xml"
+        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.hearth.metainfo.xml"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo" COMPONENT hearth)
         install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"

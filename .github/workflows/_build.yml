@@ -1145,7 +1145,7 @@ jobs:
           linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --executable AppDir/usr/bin/forge-gui \
-            --desktop-file AppDir/usr/share/applications/forge-gui.desktop \
+            --desktop-file AppDir/usr/share/applications/com.iainchesworthlabs.forge-gui.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/forge-gui.png \
             --library "$libstdcxx" \
             --library "$libgcc_s" \

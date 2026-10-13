@@ -43,9 +43,9 @@ endif()
 # A board's build is position-dependent, as the minimum-footprint library beside it is; a
 # computer's links these archives into executables and shared test binaries alike.
 if(ICLFORGE_SENDSPIN_PLAYER_ONLY)
-    set(_ac3_sendspin_pic OFF)
+    set(_iclforge_sendspin_pic OFF)
 else()
-    set(_ac3_sendspin_pic ON)
+    set(_iclforge_sendspin_pic ON)
 endif()
 
 # Sendspin's reference time filter, vendored unmodified (external/time-filter/VENDORED.md).
@@ -53,13 +53,13 @@ endif()
 # against, does not apply to it; its headers reach consumers as SYSTEM includes for the same
 # reason. Built here rather than by a CMakeLists.txt of its own beside it, so that the vendored
 # directory holds only upstream's files.
-set(_ac3_sendspin_time_filter "${PROJECT_SOURCE_DIR}/external/time-filter")
-add_library(iclforge_sendspin_time_filter STATIC "${_ac3_sendspin_time_filter}/sendspin_time_filter.cpp")
+set(_iclforge_sendspin_time_filter "${PROJECT_SOURCE_DIR}/external/time-filter")
+add_library(iclforge_sendspin_time_filter STATIC "${_iclforge_sendspin_time_filter}/sendspin_time_filter.cpp")
 target_include_directories(iclforge_sendspin_time_filter SYSTEM
     PUBLIC
-        "$<BUILD_INTERFACE:${_ac3_sendspin_time_filter}>")
+        "$<BUILD_INTERFACE:${_iclforge_sendspin_time_filter}>")
 target_compile_features(iclforge_sendspin_time_filter PUBLIC cxx_std_17)
-set_target_properties(iclforge_sendspin_time_filter PROPERTIES POSITION_INDEPENDENT_CODE ${_ac3_sendspin_pic})
+set_target_properties(iclforge_sendspin_time_filter PROPERTIES POSITION_INDEPENDENT_CODE ${_iclforge_sendspin_pic})
 
 add_library(iclforge_sendspin STATIC)
 add_library(iclforge::sendspin ALIAS iclforge_sendspin)
@@ -88,7 +88,7 @@ target_sources(iclforge_sendspin
 # The player half beyond the core: everything a player needs that takes the crypto seam, and
 # nothing that needs an operating system's sockets or threads. crypto/psa/ is the seam's one
 # backend, over the PSA Crypto API, which mbedTLS 3.6 and 4 both provide.
-set(_ac3_sendspin_player_sources
+set(_iclforge_sendspin_player_sources
     src/channel.cpp
     src/cpace.cpp
     src/handshake_session.cpp
@@ -98,14 +98,14 @@ set(_ac3_sendspin_player_sources
     src/pairing_flow.cpp
     src/player_session.cpp
     src/psk.cpp)
-set(_ac3_sendspin_crypto_sources src/crypto/psa/crypto.cpp)
+set(_iclforge_sendspin_crypto_sources src/crypto/psa/crypto.cpp)
 
 if(ICLFORGE_SENDSPIN_PLAYER_ONLY)
-    target_sources(iclforge_sendspin PRIVATE ${_ac3_sendspin_player_sources})
+    target_sources(iclforge_sendspin PRIVATE ${_iclforge_sendspin_player_sources})
     # The backend is an archive of its own there, compiled against the SDK's mbedTLS without
     # the project's warning set: the SDK's headers, and the C library headers they bring, were
     # not written against -Wpedantic, and only this file includes them.
-    add_library(iclforge_sendspin_crypto STATIC ${_ac3_sendspin_crypto_sources})
+    add_library(iclforge_sendspin_crypto STATIC ${_iclforge_sendspin_crypto_sources})
     target_include_directories(iclforge_sendspin_crypto PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
     target_compile_features(iclforge_sendspin_crypto PRIVATE cxx_std_23)
     if(ICLFORGE_SENDSPIN_MBEDTLS_TARGET)
@@ -136,8 +136,8 @@ elseif(NOT ICLFORGE_SENDSPIN_CORE_ONLY)
     # own over esp_http_server and espressif/mdns).
     target_sources(iclforge_sendspin
         PRIVATE
-            ${_ac3_sendspin_player_sources}
-            ${_ac3_sendspin_crypto_sources}
+            ${_iclforge_sendspin_player_sources}
+            ${_iclforge_sendspin_crypto_sources}
             src/codec/codec.cpp
             src/codec/flac/flac.cpp
             src/codec/opus/opus.cpp
@@ -193,4 +193,4 @@ target_compile_features(iclforge_sendspin PUBLIC cxx_std_23)
 target_link_libraries(iclforge_sendspin PUBLIC iclforge_sendspin_time_filter)
 target_link_libraries(iclforge_sendspin PRIVATE iclforge::warnings iclforge::coverage)
 
-set_target_properties(iclforge_sendspin PROPERTIES POSITION_INDEPENDENT_CODE ${_ac3_sendspin_pic})
+set_target_properties(iclforge_sendspin PROPERTIES POSITION_INDEPENDENT_CODE ${_iclforge_sendspin_pic})
