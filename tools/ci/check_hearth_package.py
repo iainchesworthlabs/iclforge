@@ -80,6 +80,17 @@ FORBIDDEN_WINDOWS_QT_TEST_QML = "qml/QtTest/"
 FORBIDDEN_WINDOWS_QT_TEST_DLLS = ("qt6test.dll", "qt6testd.dll",
                                   "qt6quicktest.dll", "qt6quicktestd.dll")
 
+# Quick 3D's leftovers. windeployqt deploys every plugin in plugins/qmltooling/,
+# and the Quick 3D profiler's backend imports Qt6Quick3DUtils.dll, which holds
+# meshoptimizer and xatlas. Hearth has no Quick 3D view, so its NOTICES.txt has
+# no Quick 3D section for that code and neither file belongs in the package -
+# unlike this file's Qt Test rule above, this one fails a real build the day
+# cmake/StripQtTestDeployment.cmake stops removing them (measured 2026-10-13:
+# both were in the Qt 6.12.0 Hearth zip before it did). Crucible's package
+# carries Quick 3D and its section, so check_crucible_package.py has no such rule.
+FORBIDDEN_WINDOWS_QUICK3D_DLLS = ("qt6quick3dutils.dll", "qt6quick3dutilsd.dll",
+                                  "qmldbg_quick3dprofiler.dll", "qmldbg_quick3dprofilerd.dll")
+
 # The Linux archive is a different shape and a different claim, the same
 # split check_crucible_package.py's own REQUIRED_LINUX documents: no bundled
 # Qt - the system's own loader finds it - so nothing about qt.conf or a
@@ -127,6 +138,12 @@ REQUIRED_MACOS = (
 FORBIDDEN_MACOS_QT_TEST_QML = "hearth.app/Contents/Resources/qml/QtTest/"
 FORBIDDEN_MACOS_QT_TEST_FILES = ("libquicktestplugin.dylib",)
 FORBIDDEN_MACOS_QT_TEST_FRAMEWORKS = ("QtTest.framework/", "QtQuickTest.framework/")
+
+# The same Quick 3D leftovers in a macOS bundle's shape - see
+# FORBIDDEN_WINDOWS_QUICK3D_DLLS above. Written from Qt's layout, not from a
+# macOS artifact, like the Qt Test frameworks rule.
+FORBIDDEN_MACOS_QUICK3D_FILES = ("libqmldbg_quick3dprofiler.dylib",)
+FORBIDDEN_MACOS_QUICK3D_FRAMEWORKS = ("QtQuick3DUtils.framework/",)
 
 # What NOTICES.txt has to say everywhere: notices/hearth/notices.cmake
 # includes these fragments (notices/fragments/) on every
@@ -267,6 +284,13 @@ def check_windows(path: str) -> int:
         if name.startswith(FORBIDDEN_WINDOWS_QT_TEST_QML)
         or name.rsplit("/", 1)[-1].lower() in FORBIDDEN_WINDOWS_QT_TEST_DLLS
     ]
+    problems += [
+        f"the package carries Quick 3D's leftovers ({name}): Hearth has no Quick 3D view, so "
+        "its notices have no section for the third-party code in it - "
+        "cmake/StripQtTestDeployment.cmake removes both after the Qt deploy script"
+        for name in names
+        if name.rsplit("/", 1)[-1].lower() in FORBIDDEN_WINDOWS_QUICK3D_DLLS
+    ]
     if notices is not None:
         problems += check_notices(notices, qt_bundled=True)
     for problem in problems:
@@ -274,7 +298,7 @@ def check_windows(path: str) -> int:
     if problems:
         return 1
     print("ok: the Windows package holds the window, its Qt, the licence and a notices file "
-          "written for it, and no Qt Test")
+          "written for it, and no Qt Test or Quick 3D leftovers")
     return 0
 
 
@@ -303,6 +327,14 @@ def check_macos(path: str) -> int:
         or name.rsplit("/", 1)[-1].lower() in FORBIDDEN_MACOS_QT_TEST_FILES
         or any(f"/Frameworks/{fw}" in name for fw in FORBIDDEN_MACOS_QT_TEST_FRAMEWORKS)
     ]
+    problems += [
+        f"the package carries Quick 3D's leftovers ({name}): Hearth has no Quick 3D view, so "
+        "its notices have no section for the third-party code in it - "
+        "cmake/StripQtTestDeployment.cmake removes both after the Qt deploy script"
+        for name in names
+        if name.rsplit("/", 1)[-1] in FORBIDDEN_MACOS_QUICK3D_FILES
+        or any(f"/Frameworks/{fw}" in name for fw in FORBIDDEN_MACOS_QUICK3D_FRAMEWORKS)
+    ]
     if notices is not None:
         problems += check_notices(notices, qt_bundled=True)
     for problem in problems:
@@ -310,7 +342,7 @@ def check_macos(path: str) -> int:
     if problems:
         return 1
     print("ok: the macOS package holds the window, its Qt, the licence and a notices file "
-          "written for it, and no Qt Test")
+          "written for it, and no Qt Test or Quick 3D leftovers")
     return 0
 
 

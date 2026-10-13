@@ -129,6 +129,10 @@ class EncoderController : public QObject {
     // What the last exportDiagnostics() call did, in one sentence for the
     // Preferences dialog to show under its button. Empty until one has run.
     Q_PROPERTY(QString diagnosticsMessage READ diagnosticsMessage NOTIFY diagnosticsChanged)
+    // The third-party notices this build ships - the package's NOTICES.txt,
+    // embedded at build time - for About > Licences…, the property
+    // CrucibleController and HearthController carry under the same name.
+    Q_PROPERTY(QString licenceNotices READ licenceNotices CONSTANT)
     // See loudnessTouchedChanged()'s own comment. Written by LoudnessGroup.qml's
     // interactive handlers only - never by the setters those handlers call,
     // and never by guided's own contract application.
@@ -742,6 +746,9 @@ public:
     void setKeepPartialOutput(bool keep);
     [[nodiscard]] QString status() const { return status_; }
     [[nodiscard]] QString diagnosticsMessage() const { return diagnostics_message_; }
+    // The third-party notices this build ships: the package's NOTICES.txt,
+    // read from the copy embedded at build time (licenceNotices() in the .cpp).
+    [[nodiscard]] QString licenceNotices() const;
     // The support file, as text (docs/forge/gui/accessibility.md, "Saving a
     // diagnostics file"). The rule it holds - no signing key, no environment
     // value, no byte of anything loaded - lives in gui_diagnostics.hpp, not here;

@@ -33,7 +33,7 @@
 |---|---|
 | What runs here | The library, `forge` and `forge-gui`. Hearth's window builds, and Crucible's macOS half compiles and its suites run |
 | Build | Two CI legs, Apple Silicon after each merge and native Intel nightly; neither is experimental |
-| Minimum OS | macOS 13.3 (Ventura): the deployment target `cmake/toolchains/macos.llvm.toolchain.cmake` sets for C++23 libc++ features, which the Homebrew cask also requires. The Core Audio process tap needs 14.2 |
+| Minimum OS | macOS 14.4 (Sonoma), the floor of Qt 6.12, the LTS the GUI applications are built against: `cmake/toolchains/macos.llvm.toolchain.cmake` sets it as the deployment target. The Homebrew cask requires macOS 14 and cannot name the point release. It was 13.3 (Ventura) before the move to Qt 6.12, chosen for C++23 libc++ features. The Core Audio process tap needs 14.2, so it is always there |
 | Sound | **Nothing on macOS has captured or played anything.** No Mac host is available to this project. A hosted runner has a virtual output device (`Apple Virtual Sound Device`) and a window session, but no audio hardware and no way to grant a consent prompt |
 | Core Audio process tap | Written, compiled, **never created at runtime** |
 | Crucible | Compiles and is exercised by the CI suites; the application has never been launched on a Mac |

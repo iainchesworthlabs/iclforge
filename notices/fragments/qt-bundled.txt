@@ -29,35 +29,37 @@ issue tracker, for as long as this package is offered.
 
 The Qt libraries in turn contain third-party code, each part under its
 own terms. The list below was transcribed from the SPDX documents in the
-Qt 6.8.3 kit (sbom/*.spdx) for the modules this package includes; the
+Qt 6.12.0 kit (sbom/*.spdx) for the modules this package includes; the
 documents the {{QT_VERSION}} kit carries are the record for this package,
 and Qt's attribution for each entry, with the full text of every licence
 named, is at https://doc.qt.io/qt-6/licenses-used-in-qt.html
 
   Qt Core, Gui, Network, Widgets and their plugins (qtbase):
-    PCRE2 10.45                    BSD-3-Clause with PCRE2 exception
-    PCRE2 sljit 10.45              BSD-2-Clause
-    zlib 1.3.1                     Zlib
-    FreeType 2.13.3                FTL or GPL-2.0-only, used under the FTL
-                                   (its bdf and pcf parts: MIT)
-    HarfBuzz 10.4.0                MIT
-    libpng 1.6.47                  Libpng and libpng-2.0
-    libjpeg-turbo 3.1.0            IJG and BSD-3-Clause
-    double-conversion 3.3.0        BSD-3-Clause
-    TinyCBOR 0.6.1                 MIT
-    md4c 0.5.2                     MIT
+    PCRE2 10.48                    BSD-3-Clause with PCRE2 exception
+    PCRE2 sljit 10.48              BSD-2-Clause
+    zlib 1.3.2                     Zlib
+    FreeType 2.14.3                FTL or GPL-2.0-only, used under the FTL
+                                   (its bdf part: MIT; its pcf part: MIT and
+                                   MIT-open-group; its zlib part: Zlib)
+    HarfBuzz 14.5.0                MIT
+    libpng 1.6.58                  Libpng and libpng-2.0
+    libjpeg-turbo 3.2.0            IJG and BSD-3-Clause
+    double-conversion 3.4.0        BSD-3-Clause
+    TinyCBOR 7.0                   MIT
+    md4c 0.5.3                     MIT
+    tl::expected                   CC0-1.0
     BLAKE2                         CC0-1.0 or Apache-2.0
     MD4, MD5, SipHash, SHA-3       CC0-1.0 (SHA-3 endian helper: BSD-2-Clause)
     SHA-1                          public domain
     RFC 6234 SHA-2                 BSD-3-Clause
     easing curves                  BSD-3-Clause
-    Unicode Character Database 34  Unicode-3.0
-    Unicode CLDR 46.1              Unicode-3.0
+    Unicode Character Database 36  Unicode-3.0
+    Unicode CLDR 48.2              Unicode-3.0
     Apache Tika MIME types         Apache-2.0
     libpsl                         BSD-3-Clause
     Public Suffix List data        MPL-2.0
     D3D12 Memory Allocator         MIT
-    Vulkan Memory Allocator 3.0.1  MIT
+    Vulkan Memory Allocator 3.3.0  MIT
     D3D12 MiniEngine mipmap        MIT
     OpenGL and OpenGL ES 2 headers MIT
     Vulkan XML specification       Apache-2.0 or MIT
@@ -66,24 +68,25 @@ named, is at https://doc.qt.io/qt-6/licenses-used-in-qt.html
     smooth scaling (Imlib2)        BSD-2-Clause and Imlib2
     grayraster (FreeType)          FTL
     xserverhelper                  X11 and HPND
+    xsvg                           HPND-sell-variant
+    emoji-segmenter 0.4.0          Apache-2.0
     webgradients                   MIT
     Wintab (platform plugin)       Lcs-Telegraphics
-  Qt Svg (qtsvg):
-    xsvg                           HPND-sell-variant
   Qt Qml and Quick Controls 2 (qtdeclarative):
     masm (JavaScriptCore)          BSD-2-Clause
+    Yoga 2.0.1 (Quick Layouts)     MIT
     Angular Material shadow        MIT (the Material style)
   Qt Shader Tools (qtshadertools):
-    glslang 14.2.0                 BSD-3-Clause, MIT (Khronos, old variant),
+    glslang 16.3.0                 BSD-3-Clause, MIT (Khronos, old variant),
                                    Apache-2.0, GPL-3.0-or-later with the
                                    Bison exception 2.2, and the AML glslang
                                    variant
     SPIRV-Cross                    Apache-2.0 and MIT (Khronos, old variant)
   Qt Test (qtbase; a test-only module the deployment tool placed):
     Catch2 2.13.10                 BSL-1.0
-    cycle 3.3.10                   MIT
-    Linux perf headers 6.13        GPL-2.0-only with Linux-syscall-note
-    Valgrind headers 3.24.0        BSD-4-Clause
+    cycle 3.3.11                   MIT
+    Linux perf headers 7.0         GPL-2.0-only with Linux-syscall-note
+    Valgrind headers 3.25.1        BSD-4-Clause
   Qt Translations (qttranslations): BSD-3-Clause
 
 {{FILE:LGPL3}}

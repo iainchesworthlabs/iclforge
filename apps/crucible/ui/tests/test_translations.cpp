@@ -54,32 +54,6 @@ constexpr std::array<std::string_view, 19> kHearthBrandTerms{
     "AC-4", "JOC", "PCM", "Opus", "IEC 61937", "Matroska", "MP4", "MPEG-TS", "mDNS",
     "WiFi", "NOTICES.txt"};
 
-// A message in which English builds a plural by appending a suffix that a
-// placeholder carries ("%1 entr%2", with y or ies in %2). No other language
-// makes its plural that way, so a translation cannot use the placeholder, and
-// the rule below lets such a translation leave that one placeholder out. The
-// window still hands the argument over; Qt notes that the string has nowhere
-// for it and prints it nowhere.
-//
-// Each entry names a piece of the source that picks the message out and the
-// placeholder that may be absent. The cure is in the QML and C++ (a `%n`
-// message, which gives each language the forms it needs), not here: when a
-// source is reworded it leaves its catalogue, and the entry stops matching.
-struct SuffixPlaceholder {
-    std::string_view source_has;
-    std::string_view placeholder;
-};
-
-constexpr std::array<SuffixPlaceholder, 7> kHearthSuffixPlaceholders{{
-    {"entr%2", "%2"},               // Media.qml: the edit list's "%1 entr%2"
-    {"substream%3", "%3"},          // Media.qml: the dec3 box's row
-    {"group%3", "%3"},              // NetworkSinkList.qml: "%1 found · %2 group%3"
-    {"speaker%2", "%2"},            // NetworkSinkSpeakers.qml: "%1 speaker%2 reaches no slot ..."
-    {"Slot%1 %2 %3", "%1"},         // NetworkSinkSpeakers.qml: "Slot%1 %2 %3 silent."
-    {"Slot%1 %2 %3", "%3"},         //   the is / are that agrees with it
-    {"substream%5", "%5"},          // network_controller.cpp: "%4 substream%5"
-}};
-
 // The catalogues are regenerated centrally once the source changes of this
 // pass have landed, and the review that fills the new entries follows that
 // regeneration (docs/crucible/localisation.md, "Regenerating the
@@ -107,12 +81,10 @@ struct CatalogueSet {
     std::string_view dir;
     std::string_view prefix;
     std::span<const std::string_view> brand_terms;
-    std::span<const SuffixPlaceholder> droppable;
 };
 
-const CatalogueSet kCrucible{"crucible", ICLFORGE_CRUCIBLE_TS_DIR, "crucible_", kBrandTerms, {}};
-const CatalogueSet kHearth{"hearth", ICLFORGE_HEARTH_TS_DIR, "hearth_", kHearthBrandTerms,
-                           kHearthSuffixPlaceholders};
+const CatalogueSet kCrucible{"crucible", ICLFORGE_CRUCIBLE_TS_DIR, "crucible_", kBrandTerms};
+const CatalogueSet kHearth{"hearth", ICLFORGE_HEARTH_TS_DIR, "hearth_", kHearthBrandTerms};
 
 struct Message {
     std::string context;
@@ -290,10 +262,8 @@ struct Message {
 }
 
 // Whether `translation` carries the placeholders of `source`: all of them,
-// none that the source lacks, apart from those the set lists as droppable for
-// this message.
-[[nodiscard]] bool carries_placeholders(const std::string& source, const std::string& translation,
-                                        std::span<const SuffixPlaceholder> droppable) {
+// and none that the source lacks.
+[[nodiscard]] bool carries_placeholders(const std::string& source, const std::string& translation) {
     auto missing = placeholders(source);
     for (const auto& have : placeholders(translation)) {
         const auto it = std::find(missing.begin(), missing.end(), have);
@@ -302,20 +272,15 @@ struct Message {
         }
         missing.erase(it);
     }
-    return std::all_of(missing.begin(), missing.end(), [&](const std::string& left) {
-        return std::any_of(droppable.begin(), droppable.end(), [&](const SuffixPlaceholder& d) {
-            return d.placeholder == left && source.find(d.source_has) != std::string::npos;
-        });
-    });
+    return missing.empty();
 }
 
 // An empty string when the translation is fine, otherwise what is wrong. A
 // plural message holds the placeholders in every form; %n is the one that a
 // form may spell out in words ("One file"), so it is asked of at least one.
-[[nodiscard]] std::string placeholder_fault(const Message& message,
-                                            std::span<const SuffixPlaceholder> droppable) {
+[[nodiscard]] std::string placeholder_fault(const Message& message) {
     if (!message.numerus) {
-        return carries_placeholders(message.source, message.translation, droppable)
+        return carries_placeholders(message.source, message.translation)
                    ? std::string{}
                    : std::string{"placeholders differ from the source"};
     }
@@ -342,7 +307,7 @@ struct Message {
                 counted = true;
             }
         }
-        if (!carries_placeholders(source_without_count, form_without_count, droppable)) {
+        if (!carries_placeholders(source_without_count, form_without_count)) {
             return "a plural form's placeholders differ from the source";
         }
     }
@@ -467,7 +432,7 @@ void check_placeholders(const CatalogueSet& set) {
             }
             INFO(code << " / " << message.context << ": " << quoted(message.source));
             INFO("translation: " << quoted(message.translation));
-            const auto fault = placeholder_fault(message, set.droppable);
+            const auto fault = placeholder_fault(message);
             INFO(fault);
             CHECK(fault.empty());
         }
@@ -639,7 +604,7 @@ TEST_CASE("all six hearth catalogues share one source set", "[hearth][translatio
 
 TEST_CASE("hearth catalogues carry the messages the window has", "[hearth][translations]") {
     // A file that parsed to nothing, or to a fragment, would pass every rule
-    // above it. 1101 messages today; the floor is below that so that a string
+    // above it. About 1100 messages today; the floor is below that so that a string
     // the window drops does not fail this, and far above anything a broken
     // read produces.
     for (const auto code : kLanguages) {
@@ -649,12 +614,67 @@ TEST_CASE("hearth catalogues carry the messages the window has", "[hearth][trans
     }
 }
 
-// The rules that no catalogue exercises today, run on a made-up one: no message
-// of the three apps has a plural form, and the six English-suffix strings above
-// are the only ones that may leave a placeholder out. Written so that the day a
-// `%n` message arrives the rule it meets has been seen to work.
-TEST_CASE("the plural and suffix-placeholder rules read a catalogue correctly",
+// English holds no catalogue of its own for ordinary strings, but a plural
+// message needs one: Qt takes the form a count asks for from the catalogue, and
+// the source holds only one of the two, so without an entry here "1 entries" is
+// what the window says. hearth_en.ts is that catalogue (kept by
+// PLURALS_TS_FILE in apps/hearth/ui/CMakeLists.txt, which runs lupdate and then
+// lconvert -pluralonly over it): the plural messages of the window and nothing
+// else, two forms each. It is English written by the people who wrote the
+// source, so unlike the six it is not a machine draft.
+TEST_CASE("hearth's English plural catalogue holds every plural message, finished",
           "[hearth][translations]") {
+    using Pair = std::pair<std::string, std::string>;
+    std::set<Pair> english;
+    for (const Message& message : parse(read_catalogue(kHearth, "en"))) {
+        INFO("en / " << message.context << ": " << quoted(message.source));
+        // Only plural messages belong in the file.
+        CHECK(message.numerus);
+        CHECK_FALSE(marked(message, "unfinished"));
+        CHECK_FALSE(marked(message, "vanished"));
+        CHECK_FALSE(marked(message, "obsolete"));
+        // English has two forms: one, and every other count including 0.
+        const auto forms = numerus_forms(message.translation);
+        CHECK(forms.size() == 2);
+        CHECK(std::none_of(forms.begin(), forms.end(), blank));
+        CHECK(placeholder_fault(message).empty());
+        english.emplace(message.context, message.source);
+    }
+    // A file that parsed to nothing would hold every plural message of the
+    // six by holding none of them.
+    REQUIRE_FALSE(english.empty());
+
+    for (const auto code : kLanguages) {
+        std::set<Pair> plural;
+        std::set<std::size_t> form_counts;
+        for (const Message& message : parse(read_catalogue(kHearth, code))) {
+            if (message.numerus) {
+                plural.emplace(message.context, message.source);
+                form_counts.insert(numerus_forms(message.translation).size());
+            }
+        }
+        // The same plural messages in every file, so a `%n` message added to
+        // the window is added to English's file as well.
+        for (const auto& entry : plural) {
+            INFO(code << " has a plural message the English file does not: " << entry.first
+                      << " / " << quoted(entry.second));
+            CHECK(english.contains(entry));
+        }
+        for (const auto& entry : english) {
+            INFO("the English file has a plural message " << code << " does not: " << entry.first
+                 << " / " << quoted(entry.second));
+            CHECK(plural.contains(entry));
+        }
+        // lupdate writes the number of forms the language needs (Arabic six,
+        // Hebrew four); one file holding two counts is a hand edit.
+        INFO(code << " holds plural messages with " << form_counts.size() << " different form counts");
+        CHECK(form_counts.size() <= 1);
+    }
+}
+
+// The plural rules run on a made-up catalogue, so that each way a plural entry
+// can be wrong is seen to be caught: the real catalogues hold none of them.
+TEST_CASE("the plural rules read a catalogue correctly", "[hearth][translations]") {
     const std::string text = R"(<?xml version="1.0" encoding="utf-8"?>
 <TS version="2.1" language="fr" sourcelanguage="en">
 <context>
@@ -688,12 +708,8 @@ TEST_CASE("the plural and suffix-placeholder rules read a catalogue correctly",
         </translation>
     </message>
     <message>
-        <source>%1 entr%2</source>
+        <source>%1 entries in %2</source>
         <translation>entrees : %1</translation>
-    </message>
-    <message>
-        <source>%1 file%2</source>
-        <translation>fichiers : %1</translation>
     </message>
     <message>
         <source>%1 of %2</source>
@@ -703,26 +719,22 @@ TEST_CASE("the plural and suffix-placeholder rules read a catalogue correctly",
 </TS>
 )";
     const auto messages = parse(text);
-    REQUIRE(messages.size() == 7);
-    const std::span<const SuffixPlaceholder> listed_suffixes{kHearthSuffixPlaceholders};
+    REQUIRE(messages.size() == 6);
 
     // A plural entry with both forms and the count: fine.
     CHECK(messages[0].numerus);
-    CHECK(placeholder_fault(messages[0], {}).empty());
+    CHECK(placeholder_fault(messages[0]).empty());
     // No form shows the count: caught.
-    CHECK_FALSE(placeholder_fault(messages[1], {}).empty());
+    CHECK_FALSE(placeholder_fault(messages[1]).empty());
     // An empty form: the non-empty rule sees it.
     const auto empty_forms = bodies(messages[2]);
     REQUIRE(empty_forms.size() == 2);
     CHECK(std::any_of(empty_forms.begin(), empty_forms.end(), blank));
     // A form that drops %1: caught.
-    CHECK_FALSE(placeholder_fault(messages[3], {}).empty());
-    // The listed suffix string may omit its suffix placeholder ...
-    CHECK(placeholder_fault(messages[4], listed_suffixes).empty());
-    // ... a string that is not listed may not ...
-    CHECK_FALSE(placeholder_fault(messages[5], listed_suffixes).empty());
-    // ... and nothing may be left out where the set lists nothing.
-    CHECK_FALSE(placeholder_fault(messages[4], {}).empty());
+    CHECK_FALSE(placeholder_fault(messages[3]).empty());
+    // A plain message that leaves a placeholder out: caught, with no
+    // exception for a message that builds its plural by a suffix.
+    CHECK_FALSE(placeholder_fault(messages[4]).empty());
     // %L1 and %L2 are %1 and %2.
-    CHECK(placeholder_fault(messages[6], {}).empty());
+    CHECK(placeholder_fault(messages[5]).empty());
 }

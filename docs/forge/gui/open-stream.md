@@ -5,7 +5,7 @@ The GUI player/monitor for an existing file — the same shape [QC a stream](qc.
 configures and runs an **encode**, while this dialog opens an **already-encoded** `.ac3`/`.ec3`
 file (or an [`.ac4` one](#ac-4)) and decodes it, with no source, no plan and no encoder involved. It lives as its own dialog,
 opened from an **Open stream…** button in the header beside **QC a stream…**, **Inspect
-objects…** and **Preferences**.
+objects…** and **Settings**.
 
 Where QC measures a stream and Inspect objects shows its Atmos object metadata, this one plays
 it: the GUI twin of `forge monitor`, plus `forge decode`'s WAV and object export.
@@ -13,7 +13,7 @@ it: the GUI twin of `forge monitor`, plus `forge decode`'s WAV and object export
 ## Opening it
 
 **Open stream…**, in the header beside **QC a stream…**, **Inspect objects…** and
-**Preferences**. It opens regardless of what (if anything) is loaded in the main workbench.
+**Settings**. It opens regardless of what (if anything) is loaded in the main workbench.
 
 **Choose file…** opens a standard file picker with three filters: `*.ac3`/`*.ec3`, `*.ac4` and
 **All files**. Picking one starts the decode immediately, off the window's own event loop so the dialog stays

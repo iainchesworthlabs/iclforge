@@ -64,9 +64,11 @@ cask "iclforge" do
   # verified-in-CI-only caveat that still applies to both architectures now.
   #
   # cmake/toolchains/macos.llvm.toolchain.cmake pins CMAKE_OSX_DEPLOYMENT_TARGET
-  # to 13.3 (Ventura) for C++23 libc++ feature availability - see that
-  # file's own header comment.
-  depends_on macos: ">= :ventura"
+  # to 14.4 (Sonoma), the floor of the Qt 6.12 the apps are built against -
+  # see that file's own comment. A cask can only name a macOS release, not a
+  # point release, so 14.0-14.3 pass this check and then meet macOS's own
+  # "requires macOS 14.4 or later" at launch.
+  depends_on macos: ">= :sonoma"
 
   app "forge-gui.app"
 
