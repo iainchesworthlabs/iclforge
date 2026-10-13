@@ -393,6 +393,8 @@ To hold a board to figures:
   measurements, with how each was made.
 - [An ESP32-S3 sink](../../hearth/sink-esp32-s3.md), [An ESP32-C6 sink](../../hearth/sink-esp32-c6.md)
   and [An ESP32-P4 sink](../../hearth/sink-esp32-p4.md): building and flashing each board.
+- [Testing and benchmarking the ESP32 boards](board-bench.md): the play suite, how a baseline is
+  recorded and compared, and the bench tools.
 - [Sink firmware](../../hearth/sink-firmware.md): which image a board takes, and updating over the
   network.
 - [The firmware's README](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md):
