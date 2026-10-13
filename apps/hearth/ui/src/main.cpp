@@ -129,6 +129,7 @@
 #include "network_controller.hpp"
 #include "settings_migration.hpp"
 #include "single_instance.hpp"
+#include "window_memory.hpp"
 
 // Qt's headers define `slots` as a macro, and iclforge::render::OutputLayout has a method of that
 // name: undone before the engine's headers, which silent_outputs.hpp reaches through the sink.
@@ -374,6 +375,13 @@ int main(int argc, char** argv) {
         }
     }
 
+    // The window's size, position and maximised state, kept in the store between starts
+    // (apps/shared/preferences/src/window_placement.hpp has the keys and the rules). Main.qml is
+    // loaded hidden so that attach() places it before it is first shown; a capture is on the
+    // scratch store above, which holds nothing, so it opens at Main.qml's own size.
+    iclforge::window_memory::WindowMemory remembered_window;
+    engine.setInitialProperties({{QStringLiteral("visible"), false}});
+
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     engine.loadFromModule("Hearth", "Main");
@@ -382,6 +390,9 @@ int main(int argc, char** argv) {
     }
     if (auto* root_window = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) {
         mark_frames_for_tracy(root_window);
+        remembered_window.attach(root_window);
+    } else {
+        engine.rootObjects().first()->setProperty("visible", true);
     }
     // A capture never shows the first-run dialog it did not ask for:
     // Main.qml reads this one event-loop turn later, after main() has had

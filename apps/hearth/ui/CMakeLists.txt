@@ -98,6 +98,12 @@ else()
         # shared by the three programs the same way.
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.hpp"
+        # Where the window opens and what it remembers (size, position, maximised), shared by the
+        # three programs the same way.
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_memory.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_memory.hpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_placement.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_placement.hpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp"
         # The picture of a CD+G disc, shared with Crucible's lyric strip and the Forge GUI's

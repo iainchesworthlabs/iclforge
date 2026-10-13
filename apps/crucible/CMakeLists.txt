@@ -412,6 +412,10 @@ else()
         ../shared/preferences/src/language_manager.hpp
         ../shared/preferences/src/settings_migration.cpp
         ../shared/preferences/src/settings_migration.hpp
+        ../shared/preferences/src/window_memory.cpp
+        ../shared/preferences/src/window_memory.hpp
+        ../shared/preferences/src/window_placement.cpp
+        ../shared/preferences/src/window_placement.hpp
         # The picture of a CD+G disc the lyric strip draws, shared with Hearth and the Forge GUI
         # (apps/shared/cdg-picture): a QML_ELEMENT is registered only by a target that compiles it.
         ../shared/cdg-picture/src/cdg_frame_source.hpp
@@ -477,8 +481,8 @@ else()
         QML_FILES ${ICLFORGE_CRUCIBLE_QML_FILES}
         RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/tray.svg")
     # ui/src for the generated type registrations to find crucible_controller.hpp, the shared
-    # theme for system_theme.hpp and the shared preferences for language_manager.hpp and
-    # settings_migration.hpp.
+    # theme for system_theme.hpp and the shared preferences for language_manager.hpp,
+    # settings_migration.hpp and window_memory.hpp.
     target_include_directories(crucible PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/cdg-picture/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"

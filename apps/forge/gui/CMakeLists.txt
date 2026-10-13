@@ -76,7 +76,11 @@ qt_add_executable(forge-gui
     ../../shared/preferences/src/language_manager.cpp
     ../../shared/preferences/src/language_manager.hpp
     ../../shared/preferences/src/settings_migration.cpp
-    ../../shared/preferences/src/settings_migration.hpp)
+    ../../shared/preferences/src/settings_migration.hpp
+    ../../shared/preferences/src/window_memory.cpp
+    ../../shared/preferences/src/window_memory.hpp
+    ../../shared/preferences/src/window_placement.cpp
+    ../../shared/preferences/src/window_placement.hpp)
 
 # RecordingSink and its Fmp4FolderWriter moved to apps/shared/media/src when
 # `forge record`/`live` started writing their takes through the same classes

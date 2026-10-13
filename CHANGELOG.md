@@ -44,6 +44,19 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**The Forge GUI, Hearth and Crucible open where they were left**
+
+- **Each remembers its window's size, position and whether it was maximised**, in the settings
+  store it already has (`window/geometry` as `x,y,width,height` and `window/maximised`, under the
+  organisation `iclforge` and the application `forge-gui`, `Hearth` or `Crucible`), and restores
+  them on the next start. A remembered position on no connected screen, such as a monitor that was
+  unplugged, is ignored and the window opens at its remembered size where the system puts it; a
+  size below the program's minimum (1280 by 900, and 960 by 620) is raised to it. The first start
+  is as it was. Hearth's full-screen lyrics and Crucible's hide to the tray are not recorded as the
+  window's state. A capture is on a scratch store, so a picture is taken at the window's own size
+  unless `--setting window/geometry=<x>,<y>,<w>,<h>` says otherwise. The rule is
+  `apps/shared/preferences/src/window_placement.hpp`, held by `iclforge-settings-tests`.
+
 **Crucible: a capture runs over a scripted machine on a settings store of its own, and its pictures are taken by `take_pictures.py`**
 
 - **`crucible --shot` no longer reads or writes the person's own settings.** It runs on an INI
