@@ -16,12 +16,15 @@
      workloads, and the message names the workload; figures of different codecs come
      from different workloads and do not compare. A colour comes from a gate that
      already exists (real time, each channel's SNR floor, the 4 KiB live-growth
-     line); allocation per frame has no gate and is blue. All four link to the page
-     explaining what the numbers mean. -->
+     line); allocation per frame has no gate and is blue. The fifth says which
+     commit of main the other four are from and the day it was made, since a
+     figure on a badge carries no date and each series is written by its own job.
+     All five link to the page explaining what the numbers mean. -->
 [![Speed](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/iainchesworthlabs/iclforge/quality-history/badges/speed.json)](https://iainchesworthlabs.github.io/iclforge/performance-quality/)
 [![Decode accuracy](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/iainchesworthlabs/iclforge/quality-history/badges/accuracy.json)](https://iainchesworthlabs.github.io/iclforge/performance-quality/)
 [![Allocation per frame](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/iainchesworthlabs/iclforge/quality-history/badges/memory.json)](https://iainchesworthlabs.github.io/iclforge/performance-quality/)
 [![Live growth](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/iainchesworthlabs/iclforge/quality-history/badges/growth.json)](https://iainchesworthlabs.github.io/iclforge/performance-quality/)
+[![Figures measured on](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/iainchesworthlabs/iclforge/quality-history/badges/measured.json)](https://iainchesworthlabs.github.io/iclforge/performance-quality/)
 <!-- Supply chain & project meta -->
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/iainchesworthlabs/iclforge/badge)](https://scorecard.dev/viewer/?uri=github.com/iainchesworthlabs/iclforge)
 [![Latest release](https://img.shields.io/github/v/release/iainchesworthlabs/iclforge?include_prereleases&sort=semver)](https://github.com/iainchesworthlabs/iclforge/releases/latest)

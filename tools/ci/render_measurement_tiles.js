@@ -7,6 +7,8 @@
 //   node tools/ci/render_measurement_tiles.js <history-dir>          the home page's strip
 //   node tools/ci/render_measurement_tiles.js <history-dir> --page   performance-quality.md's cards
 //   ...                                       --json                  the same, as JSON
+//   ...                                       --now <ISO date>        the reader's clock, for the age
+//                                                                     in the "measured on" line
 //
 // <history-dir> holds the *.jsonl files the scripts fetch from
 // raw.githubusercontent.com/<repo>/quality-history/, for example a directory with
@@ -28,7 +30,8 @@ const SURFACES = {
   strip: {
     file: path.join(repoRoot, "docs", "javascripts", "hero-stats.js"),
     mount: "ac3f-stats",
-    ids: ["ac3f-stats"],
+    ids: ["ac3f-stats", "ac3f-stats-asof"],
+    asof: "ac3f-stats-asof",
     classes: { card: "ac3f-stat-card", head: "ac3f-stat-head", sub: "ac3f-stat-sub", line: "ac3f-stat-line",
       codec: "ac3f-stat-codec", figure: "ac3f-stat-figure", what: "ac3f-stat-what", note: "ac3f-stat-note",
       chip: "ac3f-stat-badge", watch: "ac3f-stat-figure-watch" },
@@ -37,6 +40,7 @@ const SURFACES = {
     file: path.join(repoRoot, "docs", "performance-quality.md"),
     mount: "pq-status",
     ids: ["pq-status", "pq-asof"],
+    asof: "pq-asof",
     classes: { card: "pq-card", head: "pq-head", sub: "pq-sub", line: "pq-line", codec: "pq-codec",
       figure: "pq-figure", what: "pq-what", note: "pq-note", chip: "pq-badge", watch: "pq-figure-watch" },
   },
@@ -66,10 +70,20 @@ function scriptOf(surface) {
   return scripts[scripts.length - 1][1];
 }
 
-async function render(surface, historyDir) {
+// The scripts' own Date, with Date.now() held to `now` when one is given: the "measured on" line
+// says how many days old the newest record is, which a test can only hold to a date it chose.
+function clock(now) {
+  if (now === null) return Date;
+  const fixed = Date.parse(now);
+  if (Number.isNaN(fixed)) throw new Error(`--now ${now} is not a date`);
+  return class extends Date { static now() { return fixed; } };
+}
+
+async function render(surface, historyDir, now) {
   const elements = {};
-  for (const id of surface.ids) elements[id] = { innerHTML: "" };
+  for (const id of surface.ids) elements[id] = { innerHTML: "", className: "" };
   const sandbox = {
+    Date: clock(now),
     document: {
       readyState: "complete",
       getElementById: (id) => elements[id] || null,
@@ -94,9 +108,10 @@ async function render(surface, historyDir) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   if (mount.innerHTML === "") throw new Error(`${surface.file} rendered nothing into #${surface.mount}`);
-  // The page fills its "as of" line after the cards; give it a moment.
+  // Each surface fills its "measured on" line after the cards; give it a moment.
   await new Promise((resolve) => setTimeout(resolve, 20));
-  return { html: mount.innerHTML, asof: elements["pq-asof"] ? elements["pq-asof"].innerHTML : "" };
+  const asof = elements[surface.asof];
+  return { html: mount.innerHTML, asof: asof.innerHTML, stale: asof.className.includes("-stale") };
 }
 
 // One entry per card: title, chip, sub line, one entry per line, note.
@@ -122,16 +137,19 @@ function cardsOf(html, c) {
 
 async function main(argv) {
   const args = argv.slice(2);
-  const historyDir = args.find((a) => !a.startsWith("--"));
+  // The first argument that is neither a flag nor --now's value.
+  const historyDir = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--now");
   if (!historyDir) {
     process.stderr.write("usage: render_measurement_tiles.js <history-dir> [--page] [--json]\n");
     return 2;
   }
   const surface = args.includes("--page") ? SURFACES.page : SURFACES.strip;
-  const rendered = await render(surface, path.resolve(historyDir));
+  const at = args.indexOf("--now");
+  const rendered = await render(surface, path.resolve(historyDir), at >= 0 ? args[at + 1] : null);
   const cards = cardsOf(rendered.html, surface.classes);
   if (args.includes("--json")) {
-    process.stdout.write(JSON.stringify({ cards, asof: text(rendered.asof) }, null, 2) + "\n");
+    process.stdout.write(
+      JSON.stringify({ cards, asof: text(rendered.asof), stale: rendered.stale }, null, 2) + "\n");
     return 0;
   }
   for (const card of cards) {

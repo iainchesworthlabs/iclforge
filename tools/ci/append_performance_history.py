@@ -10,7 +10,8 @@ because it also failed the run).
 This is the trend-tracking HALF of the performance suite, not the hard
 real-time gate - that is tests/performance/test_performance.cpp's iclforge-perf
 target, a separate CI-blocking ctest run on every push/PR. This script only
-ever runs on main pushes (mirrors persist_quality_trend's own gating),
+ever runs on a run of main that records the trend (after a merge, nightly,
+or a dispatch on main - ci.yml's record_trend),
 records numbers iclforge-perf's pass/fail already implicitly bounds, and
 raises a softer, trend-relative signal on top: not "did this exceed the
 absolute real-time budget" (iclforge-perf's job) but "is this drifting slower over
@@ -30,6 +31,12 @@ dB is worse; for performance, HIGHER ms/frame is worse. Percentage-based
 thresholds are used here rather than quality-trend's fixed dB deltas,
 because ms/frame's absolute scale varies a lot across CI runner hardware in
 a way dB (already a log-relative unit) does not.
+
+A (leg, config) already recorded for this commit is not recorded again, as
+in append_quality_history.py: the nightly run and a dispatch on main measure
+a commit the run after its merge may have measured already, and the series
+holds one point a commit. A repeated run is still judged, against the history
+from before its commit, so a hard regression keeps failing the job it is in.
 
 stdlib-only (json/argparse/pathlib), matching compare_wav.py's/
 append_quality_history.py's own no-new-CI-provisioning reasoning. Takes
@@ -145,7 +152,24 @@ def load_leg_results(results_dir: Path):
             }
 
 
-def trailing_mean(history_path: Path, leg: str, config: str, window: int):
+def recorded_keys(history_path: Path, commit: str):
+    """The (leg, config) of every record the file already holds for `commit`."""
+    if not history_path.exists():
+        return set()
+    keys = set()
+    for line in history_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        if rec.get("commit") == commit:
+            keys.add((rec.get("leg"), rec.get("config")))
+    return keys
+
+
+def trailing_mean(history_path: Path, leg: str, config: str, window: int,
+                  exclude_commit=None):
+    """The records of `exclude_commit` are left out: a run is judged against
+    what came before its commit, not against an earlier run of the same one."""
     if not history_path.exists():
         return None
     matches = []
@@ -153,6 +177,8 @@ def trailing_mean(history_path: Path, leg: str, config: str, window: int):
         if not line.strip():
             continue
         rec = json.loads(line)
+        if exclude_commit is not None and rec.get("commit") == exclude_commit:
+            continue
         if rec.get("leg") == leg and rec.get("config") == config:
             matches.append(rec["ms_per_frame"])
     if not matches:
@@ -188,11 +214,12 @@ def main() -> int:
               f"{args.results_dir}; nothing to append")
         return 0
 
+    already = recorded_keys(history_path, args.commit)
     lines = []
     hard_regression = False
     for rec in records:
         baseline = trailing_mean(history_path, rec["leg"], rec["config"],
-                                 REGRESSION_TRAILING_WINDOW)
+                                 REGRESSION_TRAILING_WINDOW, exclude_commit=args.commit)
         entry = {
             "commit": args.commit,
             "branch": args.branch,
@@ -218,7 +245,8 @@ def main() -> int:
             "runner_image": rec["runner_image"],
             "real_time_budget_ms_per_frame": rec["real_time_budget_ms_per_frame"],
         }
-        lines.append(json.dumps(entry, sort_keys=True))
+        if (rec["leg"], rec["config"]) not in already:
+            lines.append(json.dumps(entry, sort_keys=True))
 
         slowdown = None if baseline is None or baseline <= 0 else (
             (rec["ms_per_frame"] - baseline) / baseline)
@@ -244,7 +272,9 @@ def main() -> int:
         for line in lines:
             f.write(line + "\n")
 
-    print(f"Appended {len(lines)} record(s) to {history_path}")
+    skipped = len(records) - len(lines)
+    print(f"Appended {len(lines)} record(s) to {history_path}"
+          + (f" ({skipped} already recorded for {args.commit[:8]})" if skipped else ""))
     write_recent_window(history_path)
     emit_github_output("hard_regression", "true" if hard_regression else "false")
     return 0

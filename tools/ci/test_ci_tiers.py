@@ -99,11 +99,13 @@ class WhatRunsAfterAMerge(unittest.TestCase):
             with self.subTest(job=name):
                 self.assertNotIn("tier", condition("_ci-core.yml", name))
 
-    def test_the_trend_publishers_that_read_ffmpeg_validate_run_nightly_too(self):
+    def test_the_trend_publishers_that_read_ffmpeg_validate_run_where_it_runs(self):
+        """On a run that records the trend, after the job whose scores they publish: the
+        nightly run and a dispatch on main, since the run after a merge leaves that job out."""
         for name in ("persist-external-comparison-trend", "persist-object-quality-trend"):
             with self.subTest(job=name):
                 cond = condition("_ci-core.yml", name)
-                self.assertIn("github.event_name == 'schedule'", cond)
+                self.assertIn("inputs.record_trend", cond)
                 self.assertIn("needs: ffmpeg-validate", job("_ci-core.yml", name))
 
     def test_the_comparison_publisher_also_runs_after_a_failed_ffmpeg_validate(self):
@@ -163,17 +165,89 @@ class WhatRunsAfterAMerge(unittest.TestCase):
     def test_the_appimage_is_nightly_only(self):
         self.assertIn("inputs.tier != 't2'", condition("_build.yml", "linux-appimage"))
 
-    def test_the_quality_trend_is_recorded_by_both_tiers_and_tolerates_a_skipped_platform(self):
-        self.assertIn(
-            "(github.event_name == 'push' || github.event_name == 'schedule')",
-            text("ci.yml"),
-        )
+    PUBLISHERS = (
+        ("ci.yml", "persist-performance-trend"),
+        ("ci.yml", "performance-trend-arm64"),
+        ("_build.yml", "quality-trend"),
+        ("_ci-core.yml", "persist-external-comparison-trend"),
+        ("_ci-core.yml", "persist-object-quality-trend"),
+    )
+
+    def test_one_rule_says_which_runs_record_the_trend(self):
+        """After a merge, nightly, and a dispatch on main that names no legs.
+
+        Decided once, by the `changes` job, and read by every publisher. Each used to ask the
+        event for itself and they did not agree: the performance series was written by the run
+        after a merge alone, the comparison series by the nightly alone, and a dispatch wrote
+        nothing, so no one run could record every series.
+        """
+        changes = job("ci.yml", "changes")
+        self.assertIn("record_trend: ${{ steps.detect.outputs.record_trend }}", changes)
+        self.assertIn('if [ "$REF" = "refs/heads/main" ] && [ -z "${LEGS:-}" ]; then', changes)
+        self.assertIn("push|schedule|workflow_dispatch) record_trend=true ;;", changes)
+        passed = "${{ needs.changes.outputs.record_trend == 'true' }}"
+        self.assertIn(f"persist_quality_trend: {passed}", job("ci.yml", "build-and-test"))
+        self.assertIn(f"record_trend: {passed}", job("ci.yml", "core"))
+        for name in ("persist-performance-trend", "performance-trend-arm64"):
+            with self.subTest(job=name):
+                self.assertIn(
+                    "needs.changes.outputs.record_trend == 'true'", condition("ci.yml", name)
+                )
+        for workflow, name in self.PUBLISHERS:
+            with self.subTest(job=name):
+                self.assertNotIn("github.event_name", condition(workflow, name))
+
+    def test_the_performance_publishers_do_not_wait_for_the_build_matrix(self):
+        """They build the benchmarks and measure them by themselves.
+
+        From 2026-10-12 02:12Z none of the 19 runs after a merge that finished in the next day
+        (136 merges) recorded a speed or memory figure: the publisher needed all of
+        build-and-test green, and it was red on a browser test, the wheels, an ESP32 image and
+        a macOS test while the Linux GCC leg passed in every one of those runs.
+        """
+        for name in ("persist-performance-trend", "performance-trend-arm64"):
+            with self.subTest(job=name):
+                needs = re.search(r"(?m)^    needs: \[(.*)\]$", job("ci.yml", name))
+                self.assertIsNotNone(needs)
+                self.assertNotIn("build-and-test", needs.group(1))
+                cond = condition("ci.yml", name)
+                self.assertNotIn("build-and-test", cond)
+                # A batch of merges with no code in it measures nothing, as before.
+                self.assertIn("needs.changes.outputs.code == 'true'", cond)
+        # The arm64 leg's artifact is optional (continue-on-error on its download), so its
+        # failure must not cost the x86 series its record.
+        cond = condition("ci.yml", "persist-performance-trend")
+        self.assertIn("needs.performance-trend-arm64.result != 'cancelled'", cond)
+        self.assertNotIn("needs.performance-trend-arm64.result == 'success'", cond)
+
+    def test_the_quality_trend_records_the_legs_that_passed_when_another_failed(self):
+        """One platform that ran is enough, and a leg's own gates decide whether it is recorded.
+
+        From 2026-10-12 15:20Z a Hearth test on the macOS leg kept the Linux and Windows
+        figures of every later merge off the trend: the job needed every platform's job-call
+        to pass.
+        """
         trend = condition("_build.yml", "quality-trend")
+        self.assertIn("!cancelled()", trend)
+        self.assertIn("inputs.persist_quality_trend", trend)
         for platform in ("windows", "linux", "macos"):
-            self.assertIn(f"needs.build-{platform}.result", trend)
-        self.assertIn('"skipped"', trend)
-        # ...but not with nothing built at all, which leaves no artifact to record.
-        self.assertIn("== 'success'", trend)
+            self.assertIn(
+                f"""contains(fromJSON('["success","failure"]'), needs.build-{platform}.result)""",
+                trend,
+            )
+        self.assertEqual(trend.count("||"), 2)
+        self.assertNotIn('"skipped"', trend)
+        # With no artifact at all (every leg failed) there is nothing to append or push.
+        body = job("_build.yml", "quality-trend")
+        self.assertEqual(body.count("if: hashFiles('results/**/*.json') != ''"), 2)
+        # What keeps a broken leg's figures out of the history, which the per-channel floors
+        # are derived from: a leg uploads its results under the default `if`, after its gates.
+        for workflow in ("_ci-linux.yml", "_ci-macos.yml", "_ci-windows.yml"):
+            with self.subTest(workflow=workflow):
+                self.assertIn(
+                    "        if: matrix.gold_reference && inputs.persist_quality_trend\n",
+                    text(workflow),
+                )
 
     def test_the_lane_range_is_what_merged_since_verified_and_satellites_are_direct(self):
         changes = job("ci.yml", "changes")

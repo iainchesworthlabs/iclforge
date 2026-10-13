@@ -85,6 +85,22 @@ class KernelHistory(unittest.TestCase):
         self.assertIn("::warning title=Kernel trend regression::linux/a", out)
         self.assertNotIn("linux/b", out)
 
+    def test_a_commit_already_recorded_is_not_recorded_again(self):
+        """A second run of a commit (the nightly, a dispatch on main) adds the kernels the
+        first did not have, and is judged against what came before the commit."""
+        self.write({"mdct": 100.0})
+        self.run_main()
+        self.write({"mdct": 250.0, "bitalloc": 50.0})
+        rc, out = self.run_main()
+        self.assertEqual(rc, 0)
+        recs = [json.loads(line) for line in self.history.read_text().splitlines()]
+        self.assertEqual([(r["kernel"], r["ns_per_call"]) for r in recs],
+                         [("mdct", 100.0), ("bitalloc", 50.0)])
+        self.assertIn("Appended 1 record(s)", out)
+        self.assertIn("(1 already recorded for c)", out)
+        # Nothing came before this commit, so 250 against its own 100 is no finding.
+        self.assertNotIn("::warning", out)
+
     def test_trailing_mean_edge_cases(self):
         self.assertIsNone(akh.trailing_mean(self.history, "l", "k", 10))
         self.seed([{"leg": "l", "kernel": "k", "ns_per_call": v} for v in (9.0, 1.0, 3.0)])

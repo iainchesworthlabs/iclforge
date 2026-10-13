@@ -241,6 +241,12 @@
 }
 @media (max-width: 30rem) { .ac3f-stat-grid { grid-template-columns: 1fr; } }
 .ac3f-stat-status { grid-column: 1 / -1; font-size: 0.8rem; color: var(--md-default-fg-color--light); margin: 0; }
+/* When the figures are from: under the home page's strip (hero-stats.js) and above each series
+   on the trend pages. Muted, and in the warning colour once the newest record is older than the
+   series is normally left. */
+.ac3f-stat-asof, .trend-asof { font-size: 0.8rem; color: var(--md-default-fg-color--light); margin: 0.5rem 0 0.75rem; }
+.ac3f-stat-asof-stale, .trend-asof-stale { color: #ef6c00; font-weight: 600; }
+[data-md-color-scheme="slate"] .ac3f-stat-asof-stale, [data-md-color-scheme="slate"] .trend-asof-stale { color: #ffb74d; }
 .ac3f-stat-card {
   border: 1px solid var(--md-default-fg-color--lightest); border-radius: 0.45rem;
   padding: 0.85rem 1rem; background: var(--md-default-bg-color);

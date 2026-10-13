@@ -1,8 +1,11 @@
 # Performance & quality
 
-CI records performance, quality, and memory measurements after merges. This page
-shows the latest values from `main`, explains each measure, and links to the
-append-only histories.
+CI records performance, quality, and memory measurements after merges and every
+night. This page shows the latest values from `main`, explains each measure, and
+links to the append-only histories. The line under the cards names the commit the
+newest figures were measured on and says how old it is;
+[Where each number comes from](#where-each-number-comes-from) says which job
+measures each series and when.
 
 Each card has one line per codec (AC-3, E-AC-3, and AC-4). A figure is the worst case among that
 codec's own workloads, except on the listening-quality card, which gives the range, and the
@@ -113,6 +116,45 @@ on long content and on small devices even when it is fast.
 
 → [Performance trend](performance-trend.md#memory-trend) carries the memory tables.
 
+## Where each number comes from
+
+Nothing on these pages is typed in. Each page fetches a history file from the
+`quality-history` branch when it is opened and draws its figures from the records
+in it, and a record carries the commit it was measured on and that commit's date.
+The files are written by jobs of `ci.yml`, the run that verifies `main`:
+
+| Series (file on `quality-history`) | Measured by | Runs | Runner |
+| --- | --- | --- | --- |
+| Speed, per workload (`performance-main.jsonl`) | `Publish performance trend`: builds `iclforge-bench` with GCC 16, runs it three times and records the fastest; the arm64 figures come from `Publish performance trend (arm64 measurements)` | After a merge, nightly, on request | GitHub-hosted `ubuntu-latest` and `ubuntu-24.04-arm`, in an `ubuntu:26.04` container |
+| Speed, per kernel (`kernels-main.jsonl`) | The same job, `iclforge-kernelbench` | The same | `ubuntu-latest` |
+| Allocation and live growth (`memory-main.jsonl`) | The same job, `iclforge-membench` | The same | `ubuntu-latest` |
+| Decode accuracy (`main.jsonl`) | The gold-reference gate of each build leg; `Publish quality trend` appends the legs whose gates passed | After a merge (the legs the merges touched), nightly (every leg), on request | The Linux and Windows legs normally on the self-hosted fleet, macOS and arm64 on GitHub-hosted runners |
+| Tool comparison and listening quality (`external-comparison-main.jsonl`) | `FFmpeg Validate` scores this build's encodes (SNR, LSD and ViSQOL's MOS-LQO, `tools/ci/quality_race.py`); `Publish external-encoder landscape trend` appends them beside the committed FFmpeg and Dolby figures | Nightly, on request | Normally self-hosted Linux |
+| AC-4 decode quality (`ac4-quality-main.jsonl`) and AC-4 encode quality (`ac4-encode-quality-main.jsonl`) | Two scoring steps of `FFmpeg Validate`, appended by the same publisher | Nightly, on request | Normally self-hosted Linux |
+| Object reconstruction (`object-quality-main.jsonl`) | The last step of `FFmpeg Validate`; `Publish object-reconstruction quality trend` appends it | Nightly, on request, and only after an `FFmpeg Validate` that passed | Normally self-hosted Linux |
+| The README's badges (`badges/*.json`) | `Publish performance trend`, from the series above | With the speed series | `ubuntu-latest` |
+
+"After a merge" is the run of `ci.yml` on a push to `main`. One runs at a time, so
+when merges come faster than a run takes (about an hour), one run stands for all
+the merges since the run before it, and its records carry the newest of those
+commits. "Nightly" is the scheduled run of the whole matrix. "On request" is
+`gh workflow run ci.yml --ref main`, which runs the whole matrix on the tip of
+`main` and records every series: it is how a full set of records is taken without
+waiting for the night. A series holds a commit once, so a second run of a commit
+adds only what the first did not record.
+
+Each publisher depends on the job that measured its figures and on nothing else.
+A leg that failed leaves a gap in its own series for that commit, and every other
+series is still written. When no run has recorded anything for a while, the pages
+go on showing the last figures: the line above each series gives their commit and
+age, and turns amber after two days for the series written after merges and three
+for the nightly ones.
+
+The figures on the ESP32 pages are not part of this. They are measured on real
+boards with `tools/hearth/board_suite.py`, by hand, and kept as baselines under
+`firmware/hearth-sink/baselines/`; the emulated ESP32 legs of CI hold a build to
+its size, its levels and its heap floor and publish nothing.
+
 ## What happens when a number moves
 
 Thresholds separate expected run-to-run variation from regressions:
@@ -222,8 +264,10 @@ ceiling) fails the build rather than merely being recorded.
 .pq-watch { background: rgba(251, 140, 0, 0.18); color: #ef6c00; }
 .pq-unknown { background: var(--md-default-fg-color--lightest); color: var(--md-default-fg-color--light); }
 .pq-loading, .pq-asof { color: var(--md-default-fg-color--light); font-size: 0.82rem; }
+.pq-asof-stale { color: #ef6c00; font-weight: 600; }
 [data-md-color-scheme="slate"] .pq-ok { color: #81c784; }
-[data-md-color-scheme="slate"] .pq-watch, [data-md-color-scheme="slate"] .pq-figure-watch { color: #ffb74d; }
+[data-md-color-scheme="slate"] .pq-watch, [data-md-color-scheme="slate"] .pq-figure-watch,
+[data-md-color-scheme="slate"] .pq-asof-stale { color: #ffb74d; }
 </style>
 
 <script>
@@ -512,6 +556,42 @@ ceiling) fails the build rather than merely being recorded.
     }
     return best;
   }
+
+  // How old the newest record is, in whole hours, or null with no date to count from. `latest`
+  // is newestSeries()'s pick and `now` the reader's clock in milliseconds.
+  function recordAgeHours(latest, now) {
+    const at = latest ? Date.parse(latest.date) : NaN;
+    return Number.isNaN(at) ? null : Math.max(0, Math.floor((now - at) / 3600000));
+  }
+
+  // An age in words: hours up to two days, days after.
+  function agoWords(hours) {
+    if (hours < 1) return "within the last hour";
+    if (hours < 48) return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+    return `${Math.floor(hours / 24)} days ago`;
+  }
+
+  // The line under the cards: the commit the newest figures are from, the day that commit was
+  // made and how long ago that is. CI writes the series after merges and nightly, and when it
+  // has written nothing for a while (main red, a failed nightly) the cards go on showing the
+  // last figures recorded: this line is what says how old they are. Past STALE_AFTER_DAYS it
+  // says that nothing newer has been recorded, and `stale` tells the caller to colour it. Speed,
+  // memory and the gold-reference gate are recorded after merges and nightly, so the newest
+  // record is normally a day old at the most. The date is the commit's own, which is all a
+  // record carries; its figures were measured within hours of it.
+  const STALE_AFTER_DAYS = 2;
+  function measuredOn(latest, now) {
+    const hours = recordAgeHours(latest, now);
+    if (hours === null || !latest.commit) return { html: "", stale: false };
+    const stale = hours > STALE_AFTER_DAYS * 24;
+    return {
+      stale,
+      html: `Measured on <a href="https://github.com/${REPO}/commit/${esc(latest.commit)}">` +
+        `<code>main@${esc(String(latest.commit).slice(0, 8))}</code></a>, committed ` +
+        `${new Date(latest.date).toISOString().slice(0, 10)} (${agoWords(hours)}).` +
+        (stale ? " Nothing newer has been recorded since." : ""),
+    };
+  }
   // <<< measurement summary
 
   function rawUrl(file) {
@@ -751,10 +831,13 @@ ceiling) fails the build rather than merely being recorded.
     ].join("");
 
     if (latest) {
-      document.getElementById("pq-asof").innerHTML =
-        `Latest measurement on <code>main</code>: ` +
-        `<a href="https://github.com/${REPO}/commit/${esc(latest.commit)}">${esc(String(latest.commit).slice(0, 8))}</a>, ` +
-        `${new Date(latest.date).toLocaleString()}. A line recorded on an older commit says which.`;
+      // The commit the newest figures are from and how old it is (measuredOn). It used to give
+      // the commit and its date in the reader's locale, with nothing to say the date was a week
+      // ago when it was.
+      const measured = measuredOn(latest, Date.now());
+      const asof = document.getElementById("pq-asof");
+      asof.innerHTML = `${measured.html} A line recorded on an older commit says which.`;
+      if (measured.stale) asof.className = "pq-asof pq-asof-stale";
     }
   }
 

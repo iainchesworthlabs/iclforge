@@ -159,6 +159,35 @@ class Main(unittest.TestCase):
         self.assertNotIn("::warning", out)
         self.assertNotIn("::error", out)
 
+    def test_a_commit_already_recorded_is_not_recorded_again(self):
+        """The nightly run and a dispatch on main measure a commit the run after its merge
+        may have recorded already: the series keeps one point a commit, and a second run
+        adds only the leg the first did not have."""
+        write_leg(self.results, "linux", [[row("ac3", 1.0)]])
+        self.run_main()
+        write_leg(self.results, "linux", [[row("ac3", 1.1)]])
+        write_leg(self.results, "arm", [[row("ac3", 3.0)]])
+        rc, out, verdict = self.run_main()
+        self.assertEqual(rc, 0)
+        recs = [json.loads(line) for line in self.history.read_text().splitlines()]
+        self.assertEqual([(r["leg"], r["ms_per_frame"]) for r in recs],
+                         [("linux", 1.0), ("arm", 3.0)])
+        self.assertIn("Appended 1 record(s)", out)
+        self.assertIn("(1 already recorded for abc)", out)
+        # The output file holds a line for each of the two runs: the last is this one's.
+        self.assertEqual(verdict.splitlines()[-1], "hard_regression=false")
+
+    def test_a_repeated_run_is_judged_against_what_came_before_its_commit(self):
+        """Its own earlier record is not part of its baseline: with it the mean would be
+        1.17 and a doubling would read as +71%, a warning, the second time."""
+        self.seed([1.0] * 5)
+        write_leg(self.results, "linux", [[row("ac3", 2.0)]])
+        self.run_main()
+        _, out, verdict = self.run_main()
+        self.assertIn("::error title=Performance trend hard regression::linux/ac3", out)
+        self.assertEqual(verdict.splitlines()[-1], "hard_regression=true")
+        self.assertEqual(len(self.history.read_text().splitlines()), 6)
+
     def test_emit_output_is_a_noop_locally(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             aph.emit_github_output("x", "y")   # must not raise

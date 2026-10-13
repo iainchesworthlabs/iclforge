@@ -757,6 +757,41 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.assertIn("dd67c646", asof)
         self.assertNotIn("Updated on every merge", asof)
 
+    def test_both_surfaces_say_which_commit_the_figures_are_from_and_how_old_it_is(self):
+        """A reader could not tell a week-old figure from the day's.
+
+        The home page's strip had no date on it at all, and the page's footer gave the commit's
+        date in the reader's locale with nothing to say how long ago that was: main was red for
+        over a day from 2026-10-12 and both went on showing the last figures recorded.
+        """
+        self.fixture()  # every series on c0ffee, committed 2026-09-30T00:00:00Z
+        for flags in ((), ("--page",)):
+            with self.subTest(surface="page" if flags else "strip"):
+                fresh = self.render_json(*flags, "--now", "2026-09-30T13:20:00Z")
+                self.assertIn("Measured on main@c0ffee, committed 2026-09-30 (13 hours ago).",
+                              fresh["asof"])
+                self.assertNotIn("Nothing newer", fresh["asof"])
+                self.assertFalse(fresh["stale"])
+                old = self.render_json(*flags, "--now", "2026-10-09T06:00:00Z")
+                self.assertIn("committed 2026-09-30 (9 days ago). "
+                              "Nothing newer has been recorded since.", old["asof"])
+                self.assertTrue(old["stale"])
+
+    def test_the_figures_are_stale_after_two_days_and_not_at_two(self):
+        """Speed, memory and the gate are recorded after merges and nightly: the newest record
+        is normally a day old at the most, and hours are said up to two days."""
+        self.fixture()
+        at_two = self.render_json("--now", "2026-10-02T00:30:00Z")
+        self.assertIn("(2 days ago).", at_two["asof"])
+        self.assertFalse(at_two["stale"])
+        before = self.render_json("--now", "2026-10-01T23:30:00Z")
+        self.assertIn("(47 hours ago).", before["asof"])
+        after = self.render_json("--now", "2026-10-02T01:30:00Z")
+        self.assertIn("(2 days ago). Nothing newer has been recorded since.", after["asof"])
+        self.assertTrue(after["stale"])
+        within = self.render_json("--now", "2026-09-30T00:20:00Z")
+        self.assertIn("(within the last hour).", within["asof"])
+
     def test_a_codec_with_no_rows_says_so_on_its_own_line(self):
         self.fixture()
         self.write("performance-main", [perf("plain_51", 4.0)])
@@ -796,9 +831,10 @@ class HistoryAndMainTest(unittest.TestCase):
                 {"leg": "ac4-20-speech-128", "min_snr_db": 38.1, "mos_lqo": 4.39}]
         self.assertEqual(badges.ac4_quality(rows)["streams"], 2)
 
-    def test_main_writes_four_badges(self):
+    def test_main_writes_five_badges(self):
         (self.dir / "performance-dev.jsonl").write_text(json.dumps(
-            {"commit": "x", "config": "plain_51", "ms_per_frame": 4.0,
+            {"commit": "0123456789abcdef", "commit_date": "2026-10-12T02:09:14Z",
+             "config": "plain_51", "ms_per_frame": 4.0,
              "real_time_budget_ms_per_frame": 32.0}) + "\n")
         code, out = self.run_main()
         self.assertEqual(code, 0)
@@ -810,6 +846,37 @@ class HistoryAndMainTest(unittest.TestCase):
             self.assertEqual(data["message"], badges.NO_DATA)
             self.assertEqual(data["color"], badges.GREY)
         self.assertIn(f"{badges.LABELS['speed']} = AC-3 5.1 encode: 8x", out)
+        # The fifth names the commit of the one series that has rows.
+        measured = json.loads((self.dir / "badges" / "measured.json").read_text())
+        self.assertEqual(measured["message"], "speed: 2026-10-12 main@01234567")
+        self.assertEqual(measured["color"], badges.INFO)
+
+    def test_the_measured_badge_names_each_commit_the_figures_are_from(self):
+        """A figure on a badge has no date, and the series are written by different jobs.
+
+        On 2026-10-13 the README's speed and memory figures were 136 merges behind main and the
+        AC-4 half of its accuracy figure was from 2026-10-02, with nothing there to say so.
+        """
+        def rows(commit, date):
+            return [{"commit": commit, "commit_date": date}]
+
+        message = badges.measured_badge([
+            ("speed", rows("ce0e099dbfc8", "2026-10-12T02:09:14Z")),
+            ("memory", rows("ce0e099dbfc8", "2026-10-12T02:09:14Z")),
+            ("accuracy", rows("df7ddcdeea75", "2026-10-12T14:26:46Z")),
+            ("AC-4 accuracy", rows("dd67c64615a3", "2026-10-02T06:26:42Z")),
+        ])["message"]
+        self.assertEqual(
+            message,
+            "speed, memory: 2026-10-12 main@ce0e099d | accuracy: 2026-10-12 main@df7ddcde | "
+            "AC-4 accuracy: 2026-10-02 main@dd67c646")
+
+    def test_the_measured_badge_leaves_out_a_series_with_no_rows(self):
+        only = badges.measured_badge([("speed", []), ("accuracy", [{"commit": "abcdef0123"}])])
+        # No date on the record: the commit alone, and no stray space before it.
+        self.assertEqual(only["message"], "accuracy: main@abcdef01")
+        nothing = badges.measured_badge([("speed", []), ("memory", [{"leg": "no commit"}])])
+        self.assertEqual((nothing["message"], nothing["color"]), (badges.NO_DATA, badges.GREY))
 
     def test_main_reads_ac4_quality_from_its_own_file(self):
         (self.dir / "ac4-quality-dev.jsonl").write_text(json.dumps(
