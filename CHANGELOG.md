@@ -4343,6 +4343,13 @@ The sections below contain the complete change list and fixes.
   libraries. In the support catalogue Hearth's window has seven pages, the ESP32-P4 has one
   download row for each of its two images where it had two for one, and the AC-4 cells for the
   ESP32-S3 and C6 say what a board measured.
+- **The ESP32 boards have a testing and benchmarking page.**
+  [Testing and benchmarking the ESP32 boards](docs/platforms/bare-metal/board-bench.md) says what
+  is tested on the host, under QEMU and in CI and in which lane, and what needs a board; how the
+  play suite holds a board to its baseline, with the tolerance and what a mismatch means; what a
+  baseline file holds and when one kept under an earlier profile hash is accepted or recorded
+  again; the decode time of each board and codec from the five baselines of 2026-10-12; the bench
+  tools; and the hazards met on the boards, each with where it was learned.
 - The performance and quality pages say which codecs their series cover, and name AC-4's scoring
   scripts and the local race against DEE. AC-4 joined the series afterwards (see Verification and
   CI), decode quality first.
