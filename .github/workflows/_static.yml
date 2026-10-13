@@ -70,6 +70,18 @@ jobs:
         shell: pwsh
         run: ./tools/checks/check_platform_macros.ps1 -Root $PWD
 
+      # The {fmt}-not-<format> rule (CONTRIBUTING.md, "Code conventions"; cmake/Fmt.cmake). NDK
+      # r26's libc++ has no usable <format> but a desktop standard library does, so a std::format
+      # compiles on every desktop leg and breaks only where an NDK build reaches the file - and
+      # some of the files that had one (the Hearth take recorder, the forge CLI) are in no NDK
+      # build at all. This fails the include and each std::format/std::print name in first-party
+      # C++ instead, in seconds, ungated like platform-macros above. Its own suite runs in the
+      # Oracle unit tests step below.
+      - name: Check first-party C++ formats with fmt, not std::format or std::print
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 tools/checks/check_no_std_format.py
+
       # Internal consistency of packaging/ (vcpkg port, Homebrew, winget, Conan), plus a
       # latest-tag advisory (manifest bump automation) - see the script's own header for the split
       # between the two and why only the first one fails the job. fetch-depth: 0, unlike

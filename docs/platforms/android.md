@@ -30,7 +30,7 @@ enabled, and that build (which carries the key) must never leave the user's own 
 
 ## Build and run
 
-An Android SDK with **NDK 26.1.10909125** and **CMake 3.31.6** installed (`local.properties` →
+An Android SDK with **NDK 28.2.13676358** (r28c) and **CMake 3.31.6** installed (`local.properties` →
 `sdk.dir`), plus a Shield TV reachable over the network or USB:
 
 ```bash
@@ -61,7 +61,7 @@ project the desktop tools build from.
 
 ## Toolchain
 
-**NDK r26.1.10909125**, pinned explicitly in `app/build.gradle.kts` rather than left to "whichever
+**NDK r28c (28.2.13676358)**, pinned explicitly in `app/build.gradle.kts` rather than left to "whichever
 NDK Gradle resolves" — a build failure should mean something changed, not that a different NDK got
 silently picked. CMake **3.31.6** (the closest available match in the SDK manager's package
 repository to the root project's declared `3.28...4.3` range; there is no 3.28.x package for
@@ -69,19 +69,21 @@ Android). `ANDROID_STL=c++_shared` — the app's `iclforge::ac3`/`iclforge::audi
 linked into one shared object (`iclforge_jni.so`), and a static STL would duplicate global state
 (locale, iostream init) if anything else in the process ever pulled in libc++ too.
 
-The r26 pin also reaches into the library itself: r26's bundled libc++ does not implement
-`<format>` at all unless the compiler is invoked with `-fexperimental-library`, which nothing in
-this project's Android build passes. Rather than avoiding formatted output file by file to route
-around that, the whole project uses [{fmt}](https://github.com/fmtlib/fmt) — `fmt::format`/
-`fmt::print` in place of `std::format`/`std::print` everywhere — since {fmt} has no
-such gap (see `cmake/Fmt.cmake` and `CONTRIBUTING.md`'s code-conventions section). That single
-choice is also what lets `iclforge::containers::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
+The pin used to be r26b, and that reached into the library itself: r26's bundled libc++ (LLVM 17)
+does not implement `<format>` at all unless the compiler is invoked with `-fexperimental-library`.
+Rather than avoiding formatted output file by file to route around that, the whole project uses
+[{fmt}](https://github.com/fmtlib/fmt) — `fmt::format`/`fmt::print` in place of
+`std::format`/`std::print` everywhere — since {fmt} has no such gap (see `cmake/Fmt.cmake` and
+`CONTRIBUTING.md`'s code-conventions section). r28c's libc++ (LLVM 19) has `<format>` and `<print>`
+without the flag; the convention stays, because it is one formatting library on every toolchain,
+the macOS wheel's deployment target included, and not a per-toolchain split. That single choice is
+also what lets `iclforge::containers::mp4`'s HLS/DASH signaling helpers build for Android at all; see the
 note in `apps/demos/android/app/src/main/cpp/CMakeLists.txt` for why this app still doesn't link them
 regardless (it never muxes a file).
 
-The same libc++ implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
-overloads — a gap {fmt} does not close, since {fmt} only formats text *out*, the same direction
-`std::format` goes. Library code that has to turn text *into* a `double` therefore uses `strtod`
+The libc++ still implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
+overloads (r28c included, measured) — a gap {fmt} does not close, since {fmt} only formats text *out*,
+the same direction `std::format` goes. Library code that has to turn text *into* a `double` therefore uses `strtod`
 instead (`libs/ac3/src/encoder/plan.cpp`, `encoder/assignment.cpp`,
 `libs/objects/src/scene_text.hpp`, which also serves the object-scene file formats' parsing —
 the write side of that same file goes through `fmt::format`, like everything else, once {fmt}
@@ -89,8 +91,21 @@ made that safe). The macOS wheel's own deployment target has the identical `from
 (`'from_chars' is unavailable: introduced in macOS 26.0`) — {fmt}'s own vendored formatting avoids
 the matching `to_chars` gap there (`'to_chars' is unavailable: introduced in macOS 13.3`) that a
 raw `std::format` call would hit — so this leg and **Build wheels (macos-latest)** are the two
-that catch a *parsing* regression; a *formatting* one shows up everywhere, same as any other
-compile error.
+that catch a *parsing* regression. A *formatting* one is a `std::format` or `std::print`, which
+every desktop standard library compiles, so `tools/checks/check_no_std_format.py` fails it in the
+static job instead.
+
+What r28c has that r26b did not, measured by compiling one translation unit per feature against both
+(2026-10-13): `std::format` and `std::print` (r26 only behind `-fexperimental-library`, and only
+`format`), `std::ranges::contains` and `fold_left`, `std::expected::transform`, `std::mdspan`, a correct `std::ranges::binary_search` (r26b's answers
+true for every value between the first element and the last, llvm-project#61160), a
+`std::expected` whose has-value flag survives a trivially copyable payload with tail padding
+(llvm-project#68552 and #70494, android/ndk#1963: r27 has half the fix, r28 both), and Clang 19's
+P2718R0, which keeps a range-for's temporaries alive to the end of the loop. What it still does not
+have: floating-point `from_chars`, `std::views::enumerate`, `std::flat_map`, `std::atomic_ref`, and
+`std::jthread` / `std::stop_token` without `-fexperimental-library` (the header is there; the
+types are behind the flag, which nothing here passes: `libs/audio/src/backend/android/monitor.cpp`
+keeps its own stop flag).
 
 `minSdk = 26` (Oreo) is a hard floor, not a target: `monitor.cpp` depends on AAudio outright, which
 does not exist below API 26, and there is no fallback path. Real Shield TV hardware (2017 model
@@ -101,7 +116,7 @@ the app. The debug build type also builds `x86_64`, for the emulator the CI test
 
 ### `std::expected` and tail padding
 
-NDK r26's libc++ is LLVM 17's, and its `std::expected<T, E>` keeps the has-value flag in the tail
+NDK r26's libc++ is LLVM 17's, and its `std::expected<T, E>` kept the has-value flag in the tail
 padding of the payload when the ABI lets it: a trivially copyable `T` (or `E`) with a byte or more
 of padding after its last member that is not a POD for the purpose of layout, which a default
 member initialiser or a `std::optional` member is enough to make it. The converting constructor
@@ -110,7 +125,9 @@ sets the flag and then copies the payload in, `sizeof(T)` bytes, padding include
 comes back as a value. A Shield showed it: `std::expected<FrameMetadata, EditError>`, what
 `read_frame_metadata()` and the metadata editor return, lost its value in ten `iclforge-ac3-tests`
 cases, and, through `AnimatedValue`, in five `iclforge-containers-tests` ones (IAMF parameter
-blocks); nothing on a desktop did, where the library is LLVM 18 or later or libstdc++.
+blocks); nothing on a desktop did, where the library is LLVM 18 or later or libstdc++. The pin is
+r28c now and none of this happens on it; what follows is what was found, kept for the next
+toolchain.
 
 | | |
 |---|---|
@@ -120,20 +137,21 @@ blocks); nothing on a desktop did, where the library is LLVM 18 or later or libs
 | r27 (clang-r522817) | the flag is set after the value, which cures the lost value; the type still reuses the padding |
 | r28 (clang-r530567) | both fixed; `expected` has no tail padding of its own |
 
-The build therefore turns the attribute that causes it into a no-op, for an Android build with a
-Clang older than 19: `cmake/LibcxxExpectedLayout.cmake` adds
-`cmake/toolchains/android.libcxx17-expected-layout.h` to every C++ translation unit, which empties
-libc++'s `_LIBCPP_NO_UNIQUE_ADDRESS`, so the flag sits after the union. The root `CMakeLists.txt`
-includes the module, and so do the two Gradle wrappers (the root's `add_subdirectory()` does not
-reach a wrapper's own targets, and an inline function that returns a `std::expected` is compiled
-into every translation unit that calls it, so a call site without the option would lay the type
-out another way than the library does). The configure step asks the compiler whether the option
-took, and fails when it did not. Every other toolchain returns from the module at once.
+Between the discovery and the move to r28c the build turned the attribute that causes it into a
+no-op, for an Android build with a Clang older than 19: a module, `cmake/LibcxxExpectedLayout.cmake`
+(in the history of this file's PR, #1514), force-included a header that emptied libc++'s
+`_LIBCPP_NO_UNIQUE_ADDRESS` into every translation unit, so the flag sat after the union. It had to
+reach the Gradle wrappers' own targets as well as the root's, because an inline function that
+returns a `std::expected` is compiled into every translation unit that calls it and a call site
+without the option would have laid the type out another way than the library did. r28c needs
+none of it. What stays is `cmake/AndroidNdkMinimum.cmake`, which refuses an Android Clang older
+than 19 (`-DICLFORGE_ALLOW_OLD_NDK=ON` to reproduce one of the above on purpose), so that an old
+NDK in somebody's `ANDROID_NDK_HOME` is an error at configure and not a failed test on a device.
 
-What it holds the tree to is `iclforge-base-tests`'s `[expected]` cases, which build a payload in
-storage whose padding is set to `0x00` and to `0xFF` and return it, copy it, assign it, swap it
-and emplace it. Built for arm64 and pushed to a device they fail without the option and pass with
-it; `build-android-arm64` links the binary, so CI sees the configure check and not the run.
+What holds the tree to the behaviour is `iclforge-base-tests`'s `[expected]` cases, which build a
+payload in storage whose padding is set to `0x00` and to `0xFF` and return it, copy it, assign it,
+swap it and emplace it. Built for arm64 and pushed to a device they failed on r26 and pass on
+r28c; `build-android-arm64` links the binary, and the run is a device's.
 
 How the set of affected types was found, for the next toolchain: compile with
 `-Xclang -fdump-record-layouts`, take each `std::expected<...>` record, and look at where
@@ -143,13 +161,11 @@ vector, a string or a smart pointer, so are not trivially copyable and are copie
 and eight, in seven payload types, are the ones at risk: `io::FrameMetadata`, `ac4::FrameInfo`, `containers::iamf::AnimatedValue`,
 `sendspin::BurstChunk` and `sendspin::pairing_messages::ClientPairInit`, and three that are private
 to a translation unit (`io::Ac3Syncinfo`, `PresentationShape`, `base::detail::WavFormat`). With the
-option applied none is.
+layout option applied none was, and on r28c the flag still sits in the padding (the layout is the
+same) and is safe.
 
-Delete the module, the header and the three `include()` lines that name them when the NDK pin
-reaches r28.
-
-The same device run found two more gaps that are not `std::expected`, and that are corrected in the
-source and not by an option:
+The same device run found two more gaps that are not `std::expected`, and that were corrected in
+the source (r28c has both right, so the corrections are no longer load-bearing and cost nothing):
 
 - **`std::ranges::binary_search` answers true for every value between the first element and the
   last** (r26 only; [llvm-project#61160](https://github.com/llvm/llvm-project/issues/61160), a
@@ -213,7 +229,7 @@ So the backend is split, unlike the other three:
 its object signer) and `iclforge::audio` and not the AC-4 library
 (`libs/ac4`). The wrapper `CMakeLists.txt` leaves `ICLFORGE_BUILD_AC4` at its
 default, on, so the NDK build compiles the library and holds its sources to building under
-NDK r26 (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
+the pinned NDK (`tools/checks/test_ac4_build_configurations.py` holds it to that default), and nothing
 calls them. The live encode loop makes E-AC-3 only. The `play_file` diagnostic (below) replays
 E-AC-3 files only, and refuses a file that does not open with an AC-3 or E-AC-3 syncframe, an
 AC-4 file included. The app never asks the passthrough sink for AC-4.
@@ -791,7 +807,7 @@ adb -s <shield-ip>:5555 install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s <shield-ip>:5555 shell am start -n com.iclforge.shield/.MainActivity
 ```
 
-`local.properties` needs `sdk.dir` pointing at an Android SDK with NDK 26.1.10909125 and CMake
+`local.properties` needs `sdk.dir` pointing at an Android SDK with NDK 28.2.13676358 and CMake
 3.31.6 installed (via Android Studio's SDK Manager, or `sdkmanager --install`). For a local *signed*
 build, also drop a `signing.key` asset into `app/src/main/assets/` as described in
 [Object signing](#object-signing).
@@ -802,7 +818,7 @@ The Shield app's Gradle wrapper has no vcpkg, so it leaves `ICLFORGE_BUILD_HEART
 build `libs/sendspin`. A CMake preset does, under the same NDK:
 
 ```bash
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 cmake --preset config-android-arm64
 cmake --build --preset build-android-arm64
 ```
@@ -870,7 +886,7 @@ The app builds alongside the desktop packages rather than only ever being hand-b
 `.github/workflows/_build.yml`'s `build-android` job builds the **debug** variant in every run in
 which the Android lane runs: the nightly run, and the run after a merge that changes
 `apps/demos/android/` (no Android SDK/NDK setup beyond what `ubuntu-latest` ships plus an explicit
-`sdkmanager` install of the exact NDK version, `26.1.10909125`, the same "don't trust whatever the
+`sdkmanager` install of the exact NDK version, `28.2.13676358`, the same "don't trust whatever the
 image happens to cache" reasoning every other toolchain step in that workflow already follows) — a
 smoke test proving the Gradle/CMake/NDK toolchain and every native source file still build. A
 change to `src/` reaches it in the nightly run. **Object signing in CI reaches the debug APK

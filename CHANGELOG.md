@@ -3902,6 +3902,24 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Android: NDK r28c**
+
+- **Every Android build is pinned to NDK r28c (28.2.13676358), up from r26b (26.1.10909125).** The
+  two Gradle apps' `ndkVersion`, the four `sdkmanager` installs and the `ANDROID_NDK_HOME` of
+  `_build.yml` and `codeql.yml`, `tools/ci/regenerate_android_locks.sh`, the preset's text and
+  docs/platforms/android.md. r26's libc++ (LLVM 17) was what put a `std::expected` payload's
+  has-value flag in the payload's tail padding and then copied the payload over it
+  (llvm-project#68552 and #70494, android/ndk#1963: r27 has half the fix, r28 both), answered true
+  from `std::ranges::binary_search` for every value between the first element and the last
+  (llvm-project#61160), and ended a range-for's temporaries before its first iteration; r28c's
+  clang 19.0.1 and libc++ 19 have all three right. `cmake/LibcxxExpectedLayout.cmake`, the header
+  it force-included and the three `include()` lines that named them are removed, and
+  `cmake/AndroidNdkMinimum.cmake` makes an Android Clang older than 19 a configure error
+  (`-DICLFORGE_ALLOW_OLD_NDK=ON` to override), so an old NDK in `ANDROID_NDK_HOME` fails at
+  configure and not on a device. What r28c adds is measured in docs/platforms/android.md; what it
+  still lacks is floating-point `from_chars` (`strtod` stays) and `std::jthread`/`std::stop_token`
+  without `-fexperimental-library`. {fmt} stays the one formatting library on every toolchain.
+
 **Shared code**
 
 - **The picture of a CD+G disc is shared code, `apps/shared/cdg-picture`.** Hearth's picture item
@@ -4343,6 +4361,13 @@ The sections below contain the complete change list and fixes.
   libraries. In the support catalogue Hearth's window has seven pages, the ESP32-P4 has one
   download row for each of its two images where it had two for one, and the AC-4 cells for the
   ESP32-S3 and C6 say what a board measured.
+- **The ESP32 boards have a testing and benchmarking page.**
+  [Testing and benchmarking the ESP32 boards](docs/platforms/bare-metal/board-bench.md) says what
+  is tested on the host, under QEMU and in CI and in which lane, and what needs a board; how the
+  play suite holds a board to its baseline, with the tolerance and what a mismatch means; what a
+  baseline file holds and when one kept under an earlier profile hash is accepted or recorded
+  again; the decode time of each board and codec from the five baselines of 2026-10-12; the bench
+  tools; and the hazards met on the boards, each with where it was learned.
 - The performance and quality pages say which codecs their series cover, and name AC-4's scoring
   scripts and the local race against DEE. AC-4 joined the series afterwards (see Verification and
   CI), decode quality first.
@@ -4412,27 +4437,36 @@ The sections below contain the complete change list and fixes.
 **Android: `std::expected` no longer loses a payload that has tail padding**
 
 - **NDK r26's libc++ overwrote the has-value flag of a `std::expected` whose payload is trivially
-  copyable and has tail padding; the build now keeps the flag out of the padding.** libc++ 17
+  copyable and has tail padding; the build kept the flag out of the padding until the pin moved to
+  r28c (see "Android: NDK r28c" under Changed).** libc++ 17
   puts the flag in the payload's tail padding and then copies `sizeof(T)` bytes, padding included,
   over it, so `return meta;` came back as "no value, error 0" and an error whose padding held a
   non-zero byte came back as a value. On a Shield that was `read_frame_metadata()`,
   `edit_stream_metadata()` and `insert_stream_metadata()` (ten `iclforge-ac3-tests` cases);
   nothing on a desktop shows it. llvm-project#68552 and #70494, android/ndk#1963: NDK r27 has half
   the fix and r28 both, and none of r26's point releases has either.
-  `cmake/LibcxxExpectedLayout.cmake`, which the root and both Gradle wrappers include, adds
-  `cmake/toolchains/android.libcxx17-expected-layout.h` to every C++ translation unit of an Android
-  build with a Clang older than 19, and checks at configure time that the layout changed. The
-  audit of what was exposed (39 of 227 `std::expected` specializations the Android-reachable
+  `cmake/LibcxxExpectedLayout.cmake` added a header to every C++ translation unit of an Android
+  build with a Clang older than 19 and checked at configure time that the layout changed; r28c
+  made it unnecessary and it is gone. The audit of what was exposed (39 of 227 `std::expected` specializations the Android-reachable
   libraries instantiate had the flag in padding; eight, in seven payload types, were trivially
   copyable) and the way to repeat it are in docs/platforms/android.md. `iclforge-base-tests`
-  gains the `[expected]` cases, which fail on r26 without the option; `build-android-arm64` links
-  that binary now. Delete the module with the NDK r26 pin.
+  gains the `[expected]` cases, which failed on r26 without the option; `build-android-arm64`
+  links that binary.
 - **Two other r26 gaps the same device run found.** `std::ranges::binary_search` in r26's libc++
   answers true for every value between the first and last element (llvm-project#61160), which made
   every frame between the first named AC-4 I-frame and the last an I-frame:
   `ac4::Encoder` uses `std::binary_search`, the same answer everywhere else. And Clang 17 ends a
   range-for's temporaries before its first iteration (P2718R0 is Clang 19), which left eleven
   `iclforge-containers-tests` cases iterating a freed vector: the test binds the optional first.
+
+**{fmt} everywhere: the last two `std::format` users, and a check that keeps it so**
+
+- **`take_recorder.cpp` and `atmos.cpp` formatted with the standard library's `<format>`, which
+  NDK r26's libc++ lacks and every desktop leg compiles without a word.** Both use `fmt::format`
+  now, with the output byte for byte what it was (the take's `.take.json` and the `atmos-encode`
+  verbose `object N: ch0 x0.500` line are pinned by tests that passed on the old code first), and
+  `tools/checks/check_no_std_format.py` fails `#include <format>`, `#include <print>` and every
+  `std::format`/`std::print` name in first-party C++ in the static job.
 
 **Forge GUI Karaoke flow: a part of another length**
 
@@ -4444,6 +4478,19 @@ The sections below contain the complete change list and fixes.
   shorter part holds its last sample for the rest of the programme", in the seven catalogues too.
   The encoding is unchanged, held by the owner's decision; a part that should fall silent after its
   end has to be given as long as the backing.
+
+**Hearth: the empty queue's hint and the first-run dialog**
+
+- **The Play page's hint for an empty queue was cut off at both ends.** Its second line, "Drop AC-3,
+  E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here.", is longer than the queue
+  column is wide, and the text kept its own width, centred on the list, which clips it: "E-AC-3 or
+  AC-4 files (raw, MP4, Matroska or MPEG-T" was what showed in a window of the default size. The
+  hint is now as wide as the list and wraps inside it, at every text size and with the window
+  mirrored for a language written right to left.
+- **The first-run dialog said the output name is "at the top right"; it is beside the title, before
+  the page buttons**, which is the left of the window, and the right of it only in Arabic, Hebrew
+  and Yiddish, where the window is mirrored. The dialog now says "at the top of the window", which
+  holds in both. The six catalogues carry the new sentence; none had a translation of the old one.
 
 **Footprint probes: the E-AC-3 fold fixtures expect the -3 dB levels**
 
