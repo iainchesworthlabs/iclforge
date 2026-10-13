@@ -553,9 +553,9 @@
           ""
         ],
         "android": [
-          "unavailable",
-          "not-applicable",
-          ""
+          "development",
+          "hardware",
+          "Hearth for Android sink: AC-3 and E-AC-3 passed to the receiver"
         ],
         "esp32": [
           "source",
@@ -801,9 +801,9 @@
           ""
         ],
         "android": [
-          "unavailable",
-          "not-applicable",
-          ""
+          "development",
+          "hardware",
+          "Hearth for Android, an Android TV sink: AC-3 and E-AC-3 passed to the receiver, karaoke lyrics on screen; one Shield run; built from source"
         ],
         "esp32": [
           "source",
@@ -1421,11 +1421,11 @@
           ]
         ],
         [
-          "Hearth",
+          "Hearth for Android (Sendspin sink)",
           [
-            "unavailable",
-            "not-applicable",
-            ""
+            "development",
+            "hardware",
+            "AC-3 and E-AC-3 from a Hearth server passed to the receiver, karaoke lyrics on screen; no decoding on the device yet; CI builds a debug APK, no release carries one"
           ]
         ],
         [
@@ -1903,7 +1903,7 @@
         "Encode `bsmod=voiceover` at 3/0 to 3/2; probe; decode as an aware decoder (`karaoke`) or a capable one (`karaoke=none|v1|v2|v1+v2`)",
         "A Karaoke flow builds a stream from a backing, a guide melody and one or two vocals, and plays it under each reproduction before saving",
         "No",
-        "Desktop: the Karaoke page with the listener's choice of vocals, word-timed lyrics, a full-screen singer view, and a microphone with a pitch score and takes"
+        "Desktop: the Karaoke page with the listener's choice of vocals, word-timed lyrics, a full-screen singer view, and a microphone with a pitch score and takes; the Android TV sink shows the lyrics"
       ],
       [
         "AC-4 decode",
@@ -1967,7 +1967,7 @@
         "Yes",
         "Yes",
         "Output policy",
-        "Desktop engine"
+        "The Android TV sink; the desktop engine has it and the window does not open it"
       ],
       [
         "Sendspin network playback",
@@ -1975,7 +1975,7 @@
         "Test server only",
         "No",
         "No",
-        "Desktop engine and ESP32 sink"
+        "Desktop engine, ESP32 sinks and the Android TV sink"
       ]
     ]
   },
@@ -2269,6 +2269,16 @@
       "action": "Read the browser package guide",
       "url": "platforms/wasm/",
       "note": "iclforge-wasm-decoder has not been published to npm."
+    },
+    {
+      "product": "Hearth",
+      "platform": "Android",
+      "variant": "Android TV arm64 (NVIDIA Shield)",
+      "state": "development",
+      "artifact": "No package; a debug APK built from source",
+      "action": "Read Hearth for Android",
+      "url": "hearth/android/",
+      "note": "Hearth for Android is a Sendspin sink: a Hearth server sends it AC-3 or E-AC-3, it passes the stream to the receiver and shows karaoke lyrics. It does not decode on the device yet, and no release carries an APK."
     },
     {
       "product": "Shield Atmos Demo",

@@ -197,7 +197,9 @@ decoder and has a page of its own.
 The Network page lists the Sendspin players Hearth finds on the network. A Hearth sink takes the
 coded stream itself; any other Sendspin player takes PCM that Hearth has decoded.
 
-1. **Find.** Sinks appear by themselves; **Look again** asks the network once more.
+1. **Find.** Sinks appear by themselves; **Look again** asks the network once more. A sink can be
+   an ESP32 board running `hearth_sink`, an Android TV box running
+   [Hearth for Android](android.md), or any other Sendspin player.
 2. **Pair.** Select a sink and press **Pair with this computer**. The sink shows a six-digit code,
    new for each attempt, on its own web page and on its serial console; type it in. Pairing makes a
    key that both keep, and after it the sink takes streams from Hearth without a code.
@@ -209,8 +211,8 @@ coded stream itself; any other Sendspin player takes PCM that Hearth has decoded
 A paired Hearth sink has a settings view with three tabs: **Speakers**, for the sink's own layout
 and trims; **Decoder**, for its decoder settings and for whether audio decoded here reaches it as
 PCM or as Opus; and **Firmware**, which shows the image it is running and updates it over the
-network. The sink guides have the detail: [ESP32-S3](sink-esp32-s3.md), [ESP32-C6](sink-esp32-c6.md),
-[ESP32-P4](sink-esp32-p4.md) and [sink firmware](sink-firmware.md).
+network. The sink guides have the detail: [ESP32-S3](sink-esp32-s3.md),
+[ESP32-C6](sink-esp32-c6.md), [ESP32-P4](sink-esp32-p4.md) and [sink firmware](sink-firmware.md).
 
 A sink another server holds, such as one Music Assistant holds, shows as in use by another server,
 with a **Take it back** button.
