@@ -195,6 +195,14 @@ class MicrophoneController : public QObject {
     Q_INVOKABLE bool deleteTake(const QString& path);
     // Where takes go: a folder URL from a dialog, or a path. Kept.
     Q_INVOKABLE void setTakesFolder(const QString& urlOrPath);
+    // The takes folder a capture names (main.cpp, --shot and --smoke-shot): the default's own
+    // shape under a home that is nobody's - C:/Users/you/Documents/Hearth takes on Windows - so
+    // that a picture of the card carries no account's name. Nothing is made there: a capture
+    // never turns a microphone on.
+    [[nodiscard]] static QString capture_takes_folder();
+    // Keeps that folder in the settings store in use, which a capture has just pointed at a
+    // scratch one of its own. Called before the controller that reads it exists.
+    static void keep_capture_takes_folder();
 
     // The item playing, and which part to take the reference from ("m", "v1", "v2" or "" for the
     // first present). An empty path closes the microphone: nothing is playing to sing along to.

@@ -581,6 +581,16 @@ void MicrophoneController::setTakesFolder(const QString& urlOrPath) {
     refreshTakes();
 }
 
+QString MicrophoneController::capture_takes_folder() {
+    // Beside the person's own home, in one named for nobody: /home/you, /Users/you, C:/Users/you.
+    const QDir homes = QFileInfo(QDir::homePath()).dir();
+    return QDir::cleanPath(homes.filePath(QStringLiteral("you/Documents/Hearth takes")));
+}
+
+void MicrophoneController::keep_capture_takes_folder() {
+    kept().setValue(QStringLiteral("microphone/takesFolder"), capture_takes_folder());
+}
+
 void MicrophoneController::limit_take_bytes_for_test(std::uint64_t bytes) {
     state_data_->session.limit_take_bytes(bytes);
 }

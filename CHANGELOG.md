@@ -4488,6 +4488,13 @@ The sections below contain the complete change list and fixes.
   `KaraokePage::test_nothingOnThePageRunsPastItsEdges` checks the page's edges and each card's,
   and `MicrophoneCard::test_the_rows_fit_a_narrow_card_and_a_wide_one` the card alone. No string
   changed.
+- **A capture names a takes folder that is nobody's.** The Microphone card says where takes go,
+  which by default is a folder under the person's own documents: right for the person, and the
+  account's name in a screenshot. `hearth --shot` and `--smoke-shot`, which already run on a
+  scratch settings store and show no first-run dialog, now start that store with a takes folder
+  under a home named for nobody (`C:/Users/you/Documents/Hearth takes` on Windows), so the page
+  can be photographed for the documentation. Nothing is made there, and an ordinary launch is
+  unchanged.
 
 **Forge GUI Karaoke flow: a part of another length**
 
