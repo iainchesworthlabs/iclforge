@@ -48,12 +48,14 @@
 // say - into frame before the grab; there is no scroll-to-item helper, just a
 // raw pixel offset into the tab area's own Flickable, so finding the right
 // value is trial and error against a local build. project=<file.forgeproj>
-// opens a project as File > Open does, and karaokeStep=parts|levels|hear|save
-// then goes to that step of the Karaoke flow (the grab waits for Hear to build
-// its stream), which is how the Karaoke flow is shot with parts in it:
+// opens a project as the window's own Open does, and
+// karaokeStep=parts|levels|hear|save then goes to that step of the Karaoke flow
+// (the grab waits for Hear to build its stream), which is how the Karaoke flow
+// is shot with parts in it. On one line:
 //
-//   forge-gui --smoke-shot hear.png \
-//       project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=hear
+//   forge-gui --smoke-shot hear.png project=<example>.forgeproj karaokeStep=hear
+//
+// where <example> is examples/karaoke/auld-lang-syne/auld-lang-syne.
 //
 // Both --smoke and --smoke-record fail unless every channel the routing FEEDS
 // has its needle leave the floor, so --smoke-record against a silent endpoint
