@@ -4317,6 +4317,13 @@ The sections below contain the complete change list and fixes.
   the five cases of `decode.spec.js` pass; a page that drops its document on a refused file fails
   the new seek check.
 
+**Forge GUI user guide: the Karaoke page's note on the length warning**
+
+- **The Karaoke page no longer says the window's warning reads "padded with silence".** The
+  note was added with the take recipe, while the warning said a shorter part is padded with
+  silence and the window and `forge encode` hold its last sample. The warning now says what is
+  done, so the page's bullet states the behaviour and nothing else.
+
 **Lyrics on a board**
 
 - **The P4 panel's footer counted a line that only marks a time.** A lyric file that ends with a
