@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -68,6 +69,25 @@ std::vector<std::uint8_t> read_all(const fs::path& path) {
 std::string read_text(const fs::path& path) {
     const auto bytes = read_all(path);
     return std::string(bytes.begin(), bytes.end());
+}
+
+// The clock's whole seconds since 1970-01-01T00:00:00Z (the system clock's epoch since C++20).
+std::int64_t unix_seconds() {
+    return std::chrono::duration_cast<std::chrono::seconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+// Days from 1970-01-01 to a civil date (Howard Hinnant's days_from_civil), so that a stamp can be
+// read back without <chrono>'s calendar types or the C library's gmtime.
+std::int64_t days_from_civil(int year, unsigned month, unsigned day) {
+    year -= month <= 2 ? 1 : 0;
+    const int era = (year >= 0 ? year : year - 399) / 400;
+    const auto year_of_era = static_cast<unsigned>(year - era * 400);
+    const unsigned day_of_year = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1;
+    const unsigned day_of_era =
+        year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    return static_cast<std::int64_t>(era) * 146097 + static_cast<std::int64_t>(day_of_era) - 719468;
 }
 
 std::int32_t quantised(float v) {
@@ -195,6 +215,72 @@ TEST_CASE("take recorder: a start that is not known is null, not zero", "[take]"
     const auto info = recorder.finish({});
     REQUIRE(info.has_value());
     CHECK(read_text(info->sidecar).find("\"item_start_ms\": null") != std::string::npos);
+}
+
+TEST_CASE("take recorder: the description is exactly this text, field by field", "[take]") {
+    Folder folder;
+    TakeRecorder recorder;
+    REQUIRE(recorder.begin(folder.path() / "four.flac", kRate).has_value());
+    // 1000 frames at 48 kHz are 0.0208333... s, which "seconds" writes rounded, as 0.021.
+    REQUIRE(recorder.write(std::vector<float>(1000, 0.25F)));
+    TakeMetadata metadata;
+    metadata.item_path = "songs/a.ac3";
+    // A control byte is written as \u00XX in lower-case hex: 0x01 and 0x1b (octal 001 and 033).
+    metadata.item_title = "A\001\033C";
+    metadata.item_start_ms = -1250;
+    metadata.input_delay_ms = 130;
+    metadata.offset_ms = -20;
+    metadata.reference = "vocal 1";
+    metadata.headphones = true;
+    const auto first = unix_seconds();
+    const auto info = recorder.finish(metadata);
+    const auto last = unix_seconds();
+    REQUIRE(info.has_value());
+    std::string json = read_text(info->sidecar);
+
+    // created_utc is the one field that depends on the clock: it is read for its shape (UTC, to
+    // the second, "Z" at the end) and for falling between two readings of the clock, then taken
+    // out so that everything else is compared as one exact text.
+    const std::string key = "\"created_utc\": \"";
+    const auto at = json.find(key);
+    REQUIRE(at != std::string::npos);
+    const std::string stamp = json.substr(at + key.size(), 20);
+    REQUIRE(stamp.size() == 20);
+    const std::string shape = "dddd-dd-ddTdd:dd:ddZ";
+    for (std::size_t i = 0; i < shape.size(); ++i) {
+        INFO("stamp " << stamp << ", character " << i);
+        CHECK((shape[i] == 'd' ? std::isdigit(static_cast<unsigned char>(stamp[i])) != 0
+                               : stamp[i] == shape[i]));
+    }
+    const auto field = [&](std::size_t from) { return std::stoi(stamp.substr(from, 2)); };
+    const std::int64_t written =
+        days_from_civil(std::stoi(stamp.substr(0, 4)), static_cast<unsigned>(field(5)),
+                        static_cast<unsigned>(field(8))) *
+            86400 +
+        field(11) * 3600 + field(14) * 60 + field(17);
+    INFO("stamp " << stamp << " = " << written << ", clock " << first << " to " << last);
+    CHECK(written >= first);
+    CHECK(written <= last);
+    json.replace(at + key.size(), stamp.size(), "<stamp>");
+
+    CHECK(json ==
+          "{\n"
+          "  \"format\": \"iclforge-take-1\",\n"
+          "  \"audio\": \"four.flac\",\n"
+          "  \"dry_voice\": true,\n"
+          "  \"sample_rate\": 48000,\n"
+          "  \"channels\": 1,\n"
+          "  \"bit_depth\": 24,\n"
+          "  \"frames\": 1000,\n"
+          "  \"seconds\": 0.021,\n"
+          "  \"created_utc\": \"<stamp>\",\n"
+          "  \"item\": {\"path\": \"songs/a.ac3\", \"title\": \"A\\u0001\\u001bC\"},\n"
+          "  \"item_start_ms\": -1250,\n"
+          "  \"alignment\": {\"input_delay_ms\": 130, \"offset_ms\": -20, \"timing_estimated\": "
+          "false},\n"
+          "  \"reference\": \"vocal 1\",\n"
+          "  \"headphones\": true\n"
+          "}\n");
 }
 
 TEST_CASE("take recorder: the folder is made, and a discarded take leaves nothing", "[take]") {

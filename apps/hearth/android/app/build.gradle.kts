@@ -66,9 +66,9 @@ android {
         }
     }
 
-    // NDK r26.1, pinned as the Shield app pins it: a build failure means something changed, not
+    // NDK r28c, pinned as the Shield app pins it: a build failure means something changed, not
     // that a different NDK was picked.
-    ndkVersion = "26.1.10909125"
+    ndkVersion = "28.2.13676358"
 
     signingConfigs {
         if (releaseSigningAvailable) {

@@ -549,6 +549,8 @@ reports no profile, and `verify` fails it under `identity`.
 started from any shell, Git Bash included. It reads the ESP-IDF location and the build root from
 `tools/hearth/bench.json`, which describes the project's own bench; the environment variable
 `ICLFORGE_BENCH` names another file of the same form for another machine.
+[Testing and benchmarking the ESP32 boards](board-bench.md#the-bench-tools) covers that tool and
+the rest of the bench.
 
 ## Changing a profile
 
@@ -586,7 +588,8 @@ moved in a list, a new default for a locked key, and a new key.
 `s3-n16r8-ac4`, `c6-16mb`, `p4-rev1` and `p4-rev1-ac4`. A baseline is a recorded run of the board
 suite (`tools/hearth/board_suite.py`): the figures of a fixed list of plays on that profile's
 image, and the board's boot line. `c6-4mb` and `p4-rev3` have none, because no bench board runs
-them.
+them. [Testing and benchmarking the ESP32 boards](board-bench.md#the-play-suite) describes the
+suite, its tolerances and how a baseline is recorded.
 
 Each baseline carries the hash of the profile it was recorded under, and an edit to the profile
 changes the hash. A test fails the pull request until it does one of two things for every
@@ -617,6 +620,8 @@ to the file. The `ESP32 profiles` job picks the new profile up from `sink_profil
   is the design record, with the board suite, its tolerances and each baseline's figures.
 - [The firmware's README](https://github.com/iainchesworthlabs/iclforge/blob/main/firmware/hearth-sink/README.md#build-profiles)
   has the generated profile table and everything else about `hearth_sink`.
+- [Testing and benchmarking the ESP32 boards](board-bench.md) covers what is tested where, the
+  play suite, the baselines and the bench tools.
 - [Sink firmware](../../hearth/sink-firmware.md) covers installing a release image and updating a
   board over its network.
 - [Bare metal](index.md) is the overview of the parts.

@@ -52,6 +52,9 @@ C6 / S3 / P4 sink modules on one dual-ES9080 PCB, are on
   configuration?** [ESP32 build profiles](build-profiles.md) has the locked configuration of each
   board, the guard CI holds a build to, the commands to build a board from its profile, and what a
   change to one has to carry.
+- **Changing the ESP32 firmware, or a decoder it links?**
+  [Testing and benchmarking the boards](board-bench.md) says what is tested on the host, under
+  QEMU and in CI, what needs a board, and how a board's plays are held to a recorded baseline.
 
 ## Where to go next
 

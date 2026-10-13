@@ -92,6 +92,10 @@ A target can sit at different levels for different things, and several do. macOS
 under the second level while its process tap sits at the fourth. Read the platform page before
 depending on any of it.
 
+For the ESP32 boards, [Testing and benchmarking the ESP32 boards](bare-metal/board-bench.md) says
+which checks run on the host, under QEMU and in CI, which need a board, and what the boards
+measured.
+
 ## Codec detail
 
 [Capabilities and limitations](../library/capabilities.md) lists every coding mode, layout,
