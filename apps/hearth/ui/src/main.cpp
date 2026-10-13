@@ -111,6 +111,7 @@
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QTranslator>
 #include <QUrl>
 #include <QVariantMap>
 
@@ -334,6 +335,19 @@ int main(int argc, char** argv) {
         for (const auto& [key, value] : command_line.settings) {
             scratch.setValue(key, value);
         }
+    }
+
+    // English plural forms. A plural message holds one of its two English forms in the source
+    // and Qt takes the other from a catalogue, which for English is hearth_en.qm
+    // (assets/translations/hearth_en.ts: the plural messages and nothing else). The language
+    // manager installs no translator for English, so this one is installed here, and FIRST:
+    // the translator installed last is asked first, so whichever language the person chose
+    // answers every message it has and this one answers the rest, in English, with the form the
+    // count needs. A build whose Qt has no PLURALS_TS_FILE has no such resource and shows the
+    // source's form for every count.
+    QTranslator english_plurals;
+    if (english_plurals.load(QStringLiteral(":/i18n/hearth_en.qm"))) {
+        app.installTranslator(&english_plurals);
     }
 
     QQmlApplicationEngine engine;

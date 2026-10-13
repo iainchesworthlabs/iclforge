@@ -6,6 +6,7 @@
 #include <QSysInfo>
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <unordered_set>
 #include <utility>
@@ -49,6 +50,16 @@ namespace {
 namespace forge = iclforge::sendspin::player;
 
 constexpr int kPollMs = 60;
+
+// The `n` of a plural tr(). Qt reads a negative one as "no count" and leaves
+// the %n in the text, and what a sink reports is not ours to trust, so the
+// count is held to what an int can carry.
+[[nodiscard]] int plural_count(std::int32_t n) {
+    return std::max<std::int32_t>(n, 0);
+}
+[[nodiscard]] int plural_count(std::uint64_t n) {
+    return static_cast<int>(std::min<std::uint64_t>(n, std::numeric_limits<int>::max()));
+}
 
 // NetworkController::set_network_discovery(); read by start() on the GUI
 // thread only.
@@ -366,12 +377,10 @@ struct LayoutFields {
         const forge::DecoderReport& decoder = *facts.iclforge_state->decoder;
         const QString data_type = QString::fromStdString(std::string(forge::data_type_name(decoder.data_type)))
                                        .toUpper();
-        stream_text = QObject::tr("%1 · %2%3 · %4 substream%5")
+        stream_text = QObject::tr("%1 · %2%3 · %n substreams", "", plural_count(decoder.substreams))
                           .arg(data_type == QStringLiteral("EAC3") ? QStringLiteral("E-AC-3") : QStringLiteral("AC-3"))
                           .arg(acmod_text(decoder.acmod))
-                          .arg(decoder.lfe ? QStringLiteral(" + LFE") : QString())
-                          .arg(decoder.substreams)
-                          .arg(decoder.substreams == 1 ? QString() : QStringLiteral("s"));
+                          .arg(decoder.lfe ? QStringLiteral(" + LFE") : QString());
         objects_text = decoder.objects == 0
                            ? QObject::tr("none")
                            : QObject::tr("%1 carried · %2").arg(decoder.objects).arg(decoder.objects_placed
@@ -386,7 +395,7 @@ struct LayoutFields {
     map[QStringLiteral("lyricsText")] = sink_lyrics_text(facts);
 
     const forge::Counters counters = facts.iclforge_state ? facts.iclforge_state->counters : forge::Counters{};
-    map[QStringLiteral("playedText")] = QObject::tr("%1 bursts").arg(counters.bursts_played);
+    map[QStringLiteral("playedText")] = QObject::tr("%n bursts", "", plural_count(counters.bursts_played));
     map[QStringLiteral("problemsText")] = QObject::tr("%1 underruns · %2 late · %3 dropped · %4 invalid")
                                                .arg(counters.underruns)
                                                .arg(counters.late_chunks)

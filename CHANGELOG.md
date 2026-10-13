@@ -1075,8 +1075,10 @@ The sections below contain the complete change list and fixes.
   `test_translations.cpp` reads Hearth's six files with the rules it
   applies to Crucible's (nothing unfinished or dead, nothing empty, placeholders and brand terms
   kept, one source set), and a new or reworded string now fails it until its six entries are
-  filled. Six strings that English builds by gluing `s` or `ies` onto a count cannot be translated
-  as written; their renderings leave that placeholder out and the test names the six
+  filled. Ten messages that carry a count (six of them built English plurals by gluing `s` or
+  `ies` on) are plural messages, so each language has the forms it needs, six in Arabic, and
+  `1 item` and `2 items` are right in English, from a seventh file, `hearth_en.ts`, that holds only
+  those; the test no longer lets any string leave a placeholder out
   ([Languages](docs/hearth/index.md#languages)).
 - **The Network page says whether a board holds lyrics and which line it is on.** The sink report
   has a Lyrics row: "not offered" for a board that lists no lyric commands, "none held", "held,

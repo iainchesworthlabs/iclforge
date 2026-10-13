@@ -2203,19 +2203,9 @@
         <translation>قائمة التحرير</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="342"/>
-        <source>%1 entr%2</source>
-        <translation>الإدخالات: %1</translation>
-    </message>
-    <message>
         <location filename="../qml/Media.qml" line="348"/>
         <source>dec3</source>
         <translation>dec3</translation>
-    </message>
-    <message>
-        <location filename="../qml/Media.qml" line="355"/>
-        <source>data rate %1 kbit/s · %2 independent substream%3, %4 dependent · bsid %5 · %6%7</source>
-        <translation>معدل البيانات %1 kbit/s · البثوث الفرعية المستقلة: %2، التابعة: %4 · bsid %5 · %6%7</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="363"/>
@@ -2473,6 +2463,32 @@
         <location filename="../qml/Media.qml" line="887"/>
         <source>#</source>
         <translation>#</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="346"/>
+        <source>%n entries</source>
+        <extracomment>How many edits an MP4 track&apos;s edit list holds, beside the label &apos;Edit list&apos;.</extracomment>
+        <translation>
+            <numerusform>%n إدخالات</numerusform>
+            <numerusform>%n إدخال</numerusform>
+            <numerusform>إدخالان</numerusform>
+            <numerusform>%n إدخالات</numerusform>
+            <numerusform>%n إدخالًا</numerusform>
+            <numerusform>%n إدخال</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="359"/>
+        <source>data rate %1 kbit/s · %n independent substreams, %2 dependent · bsid %3 · %4%5</source>
+        <extracomment>The dec3 box of an MP4 track. %n counts the independent substreams; %2 is the number of dependent ones.</extracomment>
+        <translation>
+            <numerusform>معدل البيانات %1 kbit/s · %n بثوث فرعية مستقلة، التابعة: %2 · bsid %3 · %4%5</numerusform>
+            <numerusform>معدل البيانات %1 kbit/s · %n بث فرعي مستقل، التابعة: %2 · bsid %3 · %4%5</numerusform>
+            <numerusform>معدل البيانات %1 kbit/s · بثّان فرعيان مستقلّان، التابعة: %2 · bsid %3 · %4%5</numerusform>
+            <numerusform>معدل البيانات %1 kbit/s · %n بثوث فرعية مستقلة، التابعة: %2 · bsid %3 · %4%5</numerusform>
+            <numerusform>معدل البيانات %1 kbit/s · %n بثًّا فرعيًّا مستقلًّا، التابعة: %2 · bsid %3 · %4%5</numerusform>
+            <numerusform>معدل البيانات %1 kbit/s · %n بث فرعي مستقل، التابعة: %2 · bsid %3 · %4%5</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="546"/>
@@ -3751,10 +3767,18 @@
         <source>On this network</source>
         <translation>على هذه الشبكة</translation>
     </message>
-    <message>
-        <location filename="../qml/NetworkSinkList.qml" line="46"/>
-        <source>%1 found · %2 group%3</source>
-        <translation>المكتشَف: %1 · المجموعات: %2</translation>
+    <message numerus="yes">
+        <location filename="../qml/NetworkSinkList.qml" line="47"/>
+        <source>%1 found · %n groups</source>
+        <extracomment>Beside the heading &apos;On this network&apos;. %1 is how many sinks were found on it; %n counts the groups made of them.</extracomment>
+        <translation>
+            <numerusform>المكتشَف: %1 · %n مجموعات</numerusform>
+            <numerusform>المكتشَف: %1 · %n مجموعة</numerusform>
+            <numerusform>المكتشَف: %1 · مجموعتان</numerusform>
+            <numerusform>المكتشَف: %1 · %n مجموعات</numerusform>
+            <numerusform>المكتشَف: %1 · %n مجموعةً</numerusform>
+            <numerusform>المكتشَف: %1 · %n مجموعة</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkList.qml" line="58"/>
@@ -3940,11 +3964,6 @@
 <context>
     <name>NetworkSinkSpeakers</name>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="50"/>
-        <source>%1 speaker%2 reaches no slot and will not be heard.</source>
-        <translation>مكبرات الصوت التي لا تصل إلى أي فتحة ولن تُسمع: %1.</translation>
-    </message>
-    <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="58"/>
         <source>✓ Every speaker reaches a slot, and every slot has one.</source>
         <translation>✓ يصل كل مكبّر صوت إلى فتحة، ولكل فتحة مكبّر.</translation>
@@ -3954,20 +3973,30 @@
         <source> and </source>
         <translation> و </translation>
     </message>
-    <message>
+    <message numerus="yes">
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="50"/>
+        <source>%n speakers reach no slot and will not be heard.</source>
+        <translation>
+            <numerusform>%n مكبرات صوت لا تصل إلى أي فتحة ولن تُسمع.</numerusform>
+            <numerusform>مكبر صوت واحد لا يصل إلى أي فتحة ولن يُسمع.</numerusform>
+            <numerusform>مكبرا صوت لا يصلان إلى أي فتحة ولن يُسمعا.</numerusform>
+            <numerusform>%n مكبرات صوت لا تصل إلى أي فتحة ولن تُسمع.</numerusform>
+            <numerusform>%n مكبر صوت لا يصل إلى أي فتحة ولن يُسمع.</numerusform>
+            <numerusform>%n مكبر صوت لا يصل إلى أي فتحة ولن يُسمع.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <location filename="../qml/NetworkSinkSpeakers.qml" line="63"/>
-        <source>✓ Every speaker reaches a slot. Slot%1 %2 %3 silent.</source>
-        <translation>✓ يصل كل مكبّر صوت إلى فتحة. الفتحات الصامتة: %2.</translation>
-    </message>
-    <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="64"/>
-        <source>is</source>
-        <translation>هي</translation>
-    </message>
-    <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="64"/>
-        <source>are</source>
-        <translation>هي</translation>
+        <source>✓ Every speaker reaches a slot. Slots %1 are silent.</source>
+        <extracomment>%n is how many slots are silent; %1 names them, as &apos;7&apos; or &apos;7, 8 and 9&apos;.</extracomment>
+        <translation>
+            <numerusform>✓ يصل كل مكبّر صوت إلى فتحة. الفتحات %1 صامتة.</numerusform>
+            <numerusform>✓ يصل كل مكبّر صوت إلى فتحة. الفتحة %1 صامتة.</numerusform>
+            <numerusform>✓ يصل كل مكبّر صوت إلى فتحة. الفتحتان %1 صامتتان.</numerusform>
+            <numerusform>✓ يصل كل مكبّر صوت إلى فتحة. الفتحات %1 صامتة.</numerusform>
+            <numerusform>✓ يصل كل مكبّر صوت إلى فتحة. الفتحات %1 صامتة.</numerusform>
+            <numerusform>✓ يصل كل مكبّر صوت إلى فتحة. الفتحات %1 صامتة.</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="81"/>
@@ -4373,11 +4402,6 @@
 <context>
     <name>PlayPage</name>
     <message>
-        <location filename="../qml/PlayPage.qml" line="79"/>
-        <source>%1 items</source>
-        <translation>العناصر: %1</translation>
-    </message>
-    <message>
         <location filename="../qml/PlayPage.qml" line="98"/>
         <source>%1 ch</source>
         <translation>%1 قناة</translation>
@@ -4424,11 +4448,6 @@
         <location filename="../qml/PlayPage.qml" line="132"/>
         <source> JOC</source>
         <translation> JOC</translation>
-    </message>
-    <message>
-        <location filename="../qml/PlayPage.qml" line="137"/>
-        <source> bed + %1 objects</source>
-        <translation> طبقة أساسية + %1 كائن</translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="152"/>
@@ -4506,6 +4525,30 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../qml/PlayPage.qml" line="482"/>
         <source>No output device chosen yet</source>
         <translation>لم يُختر جهاز إخراج بعد</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PlayPage.qml" line="79"/>
+        <source>%n items</source>
+        <translation>
+            <numerusform>%n عناصر</numerusform>
+            <numerusform>%n عنصر</numerusform>
+            <numerusform>عنصران</numerusform>
+            <numerusform>%n عناصر</numerusform>
+            <numerusform>%n عنصرًا</numerusform>
+            <numerusform>%n عنصر</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PlayPage.qml" line="137"/>
+        <source> bed + %n objects</source>
+        <translation>
+            <numerusform> طبقة أساسية + %n كائنات</numerusform>
+            <numerusform> طبقة أساسية + %n كائن</numerusform>
+            <numerusform> طبقة أساسية + كائنان</numerusform>
+            <numerusform> طبقة أساسية + %n كائنات</numerusform>
+            <numerusform> طبقة أساسية + %n كائنًا</numerusform>
+            <numerusform> طبقة أساسية + %n كائن</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="485"/>
@@ -4742,10 +4785,17 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <source>dialnorm −%1: %2 dB down%3</source>
         <translation>dialnorm −%1: أقل بمقدار %2 ديسيبل%3</translation>
     </message>
-    <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="80"/>
-        <source> · %1 objects</source>
-        <translation> · %1 كائن</translation>
+    <message numerus="yes">
+        <location filename="../qml/PlaySignalPathCard.qml" line="81"/>
+        <source> · %n objects</source>
+        <translation>
+            <numerusform> · %n كائنات</numerusform>
+            <numerusform> · %n كائن</numerusform>
+            <numerusform> · كائنان</numerusform>
+            <numerusform> · %n كائنات</numerusform>
+            <numerusform> · %n كائنًا</numerusform>
+            <numerusform> · %n كائن</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/PlaySignalPathCard.qml" line="108"/>
@@ -4894,10 +4944,29 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <source>not reported</source>
         <translation>غير مبلَّغ عنه</translation>
     </message>
-    <message>
-        <location filename="../../src/network_controller.cpp" line="369"/>
-        <source>%1 · %2%3 · %4 substream%5</source>
-        <translation>%1 · %2%3 · البثوث الفرعية: %4</translation>
+    <message numerus="yes">
+        <location filename="../../src/network_controller.cpp" line="380"/>
+        <source>%1 · %2%3 · %n substreams</source>
+        <translation>
+            <numerusform>%1 · %2%3 · %n بثوث فرعية</numerusform>
+            <numerusform>%1 · %2%3 · %n بث فرعي</numerusform>
+            <numerusform>%1 · %2%3 · بثّان فرعيان</numerusform>
+            <numerusform>%1 · %2%3 · %n بثوث فرعية</numerusform>
+            <numerusform>%1 · %2%3 · %n بثًّا فرعيًّا</numerusform>
+            <numerusform>%1 · %2%3 · %n بث فرعي</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../../src/network_controller.cpp" line="398"/>
+        <source>%n bursts</source>
+        <translation>
+            <numerusform>%n دفعات</numerusform>
+            <numerusform>%n دفعة</numerusform>
+            <numerusform>دفعتان</numerusform>
+            <numerusform>%n دفعات</numerusform>
+            <numerusform>%n دفعةً</numerusform>
+            <numerusform>%n دفعة</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../../src/network_controller.cpp" line="377"/>
@@ -4918,11 +4987,6 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../../src/network_controller.cpp" line="380"/>
         <source>dialnorm %1</source>
         <translation>dialnorm %1</translation>
-    </message>
-    <message>
-        <location filename="../../src/network_controller.cpp" line="389"/>
-        <source>%1 bursts</source>
-        <translation>الدفعات: %1</translation>
     </message>
     <message>
         <location filename="../../src/network_controller.cpp" line="390"/>

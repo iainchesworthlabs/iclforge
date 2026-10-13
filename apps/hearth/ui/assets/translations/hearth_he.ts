@@ -2203,19 +2203,9 @@
         <translation>רשימת עריכה</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="342"/>
-        <source>%1 entr%2</source>
-        <translation>ערכים: %1</translation>
-    </message>
-    <message>
         <location filename="../qml/Media.qml" line="348"/>
         <source>dec3</source>
         <translation>dec3</translation>
-    </message>
-    <message>
-        <location filename="../qml/Media.qml" line="355"/>
-        <source>data rate %1 kbit/s · %2 independent substream%3, %4 dependent · bsid %5 · %6%7</source>
-        <translation>קצב נתונים %1 kbit/s · תת-זרמים בלתי תלויים: %2, תלויים: %4 · bsid %5 · %6%7</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="363"/>
@@ -2473,6 +2463,24 @@
         <location filename="../qml/Media.qml" line="887"/>
         <source>#</source>
         <translation>#</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="346"/>
+        <source>%n entries</source>
+        <extracomment>How many edits an MP4 track&apos;s edit list holds, beside the label &apos;Edit list&apos;.</extracomment>
+        <translation>
+            <numerusform>ערך אחד</numerusform>
+            <numerusform>%n ערכים</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="359"/>
+        <source>data rate %1 kbit/s · %n independent substreams, %2 dependent · bsid %3 · %4%5</source>
+        <extracomment>The dec3 box of an MP4 track. %n counts the independent substreams; %2 is the number of dependent ones.</extracomment>
+        <translation>
+            <numerusform>קצב נתונים %1 kbit/s · תת-זרם בלתי תלוי אחד, תלויים: %2 · bsid %3 · %4%5</numerusform>
+            <numerusform>קצב נתונים %1 kbit/s · %n תת-זרמים בלתי תלויים, תלויים: %2 · bsid %3 · %4%5</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="546"/>
@@ -3751,10 +3759,14 @@
         <source>On this network</source>
         <translation>ברשת הזו</translation>
     </message>
-    <message>
-        <location filename="../qml/NetworkSinkList.qml" line="46"/>
-        <source>%1 found · %2 group%3</source>
-        <translation>נמצאו: %1 · קבוצות: %2</translation>
+    <message numerus="yes">
+        <location filename="../qml/NetworkSinkList.qml" line="47"/>
+        <source>%1 found · %n groups</source>
+        <extracomment>Beside the heading &apos;On this network&apos;. %1 is how many sinks were found on it; %n counts the groups made of them.</extracomment>
+        <translation>
+            <numerusform>נמצאו: %1 · קבוצה אחת</numerusform>
+            <numerusform>נמצאו: %1 · %n קבוצות</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkList.qml" line="58"/>
@@ -3940,11 +3952,6 @@
 <context>
     <name>NetworkSinkSpeakers</name>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="50"/>
-        <source>%1 speaker%2 reaches no slot and will not be heard.</source>
-        <translation>רמקולים שאינם מגיעים לשום משבצת ולא יישמעו: %1.</translation>
-    </message>
-    <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="58"/>
         <source>✓ Every speaker reaches a slot, and every slot has one.</source>
         <translation>✓ כל רמקול מגיע למשבצת, ולכל משבצת יש רמקול.</translation>
@@ -3954,20 +3961,22 @@
         <source> and </source>
         <translation> ו- </translation>
     </message>
-    <message>
+    <message numerus="yes">
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="50"/>
+        <source>%n speakers reach no slot and will not be heard.</source>
+        <translation>
+            <numerusform>רמקול אחד אינו מגיע לשום משבצת ולא יישמע.</numerusform>
+            <numerusform>%n רמקולים אינם מגיעים לשום משבצת ולא יישמעו.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <location filename="../qml/NetworkSinkSpeakers.qml" line="63"/>
-        <source>✓ Every speaker reaches a slot. Slot%1 %2 %3 silent.</source>
-        <translation>✓ כל רמקול מגיע למשבצת. משבצות שותקות: %2.</translation>
-    </message>
-    <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="64"/>
-        <source>is</source>
-        <translation>היא</translation>
-    </message>
-    <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="64"/>
-        <source>are</source>
-        <translation>הן</translation>
+        <source>✓ Every speaker reaches a slot. Slots %1 are silent.</source>
+        <extracomment>%n is how many slots are silent; %1 names them, as &apos;7&apos; or &apos;7, 8 and 9&apos;.</extracomment>
+        <translation>
+            <numerusform>✓ כל רמקול מגיע למשבצת. משבצת %1 שותקת.</numerusform>
+            <numerusform>✓ כל רמקול מגיע למשבצת. משבצות %1 שותקות.</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="81"/>
@@ -4373,11 +4382,6 @@
 <context>
     <name>PlayPage</name>
     <message>
-        <location filename="../qml/PlayPage.qml" line="79"/>
-        <source>%1 items</source>
-        <translation>פריטים: %1</translation>
-    </message>
-    <message>
         <location filename="../qml/PlayPage.qml" line="98"/>
         <source>%1 ch</source>
         <translation>%1 ער&apos;</translation>
@@ -4424,11 +4428,6 @@
         <location filename="../qml/PlayPage.qml" line="132"/>
         <source> JOC</source>
         <translation> JOC</translation>
-    </message>
-    <message>
-        <location filename="../qml/PlayPage.qml" line="137"/>
-        <source> bed + %1 objects</source>
-        <translation> שכבת בסיס + %1 אובייקטים</translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="152"/>
@@ -4506,6 +4505,22 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../qml/PlayPage.qml" line="482"/>
         <source>No output device chosen yet</source>
         <translation>עדיין לא נבחר התקן פלט</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PlayPage.qml" line="79"/>
+        <source>%n items</source>
+        <translation>
+            <numerusform>פריט אחד</numerusform>
+            <numerusform>%n פריטים</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PlayPage.qml" line="137"/>
+        <source> bed + %n objects</source>
+        <translation>
+            <numerusform> שכבת בסיס + אובייקט אחד</numerusform>
+            <numerusform> שכבת בסיס + %n אובייקטים</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="485"/>
@@ -4742,10 +4757,13 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <source>dialnorm −%1: %2 dB down%3</source>
         <translation>dialnorm −%1: %2 dB פחות%3</translation>
     </message>
-    <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="80"/>
-        <source> · %1 objects</source>
-        <translation> · %1 אובייקטים</translation>
+    <message numerus="yes">
+        <location filename="../qml/PlaySignalPathCard.qml" line="81"/>
+        <source> · %n objects</source>
+        <translation>
+            <numerusform> · אובייקט אחד</numerusform>
+            <numerusform> · %n אובייקטים</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/PlaySignalPathCard.qml" line="108"/>
@@ -4894,10 +4912,21 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <source>not reported</source>
         <translation>לא דווח</translation>
     </message>
-    <message>
-        <location filename="../../src/network_controller.cpp" line="369"/>
-        <source>%1 · %2%3 · %4 substream%5</source>
-        <translation>%1 · %2%3 · תת-זרמים: %4</translation>
+    <message numerus="yes">
+        <location filename="../../src/network_controller.cpp" line="380"/>
+        <source>%1 · %2%3 · %n substreams</source>
+        <translation>
+            <numerusform>%1 · %2%3 · תת-זרם אחד</numerusform>
+            <numerusform>%1 · %2%3 · %n תת-זרמים</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../../src/network_controller.cpp" line="398"/>
+        <source>%n bursts</source>
+        <translation>
+            <numerusform>פרץ אחד</numerusform>
+            <numerusform>%n פרצים</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../../src/network_controller.cpp" line="377"/>
@@ -4918,11 +4947,6 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
         <location filename="../../src/network_controller.cpp" line="380"/>
         <source>dialnorm %1</source>
         <translation>dialnorm %1</translation>
-    </message>
-    <message>
-        <location filename="../../src/network_controller.cpp" line="389"/>
-        <source>%1 bursts</source>
-        <translation>פרצים: %1</translation>
     </message>
     <message>
         <location filename="../../src/network_controller.cpp" line="390"/>

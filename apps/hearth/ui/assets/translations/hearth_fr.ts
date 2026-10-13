@@ -2203,19 +2203,9 @@
         <translation>Liste d&apos;édition</translation>
     </message>
     <message>
-        <location filename="../qml/Media.qml" line="342"/>
-        <source>%1 entr%2</source>
-        <translation>entrées&#xa0;:&#xa0;%1</translation>
-    </message>
-    <message>
         <location filename="../qml/Media.qml" line="348"/>
         <source>dec3</source>
         <translation>dec3</translation>
-    </message>
-    <message>
-        <location filename="../qml/Media.qml" line="355"/>
-        <source>data rate %1 kbit/s · %2 independent substream%3, %4 dependent · bsid %5 · %6%7</source>
-        <translation>débit&#xa0;%1 kbit/s · sous-flux indépendants&#xa0;:&#xa0;%2, dépendants&#xa0;:&#xa0;%4 · bsid&#xa0;%5 ·&#xa0;%6%7</translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="363"/>
@@ -2473,6 +2463,24 @@
         <location filename="../qml/Media.qml" line="887"/>
         <source>#</source>
         <translation>#</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="346"/>
+        <source>%n entries</source>
+        <extracomment>How many edits an MP4 track&apos;s edit list holds, beside the label &apos;Edit list&apos;.</extracomment>
+        <translation>
+            <numerusform>%n entrée</numerusform>
+            <numerusform>%n entrées</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Media.qml" line="359"/>
+        <source>data rate %1 kbit/s · %n independent substreams, %2 dependent · bsid %3 · %4%5</source>
+        <extracomment>The dec3 box of an MP4 track. %n counts the independent substreams; %2 is the number of dependent ones.</extracomment>
+        <translation>
+            <numerusform>débit&#xa0;%1 kbit/s · %n sous-flux indépendant, dépendants&#xa0;:&#xa0;%2 · bsid&#xa0;%3 ·&#xa0;%4%5</numerusform>
+            <numerusform>débit&#xa0;%1 kbit/s · %n sous-flux indépendants, dépendants&#xa0;:&#xa0;%2 · bsid&#xa0;%3 ·&#xa0;%4%5</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/Media.qml" line="546"/>
@@ -3751,10 +3759,14 @@
         <source>On this network</source>
         <translation>Sur ce réseau</translation>
     </message>
-    <message>
-        <location filename="../qml/NetworkSinkList.qml" line="46"/>
-        <source>%1 found · %2 group%3</source>
-        <translation>Trouvés&#xa0;:&#xa0;%1 · groupes&#xa0;:&#xa0;%2</translation>
+    <message numerus="yes">
+        <location filename="../qml/NetworkSinkList.qml" line="47"/>
+        <source>%1 found · %n groups</source>
+        <extracomment>Beside the heading &apos;On this network&apos;. %1 is how many sinks were found on it; %n counts the groups made of them.</extracomment>
+        <translation>
+            <numerusform>Trouvés&#xa0;:&#xa0;%1 · %n groupe</numerusform>
+            <numerusform>Trouvés&#xa0;:&#xa0;%1 · %n groupes</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkList.qml" line="58"/>
@@ -3940,11 +3952,6 @@
 <context>
     <name>NetworkSinkSpeakers</name>
     <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="50"/>
-        <source>%1 speaker%2 reaches no slot and will not be heard.</source>
-        <translation>Haut-parleurs sans emplacement, donc inaudibles&#xa0;:&#xa0;%1.</translation>
-    </message>
-    <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="58"/>
         <source>✓ Every speaker reaches a slot, and every slot has one.</source>
         <translation>✓ Chaque haut-parleur atteint un emplacement, et chaque emplacement en a un.</translation>
@@ -3954,20 +3961,22 @@
         <source> and </source>
         <translation> et </translation>
     </message>
-    <message>
+    <message numerus="yes">
+        <location filename="../qml/NetworkSinkSpeakers.qml" line="50"/>
+        <source>%n speakers reach no slot and will not be heard.</source>
+        <translation>
+            <numerusform>%n haut-parleur n&apos;atteint aucun emplacement et ne sera pas entendu.</numerusform>
+            <numerusform>%n haut-parleurs n&apos;atteignent aucun emplacement et ne seront pas entendus.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <location filename="../qml/NetworkSinkSpeakers.qml" line="63"/>
-        <source>✓ Every speaker reaches a slot. Slot%1 %2 %3 silent.</source>
-        <translation>✓ Chaque haut-parleur atteint un emplacement. Emplacements silencieux&#xa0;:&#xa0;%2.</translation>
-    </message>
-    <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="64"/>
-        <source>is</source>
-        <translation>est</translation>
-    </message>
-    <message>
-        <location filename="../qml/NetworkSinkSpeakers.qml" line="64"/>
-        <source>are</source>
-        <translation>sont</translation>
+        <source>✓ Every speaker reaches a slot. Slots %1 are silent.</source>
+        <extracomment>%n is how many slots are silent; %1 names them, as &apos;7&apos; or &apos;7, 8 and 9&apos;.</extracomment>
+        <translation>
+            <numerusform>✓ Chaque haut-parleur atteint un emplacement. L&apos;emplacement %1 est silencieux.</numerusform>
+            <numerusform>✓ Chaque haut-parleur atteint un emplacement. Les emplacements %1 sont silencieux.</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/NetworkSinkSpeakers.qml" line="81"/>
@@ -4373,11 +4382,6 @@
 <context>
     <name>PlayPage</name>
     <message>
-        <location filename="../qml/PlayPage.qml" line="79"/>
-        <source>%1 items</source>
-        <translation>%1 éléments</translation>
-    </message>
-    <message>
         <location filename="../qml/PlayPage.qml" line="98"/>
         <source>%1 ch</source>
         <translation>%1 can.</translation>
@@ -4424,11 +4428,6 @@
         <location filename="../qml/PlayPage.qml" line="132"/>
         <source> JOC</source>
         <translation> JOC</translation>
-    </message>
-    <message>
-        <location filename="../qml/PlayPage.qml" line="137"/>
-        <source> bed + %1 objects</source>
-        <translation> lit +&#xa0;%1 objets</translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="152"/>
@@ -4506,6 +4505,22 @@ Déposez ici des fichiers AC-3, E-AC-3 ou AC-4 (bruts, MP4, Matroska ou MPEG-TS)
         <location filename="../qml/PlayPage.qml" line="482"/>
         <source>No output device chosen yet</source>
         <translation>Aucun périphérique de sortie choisi pour l&apos;instant</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PlayPage.qml" line="79"/>
+        <source>%n items</source>
+        <translation>
+            <numerusform>%n élément</numerusform>
+            <numerusform>%n éléments</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/PlayPage.qml" line="137"/>
+        <source> bed + %n objects</source>
+        <translation>
+            <numerusform> lit +&#xa0;%n objet</numerusform>
+            <numerusform> lit +&#xa0;%n objets</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/PlayPage.qml" line="485"/>
@@ -4742,10 +4757,13 @@ Déposez ici des fichiers AC-3, E-AC-3 ou AC-4 (bruts, MP4, Matroska ou MPEG-TS)
         <source>dialnorm −%1: %2 dB down%3</source>
         <translation>dialnorm −%1&#xa0;:&#xa0;%2 dB en moins%3</translation>
     </message>
-    <message>
-        <location filename="../qml/PlaySignalPathCard.qml" line="80"/>
-        <source> · %1 objects</source>
-        <translation> ·&#xa0;%1 objets</translation>
+    <message numerus="yes">
+        <location filename="../qml/PlaySignalPathCard.qml" line="81"/>
+        <source> · %n objects</source>
+        <translation>
+            <numerusform> ·&#xa0;%n objet</numerusform>
+            <numerusform> ·&#xa0;%n objets</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../qml/PlaySignalPathCard.qml" line="108"/>
@@ -4894,10 +4912,21 @@ Déposez ici des fichiers AC-3, E-AC-3 ou AC-4 (bruts, MP4, Matroska ou MPEG-TS)
         <source>not reported</source>
         <translation>non signalé</translation>
     </message>
-    <message>
-        <location filename="../../src/network_controller.cpp" line="369"/>
-        <source>%1 · %2%3 · %4 substream%5</source>
-        <translation>%1 ·&#xa0;%2%3 · sous-flux&#xa0;:&#xa0;%4</translation>
+    <message numerus="yes">
+        <location filename="../../src/network_controller.cpp" line="380"/>
+        <source>%1 · %2%3 · %n substreams</source>
+        <translation>
+            <numerusform>%1 ·&#xa0;%2%3 · %n sous-flux</numerusform>
+            <numerusform>%1 ·&#xa0;%2%3 · %n sous-flux</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../../src/network_controller.cpp" line="398"/>
+        <source>%n bursts</source>
+        <translation>
+            <numerusform>%n burst</numerusform>
+            <numerusform>%n bursts</numerusform>
+        </translation>
     </message>
     <message>
         <location filename="../../src/network_controller.cpp" line="377"/>
@@ -4918,11 +4947,6 @@ Déposez ici des fichiers AC-3, E-AC-3 ou AC-4 (bruts, MP4, Matroska ou MPEG-TS)
         <location filename="../../src/network_controller.cpp" line="380"/>
         <source>dialnorm %1</source>
         <translation>dialnorm %1</translation>
-    </message>
-    <message>
-        <location filename="../../src/network_controller.cpp" line="389"/>
-        <source>%1 bursts</source>
-        <translation>%1 bursts</translation>
     </message>
     <message>
         <location filename="../../src/network_controller.cpp" line="390"/>

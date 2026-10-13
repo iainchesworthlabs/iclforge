@@ -226,7 +226,7 @@ what they found. What they assert is that every entry has a translation, which i
 than that every translation is right — the review the glossary describes is what settles that, and
 arming these rules does not stand in for it.
 
-**Hearth's six catalogues** (`apps/hearth/ui/assets/translations/hearth_<code>.ts`, 1101 messages
+**Hearth's six catalogues** (`apps/hearth/ui/assets/translations/hearth_<code>.ts`, 1099 messages
 each) are held to the same six rules by the same file, in cases tagged `[hearth][translations]`,
 with Hearth's own list of names that are not translated (Hearth, Sendspin, Opus, IEC 61937,
 Matroska, mDNS, WiFi and the formats; `kHearthBrandTerms`). They were the one set of the three no
@@ -238,13 +238,16 @@ are Hearth's own:
 
 - **Plural forms.** `%n` and `%Ln` count as placeholders (as `%L1` counts as `%1`), and a plural
   entry needs every form non-empty, the other placeholders in each form, and the count in at
-  least one, since a form may spell out "one" in words. No message of the three apps is plural
-  yet; a case on a made-up catalogue shows the rule reading one correctly.
-- **Suffix placeholders.** Six sources make an English plural by appending a suffix that a
-  placeholder carries (`%1 entr%2`, `%2 group%3`, `Slot%1 %2 %3 silent`). No other language can
-  use that placeholder, so a translation of these may leave it out and the placeholder rule lets
-  exactly those do so (`kHearthSuffixPlaceholders`, which names the piece of the source and the
-  placeholder). Rewording one as a `%n` message removes it from the catalogue and from the list.
+  least one, since a form may spell out "one" in words. Ten messages of Hearth's window are
+  plural, each with the forms its language needs (Arabic six, the other five two, from Qt's own
+  table); a case on a made-up catalogue shows each way a plural entry can be wrong being caught.
+  A string carries no suffix placeholder: `%1 entr%2` is a mistake in the source, and its cure is
+  a `%n` message, not an exception in the gate.
+- **English's plural file.** `apps/hearth/ui/assets/translations/hearth_en.ts` holds the plural
+  messages and nothing else, two forms each, because Qt takes the form a count asks for from a
+  catalogue and the source holds only one. The lupdate target keeps it (`PLURALS_TS_FILE` in
+  `apps/hearth/ui/CMakeLists.txt`, which filters the file with `lconvert -pluralonly`), and one
+  case holds it to the same plural messages as the six, finished, in two non-empty forms.
 - **A floor on the count.** A file that parsed to a fragment would pass every rule above, so a
   case asks for more than 900 messages in each file.
 
