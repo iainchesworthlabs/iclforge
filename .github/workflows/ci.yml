@@ -732,8 +732,10 @@ jobs:
       # What the numbers were measured ON. ms/frame is hardware-relative in a
       # way the quality series' dB is not, so a hosted-image bump or a
       # differently-specced runner otherwise shows up as an unattributable step
-      # in the trend that nobody can distinguish from a code change. Recorded
-      # only - nothing compares against it.
+      # in the trend that nobody can distinguish from a code change. This
+      # runner is one of several CPU models from run to run, and the append
+      # step below judges a run against the records of its own model
+      # (append_performance_history.py's like_for_like_baseline).
       - name: Capture the measurement environment
         shell: bash
         env:
@@ -749,6 +751,15 @@ jobs:
           set -euo pipefail
           mkdir -p kernel-results/kernels-linux-gcc
           build/config-linux-gcc/bin/iclforge-kernelbench --json-out kernel-results/kernels-linux-gcc/kernels.json
+
+      # The same machine, said again in the kernel tree: each append script
+      # reads the machine from its own leg directory, and the kernel records
+      # are judged against their own CPU model's as the whole-frame ones are.
+      - name: Capture the kernel measurement environment
+        shell: bash
+        env:
+          LEG_DIR: kernel-results/kernels-linux-gcc
+        run: bash .github/scripts/capture-bench-environment.sh
 
       # Third results tree, same reasoning as the kernel one above: each
       # append script globs every *.json under its legs and requires its own

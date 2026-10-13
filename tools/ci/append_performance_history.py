@@ -32,6 +32,17 @@ thresholds are used here rather than quality-trend's fixed dB deltas,
 because ms/frame's absolute scale varies a lot across CI runner hardware in
 a way dB (already a log-relative unit) does not.
 
+A percentage does not make two machines comparable, though, and the hosted
+runner a leg is measured on is not one machine: `ubuntu-latest` was six CPU
+models in the six weeks to 2026-10-12, and in the last two days of them
+plain_51 read 2.07, 3.74 and 4.38 ms/frame on three, with nothing in the code
+to account for it. So the trailing mean is taken over the records measured on
+the SAME CPU model as the run being judged (`cpu_model`, which each record
+carries, from .github/scripts/capture-bench-environment.sh). When the history
+holds none from that model, or the run recorded no model, the mean is of
+every record, as it was before, and the annotation and the log say so - see
+MIN_SAME_CPU_RECORDS below for what that was measured to change.
+
 A (leg, config) already recorded for this commit is not recorded again, as
 in append_quality_history.py: the nightly run and a dispatch on main measure
 a commit the run after its merge may have measured already, and the series
@@ -66,6 +77,27 @@ REGRESSION_SLOWDOWN_FRACTION = 0.20
 # caught the ~8-28x regression this whole suite exists because of, with
 # enormous margin to spare.
 HARD_REGRESSION_SLOWDOWN_FRACTION = 1.0
+# How many earlier records of a series must be from the run's own CPU model
+# for the run to be judged against those alone; with fewer it is judged
+# against every machine's records, which is the comparison this rule replaces.
+#
+# One, the smallest number that is a comparison at all. Replayed over
+# performance-main.jsonl as it stood on 2026-10-13 (2 098 linux-gcc records
+# that name a CPU model, six models): the mean of every machine raised 118
+# soft warnings and no hard one. Like for like raised 11, every one of them
+# on "AMD EPYC 9V74 80-Core Processor", which runs at two speeds under one
+# name (3.74 and 4.82 ms/frame for plain_51). What is left is the fallback,
+# and it is the noisy path: 7 warnings with this at one, 9 at two, 13 at
+# three, 27 at five, while the 152 records that had only one or two earlier
+# ones from their own model raised none when judged against those. Timing
+# noise on a shared runner is one-sided (see load_leg_results), so a mean of
+# one sample can sit too slow and hide a regression for a run, but it does not
+# invent one; a mean across machines does both, by the 2.1x between them.
+MIN_SAME_CPU_RECORDS = 1
+# What a record carries when its machine was not named: no environment.json
+# for the leg (an older workflow, a local run), or a runner the capture script
+# could read no model name from.
+UNNAMED_CPU_MODELS = ("", "unknown")
 
 
 def load_leg_results(results_dir: Path):
@@ -167,9 +199,13 @@ def recorded_keys(history_path: Path, commit: str):
 
 
 def trailing_mean(history_path: Path, leg: str, config: str, window: int,
-                  exclude_commit=None):
+                  exclude_commit=None, cpu_model=None, min_records=1):
     """The records of `exclude_commit` are left out: a run is judged against
-    what came before its commit, not against an earlier run of the same one."""
+    what came before its commit, not against an earlier run of the same one.
+
+    Given a `cpu_model`, only the records measured on that model are taken,
+    however far back the last `window` of them reach. None when the series
+    has fewer than `min_records` to take."""
     if not history_path.exists():
         return None
     matches = []
@@ -179,12 +215,63 @@ def trailing_mean(history_path: Path, leg: str, config: str, window: int,
         rec = json.loads(line)
         if exclude_commit is not None and rec.get("commit") == exclude_commit:
             continue
+        if cpu_model is not None and rec.get("cpu_model") != cpu_model:
+            continue
         if rec.get("leg") == leg and rec.get("config") == config:
             matches.append(rec["ms_per_frame"])
-    if not matches:
+    if len(matches) < max(min_records, 1):
         return None
     tail = matches[-window:]
     return sum(tail) / len(tail)
+
+
+def like_for_like_baseline(history_path: Path, leg: str, config: str, cpu_model: str,
+                           exclude_commit=None):
+    """(the trailing mean a run is judged against, whether it is like for like).
+
+    Like for like is the mean of the series' records from the run's own CPU
+    model. Without MIN_SAME_CPU_RECORDS of those, or without a model to match,
+    it is the mean of every record of the series and the second value is
+    False; (None, False) when the series has no earlier record at all."""
+    if cpu_model not in UNNAMED_CPU_MODELS:
+        same = trailing_mean(history_path, leg, config, REGRESSION_TRAILING_WINDOW,
+                             exclude_commit=exclude_commit, cpu_model=cpu_model,
+                             min_records=MIN_SAME_CPU_RECORDS)
+        if same is not None:
+            return same, True
+    return trailing_mean(history_path, leg, config, REGRESSION_TRAILING_WINDOW,
+                         exclude_commit=exclude_commit), False
+
+
+def baseline_words(baseline: str, same_cpu: bool, cpu_model: str) -> str:
+    """What a slowdown is measured against, for an annotation: `baseline` is
+    the mean with its unit. A mean across machines says that it is one, and
+    why, because a slower machine reads against it as a slower build."""
+    if same_cpu:
+        return (f"the trailing {REGRESSION_TRAILING_WINDOW}-run mean on the same CPU model, "
+                f"{cpu_model} ({baseline})")
+    why = ("this run recorded no CPU model" if cpu_model in UNNAMED_CPU_MODELS else
+           f"too few earlier records are from this run's CPU model, {cpu_model}, to compare "
+           "with those alone")
+    return (f"the trailing {REGRESSION_TRAILING_WINDOW}-run mean of every machine ({baseline}; "
+            f"{why}, so a difference between machines reads here as a change)")
+
+
+def note_judged(judged: dict, leg: str, cpu_model: str, baseline, same_cpu: bool) -> None:
+    """Counts one series of a leg under what it was judged against."""
+    counts = judged.setdefault((leg, cpu_model), {"same": 0, "every": 0, "none": 0})
+    counts["none" if baseline is None else "same" if same_cpu else "every"] += 1
+
+
+def report_judged(judged: dict) -> None:
+    """One log line a leg, flagged or not: a run judged against every machine's
+    records is one whose silence means less, and the log is where that shows."""
+    for (leg, cpu_model), counts in sorted(judged.items()):
+        machine = ("no CPU model recorded" if cpu_model in UNNAMED_CPU_MODELS
+                   else f"measured on {cpu_model}")
+        print(f"{leg} ({machine}): {counts['same']} series judged against the same CPU "
+              f"model's records, {counts['every']} against every machine's, "
+              f"{counts['none']} with no earlier record.")
 
 
 def emit_github_output(name: str, value: str) -> None:
@@ -217,9 +304,13 @@ def main() -> int:
     already = recorded_keys(history_path, args.commit)
     lines = []
     hard_regression = False
+    # (leg, cpu_model) -> how many of its series were judged against what.
+    judged = {}
     for rec in records:
-        baseline = trailing_mean(history_path, rec["leg"], rec["config"],
-                                 REGRESSION_TRAILING_WINDOW, exclude_commit=args.commit)
+        baseline, same_cpu = like_for_like_baseline(
+            history_path, rec["leg"], rec["config"], rec["cpu_model"],
+            exclude_commit=args.commit)
+        note_judged(judged, rec["leg"], rec["cpu_model"], baseline, same_cpu)
         entry = {
             "commit": args.commit,
             "branch": args.branch,
@@ -239,8 +330,9 @@ def main() -> int:
             # percentages rather than fixed deltas), so a hosted-image bump or
             # a differently-specced runner shows up as an unattributable step
             # in the series unless the environment is recorded beside it.
-            # Empty string on a leg whose job wrote no environment.json - an
-            # older workflow, or a local run.
+            # cpu_model is also what the next run's baseline is chosen by
+            # (like_for_like_baseline). Empty string on a leg whose job wrote
+            # no environment.json - an older workflow, or a local run.
             "cpu_model": rec["cpu_model"],
             "runner_image": rec["runner_image"],
             "real_time_budget_ms_per_frame": rec["real_time_budget_ms_per_frame"],
@@ -250,20 +342,20 @@ def main() -> int:
 
         slowdown = None if baseline is None or baseline <= 0 else (
             (rec["ms_per_frame"] - baseline) / baseline)
+        than = None if slowdown is None else baseline_words(
+            f"{baseline:.3f} ms/frame", same_cpu, rec["cpu_model"])
         if slowdown is not None and slowdown >= HARD_REGRESSION_SLOWDOWN_FRACTION:
             hard_regression = True
             print(f"::error title=Performance trend hard regression::{rec['leg']}/"
                   f"{rec['config']}: {rec['ms_per_frame']:.3f} ms/frame is "
-                  f"{slowdown * 100:.0f}% slower than the trailing "
-                  f"{REGRESSION_TRAILING_WINDOW}-run mean ({baseline:.3f} ms/frame) on "
+                  f"{slowdown * 100:.0f}% slower than {than} on "
                   f"{args.branch} - past the {HARD_REGRESSION_SLOWDOWN_FRACTION * 100:.0f}% "
                   "hard-regression threshold. Still recorded below; the run this came from is "
                   "failed separately so this doesn't go unnoticed.")
         elif slowdown is not None and slowdown >= REGRESSION_SLOWDOWN_FRACTION:
             print(f"::warning title=Performance trend regression::{rec['leg']}/"
                   f"{rec['config']}: {rec['ms_per_frame']:.3f} ms/frame is "
-                  f"{slowdown * 100:.0f}% slower than the trailing "
-                  f"{REGRESSION_TRAILING_WINDOW}-run mean ({baseline:.3f} ms/frame) on "
+                  f"{slowdown * 100:.0f}% slower than {than} on "
                   f"{args.branch}. This is a trend warning, not a failure - see iclforge-perf for "
                   "the absolute real-time gate.")
 
@@ -275,6 +367,7 @@ def main() -> int:
     skipped = len(records) - len(lines)
     print(f"Appended {len(lines)} record(s) to {history_path}"
           + (f" ({skipped} already recorded for {args.commit[:8]})" if skipped else ""))
+    report_judged(judged)
     write_recent_window(history_path)
     emit_github_output("hard_regression", "true" if hard_regression else "false")
     return 0

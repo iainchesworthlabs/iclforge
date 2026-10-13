@@ -634,6 +634,24 @@ class SiteScriptsRenderTest(unittest.TestCase):
         self.assertNotIn("tool set", listening["AC-4"]["what"])
         self.assertIn("tool set spx", listening["E-AC-3"]["what"])
 
+    def test_the_speed_card_names_the_machine_of_each_figure(self):
+        """The hosted x86 runner is one of several CPU models from run to run, and the
+        multiple moves with it: the card says which one the newest run had. A record that
+        names none, or the capture script's "unknown", adds nothing to its line."""
+        self.fixture()
+        self.write("performance-main", [
+            {**perf("plain_51", 4.376), "cpu_model": "AMD EPYC 7763 64-Core Processor"},
+            {**perf("plain_51", 3.248, leg="linux-gcc-arm64"), "cpu_model": "Neoverse-N2"},
+            {**perf("atmos_4obj", 8.0), "cpu_model": "unknown"},
+            perf("ac4_51_encode", 3.83, AC4_BUDGET)])
+        whats = {line["codec"]: line["what"] for line in self.render("--page")["Speed"]["lines"]}
+        self.assertIn("5.1 encode (plain_51) on linux-gcc, AMD EPYC 7763 64-Core Processor: "
+                      "4.376 ms/frame", whats["AC-3"])
+        self.assertIn("(atmos_4obj) on linux-gcc: 8.000 ms/frame", whats["E-AC-3"])
+        self.assertIn("(ac4_51_encode) on linux-gcc: 3.830 ms/frame", whats["AC-4"])
+        self.assertIn("a different CPU model from run to run",
+                      self.render("--page")["Speed"]["note"])
+
     def test_an_ac4_leg_name_is_read_as_the_layout_it_spells(self):
         """"ac4-514-music-768" is 5.1.4 music at 768 kbps, not "514 music"."""
         self.fixture()

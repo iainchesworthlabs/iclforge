@@ -10,8 +10,14 @@
 # Written into the leg's own results directory rather than passed on the
 # appender's command line, because the trend now has more than one leg and they
 # are measured on different machines: one x86 job and one arm64 job cannot
-# share a single --cpu-model value. append_performance_history.py reads this
-# file per leg and records empty strings for a leg that has none.
+# share a single --cpu-model value. append_performance_history.py and
+# append_kernel_history.py read this file per leg and record empty strings for
+# a leg that has none.
+#
+# cpu_model is compared against, not only recorded: a hosted runner is one of
+# several CPU models from run to run, and each appender judges a run against
+# the earlier records that carry the same string. Changing how the string is
+# formed here starts every model's comparison again from its next record.
 #
 # $LEG_DIR is the results directory to write into.
 set -euo pipefail
