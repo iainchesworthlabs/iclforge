@@ -45,12 +45,20 @@ The Speed card shows the slowest workload of each codec, encode or decode, and
 says which it is. Encoding is the slower direction by a wide margin, so it is the
 one shown in practice.
 
+Each line also names the CPU model it was measured on. The `linux-gcc` leg runs on
+GitHub's hosted runner, which is one of several models from run to run, and the
+card shows the newest run, whichever machine it had. Over the fourteen runs to
+2026-10-12 AC-3 read 7x, 9x and 10x and E-AC-3 4x, 5x and 6x, while the eight of
+those runs that had the same machine agree to within 0.4%. When the x86 machine is
+a fast one the arm64 leg is the slower of the two, and its figure is the one shown.
+The README's speed badge carries the same figures and has no room for the name.
+
 Anything above 1x is fast enough to keep up with playback. The margin above that
 is what buys you batch transcoding, live capture with headroom, and running on a
 Raspberry Pi rather than a workstation.
 
 → [Performance trend](performance-trend.md) tracks this per workload, per
-kernel, and alongside memory use.
+kernel, and alongside memory use, and compares each CPU model with itself.
 
 ### Does it sound right?
 
@@ -660,6 +668,16 @@ ceiling) fails the build rather than merely being recorded.
   const noLine = (codec, what) => line(codec, "&mdash;", "", what || NO_MEASUREMENT);
   const code = (s) => `<code>${esc(s)}</code>`;
 
+  // The CPU model a picked workload was measured on, for the line that shows it. The x86
+  // leg's hosted runner is one of several models from run to run and twice as fast on one as
+  // on another, so a multiple on this card moves with the machine as well as with the code.
+  // Nothing for a record that names no model: one from before the model was recorded, or one
+  // whose runner gave the capture script no name ("unknown").
+  function machineOf(rows, e) {
+    const row = rows.find((r) => r.config === e.config && r.leg === e.leg && r.ms_per_frame === e.ms);
+    return row && row.cpu_model && row.cpu_model !== "unknown" ? `, ${esc(row.cpu_model)}` : "";
+  }
+
   function speedCard(rows, noteFor = () => "") {
     const picked = slowestPerCodec(rows);
     if (Object.keys(picked).length === 0) return emptyCard("Speed");
@@ -667,7 +685,7 @@ ceiling) fails the build rather than merely being recorded.
     const lines = CODECS.map((codec) => {
       const e = picked[codec];
       return e ? line(codec, formatMultiple(e.times) + "&times;", "",
-        `${esc(e.words)} (${code(e.config)}) on ${code(e.leg)}: ${e.ms.toFixed(3)} ms/frame ` +
+        `${esc(e.words)} (${code(e.config)}) on ${code(e.leg)}${machineOf(rows, e)}: ${e.ms.toFixed(3)} ms/frame ` +
         `against a ${round2(e.budget)} ms frame.${noteFor(codec)}`) : noLine(codec);
     });
     // 1x is the line that means something - below it the codec cannot keep up
@@ -677,7 +695,8 @@ ceiling) fails the build rather than merely being recorded.
     return card("Speed", "Times real time: the slowest workload of each codec.", lines,
       `Slowest of ${new Set(timed.map((r) => r.config)).size} workloads on ` +
       `${new Set(timed.map((r) => r.leg)).size} CI legs, encodes and decodes together. ` +
-      "Real time is 1&times;. An AC-4 frame is 2&thinsp;048 samples, 42.67 ms, against A/52's 1&thinsp;536 samples, 32 ms.",
+      "Real time is 1&times;. An AC-4 frame is 2&thinsp;048 samples, 42.67 ms, against A/52's 1&thinsp;536 samples, 32 ms. " +
+      "The x86 leg runs on a different CPU model from run to run, and its multiples move with the machine.",
       ok ? OK : WATCH);
   }
 
