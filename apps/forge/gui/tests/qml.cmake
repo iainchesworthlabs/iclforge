@@ -74,6 +74,10 @@ qt_add_executable(forge_gui_qmltests
     ../../shared/theme/src/system_theme.hpp
     ../../shared/preferences/src/language_manager.cpp
     ../../shared/preferences/src/language_manager.hpp)
+# Whether the operating system has been asked to cut back animation, which Theme.reducedMotion
+# binds to: SystemMotion and the platform file that answers it (cmake/SystemMotion.cmake).
+include(SystemMotion)
+iclforge_add_system_motion(forge_gui_qmltests)
 
 # apps/shared/media/src, for the same reason ../CMakeLists.txt names it: RecordingSink
 # and Fmp4FolderWriter moved there when forge's own takes started streaming

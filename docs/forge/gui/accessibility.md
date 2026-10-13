@@ -140,12 +140,40 @@ a final pass that replaces every spelling of the two signing values with `<withh
 window, and `tst_diagnostics.qml` holds the other half — that the controller fills those fields
 from what the window is actually showing.
 
+## Motion
+
+**Preferences → Appearance → Motion** is System, Reduced or Full, the same three choices Crucible
+and Hearth offer. System follows the operating system's own request to cut back animation;
+Reduced and Full are the person's answer and win over it. Unlike Crucible's and Hearth's, the
+choice is kept with this window's other appearance settings (`workbench/motion`, beside
+`workbench/theme`, `workbench/palette` and `workbench/textScale`), and it applies when Preferences
+is saved.
+
+Under Reduced:
+
+- the busy mark beside a file in the QC, Object inspector and Stream player dialogs, and beside
+  an export, is three still squares instead of a turning spinner;
+- the Guided wizard's movement preview, which loops the authored paths for as long as the step is
+  open, stops, with each object at the start of its path. The sentence under it still says the
+  paths loop; it is describing the paths, and the preview is still.
+
+The style's own scroll-bar fade (200 ms of opacity after a pause) is the style's and is not
+changed; it is a fade, not movement. The encode progress bars, the meters and the object
+positions move because the signal does and are not touched. How each platform's setting is read is
+on [Crucible's page](../../crucible/accessibility.md#motion).
+
 ## Colour and contrast
 
 The palettes are `Theme.qml`'s, shared with Crucible and checked by the test suite rather than by
-eye. The measured numbers, including the one that does not reach 4.5:1, are on
+eye. The measured numbers, including the fill and label of a primary button, are on
 [Crucible's page](../../crucible/accessibility.md#colour-and-contrast); they apply here unchanged
 because they are the same tokens.
+
+Two places in this window are not the shared controls and take the pair directly: the first-run
+screen's primary card, the Guided and Karaoke steps' current dot, the tab badge and the channel
+meter's CLIP box are filled with `Theme.accentFill` and lettered in `Theme.accentText`, and the
+window's selection colour (a highlighted item, selected text, the style's progress fill) is the
+same pair.
 
 ## What is still mouse-only
 

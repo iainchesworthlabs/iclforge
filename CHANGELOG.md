@@ -82,6 +82,32 @@ The sections below contain the complete change list and fixes.
   every platform Crucible builds on; `test_scripted_machine.cpp` holds the option's words, the
   applications as a monitor lists them, the paced tap and the engine over the machine.
 
+**Motion: a setting to cut back animation, in all three programs**
+
+- **Settings > Appearance > Motion is System, Reduced or Full** in Crucible, Hearth and the Forge
+  GUI (Preferences). System, the default, follows the operating system's own request to cut back
+  animation: Windows' Animation effects switch (`SPI_GETCLIENTAREAANIMATION`), macOS's Reduce
+  motion (`accessibilityDisplayShouldReduceMotion`), and on Linux GNOME's `enable-animations` or
+  KDE's animation speed at instant. A platform with none, or one that cannot be read, is "not
+  reduced". Reduced and Full win over the system's answer in both directions. Crucible and Hearth
+  store it under `appearance/motion`; the Forge GUI keeps it with its own appearance keys, as
+  `workbench/motion`. The system's setting is read at start and each time the window is activated.
+  The four new strings of each window are filled in the six catalogues of all three programs,
+  machine-made and not read by a speaker like the rest.
+- **Under Reduced, nothing in the windows animates that is not the signal itself.** Crucible's room
+  markers and level bars take each position and reading as it arrives instead of easing over 90 and
+  60 ms; the waiting mark beside a QC, Object inspector or Stream player run, an export and a
+  pairing request is three still squares instead of a turning spinner; and the Guided wizard's
+  movement preview, which looped for as long as the step was open, stops with each object at the
+  start of its path. Every duration in the windows goes through `Theme.motionDuration()`, so a new
+  animation is one wrapped literal away from following the setting.
+  [Motion](docs/crucible/accessibility.md#motion) says what is and is not covered.
+- **`SystemMotion`** (`apps/shared/theme/src/system_motion*`) is the one place that asks the
+  platform, one file per platform under `src/platform/`. Held by `iclforge-theme-tests` (what each
+  printed value means, and the override that stands in for the system) and by `tst_motion.qml`.
+  The macOS call and the Linux reads were written to the documented interfaces and have not been
+  run on those systems.
+
 **Hearth: the output chosen in the picker is kept across starts**
 
 - **Hearth's window plays to the output a person chose last time.** It started on the computer's
@@ -4037,6 +4063,25 @@ The sections below contain the complete change list and fixes.
   through, each of its four lines marked at the top level; a file that is not a WAV file).
 
 ### Changed
+
+**The label on a primary button reaches 4.5:1 in every palette and both modes**
+
+- **A filled accent control has its own fill, `Theme.accentFill`, and the label that goes on it,
+  `Theme.accentText`.** The brand accent stays for shapes. In the light Signal palette the label on
+  the red button read 3.95:1 (white would have been 4.20) and in the light Console palette 4.22:1;
+  the fill there is now `#b82009` under white (6.46:1), and Console's amber keeps its colour under
+  white (4.67:1). The other four palette-and-mode combinations already carried their label, and
+  their fill and label are the colours they were. The System palette derives its fill from the
+  desktop's accent, moving only the lightness until the label reaches 4.5:1. Used by the primary
+  button, the chosen segment, a ticked box, the first-run card, the step dots, the tab badge, the
+  CLIP boxes, a Hearth list badge and the first-run button, and by the selection colour of
+  Forge's and Hearth's windows. **This is visible**: in Signal light every one of those is a deeper
+  red under a white label than it was.
+- **`tst_accessibility.qml` holds it**: the label on the fill at 4.5:1 and the fill at 3:1 against
+  the background and the surface in every palette and mode, a sweep of 1,440 desktop accents for
+  the System palette, and that the controls draw the pair and not the accent. Text set in the
+  brand accent itself (the lyric strip, some error lines) is not part of this and is still
+  3.76:1 in Signal light.
 
 **Qt 6.12, the long-term-support release, and macOS 14.4 as the minimum**
 

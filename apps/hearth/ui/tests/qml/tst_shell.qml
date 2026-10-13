@@ -158,4 +158,20 @@ TestCase {
         tryCompare(Theme, "fontScale", 1.0, 2000);
         HearthController.theme = "system";
     }
+
+    // Motion reaches Theme the same way, and Reduced is what turns every
+    // duration to zero.
+    function test_motionFollowsTheSetting() {
+        HearthController.motion = "reduced";
+        const win = openWindow();
+        compare(Theme.motionChoice, "reduced");
+        compare(Theme.reducedMotion, true);
+        compare(Theme.motionDuration(90), 0);
+        HearthController.motion = "full";
+        tryCompare(Theme, "motionChoice", "full", 2000);
+        compare(Theme.reducedMotion, false);
+        compare(Theme.motionDuration(90), 90);
+        HearthController.motion = "system";
+        tryCompare(Theme, "motionChoice", "system", 2000);
+    }
 }

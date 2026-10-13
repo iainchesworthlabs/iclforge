@@ -686,6 +686,23 @@ void CrucibleController::setTextScale(const QString& scale) {
     emit settingsChanged();
 }
 
+QString CrucibleController::motion() const {
+    // A stored value this version does not know reads as the default rather
+    // than as a fourth state the window has no wording for.
+    const auto stored = settings_.value(QStringLiteral("appearance/motion"), QStringLiteral("system")).toString();
+    static const QStringList known{QStringLiteral("system"), QStringLiteral("reduced"), QStringLiteral("full")};
+    return known.contains(stored) ? stored : QStringLiteral("system");
+}
+
+void CrucibleController::setMotion(const QString& motion) {
+    if (motion == this->motion()) {
+        return;
+    }
+    settings_.setValue(QStringLiteral("appearance/motion"), motion);
+    settings_.sync();  // survive a hard exit
+    emit settingsChanged();
+}
+
 bool CrucibleController::keepRunningWhenClosed() const {
     return settings_.value(QStringLiteral("behaviour/keepRunningWhenClosed"), true).toBool();
 }
@@ -1204,6 +1221,7 @@ iclforge::crucible::ReportFacts CrucibleController::build_report_facts() const {
     setting("appearance/roomView", roomView());
     setting("appearance/roomLayout", roomLayout());
     setting("appearance/textScale", textScale());
+    setting("appearance/motion", motion());
     setting("behaviour/keepRunningWhenClosed", flag(keepRunningWhenClosed()));
     setting("behaviour/moveDefaultOnLaunch", flag(moveDefaultOnLaunch()));
     setting("behaviour/showBackgroundApps", flag(showBackgroundApps()));

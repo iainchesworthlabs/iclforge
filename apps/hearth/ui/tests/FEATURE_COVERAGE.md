@@ -109,6 +109,7 @@ Status:
 | 82 | Settings | Look for Sendspin players checkbox | none | UI | SettingsPage::test_networkNameAndDiscovery |
 | 83 | Settings | Pairing records list and Forget | none | UI | NetworkPairing::test_pairingRecordShowsInSettingsAndForgetRemovesIt (after a real pairing) |
 | 84 | Settings | Theme / palette / text size | none | UI | SettingsPage::test_appearanceThemePaletteAndTextSize |
+| 84a | Settings | Motion (System / Reduced / Full): stored, an unknown value reads as System, applied to Theme at start and on change | none | UI | SettingsPage::test_appearanceMotion, Shell::test_motionFollowsTheSetting |
 | 85 | Settings | Language | none | UI | SettingsPage::test_languageChoice |
 | 85a | Media, Decoder | Right to left: a negative level the page works out ("-3.0 dB") is set in a left-to-right isolate, so its sign stays in front of its digits; a window read left to right has none | none | UI | MediaPage::test_mixLevelsKeepTheirSignInARightToLeftWindow, DecoderApplied::test_mixLevelsKeepTheirSignInARightToLeftWindow, Shell::test_ltrIsolatesANumberOnlyInAWindowThatReadsRightToLeft |
 | 85b | Decoder | Right to left: the unit in a number field (RF ceiling, "dBFS") is at the end of the box and the number at its start, never one over the other | none | UI | DecoderApplied::test_theUnitInTheRfCeilingFieldNeverCoversTheNumber |

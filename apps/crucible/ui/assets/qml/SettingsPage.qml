@@ -460,6 +460,18 @@ Flickable {
                     Note { text: qsTr("Every size in the window follows this; 100% is the size it is drawn at. System takes the text size the desktop reports and counts 9 pt as 100%, so on a desktop whose base size is larger the window starts larger too.") }
                 }
                 SettingRow {
+                    label: qsTr("Motion")
+                    SegmentedControl {
+                        objectName: "motionChoice"
+                        model: [{ label: qsTr("System"), value: "system" }, { label: qsTr("Reduced"), value: "reduced" },
+                                { label: qsTr("Full"), value: "full" }]
+                        currentValue: CrucibleController.motion
+                        accessibleName: qsTr("Motion")
+                        onSelected: function(value) { CrucibleController.motion = value; }
+                    }
+                    Note { text: qsTr("Reduced stops the room's markers and level bars easing between readings: each shows the latest one at once. System follows the desktop's own setting for animation.") }
+                }
+                SettingRow {
                     label: qsTr("3D layout")
                     SegmentedControl {
                         model: [{ label: qsTr("Auto"), value: "auto" }, { label: "5.1", value: "5.1" }, { label: "7.1", value: "7.1" }, { label: "7.1.4", value: "7.1.4" }]

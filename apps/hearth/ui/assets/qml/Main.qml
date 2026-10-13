@@ -47,8 +47,10 @@ ApplicationWindow {
     palette.button: Theme.neutral300
     palette.buttonText: Theme.text
     palette.brightText: Theme.text
-    palette.highlight: Theme.accent
-    palette.highlightedText: Theme.bg
+    // A selection is a filled accent carrying text, so it takes the fill and
+    // the label that reach 4.5:1 together (Theme.accentFill / accentText).
+    palette.highlight: Theme.accentFill
+    palette.highlightedText: Theme.accentText
     palette.light: Theme.neutral100
     palette.midlight: Theme.neutral200
     palette.mid: Theme.neutral400
@@ -95,6 +97,7 @@ ApplicationWindow {
     Component.onCompleted: {
         Theme.preference = HearthController.theme;
         Theme.paletteChoice = HearthController.palette;
+        Theme.motionChoice = HearthController.motion;
         window.applyTextScale();
         HearthController.start();
         NetworkController.start();
@@ -145,6 +148,7 @@ ApplicationWindow {
         function onSettingsChanged() {
             Theme.preference = HearthController.theme;
             Theme.paletteChoice = HearthController.palette;
+            Theme.motionChoice = HearthController.motion;
             window.applyTextScale();
         }
     }

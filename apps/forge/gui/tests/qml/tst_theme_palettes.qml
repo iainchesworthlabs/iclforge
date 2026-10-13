@@ -26,6 +26,8 @@ TestCase {
     function cleanup() {
         Theme.preference = "system";
         Theme.paletteChoice = "signal";
+        Theme.motionChoice = "system";
+        SystemMotion.clearOverride();
     }
 
     function test_palettesSwapEveryTokenFamily() {
@@ -94,6 +96,77 @@ TestCase {
             verify(Math.abs(accentHue - baseHue) < 0.02
                    || Math.abs(accentHue - baseHue) > 0.98);   // hue wraps
         }
+    }
+
+    // A label on a filled accent control reaches 4.5:1 in every palette and
+    // both modes (the Crucible suite's tst_accessibility.qml holds the
+    // table; this is the same token pair seen from this module), and the
+    // window hands it to the style's selection colours, which carry text
+    // too: a highlighted item and a selected run of text.
+    function test_accentFillCarriesItsLabelAndTheSelectionUsesThePair() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        for (const palette of ["signal", "ink", "console", "system"]) {
+            for (const mode of ["light", "dark"]) {
+                Theme.paletteChoice = palette;
+                Theme.preference = mode;
+                const ratio = Theme.contrast(Theme.accentText, Theme.accentFill);
+                verify(ratio >= 4.5, palette + " " + mode + ": " + ratio.toFixed(2));
+                compare(String(win.palette.highlight), String(Theme.accentFill));
+                compare(String(win.palette.highlightedText), String(Theme.accentText));
+            }
+        }
+    }
+
+    // Motion: the Preferences working copy, Save and Cancel, as the palette
+    // above, and what Save does to Theme. "system" is what an empty store
+    // reads as, and the operating system's answer (stood in for here) is
+    // what it means.
+    function test_prefsMotionRoundTripsAndAppliesOnSave() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        compare(win.settings.motion, "system");
+
+        win.prefsDialog.open();
+        let saveButton = null;
+        tryVerify(() => {
+            saveButton = findChild(win.contentItem, "prefsSaveButton");
+            return saveButton !== null && saveButton.visible;
+        });
+        const choice = findChild(win.contentItem, "prefsMotion");
+        verify(choice !== null, "Preferences offers a Motion choice");
+        compare(choice.currentValue, "system");
+        choice.selected("reduced");
+        compare(win.prefsDialog.motionChoice, "reduced");
+        compare(choice.currentValue, "reduced");
+        saveButton.clicked();
+        compare(win.settings.motion, "reduced");
+        compare(Theme.motionChoice, "reduced");
+        compare(Theme.reducedMotion, true);
+        compare(Theme.motionDuration(90), 0);
+
+        // Cancel is a real cancel for it too.
+        win.prefsDialog.open();
+        let cancelButton = null;
+        tryVerify(() => {
+            cancelButton = findChild(win.contentItem, "prefsCancelButton");
+            return cancelButton !== null && cancelButton.visible;
+        });
+        win.prefsDialog.motionChoice = "full";
+        cancelButton.clicked();
+        compare(win.settings.motion, "reduced");
+
+        // The choice wins over the system's own answer in both directions.
+        SystemMotion.setOverride(true);
+        win.settings.motion = "full";
+        Theme.motionChoice = "full";
+        compare(Theme.reducedMotion, false, "Full overrides a system that asked for less");
+        SystemMotion.setOverride(false);
+        Theme.motionChoice = "reduced";
+        compare(Theme.reducedMotion, true, "Reduced applies on a system that asked for nothing");
+
+        win.settings.motion = "system";
+        Theme.motionChoice = "system";
     }
 
     function test_prefsPaletteRoundTripsAndAppliesOnSave() {

@@ -254,12 +254,24 @@ ColumnLayout {
         }
         return end > 0 ? end : cycleSeconds;
     }
+    // Not while motion is reduced: this is a loop with no end and no way to
+    // stop it, which is what that setting exists to spare a person. The
+    // objects stay at the start of their paths, the same still picture
+    // whenever the step is opened.
+    Connections {
+        target: Theme
+        function onReducedMotionChanged() {
+            if (Theme.reducedMotion) {
+                wizard.previewT = 0;
+            }
+        }
+    }
     Timer {
         interval: 50
         repeat: true
         running: wizard.currentStepKey === "motion" && wizard.visible
                  && EncoderController.atmosEnabled && EncoderController.objectCount > 0
-                 && wizard.traj !== "hold"
+                 && wizard.traj !== "hold" && !Theme.reducedMotion
         onTriggered: {
             const loop = wizard.liveSession ? wizard.cycleSeconds : wizard.derivedDuration();
             wizard.previewT = (wizard.previewT + 0.05) % loop;
@@ -369,9 +381,9 @@ ColumnLayout {
                     objectName: "wizardStepDot-" + stepEntry.modelData.key
                     width: 22
                     height: 22
-                    color: stepEntry.current ? Theme.accent
+                    color: stepEntry.current ? Theme.accentFill
                            : stepEntry.completed ? Theme.text : "transparent"
-                    border.color: stepEntry.current ? Theme.accent : Theme.divider
+                    border.color: stepEntry.current ? Theme.accentFill : Theme.divider
                     border.width: 1
 
                     Text {
@@ -379,7 +391,8 @@ ColumnLayout {
                         text: stepEntry.index + 1
                         font.pixelSize: Theme.fontMono
                         font.family: Theme.monoFamily
-                        color: stepEntry.current || stepEntry.completed ? Theme.bg : Theme.text
+                        color: stepEntry.current ? Theme.accentText
+                               : stepEntry.completed ? Theme.bg : Theme.text
                     }
                     Accessible.role: Accessible.PageTab
                     Accessible.name: stepEntry.modelData.label

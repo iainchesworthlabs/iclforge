@@ -134,8 +134,8 @@ RowLayout {
         objectName: "clipBox"
         Layout.preferredWidth: 30
         Layout.preferredHeight: 13
-        color: root.clipped ? Theme.accent : "transparent"
-        border.color: root.clipped ? Theme.accent : Theme.neutral300
+        color: root.clipped ? Theme.accentFill : "transparent"
+        border.color: root.clipped ? Theme.accentFill : Theme.neutral300
         border.width: 1
         // An unfed channel cannot clip - its CLIP box dims with the rest of
         // the row instead of implying a judgement is being made.
@@ -154,7 +154,7 @@ RowLayout {
         Text {
             anchors.centerIn: parent
             text: qsTr("CLIP")
-            color: root.clipped ? Theme.bg : Theme.neutral500
+            color: root.clipped ? Theme.accentText : Theme.neutral500
             font.pixelSize: Math.round(8 * Theme.fontScale)
             font.bold: true
         }

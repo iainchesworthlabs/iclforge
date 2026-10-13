@@ -28,6 +28,17 @@ import ForgeGui
 // and gets whichever palette and mode are active; nothing outside this file
 // knows how many palettes there are, and nothing outside this file may know
 // either.
+//
+// Two accents, because a shape and a surface under a label ask different
+// things of a colour. `accent` is the brand colour and is for shapes - a
+// bar, a dot, a border, a progress fill. `accentFill` is the colour of a
+// control that carries a LABEL (a primary button, the chosen segment, a
+// ticked box) and `accentText` is that label; every palette defines the pair
+// so the label reaches 4.5:1 on it in both modes. In Signal light the brand
+// red under the better of its two labels read 3.95:1, so the fill there is a
+// deeper red (#b82009, the value Cubeulator's design tokens give it) under
+// white; wherever the accent already carried its label at 4.5:1 the fill IS
+// the accent and nothing on screen moved.
 QtObject {
     id: theme
 
@@ -44,7 +55,8 @@ QtObject {
     property string paletteChoice: "signal"
 
     // ---- the palettes ------------------------------------------------------
-    // Order inside each mode: bg, surface, text, accent, then the two ramps.
+    // Order inside each mode: bg, surface, text, accent, the fill and its
+    // label (see accentFill), then the two ramps.
     // 100 sits nearest the background in BOTH modes (a tint in light, a deep
     // shade in dark) and 900 farthest, so a component's rung choice keeps
     // its contrast intent whichever mode is active.
@@ -52,6 +64,7 @@ QtObject {
         signal: {
             light: {
                 bg: "#f3f2f2", surface: "#eae9e9", text: "#201e1d", accent: "#ec3013",
+                fill: "#b82009", onFill: "#ffffff",
                 n100: "#f8f4f4", n200: "#eae7e7", n300: "#d7d3d3", n400: "#bab6b6",
                 n500: "#9b9797", n600: "#7d7979", n700: "#605d5d", n800: "#444141",
                 n900: "#2d2b2b",
@@ -61,6 +74,7 @@ QtObject {
             },
             dark: {
                 bg: "#151313", surface: "#1d1a1a", text: "#ece7e5", accent: "#ff5c40",
+                fill: "#ff5c40", onFill: "#151313",
                 n100: "#1c1919", n200: "#272423", n300: "#353130", n400: "#4b4645",
                 n500: "#6b6563", n600: "#8b8583", n700: "#aba4a1", n800: "#cfc8c5",
                 n900: "#e8e2df",
@@ -72,6 +86,7 @@ QtObject {
         ink: {
             light: {
                 bg: "#f4f4f5", surface: "#ebebed", text: "#1c1d20", accent: "#2f54d0",
+                fill: "#2f54d0", onFill: "#f4f4f5",
                 n100: "#f7f7f8", n200: "#e9e9eb", n300: "#d5d5d8", n400: "#b7b7bb",
                 n500: "#98989d", n600: "#7a7a80", n700: "#5d5d63", n800: "#414147",
                 n900: "#2b2b30",
@@ -81,6 +96,7 @@ QtObject {
             },
             dark: {
                 bg: "#131417", surface: "#1a1c20", text: "#e7e9ee", accent: "#7d9bff",
+                fill: "#7d9bff", onFill: "#131417",
                 n100: "#191b1f", n200: "#23262b", n300: "#31343a", n400: "#464a52",
                 n500: "#666b74", n600: "#868b94", n700: "#a6abb4", n800: "#cbcfd6",
                 n900: "#e4e7ec",
@@ -92,6 +108,7 @@ QtObject {
         console: {
             light: {
                 bg: "#f5f3ef", surface: "#ece9e3", text: "#211e18", accent: "#b25e00",
+                fill: "#b25e00", onFill: "#ffffff",
                 n100: "#f8f6f2", n200: "#ebe8e2", n300: "#d8d4cc", n400: "#bbb6ac",
                 n500: "#9c978d", n600: "#7e7970", n700: "#615d55", n800: "#45413b",
                 n900: "#2e2b26",
@@ -101,6 +118,7 @@ QtObject {
             },
             dark: {
                 bg: "#161311", surface: "#1e1a17", text: "#ece7df", accent: "#f0a03c",
+                fill: "#f0a03c", onFill: "#161311",
                 n100: "#1c1815", n200: "#272220", n300: "#35302c", n400: "#4b4540",
                 n500: "#6b655e", n600: "#8b857d", n700: "#aba49b", n800: "#cfc8bf",
                 n900: "#e8e1d8",
@@ -111,27 +129,51 @@ QtObject {
         }
     })
 
+    // The fill of a labelled control and the label on it, for the system
+    // palette, where the accent is whatever the desktop says and a hand-chosen
+    // pair cannot exist. The label is white in light and the neutral set's
+    // background in dark. The fill is the accent itself when the label already
+    // reads on it, and otherwise the accent with its lightness walked - down
+    // in light, up in dark - until it does. Hue and saturation never move, so
+    // the fill is still the desktop's colour, only deep enough to carry a word.
+    readonly property real _labelOnFill: 4.6   // the 4.5 floor, plus what 8-bit rounding can take
+    function _fillFor(accent, label, lighter) {
+        const hue = accent.hslHue < 0 ? 0 : accent.hslHue;
+        let fill = accent;
+        let lightness = accent.hslLightness;
+        for (let step = 0; step < 100 && contrast(label, fill) < _labelOnFill; ++step) {
+            lightness = Math.max(0, Math.min(1, lightness + (lighter ? 0.01 : -0.01)));
+            fill = Qt.hsla(hue, accent.hslSaturation, lightness, 1.0);
+        }
+        return fill;
+    }
+
     // The system palette's accent ramp, derived from whatever single colour
     // the desktop supplies. Guardrails, not arithmetic inversion: lightness
     // rungs are FIXED per mode (so the ramp's contrast intent holds for any
     // hue) and saturation is clamped, softened near the background where a
-    // strong chroma would read as a stain.
-    function _systemAccentRamp(base, wantDark) {
+    // strong chroma would read as a stain. `darkLabel` is the colour a dark
+    // fill carries its label in (see _fillFor).
+    function _systemAccentRamp(base, wantDark, darkLabel) {
         const h = base.hslHue < 0 ? 0 : base.hslHue;
         const s = Math.max(0.25, Math.min(base.hslSaturation, 0.95));
         function at(lightness, satScale) {
             return Qt.hsla(h, Math.min(s * satScale, 0.95), lightness, 1.0);
         }
         if (wantDark) {
+            const accent = at(Math.min(Math.max(base.hslLightness, 0.58), 0.68), 0.9);
+            const label = Qt.color(darkLabel);
             return {
-                accent: at(Math.min(Math.max(base.hslLightness, 0.58), 0.68), 0.9),
+                accent: accent, fill: _fillFor(accent, label, true), onFill: label,
                 a100: at(0.13, 0.6), a200: at(0.17, 0.65), a300: at(0.24, 0.7),
                 a400: at(0.36, 0.8), a500: at(0.50, 0.9), a600: at(0.60, 0.9),
                 a700: at(0.70, 0.9), a800: at(0.80, 0.85), a900: at(0.89, 0.8)
             };
         }
+        const accent = at(Math.min(Math.max(base.hslLightness, 0.32), 0.50), 1.0);
+        const white = Qt.color("#ffffff");
         return {
-            accent: at(Math.min(Math.max(base.hslLightness, 0.32), 0.50), 1.0),
+            accent: accent, fill: _fillFor(accent, white, false), onFill: white,
             a100: at(0.96, 0.8), a200: at(0.90, 0.8), a300: at(0.80, 0.85),
             a400: at(0.66, 0.95), a500: at(0.52, 1.0), a600: at(0.42, 1.0),
             a700: at(0.33, 1.0), a800: at(0.24, 1.0), a900: at(0.16, 1.0)
@@ -144,10 +186,10 @@ QtObject {
     readonly property var _active: {
         if (paletteChoice === "system") {
             const greys = dark ? _palettes.ink.dark : _palettes.ink.light;
-            const ramp = _systemAccentRamp(SystemTheme.accentColor, dark);
+            const ramp = _systemAccentRamp(SystemTheme.accentColor, dark, greys.bg);
             return {
                 bg: greys.bg, surface: greys.surface, text: greys.text,
-                accent: ramp.accent,
+                accent: ramp.accent, fill: ramp.fill, onFill: ramp.onFill,
                 n100: greys.n100, n200: greys.n200, n300: greys.n300,
                 n400: greys.n400, n500: greys.n500, n600: greys.n600,
                 n700: greys.n700, n800: greys.n800, n900: greys.n900,
@@ -164,7 +206,15 @@ QtObject {
     readonly property color bg: _active.bg
     readonly property color surface: _active.surface
     readonly property color text: _active.text
+    // The brand colour, for SHAPES: a bar, a dot, a border, a progress fill, a
+    // marker. Not for a surface that carries a label (accentFill) and not for
+    // text (accentInk).
     readonly property color accent: _active.accent
+    // The fill of a control that carries a label - a primary button, the
+    // chosen segment, a ticked box, a badge - with accentText as the label on
+    // it. Palette by palette it is the accent where that already carries its
+    // label at 4.5:1 and a deeper shade where it does not (Signal light).
+    readonly property color accentFill: _active.fill
     // Text at 50% alpha, the same recipe as the CSS token: always legible
     // against whatever "text" resolves to this mode, because it IS that
     // colour. 50 rather than the CSS 40 because a control's border is what
@@ -260,6 +310,27 @@ QtObject {
     readonly property color accent700: _active.a700
     readonly property color accent800: _active.a800
     readonly property color accent900: _active.a900
+
+    // ---- motion -------------------------------------------------------------
+    // "system" follows the operating system's request to cut back animation
+    // (SystemMotion.reduced - Windows' Animation effects switch, macOS's
+    // Reduce motion, the desktop's animations switch on Linux, and "not
+    // reduced" where the platform has none); "reduced" and "full" are the
+    // person's own answer and win over it. Each program persists it with its
+    // other appearance keys (appearance/motion in Crucible and Hearth,
+    // workbench/motion in the Forge GUI), and an unknown value reads as
+    // "system".
+    property string motionChoice: "system"
+    readonly property bool reducedMotion: motionChoice === "reduced"
+                                           || (motionChoice !== "full" && SystemMotion.reduced)
+    // The duration of every animation in the family goes through this, so
+    // reduced motion is one switch and not a hunt: a Behavior or a
+    // NumberAnimation with duration 0 still ends where it would have ended,
+    // it just does not take the time. Wrapping the literal keeps it readable
+    // as the designed duration - `duration: Theme.motionDuration(90)`.
+    function motionDuration(ms) {
+        return reducedMotion ? 0 : ms;
+    }
 
     // ---- spacing and radius -------------------------------------------------
     // 4 / 8 / 12 / 16 / 24 / 32, per the handoff. Zero radius everywhere is
@@ -410,14 +481,14 @@ QtObject {
     // the 10-13 px text it is used on nearly everywhere. 68% composites to
     // 5.2:1 or better in every palette and both modes.
     readonly property color textMuted: Qt.rgba(text.r, text.g, text.b, 0.68)
-    // The colour drawn on an accent fill, e.g. a primary button's label:
-    // whichever of the two ends of the palette reads better ON the accent.
-    // bg in the dark modes and in ink light (5.8-8.6:1); text in signal
-    // light, whose red carries a dark label better than a pale one. The
-    // accent fill is the design system's and is not darkened to suit the
-    // label, so in signal and console light this is the best available
-    // rather than a 4.5:1 pass - docs/crucible/accessibility.md says so.
-    readonly property color accentText: contrast(bg, accent) >= contrast(text, accent) ? bg : text
+    // The colour drawn on accentFill, e.g. a primary button's label or the
+    // mark in a ticked box. Each palette names it beside its fill so that the
+    // pair reaches 4.5:1 in every mode: white on Signal's deeper red (6.46:1)
+    // and on Console's amber (4.67:1), the palette's own background on the
+    // dark fills and on Ink light (5.8-8.6:1). It used to be whichever of bg
+    // and text read better on the raw accent, which left Signal light at 3.95
+    // and Console light at 4.22 - the pair the accentFill token replaces.
+    readonly property color accentText: _active.onFill
     // The new meter design (checkpoint 4) is a plain neutral-800 fill that
     // turns accent past -6 dBFS/clip, with no separate amber step - mapping
     // the old three-way ternary onto exactly those two colours now means

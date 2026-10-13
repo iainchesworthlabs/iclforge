@@ -103,6 +103,24 @@ TestCase {
         tryCompare(HearthController, "textScale", "100", 5000);
     }
 
+    // Motion: System until the person says otherwise, then kept under
+    // appearance/motion like the choices around it. A value the window does
+    // not know reads back as System rather than as a fourth state.
+    function test_appearanceMotion() {
+        const page = makePage();
+        compare(H.segment(page, "Motion", "system").Accessible.checked, true);
+        click(H.segment(page, "Motion", "reduced"), "Reduced");
+        tryCompare(HearthController, "motion", "reduced", 5000);
+        compare(H.segment(page, "Motion", "reduced").Accessible.checked, true);
+        click(H.segment(page, "Motion", "full"), "Full");
+        tryCompare(HearthController, "motion", "full", 5000);
+        HearthController.motion = "sparkle";
+        compare(HearthController.motion, "system");
+
+        click(H.segment(page, "Motion", "system"), "System motion");
+        tryCompare(HearthController, "motion", "system", 5000);
+    }
+
     // Down on the focused language box picks the first real language, as
     // choosing it from the list does (ComboBox emits activated either way);
     // Up goes back to System.

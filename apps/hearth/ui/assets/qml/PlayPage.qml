@@ -285,7 +285,7 @@ Item {
                                 // badge). neutral800 is the far end of the
                                 // ramp in BOTH modes, so bg always reads on
                                 // it.
-                                color: modelData.current ? Theme.accent : Theme.neutral800
+                                color: modelData.current ? Theme.accentFill : Theme.neutral800
                                 radius: 2
                                 Text {
                                     id: badgeLabel
@@ -579,8 +579,8 @@ Item {
                                 Rectangle {
                                     Layout.preferredWidth: 40
                                     Layout.preferredHeight: 18
-                                    color: levelRow.modelData.clipped ? Theme.bad : "transparent"
-                                    border.color: levelRow.modelData.clipped ? Theme.bad : Theme.border
+                                    color: levelRow.modelData.clipped ? Theme.accentFill : "transparent"
+                                    border.color: levelRow.modelData.clipped ? Theme.accentFill : Theme.border
                                     border.width: 1
 
                                     Text {

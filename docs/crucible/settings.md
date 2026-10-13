@@ -134,14 +134,16 @@ it while the window is open.
 Console a studio amber. System derives its accent ramp from the desktop's own accent colour and
 wears Ink's neutrals. The three named palettes are checked for contrast by the test suite in both
 modes ([Colour and contrast](accessibility.md#colour-and-contrast)). The System palette is not
-among them: its accent comes from the desktop while the window runs.
+among them, because its accent comes from the desktop while the window runs; what it does hold is
+that the fill of a labelled control and the label on it reach 4.5:1 whatever accent the desktop
+reports.
 
 **Language** is System, English, or one of the six the window is translated into: French, German,
 Spanish, Arabic, Hebrew and Yiddish. Choosing one of the six swaps in its translators, the
 application font where the language needs glyph coverage the window's own face has not, and the
 window's layout direction, and retranslates the running window without a restart; English takes
 the translators away and leaves the source strings. Every string the window has is translated in
-all six: the catalogues carry 385 messages each and none is left unfinished, so nothing falls back
+all six: the catalogues carry 428 messages each and none is left unfinished, so nothing falls back
 to English. What is not settled is whether each rendering is the right one. The translations are
 machine-made and no speaker of any of the six has read them, which is what the window's own note
 under this control says. That note also words System as following the language the desktop is set
@@ -151,6 +153,10 @@ glossary they are held to and the review that has yet to run.
 **Text size** is 100%, 125%, 150%, 175% or System, and every size in the window is a multiple of
 it. What System means, and why it starts a Linux window larger than a Windows one, is
 [Text size](accessibility.md#text-size).
+
+**Motion** is System, Reduced or Full. System follows the operating system's own request to cut
+back animation; Reduced and Full are the person's answer and win over it. What Reduced stops, and
+how the system's setting is read on each platform, is [Motion](accessibility.md#motion).
 
 **3D layout** is the reference speaker layout the [3D room](room.md#the-3d-view) draws — Auto,
 5.1, 7.1 or 7.1.4. Auto shows 5.1 while the stream is the bed only and 7.1.4 once objects are on.

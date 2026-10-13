@@ -186,6 +186,8 @@ button. It is called Settings, as Crucible's and Hearth's pages are. Three colum
       text size](accessibility.md#text-size) for which panels still hold a fixed height).
     - The **palette** (Signal / Ink / Console / System — the last follows the desktop's accent
       colour where the platform exposes one).
+    - **Motion** (System / Reduced / Full): whether the window cuts back its animation. System
+      follows the desktop's own request; see [Motion](accessibility.md#motion).
     - **Language** (System / English / Français / Deutsch / Español / العربية / עברית / יידיש),
       switching live with no restart. Arabic, Hebrew and Yiddish also mirror the whole window
       right-to-left and switch to a bundled Noto Sans face, since Archivo has no glyph coverage

@@ -28,6 +28,16 @@ TestCase {
     Component { id: settingsPage; SettingsPage { width: 1480; height: 700 } }
     Component { id: outputPage; OutputPage { width: 1480; height: 700 } }
     Component { id: shell; Main {} }
+    Component { id: buttonComponent; AppButton { text: "Send"; primary: true } }
+    Component { id: iconButtonComponent; IconButton { glyph: "x"; primary: true; accessibleName: "Go" } }
+    Component {
+        id: segmentsComponent
+        SegmentedControl {
+            model: [{ value: "a", label: "One" }, { value: "b", label: "Two" }]
+            currentValue: "a"
+        }
+    }
+    Component { id: checkBoxComponent; AppCheckBox { text: "Keep"; checked: true } }
     Component {
         id: fakeAppComponent
         QtObject {
@@ -363,19 +373,130 @@ TestCase {
                        where + "a control border on bg is " + ratio(Theme.divider, Theme.bg).toFixed(2));
                 verify(ratio(Theme.divider, Theme.surface) >= 3,
                        where + "a control border on surface is " + ratio(Theme.divider, Theme.surface).toFixed(2));
-                // The label on an accent fill is the better of the two ends
-                // of the palette. The fill is the design system's and is not
-                // darkened to suit the label, so in signal and console light
-                // this is the best available (3.9 and 4.2:1) rather than a
-                // 4.5 pass - docs/crucible/accessibility.md says so plainly.
-                const onAccent = ratio(Theme.accentText, Theme.accent);
-                verify(onAccent >= 3, where + "a primary label on the accent is " + onAccent.toFixed(2));
-                fuzzyCompare(onAccent,
-                             Math.max(ratio(Theme.bg, Theme.accent), ratio(Theme.text, Theme.accent)),
-                             1e-9,
-                             where + "the label takes the better of the two");
+                // A label on a filled accent control - a primary button, the
+                // chosen segment, a badge, a selection - is Theme.accentText
+                // on Theme.accentFill, and that pair reaches the 4.5:1 text
+                // floor in every palette and both modes. The brand accent
+                // under the same labels read 3.95:1 in signal light and
+                // 4.22:1 in console light (docs/crucible/accessibility.md).
+                const onFill = ratio(Theme.accentText, Theme.accentFill);
+                verify(onFill >= 4.5, where + "a label on the accent fill is " + onFill.toFixed(2));
+                // The fill is still a shape against the page it sits on,
+                // and the brand accent is still one for the shapes that use
+                // it directly (bars, dots, borders): WCAG 1.4.11's 3:1.
+                verify(ratio(Theme.accentFill, Theme.bg) >= 3,
+                       where + "the accent fill on bg is " + ratio(Theme.accentFill, Theme.bg).toFixed(2));
+                verify(ratio(Theme.accentFill, Theme.surface) >= 3,
+                       where + "the accent fill on surface is " + ratio(Theme.accentFill, Theme.surface).toFixed(2));
+                verify(ratio(Theme.accent, Theme.bg) >= 3,
+                       where + "the accent on bg is " + ratio(Theme.accent, Theme.bg).toFixed(2));
             }
         }
+    }
+
+    // What changed on screen, as a test: the fill moves only where the
+    // brand accent could not carry its label. Signal light is the one
+    // palette-mode whose fill is a different colour from its accent, and
+    // console light keeps its fill and changes only the label (4.22:1 under
+    // the background colour, 4.67 under white). The other four keep the
+    // fill AND the label they had.
+    function test_theFillIsTheAccentWhereTheAccentAlreadyCarriesItsLabel() {
+        const unchanged = [["signal", "dark"], ["ink", "light"], ["ink", "dark"],
+                           ["console", "light"], ["console", "dark"]];
+        for (const [palette, mode] of unchanged) {
+            Theme.paletteChoice = palette;
+            Theme.preference = mode;
+            compare(String(Theme.accentFill), String(Theme.accent), palette + " " + mode + " fill is the accent");
+        }
+        Theme.paletteChoice = "signal";
+        Theme.preference = "light";
+        verify(String(Theme.accentFill) !== String(Theme.accent), "signal light needed a deeper fill");
+        compare(String(Theme.accentFill), "#b82009");
+        compare(String(Theme.accentText), "#ffffff");
+        // The label that was already right stays what it was.
+        Theme.paletteChoice = "ink";
+        compare(String(Theme.accentText), String(Theme.bg), "ink light keeps the background colour as its label");
+    }
+
+    // The system palette's accent is whatever the desktop says, so there is
+    // no hand-chosen pair to read off: a sweep of colours a desktop can
+    // plausibly report, in both modes, through the function that derives
+    // the ramp. Hue never moves (it is the desktop's colour, only made deep
+    // enough to carry a word) and a fill that already carried its label is
+    // returned as it came.
+    function test_systemPaletteFillCarriesItsLabelForAnyDesktopAccent() {
+        const darkLabel = "#131417";
+        let derived = 0;
+        for (let hue = 0; hue < 360; hue += 10) {
+            for (const saturation of [0.0, 0.3, 0.7, 1.0]) {
+                for (const lightness of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+                    for (const dark of [false, true]) {
+                        const base = Qt.hsla(hue / 360, saturation, lightness, 1.0);
+                        const ramp = Theme._systemAccentRamp(base, dark, darkLabel);
+                        const where = "hue " + hue + " saturation " + saturation + " lightness " + lightness
+                                      + (dark ? " dark: " : " light: ");
+                        const onFill = ratio(ramp.onFill, ramp.fill);
+                        verify(onFill >= 4.5, where + "a label on the fill is " + onFill.toFixed(2));
+                        if (String(ramp.fill) !== String(ramp.accent)) {
+                            ++derived;
+                            if (ramp.accent.hslSaturation > 0.1) {
+                                const drift = Math.abs(ramp.fill.hslHue - ramp.accent.hslHue);
+                                verify(Math.min(drift, 1 - drift) < 0.02, where + "the hue moved by " + drift);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        verify(derived > 0, "the sweep reached accents that needed a deeper or lighter fill");
+
+        // And whatever this machine's desktop actually reports.
+        for (const mode of ["light", "dark"]) {
+            Theme.paletteChoice = "system";
+            Theme.preference = mode;
+            const onFill = ratio(Theme.accentText, Theme.accentFill);
+            verify(onFill >= 4.5, "the desktop's own accent, " + mode + ": " + onFill.toFixed(2));
+        }
+    }
+
+    // The contrast test above reads the tokens; this one reads the controls,
+    // because a control that went back to `accent` under the same label would
+    // pass every ratio there and still be the 3.95:1 button.
+    function test_filledControlsDrawTheFillAndItsLabel() {
+        Theme.paletteChoice = "signal";
+        Theme.preference = "light";
+
+        const button = createTemporaryObject(buttonComponent, testCase.parent);
+        verify(button);
+        compare(String(button.color), String(Theme.accentFill), "a primary button is filled with the accent fill");
+        compare(String(findChild(button, "appButtonLabel").color), String(Theme.accentText));
+        button.primary = false;
+        compare(button.color.a, 0, "a plain button is not filled");
+        compare(String(findChild(button, "appButtonLabel").color), String(Theme.text));
+
+        const icon = createTemporaryObject(iconButtonComponent, testCase.parent);
+        verify(icon);
+        compare(String(icon.color), String(Theme.accentFill));
+
+        const group = createTemporaryObject(segmentsComponent, testCase.parent);
+        verify(group);
+        const chosen = findChild(group, "seg-a");
+        const other = findChild(group, "seg-b");
+        verify(chosen && other);
+        compare(String(chosen.color), String(Theme.accentFill));
+        compare(String(findChild(chosen, "segLabel").color), String(Theme.accentText));
+        compare(other.color.a, 0);
+
+        const box = createTemporaryObject(checkBoxComponent, testCase.parent);
+        verify(box);
+        compare(String(findChild(box, "checkBoxSquare").color), String(Theme.accentFill));
+
+        // The control follows the palette it is drawn in, not the one it was
+        // made in.
+        Theme.preference = "dark";
+        button.primary = true;
+        compare(String(button.color), String(Theme.accentFill));
+        compare(String(Theme.accentFill), "#ff5c40");
     }
 
     function test_contrastCompositesTheAlphaItIsGiven() {

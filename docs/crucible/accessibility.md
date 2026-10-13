@@ -2,7 +2,8 @@
 
 Crucible can be operated without a mouse, and the parts of it a person acts on carry a role, a
 name and a description for a screen reader. This page is the key map, the focus order, what is
-announced, the text size setting, and what is still mouse-only.
+announced, the text size and motion settings, the contrast the palettes are held to, and what is
+still mouse-only.
 
 ## The key map
 
@@ -10,7 +11,7 @@ announced, the text size setting, and what is still mouse-only.
 | --- | --- |
 | `Tab` / `Shift+Tab` | Move to the next or previous control. Disabled controls are skipped. |
 | `Space` or `Enter` | Press the focused button, tick the focused checkbox, open the focused disclosure. |
-| `Left` `Right` `Home` `End` | Choose within a segmented control (Room / Signal path / Settings, Theme, Palette, Text size, Latency, 3D layout). Left from the first wraps to the last. |
+| `Left` `Right` `Home` `End` | Choose within a segmented control (Room / Signal path / Settings, Theme, Palette, Text size, Motion, Latency, 3D layout). Left from the first wraps to the last. |
 | `Ctrl+1` `Ctrl+2` `Ctrl+3` | The Room, the Signal path and the Settings page. |
 | `F1` | About. |
 | `Esc` | Close the open dialog. |
@@ -107,18 +108,64 @@ desktop's own Text size setting scales it, which is how that setting reaches Cru
 Linux desktops report 10 or 11 pt with nothing about text size touched, so System starts the
 window 11 to 22% larger there — pick a percentage if that is not what you want.
 
+## Motion
+
+**Settings → Appearance → Motion** is System, Reduced or Full. System is the default and follows
+the operating system's own request to cut back animation: Windows' Animation effects switch,
+macOS's Reduce motion, and on Linux the desktop's animations switch (GNOME's `enable-animations`,
+KDE's animation speed set to instant). Where the platform has none, or it cannot be read, System
+means not reduced. Reduced and Full are the person's own answer and win over the system's, in both
+directions. The choice is stored under `appearance/motion`.
+
+The window's animations are few. Under Reduced:
+
+| Full | Reduced |
+| --- | --- |
+| An application's marker in the room glides over 90 ms between the engine's steps | It is at the engine's position at once |
+| A level bar eases over 60 ms between readings | It shows each reading as it arrives |
+| A spinner turns while something is waiting | Three still squares stand in for it, drawn only while there is work |
+
+The level readings, the position the lyric strip highlights and the live meters are data, not
+decoration: they move because the signal does, and they are not slowed or stopped.
+
+The operating system's setting is read when the window starts and again each time the window is
+activated, which is when a person who has just changed it in the system's Settings comes back.
+
 ## Colour and contrast
 
 The palettes are checked by the test suite rather than by eye. In all three palettes and both
 modes, body text reaches at least 7:1 against the background, muted text and the accent used as
 ink at least 4.5:1, and the focus ring and control borders at least 3:1.
 
-One number does not reach 4.5:1: the label on a primary button's accent fill. The fill is the
-palette's accent, which is the design system's colour and is not darkened to suit the label, so
-the label takes whichever end of the palette reads better on it — 3.95:1 in the light signal
-palette and 4.22:1 in the light console palette, above the 3:1 floor for a control but below the
-4.5:1 one for small text. Every primary button is also a plain word that appears elsewhere on
-the page, and the dark modes and the ink palette are all above 5.7:1.
+A label on a filled accent control reaches 4.5:1 as well, in every palette and both modes. The
+window has two accent colours for this: the **accent**, for shapes (a bar, a dot, a border), and
+the **accent fill**, for a control that carries a word — a primary button, the chosen segment of a
+group, a ticked box, a badge, a selected item. Each palette defines the fill and the label that
+goes on it together:
+
+| Palette and mode | Fill | Label | Label on fill |
+| --- | --- | --- | --- |
+| Signal, light | `#b82009` | white | 6.46:1 |
+| Signal, dark | `#ff5c40` | the background | 6.04:1 |
+| Ink, light | `#2f54d0` | the background | 5.79:1 |
+| Ink, dark | `#7d9bff` | the background | 7.02:1 |
+| Console, light | `#b25e00` | white | 4.67:1 |
+| Console, dark | `#f0a03c` | the background | 8.63:1 |
+
+Four of the six already had a brand accent that carried its label, and there the fill is that
+accent and nothing changed. In Signal light the label on the brand red was 3.95:1, so the fill is a
+deeper red under a white label; in Console light the amber is unchanged and the label is white
+where it was the background colour (4.22:1). The System palette cannot be hand-chosen, because its
+accent is the desktop's: it takes that colour, and deepens it (light) or lightens it (dark) until
+the label reaches 4.5:1 (it stops at 4.6:1 to leave room for rounding to eight bits), without
+moving its hue. A sweep of 1,440 desktop colours in the test suite holds every one at 4.6:1 or
+better. The fill also reaches 3:1 against the background and the surface in every combination, and
+so does the brand accent against the background.
+
+**Not covered by this.** A few lines of text are still set in the brand accent itself, or in the
+error colour, rather than in the accent used as ink: the lyric strip's sung line, a singer's tag,
+and the error lines under some dialogs. In Signal light those measure 3.76:1 against the
+background. They are text, not a labelled control, and were not part of this change.
 
 ## What is still mouse-only
 
@@ -135,6 +182,12 @@ The names, roles, descriptions and announcements on this page are asserted by th
 suites (`tst_accessibility.qml`, `tst_keyboard.qml`) on every build. Those suites run under the
 offscreen platform, which has no accessibility bridge, so they prove that the window offers the
 right things and not that a particular screen reader speaks them as intended.
+
+The contrast table is asserted by `tst_accessibility.qml` and the motion rules by
+`tst_motion.qml`, which stands in for the operating system's answer rather than reading it. What
+each platform's own answer returns was read on Windows only: the macOS call and the Linux reads
+(gsettings, KDE's `kdeglobals`) are written to the documented interfaces and have not been run on
+those systems.
 
 **No manual screen-reader pass has been run.** Neither NVDA on Windows nor Orca on Linux has
 been through the window. That check is still to do, and until it is, treat the screen-reader

@@ -6,7 +6,8 @@ import ForgeGui
 // A checkbox with an optional note beneath, drawn to the design system
 // (docs/hearth/design/screenshots/components.png, "CHECK BOXES · OFF, ON,
 // FOCUSED, DISABLED"): a 16 px square that fills with the accent when
-// checked, with the mark struck in the on-accent colour.
+// checked (Theme.accentFill), with the mark struck in the colour that goes on
+// it (Theme.accentText).
 //
 // A plain Rectangle rather than a QQC2 CheckBox: Basic's own indicator is a
 // light box with a dark mark whatever the palette says, which reads as an
@@ -51,11 +52,12 @@ Item {
         RowLayout {
             spacing: 10
             Rectangle {
+                objectName: "checkBoxSquare"
                 width: 16
                 height: 16
                 // Beside a label of one line; at the top of one that has wrapped.
                 Layout.alignment: label.lineCount > 1 ? Qt.AlignTop : Qt.AlignVCenter
-                color: root.checked ? Theme.accent : "transparent"
+                color: root.checked ? Theme.accentFill : "transparent"
                 border.color: Theme.divider
                 border.width: 1
                 Canvas {

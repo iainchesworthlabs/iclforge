@@ -2615,6 +2615,22 @@ void HearthController::setTextScale(const QString& scale) {
     emit settingsChanged();
 }
 
+QString HearthController::motion() const {
+    // A stored value this version does not know reads as the default.
+    const auto stored = settings_.value(QStringLiteral("appearance/motion"), QStringLiteral("system")).toString();
+    static const QStringList known{QStringLiteral("system"), QStringLiteral("reduced"), QStringLiteral("full")};
+    return known.contains(stored) ? stored : QStringLiteral("system");
+}
+
+void HearthController::setMotion(const QString& motion) {
+    if (motion == this->motion()) {
+        return;
+    }
+    settings_.setValue(QStringLiteral("appearance/motion"), motion);
+    settings_.sync();  // survive a hard exit
+    emit settingsChanged();
+}
+
 // --- diagnostics -------------------------------------------------------
 
 QString HearthController::diagnosticsReport() const {

@@ -69,6 +69,10 @@ qt_add_executable(hearth_qmltests
     "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_frames.hpp"
     "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_picture.cpp"
     "${PROJECT_SOURCE_DIR}/apps/shared/cdg-picture/src/cdg_picture.hpp")
+# Whether the operating system has been asked to cut back animation, which Theme.reducedMotion
+# binds to: SystemMotion and the platform file that answers it (cmake/SystemMotion.cmake).
+include(SystemMotion)
+iclforge_add_system_motion(hearth_qmltests)
 
 qt_add_qml_module(hearth_qmltests
     URI Hearth

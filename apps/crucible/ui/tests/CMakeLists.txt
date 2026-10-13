@@ -41,6 +41,10 @@ qt_add_executable(crucible_qmltests
     ../shared/cdg-picture/src/cdg_frames.hpp
     ../shared/cdg-picture/src/cdg_picture.cpp
     ../shared/cdg-picture/src/cdg_picture.hpp)
+# Whether the operating system has been asked to cut back animation, which Theme.reducedMotion
+# binds to: SystemMotion and the platform file that answers it (cmake/SystemMotion.cmake).
+include(SystemMotion)
+iclforge_add_system_motion(crucible_qmltests)
 # The icon provider and the tray answer are per platform, the same way the
 # window's own target selects them (apps/crucible/CMakeLists.txt): this target
 # embeds the same sources and has to make the same choice. Every file listed

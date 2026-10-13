@@ -81,6 +81,10 @@ qt_add_executable(forge-gui
     ../../shared/preferences/src/window_memory.hpp
     ../../shared/preferences/src/window_placement.cpp
     ../../shared/preferences/src/window_placement.hpp)
+# Whether the operating system has been asked to cut back animation, which Theme.reducedMotion
+# binds to: SystemMotion and the platform file that answers it (cmake/SystemMotion.cmake).
+include(SystemMotion)
+iclforge_add_system_motion(forge-gui)
 
 # RecordingSink and its Fmp4FolderWriter moved to apps/shared/media/src when
 # `forge record`/`live` started writing their takes through the same classes
@@ -144,6 +148,7 @@ set(ICLFORGE_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/SoundfieldView.qml"
     "${ICLFORGE_GUI_SHARED_DIR}/SegmentedControl.qml"
     "${ICLFORGE_GUI_SHARED_DIR}/FocusRing.qml"
+    "${ICLFORGE_GUI_SHARED_DIR}/BusyMark.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/LoudnessGroup.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/VbrPanel.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Ac4Panel.qml"

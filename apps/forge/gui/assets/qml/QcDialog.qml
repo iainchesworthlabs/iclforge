@@ -101,7 +101,7 @@ Dialog {
                 font.pixelSize: Theme.fontSmall
                 font.family: Theme.monoFamily
             }
-            BusyIndicator {
+            BusyMark {
                 objectName: "qcBusyIndicator"
                 visible: QcController.busy
                 running: QcController.busy

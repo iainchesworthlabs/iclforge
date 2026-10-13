@@ -427,6 +427,10 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/tray_support.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui/src/app_entry.hpp"
     )
+    # Whether the operating system has been asked to cut back animation, which Theme.reducedMotion
+    # binds to: SystemMotion and the platform file that answers it (cmake/SystemMotion.cmake).
+    include(SystemMotion)
+    iclforge_add_system_motion(crucible)
     # The application-icon provider and the tray answer are the two parts of
     # the window that talk to the operating system directly, so they are a
     # platform directory like engine/src/platform/: Windows asks the shell for an

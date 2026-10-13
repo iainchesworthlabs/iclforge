@@ -72,6 +72,7 @@ ApplicationWindow {
     Component.onCompleted: {
         Theme.preference = CrucibleController.theme;
         Theme.paletteChoice = CrucibleController.palette;
+        Theme.motionChoice = CrucibleController.motion;
         window.applyTextScale();
         // start() changes no sound setting: the output policy never opens
         // the endpoint that is the default, and its probe is what fills the
@@ -95,6 +96,7 @@ ApplicationWindow {
         function onSettingsChanged() {
             Theme.preference = CrucibleController.theme;
             Theme.paletteChoice = CrucibleController.palette;
+            Theme.motionChoice = CrucibleController.motion;
             window.applyTextScale();
         }
     }
