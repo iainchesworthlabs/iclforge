@@ -10,13 +10,18 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
+#include <numbers>
 #include <random>
 #include <span>
+#include <utility>
+#include <vector>
 
 #include "iclforge/ac3/core/mdct.hpp"
 #include "iclforge/base/arithmetic/fixed32.hpp"
 #include "mdct_fixed.hpp"
+#include "mdct_tables.hpp"
 
 using iclforge::internal::Fixed32;
 
@@ -213,4 +218,146 @@ TEST_CASE("the fixed inverse is linear in the block exponent", "[fixed32]") {
     // saturation anywhere in either.
     CHECK(worst < 128.0);
     CHECK(snr_db > 115.0);
+}
+
+namespace {
+
+// The tables as the C library makes them: what FixedImdctTables was before it was a constant,
+// an expression for expression copy of its old constructor and of StockhamTables'.
+template <std::size_t P>
+void library_plan(std::array<iclforge::dsp::tiered::fft_kernels::Stage, 8>& stages,
+                  std::vector<std::pair<std::int32_t, std::int32_t>>& factors) {
+    std::size_t n = P;
+    std::size_t stride = 1;
+    std::size_t count = 0;
+    std::size_t pass = 0;
+    factors.clear();
+    while (n > 1) {
+        const std::size_t r = n % 4 == 0 ? 4 : 2;
+        const std::size_t m = n / r;
+        stages[pass++] = {static_cast<int>(r), n, stride, count};
+        for (std::size_t p = 0; p < m; ++p) {
+            for (std::size_t k = 0; k < r; ++k) {
+                const double angle = -2.0 * std::numbers::pi * static_cast<double>((p * k) % n) /
+                                     static_cast<double>(n);
+                factors.emplace_back(Fixed32{std::cos(angle)}.raw, Fixed32{std::sin(angle)}.raw);
+            }
+        }
+        count += m * r;
+        n = m;
+        stride *= r;
+    }
+}
+
+template <std::size_t P, typename Plan>
+void require_plan_is_the_library_one(const Plan& plan) {
+    std::array<iclforge::dsp::tiered::fft_kernels::Stage, 8> stages{};
+    std::vector<std::pair<std::int32_t, std::int32_t>> factors;
+    library_plan<P>(stages, factors);
+    REQUIRE(factors.size() == plan.twiddles.size());
+    for (std::size_t i = 0; i < plan.stages.size(); ++i) {
+        CHECK(plan.stages[i].radix == stages[i].radix);
+        CHECK(plan.stages[i].n == stages[i].n);
+        CHECK(plan.stages[i].stride == stages[i].stride);
+        CHECK(plan.stages[i].twiddle == stages[i].twiddle);
+    }
+    std::size_t differing = 0;
+    for (std::size_t i = 0; i < factors.size(); ++i) {
+        differing += plan.twiddles[i].re.raw != factors[i].first ? 1U : 0U;
+        differing += plan.twiddles[i].im.raw != factors[i].second ? 1U : 0U;
+    }
+    CHECK(differing == 0);
+}
+
+}  // namespace
+
+TEST_CASE("the inverse pair's tables are the C library's, rounded to the format", "[fixed32]") {
+    const auto& t = iclforge::ac3::internal::fixed_imdct_tables();
+    constexpr double kPi = std::numbers::pi;
+    constexpr std::size_t kN = iclforge::ac3::internal::FixedImdctTables::kN;
+    std::size_t differing = 0;
+    for (std::size_t k = 0; k < kN / 4; ++k) {
+        const double angle =
+            2.0 * kPi * (8.0 * static_cast<double>(k) + 1.0) / (8.0 * static_cast<double>(kN));
+        differing += t.cos1[k].raw != Fixed32{-std::cos(angle)}.raw ? 1U : 0U;
+        differing += t.sin1[k].raw != Fixed32{-std::sin(angle)}.raw ? 1U : 0U;
+    }
+    for (std::size_t k = 0; k < kN / 8; ++k) {
+        const double angle =
+            2.0 * kPi * (8.0 * static_cast<double>(k) + 1.0) / (4.0 * static_cast<double>(kN));
+        differing += t.cos2[k].raw != Fixed32{-std::cos(angle)}.raw ? 1U : 0U;
+        differing += t.sin2[k].raw != Fixed32{-std::sin(angle)}.raw ? 1U : 0U;
+    }
+    for (std::size_t i = 0; i < kN; ++i) {
+        differing +=
+            t.window[i].raw != Fixed32{iclforge::ac3::kAnalysisWindow[i]}.raw ? 1U : 0U;
+    }
+    CHECK(differing == 0);
+    require_plan_is_the_library_one<kN / 4>(t.fft128);
+    require_plan_is_the_library_one<kN / 8>(t.fft64);
+}
+
+namespace {
+
+template <typename T, std::size_t N>
+bool same_bits(const std::array<T, N>& a, const std::array<T, N>& b) {
+    return std::memcmp(a.data(), b.data(), sizeof(T) * N) == 0;
+}
+
+template <std::size_t P, typename Plan, typename Reference>
+void require_same_plan(const Plan& constant, const Reference& runtime) {
+    REQUIRE(constant.twiddles.size() == runtime.twiddles.size());
+    std::size_t differing = 0;
+    for (std::size_t i = 0; i < constant.twiddles.size(); ++i) {
+        differing += std::memcmp(&constant.twiddles[i], &runtime.twiddles[i],
+                                 sizeof(constant.twiddles[i])) != 0
+                         ? 1U
+                         : 0U;
+    }
+    CHECK(differing == 0);
+    for (std::size_t i = 0; i < constant.stages.size(); ++i) {
+        CHECK(constant.stages[i].radix == runtime.stages[i].radix);
+        CHECK(constant.stages[i].n == runtime.stages[i].n);
+        CHECK(constant.stages[i].stride == runtime.stages[i].stride);
+        CHECK(constant.stages[i].twiddle == runtime.stages[i].twiddle);
+    }
+}
+
+}  // namespace
+
+TEST_CASE("the float transform tables that are constants are the C library's, narrowed",
+          "[fixed32]") {
+    // JOC's float transforms in a build whose decoder is not float read constants (mdct_tables.hpp);
+    // every bit of them is what the run-time form makes with the C library's cosine and sine.
+    namespace internal = iclforge::ac3::internal;
+    {
+        const internal::Twiddles<float> runtime;
+        const auto& constant = internal::kTwiddlesConstant<float>;
+        CHECK(same_bits(constant.cos1, runtime.cos1));
+        CHECK(same_bits(constant.sin1, runtime.sin1));
+    }
+    {
+        const internal::Twiddles2<float> runtime;
+        const auto& constant = internal::kTwiddles2Constant<float>;
+        CHECK(same_bits(constant.cos2, runtime.cos2));
+        CHECK(same_bits(constant.sin2, runtime.sin2));
+    }
+    {
+        const internal::FastMdctTables<512, float> runtime;
+        const auto& constant = internal::kFastMdctTablesConstant<512, float>;
+        CHECK(same_bits(constant.pre_re, runtime.pre_re));
+        CHECK(same_bits(constant.pre_im, runtime.pre_im));
+        CHECK(same_bits(constant.post_re, runtime.post_re));
+        CHECK(same_bits(constant.post_im, runtime.post_im));
+        require_same_plan<128>(constant.fft, runtime.fft);
+    }
+    {
+        const internal::FastMdctTables<256, float> runtime;
+        const auto& constant = internal::kFastMdctTablesConstant<256, float>;
+        CHECK(same_bits(constant.pre_re, runtime.pre_re));
+        CHECK(same_bits(constant.pre_im, runtime.pre_im));
+        CHECK(same_bits(constant.post_re, runtime.post_re));
+        CHECK(same_bits(constant.post_im, runtime.post_im));
+        require_same_plan<64>(constant.fft, runtime.fft);
+    }
 }

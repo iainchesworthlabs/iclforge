@@ -9,11 +9,13 @@
 #include <type_traits>
 
 #include "iclforge/ac3/core/window.hpp"
+#include "iclforge/ac3/detail/decode_scalar.hpp"
 #include "iclforge/base/detail/simd.hpp"
 
 #include "iclforge/base/detail/cpu_features.hpp"
 #include "iclforge/dsp/detail/fft_stockham.hpp"
 #include "mdct_avx2.hpp"
+#include "mdct_tables.hpp"
 #include "reference_transform.hpp"
 
 namespace iclforge::ac3 {
@@ -21,54 +23,60 @@ namespace iclforge::ac3 {
 namespace {
 
 constexpr int kN = kTransformLength;  // 512
-constexpr double kPi = std::numbers::pi;
 
-// §7.9.4.1 step 2: xcos1[k] = -cos(2pi(8k+1)/8N), xsin1[k] = -sin(2pi(8k+1)/8N).
+// The twiddles and the fast structure's tables are mdct_tables.hpp's, which has them both ways: built
+// on first use with the C library's cosine and sine, and as constants (a test holds the constants to
+// the C library's values there). Which a table is, is a question about the cache. A part with a
+// flash cache (an ESP32-C6's is 16 KB, shared by the code and the data, with 32-byte lines) fetches a
+// read-only table's lines from flash whenever the code in between has pushed them out: the
+// fixed-point inverse pair's tables (mdct_fixed.hpp) as constants in flash cost 15 permille of a
+// burst on a C6 (AC-3 656 -> 671, E-AC-3 751 -> 766), and as initialised data in RAM cost nothing.
+// So a table the decoder reads on every block stays built on first use, in RAM, and a table it
+// reads only in a stream of another kind is a constant, which costs nothing it does not use:
 //
-// Scalar (float32 for the minimum-footprint profile): the type the twiddles are STORED in.
-// Computed in double and narrowed once on the way in, for the same reason
-// the transform's own factors are (iclforge/dsp/detail/fft_stockham.hpp) - the angle here is small
-// and exact and deserves the library call at full precision whatever the table holds. Default
-// double, so every existing use is the one it always was.
-template <typename Scalar = double>
-struct Twiddles {
-    std::array<Scalar, kN / 4> cos1;
-    std::array<Scalar, kN / 4> sin1;
-    Twiddles() {
-        for (int k = 0; k < kN / 4; ++k) {
-            const double angle = 2.0 * kPi * (8.0 * k + 1.0) / (8.0 * kN);
-            cos1[static_cast<std::size_t>(k)] = static_cast<Scalar>(-std::cos(angle));
-            sin1[static_cast<std::size_t>(k)] = static_cast<Scalar>(-std::sin(angle));
-        }
-    }
-};
+//   the decoder's own scalar   built on first use, as it always was (the float32 profile's
+//                              float tables are every stream's main transform)
+//   float, in a build whose    JOC's object reconstruction runs in float whatever the decoder's
+//   decoder is not float       scalar is (recon_scalar_t), and that is all that reads them:
+//                              4,496 bytes of an ESP32-C6's RAM, never read there
+//   double                     the encoder's and the reference's, bit-pinned (the bitstream
+//                              hashes) and the C library's values to the last bit: unchanged
+template <typename Scalar>
+inline constexpr bool kTablesAreConstants =
+    std::is_same_v<Scalar, float> && !std::is_same_v<internal::decode_scalar_t, float>;
+
+using internal::FastMdctTables;
+using internal::Twiddles;
+using internal::Twiddles2;
 
 template <typename Scalar = double>
 const Twiddles<Scalar>& twiddles() {
-    static const Twiddles<Scalar> t;
-    return t;
-}
-
-// §7.9.4.2 step 2: xcos2[k] = -cos(2pi(8k+1)/4N), xsin2[k] = -sin(2pi(8k+1)/4N)
-// (N = 512 throughout this section, per the spec's own note — these are NOT
-// the 256-sample transform's own N).
-template <typename Scalar = double>
-struct Twiddles2 {
-    std::array<Scalar, kN / 8> cos2;
-    std::array<Scalar, kN / 8> sin2;
-    Twiddles2() {
-        for (int k = 0; k < kN / 8; ++k) {
-            const double angle = 2.0 * kPi * (8.0 * k + 1.0) / (4.0 * kN);
-            cos2[static_cast<std::size_t>(k)] = static_cast<Scalar>(-std::cos(angle));
-            sin2[static_cast<std::size_t>(k)] = static_cast<Scalar>(-std::sin(angle));
-        }
+    if constexpr (kTablesAreConstants<Scalar>) {
+        return internal::kTwiddlesConstant<Scalar>;
+    } else {
+        static const Twiddles<Scalar> t;
+        return t;
     }
-};
+}
 
 template <typename Scalar = double>
 const Twiddles2<Scalar>& twiddles2() {
-    static const Twiddles2<Scalar> t;
-    return t;
+    if constexpr (kTablesAreConstants<Scalar>) {
+        return internal::kTwiddles2Constant<Scalar>;
+    } else {
+        static const Twiddles2<Scalar> t;
+        return t;
+    }
+}
+
+template <int NLen, typename Scalar = double>
+const FastMdctTables<NLen, Scalar>& fast_mdct_tables() {
+    if constexpr (kTablesAreConstants<Scalar>) {
+        return internal::kFastMdctTablesConstant<NLen, Scalar>;
+    } else {
+        static const FastMdctTables<NLen, Scalar> t;
+        return t;
+    }
 }
 
 // §7.9.4.1 step 5's window, in the transform's own scalar type.
@@ -133,57 +141,6 @@ const std::array<float, static_cast<std::size_t>(kN)>& analysis_window<float>() 
 // on both random data and real audio, the short folds 2026-08-15 the same
 // way; see libs/ac3/tests/core/test_mdct_fast.cpp, which asserts a 1e-10 bound on all
 // three.
-
-// Everything angle-dependent in the fold below, computed once per NLen -
-// the same treatment Twiddles and the direct-form matrices give every
-// other transform in this file, applied to the fast path itself (phase-5
-// target 1 of the performance programme: this kernel runs 36x per frame in
-// every encode path, plus 6x per object per frame inside band_energy, and
-// its per-call cost was dominated by the 512 std::cos/std::sin libm calls
-// below being made fresh on every transform). Two exactness classes:
-//
-// - pre/post twiddles: the EXACT expressions the fold used to evaluate per
-//   call (std::cos/std::sin of -pi*m/M and -pi*(4k+1)/(4M)), stored instead
-//   of re-evaluated - bit-identical values, the direct-form tables' own
-//   reasoning (src/core/transform/reference/reference_transform.cpp).
-// - FFT stage twiddles + bit-reversal permutation: the previous in-place
-//   FFT generated each butterfly group's j-th twiddle by ITERATED complex
-//   multiply (w *= wlen), so it carried j-1 accumulated rounding steps.
-//   The table stores std::cos/std::sin of each exact angle -2*pi*j/len
-//   instead - a (tiny) numerical change in the direction of MORE precision,
-//   re-verified against the direct form's ground truth by
-//   libs/ac3/tests/core/test_mdct_fast.cpp's unchanged 1e-10 bound.
-template <int NLen, typename Scalar = double>
-struct FastMdctTables {
-    static constexpr std::size_t kM = static_cast<std::size_t>(NLen) / 2;
-    static constexpr std::size_t kP = kM / 2;
-    // z[m] pre-twiddle exp(-i*pi*m/M), split re/im.
-    std::array<Scalar, kP> pre_re{};
-    std::array<Scalar, kP> pre_im{};
-    // w[k] post-twiddle exp(-i*pi*(4k+1)/(4M)), split re/im.
-    std::array<Scalar, kP> post_re{};
-    std::array<Scalar, kP> post_im{};
-    // The P-point transform's plan - the family's one FFT, which dft512
-    // runs at P = 512 too; see iclforge/dsp/detail/fft_stockham.hpp.
-    iclforge::dsp::fft::StockhamTables<kP, Scalar> fft{};
-    FastMdctTables() {
-        for (std::size_t m = 0; m < kP; ++m) {
-            const double ang = -kPi * static_cast<double>(m) / static_cast<double>(kM);
-            pre_re[m] = static_cast<Scalar>(std::cos(ang));
-            pre_im[m] = static_cast<Scalar>(std::sin(ang));
-            const double ang2 =
-                -kPi * (4.0 * static_cast<double>(m) + 1.0) / (4.0 * static_cast<double>(kM));
-            post_re[m] = static_cast<Scalar>(std::cos(ang2));
-            post_im[m] = static_cast<Scalar>(std::sin(ang2));
-        }
-    }
-};
-
-template <int NLen, typename Scalar = double>
-const FastMdctTables<NLen, Scalar>& fast_mdct_tables() {
-    static const FastMdctTables<NLen, Scalar> t;
-    return t;
-}
 
 // The scaled DCT-IV every fold below lands on: out[j] = scale * DCT4_M(u)[j]
 // for the length-M input `u`, via one P = M/2-point complex FFT - the

@@ -4306,6 +4306,16 @@ The sections below contain the complete change list and fixes.
   ESP32-P4 has its row, and its page is in the navigation.
 - The front page, the README and the site description name AC-4 and say where it is and is not
   supported.
+- The pages that still said no ESP32 sink takes AC-4 in a Sendspin group say what is built: a sink
+  built with the decoder takes it on an ESP32-P4 (to 5.1) and an ESP32-S3 (at 2.0), the published
+  images have the decoder off, and a C6 is sent PCM. That is the README, the front page, Hearth's
+  page and its S3 and C6 sink guides, the sink firmware's README, the bare-metal and platform
+  indexes and the development status page, whose ESP32 figures are the current ones. The karaoke
+  guide no longer lists the microphone as unbuilt beneath the section that describes it. The
+  README names karaoke and Hearth for Android and lists the `sink`, `lyrics`, `pitch` and `device`
+  libraries. In the support catalogue Hearth's window has seven pages, the ESP32-P4 has one
+  download row for each of its two images where it had two for one, and the AC-4 cells for the
+  ESP32-S3 and C6 say what a board measured.
 - The performance and quality pages say which codecs their series cover, and name AC-4's scoring
   scripts and the local race against DEE. AC-4 joined the series afterwards (see Verification and
   CI), decode quality first.
@@ -5623,6 +5633,19 @@ The sections below contain the complete change list and fixes.
   14 KB free. The floor is 160,796 in both C6 profiles: what a play takes (134,008) and the
   26,788 bytes the network was left at its least beside an E-AC-3 stream. The C6 still refuses
   an HTTP play with `why: memory` and plays over Sendspin.
+- **JOC's float MDCT tables were 4,496 bytes of a C6's RAM that it never reads, and the fixed-point
+  inverse pair's tables were built by the first block that decoded.** The float tables are
+  constants in the read-only data (`kTwiddlesConstant`, `kFastMdctTablesConstant`, made at compile
+  time with dsp's portable cosine and sine) in a build whose decoder is not float: only Atmos object
+  reconstruction in the MDCT domain reads them, and on a part with no objects to place nothing does.
+  The fixed pair's 5,728 bytes are initialised data (`constinit`) and no longer cost 800 software
+  cosines at the first block; they are deliberately **not** read-only constants, which on a C6's
+  16 KB flash cache (shared with the code) cost 15 permille of a burst (AC-3 656 -> 671, E-AC-3
+  751 -> 766). Every entry is the C library's, bit for bit, narrowed (a test holds them to it on
+  MSVC, and the same check under g++ 15 and clang++ 22 with glibc); `float` tables on the S3 and
+  the P4, where float is the decoder's own scalar and the main transform, stay built on first use.
+  `c6-16mb` and `c6-4mb`: DIRAM 116,307 -> 111,823 (budget 117,000), AC-3 658 and E-AC-3 755
+  permille on the board (baseline 656/657 and 751/752).
 - **An E-AC-3 decoder held the spectra of seven streams for every block of every frame, a stereo
   stream's two or three included.** `Eac3Decoder` keeps six blocks of spectra between its two
   passes, and each block's was sized for the most a frame can code (five full-bandwidth channels,
