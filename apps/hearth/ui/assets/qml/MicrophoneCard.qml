@@ -251,7 +251,9 @@ Card {
             id: recordButton
             objectName: "microphoneRecord"
             width: Math.min(implicitWidth, recordRow.width)
-            text: MicrophoneController.recording ? qsTr("Stop recording") : qsTr("Record a take")
+            text: MicrophoneController.recording ? qsTr("Stop recording")
+            //: A take is one recording of the singer's voice.
+                : qsTr("Record a take")
             onClicked: MicrophoneController.recording ? MicrophoneController.stopRecording()
                                                       : MicrophoneController.startRecording()
         }
@@ -292,6 +294,7 @@ Card {
         columnSpacing: Theme.gap
         rowSpacing: Theme.space1
         Text {
+            //: A take is one recording of the singer's voice. The folder that takes are saved in follows.
             text: qsTr("Takes go to")
             color: Theme.text
             font.pixelSize: Theme.fontNormal
@@ -432,6 +435,7 @@ Card {
                         objectName: "microphoneTakeKeep"
                         visible: takeRow.confirming
                         width: Math.min(implicitWidth, takeButtons.width)
+                        //: Button shown beside "Delete for good" once Delete is pressed: do not delete this take (a recording of the singer's voice), keep it.
                         text: qsTr("Keep")
                         onClicked: takeRow.confirming = false
                     }
@@ -645,6 +649,7 @@ Card {
     AppCheckBox {
         objectName: "microphoneOwnKey"
         Layout.fillWidth: true
+        //: The key is the song's musical key (its tonality), not a cryptographic key.
         text: qsTr("Score against my key")
         note: qsTr("If you sing the whole song a little sharp or flat of the tune, judge the shape of "
                    + "your melody instead: your own key is taken from your first sung notes and "
@@ -658,9 +663,11 @@ Card {
         Layout.fillWidth: true
         visible: MicrophoneController.ownKey
         text: MicrophoneController.keyShiftCents === 0
+              //: The key is the singer's musical key (tonality), not a cryptographic key.
               ? qsTr("Waiting for a few sung notes to find your key.")
               : qsTr("Scored against your key: you are about %1 cents %2 the tune's, and that is allowed for.")
                     .arg(Math.round(Math.abs(MicrophoneController.keyShiftCents)))
+                    //: 'sharp of' and 'flat of' fill %2 of "you are about %1 cents %2 the tune's": higher than, lower than. Fragments, not sentences.
                     .arg(MicrophoneController.keyShiftCents > 0 ? qsTr("sharp of") : qsTr("flat of"))
         color: Theme.text
         font.pixelSize: Theme.fontSmall

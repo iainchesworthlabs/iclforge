@@ -1052,6 +1052,19 @@ The sections below contain the complete change list and fixes.
   Crucible's do, and which pages are translated; the rest of the window is English in every
   language, as it was. The catalogues also hold `lupdate`'s own suggestions: a rendering copied to
   an identical string on another page, marked unfinished ([Languages](docs/hearth/index.md#languages)).
+- **The rest of Hearth's window is translated, and a test holds it there.** The 911 messages still
+  unfinished in each of the six catalogues (910 in German) have a rendering in German, Spanish,
+  French, Arabic, Hebrew and Yiddish: the Play, Media, Speakers, Decoder, Network and Settings
+  pages, the sink pages, the shortcuts and the first-run dialog. They are machine-made and have
+  not been read by a speaker, and they use the words the Karaoke entries and the Crucible and Forge
+  catalogues already carry. The note under Settings' language chooser, which listed the pages
+  that were not translated, now says only that the translations are machine-made and unread.
+  `test_translations.cpp` reads Hearth's six files with the rules it
+  applies to Crucible's (nothing unfinished or dead, nothing empty, placeholders and brand terms
+  kept, one source set), and a new or reworded string now fails it until its six entries are
+  filled. Six strings that English builds by gluing `s` or `ies` onto a count cannot be translated
+  as written; their renderings leave that placeholder out and the test names the six
+  ([Languages](docs/hearth/index.md#languages)).
 - **The Network page says whether a board holds lyrics and which line it is on.** The sink report
   has a Lyrics row: "not offered" for a board that lists no lyric commands, "none held", "held,
   before the first line", or "line 3 of 12" with the line's text. The board reports the item and

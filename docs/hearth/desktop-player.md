@@ -254,9 +254,9 @@ with a **Take it back** button.
 - **Network**: the name sinks and players show for this computer, whether Hearth looks for
   Sendspin players, and the pairing records, each with **Forget**.
 - **Appearance**: the theme, the palette and the text size.
-- **Language**: English, German, Spanish, French, Arabic, Hebrew or Yiddish. The words of the
-  Karaoke page, the lyric views and the singer view are translated; the other pages are in English
-  in every language ([Languages](index.md#languages)).
+- **Language**: English, German, Spanish, French, Arabic, Hebrew or Yiddish. Every page is
+  translated; the translations are machine-made and no speaker has read them
+  ([Languages](index.md#languages)).
 - **Diagnostics**: a text file of what Hearth has done (the outputs opened, the streams played,
   the sinks found and paired, and every error), saved, copied or viewed live. Pairing keys, codes
   and file paths are left out of it.

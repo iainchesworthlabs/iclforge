@@ -63,6 +63,7 @@ Card {
                              : root.receiverDecodes ? qsTr("sent as it is")
                              : modeName === "rf" ? qsTr("RF mode")
                              : modeName === "custom" ? qsTr("custom mode") : qsTr("line mode");
+                    //: Shown when the kind of the stream is not known, as in 'stream · RF mode'. The stream itself.
                     return (kind.length > 0 ? kind : qsTr("stream")) + " · " + mode;
                 }
                 color: Theme.text
