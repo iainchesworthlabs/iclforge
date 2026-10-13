@@ -134,6 +134,8 @@ jobs:
         uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ needs.toolchain-versions.outputs.qt_version }}
+          aqtsource: ${{ needs.toolchain-versions.outputs.aqt_source }}
+          modules: qttasktree
           cache: true
           setup-python: false
 
