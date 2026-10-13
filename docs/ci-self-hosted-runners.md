@@ -38,8 +38,8 @@ macOS legs (the fleet's Python has no pip, which `cibuildwheel` needs before it 
 see `wheels.yml`'s own comment).
 
 Control-plane jobs - the `check-runner`/`check-runners` deciders in `ci.yml`, `_build.yml`,
-`codeql.yml` and `static-analysis.yml`, `_toolchain-versions.yml`'s `resolve`, and the
-`Verify Status` aggregator of `ci.yml` -
+`codeql.yml` and `static-analysis.yml`, `_toolchain-versions.yml`'s `resolve`, the
+`Verify Status` aggregator of `ci.yml`, and `dependency-review.yml`'s `Scan dependency diff` -
 route separately, via the repository variable `CONTROL_RUNNER_JSON` (a runner-label JSON
 array, e.g. `["self-hosted","Linux","X64"]`; unset means `ubuntu-latest`). These are
 seconds-long jobs that everything else waits on, and leaving them on the shared hosted pool
