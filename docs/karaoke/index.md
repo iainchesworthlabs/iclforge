@@ -369,6 +369,15 @@ the bar is held at, and the song moves there when you let go, whether it was pla
 queue beside the words: the song that is playing is marked, and pressing another plays it from
 its start. `Q` or the button closes it again.
 
+### In another player, in Crucible
+
+[Crucible](../crucible/index.md) reads the same `.lrc` file and shows the line being sung on its
+Room page, against whichever application it is given the file for: a player with no words of its
+own, or a browser. A player that publishes where it is in the song to the system's media controls
+is followed from that, and one that does not is followed from a press of **Start**, which is how
+Hearth is followed there. [The room](../crucible/room.md#06-lyrics) has a picture of it and the
+details.
+
 ## Sing into a microphone
 
 The Karaoke page has a **Microphone** card. It shows you how close your pitch is to the tune while
