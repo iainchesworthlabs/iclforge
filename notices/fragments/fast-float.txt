@@ -1,0 +1,8 @@
+fast_float {{FAST_FLOAT_VERSION}}
+-------------------------
+
+The fast_float library, version {{FAST_FLOAT_VERSION}}, is compiled into {{FAST_FLOAT_USERS}}: it
+is what reads a decimal number from text (iclforge::base::parse_double). It is available under the
+Apache-2.0, BSL-1.0 and MIT licences; the MIT licence is reproduced here.
+
+{{FILE:FAST_FLOAT_MIT}}

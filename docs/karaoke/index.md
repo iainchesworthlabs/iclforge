@@ -85,7 +85,7 @@ an AC-3 or E-AC-3 track) and choose the **Karaoke** page (`Ctrl+7`).
 
 ![Hearth's Karaoke page: the stream, its reproduction, the words, and what each speaker plays](screenshots/hearth-karaoke-page.png)
 
-*The "Auld Lang Syne" example, 1.8 s in and held there: the word being sung is part way through its fill. Taken from the running window with `hearth --smoke-shot ... --open ... --seek 1800` ([Hearth's command line](../hearth/index.md#command-line)).*
+*The "Auld Lang Syne" example, 1.8 s in and held there: the word being sung is part way through its fill. `hearth --smoke-shot karaoke.png --page karaoke --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 1800` ([Hearth's command line](../hearth/index.md#command-line)). The picture is of 2026-10-12, before the page had its [Microphone card](#sing-into-a-microphone), which is now the first card of the right-hand column.*
 
 **Reproduction** is the decoder's choice, kept across starts:
 
@@ -184,7 +184,8 @@ under Capable changes.
 
 ![Hearth's Karaoke page for the duet example: each line is tagged with who sings it and whether the playing vocal guides it](screenshots/hearth-karaoke-duet.png)
 
-*"Leave Her, Johnny", 6.3 s in: the crew's line, indented and tagged **guide** because both vocals play.*
+*"Leave Her, Johnny", 6.3 s in: the crew's line, indented and tagged **guide** because both vocals play. `hearth --smoke-shot duet.png --page karaoke --open examples/karaoke/leave-her-johnny/leave-her-johnny.ac3 --seek 6300`, of 2026-10-12 as the picture above is.*
+
 ### SubRip
 
 A `.srt` file is read as lyrics too, which is what subtitle tools and ripped karaoke subtitles write:
@@ -299,7 +300,7 @@ item with none gets no card, so the Play page is as it was for every other strea
 
 ![Hearth's Play page for a karaoke stream: the queue, and a Lyrics card above what is playing](screenshots/hearth-play-lyrics.png)
 
-*The Play page at its default size, 1.8 s into the example.*
+*The Play page at its default size, 1.8 s into the example. `hearth --smoke-shot play.png --page play --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 1800`.*
 
 ### A CD+G disc
 
@@ -337,12 +338,27 @@ for parity: a rip has already been through the drive's error correction.
 second in steps of 10 ms, on top of the file's own `[offset:]`. It is kept across starts. A file's
 times are rarely right to the frame against a particular output.
 
+### Timing a file by hand
+
+**Time the lyrics…** on the Karaoke page's Lyrics card opens a window that gives a file its times
+as the song plays: `Space` as each line starts, then as each word starts, with your reaction time
+taken off each press. A file that already has times opens with them, so the window is also where
+one wrong line or word is put right: choose it, then stamp it again or move it 10 ms at a time.
+**Save** writes the `.lrc` beside the song and keeps the file that was there once, as `.lrc.bak`.
+[Timing the lyrics](../hearth/index.md#timing-the-lyrics) has every step.
+
+![The timing window over the Karaoke page: the Lines and Words passes, Play and the position, the example's four lines each with its time and its words, and under them Stamp again, the 10 ms nudges, the singer of a line and the reaction time](screenshots/hearth-timing-window.png)
+
+*The example's own file in the timing window, 5.2 s in: every line has a time already, and its words are drawn solid because the file gives their times. `hearth --smoke-shot timing.png --page timing --setting "microphone/takesFolder=C:/Users/you/Documents/Hearth takes" --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --seek 5200`.*
+
 ### The singer view
 
 `F11`, or **Full screen** on the Karaoke page's lyrics or the Play page's, opens the words alone,
 large, on a dark screen. `Esc` leaves it, and `Space` pauses.
 
-![The singer view: the line being sung large, the queue beside it, and the position bar and controls at the bottom](screenshots/hearth-singer-view.png)
+![The singer view: the line being sung large between the line before it and the two after, the song that comes next named at the top right, and the position bar, Previous, Play, Next, Queue and the Vocals chooser at the bottom](screenshots/hearth-singer-view.png)
+
+*The example 5.2 s in, with the duet queued behind it. `hearth --smoke-shot singer.png --page singer --open examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --open examples/karaoke/leave-her-johnny/leave-her-johnny.ac3 --seek 5200`: a capture draws the view in the window, where `F11` gives it the whole screen.*
 
 A position bar, Previous, Play/Pause, Next, **Queue** and the **Vocals** chooser stay at the
 bottom, so a singer can move about in the song, pause, skip, pick the next song or change which
@@ -355,6 +371,15 @@ the bar is held at, and the song moves there when you let go, whether it was pla
 **The queue.** The strip at the top names the song that comes next. **Queue**, or `Q`, opens the
 queue beside the words: the song that is playing is marked, and pressing another plays it from
 its start. `Q` or the button closes it again.
+
+### In another player, in Crucible
+
+[Crucible](../crucible/index.md) reads the same `.lrc` file and shows the line being sung on its
+Room page, against whichever application it is given the file for: a player with no words of its
+own, or a browser. A player that publishes where it is in the song to the system's media controls
+is followed from that, and one that does not is followed from a press of **Start**, which is how
+Hearth is followed there. [The room](../crucible/room.md#06-lyrics) has a picture of it and the
+details.
 
 ## Sing into a microphone
 
@@ -510,24 +535,40 @@ somebody else's work: keep it for yourself.
 ## Make one in the Forge GUI
 
 Choose **Karaoke** in the Controls switch. Four steps build the stream from the recordings it is
-made of:
+made of. The pictures are of the [example's project](#try-it), opened with **Project…** in the
+title strip.
 
-![The Forge GUI's Karaoke flow at the Parts step: a backing, a melody guide and two vocals, each its own file](screenshots/forge-karaoke-parts.png)
+**1 · Parts.** Give each part its own file: a **stereo backing**, and optionally a **mono melody
+guide**, **Vocal 1**, **Vocal 2** and an **LFE**. Or give **one multichannel file** whose WAV
+speakers are already named. The page shows the coding mode the parts make, why, and what is wrong
+with anything that cannot be used.
 
-1. **Parts.** Give each part its own file: a **stereo backing**, and optionally a **mono melody
-   guide**, **Vocal 1** and **Vocal 2**. Or give **one multichannel file** whose WAV speakers are
-   already named. The page shows the coding mode the parts make, why, and what is wrong with
-   anything that cannot be used.
-2. **Levels.** The centre level (the melody guide in a stereo fold) and the surround level (the
-   vocals), which an aware decoder applies.
-3. **Hear.** The stream is encoded and played back the way a karaoke player decodes it: as coded,
-   aware, or capable with the vocals you choose. It plays the encoded stream, not your source
-   files.
-4. **Save.** The format (AC-3, the default, or E-AC-3), the file type (the raw stream, or
-   Matroska, MP4 or MPEG-TS), the bit rate, the equivalent `forge encode` (or `forge eac3-encode`)
-   command, and the encode.
+![The Forge GUI's Karaoke flow at the Parts step: a backing, a melody guide and two vocals, each its own file, an LFE row with nothing chosen, and under them the coding mode 3/2 with its checks](screenshots/forge-karaoke-parts.png)
 
-![The Hear step: the stream built, played as an aware decoder plays it, with which part reaches which speaker](screenshots/forge-karaoke-hear.png)
+*`forge-gui --smoke-shot parts.png project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=parts height=1100`*
+
+**2 · Levels.** The centre level (the melody guide in a stereo fold) and the surround level (the
+vocals), which an aware decoder applies.
+
+![The Levels step: the centre level and the surround level, each with what an aware decoder does with it](screenshots/forge-karaoke-levels.png)
+
+*`forge-gui --smoke-shot levels.png project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=levels`*
+
+**3 · Hear.** The stream is encoded and played back the way a karaoke player decodes it: as coded,
+aware, or capable with the vocals you choose and a level for each part. It plays the encoded
+stream, not your source files.
+
+![The Hear step: the stream built and ready to play as an aware decoder plays it, the vocals and the part levels closed until Capable is chosen, and which parts reach which speaker](screenshots/forge-karaoke-hear.png)
+
+*`forge-gui --smoke-shot hear.png project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=hear`: the capture waits for the stream to be built, and plays nothing.*
+
+**4 · Save.** The format (AC-3, the default, or E-AC-3), the file type (the raw stream, or
+Matroska, MP4 or MPEG-TS), the bit rate, the lyrics file that goes beside the stream, the
+equivalent `forge encode` (or `forge eac3-encode`) command, and the encode.
+
+![The Save step: the format, the file type, the bit rate, the Lyrics row with no file chosen, and the same encode as a forge command line](screenshots/forge-karaoke-save.png)
+
+*`forge-gui --smoke-shot save.png project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj karaokeStep=save`*
 
 Each coded channel is written into the same draft the other tiers edit, so switching to Expert
 afterwards shows the same bed, `bsmod` and assignments. The Forge GUI guide has the details of each

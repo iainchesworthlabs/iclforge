@@ -143,8 +143,12 @@ when this page was corrected.
   script run in the test binaries, with a generated stream and a fake output, and the bundled
   fonts on `QT_QPA_FONTDIR`. *Since:* Hearth has `--smoke-shot` (`--shot` with network discovery
   off, so it raises no firewall prompt), `--open <file>` and `--seek <ms>` (PR #1361), and the
-  guide's Karaoke page screenshot is the running window's. The singer view is still the harness's,
-  since a full-screen window is resized by an offscreen platform to its 800 px screen.
+  guide's Karaoke page screenshot is the running window's. *Since then:* every picture is the
+  running program's and can be taken again. `forge-gui --smoke-shot` opens a project and goes to a
+  step of the Karaoke flow (`project=`, `karaokeStep=`), `hearth --smoke-shot` shows the singer
+  view in the window and the timing window (`--page singer`, `--page timing`), and
+  `tools/pictures/pictures.json` has the command line, the environment and the build of each
+  picture, which `tools/pictures/take_pictures.py` takes again.
 
 ### Not measured
 

@@ -414,42 +414,42 @@
         <translation>%1 · sans temps, donc affichées en entier et non suivies</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="233"/>
+        <location filename="../qml/LyricStrip.qml" line="237"/>
         <source>Start again</source>
         <translation>Redémarrer</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="233"/>
+        <location filename="../qml/LyricStrip.qml" line="237"/>
         <source>Start</source>
         <translation>Démarrer</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="238"/>
+        <location filename="../qml/LyricStrip.qml" line="242"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="245"/>
+        <location filename="../qml/LyricStrip.qml" line="249"/>
         <source>Follow the media session</source>
         <translation>Suivre la session multimédia</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="252"/>
+        <location filename="../qml/LyricStrip.qml" line="259"/>
         <source>Show the words earlier</source>
         <translation>Afficher les paroles plus tôt</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="261"/>
+        <location filename="../qml/LyricStrip.qml" line="268"/>
         <source>Words shifted by %1</source>
         <translation>Paroles décalées de %1</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="266"/>
+        <location filename="../qml/LyricStrip.qml" line="273"/>
         <source>Show the words later</source>
         <translation>Afficher les paroles plus tard</translation>
     </message>
     <message>
-        <location filename="../qml/LyricStrip.qml" line="401"/>
+        <location filename="../qml/LyricStrip.qml" line="409"/>
         <source>CD+G picture</source>
         <translation>Image CD+G</translation>
     </message>

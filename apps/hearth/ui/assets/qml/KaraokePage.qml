@@ -25,6 +25,28 @@ ScrollView {
     // puts the window full screen with the singer view.
     signal lyricsFullScreenRequested()
 
+    // The timing window, as "Time the lyrics…" opens it, for Main.qml's
+    // openLyricTiming() (`--page timing`). It times the lyrics of the item that is
+    // loaded, which are read a moment after the item is, so a request made sooner
+    // than a person could press the button waits: for an item, and then one turn
+    // of the timer more.
+    function openTiming() {
+        root.timingOpener.itemSeen = false;
+        root.timingOpener.restart();
+    }
+    readonly property Timer timingOpener: Timer {
+        property bool itemSeen: false
+        interval: 250
+        onTriggered: {
+            if (root.loaded && itemSeen) {
+                timingDialog.open();
+                return;
+            }
+            itemSeen = root.loaded;
+            restart();
+        }
+    }
+
     clip: true
     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 

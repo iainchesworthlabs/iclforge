@@ -85,7 +85,11 @@ the column was never populated. Rows from that point on carry real numbers.
 .tool-trend-table-wrap { overflow-x: auto; }
 #tool-trend-app table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
 #tool-trend-app th, #tool-trend-app td { padding: 0.35em 0.6em; text-align: left; border-bottom: 1px solid var(--md-default-fg-color--lightest); white-space: nowrap; }
-.tool-trend-regression { color: var(--md-typeset-mark-color, #c62828); font-weight: 600; }
+/* Red, as performance-trend.md's breach colour is: --md-typeset-mark-color is the <mark> highlight's
+   background, not a red, so a fallback after it never applied. A deep step on the light page and a
+   pale one on the dark page, as performance-quality.md's .pq-watch is. */
+.tool-trend-regression { color: #c62828; font-weight: 600; }
+[data-md-color-scheme="slate"] .tool-trend-regression { color: #e57373; }
 .tool-trend-release-row { background: color-mix(in srgb, var(--md-accent-fg-color, #7c4dff) 8%, transparent); }
 .tool-trend-release { text-decoration: none; font-weight: 600; }
 .tool-trend-release:hover { text-decoration: underline; }

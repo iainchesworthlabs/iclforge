@@ -271,6 +271,13 @@ right rail then shows the line being sung with the lines around it. The format i
 for a word-timed file, in which a word is **sung**, **being sung** (underlined and filled left to
 right) or **not yet sung**.
 
+![The Room page with Hearth selected and its lyrics imported: under 06 Lyrics in the right rail, the file's name and line count, Start again, Stop and Follow the media session, the nudge buttons, the line before, the line being sung with one word filled, and the two lines after it](screenshots/crucible-lyrics.png)
+
+*"Auld Lang Syne" from the karaoke example, imported against Hearth, which is playing it. Hearth
+publishes no media session, so the strip was started by hand at 5.75 s, with `--lyrics
+"Hearth=examples/karaoke/auld-lang-syne/auld-lang-syne.lrc@00:05.75"`, and says that it cannot see
+a pause or a seek.*
+
 A **SubRip** `.srt`, an **Advanced SubStation Alpha** `.ass` script and a **MIDI karaoke** `.kar`
 file are imported the same way, and told apart by what is in them and not by their name, as Hearth
 does: a `.kar` carries no word of its encoding, so its words must be UTF-8.

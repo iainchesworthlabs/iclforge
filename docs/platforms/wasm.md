@@ -361,9 +361,10 @@ once.
 ## Toolchain
 
 No vcpkg. Every other platform preset in `CMakePresets.json` chainloads through vcpkg for
-consistency, but the third-party libraries `iclforge::ac3` takes in this build are {fmt} and
-nlohmann/json (the scene file's reader), both header-only, which `cmake/Fmt.cmake` and
-`cmake/NlohmannJson.cmake` fetch from source with `FetchContent`, so `config-wasm-emscripten`'s toolchain
+consistency, but the third-party libraries `iclforge::ac3` takes in this build are {fmt},
+nlohmann/json (the scene file's reader) and fast_float (decimal text, through
+`iclforge::base::parse_double`), all header-only, which `cmake/Fmt.cmake`,
+`cmake/NlohmannJson.cmake` and `cmake/FastFloat.cmake` fetch from source with `FetchContent`, so `config-wasm-emscripten`'s toolchain
 file goes straight to Emscripten's own `Emscripten.cmake` — see that toolchain file's own header for
 why going through vcpkg's community `wasm32-emscripten` triplet would be pure cost for nothing this
 preset needs.
