@@ -90,15 +90,15 @@ _NAME = re.compile(
 
 GUIDANCE = (
     "This project formats with {fmt}, never the standard library's <format>/<print>:\n"
-    "  - include <fmt/format.h> for fmt::format and fmt::format_to, <fmt/base.h> for fmt::print and\n"
-    "    fmt::println, <fmt/chrono.h> to format a std::chrono time_point or duration, <fmt/ranges.h>\n"
-    "    for a range, and link the target iclforge::fmt;\n"
+    "  - include <fmt/format.h> for fmt::format and fmt::format_to, <fmt/base.h> for fmt::print\n"
+    "    and fmt::println, <fmt/chrono.h> to format a std::chrono time_point or duration,\n"
+    "    <fmt/ranges.h> for a range, and link the target iclforge::fmt;\n"
     "  - the format-spec syntax is the same, so the call usually changes in its prefix alone, but\n"
     "    compare the output where a floating-point value is written with a bare {}: 100000.0 is\n"
-    "    \"1e+05\" under std::format and \"100000\" under fmt::format.\n"
-    "Why: NDK r26's libc++ has no usable <format>, and a desktop build compiles std::format without\n"
-    "a word, so it breaks only where an NDK build reaches the file. See CONTRIBUTING.md (Code\n"
-    "conventions) and cmake/Fmt.cmake."
+    '    "1e+05" under std::format and "100000" under fmt::format.\n'
+    "Why: NDK r26's libc++ has no usable <format>, and a desktop build compiles std::format\n"
+    "without a word, so it breaks only where an NDK build reaches the file. See CONTRIBUTING.md\n"
+    "(Code conventions) and cmake/Fmt.cmake."
 )
 
 
@@ -131,11 +131,15 @@ def tracked(root: Path) -> list[str]:
         # A root that is a directory inside some other repository is no repository of its own: a
         # test's temporary tree under a checkout would otherwise be answered with that checkout's
         # (empty) listing for these paths.
-        prefix = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--show-prefix"],
-            capture_output=True,
-            check=True,
-        ).stdout.decode("utf-8").strip()
+        prefix = (
+            subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--show-prefix"],
+                capture_output=True,
+                check=True,
+            )
+            .stdout.decode("utf-8")
+            .strip()
+        )
         if prefix:
             raise FileNotFoundError(prefix)
         out = subprocess.run(
@@ -179,7 +183,9 @@ def main(argv: list[str] | None = None) -> int:
     findings = check(root, files)
     for x in findings:
         print(f"FAIL: {x.path}:{x.line}: {x.what}" + (f": {x.text}" if x.text else ""))
-    print(f"{len(files)} C++ files under {', '.join(TREES)}: {len(findings)} uses of <format>/<print>")
+    print(
+        f"{len(files)} C++ files under {', '.join(TREES)}: {len(findings)} uses of <format>/<print>"
+    )
     if findings:
         print()
         print(GUIDANCE)

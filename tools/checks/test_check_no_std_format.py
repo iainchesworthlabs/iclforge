@@ -64,7 +64,7 @@ class NoStdFormat(unittest.TestCase):
     def test_fmt_passes(self) -> None:
         self.assert_clean(
             "libs/x/src/a.cpp",
-            '#include <fmt/format.h>\n#include <fmt/chrono.h>\n'
+            "#include <fmt/format.h>\n#include <fmt/chrono.h>\n"
             'std::string f(int n) { return fmt::format("{}", n); }\n',
         )
 
@@ -75,9 +75,7 @@ class NoStdFormat(unittest.TestCase):
         self.assert_flagged("apps/x/src/a.cpp", "#include <print>\n", "#include <print>")
 
     def test_an_include_spaced_oddly_fails(self) -> None:
-        self.assert_flagged(
-            "apps/x/src/a.cpp", "#  include  < format >\n", "#include <format>"
-        )
+        self.assert_flagged("apps/x/src/a.cpp", "#  include  < format >\n", "#include <format>")
 
     def test_each_name_fails(self) -> None:
         names = [
@@ -105,15 +103,15 @@ class NoStdFormat(unittest.TestCase):
                 self.assert_flagged(rel, f"auto s = std::{name}(x);\n", f"std::{name}")
 
     def test_a_scope_spelled_with_spaces_fails(self) -> None:
-        self.assert_flagged("libs/x/src/a.cpp", "auto s = std :: format(\"{}\", 1);\n", "std::format")
+        self.assert_flagged("libs/x/src/a.cpp", 'auto s = std :: format("{}", 1);\n', "std::format")
 
     def test_a_leading_global_scope_fails(self) -> None:
-        self.assert_flagged("libs/x/src/a.cpp", "auto s = ::std::format(\"{}\", 1);\n", "std::format")
+        self.assert_flagged("libs/x/src/a.cpp", 'auto s = ::std::format("{}", 1);\n', "std::format")
 
     def test_the_line_number_is_the_line_of_the_use(self) -> None:
         self.assert_flagged(
             "libs/x/src/a.cpp",
-            "int a;\n\n// a comment\nint b = 1'000;\nauto s = std::format(\"{}\", b);\n",
+            'int a;\n\n// a comment\nint b = 1\'000;\nauto s = std::format("{}", b);\n',
             "std::format",
             line=5,
         )
@@ -122,7 +120,7 @@ class NoStdFormat(unittest.TestCase):
         write(
             self.root,
             "libs/x/src/a.cpp",
-            "#include <format>\nauto a = std::format(\"{}\", 1);\nstd::println(\"x\");\n",
+            '#include <format>\nauto a = std::format("{}", 1);\nstd::println("x");\n',
         )
         code, out = self.run_check()
         self.assertEqual(code, 1)
@@ -135,7 +133,7 @@ class NoStdFormat(unittest.TestCase):
     def test_a_header_and_an_inl_and_an_objc_file_are_read(self) -> None:
         for rel in ("libs/x/include/a.hpp", "libs/x/src/a.inl", "apps/x/src/a.mm", "apps/x/a.h"):
             with self.subTest(rel=rel):
-                self.assert_flagged(rel, "auto s = std::format(\"{}\", 1);\n", "std::format")
+                self.assert_flagged(rel, 'auto s = std::format("{}", 1);\n', "std::format")
                 (self.root / rel).unlink()
 
     # --- what does not ------------------------------------------------------------------------
@@ -162,7 +160,7 @@ class NoStdFormat(unittest.TestCase):
     def test_cstdio_is_not_print(self) -> None:
         self.assert_clean(
             "libs/x/src/a.cpp",
-            "#include <cstdio>\nvoid f() { std::printf(\"x\"); std::snprintf(nullptr, 0, \"x\"); }\n",
+            '#include <cstdio>\nvoid f() { std::printf("x"); std::snprintf(nullptr, 0, "x"); }\n',
         )
 
     def test_a_name_that_only_starts_like_one_does_not_count(self) -> None:
@@ -218,15 +216,11 @@ class NoStdFormat(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.root), "init", "-q"], check=True)
         write(self.root, "libs/x/src/tracked.cpp", "int x;\n")
         write(self.root, "libs/x/src/untracked.cpp", "#include <format>\n")
-        subprocess.run(
-            ["git", "-C", str(self.root), "add", "libs/x/src/tracked.cpp"], check=True
-        )
+        subprocess.run(["git", "-C", str(self.root), "add", "libs/x/src/tracked.cpp"], check=True)
         code, out = self.run_check()
         self.assertEqual(code, 0, out)
         self.assertIn("1 C++ files", out)
-        subprocess.run(
-            ["git", "-C", str(self.root), "add", "libs/x/src/untracked.cpp"], check=True
-        )
+        subprocess.run(["git", "-C", str(self.root), "add", "libs/x/src/untracked.cpp"], check=True)
         code, out = self.run_check()
         self.assertEqual(code, 1, out)
         self.assertIn("untracked.cpp:1", out)
