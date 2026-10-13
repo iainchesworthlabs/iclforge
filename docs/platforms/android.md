@@ -83,11 +83,14 @@ regardless (it never muxes a file).
 
 The libc++ still implements only `<charconv>`'s **integer** `from_chars`, not its floating-point
 overloads (r28c included, measured) — a gap {fmt} does not close, since {fmt} only formats text *out*,
-the same direction `std::format` goes. Library code that has to turn text *into* a `double` therefore uses `strtod`
-instead (`libs/ac3/src/encoder/plan.cpp`, `encoder/assignment.cpp`,
-`libs/objects/src/scene_text.hpp`, which also serves the object-scene file formats' parsing —
-the write side of that same file goes through `fmt::format`, like everything else, once {fmt}
-made that safe). The macOS wheel's own deployment target has the identical `from_chars` gap
+the same direction `std::format` goes. Library code that has to turn text *into* a `double` therefore
+calls `iclforge::base::parse_double` (`libs/base/src/number_parse.cpp`), which is fast_float, the
+implementation `std::from_chars` was specified from: `libs/ac3/src/encoder/plan.cpp`,
+`encoder/assignment.cpp`, `libs/objects/src/scene_text.cpp`, which also serves the object-scene file
+formats' parsing — the write side of the scene file goes through `fmt::format`, like everything else.
+It gives the same answer on the NDK and on a desktop; `strtod` did not, for a subnormal ("4.9e-324"
+sets `ERANGE` under Windows' C runtime and not under bionic's). The macOS wheel's own deployment
+target has the identical `from_chars` gap
 (`'from_chars' is unavailable: introduced in macOS 26.0`) — {fmt}'s own vendored formatting avoids
 the matching `to_chars` gap there (`'to_chars' is unavailable: introduced in macOS 13.3`) that a
 raw `std::format` call would hit — so this leg and **Build wheels (macos-latest)** are the two
@@ -102,10 +105,15 @@ true for every value between the first element and the last, llvm-project#61160)
 `std::expected` whose has-value flag survives a trivially copyable payload with tail padding
 (llvm-project#68552 and #70494, android/ndk#1963: r27 has half the fix, r28 both), and Clang 19's
 P2718R0, which keeps a range-for's temporaries alive to the end of the loop. What it still does not
-have: floating-point `from_chars`, `std::views::enumerate`, `std::flat_map`, `std::atomic_ref`, and
-`std::jthread` / `std::stop_token` without `-fexperimental-library` (the header is there; the
-types are behind the flag, which nothing here passes: `libs/audio/src/backend/android/monitor.cpp`
-keeps its own stop flag).
+have: floating-point `from_chars`, `std::views::enumerate`, `std::flat_map` and `std::atomic_ref`.
+`std::jthread` and `std::stop_token` are there but behind libc++'s experimental switch, and
+`cmake/AndroidExperimentalLibrary.cmake` passes `-fexperimental-library` for an Android build, so the
+Windows, ALSA and desktop code that uses them compiles for Android too (measured on a Shield against
+both the static and the shared libc++: a `jthread` that loops on its `stop_token`, a `stop_callback`
+and `request_stop()`). With it the translation units that do not build for Android go from 25 to
+the 3 that use floating-point `from_chars`, and `iclforge-audio-tests`, `iclforge-dsp-tests`,
+`iclforge-app-media-tests` and `iclforge-crucible-tests` link and run on the device.
+`libs/audio/src/backend/android/monitor.cpp` keeps the stop flag it has.
 
 `minSdk = 26` (Oreo) is a hard floor, not a target: `monitor.cpp` depends on AAudio outright, which
 does not exist below API 26, and there is no fallback path. Real Shield TV hardware (2017 model

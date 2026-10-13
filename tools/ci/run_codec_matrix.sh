@@ -115,6 +115,9 @@ fi
 # script's own location rather than $PWD, so it does not matter where the
 # script was invoked from.
 FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../testdata/audio" && pwd)"
+# The karaoke example's project, for the `forge project` section at the end. Resolved here for the
+# same reason: CI runs this script by a relative path, which names nothing after the `cd`.
+PROJECT_EXAMPLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../examples/karaoke/auld-lang-syne" && pwd)"
 
 WORKDIR="${2:-$(mktemp -d)}"
 mkdir -p "$WORKDIR"
@@ -1329,8 +1332,7 @@ run_ac4_fmp4_check i1_ac4_fmp4_2997 ac4_stereo_2997.mp4
 # matrix has already run. The one project in the repository is the karaoke example's (its four parts
 # beside it, and the stream it makes committed next to it): the matrix asks for that stream again,
 # holds it to the committed bytes, and to FFmpeg's strict decode. `print` shows the commands and
-# runs none of them.
-PROJECT_EXAMPLE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../examples/karaoke/auld-lang-syne" && pwd)"
+# runs none of them. PROJECT_EXAMPLE is resolved at the top, before the `cd` to the work directory.
 run project "$PROJECT_EXAMPLE/auld-lang-syne.forgeproj" project_karaoke.ac3
 cmp -s "$PROJECT_EXAMPLE/auld-lang-syne.ac3" project_karaoke.ac3 || {
     echo "forge project did not reproduce examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 byte for byte" >&2

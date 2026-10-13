@@ -31,6 +31,9 @@ class Iclforge < Formula
   # 3.12.0 or newer; without it cmake/NlohmannJson.cmake fetches it from GitHub at configure time,
   # as cmake/Fmt.cmake does {fmt}.
   depends_on "nlohmann-json" => :build
+  # The reader of decimal text behind iclforge::base::parse_double (libs/base). Header-only; without
+  # it cmake/FastFloat.cmake fetches it from GitHub at configure time, as cmake/Fmt.cmake does {fmt}.
+  depends_on "fast_float" => :build
 
   def install
     # DERIVED_VERSION_OVERRIDE: cmake/GitVersionDerivation.cmake derives the

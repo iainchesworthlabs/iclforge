@@ -101,6 +101,12 @@ else()
 endif()
 # nlohmann/json's, the same way (cmake/NlohmannJson.cmake): iclforge::objects compiles it in for
 # the scene file's reader, and Hearth's programs link that library.
+# fast_float's, the same way (cmake/FastFloat.cmake): iclforge::base compiles it in.
+if(FastFloat_VERSION)
+    set(ICLFORGE_HEARTH_FAST_FLOAT_VERSION "${FastFloat_VERSION}")
+else()
+    set(ICLFORGE_HEARTH_FAST_FLOAT_VERSION "${ICLFORGE_FAST_FLOAT_VERSION}")
+endif()
 if(nlohmann_json_VERSION)
     set(ICLFORGE_HEARTH_JSON_VERSION "${nlohmann_json_VERSION}")
 else()
@@ -133,7 +139,7 @@ if(EXISTS "${ICLFORGE_HEARTH_VCPKG_SHARE}/libogg/copyright")
     list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS "LIBOGG_VERSION=${version}")
     list(APPEND ICLFORGE_HEARTH_NOTICE_FILES "LIBOGG_COPYRIGHT=${ICLFORGE_HEARTH_VCPKG_SHARE}/libogg/copyright")
 endif()
-list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt nlohmann-json hearth-fonts hearth-lvgl
+list(APPEND ICLFORGE_HEARTH_NOTICE_FRAGMENTS opus time-filter fmt nlohmann-json fast-float hearth-fonts hearth-lvgl
        hearth-firmware material-symbols trademarks)
 # Tracy's client library: hearth_engine (engine/CMakeLists.txt) links iclforge::tracy
 # unconditionally, which only pulls in Tracy::TracyClient - and so is only worth
@@ -156,6 +162,8 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS
     "FMT_USERS=Hearth's programs"
     "JSON_VERSION=${ICLFORGE_HEARTH_JSON_VERSION}"
     "JSON_USERS=Hearth's programs"
+    "FAST_FLOAT_VERSION=${ICLFORGE_HEARTH_FAST_FLOAT_VERSION}"
+    "FAST_FLOAT_USERS=Hearth's programs"
     "FONT_USER=Hearth"
     "TRACY_VERSION=${ICLFORGE_HEARTH_TRACY_VERSION}"
     "TRACY_USERS=Hearth's programs")
@@ -174,6 +182,7 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_FILES
     "LGPL3=${CMAKE_SOURCE_DIR}/notices/licences/LGPL-3.0.txt"
     "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
     "JSON_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-nlohmann-json.txt"
+    "FAST_FLOAT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fast-float.txt"
     "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
     "LVGL_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-lvgl.txt"
     "ESP_IDF_COMPONENTS=${CMAKE_SOURCE_DIR}/notices/licences/ESP-IDF-components.txt"

@@ -9,10 +9,17 @@ import Hearth
 // Repeater, so the native-Button-in-a-Repeater hang the family has hit
 // elsewhere does not apply here.
 Rectangle {
+    id: root
+
     color: Theme.surface
     border.color: Theme.border
     border.width: 1
     implicitHeight: 48
+
+    // The item is going to a receiver as a bitstream, which this player's
+    // volume does not reach.
+    readonly property bool bitstreamOutput: HearthController.outputFormat.mode === "bitstream"
+                                            || HearthController.outputFormat.mode === "bitstreamAsAc3"
 
     // mm:ss, the shape every other duration readout in the family uses
     // (apps/forge/gui/assets/qml/Main.qml's own formatTime()) and what the design's
@@ -220,6 +227,12 @@ Rectangle {
             Layout.preferredWidth: 120
             from: -60
             to: 0
+            // The gain is applied to what is decoded here. A receiver sent a
+            // bitstream has the only volume there is, so the control is
+            // closed while one goes out, and kept for the next decode.
+            enabled: !root.bitstreamOutput
+            Accessible.description: root.bitstreamOutput
+                ? qsTr("The receiver sets the volume of a bitstream.") : ""
             value: HearthController.volumeDb
             // A plain binding on `value` does not survive a drag - Slider's
             // own drag handling writes it directly, which breaks the binding
@@ -238,6 +251,7 @@ Rectangle {
             Layout.preferredWidth: 56
             horizontalAlignment: Text.AlignRight
             text: qsTr("%1 dB").arg(HearthController.volumeDb.toFixed(1))
+            opacity: root.bitstreamOutput ? 0.45 : 1.0
             color: Theme.textMuted
             font.family: Theme.monoFamily
             font.pixelSize: Theme.fontSmall

@@ -107,9 +107,12 @@ choice does not apply:
 - The stream is **not karaoke**: an ordinary programme, an AC-4 stream, or an E-AC-3 stream flagged
   karaoke whose programme has a dependent substream or an object layer, which Annex C has no
   vocals for. The page says which, and that the stream plays as coded.
-- The output is a **bitstream** to a receiver. The receiver decodes it, so the choice is not
-  applied; unless it is karaoke-capable, V1 and V2 play from its surround speakers. The page has a
-  button to choose another output.
+- The stream is going to a receiver as a **bitstream**. That happens only with **As coded** chosen
+  and a receiver chosen for passthrough in the output picker: the receiver decodes the stream, and
+  unless it is karaoke-capable, V1 and V2 play from its surround speakers. With **Aware** or
+  **Capable** chosen Hearth decodes the stream itself and sends the receiver PCM, so the choice
+  is heard. The page's notice, shown while a bitstream goes out, says both, and has a button to
+  choose another output.
 - The output is a **network group**: a sink that lists the karaoke settings (and, for an E-AC-3
   stream, `eac3` among the codecs it reproduces karaoke for) and decodes as many channels as the
   stream has is sent the stream as it is and told your choice, and decodes it itself; one that

@@ -37,6 +37,11 @@ percentage tiers) with three memory-specific differences:
   the commit range where the switch happened. That range is not a safe one
   to be blind on: it is where the merge that squares two branches lands.
 
+A (leg, config) already recorded for this commit is not recorded again, as
+in append_performance_history.py: the nightly run and a dispatch on main
+measure a commit the run after its merge may have measured already. A
+repeated run is still judged, against the history from before its commit.
+
 stdlib-only, commit/commit-date taken as arguments - same reasoning as
 every other append script here (see append_performance_history.py).
 """
@@ -117,11 +122,27 @@ def load_leg_results(results_dir: Path):
                 }
 
 
-def series_samples(history_path: Path, leg: str, config: str, metric: str):
+def recorded_keys(history_path: Path, commit: str):
+    """The (leg, config) of every record the file already holds for `commit`."""
+    if not history_path.exists():
+        return set()
+    keys = set()
+    for line in history_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        if rec.get("commit") == commit:
+            keys.add((rec.get("leg"), rec.get("config")))
+    return keys
+
+
+def series_samples(history_path: Path, leg: str, config: str, metric: str,
+                   exclude_commit=None):
     """One history file's values for a single leg/config/metric, in file
     order (which is append order, so oldest first). Each sample carries its
     commit date so samples from different files can be merged in time
-    order."""
+    order. The records of `exclude_commit` are left out: a run is judged
+    against what came before its commit."""
     if not history_path.exists():
         return []
     samples = []
@@ -129,13 +150,15 @@ def series_samples(history_path: Path, leg: str, config: str, metric: str):
         if not line.strip():
             continue
         rec = json.loads(line)
+        if exclude_commit is not None and rec.get("commit") == exclude_commit:
+            continue
         if rec.get("leg") == leg and rec.get("config") == config and metric in rec:
             samples.append((rec.get("commit_date", ""), rec[metric]))
     return samples
 
 
 def baseline_for(history_dir: Path, branch: str, leg: str, config: str,
-                 metric: str, window: int):
+                 metric: str, window: int, exclude_commit=None):
     """Trailing mean for one series, as (mean, sample_count, widened) - or
     (None, 0, False) when no history for it exists anywhere.
 
@@ -154,7 +177,8 @@ def baseline_for(history_dir: Path, branch: str, leg: str, config: str,
     FROM is a sound baseline for the branch being merged INTO; the two are
     measuring the same code on the same leg.
     """
-    own = series_samples(history_dir / f"memory-{branch_slug(branch)}.jsonl", leg, config, metric)
+    own = series_samples(history_dir / f"memory-{branch_slug(branch)}.jsonl", leg, config, metric,
+                         exclude_commit)
     if len(own) >= MIN_TRAILING_RECORDS:
         tail = [value for _, value in own[-window:]]
         return sum(tail) / len(tail), len(tail), False
@@ -168,7 +192,7 @@ def baseline_for(history_dir: Path, branch: str, leg: str, config: str,
         # so reading them as a series would count those samples twice.
         if sibling.name.endswith(".recent.jsonl"):
             continue
-        merged.extend(series_samples(sibling, leg, config, metric))
+        merged.extend(series_samples(sibling, leg, config, metric, exclude_commit))
     if not merged:
         return None, 0, False
 
@@ -189,7 +213,7 @@ def emit_github_output(name: str, value: str) -> None:
         f.write(f"{name}={value}\n")
 
 
-def check_churn(rec, history_dir: Path, branch: str):
+def check_churn(rec, history_dir: Path, branch: str, exclude_commit=None):
     """Yield (hard, message) for each churn metric that regressed against
     its own trailing mean - or, for a near-zero baseline, its absolute
     floor.
@@ -201,7 +225,7 @@ def check_churn(rec, history_dir: Path, branch: str):
         value = rec[metric]
         baseline, samples, widened = baseline_for(
             history_dir, branch, rec["leg"], rec["config"], metric,
-            REGRESSION_TRAILING_WINDOW)
+            REGRESSION_TRAILING_WINDOW, exclude_commit)
         if baseline is None:
             yield (False,
                    f"{rec['leg']}/{rec['config']}: {label} recorded at {value:.1f} with "
@@ -272,17 +296,19 @@ def main() -> int:
               f"{args.results_dir}; nothing to append")
         return 0
 
+    already = recorded_keys(history_path, args.commit)
     lines = []
     hard_regression = False
     for rec in records:
-        findings = list(check_churn(rec, args.history_dir, args.branch))
+        findings = list(check_churn(rec, args.history_dir, args.branch, args.commit))
         leak = check_leak(rec)
         if leak is not None:
             findings.append(leak)
 
         entry = {"commit": args.commit, "branch": args.branch,
                  "commit_date": args.commit_date, **rec}
-        lines.append(json.dumps(entry, sort_keys=True))
+        if (rec["leg"], rec["config"]) not in already:
+            lines.append(json.dumps(entry, sort_keys=True))
 
         for hard, message in findings:
             if hard:
@@ -296,7 +322,9 @@ def main() -> int:
         for line in lines:
             f.write(line + "\n")
 
-    print(f"Appended {len(lines)} record(s) to {history_path}")
+    skipped = len(records) - len(lines)
+    print(f"Appended {len(lines)} record(s) to {history_path}"
+          + (f" ({skipped} already recorded for {args.commit[:8]})" if skipped else ""))
     write_recent_window(history_path)
     emit_github_output("hard_regression", "true" if hard_regression else "false")
     return 0

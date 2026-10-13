@@ -253,7 +253,8 @@ class CodeLog final : public testsink::SinkLog {
 
 std::optional<iclforge::hearth::SinkFacts> find_sink(iclforge::hearth::NetworkSinks& sinks,
                                                      const std::string& id) {
-    for (const iclforge::hearth::SinkFacts& facts : sinks.status().sinks) {
+    const auto status = sinks.status();
+    for (const iclforge::hearth::SinkFacts& facts : status.sinks) {
         if (facts.id == id) {
             return facts;
         }
@@ -1194,7 +1195,8 @@ TEST_CASE("engine: a sink set to Opus is sent the decoded programme as Opus",
                                          iclforge::hearth::NetworkSinksOptions{.browse = false}};
     REQUIRE(sinks.started());
     const auto find = [&](const std::string& id) -> std::optional<iclforge::hearth::SinkFacts> {
-        for (const iclforge::hearth::SinkFacts& facts : sinks.status().sinks) {
+        const auto status = sinks.status();
+        for (const iclforge::hearth::SinkFacts& facts : status.sinks) {
             if (facts.id == id) {
                 return facts;
             }
@@ -1329,7 +1331,8 @@ TEST_CASE(
     iclforge::render::LayoutRenderer renderer(*layout);
     std::uint64_t compared = 0;
     std::uint64_t different = 0;
-    for (const iclforge::ac4::SyncFrame& frame : iclforge::ac4::scan(programme).frames) {
+    const auto scanned = iclforge::ac4::scan(programme);
+    for (const iclforge::ac4::SyncFrame& frame : scanned.frames) {
         const auto decoded = decoder.decode(frame.raw_ac4_frame);
         REQUIRE(decoded.has_value());
         REQUIRE(decoded->has_value());
@@ -2074,7 +2077,8 @@ TEST_CASE("engine: the lyrics beside an item reach the boards that hold them, an
     stray.anchor = iclforge::hearth::LyricsUpdate::Anchor{.position_ms = 1000, .at_us = 1, .speed = 1.0};
     group.sinks->apply_lyrics(group.group_id, stray);
     std::this_thread::sleep_for(300ms);
-    for (const auto& message : group.decodes->roles().lyric_commands) {
+    const auto roles = group.decodes->roles();
+    for (const auto& message : roles.lyric_commands) {
         CHECK(message.lyrics.item != 987654);
         CHECK(message.lyrics_position.item != 987654);
     }
@@ -2150,17 +2154,25 @@ TEST_CASE("engine: a member that shows what is playing is told the item and wher
     KaraokeGroup group("now_playing_group", kFrameCount, wanted, true, 0, {"metadata@v1"});
     group.engine->play();
     const auto shown = [&] { return group.decodes->roles().metadata; };
-    group.await([&] { return shown() && shown()->title == "Karaoke programme" && shown()->progress; });
-    const auto playing = *shown();
-    CHECK_FALSE(playing.artist.has_value());
-    CHECK_FALSE(playing.album.has_value());
-    REQUIRE(playing.progress.has_value());
-    CHECK(playing.progress->playback_speed == 1000);
+    // The state while the sound moves, kept from the one read that found it. Before the output has
+    // played anything the position is held (speed 0), and it is held again at the item's end; on a
+    // slow output (the macOS runners) the held state is the first one a reader sees.
+    auto playing = shown();
+    group.await([&] {
+        playing = shown();
+        return playing && playing->title == "Karaoke programme" && playing->progress &&
+               playing->progress->playback_speed == 1000;
+    });
+    REQUIRE(playing.has_value());
+    CHECK_FALSE(playing->artist.has_value());
+    CHECK_FALSE(playing->album.has_value());
+    REQUIRE(playing->progress.has_value());
+    CHECK(playing->progress->playback_speed == 1000);
     // The item is about two seconds long, and the position is somewhere in it.
-    CHECK(playing.progress->track_duration_ms > 1000);
-    CHECK(playing.progress->track_duration_ms < 4000);
-    CHECK(playing.progress->track_progress_ms >= 0);
-    CHECK(playing.progress->track_progress_ms <= playing.progress->track_duration_ms);
+    CHECK(playing->progress->track_duration_ms > 1000);
+    CHECK(playing->progress->track_duration_ms < 4000);
+    CHECK(playing->progress->track_progress_ms >= 0);
+    CHECK(playing->progress->track_progress_ms <= playing->progress->track_duration_ms);
     // The board that lists no metadata role is told nothing.
     CHECK_FALSE(group.legacy->roles().metadata.has_value());
 

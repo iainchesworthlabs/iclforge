@@ -118,6 +118,7 @@ LABELS = {
     "accuracy": "decode accuracy, SNR (tightest check)",
     "memory": "allocation per frame (heaviest workload)",
     "growth": "live growth, steady state (4 KiB line)",
+    "measured": "figures measured on",
 }
 
 
@@ -468,6 +469,33 @@ def growth_badge(rows):
     return badge(LABELS["growth"], message, GREEN if held else AMBER)
 
 
+def measured_badge(sources):
+    """Which commit the other badges' figures are from, and the day it was made.
+
+    A badge is a number with no date on it, and the series behind the four are
+    written by different jobs: on 2026-10-13 the speed and memory badges were
+    136 merges behind main and the AC-4 half of the accuracy badge was from
+    2026-10-02, with nothing on the README to say so. `sources` is (what, rows) in badge
+    order - what the figures are, and the newest commit's rows of the series
+    they come from. Figures from one commit share an entry, and a series with
+    no rows has none. Blue: a date is not a verdict, and how old is too old is
+    for the reader, who is told the day.
+    """
+    by_commit = {}
+    for what, rows in sources:
+        if not rows or not rows[-1].get("commit"):
+            continue
+        commit = rows[-1]["commit"]
+        day = str(rows[-1].get("commit_date", ""))[:10]
+        by_commit.setdefault((commit, day), []).append(what)
+    if not by_commit:
+        return badge(LABELS["measured"], NO_DATA, GREY)
+    message = " | ".join(
+        f"{', '.join(names)}: {day + ' ' if day else ''}main@{commit[:8]}"
+        for (commit, day), names in by_commit.items())
+    return badge(LABELS["measured"], message, INFO)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--history-dir", type=Path, required=True,
@@ -480,15 +508,19 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     b = args.branch
+    speed_rows = newest_commit_rows(args.history_dir / f"performance-{b}.jsonl")
     memory_rows = newest_commit_rows(args.history_dir / f"memory-{b}.jsonl")
+    accuracy_rows = newest_commit_rows(args.history_dir / f"{b}.jsonl")
+    ac4_rows = newest_commit_rows(args.history_dir / f"ac4-quality-{b}.jsonl")
     try:
         written = {
-            "speed": speed_badge(newest_commit_rows(args.history_dir / f"performance-{b}.jsonl")),
-            "accuracy": accuracy_badge(
-                newest_commit_rows(args.history_dir / f"{b}.jsonl"),
-                newest_commit_rows(args.history_dir / f"ac4-quality-{b}.jsonl")),
+            "speed": speed_badge(speed_rows),
+            "accuracy": accuracy_badge(accuracy_rows, ac4_rows),
             "memory": memory_badge(memory_rows),
             "growth": growth_badge(memory_rows),
+            "measured": measured_badge([("speed", speed_rows), ("memory", memory_rows),
+                                        ("accuracy", accuracy_rows),
+                                        ("AC-4 accuracy", ac4_rows)]),
         }
     except UnknownWorkload as e:
         print(f"::error title=Measurement badges::{e}")

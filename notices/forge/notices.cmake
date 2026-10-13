@@ -108,6 +108,13 @@ if(nlohmann_json_VERSION)
 else()
     set(ICLFORGE_NOTICES_JSON_VERSION "${ICLFORGE_NLOHMANN_JSON_VERSION}")
 endif()
+# fast_float's, the same way (cmake/FastFloat.cmake): iclforge::base compiles it in for
+# parse_double, so it is named for the same users {fmt} is.
+if(FastFloat_VERSION)
+    set(ICLFORGE_NOTICES_FAST_FLOAT_VERSION "${FastFloat_VERSION}")
+else()
+    set(ICLFORGE_NOTICES_FAST_FLOAT_VERSION "${ICLFORGE_FAST_FLOAT_VERSION}")
+endif()
 # Tracy's version, from its package - the same Tracy_VERSION/"not reported" choice
 # notices/crucible/notices.cmake makes for the identical shared fragment.
 if(Tracy_VERSION)
@@ -155,6 +162,8 @@ ac3_generate_notices("${ICLFORGE_NOTICES_FILE}"
         "FMT_USERS=${ICLFORGE_NOTICES_FMT_USERS}"
         "JSON_VERSION=${ICLFORGE_NOTICES_JSON_VERSION}"
         "JSON_USERS=${ICLFORGE_NOTICES_FMT_USERS}"
+        "FAST_FLOAT_VERSION=${ICLFORGE_NOTICES_FAST_FLOAT_VERSION}"
+        "FAST_FLOAT_USERS=${ICLFORGE_NOTICES_FMT_USERS}"
         "FONT_USER=forge-gui"
         "TRACY_VERSION=${ICLFORGE_NOTICES_TRACY_VERSION}"
         # Always forge-gui, unlike FMT_USERS above: forge links no iclforge::tracy in any
@@ -165,6 +174,7 @@ ac3_generate_notices("${ICLFORGE_NOTICES_FILE}"
         "OFL=${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/OFL.txt"
         "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
         "JSON_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-nlohmann-json.txt"
+        "FAST_FLOAT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fast-float.txt"
         "MESA_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-mesa.txt"
         "DXC_NCSA=${CMAKE_SOURCE_DIR}/notices/licences/NCSA-dxc.txt"
         "TRACY_BSD=${CMAKE_SOURCE_DIR}/notices/licences/BSD-3-Clause-Tracy.txt")

@@ -16,9 +16,13 @@ import "HearthTestHelpers.js" as H
 //
 // The room is three endpoints: "Test speakers" (default, 6 ch), "Test
 // headphones" (2 ch) and "Test receiver" (8 ch, says it takes AC-3/E-AC-3
-// passthrough, so it is also the passthrough section's one row). Main.qml is
-// its own top-level window; mouseClick() reaches any window's items, so
-// nothing here needs keyboard delivery into it (tst_shell.qml does).
+// passthrough, so it is also the passthrough section's one row). The receiver
+// has a link as well as a device (TestServices.link(), test_room.hpp): what
+// the engine sends it as IEC 61937 bursts is read back there as a receiver
+// would read it, so the passthrough tests hold the window to the bytes of the
+// file and not to a property. Main.qml is its own top-level window;
+// mouseClick() reaches any window's items, so nothing here needs keyboard
+// delivery into it (tst_shell.qml does).
 TestCase {
     id: testCase
     name: "OutputPicker"
@@ -26,6 +30,10 @@ TestCase {
 
     readonly property string repo: Qt.resolvedUrl("../../../../../").toString()
     property string longEac3: ""
+    property string firstAc3: ""
+    property string secondAc3: ""
+    property string karaokeAc3: ""
+    property string tonesAc4: ""
 
     Component { id: mainComponent; Main { } }
 
@@ -37,6 +45,13 @@ TestCase {
         longEac3 = TestServices.stageFixture(repo + "testdata/external-baseline/eac3-music-stereo-96/dee.ec3",
                                              "Long stereo.ec3");
         verify(longEac3.length > 0);
+        // Ten seconds each of AC-3 5.1, AC-3 karaoke and (twenty of) AC-4 5.1.
+        firstAc3 = TestServices.writeAc3Stream("first.ac3", "main-3/2");
+        secondAc3 = TestServices.writeAc3Stream("second.ac3", "main-3/2");
+        karaokeAc3 = TestServices.writeAc3Stream("karaoke.ac3", "karaoke-3/2");
+        tonesAc4 = TestServices.writeAc4Stream("tones.ac4", "tones");
+        verify(firstAc3.length > 0 && secondAc3.length > 0 && karaokeAc3.length > 0 && tonesAc4.length > 0,
+               "the streams could not be made");
     }
 
     function cleanup() {
@@ -45,6 +60,23 @@ TestCase {
             HearthController.removeAt(i);
         }
         tryVerify(function() { return HearthController.queue.length === 0; }, 10000);
+        // Where a window starts: decoding, to the default output, at the
+        // room's own pace, a karaoke stream reproduced as an aware decoder's.
+        HearthController.selectOutputGroup("");
+        TestServices.setClockSpeed(1.0);
+        TestServices.setEndpointPassthrough("fake-receiver", true);
+        if (HearthController.decoderSettings.karaoke !== undefined
+                && HearthController.decoderSettings.karaoke !== "aware") {
+            setKaraoke("aware");
+        }
+    }
+
+    function setKaraoke(choice) {
+        const next = Object.assign({}, HearthController.decoderSettings);
+        next.karaoke = choice;
+        HearthController.setDecoderSettings(next);
+        tryVerify(function() { return HearthController.decoderSettings.karaoke === choice; }, 10000,
+                  "the karaoke choice never reached the engine");
     }
 
     function openWindow() {
@@ -83,6 +115,43 @@ TestCase {
         return H.find(picker.contentItem, function(item) {
             return item.objectName.indexOf("outputDeviceRow-") === 0 && item.modelData.id === id;
         });
+    }
+
+    // The same endpoint's row in the passthrough section.
+    function passthroughRowFor(picker, id) {
+        return H.find(picker.contentItem, function(item) {
+            return item.objectName.indexOf("passthroughDeviceRow-") === 0 && item.modelData.id === id;
+        });
+    }
+
+    // The receiver's passthrough row picked and "Play here" pressed.
+    function playToTheReceiver(win) {
+        const picker = openPicker(win);
+        const row = passthroughRowFor(picker, "fake-receiver");
+        verify(row !== null, "the passthrough section has no row for the receiver");
+        mouseClick(row);
+        compare(picker.selectedPassthroughId, "fake-receiver");
+        compare(picker.selectedDeviceId, "");
+        mouseClick(findChild(win, "outputPickerPlayHere"));
+        tryVerify(function() { return !picker.visible; }, 5000, "Play here did not close the picker");
+        compare(HearthController.passthroughDeviceId, "fake-receiver");
+    }
+
+    // The visible copy of one of the signal-path card's lines (the Play page
+    // holds the card twice, one of them hidden at any width).
+    function signalPath(win, name) {
+        const line = H.find(win.contentItem, function(item) { return item.objectName === name && item.visible; });
+        verify(line !== null, "no visible " + name);
+        return line.text;
+    }
+
+    function queueAndPlay(win, paths) {
+        const queueList = findChild(win, "queueList");
+        verify(queueList !== null);
+        verify(TestServices.dropFiles(queueList, paths), "the Play page refused the drop");
+        tryVerify(function() { return HearthController.queue.length === paths.length; }, 10000);
+        mouseClick(findChild(win, "transportPlayPause"));
+        tryCompare(HearthController, "state", "playing", 10000);
     }
 
     function test_headerSummaryShowsTheOutputDecisionAndOpensThePicker() {
@@ -167,6 +236,258 @@ TestCase {
         tryVerify(function() { return HearthController.currentDeviceId === where; }, 5000);
         compare(TestServices.device().endpoint, where);
         compare(TestServices.device().opens, opens);
+    }
+
+    // The passthrough section's rows are choices (FEATURE_COVERAGE.md row 35):
+    // Play here on the receiver's row moves the E-AC-3 item playing off the
+    // speakers and onto the receiver's link as IEC 61937 bursts, and the
+    // header, the signal path, the picker and the pages whose controls a
+    // receiver does not take all say so. A PCM row moves it back to a decode.
+    function test_passthroughRowSendsTheItemToTheReceiverAsABitstream() {
+        const win = openWindow();
+        playSomething(win);
+        compare(TestServices.device().endpoint, "fake-speakers");
+        compare(TestServices.link().open, false);
+        compare(HearthController.outputFormat.mode, "pcm");
+        // Until a row there is chosen, nothing is sent as a bitstream, though
+        // the receiver says it would take one.
+        verify(HearthController.outputReason.indexOf("Decoding here and playing PCM to \"Test speakers\"") === 0,
+               "the item did not start as a decode: " + HearthController.outputReason);
+        const opensBefore = TestServices.link().opens;
+        const burstsBefore = TestServices.link().bursts;
+
+        let picker = openPicker(win);
+        // The note under the section says what choosing a row does.
+        const note = findChild(win, "passthroughNote");
+        verify(note !== null);
+        verify(note.text.indexOf("sent to it untouched") >= 0, "the note does not say what a row does: " + note.text);
+        verify(note.text.indexOf("no effect") < 0);
+        mouseClick(findChild(win, "outputPickerCancel"));
+        tryVerify(function() { return !picker.visible; }, 5000);
+
+        playToTheReceiver(win);
+        tryVerify(function() { return TestServices.link().open; }, 10000,
+                  "the engine never opened the receiver's link: " + HearthController.outputReason);
+        compare(TestServices.link().opens, opensBefore + 1);
+        compare(TestServices.link().endpoint, "fake-receiver");
+        compare(TestServices.link().format, "E-AC-3");
+        compare(TestServices.link().sampleRate, 48000);
+        // One output at a time: the decode's device is closed.
+        compare(TestServices.device().open, false);
+        compare(HearthController.state, "playing");
+
+        // Bursts reach the link, each one an IEC 61937 E-AC-3 burst, and the
+        // link's clock plays them.
+        tryVerify(function() { return TestServices.link().bursts > burstsBefore + 8; }, 10000,
+                  "no bursts reached the link");
+        compare(TestServices.link().badBursts, 0);
+        compare(TestServices.link().dataType, "E-AC-3");
+        const heard = TestServices.link().framesHeard;
+        tryVerify(function() { return TestServices.link().framesHeard > heard + 4800; }, 10000,
+                  "the link is open but not playing");
+
+        // What the window says about it.
+        tryCompare(HearthController, "currentDeviceId", "fake-receiver", 10000);
+        compare(HearthController.deviceName, "Test receiver");
+        tryVerify(function() { return HearthController.outputFormat.mode === "bitstream"; }, 10000);
+        compare(HearthController.outputFormat.stream, "E-AC-3");
+        verify(HearthController.outputReason.indexOf(
+                   "Bitstreaming E-AC-3 to \"Test receiver\" over IEC 61937, untouched.") === 0,
+               "the header's sentence is " + HearthController.outputReason);
+        verify(H.textItem(findChild(win, "outputSummaryButton"), HearthController.outputReason) !== null,
+               "the header summary does not show the output reason");
+        tryVerify(function() { return signalPath(win, "signalPathOutput") === "Test receiver"; }, 5000);
+        compare(signalPath(win, "signalPathOutputFormat"), "E-AC-3 bitstream over IEC 61937 at 48.0 kHz");
+        compare(signalPath(win, "signalPathRender"), "Not rendered here");
+        verify(signalPath(win, "signalPathDecode").indexOf("sent as it is") >= 0,
+               "the decode stage reads " + signalPath(win, "signalPathDecode"));
+        // The volume is the receiver's, and so are the decoder settings.
+        compare(findChild(win, "transportVolume").enabled, false);
+        verify(HearthController.decoderSettingsNote.indexOf("The receiver decodes the bitstream") === 0,
+               "the decoder note is " + HearthController.decoderSettingsNote);
+        win.page = "decoder";
+        tryVerify(function() {
+            const notice = findChild(win, "receiverDecodesNotice");
+            return notice !== null && notice.visible && notice.text === HearthController.decoderSettingsNote;
+        }, 5000, "the Decoder page does not say the receiver decodes");
+        win.page = "speakers";
+        tryVerify(function() {
+            const line = findChild(win, "speakersSetupFor");
+            return line !== null && line.visible && line.text.indexOf("Test receiver is sent a bitstream") === 0;
+        }, 5000, "the Speakers page does not say the setup is not applied");
+        win.page = "play";
+
+        // Reopened, the picker starts on the row chosen, which is the one
+        // playing; the same endpoint's PCM row is not.
+        picker = openPicker(win);
+        compare(picker.selectedPassthroughId, "fake-receiver");
+        compare(picker.selectedDeviceId, "");
+        verify(H.textItem(passthroughRowFor(picker, "fake-receiver"), "playing here") !== null,
+               "the receiver's passthrough row has no \"playing here\" pill");
+        verify(H.textItem(rowFor(picker, "fake-receiver"), "playing here") === null);
+        verify(H.textItem(rowFor(picker, "fake-speakers"), "playing here") === null);
+
+        // A PCM row moves playback back to a decode, and gives the choice up.
+        mouseClick(rowFor(picker, "fake-speakers"));
+        compare(picker.selectedPassthroughId, "");
+        mouseClick(findChild(win, "outputPickerPlayHere"));
+        tryVerify(function() { return !picker.visible; }, 5000);
+        tryVerify(function() { return TestServices.device().endpoint === "fake-speakers"; }, 10000,
+                  "playback never moved back to the speakers");
+        compare(TestServices.link().open, false);
+        compare(HearthController.passthroughDeviceId, "");
+        tryVerify(function() { return HearthController.outputFormat.mode === "pcm"; }, 10000);
+        tryCompare(findChild(win, "transportVolume"), "enabled", true, 5000);
+        compare(HearthController.decoderSettingsNote, "");
+        compare(signalPath(win, "signalPathOutput"), "Test speakers");
+    }
+
+    // A queue played to the receiver from its start: the link carries every
+    // byte of both files, in order and unchanged, and the second item joins
+    // the first on the one link - gapless, as on a decode.
+    function test_receiverIsSentTheFilesOwnBytesAndTheNextItemJoins() {
+        const win = openWindow();
+        playToTheReceiver(win);
+        const opensBefore = TestServices.link().opens;
+        const deviceOpensBefore = TestServices.device().opens;
+        // Twenty seconds of audio, on a clock that ticks once a sleep: fast
+        // enough that a machine whose sleeps run long still gets through it.
+        TestServices.setClockSpeed(16.0);
+        queueAndPlay(win, [firstAc3, secondAc3]);
+        tryVerify(function() { return TestServices.link().open; }, 10000, "the link never opened");
+        compare(TestServices.link().format, "AC-3");
+        tryVerify(function() { return HearthController.outputFormat.stream === "AC-3"; }, 5000,
+                  "the window does not say the link carries AC-3");
+        tryVerify(function() { return TestServices.linkCarried([firstAc3, secondAc3]); }, 10000,
+                  "what the link carries is not the start of the first file");
+        tryCompare(HearthController, "currentIndex", 1, 60000);
+        tryCompare(HearthController, "state", "stopped", 60000);
+        compare(TestServices.link().opens, opensBefore + 1, "the second item reopened the link");
+        compare(TestServices.link().badBursts, 0);
+        compare(TestServices.link().dataType, "AC-3");
+        verify(TestServices.linkCarried([firstAc3, secondAc3], true),
+               "the link did not carry both files whole (" + TestServices.link().payloadBytes + " bytes)");
+        // Nothing was decoded to a device on the way.
+        compare(TestServices.device().opens, deviceOpensBefore);
+    }
+
+    // What a receiver does not take is decoded, to the receiver's own
+    // endpoint, and the choice stands: an AC-4 item (no receiver takes it),
+    // then an AC-3 one after it, which goes back to the link.
+    function test_receiverGetsADecodeOfWhatItDoesNotTake() {
+        const win = openWindow();
+        playToTheReceiver(win);
+        const linkOpensBefore = TestServices.link().opens;
+        queueAndPlay(win, [tonesAc4, firstAc3]);
+        tryVerify(function() { return TestServices.device().open; }, 10000,
+                  "the AC-4 item was not decoded: " + HearthController.outputReason);
+        compare(TestServices.device().endpoint, "fake-receiver");
+        compare(TestServices.device().channels, 8);
+        compare(TestServices.link().open, false);
+        compare(TestServices.link().opens, linkOpensBefore);
+        tryVerify(function() { return HearthController.outputFormat.mode === "pcm"; }, 10000);
+        verify(HearthController.outputReason.indexOf("Decoding here and playing PCM to \"Test receiver\"") === 0,
+               "the header's sentence is " + HearthController.outputReason);
+        verify(HearthController.outputReason.indexOf("No output takes AC-4") > 0,
+               "the header's sentence does not say why: " + HearthController.outputReason);
+        compare(HearthController.passthroughDeviceId, "fake-receiver");
+        tryCompare(HearthController, "deviceName", "Test receiver", 10000);
+        compare(signalPath(win, "signalPathOutputFormat"), "8 ch PCM at 48.0 kHz");
+
+        // The picker still starts on the passthrough row, the person's
+        // choice, while the pill is on the PCM row the decode is going to.
+        const picker = openPicker(win);
+        compare(picker.selectedPassthroughId, "fake-receiver");
+        verify(H.textItem(rowFor(picker, "fake-receiver"), "playing here") !== null,
+               "the receiver's PCM row has no \"playing here\" pill during a decode");
+        verify(H.textItem(passthroughRowFor(picker, "fake-receiver"), "playing here") === null);
+        mouseClick(findChild(win, "outputPickerCancel"));
+        tryVerify(function() { return !picker.visible; }, 5000);
+
+        // The AC-3 item after it is sent as a bitstream: the output reopens.
+        HearthController.next();
+        tryVerify(function() { return TestServices.link().open; }, 10000,
+                  "the AC-3 item after it was not sent to the link: " + HearthController.outputReason);
+        compare(TestServices.link().format, "AC-3");
+        compare(TestServices.device().open, false);
+    }
+
+    // A karaoke reproduction is this decoder's to make, so a karaoke item
+    // with one chosen is decoded to the receiver's endpoint; played as coded
+    // it is the receiver's to decode, and goes to the link. Changing the
+    // choice while it plays moves it.
+    function test_receiverGetsADecodeOfAKaraokeReproduction() {
+        const win = openWindow();
+        playToTheReceiver(win);
+        const linkOpensBefore = TestServices.link().opens;
+        compare(HearthController.decoderSettings.karaoke, "aware");
+        queueAndPlay(win, [karaokeAc3]);
+        tryVerify(function() { return TestServices.device().open; }, 10000,
+                  "the karaoke item was not decoded: " + HearthController.outputReason);
+        compare(TestServices.device().endpoint, "fake-receiver");
+        compare(TestServices.link().opens, linkOpensBefore);
+        tryVerify(function() {
+            return HearthController.outputReason.indexOf("The karaoke reproduction chosen is made here") > 0;
+        }, 5000, "the header's sentence does not say why");
+
+        setKaraoke("asCoded");
+        tryVerify(function() { return TestServices.link().open; }, 10000,
+                  "as coded, the item was not sent to the link: " + HearthController.outputReason);
+        compare(TestServices.link().format, "AC-3");
+        compare(TestServices.device().open, false);
+        compare(HearthController.state, "playing");
+        tryVerify(function() { return HearthController.outputFormat.mode === "bitstream"; }, 10000);
+
+        setKaraoke("capable");
+        tryVerify(function() { return TestServices.device().open; }, 10000,
+                  "with a reproduction chosen again, the item was not decoded");
+        compare(TestServices.link().open, false);
+        compare(HearthController.state, "playing");
+    }
+
+    // The engine keeps its own reading of what each output takes, and opening
+    // the picker has it read again, so a row is decided against the machine as
+    // the picker shows it: a receiver that is off is decoded for even when it
+    // is chosen, and one switched on since is listed and sent the stream.
+    function test_receiverSwitchedOnIsSeenWhenThePickerOpens() {
+        TestServices.setEndpointPassthrough("fake-receiver", false);
+        const win = openWindow();
+        playSomething(win);
+        let picker = openPicker(win);
+        verify(passthroughRowFor(picker, "fake-receiver") === null,
+               "a receiver that takes no bitstream is listed for passthrough");
+        verify(H.textItem(picker.contentItem, "No passthrough-capable outputs were found.") !== null);
+        mouseClick(findChild(win, "outputPickerCancel"));
+        tryVerify(function() { return !picker.visible; }, 5000);
+
+        // Chosen as a receiver all the same, as a choice made while it was on
+        // would leave it: the engine has read that it takes nothing, so the
+        // item is decoded to it, and the header says why.
+        HearthController.selectPassthroughDevice("fake-receiver");
+        tryVerify(function() { return TestServices.device().endpoint === "fake-receiver"; }, 10000,
+                  "the item was not decoded to the receiver: " + HearthController.outputReason);
+        compare(TestServices.link().open, false);
+        tryVerify(function() {
+            return HearthController.outputReason.indexOf("No output takes E-AC-3 over IEC 61937.") > 0;
+        }, 5000, "the header's sentence does not say why");
+
+        // Back on the speakers, and the receiver is switched on. (An output
+        // the engine is playing to is not read again until it is released -
+        // output_selector.hpp - which is why the item is moved off it first.)
+        HearthController.selectOutputDevice("fake-speakers");
+        tryVerify(function() { return TestServices.device().endpoint === "fake-speakers"; }, 10000);
+        TestServices.setEndpointPassthrough("fake-receiver", true);
+
+        // The picker's rows are fresh, and so is what the engine decides the
+        // row against: Play here sends the item to the link.
+        const opensBefore = TestServices.link().opens;
+        playToTheReceiver(win);
+        tryVerify(function() { return TestServices.link().open; }, 10000,
+                  "the receiver was chosen once it took a bitstream, and was not sent one: "
+                  + HearthController.outputReason);
+        compare(TestServices.link().opens, opensBefore + 1);
+        compare(TestServices.link().endpoint, "fake-receiver");
+        compare(TestServices.device().open, false);
     }
 
     // A group made on the Network page is a row in the picker's network

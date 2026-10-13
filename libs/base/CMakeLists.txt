@@ -263,6 +263,7 @@ iclforge_add_library(base
         src/cpu_features.cpp
         src/levels.cpp
         src/loudness.cpp
+        src/number_parse.cpp
         src/version.cpp
         src/wav.cpp
         src/wav_format.cpp
@@ -277,6 +278,10 @@ iclforge_add_library(base
     LINK_PRIVATE
         "$<BUILD_INTERFACE:iclforge::tracy>"
         "$<BUILD_INTERFACE:iclforge::fmt_private>"
+        # number_parse.cpp's fast_float. Header-only and used inside that one file, so the export
+        # graph and the archive's consumers see nothing of it. (The minimum-footprint builds do not
+        # come through here: libs/ac3/minimal.cmake lists number_parse_libc.cpp instead.)
+        "$<BUILD_INTERFACE:iclforge::fast_float>"
         # the SIMD tier's directory, whose name version_details() reports
         "$<BUILD_INTERFACE:iclforge::base_headers>")
 add_dependencies(iclforge_base_objects iclforge_version)
