@@ -25,15 +25,23 @@
 #include <QUrl>
 #include <QVariantMap>
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <limits>
 #include <memory>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "hearth_controller.hpp"
 #include "language_manager.hpp"
+#include "microphone_controller.hpp"
+#include "microphone_input.hpp"
 #include "network_controller.hpp"
 #include "test_room.hpp"
 
@@ -56,6 +64,66 @@
 
 namespace {
 
+// What a suite scripts the microphone to do, shared between TestServices (which a suite calls) and
+// the input the controller was handed (which reads it when the microphone is turned on). Both are
+// used from the GUI thread alone: the controller polls its input from a timer there.
+struct MicrophoneScript {
+    std::vector<float> samples;  // mono, RealtimeScriptedInput::kRate; empty is silence
+    std::string refusal;         // non-empty: the next start() fails with this sentence
+    int starts = 0;
+};
+
+// A microphone that is a script and runs on the real clock, for the Qt Quick suites: the controller
+// reads the steady clock, so this delivers what has been "captured" by that clock's now, from the
+// moment it is turned on - ScriptedMicrophoneInput (microphone_input.hpp) is told the time by
+// whoever tests it, and a window has no one to tell it. No device is opened and none is listed
+// but this one.
+class RealtimeScriptedInput final : public iclforge::hearth::MicrophoneInput {
+public:
+    static constexpr std::uint32_t kRate = 48000;
+
+    explicit RealtimeScriptedInput(std::shared_ptr<MicrophoneScript> script)
+        : script_(std::move(script)),
+          inner_({}, kRate, 0,
+                 {{.id = "test-microphone", .name = "Test microphone", .is_default = true,
+                   .sample_rate = kRate, .channels = 1}}) {}
+
+    [[nodiscard]] std::vector<iclforge::hearth::InputDevice> devices() override {
+        return inner_.devices();
+    }
+    [[nodiscard]] std::expected<void, std::string> start(const std::string& device_id) override {
+        ++script_->starts;
+        const std::int64_t now = steady_now_ns();
+        // A script that was never set delivers a minute of silence.
+        inner_.script(script_->samples.empty() ? std::vector<float>(kRate * 60U, 0.0F)
+                                               : script_->samples,
+                      now);
+        inner_.set_now_ns(now);
+        inner_.refuse(script_->refusal);
+        return inner_.start(device_id);
+    }
+    void stop() override { inner_.stop(); }
+    [[nodiscard]] bool running() const override { return inner_.running(); }
+    [[nodiscard]] std::uint32_t sample_rate() const override { return inner_.sample_rate(); }
+    [[nodiscard]] std::uint16_t channels() const override { return inner_.channels(); }
+    [[nodiscard]] std::uint32_t period_frames() const override { return inner_.period_frames(); }
+    bool read(iclforge::hearth::InputBlock& out) override {
+        inner_.set_now_ns(steady_now_ns());
+        return inner_.read(out);
+    }
+
+private:
+    // The clock MicrophoneController reads (microphone_controller.cpp's steady_now_ns()).
+    [[nodiscard]] static std::int64_t steady_now_ns() {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+    }
+
+    std::shared_ptr<MicrophoneScript> script_;
+    iclforge::hearth::ScriptedMicrophoneInput inner_;
+};
+
 // The fakes a suite can hand the REAL controllers (test_room.hpp), registered
 // as the HearthTest singleton - apps/crucible/ui/tests/qml_test_main.cpp's
 // own TestServices is the pattern this follows, and for the same reason: a
@@ -72,7 +140,32 @@ class TestServices : public QObject {
     Q_OBJECT
 
 public:
-    explicit TestServices(QQmlEngine& engine) : engine_(&engine) {}
+    TestServices(QQmlEngine& engine, std::shared_ptr<MicrophoneScript> microphone)
+        : engine_(&engine), microphone_(std::move(microphone)) {}
+
+    // What the microphone every suite has delivers from the moment it is turned on
+    // (RealtimeScriptedInput): a tone of `hz` at `amplitude` (1.0 is full scale, which reads as
+    // clipping) for `seconds`, or silence for 0 Hz. The default is silence. There is no other
+    // microphone in this binary: the machine's own is never opened, and its inputs are never
+    // listed (MicrophoneController::set_test_input_factory()).
+    Q_INVOKABLE void scriptMicrophone(double hz, double amplitude, double seconds) {
+        constexpr double kRate = RealtimeScriptedInput::kRate;
+        const auto count = static_cast<std::size_t>(std::max(0.0, seconds) * kRate);
+        std::vector<float> samples(count, 0.0F);
+        if (hz > 0.0) {
+            for (std::size_t i = 0; i < count; ++i) {
+                samples[i] = static_cast<float>(
+                    amplitude * std::sin(2.0 * std::numbers::pi * hz * static_cast<double>(i) / kRate));
+            }
+        }
+        microphone_->samples = std::move(samples);
+    }
+    // The next turning on is refused with `reason` (empty: it is not).
+    Q_INVOKABLE void refuseMicrophone(const QString& reason) {
+        microphone_->refusal = reason.toStdString();
+    }
+    // How many times the microphone has been turned on in this process.
+    Q_INVOKABLE int microphoneStarts() const { return microphone_->starts; }
 
     // Three endpoints: a default 5.1 set of speakers, a stereo pair of
     // headphones, and a 7.1 receiver that says it takes AC-3/E-AC-3
@@ -420,6 +513,7 @@ private:
     }
 
     QQmlEngine* engine_ = nullptr;
+    std::shared_ptr<MicrophoneScript> microphone_;
     QTemporaryDir scratch_;
     std::shared_ptr<iclforge::hearth::uitest::FakeRoom> room_;
     std::vector<std::shared_ptr<iclforge::hearth::uitest::TestSinkHost>> sinks_;
@@ -470,12 +564,17 @@ public slots:
             *qGuiApp, *engine, QStringLiteral("hearth"));
         qmlRegisterSingletonInstance("HearthLanguage", 1, 0, "LanguageManager",
                                      language_manager_.get());
-        test_services_ = std::make_unique<TestServices>(*engine);
+        // Before the microphone singleton is first used, which is when the QML makes it: every
+        // suite has the scripted microphone, so none of them lists or opens a person's.
+        iclforge::hearth::ui::MicrophoneController::set_test_input_factory(
+            [script = microphone_script_] { return std::make_unique<RealtimeScriptedInput>(script); });
+        test_services_ = std::make_unique<TestServices>(*engine, microphone_script_);
         qmlRegisterSingletonInstance("HearthTest", 1, 0, "TestServices", test_services_.get());
     }
 
 private:
     std::optional<QTemporaryDir> scratch_;
+    std::shared_ptr<MicrophoneScript> microphone_script_ = std::make_shared<MicrophoneScript>();
     std::unique_ptr<LanguageManager> language_manager_;
     std::unique_ptr<TestServices> test_services_;
 };

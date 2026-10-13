@@ -4493,6 +4493,13 @@ The sections below contain the complete change list and fixes.
   that has none), and the two `MicrophoneCard::test_the_rows_...` cases check the card alone,
   with and without a microphone on: the suites' microphone is a script now, so none of them
   lists or opens a person's. No string changed.
+- **A muted microphone never got the "No sound from the microphone" hint.** The Microphone card
+  shows it once the input has been silent for 1.5 s, and it was told the silence had grown only
+  when the level moved or when the silence differed by half a second from the reading 100 ms
+  before, which it never does. A microphone that is muted delivers digital silence, whose level
+  does not move, so the hint, whose own text says "It may be muted", was only ever shown for one
+  with noise on it. The card is told when the silence has grown by half a second since it was
+  last told.
 - **A capture names a takes folder that is nobody's.** The Microphone card says where takes go,
   which by default is a folder under the person's own documents: right for the person, and the
   account's name in a screenshot. `hearth --shot` and `--smoke-shot`, which already run on a

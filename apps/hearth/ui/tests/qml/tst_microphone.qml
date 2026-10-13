@@ -9,11 +9,13 @@ import "HearthTestHelpers.js" as H
 // The microphone card of the Karaoke page (MicrophoneCard.qml; planning/karaoke-microphone.md, M4):
 // what it promises and that its answers reach the controller.
 //
-// This suite NEVER presses "Turn the microphone on": a test must not open a person's microphone,
-// and on a developer's desk the default input is a real one. What is held here is the off state, the
-// words of the promise, that the answers (the input, the headphones, the delay) are written to the
-// controller, that a card that is not in use cannot turn the microphone on, and that the page shows
-// the card. The pipeline under it is tested with a scripted input in
+// This suite never opens a person's microphone: the one it has is a script (TestServices.
+// scriptMicrophone(), qml_test_main.cpp's RealtimeScriptedInput), the machine's inputs are not
+// listed, and on a developer's desk the default input is a real one. What is held here is the off
+// state, the words of the promise, that the answers (the input, the headphones, the delay) are
+// written to the controller, that a card that is not in use cannot turn the microphone on, that
+// the page shows the card, and that the rows that are only there while a microphone is on fit the
+// card. The pipeline under it is tested with a scripted input in
 // apps/hearth/engine/tests/test_microphone_session.cpp and test_microphone_controller.cpp.
 TestCase {
     id: testCase
@@ -41,6 +43,11 @@ TestCase {
     }
 
     function cleanup() {
+        // The takes a case made or recorded are files in the suite's one scratch folder, which
+        // the next case would count: removed, through the controller, so that each starts empty.
+        for (const take of MicrophoneController.takes.slice()) {
+            MicrophoneController.deleteTake(take.path);
+        }
         // Whatever a case did, the microphone is off at its end.
         compare(MicrophoneController.state === "on", false);
     }
@@ -52,7 +59,8 @@ TestCase {
     }
 
     // Takes in the suite's own folder, made as files: the list is read from the descriptions
-    // beside them. Returns the folder.
+    // beside them. The folder is chosen and read again, since choosing the one that is already
+    // chosen changes nothing and the files were made after it was. Returns the folder.
     function writeTakes(count) {
         let folder = "";
         for (let i = 1; i <= count; ++i) {
@@ -66,6 +74,8 @@ TestCase {
                 item_start_ms: 0 });
             verify(TestServices.writeTextFile(stem + ".take.json", description).length > 0);
         }
+        MicrophoneController.setTakesFolder(folder);
+        MicrophoneController.refreshTakes();
         return folder;
     }
 
@@ -173,16 +183,20 @@ TestCase {
     function test_the_rows_fit_a_narrow_card_and_a_wide_one_data() {
         return [
             { tag: "900 px", width: 900, fontScale: 1.0, stacked: false },
+            { tag: "434 px, the narrowest that is beside", width: 434, fontScale: 1.0, stacked: false },
+            { tag: "433 px, the widest that is above", width: 433, fontScale: 1.0, stacked: true },
             { tag: "408 px", width: 408, fontScale: 1.0, stacked: true },
             { tag: "301 px", width: 301, fontScale: 1.0, stacked: true },
             { tag: "408 px, 175%", width: 408, fontScale: 1.75, stacked: true },
+            { tag: "727 px, 175%, the narrowest that is beside", width: 727, fontScale: 1.75,
+              stacked: false },
             { tag: "900 px, 175%", width: 900, fontScale: 1.75, stacked: false }
         ];
     }
 
     function test_the_rows_fit_a_narrow_card_and_a_wide_one(data) {
-        MicrophoneController.setTakesFolder(writeTakes(2));
-        tryVerify(function() { return MicrophoneController.takes.length >= 2; }, 5000);
+        writeTakes(2);
+        verify(MicrophoneController.takes.length >= 2, "the takes were not listed");
         Theme.fontScale = data.fontScale;
         const card = createTemporaryObject(cardComponent, testCase, { width: data.width });
         verify(card);
@@ -215,9 +229,127 @@ TestCase {
         }
     }
 
+    // The rows that are only there while a microphone is on: the level and "Too loud", the pitch,
+    // the ribbon and the score, the take being made, the one just kept and the list of them, the
+    // question asked before one is removed, and what the performance came to once the microphone
+    // is off again. The input is a full-scale tone at the pitch of the stream's melody guide, so
+    // that it is loud, voiced, and sung against a tune. Each step is measured after it, since
+    // each shows rows the one before did not, and each row that is to be there is checked to be:
+    // a case that shows nothing cannot pass.
+    function test_the_rows_of_a_microphone_that_is_on_fit_the_card_data() {
+        return [
+            { tag: "900 px", width: 900, fontScale: 1.0 },
+            { tag: "434 px, the narrowest that is beside", width: 434, fontScale: 1.0 },
+            { tag: "408 px", width: 408, fontScale: 1.0 },
+            { tag: "301 px", width: 301, fontScale: 1.0 },
+            { tag: "727 px, 175%, the narrowest that is beside", width: 727, fontScale: 1.75 },
+            { tag: "301 px, 175%", width: 301, fontScale: 1.75 }
+        ];
+    }
+
+    function test_the_rows_of_a_microphone_that_is_on_fit_the_card(data) {
+        const stream = TestServices.writeAc3Stream("microphone-rows.ac3", "karaoke-3/2");
+        verify(stream.length > 0, "the stream could not be made");
+        writeTakes(3);
+        Theme.fontScale = data.fontScale;
+        MicrophoneController.headphones = true;
+        MicrophoneController.toleranceCents = 100;
+        TestServices.scriptMicrophone(800, 1.0, 60);
+
+        // Not in use, so that the card does not ask the controller to forget the item, which
+        // there is none of, a turn after it is made: the stream is loaded here, once it has.
+        const card = createTemporaryObject(cardComponent, testCase,
+                                           { width: data.width, active: false });
+        verify(card);
+        wait(100);
+        MicrophoneController.load(stream, "m");
+        tryCompare(MicrophoneController, "referenceStatus", "ready", 20000);
+
+        const row = function(name) {
+            return H.find(card, function(item) { return item.objectName === name; });
+        };
+        // `shown` rows are there, and nothing of the card is past its edges.
+        const fits = function(step, shown) {
+            for (const name of shown) {
+                const item = row(name);
+                verify(item !== null && item.visible, step + ": " + name + " is not showing");
+            }
+            let past = H.pastTheEdges(card);
+            for (let turn = 0; turn < 30 && past.length > 0; ++turn) {
+                wait(100);
+                past = H.pastTheEdges(card);
+            }
+            verify(past.length === 0, step + ": " + past.length + " past the card's edges, the first of "
+                   + "them: " + past.slice(0, 6).join("; "));
+        };
+
+        try {
+            MicrophoneController.anchor(0, true);
+            verify(MicrophoneController.start(), "the scripted microphone would not turn on");
+            tryCompare(MicrophoneController, "state", "on", 2000);
+            tryVerify(function() { return MicrophoneController.clipping; }, 10000,
+                      "a full-scale tone was never reported as too loud");
+            tryVerify(function() { return row("microphonePitch").text.indexOf("Hz") >= 0; }, 10000,
+                      "the tone was never heard as a pitch");
+            tryVerify(function() { return MicrophoneController.score.percent >= 0; }, 10000,
+                      "nothing was scored");
+            fits("turned on", ["microphoneToggle", "microphoneIndicator", "microphoneMeter",
+                               "microphoneClip", "microphonePitch", "microphoneRibbon",
+                               "microphoneScore", "microphoneScoreNote", "microphoneRecord",
+                               "microphoneTakesList"]);
+
+            verify(MicrophoneController.startRecording(), "a take would not begin");
+            tryCompare(MicrophoneController, "recording", true, 2000);
+            fits("recording", ["microphoneRecordingIndicator", "microphoneTakeLength"]);
+            wait(300);
+            MicrophoneController.stopRecording();
+            tryVerify(function() { return MicrophoneController.lastTake.name !== undefined; }, 5000,
+                      "the take was not kept");
+            fits("a take kept", ["microphoneLastTake", "microphoneShowTakes",
+                                 "microphoneDeleteTake", "microphoneTakesList",
+                                 "microphoneTakeDelete"]);
+
+            // Asked about the newest one: the two buttons that answer take the place of one.
+            row("microphoneTakeDelete").clicked();
+            fits("asked about a take", ["microphoneTakeDeleteConfirm", "microphoneTakeKeep"]);
+            row("microphoneTakeKeep").clicked();
+        } finally {
+            MicrophoneController.stop();
+        }
+
+        // Turned off: the meter and the pitch go, what the performance came to stays.
+        tryVerify(function() { return MicrophoneController.summary.percent !== undefined; }, 5000,
+                  "no summary was kept");
+        fits("turned off", ["microphoneSummary", "microphoneSummaryScore",
+                            "microphoneSummaryDetail", "microphoneSummaryBasis",
+                            "microphoneLastTake", "microphoneTakesList"]);
+        verify(!row("microphoneMeter").visible, "the meter is showing with the microphone off");
+
+        // A microphone that does not turn on says why, at length: a long sentence of short words,
+        // since a word that is wider than the card is no layout's to wrap.
+        TestServices.refuseMicrophone("The input is in use by another program, which has taken it "
+                                      + "for itself, and will not let this one have it until it "
+                                      + "has let it go again.");
+        verify(!MicrophoneController.start());
+        tryCompare(MicrophoneController, "state", "error", 2000);
+        fits("refused", ["microphoneError"]);
+        TestServices.refuseMicrophone("");
+
+        // One that is on and hears nothing says so.
+        TestServices.scriptMicrophone(0, 0, 60);
+        verify(MicrophoneController.start());
+        try {
+            tryVerify(function() { return row("microphoneSilent").visible; }, 8000,
+                      "silence was never said to the person");
+            fits("silent", ["microphoneSilent"]);
+        } finally {
+            MicrophoneController.stop();
+        }
+    }
+
     function test_the_takes_in_the_folder_are_listed_and_removed_after_asking() {
         // Seven takes in a folder of their own.
-        MicrophoneController.setTakesFolder(writeTakes(7));
+        writeTakes(7);
         compare(MicrophoneController.takes.length, 7);
 
         const card = createTemporaryObject(cardComponent, testCase);
