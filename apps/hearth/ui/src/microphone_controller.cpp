@@ -413,6 +413,10 @@ void MicrophoneController::setTakesFolder(const QString& urlOrPath) {
     emit takesFolderChanged();
 }
 
+void MicrophoneController::limit_take_bytes_for_test(std::uint64_t bytes) {
+    state_data_->session.limit_take_bytes(bytes);
+}
+
 void MicrophoneController::restartScore() {
     state_data_->session.clear_singer();
     publish(true);

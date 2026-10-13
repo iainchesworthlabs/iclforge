@@ -567,6 +567,41 @@ TEST_CASE("microphone controller: a device that goes away during a take ends it 
     CHECK(QFileInfo::exists(take.value("path").toString()));
 }
 
+TEST_CASE("microphone controller: a take the disk cannot hold ends itself, is kept, and says why",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    QTemporaryDir takes;
+    REQUIRE(takes.isValid());
+    auto rig = make_rig();
+    rig->controller->setTakesFolder(takes.path());
+    // Room for the header and a few frames of silence.
+    rig->controller->limit_take_bytes_for_test(100);
+    REQUIRE(rig->controller->start());
+    REQUIRE(rig->controller->startRecording());
+    rig->now += 1'000'000'000LL;
+    rig->input->set_now_ns(rig->now);
+    for (int i = 0; i < 5; ++i) {
+        rig->controller->tick();
+    }
+    CHECK(!rig->controller->recording());
+    CHECK(rig->controller->on());  // the microphone stays on
+    CHECK(rig->controller->takeError().contains("disk"));
+    const QVariantMap take = rig->controller->lastTake();
+    REQUIRE(take.contains("path"));
+    CHECK(QFileInfo::exists(take.value("path").toString()));
+    CHECK(QFileInfo(take.value("path").toString()).size() <= 100);
+    QString sidecar = take.value("path").toString();
+    sidecar.chop(5);
+    CHECK(QFileInfo::exists(sidecar + ".take.json"));
+    // A take begun again with the limit lifted is whole.
+    rig->controller->limit_take_bytes_for_test(0);
+    REQUIRE(rig->controller->startRecording());
+    CHECK(rig->controller->recording());
+    CHECK(rig->controller->takeError().isEmpty());
+    rig->controller->stopRecording();
+}
+
 TEST_CASE("microphone controller: a take is not written over, nor deleted while another runs",
           "[hearth][microphone][take]") {
     Room room;

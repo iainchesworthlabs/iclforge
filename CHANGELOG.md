@@ -476,6 +476,12 @@ The sections below contain the complete change list and fixes.
   **Choose…**, and **Show in folder** and **Delete this take** for the last one. A take stops when the
   microphone goes off, the page is left, the item ends, the device goes away or the disk fails, and
   says why. Turning the microphone on never starts one.
+- **A take the disk cannot hold is tested.** `TakeRecorder::limit_bytes()` (a test seam; 0, the
+  default, is no limit) makes the file refuse a write past a number of bytes, as a full disk does,
+  and the session's and the controller's handling of it, which had no test, is held: the take ends
+  by itself, the microphone stays on, the person is told it was the disk, and what was written is a
+  take with its description, handed over once (`take_ended_by_itself`). Six mutants applied, all
+  killed.
 - **A take is the voice alone, lossless, with a description beside it.** One mono 24-bit FLAC at the
   microphone's rate through the existing encoder, and a `.take.json` that says which item it was,
   where in the item the first sample was sung (the heard position when the sound reached the
