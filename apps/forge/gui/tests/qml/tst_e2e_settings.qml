@@ -248,13 +248,100 @@ TestCase {
         tryCompare(version, "visible", false);
     }
 
+    // The notices the Licences dialog shows are the NOTICES.txt this build
+    // installs, embedded at build time (forge_gui_notices in CMake), so what
+    // they say has to be the whole file and not the sentence
+    // licenceNotices() falls back to when a binary skipped the resource.
+    function test_licenceNoticesAreThisBuildsEmbeddedFile() {
+        const notices = EncoderController.licenceNotices;
+        verify(notices.length > 2000, "the embedded notices are the whole file; got "
+                                      + notices.length + " characters: " + notices.substring(0, 120));
+        verify(notices.indexOf("no embedded notices file") < 0, notices.substring(0, 120));
+        verify(notices.indexOf("ICL Forge") === 0, notices.substring(0, 80));
+        // The program compiles {fmt} in and embeds the OFL faces.
+        verify(notices.indexOf("{fmt}") >= 0, "the {fmt} section is missing");
+        verify(notices.indexOf("SIL OPEN FONT LICENSE") >= 0, "the OFL text is missing");
+    }
+
+    // About says LICENCES (the source language is British English, as
+    // Crucible's and Hearth's About do), names the repository as a link, and
+    // opens the notices over itself from a Licences… button.
+    function test_aboutHeadsTheLicencesNamesTheRepositoryAndOpensTheNotices() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        click(findByName(win.contentItem, "aboutOpenButton"));
+        const version = findByName(win.contentItem, "aboutVersionText");
+        tryCompare(version, "visible", true);
+
+        // The dialog's own content, which is the version text's parent: a
+        // popup is not a visual child of the window, so findWhere cannot walk
+        // down to it from win.contentItem.
+        const content = version.parent;
+        verify(findWhere(content, (n) => n.text === "LICENCES" && n.visible) !== null,
+               "About has no LICENCES heading");
+        verify(findWhere(content, (n) => n.text === "LICENSE") === null,
+               "About still says LICENSE");
+
+        const link = findByName(win.contentItem, "aboutRepositoryLink");
+        verify(link.text.indexOf("href=\"https://github.com/iainchesworthlabs/iclforge\"") >= 0, link.text);
+
+        const licences = findByName(win.contentItem, "licencesDialog");
+        compare(licences.visible, false);
+        click(findByName(win.contentItem, "aboutLicencesButton"));
+        tryCompare(licences, "visible", true);
+        const text = findByName(licences.contentItem, "licenceNoticesText");
+        compare(text.text, EncoderController.licenceNotices);
+        verify(text.text.length > 2000);
+
+        // The two stack: closing Licences leaves About open beneath it.
+        click(findByName(licences.contentItem, "licencesCloseButton"));
+        tryCompare(licences, "visible", false);
+        compare(version.visible, true);
+        click(findByName(win.contentItem, "aboutCloseButton"));
+        tryCompare(version, "visible", false);
+    }
+
+    // The dialog is called Settings, as Crucible's and Hearth's page is, and
+    // About is reached from it. About opens over the dialog and closing it
+    // gives the dialog back with its working copy as it was left: an act,
+    // not a setting, so neither Save nor Cancel changes meaning.
+    function test_settingsDialogIsCalledSettingsAndReachesAbout() {
+        const win = createTemporaryObject(mainWindowComponent, testCase);
+        verify(win !== null);
+        const opener = findByName(win.contentItem, "prefsOpenButton");
+        compare(opener.text, "Settings");
+        click(opener);
+        tryVerify(() => win.prefsDialog.opened);
+        verify(findWhere(win.prefsDialog.contentItem,
+                         (n) => n.text === "Settings" && n.visible) !== null,
+               "the dialog's heading does not say Settings");
+        verify(findWhere(win.prefsDialog.contentItem, (n) => n.text === "Preferences") === null,
+               "the dialog still says Preferences");
+
+        // Something in the working copy that is not what is saved.
+        compare(win.settings.showCli, true);
+        win.prefsDialog.cliVisible = false;
+
+        click(findByName(win.prefsDialog.contentItem, "prefsAboutButton"));
+        const version = findByName(win.contentItem, "aboutVersionText");
+        tryCompare(version, "visible", true);
+        verify(win.prefsDialog.visible, "Settings closed when About opened");
+        click(findByName(win.contentItem, "aboutCloseButton"));
+        tryCompare(version, "visible", false);
+
+        // Back at Settings with the working copy as it was; Cancel still
+        // cancels it.
+        verify(win.prefsDialog.visible);
+        compare(win.prefsDialog.cliVisible, false);
+        click(findByName(win.prefsDialog.contentItem, "prefsCancelButton"));
+        tryVerify(() => !win.prefsDialog.visible);
+        compare(win.settings.showCli, true);
+    }
+
     function test_preferencesSaveDiagnosticsWritesTheSupportFile() {
         const win = createTemporaryObject(mainWindowComponent, testCase);
         verify(win !== null);
-        const prefsButton = findWhere(win.contentItem,
-                                      (n) => n.text === "Preferences" && n.checkable !== undefined);
-        verify(prefsButton !== null);
-        click(prefsButton);
+        click(findByName(win.contentItem, "prefsOpenButton"));
         tryVerify(() => win.prefsDialog.opened);
 
         const saveDiag = findByName(win.prefsDialog.contentItem, "prefsDiagnosticsButton");

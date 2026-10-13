@@ -91,7 +91,7 @@ metadata options (any order, after the positional arguments):
   keep-partial      encode/eac3-encode/atmos-encode/atmos-cbi: if the run fails partway, keep
                     whatever frames were already encoded (named beside the intended output as
                     <name>.partial.<ext>) instead of discarding them - off by default, matching
-                    the GUI's own keep-partial-output preference
+                    the GUI's own keep-partial-output setting
   fast-mdct=off     force the direct §8.2.3.2 forward MDCT instead of the default §7.9.4 fast
                     path (coefficients within ~3e-12 max relative error of the direct form, so
                     a stream differs only where that tips a quantisation decision; the direct
@@ -1456,8 +1456,8 @@ Optional positional arguments, when omitted:
   `out.partial.ec3`) rather than discarded — the run still exits non-zero and prints the same
   error either way, only what happens to the frames already produced changes. Off by default, the
   same as every other bare token here; a plain invocation with no `keep-partial` behaves exactly
-  as it always has. Mirrors the GUI's own keep-partial-output preference (see
-  [GUI → window layout](../gui/index.md#preferences)) rather than a separate idea — the same
+  as it always has. Mirrors the GUI's own keep-partial-output setting (see
+  [GUI → window layout](../gui/index.md#settings)) rather than a separate idea — the same
   `.partial.` naming either way, so a file produced by either front end is named alike.
 
 ## Next

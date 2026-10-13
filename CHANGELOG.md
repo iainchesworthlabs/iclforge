@@ -4096,6 +4096,21 @@ The sections below contain the complete change list and fixes.
   (`vcpkg.json`, `cmake/FastFloat.cmake`, `ICLFORGE_FETCH_FAST_FLOAT`, the three packaging
   manifests and the notices).
 
+**Settings and Licences: the three programs say the same, and About is reached the same way**
+
+- **Forge's Preferences is Settings.** The header button, the dialog's heading and the sentence
+  that points at the output folder now say Settings, as Crucible's page and Hearth's page do; the
+  six catalogues and the guide's pages follow. The file and the `prefs*` object names keep their
+  names, which nothing shows.
+- **Forge's About says LICENCES, names the repository and opens the third-party notices.** It had
+  LICENSE, no repository link and no Licences. **Licences…** opens a new dialog with the text of
+  the `NOTICES.txt` the package installs, embedded in `forge-gui` as `:/notices/NOTICES.txt` as it
+  is in Crucible and Hearth, and `EncoderController::licenceNotices` reads it.
+- **About is reached from Settings in all three.** Forge's dialog has an **About Forge…** button at
+  its foot, Crucible's page a ninth block, **About**, and Hearth's page a sixth card, **About**.
+  Every route that was there stays: the header's About in Forge, the `?`, F1 and the tray menu in
+  Crucible, the `?` and F1 to the keyboard reference's **About…** in Hearth.
+
 **Android: NDK r28c**
 
 - **Every Android build is pinned to NDK r28c (28.2.13676358), up from r26b (26.1.10909125).** The

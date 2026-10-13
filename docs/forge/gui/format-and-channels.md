@@ -17,7 +17,7 @@ Matroska, S/PDIF, MP4, fragmented MP4/CMAF, or MPEG-TS — see below):
 
 **The codec follows the channels.** *Any* extra — rear, ceiling, a second LFE — needs Dolby
 Digital Plus, so ticking one under plain AC-3 *promotes the codec on the spot* (with a
-confirmation first, if the [Explanations preference](index.md#preferences) asks for one); while
+confirmation first, if the [Explanations setting](index.md#settings) asks for one); while
 anything is forcing it, the field reads *Codec — follows the channels* (or *fixed by object
 mode*) and is disabled. With nothing forcing it — a plain bed, with or without its LFE — the
 choice is real (both codecs carry it, and VBR needs E-AC-3), so the field is live
