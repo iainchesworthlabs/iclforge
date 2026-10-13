@@ -11,6 +11,7 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <map>
@@ -114,6 +115,51 @@ class QuietLog final : public testsink::SinkLog {
     std::vector<std::string> lines_;
 };
 
+// A sink's log that can hold its sink where it logs that it has been activated for playback:
+// inside the sink's session, with the activation taken and the client/state that answers it not
+// yet sent.
+class HeldLog final : public testsink::SinkLog {
+   public:
+    void line(std::string_view text) override {
+        std::unique_lock lock(mutex_);
+        if (!armed_ || text.find("activated for playback") == std::string_view::npos) {
+            return;
+        }
+        armed_ = false;
+        holding_ = true;
+        changed_.notify_all();
+        // Not for ever: a case that never lets go fails on what it checks, not by hanging here.
+        changed_.wait_for(lock, 30s, [&] { return !holding_; });
+        holding_ = false;
+    }
+
+    // The sink's next activation for playback is held until let_go().
+    void hold_next() {
+        const std::lock_guard lock(mutex_);
+        armed_ = true;
+    }
+
+    // Waits until the sink is being held.
+    bool wait_until_held(std::chrono::milliseconds timeout) {
+        std::unique_lock lock(mutex_);
+        return changed_.wait_for(lock, timeout, [&] { return holding_; });
+    }
+
+    void let_go() {
+        {
+            const std::lock_guard lock(mutex_);
+            holding_ = false;
+        }
+        changed_.notify_all();
+    }
+
+   private:
+    std::mutex mutex_;
+    std::condition_variable changed_;
+    bool armed_ = false;
+    bool holding_ = false;
+};
+
 class HostEvents final : public iclforge::sendspin::ServerHostEvents {
    public:
     void on_client(const iclforge::sendspin::ClientView& client) override {
@@ -135,7 +181,23 @@ class HostEvents final : public iclforge::sendspin::ServerHostEvents {
     void on_paired(const std::string& /*client_id*/) override {}
     void on_pairing_ended(const std::string& /*client_id*/,
                           std::optional<iclforge::sendspin::pairing_messages::AbortReason> /*reason*/) override {}
-    void on_log(std::string_view /*line*/) override {}
+    void on_log(std::string_view line) override {
+        std::function<void(std::string_view)> heard;
+        {
+            const std::lock_guard lock(mutex_);
+            heard = heard_;
+        }
+        if (heard) {
+            heard(line);
+        }
+    }
+
+    // Calls `heard` with each line the host logs from now on, on the thread that logs it and
+    // before the host goes on; nothing when empty.
+    void hear(std::function<void(std::string_view)> heard) {
+        const std::lock_guard lock(mutex_);
+        heard_ = std::move(heard);
+    }
 
     struct Command {
         std::string group_id;
@@ -197,6 +259,7 @@ class HostEvents final : public iclforge::sendspin::ServerHostEvents {
     std::vector<Command> commands_;
     std::vector<Request> requests_;
     std::map<std::string, iclforge::sendspin::messages::GoodbyeReason> goodbyes_;
+    std::function<void(std::string_view)> heard_;
 };
 
 // Polls `predicate` until it holds or `timeout` passes.
@@ -212,7 +275,8 @@ bool eventually(Predicate&& predicate, std::chrono::milliseconds timeout) {
     return true;
 }
 
-std::unique_ptr<testsink::Sink> start_sink(const fs::path& directory, std::string name, m::Codec codec, QuietLog& log,
+std::unique_ptr<testsink::Sink> start_sink(const fs::path& directory, std::string name,
+                                          m::Codec codec, testsink::SinkLog& log,
                                           bool unpaired_access = true) {
     testsink::SinkOptions options;
     options.name = std::move(name);
@@ -2089,6 +2153,127 @@ TEST_CASE("group: a programme waits for a sink the host has just moved to PCM",
         REQUIRE((*host)->use_pcm(id, false));
         REQUIRE(events.wait(on_extension_role, 30s));
     }
+    group.reset();
+    host->reset();
+}
+
+// The moment the case above reaches only by chance, reached on purpose. The moved sink is held
+// inside its session with the activation for player@v1 taken and its client/state not yet sent.
+// The group passes it over and starts the sink that is ready, and only then is the moved sink let
+// go and its state waited for: so the state arrives after the group has looked at the moved sink
+// to start it and before it decides whether to begin its timeline. A group that looked at the
+// sink again to decide found it on player@v1 with its state, took a member it had not started for
+// one that was not moving, and began without it: the sink was started at the next block and never
+// sent the first.
+TEST_CASE("group: a moved sink whose state arrives as the timeline would begin is waited for",
+          "[hearth][group][websocket][iclforge]") {
+    namespace ss = iclforge::sendspin;
+    const fs::path scratch =
+        fs::path{ICLFORGE_TEST_SCRATCH_DIR} / ("hearth_group_arriving_" + scratch_pid_suffix());
+    fs::remove_all(scratch);
+    HeldLog moved_log;
+    QuietLog log;
+    const std::unique_ptr<testsink::Sink> moved =
+        start_sink(scratch / "moved", "Moved", m::Codec::kPcm, moved_log, false);
+    const std::unique_ptr<testsink::Sink> ready =
+        start_sink(scratch / "ready", "Ready", m::Codec::kPcm, log, true);
+
+    std::optional<ss::noise::KeyPair> identity = ss::noise::KeyPair::generate();
+    REQUIRE(identity.has_value());
+    ss::MemoryServerStore store;
+    HostEvents events;
+    auto host = ss::ServerHost::start({.identity = *identity,
+                                       .name = "Test host",
+                                       .languages = {"en"},
+                                       .address = "127.0.0.1",
+                                       .port = std::nullopt,
+                                       .advertise = false,
+                                       .browse = false,
+                                       .mdns_interfaces = {}},
+                                      store, events);
+    REQUIRE(host.has_value());
+    REQUIRE((*host)->enter_pairing_token(moved->pairing_token()));
+    for (const testsink::Sink* sink : {moved.get(), ready.get()}) {
+        (*host)->dial("ws://127.0.0.1:" + std::to_string(sink->port()) + "/sendspin");
+    }
+    REQUIRE(events.wait([](const auto& clients) { return clients.size() == 2; }, 15s));
+    REQUIRE((*host)->approve(ready->client_id(), true));
+
+    const std::string id = moved->client_id();
+    REQUIRE(events.wait(
+        [&](const auto& clients) {
+            const auto found = clients.find(id);
+            return clients.size() == 2 && found != clients.end() && found->second.bursts &&
+                   found->second.iclforge_state.has_value() &&
+                   std::all_of(clients.begin(), clients.end(), [](const auto& entry) {
+                       return entry.second.playing && entry.second.available;
+                   });
+        },
+        30s));
+
+    // The moved sink first: the group looks at it before it starts the other.
+    std::shared_ptr<ss::Group> group = (*host)->make_group("Arriving");
+    for (const testsink::Sink* sink : {moved.get(), ready.get()}) {
+        group->add(sink->client_id());
+    }
+
+    // The sink takes the activation for player@v1 and is held before it answers.
+    moved_log.hold_next();
+    REQUIRE((*host)->use_pcm(id, true));
+    REQUIRE(moved_log.wait_until_held(30s));
+
+    // The host logs that the ready sink joined from inside the group's pass over its members,
+    // after it has passed the moved sink over: there the moved sink answers, and the host has its
+    // state before the group goes on.
+    bool arrived = false;
+    events.hear([&](std::string_view line) {
+        if (line.find("Ready joined group") == std::string_view::npos) {
+            return;
+        }
+        moved_log.let_go();
+        arrived = eventually(
+            [&] {
+                const std::optional<ss::ClientView> client = (*host)->client(id);
+                return client && !client->bursts && client->player_state.has_value();
+            },
+            30s);
+    });
+
+    const m::AudioFormat format{
+        .codec = m::Codec::kPcm, .channels = 2, .sample_rate = 48000, .bit_depth = 16};
+    constexpr std::size_t kFrames = 14400;
+    const std::vector<std::int32_t> programme(kFrames * 2, 3000);
+    REQUIRE(group->start({.pcm = format, .bursts = std::nullopt, .buffered = true}));
+    std::size_t offset = 0;
+    const auto deadline = std::chrono::steady_clock::now() + 60s;
+    while (offset < programme.size() && std::chrono::steady_clock::now() < deadline) {
+        const std::size_t taken = group->push(std::span<const std::int32_t>(programme).subspan(
+            offset, std::min<std::size_t>(4800 * 2, programme.size() - offset)));
+        if (taken > 0) {
+            offset += taken * 2;
+        } else {
+            std::this_thread::sleep_for(1ms);
+        }
+    }
+    events.hear({});
+    REQUIRE(offset == programme.size());
+    // The state did arrive where the case means it to.
+    REQUIRE(arrived);
+    CHECK(group->members_playing() == 2);
+    group->stop();
+
+    // Both play the programme from its first frame.
+    const auto frames_of = [](const testsink::Sink& sink, std::uint64_t wanted,
+                              std::chrono::seconds wait) {
+        const auto until = std::chrono::steady_clock::now() + wait;
+        while (sink.totals().frames < wanted && std::chrono::steady_clock::now() < until) {
+            std::this_thread::sleep_for(20ms);
+        }
+        return sink.totals().frames;
+    };
+    CHECK(frames_of(*ready, kFrames, 15s) == kFrames);
+    CHECK(frames_of(*moved, kFrames, 3s) == kFrames);
+    CHECK(moved->totals().bursts == 0);
     group.reset();
     host->reset();
 }
