@@ -1967,7 +1967,7 @@
         "Yes",
         "Yes",
         "Output policy",
-        "The Android TV sink; the desktop engine has it and the window does not open it"
+        "Desktop player, to a receiver chosen in the output picker; the Android TV sink"
       ],
       [
         "Sendspin network playback",

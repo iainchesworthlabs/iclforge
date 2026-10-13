@@ -7,6 +7,9 @@ What a reproduction *is*, level for level, is held by libs/ac3's output-stage te
 that the Python surface reaches it in the library's own terms, and that what is read through it is
 what the C++ reader read."""
 
+import importlib
+import sys
+import types
 from pathlib import Path
 
 import iclforge as ac3
@@ -174,6 +177,34 @@ def test_a_stream_that_is_not_karaoke_is_left_alone_whatever_was_asked() -> None
 needs_lyrics = pytest.mark.skipif(
     not hasattr(ac3, "lyrics"), reason="this build of the extension has no lyrics submodule"
 )
+
+
+def test_the_package_imports_when_the_extension_has_no_lyrics_submodule(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`import iclforge` named the submodule outright, and the Intel macOS wheel's extension has
+    none: every test of that wheel failed at collection on 2026-10-12. The package is run again
+    here over a copy of the extension without it, which is the only place most builds can take
+    that path."""
+    extension = sys.modules["iclforge._iclforge"]
+    without = types.ModuleType(extension.__name__)
+    for name, value in vars(extension).items():
+        if name != "lyrics":
+            setattr(without, name, value)
+    monkeypatch.setitem(sys.modules, extension.__name__, without)
+    # A submodule of the extension is in sys.modules under its dotted name as well, and
+    # `from ._iclforge import lyrics` falls back to that when the attribute is missing.
+    monkeypatch.delitem(sys.modules, f"{extension.__name__}.lyrics", raising=False)
+    try:
+        package = importlib.reload(ac3)
+        assert "lyrics" not in package.__all__
+        # Everything else is still the package's, and names what it did before.
+        assert "FrameDecoder" in package.__all__
+        assert package.FrameDecoder is extension.FrameDecoder
+    finally:
+        monkeypatch.undo()
+        importlib.reload(ac3)
+    assert ("lyrics" in ac3.__all__) == hasattr(extension, "lyrics")
 
 
 @needs_lyrics

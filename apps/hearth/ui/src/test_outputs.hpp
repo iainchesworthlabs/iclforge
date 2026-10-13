@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "iclforge/audio/passthrough.hpp"
+#include "bitstream_sink.hpp"
 #include "output_selector.hpp"
 #include "pcm_sink.hpp"
 
@@ -29,6 +30,11 @@ namespace iclforge::hearth::ui {
 struct TestOutputs {
     // Builds the engine's PCM sink - called once, from start().
     std::function<std::unique_ptr<iclforge::hearth::PcmSink>()> make_pcm;
+    // Builds the engine's passthrough sink, in place of
+    // make_passthrough_sink() - called once, from start(). Unset, the engine
+    // is given none and decodes everything, whatever the endpoints say they
+    // take.
+    std::function<std::unique_ptr<iclforge::hearth::BitstreamSink>()> make_bitstream;
     // The render endpoints the engine's output decision reads
     // (EngineOutputs::endpoints), in place of device_endpoints().
     iclforge::hearth::EndpointSource endpoints;

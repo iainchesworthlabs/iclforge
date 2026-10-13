@@ -89,6 +89,16 @@ arm64 series from `linux-gcc-arm64`. Kernel and memory histories remain x86-only
 These are fixed-runner trends, not comparisons across the 11 split platform
 legs, and developer-machine numbers are not comparable to these rows.
 
+`linux-gcc` runs on GitHub's hosted `ubuntu-latest`, and the machine behind that
+label changes from run to run: it was six CPU models in the six weeks to
+2026-10-12, and in the last two days of them `plain_51` took 2.07 ms/frame on an
+EPYC 9V45, 3.74 on an EPYC 9V74 and 4.38 on an EPYC 7763, on the same code.
+Whole-frame records have named the model they were measured on (`cpu_model`)
+since 2026-09-01, and kernel records name it from the change that introduced the
+comparison described below; those written before 2026-10-13 name none. The checks
+and the charts on this page compare a figure with others from the same model. The
+arm64 leg has been a Neoverse-N2 on every run.
+
 The change that inlined `to_fixed25` and fused it with exponent extraction does not
 show as a clean step in the whole-frame series above: the ~7% of a fast-path frame it
 targeted is smaller than this page's own run-to-run variance on a shared runner, so
@@ -152,6 +162,24 @@ a hard one (100% slower - i.e. at least doubled - `::error::`, fails the
 `persist-performance-trend` CI job *after* the numbers are still recorded, so a big
 regression is never silently un-recorded just because it also failed the run).
 
+The trailing mean is of one machine's records: the last ten of the series that were
+measured on the same CPU model as the run, however far back they are. Until
+2026-10-13 it was the last ten records of any machine, and a run on the EPYC 7763
+after a few on the EPYC 9V45 read as 20% slower, or as doubled after ten, with no
+change in the code. Replayed over `main`'s history to that date, the 2,098
+`linux-gcc` records that name a model raised 118 soft warnings against every
+machine's mean and 11 against their own model's. All 11 are on the EPYC 9V74, which
+runs `plain_51` at 3.74 or at 4.82 ms/frame under the one name, so a model name
+does not always mean one speed and a run that changes between the two is still
+flagged at the soft tier.
+
+A run on a model its series has no record from yet has nothing like it to be
+compared with, and neither has a run that recorded no model. Both are compared with
+the last ten records of every machine, at both tiers, and the annotation says that
+this is what it compared with. The job's log says, for each leg, how many series
+were compared with their own model's records and how many with every machine's.
+The thresholds are unchanged.
+
 Both append scripts key every series by its own name end to end, so a workload or
 kernel added to a bench simply starts its own series: its first run has no trailing
 mean to be compared against and cannot trip its own regression gate, and it never
@@ -167,7 +195,10 @@ is far noisier than a 200-frame whole-frame average, and `iclforge-perf` plus th
 whole-frame series already gate anything a user would feel. This page's per-kernel
 tables are where kernel regressions surface. Every series is keyed by its own kernel
 name end to end - a trailing mean over mixed kernels would be a number with no owner,
-the same conflation the quality-trend history once had to be cured of.
+the same conflation the quality-trend history once had to be cured of. Its trailing
+mean is of the run's own CPU model too, by the same rule; the kernel records written
+before 2026-10-13 name no model, so each model's own comparison starts with its
+first record after that, and until then a run is compared with every machine's.
 
 `tools/ci/append_memory_history.py` does the same for `iclforge-membench`'s numbers
 (`memory-develop.jsonl` / `memory-main.jsonl`, same branch), with the same two
@@ -181,7 +212,8 @@ because a leak is a leak regardless of what last week's runs did.
 Only `linux-gcc` (and, for the whole-frame series, `linux-gcc-arm64`) is measured, not the full CI matrix: a timing trend's value is in
 comparing one consistent runner against its own history over time, not in comparing
 GitHub's runner classes against each other the way the gold-reference SNR numbers
-usefully are cross-platform.
+usefully are cross-platform. The memory series counts allocations, which do not
+depend on the machine, and its trailing mean is of every record.
 
 `performance-develop.jsonl`, `kernels-develop.jsonl` and `memory-develop.jsonl`
 all stopped gaining rows on 2026-08-24, `develop`'s last commit before
@@ -197,9 +229,18 @@ data* block beneath it instead.
 Each series below is a chart first, table second. The chart plots the
 generated recent window (or the full history while it still fits that window),
 not just the table's last 20 rows, as
-ms/frame against commit date, with a dashed red line for the throughput
-budget and a dashed ring around any point whose commit was tagged as a
-GitHub release - hover a point for the exact commit, date and number. A
+ms/frame against commit date, with a dashed ring around any point whose commit
+was tagged as a GitHub release - hover a point for the exact commit, date,
+number and CPU model. Each CPU model is a line of its own in its own colour, the
+same colour on every chart, and the legend names the models a chart has; the
+table's CPU column says the same for each row. Read along one line: a change in
+the code moves every line, and a step from one line to another is a different
+machine. The scale fits the measurements, and the dashed line for the throughput
+budget is drawn where it is within twice the slowest point. Elsewhere the legend
+gives the budget as a figure: 24 of the 28 series run at a tenth of their budget or
+less, and a scale that reached up to it left their history as one flat band along
+the bottom. On 2026-10-13 no series is within twice its budget (the closest,
+`linux-gcc / atmos_4obj`, is at 27% of it), so no chart draws the line. A
 downward slope is the improvement this whole page exists to make visible;
 release rings turn that into a release-to-release story instead of a wall
 of per-commit numbers. `main`'s chart and table render directly, in solid
@@ -221,6 +262,22 @@ follow the same convention, table-only (no chart to style).
 .performance-trend-legend { display: flex; gap: 1.5em; font-size: 0.8em; margin: 0.25em 0 1em; color: var(--md-default-fg-color--light); flex-wrap: wrap; }
 .performance-trend-legend span { display: inline-flex; align-items: center; gap: 0.4em; }
 .performance-trend-legend i { width: 0.9em; height: 0.9em; border-radius: 50%; display: inline-block; background: #7c4dff; }
+/* One colour a CPU model, the same on every chart. Seven slots in a fixed order chosen so that
+   neighbours stay apart for colour-blind readers, with their own steps for the dark scheme;
+   red is left out, being this page's colour for a budget and a breach of one. Six colours on
+   one chart are more than colour alone can keep apart for every reader, so the legend, a
+   point's tooltip and the table's CPU column each name the model in words. A model past the
+   seventh, and a record that names no model, is grey. */
+#performance-trend-app {
+  --perf-cpu-1: #2a78d6; --perf-cpu-2: #eb6834; --perf-cpu-3: #1baf7a; --perf-cpu-4: #eda100;
+  --perf-cpu-5: #e87ba4; --perf-cpu-6: #4a3aa7; --perf-cpu-7: #008300; --perf-cpu-none: #9e9e9e;
+}
+[data-md-color-scheme="slate"] #performance-trend-app {
+  --perf-cpu-1: #3987e5; --perf-cpu-2: #d95926; --perf-cpu-3: #199e70; --perf-cpu-4: #c98500;
+  --perf-cpu-5: #d55181; --perf-cpu-6: #9085e9; --perf-cpu-7: #008300;
+}
+.performance-trend-cpu { display: inline-flex; align-items: center; gap: 0.4em; }
+.performance-trend-cpu i { width: 0.7em; height: 0.7em; border-radius: 50%; display: inline-block; }
 .performance-trend-table-wrap { overflow-x: auto; }
 #performance-trend-app table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
 #performance-trend-app th, #performance-trend-app td { padding: 0.35em 0.6em; text-align: left; border-bottom: 1px solid var(--md-default-fg-color--lightest); white-space: nowrap; }
@@ -262,7 +319,7 @@ follow the same convention, table-only (no chart to style).
     ? location.hostname.split(".")[0] + "/" + location.pathname.split("/")[1]
     : "iainchesworthlabs/iclforge";
   const PERF_TREND_HISTORY_BRANCH = "quality-history";
-  const PERF_TREND_MAIN_COLOR = "#7c4dff";
+  // main's track has a colour for each CPU model (--perf-cpu-N in the style block above).
   // Muted and dashed (see each section's buildChart) rather than a second
   // saturated colour - the historical track reads as archived, not as a
   // second live series. Matches the sibling trend pages' identical choice.
@@ -288,6 +345,44 @@ follow the same convention, table-only (no chart to style).
       groups.get(key).push(rec);
     }
     return groups;
+  }
+
+  function perfTrendEsc(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // The CPU model a record was measured on, or "" for a record that names none: one written
+  // before the model was recorded, or one whose runner gave the capture script no name
+  // ("unknown"). The hosted x86 runner is one of several models from run to run and twice as
+  // fast on one as on another, so this is what a figure is comparable by. Mirrors
+  // UNNAMED_CPU_MODELS in tools/ci/append_performance_history.py.
+  function perfTrendCpu(rec) {
+    return rec.cpu_model && rec.cpu_model !== "unknown" ? rec.cpu_model : "";
+  }
+
+  // A model as a legend and a table show it: the vendor's string without its trademark marks,
+  // core count and clock speed ("AMD EPYC 7763 64-Core Processor" is "AMD EPYC 7763"). Display
+  // only - records are matched on the whole string.
+  function perfTrendCpuLabel(model) {
+    if (!model) return "CPU not recorded";
+    return model.replace(/\((R|TM)\)/gi, "").replace(/\s+CPU\s+@.*$/i, "")
+      .replace(/\s+\d+-Core Processor$/i, "").replace(/\s+/g, " ").trim();
+  }
+
+  // The rows a row's trailing mean is taken over, as the append scripts choose them
+  // (like_for_like_baseline in tools/ci/append_performance_history.py, whose
+  // MIN_SAME_CPU_RECORDS this mirrors; tools/ci/test_append_kernel_history.py runs this
+  // function against the script's): the last `window` earlier rows from the row's own CPU
+  // model, or, when the row names no model or has too few earlier rows from it, the last
+  // `window` earlier rows of any.
+  const PERF_TREND_MIN_SAME_CPU_RECORDS = 1;
+  function perfTrendBaselineRows(rows, i, window) {
+    const before = rows.slice(0, i);
+    const cpu = perfTrendCpu(rows[i]);
+    const same = cpu ? before.filter((p) => perfTrendCpu(p) === cpu) : [];
+    return same.length >= PERF_TREND_MIN_SAME_CPU_RECORDS
+      ? { rows: same.slice(-window), sameCpu: true }
+      : { rows: before.slice(-window), sameCpu: false };
   }
 
   // When the newest figures below are from: the newest commit recorded on main, the day it was
@@ -407,15 +502,40 @@ follow the same convention, table-only (no chart to style).
     return shaMap;
   }
 
+  // How many CPU models have a colour of their own (--perf-cpu-1 to -7 in the style block above).
+  const CPU_COLOR_SLOTS = 7;
+
+  // model -> its colour, for every chart on the page: the models of the fetched records in
+  // name order take the slots in order, so a model is one colour wherever it is drawn. The
+  // colours move only when a model enters or leaves the fetched window. Sorted by code unit,
+  // which is the same in every reader's locale.
+  function cpuColors(records) {
+    const models = [...new Set(records.map(perfTrendCpu).filter(Boolean))].sort();
+    return (model) => {
+      const slot = models.indexOf(model);
+      return slot >= 0 && slot < CPU_COLOR_SLOTS ? `var(--perf-cpu-${slot + 1})` : "var(--perf-cpu-none)";
+    };
+  }
+
+  // Whether the budget line belongs on a series' chart: where it is within twice the slowest
+  // point. 24 of the 28 series run at a tenth of their budget or less (2026-10-13), and a
+  // scale that reached up to it left their whole history in the bottom tenth of the chart,
+  // one flat band in which the machines could not be told apart.
+  function budgetIsOnChart(sortedRows, budget) {
+    return budget !== null && budget <= 2 * Math.max(...sortedRows.map((r) => r.ms_per_frame));
+  }
+
   // sortedRows: full series history, oldest to newest. Budget is read off
   // the most recent row, same as the table below - a config's budget
   // doesn't change often, but this always reflects the current one, not a
-  // stale first-run value. color/dashed pick main's or the historical
-  // track's styling - see perfTrendRenderMainAndHistorical above.
+  // stale first-run value. colorOf gives a row's CPU model its colour; dashed
+  // is the historical track's styling, where colorOf gives every row the one
+  // muted colour - see perfTrendRenderMainAndHistorical above.
   function buildChart(sortedRows, releasesBySha, opts) {
-    const { color = PERF_TREND_MAIN_COLOR, dashed = false } = opts || {};
+    const { colorOf, dashed = false } = opts;
     const width = 720, height = 160, pad = { top: 10, right: 12, bottom: 22, left: 46 };
-    const budget = sortedRows.length ? sortedRows[sortedRows.length - 1].real_time_budget_ms_per_frame : null;
+    const lastBudget = sortedRows.length ? sortedRows[sortedRows.length - 1].real_time_budget_ms_per_frame : null;
+    const budget = budgetIsOnChart(sortedRows, lastBudget) ? lastBudget : null;
     const values = sortedRows.map((r) => r.ms_per_frame).concat(budget !== null ? [budget] : []);
     const minMs = Math.min(...values) * 0.95;
     const maxMs = Math.max(...values) * 1.05;
@@ -440,16 +560,21 @@ follow the same convention, table-only (no chart to style).
     svg += `<text x="${pad.left}" y="${height - 6}" text-anchor="start" font-size="10" fill="var(--md-default-fg-color--light)">${new Date(minT).toISOString().slice(0, 10)}</text>`;
     svg += `<text x="${width - pad.right}" y="${height - 6}" text-anchor="end" font-size="10" fill="var(--md-default-fg-color--light)">${new Date(maxT).toISOString().slice(0, 10)}</text>`;
 
-    if (sortedRows.length > 1) {
-      const path = sortedRows.map((r, i) => `${i === 0 ? "M" : "L"}${x(Date.parse(r.commit_date)).toFixed(1)},${y(r.ms_per_frame).toFixed(1)}`).join(" ");
-      const dash = dashed ? ' stroke-dasharray="5,3"' : "";
-      svg += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2"${dash}/>`;
+    // One line a CPU model. The points of one machine are comparable with each other and with
+    // no other machine's, so a line never joins two models: joined in date order they drew a
+    // sawtooth between machines that a change in the code could not be told from.
+    const dash = dashed ? ' stroke-dasharray="5,3"' : "";
+    for (const [model, track] of perfTrendGroupBy(sortedRows, perfTrendCpu)) {
+      if (track.length < 2) continue;
+      const path = track.map((r, i) => `${i === 0 ? "M" : "L"}${x(Date.parse(r.commit_date)).toFixed(1)},${y(r.ms_per_frame).toFixed(1)}`).join(" ");
+      svg += `<path d="${path}" fill="none" stroke="${colorOf(model)}" stroke-width="2"${dash}/>`;
     }
     sortedRows.forEach((r) => {
       const cx = x(Date.parse(r.commit_date)).toFixed(1);
       const cy = y(r.ms_per_frame).toFixed(1);
+      const color = colorOf(perfTrendCpu(r));
       const release = releasesBySha[r.commit];
-      const title = `${perfTrendShortSha(r.commit)} - ${r.ms_per_frame.toFixed(3)} ms/frame on ${r.commit_date.slice(0, 10)}${release ? ` - release ${release.name}` : ""}`;
+      const title = `${perfTrendShortSha(r.commit)} - ${r.ms_per_frame.toFixed(3)} ms/frame on ${r.commit_date.slice(0, 10)}, ${perfTrendEsc(perfTrendCpuLabel(perfTrendCpu(r)))}${release ? ` - release ${release.name}` : ""}`;
       svg += `<circle cx="${cx}" cy="${cy}" r="3" fill="${color}"><title>${title}</title></circle>`;
       if (release) {
         svg += `<circle cx="${cx}" cy="${cy}" r="6.5" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="2,1.5"><title>${title}</title></circle>`;
@@ -459,23 +584,39 @@ follow the same convention, table-only (no chart to style).
     return svg;
   }
 
-  function buildLegend(sortedRows, releasesBySha, color) {
+  // The historical track is one muted colour and says only what it plots. main's names each
+  // CPU model the chart has, in the colour order, with the records that name none last.
+  function buildLegend(sortedRows, releasesBySha, opts) {
+    const { colorOf, isHistorical } = opts;
     const anyRelease = sortedRows.some((r) => releasesBySha[r.commit]);
-    const items = [
-      `<span><i style="background:${color}"></i>ms/frame</span>`,
-      '<span><i class="performance-trend-budget-swatch"></i>budget</span>',
-    ];
+    const models = [...new Set(sortedRows.map(perfTrendCpu))].sort((a, b) => (a === "") - (b === "") || (a < b ? -1 : 1));
+    const items = isHistorical
+      ? [`<span><i style="background:${colorOf("")}"></i>ms/frame</span>`]
+      : models.map((m) => `<span title="${perfTrendEsc(m)}"><i style="background:${colorOf(m)}"></i>${perfTrendEsc(perfTrendCpuLabel(m))}</span>`);
+    const budget = sortedRows.length ? sortedRows[sortedRows.length - 1].real_time_budget_ms_per_frame : null;
+    // A swatch for the line where the line is drawn; where it is not, the figure in words.
+    if (budget !== null) {
+      items.push(budgetIsOnChart(sortedRows, budget)
+        ? '<span><i class="performance-trend-budget-swatch"></i>budget</span>'
+        : `<span>Budget ${budget.toFixed(3)} ms/frame, above this scale</span>`);
+    }
     if (anyRelease) {
       items.push('<span><i style="background:none;border:1.5px dashed var(--md-default-fg-color--light);"></i>tagged release</span>');
     }
     return `<div class="performance-trend-legend">${items.join("")}</div>`;
   }
 
-  function renderSeries(leg, config, rows, releasesBySha, isHistorical) {
+  // The machine of a table row: its chart colour and its name. Empty for a record that names none.
+  function cpuCell(model, colorOf) {
+    if (!model) return "";
+    return `<span class="performance-trend-cpu" title="${perfTrendEsc(model)}"><i style="background:${colorOf(model)}"></i>${perfTrendEsc(perfTrendCpuLabel(model))}</span>`;
+  }
+
+  function renderSeries(leg, config, rows, releasesBySha, isHistorical, mainColorOf) {
     const sorted = rows.slice().sort((a, b) => a.commit_date.localeCompare(b.commit_date));
     const recent = sorted.slice(-ROWS_PER_SERIES).reverse();
     const budget = sorted.length ? sorted[sorted.length - 1].real_time_budget_ms_per_frame : null;
-    const color = isHistorical ? PERF_TREND_HISTORICAL_COLOR : PERF_TREND_MAIN_COLOR;
+    const colorOf = isHistorical ? () => PERF_TREND_HISTORICAL_COLOR : mainColorOf;
     const trs = recent.map((r) => {
       const overBudget = budget !== null && r.ms_per_frame > budget;
       const release = releasesBySha[r.commit];
@@ -487,6 +628,7 @@ follow the same convention, table-only (no chart to style).
         <td>${r.commit_date ? r.commit_date.slice(0, 10) : ""}</td>
         <td><a href="https://github.com/${REPO}/commit/${r.commit}">${perfTrendShortSha(r.commit)}</a></td>
         <td>${r.ms_per_frame.toFixed(3)}</td>
+        <td>${cpuCell(perfTrendCpu(r), colorOf)}</td>
         <td>${budget !== null ? budget.toFixed(3) : ""}</td>
         <td>${r.frames}</td>
         <td>${releaseBadge}</td>
@@ -494,11 +636,11 @@ follow the same convention, table-only (no chart to style).
     }).join("");
 
     return `<h4>${leg} / ${config}</h4>
-    <div class="performance-trend-chart-wrap">${buildChart(sorted, releasesBySha, { color, dashed: isHistorical })}</div>
-    ${buildLegend(sorted, releasesBySha, color)}
+    <div class="performance-trend-chart-wrap">${buildChart(sorted, releasesBySha, { colorOf, dashed: isHistorical })}</div>
+    ${buildLegend(sorted, releasesBySha, { colorOf, isHistorical })}
     <div class="performance-trend-table-wrap">
       <table>
-        <thead><tr><th>Date</th><th>Commit</th><th>ms/frame</th><th>Budget (ms/frame)</th><th>Frames</th><th>Release</th></tr></thead>
+        <thead><tr><th>Date</th><th>Commit</th><th>ms/frame</th><th>CPU</th><th>Budget (ms/frame)</th><th>Frames</th><th>Release</th></tr></thead>
         <tbody>${trs}</tbody>
       </table>
     </div>`;
@@ -511,13 +653,14 @@ follow the same convention, table-only (no chart to style).
       fetchReleaseShaMap(),
     ]);
     const allRecords = [...mainRecords, ...developRecords];
+    const mainColorOf = cpuColors(mainRecords);
     const sectionRenderer = (records, isHistorical) => {
       const groups = perfTrendGroupBy(records, (r) => `${r.leg} ${r.config}`);
       return [...groups.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([key, rows]) => {
           const [leg, config] = key.split(" ");
-          return renderSeries(leg, config, rows, releasesBySha, isHistorical);
+          return renderSeries(leg, config, rows, releasesBySha, isHistorical, mainColorOf);
         })
         .join("\n");
     };
@@ -541,6 +684,10 @@ direct form no decoder runs any more. The Δ column is each run against its own 
 10-run mean - the same window and thresholds `append_kernel_history.py` annotates
 with: ≥ +20% is flagged as a soft drift, ≥ +100% as a hard one. Neither ever fails
 CI (see above); a flagged row here is an invitation to look, not a broken build.
+The mean is of the earlier rows from the row's own CPU model, as the script takes it.
+A Δ marked *(mixed)* is against every machine's rows instead, because the row names no
+model or is the first from its model, and a difference between two machines reads there
+as a change: every row recorded before 2026-10-13 is one of those.
 
 Several kernels appear twice, as a `<name>` / `<name>_fast` pair: the transforms
 exist in two evaluations (the spec's own direct form and an accelerated one - see
@@ -601,24 +748,29 @@ decode spends; the bare row is what the oracle costs.
   function renderSeries(leg, kernel, rows) {
     // Each row's baseline is the trailing mean of the rows BEFORE it - the
     // same the-append-script-saw-it semantics as the CI annotations, which
-    // compute the baseline before appending the new record.
+    // compute the baseline before appending the new record - and of the rows
+    // from its own CPU model where it has any, as the script takes it.
     const annotated = rows.map((r, i) => {
-      const tail = rows.slice(Math.max(0, i - TRAILING_WINDOW), i).map((p) => p.ns_per_call);
+      const basis = perfTrendBaselineRows(rows, i, TRAILING_WINDOW);
+      const tail = basis.rows.map((p) => p.ns_per_call);
       const baseline = tail.length ? tail.reduce((a, b) => a + b, 0) / tail.length : null;
       const slowdown = baseline && baseline > 0 ? (r.ns_per_call - baseline) / baseline : null;
-      return { ...r, slowdown };
+      return { ...r, slowdown, sameCpu: basis.sameCpu };
     });
     const recent = annotated.slice(-ROWS_PER_SERIES).reverse();
     const trs = recent.map((r) => {
       let cls = "";
       if (r.slowdown !== null && r.slowdown >= HARD_FRACTION) cls = ' class="kernel-trend-hard"';
       else if (r.slowdown !== null && r.slowdown >= SOFT_FRACTION) cls = ' class="kernel-trend-soft"';
-      const delta = r.slowdown === null ? "" : `${r.slowdown >= 0 ? "+" : ""}${(r.slowdown * 100).toFixed(1)}%`;
+      const delta = r.slowdown === null ? "" : `${r.slowdown >= 0 ? "+" : ""}${(r.slowdown * 100).toFixed(1)}%` +
+        (r.sameCpu ? "" : ' <span title="Against the rows of every machine, not of one CPU model">(mixed)</span>');
+      const cpu = perfTrendCpu(r);
       return `<tr${cls}>
         <td>${r.commit_date ? r.commit_date.slice(0, 10) : ""}</td>
         <td><a href="https://github.com/${REPO}/commit/${r.commit}">${perfTrendShortSha(r.commit)}</a></td>
         <td>${formatNs(r.ns_per_call)}</td>
         <td>${delta}</td>
+        <td${cpu ? ` title="${perfTrendEsc(cpu)}"` : ""}>${cpu ? perfTrendEsc(perfTrendCpuLabel(cpu)) : ""}</td>
         <td>${r.iters}</td>
       </tr>`;
     }).join("");
@@ -626,7 +778,7 @@ decode spends; the bare row is what the oracle costs.
     return `<h4>${leg} / ${kernel}</h4>
     <div class="performance-trend-table-wrap">
       <table>
-        <thead><tr><th>Date</th><th>Commit</th><th>ns/call</th><th>Δ vs trailing mean</th><th>Iters</th></tr></thead>
+        <thead><tr><th>Date</th><th>Commit</th><th>ns/call</th><th>Δ vs trailing mean</th><th>CPU</th><th>Iters</th></tr></thead>
         <tbody>${trs}</tbody>
       </table>
     </div>`;

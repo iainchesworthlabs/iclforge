@@ -15,5 +15,5 @@
 | Metadata and loudness QC | Public API | Yes | Yes | Settings only | No |
 | Live device capture | Internal audio layer | Yes | Yes | Per application | No |
 | PCM monitor playback | Internal audio layer | Yes | Yes | Output fallback | Desktop engine |
-| IEC 61937 passthrough | Internal audio layer | Yes | Yes | Output policy | The Android TV sink; the desktop engine has it and the window does not open it |
+| IEC 61937 passthrough | Internal audio layer | Yes | Yes | Output policy | Desktop player, to a receiver chosen in the output picker; the Android TV sink |
 | Sendspin network playback | Sendspin module | Test server only | No | No | Desktop engine, ESP32 sinks and the Android TV sink |

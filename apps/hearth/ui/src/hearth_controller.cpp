@@ -1199,6 +1199,17 @@ bool write_kept_karaoke(QSettings& store, const iclforge::hearth::DecoderSetting
     map[QStringLiteral("sampleRate")] = format.sample_rate;
     map[QStringLiteral("channels")] = format.channels;
     map[QStringLiteral("mode")] = output_mode_name(format.mode);
+    // What a bitstream link carries, by the codec's own name (a transcode's
+    // is the AC-3 it sends, not the item's E-AC-3); absent for any output
+    // that carries none, and for a group, whose members each take their own
+    // form.
+    const bool link = format.mode == iclforge::hearth::OutputMode::kBitstream ||
+                      format.mode == iclforge::hearth::OutputMode::kBitstreamAsAc3;
+    if (link && format.stream) {
+        const std::string_view name = iclforge::audio::format_name(*format.stream);
+        map[QStringLiteral("stream")] =
+            QString::fromUtf8(name.data(), static_cast<qsizetype>(name.size()));
+    }
     return map;
 }
 
@@ -1319,6 +1330,57 @@ bool write_kept_karaoke(QSettings& store, const iclforge::hearth::DecoderSetting
     return row;
 }
 
+// The picker's rows, for an enumeration taken while a bitstream goes out. The
+// endpoint the link is open on is held exclusively, and a probe of an
+// endpoint that is held can read it as taking no bitstream at all - "a link
+// reads as refusing the very format it carries" (output_selector.hpp, which
+// keeps the engine's own readings the same way). So that endpoint's row keeps
+// the passthrough marks it had when it was last listed, or failing that the
+// one mark its open link proves: the receiver a person is playing to does not
+// drop out of the passthrough section because it is playing.
+void keep_held_link_marks(QVariantList& rows, const QVariantList& before, const QString& held_id,
+                          const QVariantMap& output_format) {
+    const QString mode = output_format.value(QStringLiteral("mode")).toString();
+    if (held_id.isEmpty() ||
+        (mode != QLatin1String("bitstream") && mode != QLatin1String("bitstreamAsAc3"))) {
+        return;
+    }
+    const auto same_id = [&held_id](const QVariant& row) {
+        return row.toMap().value(QStringLiteral("id")).toString() == held_id;
+    };
+    const auto held = std::find_if(rows.begin(), rows.end(), same_id);
+    if (held == rows.end()) {
+        return;
+    }
+    QVariantMap row = held->toMap();
+    const auto was = std::find_if(before.begin(), before.end(), same_id);
+    if (was != before.end()) {
+        const QVariantMap listed = was->toMap();
+        row[QStringLiteral("supportsAc3")] = listed.value(QStringLiteral("supportsAc3")).toBool();
+        row[QStringLiteral("supportsEac3")] = listed.value(QStringLiteral("supportsEac3")).toBool();
+    }
+    const QString stream = output_format.value(QStringLiteral("stream")).toString();
+    if (stream == QLatin1String("AC-3")) {
+        row[QStringLiteral("supportsAc3")] = true;
+    } else if (stream == QLatin1String("E-AC-3")) {
+        row[QStringLiteral("supportsEac3")] = true;
+    }
+    *held = row;
+}
+
+// Where playback goes until a person chooses in the output picker, and when
+// a group's choice is given up: decoded here, to this machine's default
+// output (an empty endpoint id is the decision's "the default, else the
+// widest"). Pinned to a decode so that nothing is sent to a receiver as a
+// bitstream unasked - that holds the endpoint exclusively, which silences
+// whatever else plays there, and the endpoint that takes a bitstream need not
+// be the one a person listens on.
+[[nodiscard]] iclforge::hearth::OutputPreferences decode_to_default() {
+    return iclforge::hearth::OutputPreferences{.pinned = iclforge::hearth::OutputMode::kLocalPcm,
+                                               .endpoint_id = {},
+                                               .follow_sink = true};
+}
+
 // --- settings (the Settings page) ------------------------------------------
 
 // QSettingsStore itself now lives in qsettings_store.hpp: NetworkController
@@ -1421,22 +1483,27 @@ void HearthController::start() {
     // EngineOutputs, not a bare PcmSink: given every render endpoint
     // (device_endpoints(), output_selector.hpp), the engine decides each
     // item's output itself and set_output_preferences() - the output
-    // picker's "Play here" - has something to act on. No bitstream sink yet,
-    // so OutputSelector::endpoints() reads every endpoint's passthrough
-    // flags as false regardless of what the device reports
-    // (bitstream_output=false in engine_thread.cpp's EngineOutputs
-    // constructor) and every item still decodes to PCM - the same outcome
-    // the old bare-PcmSink construction gave, on the same default device
-    // (best_for_pcm() picks it the same way DeviceSink::open() did with an
-    // empty device id), until a dialog row pins a different one.
+    // picker's "Play here" - has something to act on. The passthrough sink
+    // is the one `forge play` sends through (iclforge::audio::
+    // PassthroughSink): with it the engine's decision can send an AC-3 or
+    // E-AC-3 item to a receiver as IEC 61937 bursts, on the endpoint the
+    // decision names. It opens nothing until an item is decided that way,
+    // and nothing is decided that way until a person chooses a passthrough
+    // row in the picker (decode_to_default() below is where playback starts).
     // The resolver reads NetworkOutputStatus at each open(), never a value
     // captured here - NetworkController may not even have start()ed yet at
     // this point, let alone made the group a person later pins
     // (network_output_status.hpp's own header comment).
+    std::unique_ptr<iclforge::hearth::BitstreamSink> passthrough;
+    if (!test_outputs_) {
+        passthrough = iclforge::hearth::make_passthrough_sink();
+    } else if (test_outputs_->make_bitstream) {
+        passthrough = test_outputs_->make_bitstream();
+    }
     iclforge::hearth::EngineOutputs outputs{
         .pcm = test_outputs_ ? test_outputs_->make_pcm()
                              : iclforge::hearth::make_device_sink(std::string()),
-        .bitstream = {},
+        .bitstream = std::move(passthrough),
         .group = iclforge::hearth::make_group_sink(
             [](const std::string& group_id) {
                 return iclforge::hearth::ui::NetworkOutputStatus::instance().group(group_id);
@@ -1464,6 +1531,9 @@ void HearthController::start() {
     engine_ = std::make_unique<iclforge::hearth::Engine>(
         std::move(outputs), iclforge::hearth::ui::make_file_item_loader(), layout, decoder_settings,
         iclforge::hearth::EngineTiming{}, &log_);
+    // Before anything can play: the engine's own starting choice is
+    // automatic, which sends a stream to whichever endpoint takes it.
+    engine_->set_output_preferences(decode_to_default());
     // Each reads with its own loader instance (make_file_item_loader()
     // builds a fresh std::function every call, same as the engine's own
     // above) so the Media page's own pick never blocks on whatever
@@ -1721,16 +1791,18 @@ void HearthController::poll() {
     ICLFORGE_ZONE_BEGIN(poll_transport_zone, "poll: transport");
     const QString new_state = transport_state_name(status.state);
     const QString new_output_reason = QString::fromStdString(status.output_reason);
+    const QString new_settings_note = QString::fromStdString(status.settings_note);
     const QString new_note = QString::fromStdString(status.note);
     const QString new_error = QString::fromStdString(status.error);
     QVariantMap new_output_format = output_format_to_map(status.output);
     if (new_state != state_ || status.gapless != gapless_ || status.volume_db != volume_db_ ||
-        new_output_reason != output_reason_ || new_note != note_ || new_error != error_ ||
-        new_output_format != output_format_) {
+        new_output_reason != output_reason_ || new_settings_note != decoder_settings_note_ ||
+        new_note != note_ || new_error != error_ || new_output_format != output_format_) {
         state_ = new_state;
         gapless_ = status.gapless;
         volume_db_ = status.volume_db;
         output_reason_ = new_output_reason;
+        decoder_settings_note_ = new_settings_note;
         note_ = new_note;
         error_ = new_error;
         output_format_ = std::move(new_output_format);
@@ -2133,23 +2205,50 @@ void HearthController::refreshOutputDevices() {
     // keeping whatever an earlier, working refresh found - a row from a
     // probe this machine can no longer repeat should not sit there
     // clickable as if it still could.
+    keep_held_link_marks(rows, output_devices_, device_id_, output_format_);
     output_devices_ = std::move(rows);
     emit outputDevicesChanged();
+    // The engine decides against readings of its own, which it keeps from the
+    // first item it decided at a sample rate until it is told the outputs
+    // have changed (output_selector.hpp). The rows a person is about to choose
+    // from are fresh, so the engine reads again too: a receiver switched on
+    // since then is one the engine would otherwise not know takes a bitstream,
+    // and a row chosen for it would be decided against the receiver as it
+    // was. Posted after the enumeration above has finished, so the two probes
+    // of the same endpoints do not run at once.
+    if (engine_) {
+        engine_->refresh_outputs();
+    }
 }
 
 void HearthController::selectOutputDevice(const QString& deviceId) {
     if (!engine_ || deviceId.isEmpty()) {
         return;
     }
-    if (!output_group_name_.isEmpty()) {
-        output_group_name_.clear();
-        output_group_ready_ = false;
-        emit stateChanged();
-    }
+    output_group_name_.clear();
+    output_group_ready_ = false;
+    passthrough_device_id_.clear();
+    emit stateChanged();
     engine_->set_output_preferences(
         iclforge::hearth::OutputPreferences{.pinned = iclforge::hearth::OutputMode::kLocalPcm,
                                        .endpoint_id = deviceId.toStdString(),
                                        .follow_sink = true});
+}
+
+void HearthController::selectPassthroughDevice(const QString& deviceId) {
+    if (!engine_ || deviceId.isEmpty()) {
+        return;
+    }
+    output_group_name_.clear();
+    output_group_ready_ = false;
+    passthrough_device_id_ = deviceId;
+    emit stateChanged();
+    // The endpoint, and no mode: the decision takes it with the best mode it
+    // carries for each item (output_decision.cpp, "An endpoint the user
+    // named") - the stream as it is, then E-AC-3 transcoded to AC-3 for a
+    // receiver that takes AC-3 only, then a decode to the same endpoint.
+    engine_->set_output_preferences(iclforge::hearth::OutputPreferences{
+        .pinned = std::nullopt, .endpoint_id = deviceId.toStdString(), .follow_sink = true});
 }
 
 void HearthController::selectOutputGroup(const QString& groupId) {
@@ -2157,13 +2256,13 @@ void HearthController::selectOutputGroup(const QString& groupId) {
         return;
     }
     output_group_name_ = groupId;
+    passthrough_device_id_.clear();
     if (groupId.isEmpty()) {
         output_group_ready_ = false;
         emit stateChanged();
-        // Falls back to whatever set_output_preferences's own default
-        // (automatic) would otherwise choose - the same "pin nothing" state
-        // selectOutputDevice() has no way to reach today.
-        engine_->set_output_preferences(iclforge::hearth::OutputPreferences{});
+        // Back to where playback starts: decoded, to this machine's default
+        // output.
+        engine_->set_output_preferences(decode_to_default());
         return;
     }
     const std::string id = groupId.toStdString();

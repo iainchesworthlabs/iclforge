@@ -212,7 +212,11 @@ used by the verification table below.
   decoder never flags), the controls are shown disabled with the reason, and playback is as
   without them.
 - **P7 Coded outputs.** When the output is passthrough or a network sink that takes the coded
-  stream, the page says the reproduction is not applied by Hearth and what will play.
+  stream, the page says the reproduction is not applied by Hearth and what will play. *As built
+  (2026-10-13, when the window was given its passthrough output):* a karaoke stream goes to a
+  receiver as a bitstream only when it is played as coded. With a reproduction chosen Hearth
+  decodes it for the same output, since no receiver found reproduces one, and the page's notice
+  says that choosing a reproduction does this.
 - **P8 Stereo fold.** Annex C defines no Lt/Rt reproduction. With the stereo fold set to Lt/Rt the
   page says so (the library leaves the Lt/Rt fold as it is) and offers Lo/Ro.
 - **P9 Persist.** The reproduction and the choice of vocals are kept and restored on the next

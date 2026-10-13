@@ -327,13 +327,23 @@ public:
     // (pcm_sink.hpp), forwarded - sink_ is this player's PCM sink whether or
     // not it is the output currently open, and is null for a player given no
     // PCM sink at all (PlayerOutputs::pcm unset), which these all answer as
-    // "nothing to route or say".
+    // "nothing to route or say". While a bitstream goes out, the device named
+    // is the endpoint its link is open on, as the output decision named it: a
+    // BitstreamSink reports none of its own, and nothing is routed there.
     bool set_routing(const render::Routing& routing) { return sink_ && sink_->set_routing(routing); }
     [[nodiscard]] render::Routing routing() const { return sink_ ? sink_->routing() : render::Routing{}; }
     [[nodiscard]] std::string device_name() const {
+        if (bitstreaming()) {
+            return output_open() ? choice_.endpoint_name : std::string{};
+        }
         return sink_ ? sink_->device_name() : std::string{};
     }
-    [[nodiscard]] std::string device_id() const { return sink_ ? sink_->device_id() : std::string{}; }
+    [[nodiscard]] std::string device_id() const {
+        if (bitstreaming()) {
+            return output_open() ? choice_.endpoint_id : std::string{};
+        }
+        return sink_ ? sink_->device_id() : std::string{};
+    }
     [[nodiscard]] std::uint32_t speaker_mask() const { return sink_ ? sink_->speaker_mask() : 0U; }
 
     // The output decision the open output, or the last one, was made by.
