@@ -888,3 +888,90 @@ TEST_CASE("microphone controller: the item ending closes the microphone", "[hear
     CHECK(rig->controller->state() == "off");
     CHECK(!rig->input->running());
 }
+
+TEST_CASE("microphone controller: a voice file stands in for the input, sung along as the item is heard",
+          "[hearth][microphone][voice-file]") {
+    Room room;
+    application();
+    auto rig = make_rig();
+    QString why;
+    REQUIRE(rig->controller->use_voice_file(
+        QString::fromStdString((std::filesystem::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "parts" /
+                                "vocal-1-lead.wav")
+                                   .string()),
+        &why));
+    CHECK(why.isEmpty());
+    // The input there is is the file, listed under its own name, and nothing has opened it: the
+    // scripted device the rig was made with is not in use, and was never started.
+    const QVariantList devices = rig->controller->devices();
+    REQUIRE(devices.size() == 1);
+    CHECK(devices[0].toMap().value("name").toString() == "vocal-1-lead.wav");
+    CHECK(rig->controller->state() == "off");
+
+    rig->controller->setHeadphones(true);
+    rig->controller->load(example_stream(), "m");
+    REQUIRE(wait_for([&] { return rig->controller->referenceStatus() == "ready"; }, 60000));
+    REQUIRE(rig->controller->start());
+
+    // play() is called a second on, and the output is heard to start 350 ms after that: a file that
+    // began with play() would be 350 ms early, which a pitch score would take for a flat singer.
+    const std::int64_t base = rig->now + 1'000'000'000LL;
+    // Through the whole song, which is 16.5 s: the score is of all of the tune's time, so a
+    // performance that is half way through is half a score.
+    for (int t = 0; t <= 17000; t += 20) {
+        rig->now = base + static_cast<std::int64_t>(t) * 1'000'000LL;
+        const int heard = std::max(0, t - 350);
+        rig->controller->anchor(heard, heard > 0);
+        rig->controller->tick();
+        REQUIRE(rig->controller->state() == "on");
+    }
+    const QVariantMap score = rig->controller->score();
+    CHECK(!score.value("withheld").toBool());
+    CHECK(score.value("percent").toInt() >= 85);
+    CHECK(score.value("coveragePercent").toInt() >= 90);
+    // The voice was in time with the item as it was heard: not early by the 350 ms the output took
+    // to start, which is what a file begun with play() would have been.
+    REQUIRE(score.contains("lagMs"));
+    CHECK(std::abs(score.value("lagMs").toInt()) <= 40);
+    CHECK(!score.value("timingEstimated").toBool());
+    // Each of the example's four lines, 0, 4, 8 and 12 s in, was sung on the tune and is marked so.
+    for (const auto& line : {std::pair{0, 4000}, std::pair{4000, 8000}, std::pair{8000, 12000},
+                             std::pair{12000, 16500}}) {
+        const QVariantMap mark = rig->controller->lineResult(line.first, line.second);
+        INFO("the line from " << line.first << " ms");
+        CHECK(mark.value("scored").toBool());
+        CHECK(mark.value("percent").toInt() >= 75);
+        CHECK(mark.value("level").toInt() == 3);
+    }
+    // The ribbon has the voice, on the tune.
+    const QVariantList trace = rig->controller->ribbon(0, 4000).value("trace").toList();
+    CHECK(trace.size() >= 3 * 100);
+
+    // Ended, it is a summary and the input is closed.
+    rig->controller->stop();
+    CHECK(rig->controller->summary().value("percent").toInt() >= 85);
+    CHECK(rig->controller->summary().value("reference").toString() == "the melody guide (M)");
+}
+
+TEST_CASE("microphone controller: a voice file that is not one is refused and nothing changes",
+          "[hearth][microphone][voice-file]") {
+    Room room;
+    application();
+    QTemporaryDir dir;
+    REQUIRE(dir.isValid());
+    const QString words = QDir(dir.path()).filePath("words.wav");
+    {
+        QFile file(words);
+        REQUIRE(file.open(QIODevice::WriteOnly));
+        file.write("these are words, not audio");
+    }
+    auto rig = make_rig();
+    QString why;
+    CHECK(!rig->controller->use_voice_file(words, &why));
+    CHECK(why.contains("words.wav"));
+    // The input it had is the one it still has.
+    rig->controller->refreshDevices();
+    CHECK(rig->controller->devices().size() == 2);
+    CHECK(rig->controller->start());
+    CHECK(rig->input->starts() == 1);
+}

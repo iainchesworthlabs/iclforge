@@ -4,7 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <filesystem>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -56,10 +59,75 @@ class MicrophoneInput {
 
     // Everything captured since the last call. False when there is nothing new.
     virtual bool read(InputBlock& out) = 0;
+
+    // Where the item is heard to be, as of `now_ns` on the steady clock: told on every anchor of
+    // the session the input belongs to, open or not. A device has no use for it. An input that is a
+    // recording sung along to the item (VoiceFileInput) places its samples by it.
+    virtual void heard_position(std::int64_t position_ms, bool playing, std::int64_t now_ns) {
+        static_cast<void>(position_ms);
+        static_cast<void>(playing);
+        static_cast<void>(now_ns);
+    }
 };
 
 // The machine's own input, over iclforge::audio::Capture.
 [[nodiscard]] std::unique_ptr<MicrophoneInput> make_device_input();
+
+// A voice read from a file: one channel (the file's channels averaged), at the file's rate.
+struct VoiceRecording {
+    std::vector<float> samples;
+    std::uint32_t sample_rate = 0;
+    // What the input is called where inputs are listed: the file's own name.
+    std::string name;
+};
+
+// Reads a WAV file as a voice. The error is a sentence for the person who named the file.
+[[nodiscard]] std::expected<VoiceRecording, std::string> read_voice_file(
+    const std::filesystem::path& path);
+
+// A recording as the microphone, for a capture that has no singer (`hearth --sing`; planning/
+// karaoke-microphone.md, MI2). Opening it opens no device, so the rule that only a person's press
+// opens a microphone is not bent: nothing here can hear a room.
+//
+// It is sung along to the item as the item is HEARD, not started with it. A device's samples are
+// stamped with the time they were captured and the score places them by the heard position, so a
+// recording that began when play() was called would be early by the output's latency, and by what
+// the engine takes to start. Told where the item is (heard_position(), which the session passes on
+// from its anchor), the input finds the moment the item's time 0 sounded and delivers each sample
+// of the recording at the moment the item's own time reaches it. Sung that way a voice that is in
+// time with the item reads as in time, whatever the output adds; and while the item is held, or
+// before it is known where it is, or after the recording ends, what arrives is silence, so the
+// stream is as unbroken as a device's and is never taken for a stalled one.
+class VoiceFileInput final : public MicrophoneInput {
+   public:
+    // `clock` is the steady clock's nanoseconds: the one the session is run by.
+    VoiceFileInput(VoiceRecording recording, std::function<std::int64_t()> clock);
+
+    [[nodiscard]] std::vector<InputDevice> devices() override;
+    [[nodiscard]] std::expected<void, std::string> start(const std::string& device_id) override;
+    void stop() override { running_ = false; }
+    [[nodiscard]] bool running() const override { return running_; }
+    [[nodiscard]] std::uint32_t sample_rate() const override { return recording_.sample_rate; }
+    [[nodiscard]] std::uint16_t channels() const override { return 1; }
+    [[nodiscard]] std::uint32_t period_frames() const override {
+        return recording_.sample_rate / 100;
+    }
+    bool read(InputBlock& out) override;
+    void heard_position(std::int64_t position_ms, bool playing, std::int64_t now_ns) override;
+
+    // On the steady clock, when the item's time 0 sounded as far as is known; nothing until the
+    // item has been heard for long enough to say.
+    [[nodiscard]] std::optional<std::int64_t> origin_ns() const { return origin_ns_; }
+
+   private:
+    VoiceRecording recording_;
+    std::function<std::int64_t()> clock_;
+    bool running_ = false;
+    bool playing_ = false;
+    std::optional<std::int64_t> origin_ns_{};
+    // The clock's reading at the end of the last block read.
+    std::int64_t last_ns_ = 0;
+};
 
 // A scripted input for tests: plays `samples` (mono) as a microphone that starts at
 // `first_time_ns`, and delivers what has been "captured" by the time the test says it is. No

@@ -66,6 +66,26 @@
 // no capture, so it never writes to a person's own settings.
 // `--size <width>x<height>` opens the window at that size, for a capture of a
 // page whose cards run on below the size it opens at.
+// `--sing <file.wav>` is a capture of a PERFORMANCE: the microphone is that
+// file, sung along to the first `--open` item, which plays from its start to
+// the `--seek` position with the Microphone card on, and the picture is taken
+// as it reaches it - the card's pitch ribbon with the singer's line over the
+// tune, the mark under each line sung. `--finish-singing` pauses there and
+// ends the performance first, as a person's press on "Turn off" does, so that
+// the card shows its summary ("Last performance"). Both need `--page karaoke`
+// or `--page singer`, the pages that have the card, and are dropped with a
+// line in the log where they cannot run (src/command_line.hpp says when).
+// This opens NO microphone and no sound output, so MI2 (only a person's press
+// opens a microphone; no test or capture opens a real one) is not bent: the file
+// is a MicrophoneInput of its own (VoiceFileInput, sung along to the item as
+// the item is heard, so that it is in time whatever the output adds), and the
+// item plays to a sink that plays to nothing (silent_sink.hpp, handed to
+// HearthController::set_test_outputs() as the Qt Quick suites hand it a fake
+// room), at the rate of the clock. The window names that output "Speakers". The
+// headphones answer is given as yes, since a file has no room for the backing
+// to leak into. A reference that cannot be read (the item has no melody to
+// score against) or a file that is not a WAV file ends the run with exit code
+// 3, as an item that did not load does.
 // src/command_line.hpp reads all of these, and test_command_line.cpp holds it
 // to what is said here.
 //
@@ -78,6 +98,7 @@
 // direction and the typeface.
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QFont>
 #include <QFontDatabase>
@@ -95,6 +116,7 @@
 
 #include "iclforge/base/detail/profiling.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 
@@ -102,10 +124,17 @@
 #include "command_line.hpp"
 #include "hearth_controller.hpp"
 #include "language_manager.hpp"
+#include "microphone_controller.hpp"
 #include "native_log_sink.hpp"
 #include "network_controller.hpp"
 #include "settings_migration.hpp"
 #include "single_instance.hpp"
+
+// Qt's headers define `slots` as a macro, and iclforge::render::OutputLayout has a method of that
+// name: undone before the engine's headers, which silent_outputs.hpp reaches through the sink.
+#undef slots
+
+#include "silent_outputs.hpp"
 
 namespace {
 
@@ -119,7 +148,12 @@ constexpr int kOpenSettleMs = 500;
 // How much longer a capture of the timing window settles: the window waits for the item's
 // lyrics to have been read before it opens, and then comes up.
 constexpr int kTimingOpensMs = 1500;
+// A performance's picture is taken as the item reaches its position, which is already on the
+// screen: there is nothing to wait for, and waiting would be the item playing on past the place.
+constexpr int kSingSettleMs = 0;
 constexpr int kExitItemNotLoaded = 3;
+// What the window calls the output of a run that plays to nothing (--sing).
+constexpr const char* kSilentOutputName = "Speakers";
 
 bool save_window(QQmlApplicationEngine& engine, const QString& path) {
     if (engine.rootObjects().isEmpty()) {
@@ -309,6 +343,33 @@ int main(int argc, char** argv) {
     qmlRegisterSingletonInstance("HearthLanguage", 1, 0, "LanguageManager",
                                  &language_manager);
 
+    // --sing: the capture's microphone is a file, and its output plays to nothing. Both are seams
+    // of controllers the window reads once, so they are in place before the QML loads and starts
+    // them (Main.qml's HearthController.start()); the singletons are made here, by the engine
+    // that owns them, and the QML finds them made. `microphone` stays null when there is no
+    // performance to take, or when the file would not read (the log says why and the run ends
+    // with exit code 3 after its picture).
+    iclforge::hearth::ui::MicrophoneController* microphone = nullptr;
+    bool sing_failed = false;
+    if (!command_line.sing_file.isEmpty()) {
+        auto* const player = engine.singletonInstance<iclforge::hearth::ui::HearthController*>(
+            "Hearth", "HearthController");
+        auto* const singer = engine.singletonInstance<iclforge::hearth::ui::MicrophoneController*>(
+            "Hearth", "MicrophoneController");
+        QString why;
+        if (player == nullptr || singer == nullptr) {
+            qWarning("hearth: --sing could not reach the controllers it sets");
+            sing_failed = true;
+        } else if (!singer->use_voice_file(command_line.sing_file, &why)) {
+            qWarning("hearth: %s", qUtf8Printable(why));
+            sing_failed = true;
+        } else {
+            player->set_test_outputs(
+                iclforge::hearth::ui::make_silent_outputs(kSilentOutputName));
+            microphone = singer;
+        }
+    }
+
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     engine.loadFromModule("Hearth", "Main");
@@ -429,23 +490,47 @@ int main(int argc, char** argv) {
     // for what the window says, and the exit code says it did not load.
     // The timing window opens a moment after the item is loaded (KaraokePage.qml's
     // openTiming()), so a capture of it settles for that much longer.
+    //
+    // --sing makes this a performance (MicrophoneController::use_voice_file()). The item is
+    // started at its beginning, not at the position, and the microphone is turned on first, as a
+    // person turns it on before the song starts; but not before the melody it is scored against
+    // has been read (the card asks for it as the item is loaded, and a voice fed before it
+    // arrives is a voice that was never scored). The item then plays in real time to the
+    // position, which is why the time allowed is that much longer. The picture is taken as it
+    // gets there, with the performance going on; --finish-singing holds the item there and ends
+    // the performance first, which is when the card gives its summary.
+    const bool performing = microphone != nullptr;
+    const bool finishing = performing && command_line.finish_singing;
     const int settle_ms =
-        kOpenSettleMs + (page == QLatin1String("timing") ? kTimingOpensMs : 0);
-    enum class Step { kLoading, kStarting, kHolding, kDone };
+        (performing && !finishing)
+            ? kSingSettleMs
+            : kOpenSettleMs + (page == QLatin1String("timing") ? kTimingOpensMs : 0);
+    const int wait_limit_ms =
+        kOpenWaitMs +
+        (performing ? static_cast<int>(std::min<qlonglong>(*command_line.seek_ms, 10 * 60 * 1000))
+                    : 0);
+    enum class Step { kLoading, kReference, kStarting, kHolding, kDone };
     struct Cue {
         Step step = Step::kLoading;
         int waited = 0;
+        // --sing: from the item being started to its first heard position, which is what the
+        // output and the engine add and what a voice started with play() would be early by.
+        QElapsedTimer since_play;
+        bool heard = false;
     };
     auto cue = std::make_shared<Cue>();
     auto* wait = new QTimer(&app);
     wait->setInterval(kOpenPollMs);
     QObject::connect(
         wait, &QTimer::timeout, &app,
-        [&app, &engine, controller, wait, cue, first_path, shot_path, settle_ms,
-         seek_ms = command_line.seek_ms] {
+        [&app, &engine, controller, microphone, performing, finishing, sing_failed, wait, cue,
+         first_path, shot_path, settle_ms, wait_limit_ms, seek_ms = command_line.seek_ms] {
             cue->waited += kOpenPollMs;
-            const bool timed_out = cue->waited >= kOpenWaitMs;
+            const bool timed_out = cue->waited >= wait_limit_ms;
             bool done = false;
+            // A step that cannot be taken at all (not that it is late): the run ends as one
+            // that did not get there, and says what it can in the picture and the log.
+            bool gave_up = false;
             switch (cue->step) {
                 case Step::kLoading: {
                     // Read, and a stream: a path with no codec is a file that was not one (or
@@ -453,7 +538,11 @@ int main(int argc, char** argv) {
                     const QVariantMap media = controller->currentMedia();
                     if (media.value(QStringLiteral("path")).toString() == first_path &&
                         media.contains(QStringLiteral("codec"))) {
-                        if (seek_ms.has_value()) {
+                        if (sing_failed) {
+                            gave_up = true;  // --sing's file would not read: the log said so
+                        } else if (performing) {
+                            cue->step = Step::kReference;
+                        } else if (seek_ms.has_value()) {
                             controller->seek(*seek_ms);
                             controller->playItem(controller->currentIndex());
                             cue->step = Step::kStarting;
@@ -463,23 +552,75 @@ int main(int argc, char** argv) {
                     }
                     break;
                 }
+                case Step::kReference: {
+                    const QString status = microphone->referenceStatus();
+                    if (status == QLatin1String("ready")) {
+                        // The score is shown only to a person who has said they wear
+                        // headphones, because through speakers the microphone hears the
+                        // backing too (SC5). A file has no room for it to leak into.
+                        microphone->setHeadphones(true);
+                        if (!microphone->start()) {
+                            qWarning("hearth: --sing: %s", qUtf8Printable(microphone->errorText()));
+                            gave_up = true;
+                            break;
+                        }
+                        controller->playItem(controller->currentIndex());
+                        cue->since_play.start();
+                        cue->step = Step::kStarting;
+                    } else if (status == QLatin1String("none") &&
+                               microphone->itemPath() == first_path &&
+                               !microphone->referenceText().isEmpty()) {
+                        // Asked for, read, and there is no melody in it to score against: the
+                        // card says why. (Not before the card has asked: until the item is known
+                        // to be karaoke the card says "Nothing is playing.", which is not this.)
+                        qWarning("hearth: --sing: %s", qUtf8Printable(microphone->referenceText()));
+                        gave_up = true;
+                    }
+                    break;
+                }
                 case Step::kStarting:
+                    if (performing && !cue->heard && controller->positionMs() > 0) {
+                        cue->heard = true;
+                        qInfo("hearth: --sing: the item was heard %lld ms after it was started",
+                              static_cast<long long>(cue->since_play.elapsed()));
+                    }
                     if (controller->playing() && controller->positionMs() >= *seek_ms) {
-                        controller->pause();
-                        cue->step = Step::kHolding;
+                        if (performing && !finishing) {
+                            done = true;  // the picture is of the performance, going on
+                        } else {
+                            controller->pause();
+                            cue->step = Step::kHolding;
+                        }
                     }
                     break;
                 case Step::kHolding:
                     done = controller->state() == QLatin1String("paused");
+                    if (done && finishing) {
+                        microphone->stop();  // the summary is made as it ends
+                    }
                     break;
                 case Step::kDone:
                     break;
             }
-            if (!done && !timed_out) {
+            if (!done && !gave_up && !timed_out) {
                 return;
             }
             wait->stop();
             cue->step = Step::kDone;
+            if (performing) {
+                // What the run came to, for the person regenerating a picture to see: a lag of
+                // more than a few tens of milliseconds, or a score well short of the file's own
+                // singing, says the voice and the item are not as they were.
+                const QVariantMap score =
+                    finishing ? microphone->summary() : microphone->score();
+                qInfo("hearth: --sing: %d%% of the tune, %d%% of it voiced, lag %s",
+                      score.value(QStringLiteral("percent"), -1).toInt(),
+                      score.value(QStringLiteral("coveragePercent"), 0).toInt(),
+                      score.contains(QStringLiteral("lagMs"))
+                          ? qUtf8Printable(QStringLiteral("%1 ms").arg(
+                                score.value(QStringLiteral("lagMs")).toInt()))
+                          : "not yet measured");
+            }
             if (shot_path.isEmpty()) {
                 return;
             }
