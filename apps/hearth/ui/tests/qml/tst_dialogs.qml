@@ -179,6 +179,15 @@ TestCase {
         const shortcuts = findChild(win, "shortcutsDialog");
         mouseClick(findChild(win, "helpButton"));
         tryVerify(function() { return shortcuts.opened; }, 5000);
+        // The window asks for 800 high (Main.qml), and a display shorter than that gives it less: a
+        // CI runner's, or a small laptop's. The dialog is capped at the window less 60 (its height:),
+        // so where the window is shorter than the reference needs, it is the capped one that scrolls,
+        // which is what the cases above hold. This one is for a window that has room for the text.
+        const room = shortcuts.parent.height - 60;
+        if (shortcuts.implicitHeight > room) {
+            skip("the window is " + shortcuts.parent.height + " tall, so a dialog may be " + room
+                 + " and this one is " + shortcuts.implicitHeight + ": it scrolls, as it should");
+        }
         const scroll = inDialog(shortcuts, "shortcutsScroll");
         compare(scroll.overflowing, false);
         verify(scroll.contentItem.contentHeight <= scroll.contentItem.height + 1,
