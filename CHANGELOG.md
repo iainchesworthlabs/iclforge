@@ -4301,6 +4301,8 @@ The sections below contain the complete change list and fixes.
 
 - The Crucible guide gained its two missing pages ([The room](docs/crucible/room.md),
   [Settings](docs/crucible/settings.md)).
+- The Forge page, the Crucible page and the quick start name what they did not: karaoke streams,
+  lyrics beside a stream, project files, Crucible's lyric strip, and the Android TV sink.
 - The library's docs page now presents it as a member in its own right, matching Forge,
   Crucible, and Hearth.
 - The published-asset table now matches the pipeline: a Windows arm64 row, Crucible

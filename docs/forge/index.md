@@ -3,13 +3,16 @@
 Forge contains two applications built on the [ICL Forge library](../library/index.md):
 
 - `forge` covers synthesis, encoding and decoding of AC-3, E-AC-3 (with its Atmos object layer)
-  and AC-4, container wrapping, inspection, QC, and live capture and playback. See the
-  [CLI reference](cli/index.md).
+  and AC-4, container wrapping, inspection, QC, and live capture and playback. It encodes and
+  decodes karaoke streams, writes a song's lyrics beside the stream it encodes, and runs a
+  project file the GUI saved. See the [CLI reference](cli/index.md).
 - `forge-gui` is a two-pane workbench over the same work: loading a source, choosing the codec
   (AC-3, E-AC-3 or AC-4), format and channels, placing and moving objects in a plan view, live
   capture (AC-3 and E-AC-3), metadata, QC, and channel-level metering, and it plays back and
-  inspects a finished stream. It shows the equivalent `forge` command at the bottom of the
-  window. See the [GUI guide](gui/index.md).
+  inspects a finished stream. A [Karaoke flow](gui/karaoke.md) builds a karaoke stream from a
+  backing, a melody guide and vocals, and a [project file](gui/projects.md) keeps a session to
+  open again. It shows the equivalent `forge` command at the bottom of the window. See the
+  [GUI guide](gui/index.md).
 
 The CLI and GUI ship together where both are available.
 
@@ -57,6 +60,7 @@ consuming it.
 
 - [CLI reference](cli/index.md) — `forge`'s commands, option grammars and JSON contracts.
 - [GUI guide](gui/index.md) — `forge-gui` screen by screen, with screenshots.
+- [Karaoke](../karaoke/index.md) — playing, timing, singing and making karaoke streams.
 - [Capabilities](../library/capabilities.md) — what the codec underneath both of them does.
 - [Crucible](../crucible/index.md) — capture and position applications in an Atmos scene.
-- [Hearth](../hearth/index.md) — play streams on a desktop or an ESP32 sink.
+- [Hearth](../hearth/index.md) — play streams on a desktop, an ESP32 sink or an Android TV box.
