@@ -256,16 +256,23 @@ QT_QPA_PLATFORM=offscreen crucible --language ar --page settings --shot crucible
 ```
 
 `--language` sets `ICLFORGE_GUI_LOCALE` for that run only, so a capture never moves the language the
-person chose. A capture is otherwise an ordinary run of the program: it reads the person's settings
-(the Signing card shows the key file's path, and the first run after the rename copies the old
-store across), starts the engine, and lists the applications that are running. To take a picture
-that is safe to publish, give it a throwaway key with `ICLFORGE_SIGNING_KEY_FILE`, a settings
-store with no key path in it, and an otherwise quiet desktop; and take it on a platform with a
-font that has the drop-down arrow, which the offscreen platform does not. What to look at in the result: the header title at the right edge, the page switch
-and the status pill on the left, the combo-box chevrons on the left of their controls, the room
-plan's L speaker still on the left, the endpoint table's heads unclipped, and no missing-glyph
-boxes in the Arabic or Hebrew text.
+person chose. A capture runs on a settings store of its own, in a scratch folder, so it reads and
+writes none of the person's settings; `--app Name` (once for each) puts it over a scripted machine,
+which is the applications named, one pair of speakers and no silent device, with nothing opened on
+the computer, so that the picture is the same on any machine and is heard on none. The documentation's
+pictures are taken that way, from the command lines in `tools/pictures/pictures.json`:
 
-The other options of a capture are `--page`, `--place`, `--lyrics` and `--size`.
+```sh
+crucible --shot crucible-room-ar.png --page room --language ar --app Hearth --app "Microsoft Edge" \
+         --place "Hearth=0.2,0.15,0.6" --place "Microsoft Edge=0.85,0.7,0.0"
+```
+
+Take it on a platform with a font that has the drop-down arrow, which the offscreen platform does
+not. What to look at in the result: the header title at the right edge, the page switch and the
+status pill on the left, the combo-box chevrons on the left of their controls, the room plan's L
+speaker still on the left, the endpoint table's heads unclipped, and no missing-glyph boxes in the
+Arabic or Hebrew text.
+
+The other options of a capture are `--page`, `--place`, `--lyrics`, `--size` and `--setting`.
 [The pictures' README](https://github.com/iainchesworthlabs/iclforge/blob/main/tools/pictures/README.md#crucible)
 says what each does and how the program's own pictures are taken.

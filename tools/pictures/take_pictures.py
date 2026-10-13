@@ -7,7 +7,8 @@ puts the picture where the pages embed it:
 
     python3 tools/pictures/take_pictures.py --build <build tree> [--only <part of a path> ...]
 
-    --build   a build tree of THIS checkout with the programs in bin/ (forge, forge-gui, hearth)
+    --build   a build tree of THIS checkout with the programs in bin/ (forge, forge-gui, hearth,
+              crucible)
     --only    only the pictures whose path contains one of these
     --out     write them under this folder instead of over the committed ones, to look first
     --media   where the files the pictures play are kept (default: <build>/pictures-media);
@@ -23,8 +24,7 @@ that matter are QT_QPA_PLATFORM=windows:darkmode=0, the light theme whatever the
 to, and QSG_DISTANCEFIELD_ANTIALIASING=gray, without which the text has coloured subpixel edges.
 
 An entry with `by_hand` is not taken here: it needs something a desk does not have (an Android
-device, a virtual machine with a driver in it) or is not safe to run unasked (Crucible's capture
-reads the person's settings and starts the engine). `--list` prints how each was made.
+device, a virtual machine with a driver in it). `--list` prints how each was made.
 
 A picture is taken into a scratch folder first and replaces the committed one only when the
 program said it had drawn what was asked for (exit code 0). A failed capture prints what the
@@ -32,7 +32,9 @@ program wrote and leaves the picture as it was, and the run ends with exit code 
 
 The machine shows through in three ways, which is why a retake is looked at before it is
 committed: the monospaced face is the system's own, a window is no taller than the screen it is
-on, and the Forge GUI's live-capture pictures list the machine's capture devices.
+on, and the Forge GUI's live-capture pictures list the machine's capture devices. Crucible's
+pictures are over a scripted machine on a settings store of their own: nothing of the computer is
+in them.
 """
 
 from __future__ import annotations

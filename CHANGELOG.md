@@ -44,6 +44,31 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Crucible: a capture runs over a scripted machine on a settings store of its own, and its pictures are taken by `take_pictures.py`**
+
+- **`crucible --shot` no longer reads or writes the person's own settings.** It runs on an INI
+  store in a scratch folder, as Hearth's and the Forge GUI's captures do (on Windows the registry
+  key was backed up, replaced and put back by hand), and `--setting group/key=value` seeds it.
+- **`--app Name[,idle|silent|background]` puts the window over a scripted machine**
+  (`ui/src/scripted_machine.*`): the applications named, one pair of stereo speakers with a spatial
+  format on, and no silent device and no driver to make one with. It is built from the stand-ins the
+  engine's cases and the Qt Quick tests use, handed to the controller through
+  `set_test_services()`, with a tap of its own that runs at the rate a real one would, so nothing
+  is opened on the computer, nothing is heard and none of the machine's own applications is
+  listed. The room's sentence about what its list means is the platform's own.
+- **A `--place` for an application that is not listed fails the capture**, as a `--lyrics` does:
+  no picture is taken and the exit code is 3.
+- **Crucible's seven pictures are command lines in `tools/pictures/pictures.json`** and are taken
+  again with `take_pictures.py`, over the scripted machine, on a hidden desktop, with nothing played
+  at the computer's output. They were by hand: the settings key backed up and restored, a Hearth and
+  an Edge started playing, and whatever else the machine had open showing in the room (a chat
+  client's idle session did). The room draws a monogram for each application now and not its icon.
+  `take_pictures.py` fills `{media}` in an entry's own variables for the signing key.
+- **`crucible_capture_scripted` takes one picture through the program** (`--app`, `--setting`,
+  `--lyrics`, `--size`, on the offscreen platform) and passes on a PNG of the size asked for, on
+  every platform Crucible builds on; `test_scripted_machine.cpp` holds the option's words, the
+  applications as a monitor lists them, the paced tap and the engine over the machine.
+
 **Crucible: a capture can show the lyric strip, and the Room page's guide has a picture of it**
 
 - **`crucible --shot <png> --lyrics "Name=<file>[@<time>]"` imports a lyrics file against a listed

@@ -274,7 +274,7 @@ class TheRepositorysOwnManifest(unittest.TestCase):
         document = check_doc_pictures.load(root)
         for entry in document["pictures"]:
             if "args" in entry:
-                self.assertIn(entry["program"], {"forge-gui", "hearth"}, entry["path"])
+                self.assertIn(entry["program"], {"forge-gui", "hearth", "crucible"}, entry["path"])
 
 
 if __name__ == "__main__":
