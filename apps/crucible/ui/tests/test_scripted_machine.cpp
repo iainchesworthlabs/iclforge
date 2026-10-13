@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <cstddef>
 #include <string>
 #include <thread>
 #include <vector>
@@ -121,6 +123,35 @@ TEST_CASE("[scripted-machine] the machine is one pair of speakers and no silent 
     CHECK_FALSE(state.present);
     CHECK_FALSE(state.can_install);
     CHECK_FALSE(state.blocker.empty());
+}
+
+TEST_CASE("[scripted-machine] a tap is produced at the rate it would be played, and not all at once",
+          "[crucible][capture]") {
+    const auto machine = make_scripted_machine({{.name = "Hearth"}}, kRule);
+    auto tap = machine.devices->tap();
+    REQUIRE(tap != nullptr);
+    REQUIRE(tap->start(1000, 48000, 2).has_value());
+
+    // Straight after it began there is next to nothing, and what a reader asks for is not
+    // handed over in one go: an engine that is given everything it asks for never waits.
+    std::vector<float> asked(48000 * 2);
+    CHECK(tap->available() < asked.size() / 2);
+    CHECK(tap->read(asked) < asked.size() / 2);
+
+    // After a little while there is some, in whole frames of both channels, and it is a tone.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    const std::size_t waiting = tap->available();
+    CHECK(waiting > 0);
+    const std::size_t got = tap->read(asked);
+    CHECK(got > 0);
+    CHECK(got % 2 == 0);
+    float loudest = 0.0F;
+    for (std::size_t i = 0; i < got; ++i) {
+        loudest = std::max(loudest, std::abs(asked[i]));
+    }
+    CHECK(loudest > 0.0F);
+    CHECK(loudest < 0.5F);
+    tap->stop();
 }
 
 TEST_CASE("[scripted-machine] the engine over it lists the applications and plays them", "[crucible][capture]") {
