@@ -4339,6 +4339,14 @@ The sections below contain the complete change list and fixes.
   rows, and four stale claims corrected.
 - The CLI reference lists all forty-two commands, including the previously-undocumented
   `spatial`.
+- **The locked ESP32 build profiles have a developer page.**
+  [ESP32 build profiles](docs/platforms/bare-metal/build-profiles.md) covers
+  `firmware/hearth-sink/profiles.json`: the seven profiles and their fragments in order, what
+  `locked`, `budget`, `watch` and `free` hold, the guard and where CI runs it, the rule that a new
+  Kconfig key is placed in the profiles at the pull request, how to read a board's profile from
+  `GET /hardware`, the commands that build a board from its profile in WSL and on Windows, and
+  what a change to a profile has to carry. Until now this was written down only in a planning
+  note.
 - The threat model, the WebAssembly page, the ADM page and the building guide no longer describe
   the codec libraries as free of third-party dependencies. {fmt} is compiled into `ac3::forge`
   and `mp4::mp4`.
