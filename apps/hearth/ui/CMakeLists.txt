@@ -188,21 +188,28 @@ else()
     # skip_next e044, create_new_folder e2cc, add e145, volume_up e050) via
     # fontTools - 2 KB rather than the upstream file's 8.46 MB. Only Hearth
     # ships this today, so it is not in apps/forge/gui's own font resource list.
+    #
+    # A variable, like ICLFORGE_HEARTH_QML_FILES above, because tests/CMakeLists.txt
+    # embeds the same faces in hearth_qmltests (and tests/qml_test_main.cpp
+    # registers them, as src/main.cpp does): without them that binary has no
+    # font on a machine with no QT_QPA_FONTDIR, and every layout suite measures
+    # glyphs twice the width of the typeface a person sees.
+    set(ICLFORGE_HEARTH_FONT_FILES
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Regular.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Medium.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-SemiBold.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-ExtraBold.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Regular.ttf"
+        # Archivo has no Arabic or Hebrew coverage, and Yiddish is
+        # written in Hebrew script, so without these two faces three of
+        # the six languages below render as tofu. apps/forge/gui bundles the
+        # same pair for the same reason.
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansArabic.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansHebrew.ttf")
     qt_add_resources(hearth "hearth_fonts"
         PREFIX "/fonts"
         BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts"
-        FILES
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Regular.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Medium.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-SemiBold.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-ExtraBold.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Regular.ttf"
-            # Archivo has no Arabic or Hebrew coverage, and Yiddish is
-            # written in Hebrew script, so without these two faces three of
-            # the six languages below render as tofu. apps/forge/gui bundles the
-            # same pair for the same reason.
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansArabic.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansHebrew.ttf")
+        FILES ${ICLFORGE_HEARTH_FONT_FILES})
     qt_add_resources(hearth "hearth_icons"
         PREFIX "/icons"
         BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons"
