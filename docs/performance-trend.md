@@ -140,6 +140,8 @@ see at the size it runs — a workload sized where the interesting term vanishes
 pass forever while the thing it nominally covers rots.
 
 `tools/ci/append_performance_history.py` appends every `main` run's numbers
+(after a merge, nightly, or when asked for with `gh workflow run ci.yml --ref main`;
+a commit is recorded once, however many runs measure it)
 to the `quality-history` branch (reused, not a new branch - the same reasoning
 [Quality trend](quality-trend.md) already gives for a dedicated branch over
 `gh-pages`: incremental, no publish-cadence coupling, fetchable client-side with no
@@ -277,6 +279,30 @@ follow the same convention, table-only (no chart to style).
     return groups;
   }
 
+  // When the newest figures below are from: the newest commit recorded on main, the day it was
+  // made and how long ago that is. CI writes this history after merges or nightly, and when it
+  // has written nothing for a while (main red, a failed nightly) the chart and the table still
+  // end at the last record: this line is what says how old that is, and past `staleAfterDays`
+  // it says nothing newer has been recorded. The date is the commit's own, which is all a record
+  // carries; its figures were measured within hours of it. Empty with no record on main.
+  function perfTrendAsOfLine(records, staleAfterDays) {
+    let last = null;
+    for (const r of records) {
+      if (r.branch !== "main" || Number.isNaN(Date.parse(r.commit_date))) continue;
+      if (!last || Date.parse(r.commit_date) >= Date.parse(last.commit_date)) last = r;
+    }
+    if (!last) return "";
+    const hours = Math.max(0, Math.floor((Date.now() - Date.parse(last.commit_date)) / 3600000));
+    // Hours up to two days, days after.
+    const ago = hours < 1 ? "within the last hour" : hours === 1 ? "1 hour ago"
+      : hours < 48 ? `${hours} hours ago` : `${Math.floor(hours / 24)} days ago`;
+    const stale = hours > staleAfterDays * 24;
+    return `<p class="trend-asof${stale ? " trend-asof-stale" : ""}">Newest record: ` +
+      `<a href="https://github.com/${PERF_TREND_REPO}/commit/${last.commit}"><code>main@${String(last.commit).slice(0, 8)}</code></a>, ` +
+      `committed ${new Date(Date.parse(last.commit_date)).toISOString().slice(0, 10)} (${ago}).` +
+      `${stale ? " Nothing newer has been recorded since." : ""}</p>`;
+  }
+
   // Renders `sectionRenderer`'s output for main's records directly - no
   // heading, since main is the only ongoing track and this page no longer
   // presents it as one of two choices - then, only if this fetch actually
@@ -293,7 +319,11 @@ follow the same convention, table-only (no chart to style).
       root.innerHTML = noDataMessage;
       return;
     }
-    const mainHtml = mainRecords.length ? sectionRenderer(mainRecords, false) : "<p><em>No data yet on main.</em></p>";
+    // Speed, kernels and memory are written by one job, after merges and nightly: two days
+    // without a record is longer than they are normally left.
+    const mainHtml = mainRecords.length
+      ? perfTrendAsOfLine(mainRecords, 2) + sectionRenderer(mainRecords, false)
+      : "<p><em>No data yet on main.</em></p>";
     const historicalHtml = historicalRecords.length
       ? `<details class="performance-trend-historical"><summary>Show historical data (develop, pre-2026-08-25 GitFlow era)</summary>${sectionRenderer(historicalRecords, true)}</details>`
       : "";
@@ -481,7 +511,7 @@ follow the same convention, table-only (no chart to style).
         .join("\n");
     };
     perfTrendRenderMainAndHistorical(root, allRecords, sectionRenderer,
-      '<p class="performance-trend-status">No performance-trend data recorded yet - it appears after the first main push that reaches the persist-performance-trend CI job.</p>');
+      '<p class="performance-trend-status">No performance-trend data recorded yet - it appears after the first run of main that reaches the persist-performance-trend CI job.</p>');
   }
 
   render();
@@ -603,7 +633,7 @@ decode spends; the bare row is what the oracle costs.
         .join("\n");
     };
     perfTrendRenderMainAndHistorical(root, allRecords, sectionRenderer,
-      '<p class="performance-trend-status">No kernel-trend data recorded yet - it appears after the first main push that reaches the persist-performance-trend CI job.</p>');
+      '<p class="performance-trend-status">No kernel-trend data recorded yet - it appears after the first run of main that reaches the persist-performance-trend CI job.</p>');
   }
 
   render();
@@ -629,7 +659,8 @@ memory-usage optimization programme's phases land as visible downward steps in
 these series - that is what this table exists to show.
 
 The same question is now asked before the merge as well. These series are
-written by `persist-performance-trend`, which is `push` to `main` only, so for
+written by `persist-performance-trend`, which runs on `main` only (after a merge,
+nightly, and when asked for), so for
 a while a step was reported on the trunk *after* it landed - a red check on an
 already-merged commit, blocking nothing and belonging to whoever pushed next.
 The E-AC-3 encode step from 67 to 199 allocs/frame in 2026-08 (issue #544) is
@@ -1358,7 +1389,7 @@ peaks are this leg's to the byte there.
         .join("\n");
     };
     perfTrendRenderMainAndHistorical(root, allRecords, sectionRenderer,
-      '<p class="performance-trend-status">No memory-trend data recorded yet - it appears after the first main push that reaches the persist-performance-trend CI job.</p>');
+      '<p class="performance-trend-status">No memory-trend data recorded yet - it appears after the first run of main that reaches the persist-performance-trend CI job.</p>');
   }
 
   render();

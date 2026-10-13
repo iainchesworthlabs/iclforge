@@ -30,8 +30,9 @@ The [Quick start](quickstart.md) covers installation, source builds, and the ESP
 
 ## Performance and quality
 
-The *Measured on every merge* strip above loads the newest figures from the append-only
-measurement history that CI keeps on the `quality-history` branch. Each tile has one line per codec
+The *Measured on main* strip above loads the newest figures from the append-only
+measurement history that CI keeps on the `quality-history` branch, and the line under it names the
+commit they were measured on and says how old it is. Each tile has one line per codec
 (AC-3, E-AC-3, and AC-4), and a line is the worst case among that codec's own workloads, with the
 workload named. The lines of two codecs come from different workloads and do not compare with each
 other. A line whose series was last recorded on an older commit than the newest says which.

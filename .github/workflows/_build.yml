@@ -56,14 +56,13 @@ on:
         default: 1
       persist_quality_trend:
         description: >-
-          After the gold-reference gate passes on every leg, append this run's SNR results to the
-          quality-history branch (see docs/quality-trend.md). Computed and set by ci.yml only for
-          direct pushes to main and the nightly run of main - never for a PR, so unmerged work
-          never pollutes the trend - and left false by release.yml's call, which is tag-triggered,
-          not a push at all. A plain boolean input rather than this job re-deriving
-          github.event_name/github.ref itself: those reflect the reusable workflow's own call
-          context, and computing the condition once at the unambiguous caller site is simpler
-          than relying on exactly how that context propagates through workflow_call.
+          Append the SNR results of every leg whose gold-reference gates passed to the
+          quality-history branch (see docs/quality-trend.md). Set by ci.yml from its `changes`
+          job's record_trend: true for a run of main's own matrix (after a merge, nightly, or a
+          dispatch on main that names no legs) - never for a PR or a branch, so unmerged work
+          never pollutes the trend - and left false by release.yml's call, which is tag-triggered.
+          A plain boolean input rather than this job re-deriving github.event_name/github.ref
+          itself: the rule is decided once, in ci.yml, and every publisher reads it.
         type: boolean
         default: false
       quality_trend_branch:
@@ -4217,35 +4216,32 @@ jobs:
   # Persists this run's gold-reference SNR numbers (docs/quality-trend.md) so
   # they outlive the CI run that produced them, instead of only ever living in
   # a log that ages out. One job, not one push per leg: `needs:` waits for
-  # every platform's build-<os> job-call, so this both (a) only runs when the
-  # hard gate passed everywhere - a leg failing fails its platform's job-call
-  # outright, which skips this job by its default `if` (needing all three to
-  # succeed is GitHub Actions' own default for a job with `needs:` and no
-  # `always()`/`failure()` override - unchanged by the CI lane partitions
-  # split, just now checked per-platform instead of via one cross-OS job) -
-  # and (b) writes one commit per CI run instead of up to five racing to push
-  # at once. gold_reference is not set on linux-llvm-asan-ubsan, so it never
-  # contributes an artifact; `download-artifact` only requires that at least
-  # the pattern's namespace exist, not every leg specifically.
+  # every platform's build-<os> job-call, so this writes one commit per CI run
+  # instead of up to five racing to push at once.
   #
-  # `needs: [build-windows, build-linux, build-macos]` rather than a narrower
-  # list: `if: inputs.persist_quality_trend` is only true for a direct push to
-  # `main` and for the nightly run (see that input's own description). The
-  # nightly run lights every lane, but the run after a merge lights only the
-  # lanes the merges touched, so a platform's job-call can be skipped, and
-  # that is accepted below as long as one of the three ran and passed: with
-  # none, there is no artifact to record. A skip that is not for a lane reason
-  # still means what it always has: something upstream did not run clean.
+  # What it records is the legs whose own gates passed, and only those. A leg
+  # uploads its gold-reference-<preset> artifact in the step after its gates,
+  # under the default `if` (everything before it passed), so the artifact
+  # exists exactly when that leg built, tested and passed every gold-reference
+  # gate it has. No figure of a broken leg can reach the history, which
+  # matters because the per-channel floors are derived from it
+  # (tools/checks/derive_channel_floors.py). gold_reference is not set on
+  # linux-llvm-asan-ubsan, so it never contributes one.
   #
-  # The one exception: on a push to main a GitHub-hosted leg (both macOS
-  # legs, the arm64 legs, any leg on its hosted fallback) can give way to a
-  # newer main run - docs/ci-lanes.md, "Only the newest main commit runs the
-  # hosted jobs" - leaving its platform's job-call "cancelled" rather than
-  # failed. This merge's self-hosted numbers are still published then, and
-  # the hosted legs' series just have a gap - append_quality_history.py
-  # records whichever legs' artifacts exist. A leg that failed still skips
-  # the publish: a job-call with a failed leg reads "failure" even when
-  # another of its legs was cancelled.
+  # So this job runs when at least one platform's job-call ran, whatever the
+  # other legs did, and append_quality_history.py records whichever legs'
+  # artifacts exist: a leg that failed, was cancelled or was not lit has a gap
+  # in its series for this commit. It used to need every job-call to pass (or
+  # be cancelled or skipped), which made one failed leg anywhere cost every
+  # other leg its record: from 2026-10-12 15:20Z a Hearth test on the macOS
+  # leg kept the Linux and Windows figures of every later merge off the trend,
+  # with their own gates green. With no artifact at all (every leg failed)
+  # the steps after the download do nothing.
+  #
+  # `inputs.persist_quality_trend` is true on the runs that record the trend
+  # (see that input's own description). The nightly run lights every lane, but
+  # the run after a merge lights only the lanes the merges touched, so a
+  # platform's job-call can be skipped: one that ran is enough.
   #
   # This job itself has no such group, though it is GitHub-hosted: it
   # publishes the self-hosted legs' numbers too, so giving way to a newer
@@ -4256,11 +4252,9 @@ jobs:
     needs: [build-windows, build-linux, build-macos]
     if: >-
       ${{ !cancelled() && inputs.persist_quality_trend
-      && contains(fromJSON('["success","cancelled","skipped"]'), needs.build-windows.result)
-      && contains(fromJSON('["success","cancelled","skipped"]'), needs.build-linux.result)
-      && contains(fromJSON('["success","cancelled","skipped"]'), needs.build-macos.result)
-      && (needs.build-windows.result == 'success' || needs.build-linux.result == 'success'
-          || needs.build-macos.result == 'success') }}
+      && (contains(fromJSON('["success","failure"]'), needs.build-windows.result)
+          || contains(fromJSON('["success","failure"]'), needs.build-linux.result)
+          || contains(fromJSON('["success","failure"]'), needs.build-macos.result)) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -4308,8 +4302,11 @@ jobs:
             git commit -q --allow-empty -m "Initialize quality-history branch"
           fi
 
+      # Only with something to append: a run whose every leg failed has no
+      # artifact, and then this step and the push below have nothing to do.
       - name: Append quality-trend history
         id: append
+        if: hashFiles('results/**/*.json') != ''
         shell: bash
         env:
           # Env, not interpolated straight into the script: zizmor's
@@ -4334,6 +4331,7 @@ jobs:
             --commit-date "$commit_date"
 
       - name: Commit and push quality-history update
+        if: hashFiles('results/**/*.json') != ''
         shell: bash
         env:
           BRANCH: ${{ inputs.quality_trend_branch }}

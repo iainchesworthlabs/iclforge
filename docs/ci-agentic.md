@@ -184,8 +184,32 @@ the first leaves out is found within a day.
 |---|---|---|
 | Build legs | Linux GCC and LLVM (x64), Linux GCC (arm64), Windows MSVC and LLVM, macOS arm64 | Linux LLVM (arm64), ASan+UBSan, TSan, Windows MSVC (arm64), macOS x64 |
 | Extra passes inside a leg | | The no-ALSA pass of Linux GCC (x64 and arm64), Linux GCC's float32 and fixed-point variants, Linux LLVM's shared-library pass, macOS packaging |
-| Core jobs | ADM module, Hearth Sendspin, the performance trend | coverage, ABI gate, FFmpeg Validate and the two trend publishers that read it |
+| Core jobs | ADM module, Hearth Sendspin | coverage, ABI gate, FFmpeg Validate and the two trend publishers that read it |
+| Trend | the performance, kernel and memory series, and the gold-reference series of the legs that ran | the same, for every leg |
 | Other jobs | the lane's own build, when the lane's own tree changed | Linux AppImage, and each satellite (Android, WASM, ESP-IDF, Rust, wheels, npm) whatever changed |
+
+### Which runs record the trend
+
+One rule, decided by `ci.yml`'s `changes` job (`record_trend`) and read by every publisher: a run
+of `main`'s own matrix records what it measures. That is the run after a merge, the nightly run,
+and a dispatch on `main` that names no legs (`gh workflow run ci.yml --ref main`), which is how a
+full set of records is taken by hand. A branch never writes to the trend, and a dispatch that
+names legs measures nothing. Each append script records a commit once, so a second run of a
+commit adds only what the first did not have.
+
+A publisher depends on the job that measured its figures and on nothing else:
+
+- `persist-performance-trend` and `performance-trend-arm64` build the benchmarks and run them
+  themselves, and do not wait for `build-and-test` or read its result.
+- `quality-trend` records the legs whose gold-reference gates passed, whatever the other legs
+  did. A leg uploads its results only after its own gates, so a broken leg has none to record.
+- The two publishers below record what `FFmpeg Validate` scored.
+
+Until 2026-10-13 the first two needed the whole build matrix green. `main` was red from
+2026-10-12 02:12Z on jobs that measure nothing (a browser test, the wheels, an ESP32 image, a
+macOS test), and none of the 19 runs after a merge that finished in the next day recorded a speed
+or memory figure, though the Linux leg they measure passed in every one. The pages now say how
+old their newest record is ([Performance & quality](performance-quality.md#where-each-number-comes-from)).
 
 The two trend publishers that read FFmpeg Validate differ in what they need of it.
 `persist-external-comparison-trend`, which carries the AC-4 decode and encode series, also runs

@@ -21,16 +21,11 @@
 # each one's own `if:`) and are unchanged.
 #
 # NOT moved here despite being perf-trend jobs: persist-performance-trend and
-# performance-trend-arm64 stay in ci.yml directly. Both `needs: build-and-test`
-# (a job in a different reusable workflow, _build.yml) to know the full
-# matrix passed before recording a trend point - a same-file `needs:` edge
-# ci.yml can express but this file cannot, since `needs:` cannot cross a
-# workflow_call boundary. Gating the WHOLE core call on build-and-test instead
-# would serialize coverage/adm-validate/ffmpeg-validate/abi-gate behind the
-# entire build matrix - they run in parallel with it today - for the sake of
-# two jobs that only ever run on a direct push to main anyway, where the extra
-# wait is free. Leaving them in ci.yml keeps that parallelism and avoids the
-# awkward plumbing for no benefit.
+# performance-trend-arm64 stay in ci.yml directly. They were kept there when
+# they needed build-and-test (a job in a different reusable workflow), an edge
+# `needs:` cannot cross a workflow_call boundary to express. They no longer
+# need it (ci.yml says why), and they stay where they are: the performance
+# publisher is in ci-status's `needs` by its own name.
 name: Reusable Core Checks
 
 on:
@@ -55,6 +50,13 @@ on:
           `all`, the default, runs every job. Set by ci.yml.
         type: string
         default: all
+      record_trend:
+        description: >-
+          Whether this run writes what FFmpeg Validate measured to the trend on quality-history:
+          ci.yml's `changes` job decides it once for every publisher (a run of main's own matrix:
+          after a merge, nightly, or a dispatch on main that names no legs). False for a branch.
+        type: boolean
+        default: false
     outputs:
       # Threaded individually, not folded into one aggregate result, so
       # ci-status's own summary keeps naming which of these failed - the same
@@ -1401,13 +1403,13 @@ jobs:
   persist-external-comparison-trend:
     name: Publish external-encoder landscape trend
     needs: ffmpeg-validate
-    # A push to main, or the nightly run, which is where FFmpeg Validate runs now.
-    # Passed or failed, not skipped (tier t2) and not cancelled (it gave way to a
-    # newer run, and a cancelled one has no artifact worth a commit).
+    # A run that records the trend (inputs.record_trend) in which FFmpeg Validate
+    # ran: the nightly run, or a dispatch on main, since the run after a merge
+    # leaves that job out. Passed or failed, not skipped (tier t2) and not
+    # cancelled (a cancelled one has no artifact worth a commit).
     if: >-
-      !cancelled() &&
-      (needs.ffmpeg-validate.result == 'success' || needs.ffmpeg-validate.result == 'failure') &&
-      (github.event_name == 'push' || github.event_name == 'schedule') && github.ref == 'refs/heads/main'
+      !cancelled() && inputs.record_trend &&
+      (needs.ffmpeg-validate.result == 'success' || needs.ffmpeg-validate.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1687,11 +1689,11 @@ jobs:
   persist-object-quality-trend:
     name: Publish object-reconstruction quality trend
     needs: ffmpeg-validate
-    # A push to main, or the nightly run, which is where FFmpeg Validate runs now.
-    # Only after one that PASSED, unlike persist-external-comparison-trend above:
-    # its scores come from the last step of that job, so a run that failed has none
+    # A run that records the trend in which FFmpeg Validate ran, as above. Only
+    # after one that PASSED, unlike persist-external-comparison-trend above: its
+    # scores come from the last step of that job, so a run that failed has none
     # to publish and there is nothing a looser condition would save.
-    if: (github.event_name == 'push' || github.event_name == 'schedule') && github.ref == 'refs/heads/main'
+    if: inputs.record_trend
     runs-on: ubuntu-latest
     permissions:
       contents: write
