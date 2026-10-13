@@ -127,6 +127,15 @@ class MicrophoneController : public QObject {
                          std::function<std::int64_t()> clock, QObject* parent = nullptr);
     ~MicrophoneController() override;
 
+    // The input the machine's own is replaced with, for the Qt Quick suites alone
+    // (apps/hearth/ui/tests/qml_test_main.cpp). The QML engine makes this singleton through the
+    // first constructor above, which has nowhere to be handed an input, and a suite that opens
+    // no person's microphone needs it to be a script: HearthController::set_test_outputs() is
+    // the same seam for the speakers. Set it before the singleton is first used; empty (the
+    // shipped window, always) means the machine's own.
+    static void set_test_input_factory(
+        std::function<std::unique_ptr<iclforge::hearth::MicrophoneInput>()> make);
+
     MicrophoneController(const MicrophoneController&) = delete;
     MicrophoneController& operator=(const MicrophoneController&) = delete;
 
@@ -205,6 +214,14 @@ class MicrophoneController : public QObject {
     Q_INVOKABLE bool deleteTake(const QString& path);
     // Where takes go: a folder URL from a dialog, or a path. Kept.
     Q_INVOKABLE void setTakesFolder(const QString& urlOrPath);
+    // The takes folder a capture names (main.cpp, --shot and --smoke-shot): the default's own
+    // shape under a home that is nobody's - C:/Users/you/Documents/Hearth takes on Windows - so
+    // that a picture of the card carries no account's name. Nothing is made there: a capture
+    // never turns a microphone on.
+    [[nodiscard]] static QString capture_takes_folder();
+    // Keeps that folder in the settings store in use, which a capture has just pointed at a
+    // scratch one of its own. Called before the controller that reads it exists.
+    static void keep_capture_takes_folder();
 
     // The item playing, and which part to take the reference from ("m", "v1", "v2" or "" for the
     // first present). An empty path closes the microphone: nothing is playing to sing along to.
@@ -294,6 +311,10 @@ class MicrophoneController : public QObject {
     double level_db_ = -120.0;
     bool clipping_ = false;
     double silent_seconds_ = 0.0;
+    // The silence the card was last told of (meterChanged): it is told again when it has grown by
+    // half a second. Not measured against silent_seconds_, which is read every 100 ms and so is
+    // never half a second from the one before.
+    double silent_announced_ = 0.0;
     QString reference_status_ = QStringLiteral("none");
     QString reference_text_;
     QVariantMap live_;

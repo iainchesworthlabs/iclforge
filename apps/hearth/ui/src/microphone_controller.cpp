@@ -167,8 +167,25 @@ struct MicrophoneController::State {
     int generation = 0;
 };
 
+namespace {
+
+[[nodiscard]] std::function<std::unique_ptr<iclforge::hearth::MicrophoneInput>()>&
+test_input_factory() {
+    static std::function<std::unique_ptr<iclforge::hearth::MicrophoneInput>()> factory;
+    return factory;
+}
+
+}  // namespace
+
+void MicrophoneController::set_test_input_factory(
+    std::function<std::unique_ptr<iclforge::hearth::MicrophoneInput>()> make) {
+    test_input_factory() = std::move(make);
+}
+
 MicrophoneController::MicrophoneController(QObject* parent)
-    : MicrophoneController(iclforge::hearth::make_device_input(), parent) {}
+    : MicrophoneController(test_input_factory() ? test_input_factory()()
+                                                : iclforge::hearth::make_device_input(),
+                           parent) {}
 
 MicrophoneController::MicrophoneController(std::unique_ptr<iclforge::hearth::MicrophoneInput> input,
                                            QObject* parent)
@@ -581,6 +598,16 @@ void MicrophoneController::setTakesFolder(const QString& urlOrPath) {
     refreshTakes();
 }
 
+QString MicrophoneController::capture_takes_folder() {
+    // Beside the person's own home, in one named for nobody: /home/you, /Users/you, C:/Users/you.
+    const QDir homes = QFileInfo(QDir::homePath()).dir();
+    return QDir::cleanPath(homes.filePath(QStringLiteral("you/Documents/Hearth takes")));
+}
+
+void MicrophoneController::keep_capture_takes_folder() {
+    kept().setValue(QStringLiteral("microphone/takesFolder"), capture_takes_folder());
+}
+
 void MicrophoneController::limit_take_bytes_for_test(std::uint64_t bytes) {
     state_data_->session.limit_take_bytes(bytes);
 }
@@ -777,14 +804,18 @@ void MicrophoneController::publish(bool force) {
 
     const double db = static_cast<double>(s.level_db);
     const double level = level_from_db(db);
+    // The card's "no sound" hint hangs on silentSeconds, and a microphone that is muted delivers
+    // digital silence, whose level never moves: the silence is announced on its own account, or
+    // that hint is only ever shown for a microphone with noise on it.
     const bool meter_changed = force || std::fabs(level - level_) > 0.004 ||
                                s.clipping != clipping_ ||
-                               std::fabs(s.silent_seconds - silent_seconds_) > 0.5;
+                               std::fabs(s.silent_seconds - silent_announced_) > 0.5;
     level_db_ = db;
     level_ = level;
     clipping_ = s.clipping;
     silent_seconds_ = s.silent_seconds;
     if (meter_changed) {
+        silent_announced_ = s.silent_seconds;
         emit meterChanged();
     }
 

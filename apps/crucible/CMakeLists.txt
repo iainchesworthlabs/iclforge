@@ -394,6 +394,8 @@ else()
         ui/src/main.cpp
         ui/src/capture_lyrics.cpp
         ui/src/capture_lyrics.hpp
+        ui/src/scripted_machine.cpp
+        ui/src/scripted_machine.hpp
         ui/src/crucible_controller.cpp
         ui/src/crucible_controller.hpp
         ui/src/lyric_osc.cpp
@@ -480,7 +482,12 @@ else()
     target_include_directories(crucible PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/cdg-picture/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../shared/theme/src")
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shared/theme/src"
+        # The header-only stand-ins for the platform seams (fake_devices.hpp, fake_services.hpp),
+        # which `crucible --shot ... --app` builds its scripted machine from
+        # (ui/src/scripted_machine.cpp): the same ones the engine's cases and the Qt Quick
+        # tests use, so a picture is taken over exactly what they are tested over.
+        "${CMAKE_CURRENT_SOURCE_DIR}/engine/tests")
     # The driver folder in the source tree is the default place the
     # Settings screen's install/remove buttons look when no driver/ folder
     # sits beside the executable (a build-tree run).

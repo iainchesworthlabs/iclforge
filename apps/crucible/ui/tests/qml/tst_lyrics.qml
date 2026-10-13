@@ -29,6 +29,10 @@ TestCase {
     Component { id: stripComponent; LyricStrip { width: 320 } }
     Component { id: roomPage; RoomPage { width: 1480; height: 700 } }
     Component { id: shell; Main {} }
+    // The window's smallest size is 960x620 (Main.qml). Its Room page has that less the header, 64 px
+    // at the least, and the status strip, 32 px at the least, so no page in a real window is taller
+    // than this one.
+    Component { id: smallRoomPage; RoomPage { width: 960; height: 620 - 64 - 32 } }
 
     function cleanup() {
         for (const app of [7, 8, 9, 900, 901]) {
@@ -377,6 +381,146 @@ TestCase {
         compare(CrucibleLyrics.status(7), "timed");
         CrucibleController.appsChanged();
         compare(CrucibleLyrics.status(7), "none");
+    }
+
+    // The right rail ends with the Lyrics block, so it is the first thing a short window cuts off.
+    // What the rail owes a person at the window's smallest size, whichever way it is reached: that it
+    // scrolls, that it says so, and that the strip's controls can be brought into view by the wheel,
+    // by Tab and by Page Down. `rail` is the rail's scrolling area and `strip` the lyric strip in it,
+    // with timed lyrics imported against its application.
+    function checkTheRailReachesTheStrip(rail, strip) {
+        const start = findChild(strip, "lyricsStart");
+        verify(start !== null);
+        tryVerify(function() { return start.visible; }, 5000);
+        tryVerify(function() { return rail.contentHeight > rail.height; }, 5000,
+                  "the rail's content is taller than the rail: " + rail.contentHeight + " in " + rail.height);
+
+        // Where the control is in the rail's own window onto its content: it is seen when it is
+        // between 0 and the window's height.
+        function top(item) { return item.mapToItem(rail, 0, 0).y; }
+        function bottom(item) { return top(item) + item.height; }
+        function seen(item) { return top(item) >= 0 && bottom(item) <= rail.height; }
+
+        // The rail is at its top, and Start is below its lower edge: what the window cut off.
+        compare(rail.contentY, 0);
+        verify(!seen(start), "Start is below the fold before the rail is scrolled: " + top(start) + " in " + rail.height);
+
+        // The rail says there is more of it: a bar that is on, not one that waits to be hovered.
+        const bar = findChild(rail.parent, "railScrollBar");
+        verify(bar !== null, "the rail has no scroll bar");
+        verify(bar.visible, "the scroll bar is not shown");
+        verify(bar.size > 0 && bar.size < 1, "the bar's handle is a part of its track: " + bar.size);
+
+        // The wheel moves it, a notch at a time, and not past its content. Under the harness's
+        // synthetic events the first notch can be taken without moving the Flickable (it reports
+        // moving, and contentY stays put), so the notches go on until it has moved rather than one
+        // being waited for.
+        function most() { return rail.contentHeight - rail.height; }
+        for (let notch = 0; notch < 60 && rail.contentY < most(); ++notch) {
+            mouseWheel(rail, rail.width / 2, rail.height / 2, 0, -120);
+            wait(30);
+        }
+        verify(rail.contentY > 0, "the wheel did not move the rail");
+        // It comes to rest at the end of its content and not beyond it.
+        tryVerify(function() { return !rail.moving && Math.abs(rail.contentY - most()) < 0.5; }, 5000,
+                  "the wheel did not take it to the end and stop there: " + rail.contentY + " of " + most());
+        tryVerify(function() { return seen(start); }, 5000,
+                  "Start is not on screen at the end of the rail: " + top(start) + " in " + rail.height);
+
+        // Tab walks the rail in the order it always did - Import, Clear, Start - and the control it
+        // arrives at is on screen, whichever end of the rail the walk began from.
+        rail.contentY = 0;
+        const choose = findChild(strip, "lyricsImport");
+        const clear = findChild(strip, "lyricsClear");
+        verify(choose !== null && clear !== null);
+        choose.forceActiveFocus();
+        verify(choose.activeFocus);
+        tryVerify(function() { return seen(choose); }, 5000, "Import is not on screen with the keyboard on it");
+        keyClick(Qt.Key_Tab);
+        verify(clear.activeFocus, "Tab from Import reaches Clear");
+        keyClick(Qt.Key_Tab);
+        verify(start.activeFocus, "Tab from Clear reaches Start");
+        tryVerify(function() { return seen(start); }, 5000, "Start is not on screen with the keyboard on it");
+        // And back up, from the other end of the rail.
+        rail.contentY = most();
+        keyClick(Qt.Key_Backtab);
+        verify(clear.activeFocus, "Shift+Tab from Start reaches Clear");
+        tryVerify(function() { return seen(clear); }, 5000, "Clear is not on screen with the keyboard on it");
+        // The rail's first control, which is off its top when the rail is at its end: the keyboard
+        // going to it brings the top of the rail back. The tab stops are found in the order they are
+        // in the tree, which is the order Tab walks them.
+        function stops(item, found) {
+            for (let i = 0; i < item.children.length; ++i) {
+                const child = item.children[i];
+                if (child.activeFocusOnTab === true && child.visible && child.enabled) {
+                    found.push(child);
+                }
+                stops(child, found);
+            }
+            return found;
+        }
+        const all = stops(rail.contentItem, []);
+        verify(all.length >= 3, "the rail has its tab stops: " + all.length);
+        rail.contentY = most();
+        all[0].forceActiveFocus();
+        tryVerify(function() { return seen(all[0]); }, 5000, "the rail's first control is not on screen with the keyboard on it");
+
+        // Page Down and Page Up with the keyboard in the rail move it by most of a page.
+        rail.contentY = 0;
+        start.forceActiveFocus();
+        rail.contentY = 0;
+        keyClick(Qt.Key_PageDown);
+        tryVerify(function() { return rail.contentY > 0; }, 5000, "Page Down did not move the rail");
+        verify(rail.contentY <= rail.height, "Page Down moved by more than a page: " + rail.contentY);
+        keyClick(Qt.Key_PageUp);
+        tryCompare(rail, "contentY", 0, 5000);
+    }
+
+    // The Room page at the size the smallest window gives it, with no engine under it.
+    function test_theRightRailScrollsSoTheStripsStartIsReachableInTheSmallestWindow() {
+        const page = createTemporaryObject(smallRoomPage, testCase.parent);
+        verify(page);
+        waitForRendering(page);
+        const rail = findChild(page, "railScroll");
+        verify(rail !== null, "the right rail has no scrolling area");
+        const strip = findChild(page, "lyricStrip");
+        verify(strip !== null);
+        // Timed lyrics against an application, so that the strip has its Start button.
+        verify(CrucibleLyrics.importText(7, "song.lrc", song, 12000));
+        strip.app = { app: 7, name: "Spotify" };
+        tryCompare(strip, "status", "timed", 5000);
+        checkTheRailReachesTheStrip(rail, strip);
+    }
+
+    // The window itself at its minimum, over a scripted machine, with the application chosen the way a
+    // person chooses it.
+    function test_theWindowAtItsMinimumSizeCanBringTheLyricStripIntoView() {
+        if (!TestServices.scriptSessions([{ app: 900, name: "Hearth", active: true },
+                                          { app: 901, name: "Microsoft Edge", active: true }])) {
+            skip("the scripted machine is not available in this harness");
+        }
+        CrucibleController.firstRunAcknowledged = true;
+        const window = createTemporaryObject(shell, testCase, { suppressFirstRun: true });
+        verify(window);
+        tryCompare(window, "visible", true);
+        if (!CrucibleController.running) {
+            skip("the engine did not run over the scripted machine: " + CrucibleController.lastError);
+        }
+        tryVerify(function() { return CrucibleController.apps.length === 2; }, 5000,
+                  "the scripted applications reach the room");
+        window.width = window.minimumWidth;
+        window.height = window.minimumHeight;
+        tryCompare(window, "height", 620, 5000);
+        compare(window.width, 960);
+        const rail = findChild(window, "railScroll");
+        verify(rail !== null, "the right rail has no scrolling area");
+        const strip = findChild(window, "lyricStrip");
+        verify(strip !== null);
+        window.selectApplication(901);
+        compare(strip.appId, 901);
+        verify(CrucibleLyrics.importText(901, "song.lrc", song, 12000));
+        tryCompare(strip, "status", "timed", 5000);
+        checkTheRailReachesTheStrip(rail, strip);
     }
 
     function test_theStripFollowsTheApplicationItIsGiven() {

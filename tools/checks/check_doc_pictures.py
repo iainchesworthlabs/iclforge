@@ -234,6 +234,13 @@ def _check_entry(entry: object, index: int, environments: set[str], builds: set[
         if not isinstance(extra, dict) or not all(
                 isinstance(k, str) and isinstance(v, str) for k, v in extra.items()):
             report.problems.append(f"{at}: \"env\" must map names to text")
+        else:
+            for value in extra.values():
+                for name in PLACEHOLDER.findall(value):
+                    if name not in PLACEHOLDERS:
+                        report.problems.append(
+                            f"{at}: {{{name}}} in \"env\" is not a placeholder; they are "
+                            + ", ".join("{" + p + "}" for p in PLACEHOLDERS))
     if has_by_hand and not _text(entry["by_hand"]):
         report.problems.append(f"{at}: \"by_hand\" must say how the picture was made")
     return path

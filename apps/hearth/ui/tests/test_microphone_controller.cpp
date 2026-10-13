@@ -877,6 +877,37 @@ TEST_CASE("microphone controller: the takes folder is kept, and is not made unti
     again->controller->stopRecording();
 }
 
+TEST_CASE("microphone controller: a capture names a takes folder that is nobody's",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    // An account that is itself named "you" has nothing to hide, and nothing here to tell apart.
+    const QString account = QDir(QDir::homePath()).dirName();
+    const bool named = !account.isEmpty() && account != QStringLiteral("you");
+    // Left alone, the folder is under the person's own documents, account name and all.
+    {
+        auto rig = make_rig();
+        CHECK(QDir::fromNativeSeparators(rig->controller->takesFolder())
+                  .endsWith(QStringLiteral("/Hearth takes")));
+        if (named) {
+            CHECK(rig->controller->takesFolder() != MicrophoneController::capture_takes_folder());
+        }
+    }
+    // A capture keeps its own before the controller is made: the default's shape, in a home
+    // beside the person's that is named for nobody.
+    MicrophoneController::keep_capture_takes_folder();
+    auto rig = make_rig();
+    const QString folder = rig->controller->takesFolder();
+    CHECK(folder == MicrophoneController::capture_takes_folder());
+    CHECK(folder.endsWith(QStringLiteral("/you/Documents/Hearth takes")));
+    if (named) {
+        CHECK(!folder.split(QLatin1Char('/')).contains(account));
+    }
+    // Named, and no more than that: no take has been listed from it or written to it.
+    CHECK(rig->controller->takes().isEmpty());
+    CHECK(!rig->controller->recording());
+}
+
 TEST_CASE("microphone controller: the item ending closes the microphone", "[hearth][microphone]") {
     Room room;
     application();
