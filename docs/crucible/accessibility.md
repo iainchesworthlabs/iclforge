@@ -22,6 +22,15 @@ In the **applications list**:
 | `Up` / `Down` | Choose an application. The room, the bed tray and the selected card follow. |
 | `Enter` or `Space` | Place the chosen application in the centre of the room and move the keyboard to the room. |
 
+In the **right rail** — the signal path, the signing key and the lyrics — when the window is
+shorter than what is in it:
+
+| Key | What it does |
+| --- | --- |
+| `Page Down` / `Page Up` | Scroll it by most of a page, from any control in it. |
+
+The mouse wheel and the bar on its right edge scroll it too.
+
 In the **room** — one tab stop that moves whichever application is chosen, whichever picture is
 on screen:
 
@@ -51,6 +60,11 @@ Tab walks the window in reading order: the header's signal-path pill, the page s
 then the page. On the Room page that is the applications list, the room-view switch where the
 build has the 3D picture, the room itself, the selected application's buttons, the size slider,
 the bed chips, the right rail, and the Start/Stop button in the status strip.
+
+The right rail scrolls when the window is shorter than what is in it, and a bar on its right edge
+says so. The Lyrics block is the last thing in it, so a short window cuts that off first: whatever
+control has the keyboard is brought into view, and Tab never leaves it behind the window's lower
+edge.
 
 Whatever has the keyboard draws a two-pixel ring just outside its own border. Clicking a button
 does not move the keyboard to it, so a mouse user sees no rings; clicking an application row, a

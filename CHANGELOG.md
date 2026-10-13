@@ -4520,6 +4520,19 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Crucible: the Room's right rail scrolls, so its Lyrics block can be reached in a short window**
+
+- **The rail was cut off by the window's lower edge.** The right rail (04 Signal path, 05 Signing,
+  06 Lyrics) was laid out to the window's height with nothing to move it, so whatever did not fit
+  was cut off, and the Lyrics block, last in the rail, went first: at the default 1480 by 820 it
+  began at the status strip, and on a machine without the silent device, whose first card is taller
+  by a second warning, Import lyrics, Start and Stop and the line being sung were all below the
+  fold; at the 960 by 620 minimum they could not be reached on any machine. The rail scrolls like
+  the centre column now: with the wheel, with a bar on its right edge that is shown whenever there
+  is more below, and with Page Up and Page Down from any control in it. Tab keeps its order and
+  brings the control that has the keyboard into view. No string changed; the translation
+  catalogues' line numbers moved with the page's own lines.
+
 **Crucible: the lyric strip no longer makes the Room's right rail wider than the window**
 
 - **The strip's buttons wrap.** Start, Stop, Follow the media session and the nudge were one row that
