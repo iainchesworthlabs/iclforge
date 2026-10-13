@@ -1,6 +1,6 @@
 # Hearth for Android: a Sendspin sink for the TV
 
-!!! note "Status as of 2026-10-12: requirements and design, for the owner's sign-off; nothing is built"
+!!! note "Status as of 2026-10-13: phases 0 to 3 are built; phases 4 and 5 are planned on [their own page](hearth-android-phases-4-5.md)"
     The owner's picture, end to end: **Forge makes the content** (a karaoke stream, an Atmos
     stream, whatever it is); **a Hearth server streams it over Sendspin**; **the Android Hearth sink
     passes the format through to the AV receiver exactly as the Shield demo does, and shows the
@@ -8,15 +8,41 @@
     waited for, and it carries the owner's wish for **one design across the Hearth family**: desktop
     Hearth, the Android app and the ESP32-P4X board with its panel. The research is
     [kept apart](hearth-android-findings.md); the screen is [one document for all three](hearth-sink-screen.md).
-    Nothing is built until the owner has answered [the decisions](#decisions); spikes and
-    measurements are allowed before that and are listed as [spikes](#spikes).
+    The decisions were answered on 2026-10-12 and the build followed them; what is built, and by
+    which pull request, is [below](#where-the-build-stands). What is left is local decode for
+    karaoke (phase 4) and the sink as an ordinary player (phase 5), planned in
+    [hearth-android-phases-4-5.md](hearth-android-phases-4-5.md).
 
     | Step | What | State |
     |---|---|---|
     | 0 | This page, the findings and the screen spec | Written 2026-10-12, for sign-off |
     | 1 | The owner's answers to [the decisions](#decisions) and [the questions](#questions-for-the-owner) | **D1 to D14 accepted as recommended, 2026-10-12**; questions 1 to 5 answered; the rest ([below](#questions-for-the-owner)) open |
     | 2 | Spikes S1 to S4 ([below](#spikes)) | **S2 run and passed; S1 run on the Shield except the receiver's relock; S4 read for one device; S3 only its first finding** ([findings F12](hearth-android-findings.md#f12-what-the-spikes-measured-2026-10-12)) |
-    | 3 | Phases 0 to 5 ([the plan](#phases)) | Not started; **phase 0 may begin**, in the plan's order |
+    | 3 | Phases 0 to 5 ([the plan](#phases)) | **0 to 3 built** ([the table](#where-the-build-stands)); 4 and 5 planned, 2026-10-13 |
+
+## Where the build stands
+
+As of 2026-10-13, `main` at `79a8bdb6f`. Every row is merged unless it says open.
+
+| Phase | What | Pull requests | State |
+|---|---|---|---|
+| 0 | The prerequisites: the audio backend's JNI app-agnostic (0a), the burst rebuild and null bursts in `containers` (0b), `libs/lyrics` and `libs/sendspin` for `arm64-android` (0c). `Stage` (0d) arrived as the lyrics session's own PR | #1407, #1405, #1409, #1390 | **Built** |
+| spikes | S1, S2 and S4 for one device, recorded | #1393 | **Run** ([F12](hearth-android-findings.md#f12-what-the-spikes-measured-2026-10-12)) |
+| 1 | The sink core as a library (1a), the app skeleton (1b), the pass-through output (1c), the path held end to end on the host and a device (1d), **a run on a real Shield and receiver, recorded** (1e) | #1414, #1422, #1431, #1438, #1448 | **Built** |
+| 2 | The core follows the lyrics (2a), the lyric screen (2b), the screen against the spec's fixtures (2c) | #1451, #1455, #1458 | **Built** |
+| 3 | The tokens in one file, `Tokens.kt` generated (3a), the controls sheet and its focus walk (3b), the starting, idle and attention screens (3c) | #1460, #1461, #1462 | **Built**, except the **first-run screen** and the emulator job |
+| D6 | The role's `output` key; the sink core says it; the lyric screen's route chip; the Network page's row | #1464, #1466, #1467 (the Network page's row) | **Built** |
+| D7 | `metadata@v1`: the engine says what is playing; the sink names an item with no lyrics by it | #1468, #1469 | **Built**; the header's time for an item with no lyrics is a leftover |
+| D8 | A sink asks the server for the singer's karaoke choice: the protocol (#1471), the remote's vocals row (#1475), the host's apply (**#1473, open**) | #1471, #1475, #1473 | Built; the host's apply is open |
+| 3+ | The pairing code as a QR on the idle screen | #1480 | **Built** |
+| 4 | Local decode and karaoke | [the plan](hearth-android-phases-4-5.md) | Planned |
+| 5 | `player@v1`, transport, a phone profile | [the plan](hearth-android-phases-4-5.md#phase-5) | Planned |
+
+**Leftovers that are not phases**, each small and listed with where it stands on the
+[phase 4 and 5 page](hearth-android-phases-4-5.md#the-small-leftovers-before-phase-4): the vocals
+request's "Both asks `aware`" rule, the header's time for an item with no lyrics, the `format`
+chip, a first-run screen, and two quirks (a re-pairing that times out, and 2 to 3 late bursts at
+about 9.2 s on an AC-3 stream) not yet explained.
 
 ## What it is, and what it is not
 
@@ -30,7 +56,10 @@ receives a stream someone else made.
 
 ## What exists
 
-Read on `main` at `3d6b2aa0a`; [the findings](hearth-android-findings.md) have the detail.
+Read on `main` at `3d6b2aa0a`, **before the build**; [the findings](hearth-android-findings.md) have
+the detail, and [the table above](#where-the-build-stands) what has changed since: the sink core
+is a library, the Sendspin player half and the lyric library build for Android, and `Stage` is on
+`main`.
 
 | Piece | Where | State |
 |---|---|---|
@@ -171,10 +200,10 @@ owner's answer.
 | D3 | **Where the sink's logic lives** | (a) extract a `sink` library from `hearth-testsink`, which becomes its first user; (b) the app writes its own glue over `libs/sendspin`; (c) put it in `libs/sendspin` | **(a).** (b) is a third copy beside the test sink's and the firmware's (1,006 lines), and "how a sink behaves" should be one tested thing. (c) puts product behaviour in the protocol library | (a) L: two to three stacked PRs; the test sink's suites protect it; (b) M, no touch to the test sink; (c) M and wrong | **Accepted as recommended, 2026-10-12** |
 | D4 | **The pass-through route** | (a) `ENCODING_IEC61937` always, as the demo; (b) the per-codec encodings (`AC3`, `E_AC3`, `E_AC3_JOC`, `AC4`) with raw frames; (c) (a) first, (b) where the route lists a codec's encoding and not IEC 61937 | **(c).** (a) is the only route proven on hardware; (b) lets the platform negotiate on devices that reject IEC 61937, and needs no rebuild (the chunk's payload *is* the raw frame) | (a) in phase 1; (b) S, after spike S4 says which devices need it | **Accepted as recommended, 2026-10-12** |
 | D5 | **Karaoke on a pass-through route** | (a) decode locally to PCM when a reproduction other than "as coded" is asked, pass through otherwise (karaoke D3, "the sink decodes locally where it can"); (b) pass through always and list no karaoke keys, so the engine's PCM fallback decodes on the host and sends PCM over `player@v1`; (c) always decode | **(a).** The reproductions are 2.0 or 3.0 plus LFE, so stereo LPCM, which every route takes, carries the 2.0 one, and everything (audio, the choice, the words) stays on one role. It costs a receiver mode change per karaoke song ([findings F4](hearth-android-findings.md#f4-karaoke-and-pass-through)). (b) is nearly free once `player@v1` PCM is in (D11c), but a member sent PCM there is sent **no lyrics**: the host's gate is the session's active role, and a test pins it ([findings F4](hearth-android-findings.md#f4-karaoke-and-pass-through)), so (b) is audio without words unless the host also keeps the extension role active for that member | (a) phase 4, L; (b) M if the host must also send such a member lyrics; (c) throws away the point of the app | **Accepted as recommended, 2026-10-12** |
-| D6 | **The role's state says the route** | (a) an optional `output` key (`passthrough`, `pcm`) in `_iclforge_player` state; (b) infer it from `decoder` and the settings | **(a).** An added optional key needs no version ([Versions](hearth-sendspin-extension.md#versions)); the host's Network page and the panel's footer can show it the same day | S, with the host's page | **Accepted as recommended, 2026-10-12** |
-| D7 | **Where "now playing" comes from** | (a) the engine feeds `metadata@v1`; (b) `title`, `artist` and `album` in the `lyrics` command or a new `item` command; (c) the document's `[ti:]` and `[ar:]` tags only, as the panel does today | **(a), with (c) as the fallback.** One standard role serves the panel, Android and Music Assistant's players | (a) M, host; (b) S; (c) none | **Accepted as recommended, 2026-10-12** |
-| D8 | **A request path from a sink** | (a) one new `request` message in the role, for the vocals, the reproduction and the levels, a single PR designed with the panel's Q6; (b) none: the sink's controls are local only | **(a), after phase 3, as its own PR.** Until then both screens show the vocals as read-only | M, protocol and host | **Accepted as recommended, 2026-10-12** |
-| D9 | **How long the sink is there** | (a) while the Activity is in front; (b) a foreground service from the first launch until the person leaves it; (c) a service started at boot, always discoverable | **(b).** (a) is the demo's rule and wrong for a sink; (c) depends on what a given Android release lets a boot receiver start, which is spike S3's to find | (b) in phase 1; (c) S if S3 says it works | **Accepted as recommended, 2026-10-12** |
+| D6 | **The role's state says the route** | (a) an optional `output` key (`passthrough`, `pcm`) in `_iclforge_player` state; (b) infer it from `decoder` and the settings | **(a).** An added optional key needs no version ([Versions](hearth-sendspin-extension.md#versions)); the host's Network page and the panel's footer can show it the same day | S, with the host's page | **Accepted as recommended, 2026-10-12**; built: #1464 and #1466 |
+| D7 | **Where "now playing" comes from** | (a) the engine feeds `metadata@v1`; (b) `title`, `artist` and `album` in the `lyrics` command or a new `item` command; (c) the document's `[ti:]` and `[ar:]` tags only, as the panel does today | **(a), with (c) as the fallback.** One standard role serves the panel, Android and Music Assistant's players | (a) M, host; (b) S; (c) none | **Accepted as recommended, 2026-10-12**; built: #1468 and #1469 |
+| D8 | **A request path from a sink** | (a) one new `request` message in the role, for the vocals, the reproduction and the levels, a single PR designed with the panel's Q6; (b) none: the sink's controls are local only | **(a), after phase 3, as its own PR.** Until then both screens show the vocals as read-only | M, protocol and host | **Accepted as recommended, 2026-10-12**; built: #1471, #1475; host #1473 open |
+| D9 | **How long the sink is there** | (a) while the Activity is in front; (b) a foreground service from the first launch until the person leaves it; (c) a service started at boot, always discoverable | **(b).** (a) is the demo's rule and wrong for a sink; (c) depends on what a given Android release lets a boot receiver start, which is spike S3's to find | (b) in phase 1; (c) S if S3 says it works | **Accepted as recommended, 2026-10-12; (b) kept on 2026-10-13**: available until the person leaves it |
 | D10 | **What a pass-through member promises a group** | (a) accept burst-granular alignment, say it on the Network page, measure it (S1); (b) require a PCM sink for sample-accurate groups and refuse a pass-through member in a mixed group; (c) offer pass-through to a sole sink only | **(a).** A sole Android sink, the owner's picture, has nothing to align to | S | **Accepted as recommended, 2026-10-12** |
 | D11 | **Scope of devices and roles** | (a) Android TV and Google TV first, the Shield the reference; (b) also phones and tablets (no passthrough, so local decode is their only route); (c) also `player@v1` stereo PCM, FLAC and Opus for Music Assistant | **(a) now; (c) as phase 5; (b) after phase 4** (it needs the local decode the phone has no alternative to) | (c) M: the codec libraries exist for `arm64-android`; (b) M | **Accepted as recommended, 2026-10-12** |
 | D12 | **Where the burst rebuild lives** | (a) `iclforge::containers::iec61937` next to the packers, with an ABI allowlist entry; (b) a private copy in `libs/audio` with a byte-equality test | **(a).** One packing rule beside its tests, additive; (b) avoids the ABI gate and keeps two spellings | S | **Accepted as recommended, 2026-10-12** |
@@ -192,8 +221,8 @@ without it, and the build PRs start only after the answers above.
 | **1** | **A sink core in the Shield app's family, passing through.** 1a: the `sink` library extracted, the test sink on it (L). 1b: the app skeleton, the project row, the service, `NsdManager`, the listener, the store, a plain pairing screen (M). 1c: the pass-through output, the rebuild, null bursts, `getTimestamp`, counters, the `decoder` state from the first syncframe, focus and external source (M). 1d: the host-side harness: `hearth-testserver` to the core with an output that hashes, in the instrumented tests and on the host (M). 1e: **a run on a real Shield and receiver, recorded** (S, hand-run) | L, M, M, M, S | AR1, AR2, AR6: the bytes handed to the output equal the host's burst for every fixture; the receiver locks on AC-3 and E-AC-3; a counter run with no underruns |
 | **2** | **The lyrics.** The `Follower` and `Stage` in the core, a snapshot to Kotlin each frame, the lyric view (S2 to S8 of the spec) with the lyric delay, the no-lyrics grace, scripts T1 to T4 on system faces | M to L | AR3: the spec's fixtures at fixed positions, picture-checked; RTL checked |
 | **3** | **The common design and TV navigation.** The tokens generated (D13); screens S0, S1, S9 and S10; D-pad focus and the controls sheet; first run; the `output` key (D6); `metadata@v1` (D7); the request path (D8) as its own PR with the panel | M, M, S, M, M | AR4, AR7, AR9: a focus walk of every screen; the conformance fixtures on the emulator; the Network page shows the route |
-| **4** | **Local decode and karaoke.** `libs/ac3` decoding in the core to `AudioTrack` PCM; the route switch on the first burst; `karaoke*` keys listed where the route can carry them; LPCM channel capability from the probe; the reproduction chip | L | AR5: parity with `forge decode karaoke=...` on the fixtures (bit-equal if the library is bit-exact across arm64 and the host, else within the dB the S3 check used, 0.25); a real receiver's mode change recorded |
-| **5** | **Optional.** `player@v1` for Music Assistant (D11c); the capability report to a file; a phone and tablet profile (D11b); AC-4 when a receiver that decodes it is found; a CD+G picture ([findings F10](hearth-android-findings.md#f10-cdg-and-a-sink)) | S to M each | Each its own test |
+| **4** | **Local decode and karaoke** ([planned in its own page](hearth-android-phases-4-5.md)). `libs/ac3` decoding in the core to `AudioTrack` PCM; the route switch on the first burst; `karaoke*` keys listed where the route can carry them; LPCM channel capability from the probe; the reproduction chip | L | AR5: parity with `forge decode karaoke=...` on the fixtures (bit-equal if the library is bit-exact across arm64 and the host, else within the dB the S3 check used, 0.25); a real receiver's mode change recorded |
+| **5** | **Optional** ([planned](hearth-android-phases-4-5.md#phase-5)). `player@v1` for Music Assistant (D11c); the capability report to a file; a phone and tablet profile (D11b); AC-4 when a receiver that decodes it is found; a CD+G picture ([findings F10](hearth-android-findings.md#f10-cdg-and-a-sink)) | S to M each | Each its own test |
 
 Phase 1's 1a is the expensive PR and the one that makes the rest cheap: after it, "how a sink
 behaves" is one thing tested on a desktop, and the Android app is its fourth output, beside the WAV,
@@ -258,9 +287,12 @@ Hardware first, since nothing for a device is planned until these are answered.
 4. **Is there an HDMI audio extractor or a capture device?** *Answered 2026-10-12: no.* The bytes that reach the link are checked as the demo's were, by the receiver's own lock indicator, which the session can read over the Onkyo's network port (eISCP, read-only; the receiver's input 05 is named "Shield").
 5. **A receiver that changes mode between songs.** *Answered 2026-10-12: acceptable.* D5(a) is not blocked on it.
 6. **Should the sink be always available** (D9c) **or available while it has been opened and not
-   left** (D9b)?
+   left** (D9b)? *Answered 2026-10-13: (b), until the person leaves it.* D9's recommendation
+   stands; a boot-started service is not planned.
 7. **Should the TV remote choose V1 and V2** (D8)? It is the only control that the panel's touch and
-   the TV's remote would both want, and it needs a protocol change.
+   the TV's remote would both want, and it needs a protocol change. *Answered 2026-10-13: yes, and
+   built (#1471, #1475, #1473). "Both" asks the server for `aware`; V1, V2 and None ask for
+   `capable` with the vocals.*
 8. **Does the owner want the CD+G picture on the TV** ([F10](hearth-android-findings.md#f10-cdg-and-a-sink))?
    The TV is where it is natural; nothing for it exists on the wire.
 9. **Should a phone or tablet be a sink** (D11b)? It has no passthrough, so it is a local-decode

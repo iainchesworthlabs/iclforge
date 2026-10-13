@@ -5,16 +5,23 @@ plays what Hearth sends it. The plan is [`planning/hearth-android.md`](../../../
 and the one screen design it, the desktop Hearth and the ESP32-P4X panel share is
 [`planning/hearth-sink-screen.md`](../../../planning/hearth-sink-screen.md).
 
-**State: phase 2c** (the pass-through path held end to end on the host and on a device, one run on a
-Shield and a receiver recorded below, the sink core following a karaoke item's lyrics on its own
-clock, and [the lyric screen](#the-lyric-screen-phase-2) that draws them, held to the spec's fixtures
-at fixed positions). The service, the advertisement, the listener, the pairing records, a plain
-pairing screen and the pass-through output are here: an AC-3 or E-AC-3 stream a Hearth sends is
-rebuilt into the IEC 61937 bursts it came from and written to the receiver, between null bursts, in the
-slot each is due in. What it does not do yet: show the lyrics (phase 2), the common design and the
-remote's navigation (3), decode locally for karaoke (4), and play `player@v1`'s PCM, FLAC and Opus
-(5): a stream of those is accepted and dropped. AC-4 is not listed: nothing has shown a receiver
-decoding it over this route.
+**State: phases 0 to 3, and the protocol additions D6, D7 and D8.** The service, the advertisement,
+the listener, the pairing records and the pass-through output are here: an AC-3 or E-AC-3 stream a
+Hearth sends is rebuilt into the IEC 61937 bursts it came from and written to the receiver, between
+null bursts, in the slot each is due in, and [one run on a Shield and a receiver](#a-run-on-a-shield-and-a-receiver-phase-1e)
+is recorded below. The sink core follows a karaoke item's lyrics on its own clock and
+[the lyric screen](#the-lyric-screen-phase-2) draws them, held to the spec's fixtures at fixed
+positions. [The starting, idle and attention screens](#the-status-screens-phase-3c), the controls
+sheet and its D-pad focus walk, and the family's tokens (one file, `Tokens.kt` generated from it)
+are the common design, and a pairing code the server asks for in its QR form is drawn as a QR. The route a stream takes is reported to the server and drawn as a chip
+(D6); what is playing comes from the server's `metadata@v1` (D7); and the remote's vocals row asks
+the server for the singer's karaoke choice (D8).
+
+What it does not do yet: decode locally for karaoke (phase 4), and play `player@v1`'s PCM, FLAC and
+Opus (5): a stream of those is accepted and dropped. A first-run screen and a chip for the
+stream's format are not built. AC-4 is not listed: nothing has shown a receiver decoding it over
+this route. Phases 4 and 5 are planned in
+[`planning/hearth-android-phases-4-5.md`](../../../planning/hearth-android-phases-4-5.md).
 
 | Part | Where |
 |---|---|
@@ -79,8 +86,8 @@ of paired servers; `NativeSink.statusJson()`), the active network's address and 
 `LinkHealth`, which the pass-through bridge writes when a link is refused or lost. The pairing code
 comes from the core and no longer from reading the log. **Quit** is the screen's one control, with the
 family's focus ring, and the D-pad's centre presses it; the foot also carries a small muted note
-(the advertiser's trouble, when it has one). Not here: the QR code the spec names beside the code (a
-QR encoder is a dependency of its own), and the layout line (a pass-through sink has none).
+(the advertiser's trouble, when it has one). Not here: the layout line (a pass-through sink has none);
+the QR for a server that asks for it is described below.
 
 ![The idle screen: the sink's name, its address, the code a server asked for in the accent, and Quit](../../../docs/hearth/screenshots/android-status-idle-code.png)
 ![The starting screen: the name and what it is waiting for](../../../docs/hearth/screenshots/android-status-starting.png)
@@ -136,8 +143,9 @@ still nudge the delay by 50 ms and up and down scroll a file with no times.
 **The vocals row (D8).** While a stream is open the sheet has a row between the delay and the size: Both,
 V1, V2 and None. The centre on one asks the server for it (`NativeSink.requestVocals`, a `client/command`
 request, [the spec's Requests](../../../planning/hearth-sendspin-extension.md#requests)), as the capable
-reproduction with those vocals, since the choice of vocals is read by that reproduction alone. It is
-advice with no answer: the row fills what was asked and not what is playing, and **this sink hands the
+reproduction with those vocals for V1, V2 and None, since the choice of vocals is read by that
+reproduction alone, and as the aware reproduction for Both, which plays both voices as the song's mix
+does (`sink::vocals_request`, the owner's call of 2026-10-13). It is advice with no answer: the row fills what was asked and not what is playing, and **this sink hands the
 receiver the coded bits, so it plays every vocal whatever the server decides** (the spec's SS7). What a
 press changes is what the server's own screens show and what the group's decoding members play, and it
 changes nothing this TV hears until the app decodes for itself (phase 4); the row says so beside the
@@ -216,6 +224,17 @@ document's, and the document's once the server clears it) and the header by `Lyr
 real server's `metadata@v1` to a Shield has not been run.
 
 ![An item with no lyrics, named in the header by what the server says is playing, over the sentence](../../../docs/hearth/screenshots/android-lyric-no-lyrics-titled.png)
+
+**Its time, too.** The same `metadata@v1` says where the item is: the sink computes the position at the
+sink's own time on the server's clock (`metadata::position_ms`, a pause keeps it), and for an item with no
+document, or one that is plain text, the header draws that time and the item's length at the right and the
+hairline under it fills by it, as it does for a timed document. A timed document keeps its own playhead;
+the server's length fills the one a file does not name with `[length:]`. The frame carries `progress` when
+the position is the server's, which the screen reads, and the view polls twice a second while it is, so a
+second is neither shown twice nor skipped. Nothing is drawn before the sink's clock has converged on the
+server's, which is a few seconds after the stream starts.
+
+![An item with no lyrics, with the server's clock in the header, 1:00 of 4:00, and a quarter of the hairline filled](../../../docs/hearth/screenshots/android-lyric-no-lyrics-clock.png)
 
 To see it live, `hearth-testserver --lyrics examples/karaoke/auld-lang-syne/auld-lang-syne.lrc
 --play examples/karaoke/auld-lang-syne/auld-lang-syne.ac3 --player ws://<the Shield>:8928/sendspin ...`

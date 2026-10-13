@@ -186,6 +186,10 @@ std::string lyric_frame_json(const LyricFrame& frame) {
     out += frame.timed ? "true" : "false";
     put_key(out, "length_ms");
     out += frame.length_ms ? std::to_string(*frame.length_ms) : "null";
+    if (frame.has_progress) {
+        put_key(out, "progress");
+        out += "true";
+    }
 
     put_key(out, "current");
     put_row(out, frame.current);
