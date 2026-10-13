@@ -218,6 +218,24 @@ The sections below contain the complete change list and fixes.
   also holds a deterministic synthetic singing voice with a known pitch, which is what its tests and
   the later microphone tests are made of (no recording is bundled). Standard library only, internal,
   and nothing links it yet.
+- **`iclforge::pitch::BleedMonitor`: is the microphone mostly the speakers?** (SC5; findings F6
+  and F9.) A pitch score cannot tell a singer from a loud speaker playing the answer, and a silent
+  singer in front of speakers that play the guide melody is credited with it (58 % of the tune, on
+  this workstation's noise). The monitor is given the played signal and the microphone (mono, one
+  rate), finds the delay between them, fits the room as a short filter over the last two seconds,
+  holds it fixed, and answers every 10 ms for the last 64 ms of microphone: the share of its
+  energy the room predicts from what was played, and whether that is more than 0.65, where the
+  speakers contribute most of what the microphone heard. It does not cancel the echo: a flagged
+  frame is one to give no credit for. Why a fitted path and not the best correlation near the
+  delay: a singer in tune with the guide that is playing correlates with it at any phase, and the
+  first version flagged 18 to 21 % of the frames of a singer 20 dB above the echo; the delay is
+  now chosen by the median of eight segments' signed correlations, which an echo keeps and a voice
+  does not. Standard library only. Over a simulated room (real noise and played signal, a
+  simulated echo and singer): a silent singer 58 % to 6 %, a singer 20 dB over the echo 99.5 % to
+  94 %; WebRTC AEC3 on the same recordings takes a silent singer to 0 % and a singer 20 dB over
+  to 90 %, and 78 % when the echo is as weak as the noise. Held with synthetic rooms and eight
+  mutants, all killed. The threshold is provisional (it needs a real room and a real singer), and
+  nothing in Hearth calls it yet.
 **Audio: when a packet was captured**
 
 - **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording

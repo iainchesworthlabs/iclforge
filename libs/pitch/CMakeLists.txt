@@ -16,6 +16,7 @@ if(ICLFORGE_MINIMAL_DECODER OR ICLFORGE_MINIMAL_ENCODER)
 endif()
 
 add_library(iclforge_pitch STATIC
+    src/bleed.cpp
     src/reference.cpp
     src/scorer.cpp
     src/synth.cpp

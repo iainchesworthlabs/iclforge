@@ -2,7 +2,7 @@
 
 # pitch
 
-A singing voice's pitch: a fundamental-frequency tracker (the McLeod Pitch Method, written from the paper), a reference melody as a contour on a fixed grid or as notes, and a pitch score of one against the other with an estimate of how early or late the singer is. Standard library only, so that Hearth, the browser and the sink firmware can all link it. Internal; never installed.
+A singing voice's pitch: a fundamental-frequency tracker (the McLeod Pitch Method, written from the paper), a reference melody as a contour on a fixed grid or as notes, and a pitch score of one against the other with an estimate of how early or late the singer is, and a check that says when a microphone is mostly the played signal coming back from the speakers. Standard library only, so that Hearth, the browser and the sink firmware can all link it. Internal; never installed.
 
 A library, internal to the repository.
 
