@@ -253,6 +253,7 @@ sessions change the firmware" has a shorter answer than the guard's size suggest
 | where | what it holds | when | fails a PR? |
 |---|---|---|---|
 | PR Gate, `Static` (`_static.yml`) | `sink_profile.py check-docs`; `test_sink_profile.py` (the file against `_build.yml`'s fragment lists, `check_firmware_package.py`'s image rules, the keys every profile must lock); `test_board_suite.py` (a baseline holds exactly its profile's rows, and is under the profile's hash or accepted by the PR against the current one); `sink_profile.py check-change --base` (a Kconfig key the change adds that the guard watches, that a profile has in its configuration and neither locks nor frees; a lock on a key no Kconfig declares) | every PR and queue entry | **yes**, but these are checks that the *files agree*, not that a configured build is the profile |
+| PR Gate, `ESP32 profiles` (`_profiles.yml`) | every profile **configured** in the IDF image (`idf.py reconfigure`) and held by `verify`: the fragments, the locked values, the watched keys nobody placed (no compile: the budgets stay with the builds below) | a pull request or queue entry that changes `firmware/hearth-sink`, `firmware/esp-idf` or the profile tools (the planner's `esp`), and every push to `main` | **yes**: `CI Status` fails closed on it |
 | `ci.yml` → `_build.yml`: `build-esp32s3`, `hearth-esp32s3`, `build-esp32c3`, `package-esp32-firmware` | the build **is** the profile: `sink_profile.py defaults`/`identity` configure it, `verify` holds it (asked against given, locked values, watched keys nobody placed, the app, bootloader and static RAM budgets from `idf.py size`), `package_firmware.py --profile` refuses an image that is not one | push to `main` only | **no**: red on `main`. Until #1499 they were skipped there whenever a minimum-footprint leg above them in the same job failed, which is how the C6's budget stood wrong; they run after a footprint failure now |
 | `bench_flash.py build <id>` | the same guard, on a bench build | by hand | no |
 | a booked board | the boot `budget:` line, the identity in `/hardware`, `board_suite.py` (it refuses an image built under another hash) and `compare` | by hand | no |
@@ -267,9 +268,12 @@ decision is forced depends on what changed. **A key the change adds, or a lock i
 pull request** (`check-change`, which reads the Kconfig at the head and the base and evaluates a
 key's conditions against each profile's locked values and target; what it cannot decide it leaves
 to the configured build). **A baseline the edit moves, at the pull request** (the test above).
-**A changed default of a key a profile locks, or a fragment's value, still after the merge**,
-on `main`, where two PRs that are each valid alone can first meet: that needs a configured
-build, which is the next change (a configure-only guard of every profile in PR Gate).
+**A changed default of a key a profile locks, or a fragment's value, at the pull request too**,
+by the `ESP32 profiles` job, which configures every profile in the IDF image: a PR that edits
+a Kconfig default or a fragment fails there with the guard's own `[locked]` or `[unplaced]`,
+and so does a merge-queue entry, which is where two PRs that are each valid alone first meet.
+What it does not hold is a budget (the app, bootloader and static RAM need a build): those are
+the post-merge jobs', which now run after a footprint failure.
 
 ## Boot-time budget line
 
@@ -894,8 +898,8 @@ definition the file has.
 
 **A PR that adds a key the guard watches fails at the pull request until a profile locks or frees
 it** (`sink_profile.py check-change`). **A PR that changes a locked key's Kconfig default, or a
-fragment's value, without the profile file is still first seen by a configured build, after the
-merge** ([where each check runs](#where-each-check-runs)). A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
+fragment's value, without the profile file fails at the pull request**, in the `ESP32 profiles`
+job ([where each check runs](#where-each-check-runs)). A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
 reports `<id>+scratch`, is refused by the suite's `--record`, and its overlay is committed beside
 the measurement if the figure is quoted anywhere.
 

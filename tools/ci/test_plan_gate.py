@@ -178,6 +178,40 @@ class Machinery(unittest.TestCase):
 
 
 class Conservative(unittest.TestCase):
+    def test_the_esp32_profiles_are_planned_for_what_they_are_configured_from(self):
+        for path in (
+            "firmware/hearth-sink/profiles.json",
+            "firmware/hearth-sink/sdkconfig.sendspin",
+            "firmware/hearth-sink/main/Kconfig.projbuild",
+            "firmware/esp-idf/iclforge/Kconfig",
+            "tools/hearth/sink_profile.py",
+            ".github/workflows/_profiles.yml",
+        ):
+            with self.subTest(path=path):
+                got = plan(path)
+                self.assertEqual(got["esp"], "true")
+                self.assertEqual(got["esp_reason"], path)
+
+    def test_the_esp32_profiles_are_not_planned_for_what_they_do_not_read(self):
+        for path in (
+            "libs/ac3/src/decoder/decoder.cpp",
+            "apps/forge/cli/main.cpp",
+            "tools/hearth/board_suite.py",
+            "firmware/hearth-sink/README.md",
+            "planning/esp32-platform-profiles.md",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(plan(path)["esp"], "false")
+
+    def test_the_esp32_profiles_are_planned_for_a_full_run_and_for_no_list(self):
+        self.assertEqual(gate.plan([], force_all=True)["esp"], "true")
+        self.assertEqual(gate.plan([])["esp"], "true")
+
+    def test_one_esp_path_among_others_is_enough_and_docs_only_is_not(self):
+        got = gate.plan(["docs/a.md", "firmware/hearth-sink/profiles.json", "libs/ac3/x.cpp"])
+        self.assertEqual(got["esp"], "true")
+        self.assertEqual(gate.plan(["firmware/hearth-sink/README.md"])["docs_only"], "true")
+
     def test_unknown_path_builds_everything(self):
         got = plan("brand-new-dir/thing.bin")
         self.assertEqual((got["build"], got["gui"]), ("true", "true"))
@@ -357,7 +391,18 @@ class Cli(unittest.TestCase):
         _, out, _ = self.run_main([], "libs/ac3/src/x.cpp\nbrand-new-dir/thing.bin\n")
         keys = [line.split("=", 1)[0] for line in out.splitlines()]
         self.assertEqual(
-            keys, ["build", "gui", "docs_only", "machinery", "compare", "reason", "gui_reason"]
+            keys,
+            [
+                "build",
+                "gui",
+                "docs_only",
+                "machinery",
+                "compare",
+                "esp",
+                "reason",
+                "gui_reason",
+                "esp_reason",
+            ],
         )
 
     def test_force_all_ignores_stdin(self):

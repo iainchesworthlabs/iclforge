@@ -30,7 +30,7 @@ Measured over 3.5 days in September 2026, across 300 runs of `ci.yml` and about 
 | Stage | Runs | What | Where |
 |---|---|---|---|
 | Before a push | by hand | `python tools/ci/precheck.py`: the static checks that need no build, and the gate's plan for the diff | your machine |
-| Pull request | every push to the branch | [`pr-gate.yml`](https://github.com/iainchesworthlabs/iclforge/blob/main/.github/workflows/pr-gate.yml): static checks, then Linux GCC build, every ctest case and the gold-reference gate | GitHub-hosted |
+| Pull request | every push to the branch | [`pr-gate.yml`](https://github.com/iainchesworthlabs/iclforge/blob/main/.github/workflows/pr-gate.yml): static checks, then Linux GCC build, every ctest case and the gold-reference gate; and, when the change touches the ESP32 sinks' profiles, Kconfig or fragments, every profile configured in the IDF image and held to its definition (`_profiles.yml`, no compile) | GitHub-hosted |
 | Merge queue | each queue entry | the same on the merged tree, with the Qt GUI always built, plus Windows MSVC | GitHub-hosted |
 | After a merge | every push to main, one at a time | [`ci.yml`](https://github.com/iainchesworthlabs/iclforge/blob/main/.github/workflows/ci.yml), tier `t2`: the legs and lanes a merge can break (see [The tiers](#the-tiers)), then [`main-health.yml`](https://github.com/iainchesworthlabs/iclforge/blob/main/.github/workflows/main-health.yml) | the fleet, plus hosted for macOS, arm64 and the satellites |
 | Nightly | about 19:47 UTC (05:47 in Sydney until daylight saving starts, 06:47 after), and on request | `ci.yml`, tier `all`: every leg with every extra pass, every lane | the same |

@@ -70,6 +70,41 @@ class TheGateCallsTheComparisons(unittest.TestCase):
         self.assertIn('check compare "$R_COMPARE"', status)
 
 
+class TheGateConfiguresTheEsp32Profiles(unittest.TestCase):
+    """pr-gate.yml calls _profiles.yml when the plan marks `esp`, and `CI Status` reads it."""
+
+    def test_the_profiles_job_calls_the_reusable_workflow_only_when_the_plan_asks(self):
+        profiles = job("pr-gate.yml", "profiles")
+        self.assertIn("uses: ./.github/workflows/_profiles.yml", profiles)
+        self.assertIn("needs.plan.outputs.esp == 'true'", profiles)
+        self.assertIn("vars.GATE_RUNNER_JSON", profiles)
+
+    def test_the_plan_exports_it(self):
+        gate = text("pr-gate.yml")
+        self.assertIn("esp: ${{ steps.plan.outputs.esp }}", gate)
+
+    def test_ci_status_reads_the_result_and_requires_it_when_planned(self):
+        status = job("pr-gate.yml", "ci-status")
+        self.assertRegex(status, r"needs: \[[^\]]*\bprofiles\b[^\]]*\]")
+        self.assertIn("R_PROFILES: ${{ needs.profiles.result }}", status)
+        self.assertIn("WANT_ESP: ${{ needs.plan.outputs.esp }}", status)
+        self.assertIn('check profiles "$R_PROFILES"', status)
+
+    def test_the_reusable_workflow_is_a_workflow_call_in_the_idf_image_that_checks_every_profile(
+        self,
+    ):
+        body = text("_profiles.yml")
+        self.assertRegex(body, r"(?m)^on:\n  workflow_call:")
+        self.assertIn("container: espressif/idf:v6.1", body)
+        # every profile of the file, not a list typed here, and the same guard the builds run
+        self.assertIn('done < <(python3 "$profile" list)', body)
+        self.assertIn('python3 "$profile" verify "$id"', body)
+        start = body.index("idf.py -B")
+        command = body[start : body.index("reconfigure", start)]
+        self.assertIn("-DSDKCONFIG_DEFAULTS=", command)
+        self.assertNotIn(" build", command)  # a configure, not a build
+
+
 class TheReusableWorkflow(unittest.TestCase):
     def test_it_is_a_workflow_call_with_the_four_jobs(self):
         compare = text("_compare.yml")
