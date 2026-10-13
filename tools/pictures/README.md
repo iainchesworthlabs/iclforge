@@ -40,8 +40,6 @@ with exit code 1.
   a smaller screen.
 - Hearth's pictures name the computer's sound output, and the Forge GUI's three live-capture
   pictures list its capture devices.
-- Crucible's room lists every application that has an audio session on the computer, so a chat
-  client or a game launcher the person has open shows in it as `idle`. No setting hides it.
 
 The paths the programs show are the paths the files are at. `--media <folder>` puts the played
 files somewhere with a name fit to be seen (the default is `pictures-media` in the build tree).
@@ -119,45 +117,50 @@ about 10 ms.
 
 ## Crucible
 
-Crucible's seven pictures are `by_hand`. `crucible --shot` is an ordinary run of the program: it
-reads the person's own settings (the Signing card shows the key file's path), starts the engine
-and lists the applications that are running. What it takes besides `--shot <png>`
-(`apps/crucible/ui/src/main.cpp`):
+Crucible's pictures are taken like the others, from a command line, and are safe to take: a
+`crucible --shot` run is hermetic where it is asked to be.
+
+- **A settings store of its own.** A capture runs on an INI store in a scratch folder, as Hearth's
+  and the Forge GUI's do, and never reads or writes the person's own (the registry on Windows).
+  `--setting group/key=value` seeds it.
+- **A machine that is a list.** `--app Name` puts the window over a scripted machine
+  (`apps/crucible/ui/src/scripted_machine.hpp`): the applications named, one pair of stereo
+  speakers with a spatial format on, and no silent device and no driver to make one with, which is
+  what a downloaded copy finds on Windows. It is built from the stand-ins the engine's cases and
+  the Qt Quick tests use, so nothing is opened on the computer and nothing is heard, and none of the
+  machine's own applications is listed. The window and the engine are the program's own.
+
+What a capture takes besides `--shot <png>` (`apps/crucible/ui/src/main.cpp`):
 
 | Option | What it does |
 |---|---|
 | `--page room`, `room3d`, `output`, `settings` | The page shown first. `firstrun`, `about` and `licences` open that dialog over the room. |
+| `--app "Name[,idle\|silent\|background]"` | An application of the scripted machine, with a window and playing. `idle` has a session with no sound in it, `silent` has no session (listed greyed), `background` has no window. Repeat it for each; the first is application 1000. Without one the run is over the computer's own applications and sound. |
 | `--place "Name=x,y,z[,split]"` | Positions the listed application of that name, as a pair with `,split`. Repeat it for each. |
-| `--lyrics "Name=<file>[@<time>]"` | Selects the listed application of that name in the room and imports the lyrics file against it. `<time>` is seconds (`5.75`) or an .lrc's `0:05.75`. With one the strip is started by hand so that the song is at that time when the window is grabbed, which is what a picture of the line being sung needs. Without one the strip follows the application's media session, whatever that says. |
+| `--lyrics "Name=<file>[@<time>]"` | Selects the listed application of that name in the room and imports the lyrics file against it. `<time>` is seconds (`5.75`) or an .lrc's `0:05.75`. With one the strip is started by hand so that the song is at that time when the window is grabbed, which is what a picture of the line being sung needs. Without one the strip follows the application's media session (none is read over a scripted machine). The file is read from where the program runs, which is the repository's root here. |
 | `--size <width>x<height>` | Opens the window at that size in pixels, for a picture of a page that runs on below the 1480 by 820 it opens at. The Room's right rail does not scroll: its Lyrics block starts below the fold of the default window, so the picture of the strip wants `--size 1480x1280`. |
-| `--language <code>` | The window's language for this run, with the person's own choice left alone. |
+| `--setting group/key=value` | A value in the capture's own settings store, before anything reads it (`behaviour/showSilentApps=false`). |
+| `--language <code>` | The window's language for this run. |
 
-A capture whose `--lyrics` cannot be shown (no application of that name after six seconds, a file
-that cannot be read, a time given to a file that has no times) takes no picture and exits with
-code 3. To take them:
+A capture that cannot show what it was asked to (a `--place` or `--lyrics` for an application that
+is not listed, a lyrics file that cannot be read, a time given to a file that has no times, an
+`--app` that is not one of the forms above) takes no picture and exits with code 3, which
+`take_pictures.py` reports as a picture that could not be taken.
 
-1. Back up `HKCU\Software\iclforge\Crucible` (`reg export`), replace it with a key holding one
-   value of any name, so that the first-run migration does not copy an older store in, and put
-   the backup back afterwards, whatever happened in between.
-2. Set `ICLFORGE_SIGNING_KEY_FILE` to `demo-signing.key` from the media folder, and the two
-   variables of the `hidden-desktop` environment.
-3. On one hidden desktop start `hearth <media>/night-garden.ec3` and Microsoft Edge playing
-   `<media>/tone-stereo-30.wav` from a throwaway profile (`--user-data-dir=<folder> --no-first-run
-   --autoplay-policy=no-user-gesture-required --new-window file:///...`), and wait ten seconds
-   for both to be playing. They are the two applications the room lists. The file Hearth plays
-   is heard at the computer's output.
+An entry names `ICLFORGE_SIGNING_KEY_FILE={media}/demo-signing.key` in its `env`, which is what
+makes the Signing card, the status line and the room say that a key is loaded and objects are on.
 
-   The picture of the lyric strip wants Hearth to be playing the example's song instead, six
-   copies in the one command so that it is still playing when the capture is taken (the song is
-   16.5 s, and Hearth's sound begins about six seconds after it is started):
-   `hearth examples/karaoke/auld-lang-syne/auld-lang-syne.ac3` six times over. Run Crucible
-   from the repository's root, since the `--lyrics` file is read from where the program runs,
-   with `--size 1480x1280` so that the whole strip is in the window, and put
-   `behaviour/showSilentApps` = `false` in the throwaway settings key (a string value `false` in
-   a `behaviour` subkey) so that an application with no audio session is not listed. A Hearth
-   that is already running takes the files from a second launch, so none may be.
-4. On the same desktop run the entry's `crucible --shot <png> ...` for each picture, then end
-   the two programs.
+What shows through is little, and is looked at before a retake is committed: the room draws a
+monogram for each application and not its icon, since a scripted application has no executable,
+and the monospaced face is the system's own. The engine's timings in the status line are the
+frame loop's own, on the machine that took the picture.
 
-Do not use `forge play` as the second source: it opens the output in exclusive mode and stops
-the others.
+```text
+python tools/pictures/take_pictures.py --build <build tree> --only docs/crucible --out <folder to look in>
+python tools/pictures/take_pictures.py --build <build tree> --only docs/crucible --stamp
+```
+
+`crucible_capture_scripted` (ctest, label `crucible-ui`) takes one picture through the program the
+same way on every platform and passes on a PNG of the size asked for, so a change that breaks the
+options, the scripted machine or the scratch store is a failing test and not a stale picture found
+later.

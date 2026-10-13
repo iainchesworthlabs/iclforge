@@ -209,3 +209,16 @@ foreach(test_file IN LISTS ICLFORGE_CRUCIBLE_QML_TEST_FILES)
         "XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/tests/xdg-home")
 endforeach()
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests/xdg-home")
+
+# The documentation's pictures of the window are taken over a scripted machine on a settings store
+# of their own (tools/pictures/pictures.json), so they are as safe to take in CI as the Qt Quick
+# suites are to run. This one takes one the way they are, through the program itself, and passes
+# on a PNG of the size asked for: the options' parsing is the Catch2 cases' (test_capture_lyrics,
+# test_scripted_machine), and the window's half is tst_lyrics.qml's.
+add_test(NAME crucible_capture_scripted
+    COMMAND "${CMAKE_COMMAND}"
+        "-DEXE=$<TARGET_FILE:crucible>"
+        "-DLRC=${CMAKE_SOURCE_DIR}/examples/karaoke/auld-lang-syne/auld-lang-syne.lrc"
+        "-DOUT=${CMAKE_CURRENT_BINARY_DIR}/tests/capture-scripted.png"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/ui/tests/capture_smoke.cmake")
+set_tests_properties(crucible_capture_scripted PROPERTIES TIMEOUT 240 LABELS "crucible-ui")

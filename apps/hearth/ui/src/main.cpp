@@ -306,6 +306,10 @@ int main(int argc, char** argv) {
         shot_settings_scratch.emplace();
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, shot_settings_scratch->path());
+        // The one thing a capture's store starts with: where the Karaoke page's microphone card
+        // says takes go. Left to its default that is a folder under the person's own documents,
+        // which is right for the person and puts an account's name in the picture.
+        iclforge::hearth::ui::MicrophoneController::keep_capture_takes_folder();
     }
 
     // The paired sinks, the pairing keys and the server identity, the playback and network

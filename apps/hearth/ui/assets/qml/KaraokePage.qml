@@ -305,6 +305,8 @@ ScrollView {
 
         RowLayout {
             Layout.fillWidth: true
+            // The margin every other page has (Settings.qml's own two columns).
+            Layout.margins: Theme.pad
             spacing: Theme.gap * 2
 
             // --- the reproduction --------------------------------------
@@ -364,17 +366,32 @@ ScrollView {
                 }
 
                 Card {
+                    id: reproductionCard
                     ordinal: "02"
                     title: qsTr("Reproduction")
                     summary: qsTr("Annex C, ETSI TS 102 366")
                     framed: true
 
-                    RowLayout {
+                    // A label sits beside its control where the card has the room for both, and
+                    // above it where it does not: in the third of a 960 px window at a large text
+                    // size, or in a language whose labels are long. The widest control decides,
+                    // and the slider rows follow it so that the rows of the card agree.
+                    readonly property int labelWidth: Math.round(108 * Theme.fontScale)
+                    readonly property bool stacked: reproductionCard.width - 2 * Theme.pad
+                                                    < reproductionCard.labelWidth + Theme.gap
+                                                      + decoderChoice.implicitWidth
+
+                    GridLayout {
                         Layout.fillWidth: true
-                        spacing: Theme.gap
+                        columns: reproductionCard.stacked ? 1 : 2
+                        columnSpacing: Theme.gap
+                        rowSpacing: Theme.space1
                         Text { text: qsTr("Decoder"); color: Theme.text; font.pixelSize: Theme.fontNormal
-                               elide: Text.ElideRight; Layout.preferredWidth: Math.round(108 * Theme.fontScale) }
+                               elide: Text.ElideRight
+                               Layout.fillWidth: reproductionCard.stacked
+                               Layout.preferredWidth: reproductionCard.stacked ? -1 : reproductionCard.labelWidth }
                         SegmentedControl {
+                            id: decoderChoice
                             objectName: "reproductionChoice"
                             accessibleName: qsTr("Decoder")
                             enabled: root.applicable
@@ -401,11 +418,15 @@ ScrollView {
                         wrapMode: Text.WordWrap
                     }
 
-                    RowLayout {
+                    GridLayout {
                         Layout.fillWidth: true
-                        spacing: Theme.gap
+                        columns: reproductionCard.stacked ? 1 : 2
+                        columnSpacing: Theme.gap
+                        rowSpacing: Theme.space1
                         Text { text: qsTr("Vocals"); color: Theme.text; font.pixelSize: Theme.fontNormal
-                               elide: Text.ElideRight; Layout.preferredWidth: Math.round(108 * Theme.fontScale) }
+                               elide: Text.ElideRight
+                               Layout.fillWidth: reproductionCard.stacked
+                               Layout.preferredWidth: reproductionCard.stacked ? -1 : reproductionCard.labelWidth }
                         SegmentedControl {
                             objectName: "vocalsChoice"
                             accessibleName: qsTr("Vocals")
@@ -429,43 +450,55 @@ ScrollView {
                             { part: "V1", key: "karaokeVocal1Db", label: qsTr("Vocal 1") },
                             { part: "V2", key: "karaokeVocal2Db", label: qsTr("Vocal 2") }
                         ]
-                        delegate: RowLayout {
+                        delegate: GridLayout {
                             id: levelRow
                             required property var modelData
                             readonly property real db: root.settings[levelRow.modelData.key] ?? 0
                             Layout.fillWidth: true
-                            spacing: Theme.gap
+                            columns: reproductionCard.stacked ? 1 : 2
+                            columnSpacing: Theme.gap
+                            rowSpacing: Theme.space1
                             Text { text: levelRow.modelData.label; color: Theme.text; font.pixelSize: Theme.fontNormal
-                                   elide: Text.ElideRight; Layout.preferredWidth: Math.round(108 * Theme.fontScale) }
-                            AppSlider {
-                                id: levelSlider
-                                objectName: "level-" + levelRow.modelData.part
-                                Layout.preferredWidth: Math.round(200 * Theme.fontScale)
-                                enabled: root.applicable && root.reproduction === "capable"
-                                         && root.levelApplies(levelRow.modelData.part)
-                                from: root.minLevelDb; to: root.maxLevelDb; stepSize: 1
-                                snapMode: Slider.SnapAlways
-                                value: levelRow.db
-                                Accessible.name: qsTr("%1 level, dB").arg(levelRow.modelData.label)
-                                onMoved: root.set(levelRow.modelData.key, value)
-                                // A drag writes `value` directly and the binding
-                                // above is gone, so it is resynced from the
-                                // controller - DecoderAc4.qml's sliders' shape.
-                                Connections {
-                                    target: HearthController
-                                    function onDecoderSettingsChanged() {
-                                        levelSlider.value = levelRow.db;
+                                   elide: Text.ElideRight
+                                   Layout.fillWidth: reproductionCard.stacked
+                                   Layout.preferredWidth: reproductionCard.stacked ? -1 : reproductionCard.labelWidth }
+                            // The slider is the design's 200 px where the row has them and gives
+                            // way where it has not: it is the one thing in the row that can.
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.gap
+                                AppSlider {
+                                    id: levelSlider
+                                    objectName: "level-" + levelRow.modelData.part
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: Math.round(200 * Theme.fontScale)
+                                    Layout.maximumWidth: Math.round(200 * Theme.fontScale)
+                                    enabled: root.applicable && root.reproduction === "capable"
+                                             && root.levelApplies(levelRow.modelData.part)
+                                    from: root.minLevelDb; to: root.maxLevelDb; stepSize: 1
+                                    snapMode: Slider.SnapAlways
+                                    value: levelRow.db
+                                    Accessible.name: qsTr("%1 level, dB").arg(levelRow.modelData.label)
+                                    onMoved: root.set(levelRow.modelData.key, value)
+                                    // A drag writes `value` directly and the binding
+                                    // above is gone, so it is resynced from the
+                                    // controller - DecoderAc4.qml's sliders' shape.
+                                    Connections {
+                                        target: HearthController
+                                        function onDecoderSettingsChanged() {
+                                            levelSlider.value = levelRow.db;
+                                        }
                                     }
                                 }
+                                Text {
+                                    objectName: "levelText-" + levelRow.modelData.part
+                                    text: root.levelText(levelRow.db)
+                                    color: Theme.textMuted
+                                    font.family: Theme.monoFamily
+                                    font.pixelSize: Theme.fontNormal
+                                }
+                                Item { Layout.fillWidth: true }
                             }
-                            Text {
-                                objectName: "levelText-" + levelRow.modelData.part
-                                text: root.levelText(levelRow.db)
-                                color: Theme.textMuted
-                                font.family: Theme.monoFamily
-                                font.pixelSize: Theme.fontNormal
-                            }
-                            Item { Layout.fillWidth: true }
                         }
                     }
                     RowLayout {
@@ -581,7 +614,16 @@ ScrollView {
                         active: root.visible && root.isKaraoke
                     }
 
+                    // The file's name gives way first. A button keeps its whole label up to a
+                    // third of the row and elides past that, so that two long ones in some
+                    // language cannot push the row into the card beside this one. The third is
+                    // of the card's width and not of this row's own: the limits set what the row
+                    // asks for, and a limit that read the row's width back would be a loop (Qt
+                    // breaks it after two passes and warns, "Detected recursive rearrange").
                     RowLayout {
+                        id: lyricsRow
+                        readonly property real buttonLimit:
+                            Math.floor((lyricsCard.width - 2 * Theme.pad - 2 * spacing) / 3)
                         Layout.fillWidth: true
                         spacing: Theme.gap
                         Text {
@@ -602,12 +644,14 @@ ScrollView {
                         }
                         AppButton {
                             objectName: "timeLyricsButton"
+                            Layout.maximumWidth: lyricsRow.buttonLimit
                             enabled: root.loaded
                             text: qsTr("Time the lyrics…")
                             onClicked: timingDialog.open()
                         }
                         AppButton {
                             objectName: "lyricsFullScreenButton"
+                            Layout.maximumWidth: lyricsRow.buttonLimit
                             text: qsTr("Full screen · F11")
                             onClicked: root.lyricsFullScreenRequested()
                         }
@@ -774,15 +818,22 @@ ScrollView {
                             Text { text: partRow.modelData.part; color: Theme.text
                                    font.pixelSize: Theme.fontNormal; font.bold: true
                                    Layout.preferredWidth: Math.round(32 * Theme.fontScale) }
+                            // The name and what is said of it share the row, and each wraps
+                            // where the two do not fit on a line ("not in this stream" at a
+                            // large text size), rather than the row running past the card.
                             Text { text: partRow.modelData.name; color: Theme.text
                                    font.pixelSize: Theme.fontNormal; Layout.fillWidth: true
-                                   elide: Text.ElideRight }
+                                   wrapMode: Text.WordWrap }
                             Text {
                                 objectName: "partState-" + partRow.modelData.part
+                                Layout.fillWidth: true
+                                Layout.maximumWidth: Math.ceil(implicitWidth)
                                 text: !partRow.present ? (root.isKaraoke ? qsTr("not in this stream") : "")
                                       : (root.heard(partRow.modelData.part) ? qsTr("heard") : qsTr("muted"))
                                 color: Theme.textMuted
                                 font.pixelSize: Theme.fontSmall
+                                horizontalAlignment: Text.AlignRight
+                                wrapMode: Text.WordWrap
                             }
                         }
                     }
@@ -804,6 +855,7 @@ ScrollView {
                             spacing: Theme.gap
                             Text { text: speakerRow.modelData; color: Theme.text
                                    font.pixelSize: Theme.fontNormal; font.bold: true
+                                   elide: Text.ElideRight
                                    Layout.preferredWidth: Math.round(32 * Theme.fontScale) }
                             Rectangle {
                                 Layout.fillWidth: true
@@ -831,6 +883,7 @@ ScrollView {
                         text: qsTr("Nothing karaoke is playing.")
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
+                        wrapMode: Text.WordWrap
                     }
                 }
 

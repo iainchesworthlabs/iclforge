@@ -44,6 +44,31 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Crucible: a capture runs over a scripted machine on a settings store of its own, and its pictures are taken by `take_pictures.py`**
+
+- **`crucible --shot` no longer reads or writes the person's own settings.** It runs on an INI
+  store in a scratch folder, as Hearth's and the Forge GUI's captures do (on Windows the registry
+  key was backed up, replaced and put back by hand), and `--setting group/key=value` seeds it.
+- **`--app Name[,idle|silent|background]` puts the window over a scripted machine**
+  (`ui/src/scripted_machine.*`): the applications named, one pair of stereo speakers with a spatial
+  format on, and no silent device and no driver to make one with. It is built from the stand-ins the
+  engine's cases and the Qt Quick tests use, handed to the controller through
+  `set_test_services()`, with a tap of its own that runs at the rate a real one would, so nothing
+  is opened on the computer, nothing is heard and none of the machine's own applications is
+  listed. The room's sentence about what its list means is the platform's own.
+- **A `--place` for an application that is not listed fails the capture**, as a `--lyrics` does:
+  no picture is taken and the exit code is 3.
+- **Crucible's seven pictures are command lines in `tools/pictures/pictures.json`** and are taken
+  again with `take_pictures.py`, over the scripted machine, on a hidden desktop, with nothing played
+  at the computer's output. They were by hand: the settings key backed up and restored, a Hearth and
+  an Edge started playing, and whatever else the machine had open showing in the room (a chat
+  client's idle session did). The room draws a monogram for each application now and not its icon.
+  `take_pictures.py` fills `{media}` in an entry's own variables for the signing key.
+- **`crucible_capture_scripted` takes one picture through the program** (`--app`, `--setting`,
+  `--lyrics`, `--size`, on the offscreen platform) and passes on a PNG of the size asked for, on
+  every platform Crucible builds on; `test_scripted_machine.cpp` holds the option's words, the
+  applications as a monitor lists them, the paced tap and the engine over the machine.
+
 **Hearth: the output chosen in the picker is kept across starts**
 
 - **Hearth's window plays to the output a person chose last time.** It started on the computer's
@@ -58,6 +83,7 @@ The sections below contain the complete change list and fixes.
   restored as chosen; the network is found after the window opens, so the engine refuses the item
   until the group is ready, with the reason in the header, and does not replace a group that was
   chosen with a local output. Giving a group up, or deleting the one that plays, keeps the default.
+
 **Crucible: a capture can show the lyric strip, and the Room page's guide has a picture of it**
 
 - **`crucible --shot <png> --lyrics "Name=<file>[@<time>]"` imports a lyrics file against a listed
@@ -4586,6 +4612,19 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Crucible: the Room's right rail scrolls, so its Lyrics block can be reached in a short window**
+
+- **The rail was cut off by the window's lower edge.** The right rail (04 Signal path, 05 Signing,
+  06 Lyrics) was laid out to the window's height with nothing to move it, so whatever did not fit
+  was cut off, and the Lyrics block, last in the rail, went first: at the default 1480 by 820 it
+  began at the status strip, and on a machine without the silent device, whose first card is taller
+  by a second warning, Import lyrics, Start and Stop and the line being sung were all below the
+  fold; at the 960 by 620 minimum they could not be reached on any machine. The rail scrolls like
+  the centre column now: with the wheel, with a bar on its right edge that is shown whenever there
+  is more below, and with Page Up and Page Down from any control in it. Tab keeps its order and
+  brings the control that has the keyboard into view. No string changed; the translation
+  catalogues' line numbers moved with the page's own lines.
+
 **Crucible: the lyric strip no longer makes the Room's right rail wider than the window**
 
 - **The strip's buttons wrap.** Start, Stop, Follow the media session and the nudge were one row that
@@ -4628,6 +4667,46 @@ The sections below contain the complete change list and fixes.
   verbose `object N: ch0 x0.500` line are pinned by tests that passed on the old code first), and
   `tools/checks/check_no_std_format.py` fails `#include <format>`, `#include <print>` and every
   `std::format`/`std::print` name in first-party C++ in the static job.
+
+**Hearth: the Karaoke page fits its window**
+
+- **The Karaoke page ran past the right edge of its window, and had no margin.** At the window's
+  own size (1280 px) the Microphone card's content was wider than the card. Its two slider rows
+  could not shrink (a 150 px label, a 220 px slider and the value, in a card with 387 px inside
+  it), and a column of rows is as wide as the row that shrinks least, so every row of the card
+  went with them: the card's opening sentence, its Refresh and Choose… buttons and the slider
+  values were cut at the window's edge. The page's two columns also began at the window's edge,
+  where every other page has a 16 px margin (the picture in `docs/karaoke/` shows that part,
+  from before the card existed). The page now has the margin, and every row can be as narrow as
+  its card: a label sits above its control in a narrow card and beside it in a wide one (in the
+  Reproduction card as well as the Microphone card), a button and its indicator wrap onto two
+  lines, a slider gives way to the value beside it, and a take's name elides. A part's name and
+  "not in this stream" wrap, the two lyrics buttons elide past a third of their row, and the
+  ribbon's "Listening…" is cut short at the ribbon's edge. Two shared controls shrink as well: a
+  checkbox's label (`AppCheckBox`) wraps in a box narrower than it, and a card header
+  (`SectionHeader`) elides its title and its caption, so that a header is never wider than the
+  card it heads. Buttons keep their whole labels at 1280 px at every text size. It holds at
+  100%, 125%, 150% and 175% at 1280 px, mirrored as a right-to-left language mirrors it, and in
+  the window's smallest width (960 px) at 100% to 175%.
+  `KaraokePage::test_nothingOnThePageRunsPastItsEdges` checks the page's edges, each card's and
+  the margin (the case for 960 px at 150% and 175% needs a typeface, and is skipped in a run
+  that has none), and the two `MicrophoneCard::test_the_rows_...` cases check the card alone,
+  with and without a microphone on: the suites' microphone is a script now, so none of them
+  lists or opens a person's. No string changed.
+- **A muted microphone never got the "No sound from the microphone" hint.** The Microphone card
+  shows it once the input has been silent for 1.5 s, and it was told the silence had grown only
+  when the level moved or when the silence differed by half a second from the reading 100 ms
+  before, which it never does. A microphone that is muted delivers digital silence, whose level
+  does not move, so the hint, whose own text says "It may be muted", was only ever shown for one
+  with noise on it. The card is told when the silence has grown by half a second since it was
+  last told.
+- **A capture names a takes folder that is nobody's.** The Microphone card says where takes go,
+  which by default is a folder under the person's own documents: right for the person, and the
+  account's name in a screenshot. `hearth --shot` and `--smoke-shot`, which already run on a
+  scratch settings store and show no first-run dialog, now start that store with a takes folder
+  under a home named for nobody (`C:/Users/you/Documents/Hearth takes` on Windows), so the page
+  can be photographed for the documentation. Nothing is made there, and an ordinary launch is
+  unchanged.
 
 **Forge GUI Karaoke flow: a part of another length**
 

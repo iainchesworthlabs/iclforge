@@ -79,7 +79,9 @@ is how height reads at a glance.
 
 The two sit side by side when the centre column can give each of them 240 px, and stack when it
 cannot; neither goes above 560 px, which is where the markers stop reading as a room. A narrow
-window shrinks the room rather than pushing the right rail off the edge.
+window shrinks the room rather than pushing the right rail off the edge, and a short one scrolls
+the centre column and the right rail, each on its own. The rail has a bar on its right edge while
+there is more of it below, and in a short window what is below is **06 LYRICS**.
 
 **Dragging.** Press a marker and it follows the mouse and tells the engine where it is on the way;
 let go and it stays where you dropped it. A drag in the plan sets x and y and leaves height alone;

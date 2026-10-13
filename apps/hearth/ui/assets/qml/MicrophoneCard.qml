@@ -41,6 +41,30 @@ Card {
     readonly property var lastTake: MicrophoneController.lastTake
     readonly property int labelWidth: Math.round(150 * Theme.fontScale)
 
+    // --- how the rows fit the card ----------------------------------------------------------
+    // Every row here can be as narrow as the card: a ColumnLayout is as wide as the row of it
+    // that shrinks least, so one row that could not shrink would push all of them past the
+    // card's edge, and the card's past the window's.
+    //
+    // What the rows have to share is the card's width less the box's padding (Card.qml, framed).
+    readonly property real contentWidth: Math.max(0, root.width - 2 * Theme.pad)
+    // A label sits beside its control where that leaves the control a width worth having, and
+    // above it where it does not: in a third of the window at its own size, and at a large text
+    // size in a wider card than that.
+    readonly property bool stacked: root.contentWidth
+                                    < root.labelWidth + Theme.gap + Math.round(240 * Theme.fontScale)
+    // A button beside what it acts on keeps its whole label up to half the row, and elides past
+    // that: a long word in some language shortens the button, not the page.
+    readonly property real besideLimit: Math.floor(root.contentWidth / 2)
+    // The widest a delay or a timing reads. The two values are given this width, so that the
+    // slider beside one keeps its own while it is dragged from "0 ms" to "-1000 ms".
+    TextMetrics {
+        id: widestMs
+        font.family: Theme.monoFamily
+        font.pixelSize: Theme.fontNormal
+        text: qsTr("%1 ms").arg(-MicrophoneController.maxAlignmentMs)
+    }
+
     // --- which item, and where in it -------------------------------------------------------
     readonly property string itemPath: {
         const queue = HearthController.queue;
@@ -118,42 +142,51 @@ Card {
     }
 
     // --- the input --------------------------------------------------------------------------
-    RowLayout {
+    GridLayout {
         Layout.fillWidth: true
-        spacing: Theme.gap
+        columns: root.stacked ? 1 : 2
+        columnSpacing: Theme.gap
+        rowSpacing: Theme.space1
         Text {
             text: qsTr("Input")
             color: Theme.text
             font.pixelSize: Theme.fontNormal
-            Layout.preferredWidth: root.labelWidth
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: root.stacked
+            Layout.preferredWidth: root.stacked ? -1 : root.labelWidth
         }
-        AppComboBox {
-            id: deviceBox
-            objectName: "microphoneDevice"
+        RowLayout {
             Layout.fillWidth: true
-            enabled: !root.on
-            // "The default input" first, then every one the machine has.
-            model: [{ id: "", name: qsTr("The default input") }].concat(MicrophoneController.devices)
-            textRole: "name"
-            valueRole: "id"
-            Accessible.name: qsTr("Microphone input")
-            function sync() {
-                const index = indexOfValue(MicrophoneController.deviceId);
-                currentIndex = index >= 0 ? index : 0;
+            spacing: Theme.gap
+            AppComboBox {
+                id: deviceBox
+                objectName: "microphoneDevice"
+                Layout.fillWidth: true
+                enabled: !root.on
+                // "The default input" first, then every one the machine has.
+                model: [{ id: "", name: qsTr("The default input") }].concat(MicrophoneController.devices)
+                textRole: "name"
+                valueRole: "id"
+                Accessible.name: qsTr("Microphone input")
+                function sync() {
+                    const index = indexOfValue(MicrophoneController.deviceId);
+                    currentIndex = index >= 0 ? index : 0;
+                }
+                Component.onCompleted: sync()
+                onModelChanged: sync()
+                onActivated: MicrophoneController.deviceId = currentValue
+                Connections {
+                    target: MicrophoneController
+                    function onDeviceChanged() { deviceBox.sync(); }
+                }
             }
-            Component.onCompleted: sync()
-            onModelChanged: sync()
-            onActivated: MicrophoneController.deviceId = currentValue
-            Connections {
-                target: MicrophoneController
-                function onDeviceChanged() { deviceBox.sync(); }
+            AppButton {
+                objectName: "microphoneRefresh"
+                Layout.maximumWidth: root.besideLimit
+                enabled: !root.on
+                text: qsTr("Refresh")
+                onClicked: MicrophoneController.refreshDevices()
             }
-        }
-        AppButton {
-            objectName: "microphoneRefresh"
-            enabled: !root.on
-            text: qsTr("Refresh")
-            onClicked: MicrophoneController.refreshDevices()
         }
     }
 
@@ -168,76 +201,83 @@ Card {
         onToggled: function(on) { MicrophoneController.headphones = on; }
     }
 
-    RowLayout {
+    // The button, and the indicator beside it where there is room and under it where there is not.
+    Flow {
+        id: toggleRow
         Layout.fillWidth: true
         spacing: Theme.gap
         AppButton {
+            id: toggleButton
             objectName: "microphoneToggle"
+            width: Math.min(implicitWidth, toggleRow.width)
             enabled: root.active
             text: root.on ? qsTr("Turn the microphone off") : qsTr("Turn the microphone on")
             primary: !root.on
             onClicked: root.on ? MicrophoneController.stop() : MicrophoneController.start()
         }
         // The indicator: on screen whenever a microphone is open.
-        Row {
+        RowLayout {
             objectName: "microphoneIndicator"
             visible: root.on
+            width: Math.min(implicitWidth, toggleRow.width)
+            height: toggleButton.height
             spacing: Math.round(6 * Theme.fontScale)
-            Layout.alignment: Qt.AlignVCenter
             Rectangle {
-                width: Math.round(10 * Theme.fontScale)
-                height: width
+                Layout.preferredWidth: Math.round(10 * Theme.fontScale)
+                Layout.preferredHeight: Layout.preferredWidth
                 radius: width / 2
                 color: Theme.accent
-                anchors.verticalCenter: parent.verticalCenter
             }
             Text {
+                Layout.fillWidth: true
                 text: qsTr("Microphone on")
                 color: Theme.accentInk
                 font.pixelSize: Theme.fontNormal
                 font.bold: true
-                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
             }
         }
-        Item { Layout.fillWidth: true }
     }
 
     // --- a take ---------------------------------------------------------------------------------
     // Recording is its own switch, with its own indicator: the microphone being on is not a take.
     // What is kept is the voice alone, never the backing.
-    RowLayout {
+    Flow {
+        id: recordRow
         Layout.fillWidth: true
         visible: root.on
         spacing: Theme.gap
         AppButton {
+            id: recordButton
             objectName: "microphoneRecord"
+            width: Math.min(implicitWidth, recordRow.width)
             text: MicrophoneController.recording ? qsTr("Stop recording")
             //: A take is one recording of the singer's voice.
                 : qsTr("Record a take")
             onClicked: MicrophoneController.recording ? MicrophoneController.stopRecording()
                                                       : MicrophoneController.startRecording()
         }
-        Row {
+        RowLayout {
             objectName: "microphoneRecordingIndicator"
             visible: MicrophoneController.recording
+            width: Math.min(implicitWidth, recordRow.width)
+            height: recordButton.height
             spacing: Math.round(6 * Theme.fontScale)
-            Layout.alignment: Qt.AlignVCenter
             Rectangle {
-                width: Math.round(10 * Theme.fontScale)
-                height: width
+                Layout.preferredWidth: Math.round(10 * Theme.fontScale)
+                Layout.preferredHeight: Layout.preferredWidth
                 color: Theme.accent
-                anchors.verticalCenter: parent.verticalCenter
             }
             Text {
                 objectName: "microphoneTakeLength"
+                Layout.fillWidth: true
                 text: qsTr("Recording %1").arg(root.clockText(MicrophoneController.takeSeconds))
                 color: Theme.accentInk
                 font.pixelSize: Theme.fontNormal
                 font.bold: true
-                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
             }
         }
-        Item { Layout.fillWidth: true }
     }
     Text {
         objectName: "microphoneTakeError"
@@ -248,29 +288,38 @@ Card {
         font.pixelSize: Theme.fontNormal
         wrapMode: Text.WordWrap
     }
-    RowLayout {
+    GridLayout {
         Layout.fillWidth: true
-        spacing: Theme.gap
+        columns: root.stacked ? 1 : 2
+        columnSpacing: Theme.gap
+        rowSpacing: Theme.space1
         Text {
             //: A take is one recording of the singer's voice. The folder that takes are saved in follows.
             text: qsTr("Takes go to")
             color: Theme.text
             font.pixelSize: Theme.fontNormal
-            Layout.preferredWidth: root.labelWidth
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: root.stacked
+            Layout.preferredWidth: root.stacked ? -1 : root.labelWidth
         }
-        Text {
-            objectName: "microphoneTakesFolder"
+        RowLayout {
             Layout.fillWidth: true
-            text: MicrophoneController.takesFolder
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSmall
-            elide: Text.ElideMiddle
-        }
-        AppButton {
-            objectName: "microphoneChooseFolder"
-            enabled: !MicrophoneController.recording
-            text: qsTr("Choose…")
-            onClicked: takesFolderDialog.open()
+            spacing: Theme.gap
+            Text {
+                objectName: "microphoneTakesFolder"
+                Layout.fillWidth: true
+                text: MicrophoneController.takesFolder
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSmall
+                elide: Text.ElideMiddle
+            }
+            AppButton {
+                objectName: "microphoneChooseFolder"
+                Layout.maximumWidth: root.besideLimit
+                enabled: !MicrophoneController.recording
+                text: qsTr("Choose…")
+                onClicked: takesFolderDialog.open()
+            }
         }
     }
     FolderDialog {
@@ -278,10 +327,15 @@ Card {
         title: qsTr("Where takes are kept")
         onAccepted: MicrophoneController.setTakesFolder(HearthController.urlToLocalFile(selectedFolder))
     }
-    RowLayout {
+    // The take just made, and what can be done with it: beside its name where the two buttons
+    // leave the name room, under it where they do not, and one under the other in a card too
+    // narrow for the pair.
+    GridLayout {
         Layout.fillWidth: true
         visible: root.lastTake.name !== undefined
-        spacing: Theme.gap
+        columns: root.stacked ? 1 : 2
+        columnSpacing: Theme.gap
+        rowSpacing: Theme.gap
         Text {
             objectName: "microphoneLastTake"
             Layout.fillWidth: true
@@ -290,15 +344,28 @@ Card {
             font.pixelSize: Theme.fontNormal
             elide: Text.ElideMiddle
         }
-        AppButton {
-            objectName: "microphoneShowTakes"
-            text: qsTr("Show in folder")
-            onClicked: MicrophoneController.showTakes()
-        }
-        AppButton {
-            objectName: "microphoneDeleteTake"
-            text: qsTr("Delete this take")
-            onClicked: MicrophoneController.deleteLastTake()
+        Flow {
+            id: lastTakeButtons
+            Layout.fillWidth: root.stacked
+            Layout.preferredWidth: root.stacked
+                ? -1
+                : Math.min(root.besideLimit,
+                           showTakesButton.implicitWidth + spacing + deleteTakeButton.implicitWidth)
+            spacing: Theme.gap
+            AppButton {
+                id: showTakesButton
+                objectName: "microphoneShowTakes"
+                width: Math.min(implicitWidth, lastTakeButtons.width)
+                text: qsTr("Show in folder")
+                onClicked: MicrophoneController.showTakes()
+            }
+            AppButton {
+                id: deleteTakeButton
+                objectName: "microphoneDeleteTake"
+                width: Math.min(implicitWidth, lastTakeButtons.width)
+                text: qsTr("Delete this take")
+                onClicked: MicrophoneController.deleteLastTake()
+            }
         }
     }
     // The takes in the folder, newest first. A few are shown and the rest are counted; removing
@@ -316,15 +383,18 @@ Card {
             color: Theme.text
             font.pixelSize: Theme.fontNormal
             font.bold: true
+            wrapMode: Text.WordWrap
         }
         Repeater {
             model: MicrophoneController.takes.slice(0, takesList.shown)
-            delegate: RowLayout {
+            delegate: GridLayout {
                 id: takeRow
                 required property var modelData
                 property bool confirming: false
                 Layout.fillWidth: true
-                spacing: Theme.gap
+                columns: root.stacked ? 1 : 2
+                columnSpacing: Theme.gap
+                rowSpacing: Theme.space1
                 Text {
                     objectName: "microphoneTakeRow"
                     Layout.fillWidth: true
@@ -333,24 +403,42 @@ Card {
                     font.pixelSize: Theme.fontNormal
                     elide: Text.ElideMiddle
                 }
-                AppButton {
-                    objectName: "microphoneTakeDelete"
-                    visible: !takeRow.confirming
-                    text: qsTr("Delete")
-                    onClicked: takeRow.confirming = true
-                }
-                AppButton {
-                    objectName: "microphoneTakeDeleteConfirm"
-                    visible: takeRow.confirming
-                    text: qsTr("Delete for good")
-                    onClicked: MicrophoneController.deleteTake(takeRow.modelData.path)
-                }
-                AppButton {
-                    objectName: "microphoneTakeKeep"
-                    visible: takeRow.confirming
-                    //: Button shown beside "Delete for good" once Delete is pressed: do not delete this take (a recording of the singer's voice), keep it.
-                    text: qsTr("Keep")
-                    onClicked: takeRow.confirming = false
+                // Delete, or the two that answer it: as wide as the ones on show.
+                Flow {
+                    id: takeButtons
+                    Layout.fillWidth: root.stacked
+                    Layout.preferredWidth: root.stacked
+                        ? -1
+                        : Math.min(root.besideLimit,
+                                   takeRow.confirming
+                                       ? confirmButton.implicitWidth + spacing + keepButton.implicitWidth
+                                       : deleteButton.implicitWidth)
+                    spacing: Theme.gap
+                    AppButton {
+                        id: deleteButton
+                        objectName: "microphoneTakeDelete"
+                        visible: !takeRow.confirming
+                        width: Math.min(implicitWidth, takeButtons.width)
+                        text: qsTr("Delete")
+                        onClicked: takeRow.confirming = true
+                    }
+                    AppButton {
+                        id: confirmButton
+                        objectName: "microphoneTakeDeleteConfirm"
+                        visible: takeRow.confirming
+                        width: Math.min(implicitWidth, takeButtons.width)
+                        text: qsTr("Delete for good")
+                        onClicked: MicrophoneController.deleteTake(takeRow.modelData.path)
+                    }
+                    AppButton {
+                        id: keepButton
+                        objectName: "microphoneTakeKeep"
+                        visible: takeRow.confirming
+                        width: Math.min(implicitWidth, takeButtons.width)
+                        //: Button shown beside "Delete for good" once Delete is pressed: do not delete this take (a recording of the singer's voice), keep it.
+                        text: qsTr("Keep")
+                        onClicked: takeRow.confirming = false
+                    }
                 }
             }
         }
@@ -361,6 +449,7 @@ Card {
             text: qsTr("and %1 more in the folder").arg(MicrophoneController.takes.length - takesList.shown)
             color: Theme.textMuted
             font.pixelSize: Theme.fontSmall
+            wrapMode: Text.WordWrap
         }
     }
     Text {
@@ -385,38 +474,48 @@ Card {
     }
 
     // --- the meter --------------------------------------------------------------------------
-    RowLayout {
+    GridLayout {
         Layout.fillWidth: true
         visible: root.on
-        spacing: Theme.gap
+        columns: root.stacked ? 1 : 2
+        columnSpacing: Theme.gap
+        rowSpacing: Theme.space1
         Text {
             text: qsTr("Level")
             color: Theme.text
             font.pixelSize: Theme.fontNormal
-            Layout.preferredWidth: root.labelWidth
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: root.stacked
+            Layout.preferredWidth: root.stacked ? -1 : root.labelWidth
         }
-        Rectangle {
-            id: meter
-            objectName: "microphoneMeter"
+        RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.round(12 * Theme.fontScale)
-            color: Theme.surfaceAlt ?? Theme.surface
-            border.color: Theme.border
-            border.width: 1
+            spacing: Theme.gap
             Rectangle {
-                width: Math.round(parent.width * MicrophoneController.level)
-                height: parent.height
-                color: MicrophoneController.clipping ? Theme.accent : Theme.neutral600
+                id: meter
+                objectName: "microphoneMeter"
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.round(12 * Theme.fontScale)
+                color: Theme.surfaceAlt ?? Theme.surface
+                border.color: Theme.border
+                border.width: 1
+                Rectangle {
+                    width: Math.round(parent.width * MicrophoneController.level)
+                    height: parent.height
+                    color: MicrophoneController.clipping ? Theme.accent : Theme.neutral600
+                }
+                Accessible.role: Accessible.ProgressBar
+                Accessible.name: qsTr("Microphone level")
             }
-            Accessible.role: Accessible.ProgressBar
-            Accessible.name: qsTr("Microphone level")
-        }
-        Text {
-            objectName: "microphoneClip"
-            visible: MicrophoneController.clipping
-            text: qsTr("Too loud")
-            color: Theme.accentInk
-            font.pixelSize: Theme.fontSmall
+            Text {
+                objectName: "microphoneClip"
+                Layout.maximumWidth: root.besideLimit
+                visible: MicrophoneController.clipping
+                text: qsTr("Too loud")
+                color: Theme.accentInk
+                font.pixelSize: Theme.fontSmall
+                elide: Text.ElideRight
+            }
         }
     }
     Text {
@@ -462,6 +561,7 @@ Card {
         color: Theme.text
         font.pixelSize: Theme.fontNormal
         font.family: Theme.monoFamily
+        wrapMode: Text.WordWrap
     }
 
     // The tune as notes and your voice as a line over them, in time with the words. Shown only
@@ -509,14 +609,18 @@ Card {
     }
 
     // --- how strictly, and against whose key ---------------------------------------------------
-    RowLayout {
+    GridLayout {
         Layout.fillWidth: true
-        spacing: Theme.gap
+        columns: root.stacked ? 1 : 2
+        columnSpacing: Theme.gap
+        rowSpacing: Theme.space1
         Text {
             text: qsTr("How close counts")
             color: Theme.text
             font.pixelSize: Theme.fontNormal
-            Layout.preferredWidth: root.labelWidth
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: root.stacked
+            Layout.preferredWidth: root.stacked ? -1 : root.labelWidth
         }
         AppComboBox {
             id: toleranceBox
@@ -580,10 +684,12 @@ Card {
         visible: root.lastPerformance.percent !== undefined
         spacing: Math.round(4 * Theme.fontScale)
         Text {
+            Layout.fillWidth: true
             text: qsTr("Last performance")
             color: Theme.text
             font.pixelSize: Theme.fontNormal
             font.bold: true
+            wrapMode: Text.WordWrap
         }
         Text {
             objectName: "microphoneSummaryScore"
@@ -631,75 +737,99 @@ Card {
     }
 
     // --- the alignment ------------------------------------------------------------------------
-    RowLayout {
+    // A slider is the design's 220 px where the row has them, and gives way where it has not:
+    // it is the one thing in its row that can.
+    GridLayout {
         Layout.fillWidth: true
-        spacing: Theme.gap
+        columns: root.stacked ? 1 : 2
+        columnSpacing: Theme.gap
+        rowSpacing: Theme.space1
         Text {
             text: qsTr("Microphone delay")
             color: Theme.text
             font.pixelSize: Theme.fontNormal
-            elide: Text.ElideRight
-            Layout.preferredWidth: root.labelWidth
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: root.stacked
+            Layout.preferredWidth: root.stacked ? -1 : root.labelWidth
         }
-        AppSlider {
-            id: delaySlider
-            objectName: "microphoneDelay"
-            Layout.preferredWidth: Math.round(220 * Theme.fontScale)
-            from: 0
-            to: MicrophoneController.maxAlignmentMs
-            stepSize: 5
-            snapMode: Slider.SnapAlways
-            value: MicrophoneController.inputDelayMs
-            Accessible.name: qsTr("Microphone delay, milliseconds")
-            onMoved: MicrophoneController.inputDelayMs = value
-            Connections {
-                target: MicrophoneController
-                function onAlignmentChanged() { delaySlider.value = MicrophoneController.inputDelayMs; }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Theme.gap
+            AppSlider {
+                id: delaySlider
+                objectName: "microphoneDelay"
+                Layout.fillWidth: true
+                Layout.preferredWidth: Math.round(220 * Theme.fontScale)
+                Layout.maximumWidth: Math.round(220 * Theme.fontScale)
+                from: 0
+                to: MicrophoneController.maxAlignmentMs
+                stepSize: 5
+                snapMode: Slider.SnapAlways
+                value: MicrophoneController.inputDelayMs
+                Accessible.name: qsTr("Microphone delay, milliseconds")
+                onMoved: MicrophoneController.inputDelayMs = value
+                Connections {
+                    target: MicrophoneController
+                    function onAlignmentChanged() { delaySlider.value = MicrophoneController.inputDelayMs; }
+                }
             }
+            Text {
+                objectName: "microphoneDelayText"
+                Layout.preferredWidth: Math.min(root.besideLimit, Math.ceil(widestMs.advanceWidth))
+                text: qsTr("%1 ms").arg(MicrophoneController.inputDelayMs)
+                color: Theme.textMuted
+                font.family: Theme.monoFamily
+                font.pixelSize: Theme.fontNormal
+                elide: Text.ElideRight
+            }
+            Item { Layout.fillWidth: true }
         }
-        Text {
-            objectName: "microphoneDelayText"
-            text: qsTr("%1 ms").arg(MicrophoneController.inputDelayMs)
-            color: Theme.textMuted
-            font.family: Theme.monoFamily
-            font.pixelSize: Theme.fontNormal
-        }
-        Item { Layout.fillWidth: true }
     }
-    RowLayout {
+    GridLayout {
         Layout.fillWidth: true
-        spacing: Theme.gap
+        columns: root.stacked ? 1 : 2
+        columnSpacing: Theme.gap
+        rowSpacing: Theme.space1
         Text {
             text: qsTr("Move your timing")
             color: Theme.text
             font.pixelSize: Theme.fontNormal
-            elide: Text.ElideRight
-            Layout.preferredWidth: root.labelWidth
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: root.stacked
+            Layout.preferredWidth: root.stacked ? -1 : root.labelWidth
         }
-        AppSlider {
-            id: offsetSlider
-            objectName: "microphoneOffset"
-            Layout.preferredWidth: Math.round(220 * Theme.fontScale)
-            from: -MicrophoneController.maxAlignmentMs
-            to: MicrophoneController.maxAlignmentMs
-            stepSize: 10
-            snapMode: Slider.SnapAlways
-            value: MicrophoneController.offsetMs
-            Accessible.name: qsTr("Move your timing, milliseconds")
-            onMoved: MicrophoneController.offsetMs = value
-            Connections {
-                target: MicrophoneController
-                function onAlignmentChanged() { offsetSlider.value = MicrophoneController.offsetMs; }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Theme.gap
+            AppSlider {
+                id: offsetSlider
+                objectName: "microphoneOffset"
+                Layout.fillWidth: true
+                Layout.preferredWidth: Math.round(220 * Theme.fontScale)
+                Layout.maximumWidth: Math.round(220 * Theme.fontScale)
+                from: -MicrophoneController.maxAlignmentMs
+                to: MicrophoneController.maxAlignmentMs
+                stepSize: 10
+                snapMode: Slider.SnapAlways
+                value: MicrophoneController.offsetMs
+                Accessible.name: qsTr("Move your timing, milliseconds")
+                onMoved: MicrophoneController.offsetMs = value
+                Connections {
+                    target: MicrophoneController
+                    function onAlignmentChanged() { offsetSlider.value = MicrophoneController.offsetMs; }
+                }
             }
+            Text {
+                objectName: "microphoneOffsetText"
+                Layout.preferredWidth: Math.min(root.besideLimit, Math.ceil(widestMs.advanceWidth))
+                text: qsTr("%1 ms").arg(MicrophoneController.offsetMs)
+                color: Theme.textMuted
+                font.family: Theme.monoFamily
+                font.pixelSize: Theme.fontNormal
+                elide: Text.ElideRight
+            }
+            Item { Layout.fillWidth: true }
         }
-        Text {
-            objectName: "microphoneOffsetText"
-            text: qsTr("%1 ms").arg(MicrophoneController.offsetMs)
-            color: Theme.textMuted
-            font.family: Theme.monoFamily
-            font.pixelSize: Theme.fontNormal
-        }
-        Item { Layout.fillWidth: true }
     }
     Text {
         Layout.fillWidth: true
