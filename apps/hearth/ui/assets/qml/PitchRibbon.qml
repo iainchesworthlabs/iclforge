@@ -175,6 +175,11 @@ Item {
         visible: root.listening
         anchors.verticalCenter: parent.verticalCenter
         x: Math.round(root.width * root.nowFraction) + Math.round(8 * Theme.fontScale)
+        // It sits beside the marker, and what is beyond the ribbon's edge is not drawn: in a
+        // narrow card, at a large text size or in a language with a longer word, it is cut short
+        // with an ellipsis and does not run out of the card.
+        width: Math.max(0, root.width - x)
+        elide: Text.ElideRight
         text: qsTr("Listening…")
         color: root.nowColor
         font.pixelSize: Theme.fontSmall
