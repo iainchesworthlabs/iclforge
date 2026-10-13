@@ -338,6 +338,15 @@ jobs:
         with:
           sarif_file: ${{ env.BUILD_DIR }}/sonarqube.sarif
 
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # A job of its own, on a runner with no container - the same shape
   # codeql.yml, msvc-analysis.yml and static-analysis.yml all use. It cannot
   # be a step inside `scan`: report-nightly-failure is a gh CLI script, and gh

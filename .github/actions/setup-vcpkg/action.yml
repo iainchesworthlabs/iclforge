@@ -13,16 +13,19 @@ inputs:
     required: true
   cache-key-suffix:
     description: >-
-      Extra archives-cache key component for jobs whose install set differs
-      from the default manifest's - pass the manifest FEATURES the job
-      enables (e.g. "adm"). Without this, every Linux job shares one key,
-      and GitHub cache entries are IMMUTABLE: whichever job saves a key
-      first locks its (possibly much smaller) archive set in for everyone -
-      found the hard way when a boost-less job saved the post-fmt-migration
-      key and the adm job's 43 boost ports could then never be added,
-      forcing a full boost rebuild (and its codeload-400 exposure) on every
-      adm-validate run forever. A distinct key per feature set lets each
-      install shape save its own complete entry.
+      Names the cache LINEAGE of a job whose install set differs from the
+      default manifest's - pass the manifest FEATURES the job enables (e.g.
+      "adm"). Entries are saved under a key that ends in a hash of their
+      content (see ../save-vcpkg-cache) and a restore takes the newest entry
+      of its own lineage, so two jobs with different sets must not share one:
+      each would keep restoring the other's newest entry and rebuild its own
+      extras every run. Jobs whose set is the default one pass nothing and
+      share the "core" lineage. (The lineage used to be needed for another
+      reason: with one exact key per manifest, whichever job saved first
+      locked its possibly much smaller archive set in for everyone - a
+      boost-less job did that to the adm job's 43 boost ports and forced a
+      full boost rebuild, and its codeload-400 exposure, on every adm-validate
+      run. Content-addressed keys cannot lock anything in.)
     default: ""
 
 runs:
@@ -93,33 +96,100 @@ runs:
         echo "VCPKG_DOWNLOADS=$DOWNLOADS_DIR" >> "$GITHUB_ENV"
         echo "VCPKG_BINARY_SOURCES=clear;default,readwrite" >> "$GITHUB_ENV"
 
-    # Keyed by OS + arch + the vcpkg pin + the manifest. Compiler is deliberately
-    # NOT in the key: the two Linux legs (gcc, clang) and the two Windows legs
-    # (cl, clang-cl) build the same x64-linux / x64-windows triplet, so they
-    # share one cache instead of duplicating it. vcpkg names archives by ABI
-    # hash, so entries for different triplets coexist safely anyway.
-    - name: Cache vcpkg binaries
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    # The binary and download caches, restored here and saved by the caller's
+    # last step (../save-vcpkg-cache, `if: always()`). actions/cache's own
+    # post-job save runs only when the job succeeds, so a job that built
+    # twenty packages and then failed - a flaky download, a test, a timeout -
+    # threw all of them away and the next attempt started from nothing.
+    #
+    # Keyed by OS + arch + the vcpkg pin + the manifest, then the lineage (the
+    # cache-key-suffix, or "core"). The compiler is deliberately NOT in the
+    # key: the two Linux legs (gcc, clang) and the two Windows legs (cl,
+    # clang-cl) build the same x64-linux / x64-windows triplet, so they share
+    # one cache instead of duplicating it. vcpkg names archives by ABI hash,
+    # so entries for different triplets coexist safely anyway. runner.arch is
+    # in the key since the arm64 Linux legs came up: without it an arm64
+    # runner's fallback could match a cache an x64 runner populated and hand
+    # vcpkg the wrong architecture's previously-downloaded tool binaries.
+    #
+    # `key` is never an exact hit: a save is named after what is in the
+    # directory, so every restore falls through to restore-keys, which GitHub
+    # resolves to the most recently created entry with that prefix - first the
+    # lineage's own, then (so a lineage's first run is not cold) any lineage of
+    # the same manifest, the same vcpkg pin, and finally the same OS and arch.
+    - name: Work out the vcpkg cache keys
+      id: keys
+      shell: bash
+      env:
+        VCPKG_COMMIT: ${{ inputs.vcpkg-commit }}
+        MANIFEST_HASH: ${{ hashFiles('vcpkg.json') }}
+        LINEAGE: ${{ inputs.cache-key-suffix != '' && inputs.cache-key-suffix || 'core' }}
+      run: |
+        set -euo pipefail
+        for kind in binaries downloads; do
+          if [ "$kind" = binaries ]; then prefix=vcpkg; else prefix=vcpkg-downloads; fi
+          any="$prefix-$RUNNER_OS-$RUNNER_ARCH-"
+          commit="$any$VCPKG_COMMIT-"
+          manifest="$commit$MANIFEST_HASH"
+          {
+            echo "${kind}_lineage=$manifest-$LINEAGE"
+            echo "${kind}_manifest=$manifest"
+            echo "${kind}_commit=$commit"
+            echo "${kind}_any=$any"
+          } >> "$GITHUB_OUTPUT"
+        done
+
+    - name: Restore vcpkg binaries
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/vcpkg/archives
-        key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ inputs.vcpkg-commit }}-${{ hashFiles('vcpkg.json') }}${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}
+        key: ${{ steps.keys.outputs.binaries_lineage }}-restore
         restore-keys: |
-          vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ inputs.vcpkg-commit }}-${{ hashFiles('vcpkg.json') }}
-          vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ inputs.vcpkg-commit }}-
-          vcpkg-${{ runner.os }}-${{ runner.arch }}-
+          ${{ steps.keys.outputs.binaries_lineage }}-
+          ${{ steps.keys.outputs.binaries_manifest }}
+          ${{ steps.keys.outputs.binaries_commit }}
+          ${{ steps.keys.outputs.binaries_any }}
 
-    # runner.arch in the key, matching the binaries cache above - found missing
-    # for real bringing up the arm64 Linux legs: without it, an arm64 runner's
-    # restore-keys fallback can match a downloads cache an x64 runner
-    # populated (or vice versa), silently handing vcpkg the wrong architecture's
-    # previously-downloaded tool binaries for anything not covered by an exact
-    # key hit.
-    - name: Cache vcpkg downloads
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    - name: Restore vcpkg downloads
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/vcpkg/downloads
-        key: vcpkg-downloads-${{ runner.os }}-${{ runner.arch }}-${{ inputs.vcpkg-commit }}-${{ hashFiles('vcpkg.json') }}${{ inputs.cache-key-suffix != '' && format('-{0}', inputs.cache-key-suffix) || '' }}
+        key: ${{ steps.keys.outputs.downloads_lineage }}-restore
         restore-keys: |
-          vcpkg-downloads-${{ runner.os }}-${{ runner.arch }}-${{ inputs.vcpkg-commit }}-${{ hashFiles('vcpkg.json') }}
-          vcpkg-downloads-${{ runner.os }}-${{ runner.arch }}-${{ inputs.vcpkg-commit }}-
-          vcpkg-downloads-${{ runner.os }}-${{ runner.arch }}-
+          ${{ steps.keys.outputs.downloads_lineage }}-
+          ${{ steps.keys.outputs.downloads_manifest }}
+          ${{ steps.keys.outputs.downloads_commit }}
+          ${{ steps.keys.outputs.downloads_any }}
+
+    # What was restored, and the keys to save under, handed to ../save-vcpkg-cache
+    # through the environment so a caller needs no inputs. Same github-env
+    # reasoning as the steps above: the values are the runner-assigned OS and
+    # arch, the pinned vcpkg commit, a hash and the lineage - never anything a
+    # pull request title, branch name or other attacker-reachable string
+    # reaches - and later steps read them as plain environment variables.
+    - name: Record what was restored
+      shell: bash
+      env:
+        BINARIES_KEY: ${{ steps.keys.outputs.binaries_lineage }}
+        DOWNLOADS_KEY: ${{ steps.keys.outputs.downloads_lineage }}
+      run: | # zizmor: ignore[github-env] runner OS/arch, pinned commit, manifest hash and a fixed lineage name - see above
+        set -euo pipefail
+        # The same definition of "what is in the cache" as ../save-vcpkg-cache.
+        names_of() {
+          local kind="$1" dir="$2" f
+          if [ "$kind" = binaries ]; then
+            (cd "$dir" && LC_ALL=C ls -R . | grep -E '\.zip$|:$' || true)
+          else
+            for f in "$dir"/*; do
+              if [ -f "$f" ]; then echo "${f##*/}"; fi
+            done | LC_ALL=C sort
+          fi
+        }
+        listing() { names_of "$1" "$2" | sha256sum | cut -c1-16; }
+        {
+          echo "VCPKG_CACHE_BINARIES_KEY=$BINARIES_KEY"
+          echo "VCPKG_CACHE_BINARIES_LISTING=$(listing binaries "$HOME/.cache/vcpkg/archives")"
+          echo "VCPKG_CACHE_DOWNLOADS_KEY=$DOWNLOADS_KEY"
+          echo "VCPKG_CACHE_DOWNLOADS_LISTING=$(listing downloads "$HOME/.cache/vcpkg/downloads")"
+        } >> "$GITHUB_ENV"
+        echo "vcpkg cache: restored $(LC_ALL=C ls -R "$HOME/.cache/vcpkg/archives" | grep -c '\.zip$' || true) archive(s)"

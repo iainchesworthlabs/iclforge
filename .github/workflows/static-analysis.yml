@@ -163,6 +163,15 @@ jobs:
             -warnings-as-errors='*' \
             '(libs/(ac3|base|objects|render)/src/.*|libs/dsp/src/[^/]*|libs/containers/src/(iec61937|matroska|mp4|mpegts)/.*|apps/forge/cli/src/.*)\.cpp'
 
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # A finding (or a broken build) is handed to the shared
   # report-nightly-failure action, which opens - or comments on - the one
   # `nightly-analysis` issue for this engine. `!cancelled()` rather than

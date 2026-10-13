@@ -1322,6 +1322,15 @@ jobs:
           fi
           echo "forge-gui ran clean on debian:12-slim, which never had Qt installed and only gained ALSA/graphics-stack libraries as normal runtime dependencies"
 
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # The Shield app (apps/demos/android): a Gradle/NDK build, not a CMake preset
   # leg, so it is its own job outside the split platform workflows - there is
   # no config-android/build-android/pack-android preset to reuse, and trying
@@ -1654,6 +1663,15 @@ jobs:
         shell: bash
         run: cmake --build --preset build-android-arm64 -- -k 0
 
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # Hearth for Android's debug APK and its instrumented tests (planning/hearth-android.md, phases 1b
   # and 1d): the Gradle project at apps/hearth/android, whose native build puts vcpkg in front of the
   # NDK's toolchain (app/src/main/cpp/CMakeLists.txt), which is the part build-android above cannot
@@ -1734,6 +1752,15 @@ jobs:
             -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio
             -no-boot-anim -camera-back none
           script: ./gradlew :app:connectedDebugAndroidTest --console=plain
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
 
   # The WASM browser decode demo (apps/demos/wasm, WASM browser demo): a real CMake
   # preset (config-wasm-emscripten) unlike build-android above, but still its
@@ -3652,6 +3679,15 @@ jobs:
             improv-qemu-run/late-network/server.txt
             improv-qemu-run/late-network/report.json
           if-no-files-found: warn
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
 
   build-esp32c3:
     name: Minimum-footprint codec (ESP32-C3, QEMU)

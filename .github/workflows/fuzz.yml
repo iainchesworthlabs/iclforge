@@ -488,6 +488,15 @@ jobs:
           path: build/fuzz-artifacts/
           if-no-files-found: ignore
 
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # The deeper half of the encoder input-space search - see this file's header
   # for what it is and why it shares nothing with the four jobs above. Its
   # bounded per-PR counterpart is a step in _ci-core.yml's ffmpeg-validate
@@ -594,3 +603,12 @@ jobs:
             fuzz-encoder-artifacts/
             fuzz-eac3-encoder-artifacts/
           if-no-files-found: ignore
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache

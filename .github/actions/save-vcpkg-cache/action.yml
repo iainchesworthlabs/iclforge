@@ -1,0 +1,89 @@
+name: Save vcpkg caches
+description: >-
+  Saves the vcpkg binary and download caches that ../setup-vcpkg restored, if
+  the job added to them and no identical entry is already readable from this
+  ref, under a key ending in a hash of the directory's contents. Run it as the
+  last step of a job, `if: always()` and `continue-on-error: true`, so a failing
+  or cancelled job keeps the packages it had already built and a cache that
+  cannot be saved is never what fails the job. It takes no inputs: setup-vcpkg
+  exports the keys and the restored listings through the environment.
+
+runs:
+  using: composite
+  steps:
+    - name: Decide what is new
+      id: state
+      shell: bash
+      run: |
+        # What counts as "something was added": the .zip archives of the binary
+        # cache (in subdirectories), and the top-level files of the downloads
+        # cache (source archives). Not the extracted tools/ trees or temp/, which
+        # can change without anything worth keeping having been downloaded - a
+        # listing that moved on every run would store a new full copy each time.
+        names_of() {
+          local kind="$1" dir="$2" f
+          if [ "$kind" = binaries ]; then
+            (cd "$dir" && LC_ALL=C ls -R . | grep -E '\.zip$|:$' || true)
+          else
+            for f in "$dir"/*; do
+              if [ -f "$f" ]; then echo "${f##*/}"; fi
+            done | LC_ALL=C sort
+          fi
+        }
+        decide() {
+          local name="$1" dir="$2" key="$3" restored="$4"
+          local files=0 listing="" changed=false
+          if [ -n "$key" ] && [ -d "$dir" ]; then
+            files=$(names_of "$name" "$dir" | grep -c -v ':$' || true)
+            listing=$(names_of "$name" "$dir" | sha256sum | cut -c1-16)
+          fi
+          if [ "$files" -gt 0 ] && [ -n "$listing" ] && [ "$listing" != "$restored" ]; then
+            changed=true
+          fi
+          {
+            echo "${name}_changed=$changed"
+            echo "${name}_key=$key-$listing"
+            echo "${name}_files=$files"
+          } >> "$GITHUB_OUTPUT"
+          echo "vcpkg cache $name: $files file(s); restored ${restored:-nothing}, now ${listing:-n/a}; save=$changed"
+        }
+        decide binaries "$HOME/.cache/vcpkg/archives" "${VCPKG_CACHE_BINARIES_KEY:-}" "${VCPKG_CACHE_BINARIES_LISTING:-}"
+        decide downloads "$HOME/.cache/vcpkg/downloads" "${VCPKG_CACHE_DOWNLOADS_KEY:-}" "${VCPKG_CACHE_DOWNLOADS_LISTING:-}"
+
+    # A cache entry is readable only from its own ref, a pull request's base and
+    # the default branch, so two refs can each hold a full copy of the same key
+    # (a merge-queue entry that started from an older generation did exactly
+    # that). An exact-key lookup, which downloads nothing, sees every scope this
+    # run can restore from: if the key is already there, storing it again would
+    # only spend quota.
+    - name: Is an identical binaries entry already readable?
+      id: binaries-exists
+      if: steps.state.outputs.binaries_changed == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/vcpkg/archives
+        key: ${{ steps.state.outputs.binaries_key }}
+        lookup-only: true
+
+    - name: Save vcpkg binaries
+      if: steps.state.outputs.binaries_changed == 'true' && steps.binaries-exists.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/vcpkg/archives
+        key: ${{ steps.state.outputs.binaries_key }}
+
+    - name: Is an identical downloads entry already readable?
+      id: downloads-exists
+      if: steps.state.outputs.downloads_changed == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/vcpkg/downloads
+        key: ${{ steps.state.outputs.downloads_key }}
+        lookup-only: true
+
+    - name: Save vcpkg downloads
+      if: steps.state.outputs.downloads_changed == 'true' && steps.downloads-exists.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/vcpkg/downloads
+        key: ${{ steps.state.outputs.downloads_key }}

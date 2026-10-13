@@ -340,6 +340,15 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
 
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # Turns "a new CodeQL alert appeared on main" into something a person sees
   # the next morning. codeql-action/analyze never fails on findings and
   # GitHub does not notify on new default-branch alerts, so this job asks
