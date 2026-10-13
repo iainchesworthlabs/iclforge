@@ -63,7 +63,6 @@ from ._iclforge import (
     describe,
     eac3,
     fullbw_channel_count,
-    lyrics,
     meta,
     profile_for,
     profile_name,
@@ -79,6 +78,18 @@ from ._iclforge import (
     uniform_access_unit_samples,
     verify,
 )
+
+# The lyrics reader is a submodule the extension has only when it was built with iclforge::lyrics
+# and a <filesystem> to read files through (bindings/python/CMakeLists.txt). Every wheel has it but
+# the Intel macOS one, whose deployment target (10.9) has no std::filesystem, and imported with the
+# names above an absent submodule took `import iclforge` with it there. Absent, `iclforge.lyrics`
+# is an AttributeError.
+try:
+    from ._iclforge import lyrics
+except ImportError:
+    _HAS_LYRICS = False
+else:
+    _HAS_LYRICS = True
 
 try:
     from importlib.metadata import PackageNotFoundError
@@ -163,3 +174,5 @@ __all__ = [
     "uniform_access_unit_samples",
     "verify",
 ]
+if not _HAS_LYRICS:
+    __all__.remove("lyrics")

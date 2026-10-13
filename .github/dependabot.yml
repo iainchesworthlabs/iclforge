@@ -60,6 +60,14 @@ updates:
     rebase-strategy: "auto"
     commit-message:
       prefix: "build"
+    # aiosendspin itself stays where it is: 9.1.1 is the release Music Assistant pins, and the
+    # scripts here stand in for it (planning/hearth-sendspin-extension.md). 10.0.0 dropped
+    # `encode_token` from aiosendspin.noise.pairing_token, which aiosendspin_player.py imports, and
+    # the job that runs these scripts (Core checks / Hearth Sendspin) is not on the pull-request
+    # gate, so #1477 merged green and main went red behind it on 2026-10-12. A move to a new
+    # release is a change to the scripts and the plan, made by hand. Its dependencies still update.
+    ignore:
+      - dependency-name: "aiosendspin"
 
   # WASM demo TypeScript toolchain (bindings/js/) and browser test deps (apps/demos/wasm/tests/).
   - package-ecosystem: "npm"

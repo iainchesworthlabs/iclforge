@@ -832,7 +832,9 @@ namespace {
 
 [[nodiscard]] std::string live_lyrics_text(int timed_lines, std::size_t min_bytes) {
     const auto stamp = [](char open, char close, int ms) {
-        char text[16];
+        // 17 bytes at the most an int can make of it, which is what GCC's -Wformat-truncation counts
+        // (the coverage build's flags let it see that far, and it is an error there).
+        char text[24];
         std::snprintf(text, sizeof text, "%c%02d:%02d.%02d%c", open, ms / 60000, ms / 1000 % 60, ms % 1000 / 10, close);
         return std::string(text);
     };

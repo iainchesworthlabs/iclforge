@@ -26,4 +26,11 @@ add_library(iclforge::lyrics ALIAS iclforge_lyrics)
 target_include_directories(iclforge_lyrics PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 target_compile_features(iclforge_lyrics PUBLIC cxx_std_23)
+# Position-independent on a computer, as iclforge::sendspin's archives are: the Python extension is a
+# shared module that links this one, and on Linux an object not built -fPIC cannot go into one (the
+# manylinux wheels failed at that link on 2026-10-12). A sink's player is a firmware image linked
+# once, and its build is left as it was.
+if(NOT ICLFORGE_SENDSPIN_PLAYER_ONLY)
+    set_target_properties(iclforge_lyrics PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
 target_link_libraries(iclforge_lyrics PRIVATE iclforge::warnings iclforge::coverage)

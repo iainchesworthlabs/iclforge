@@ -53,7 +53,15 @@ bool convert_to_utf8(const CodePage& page, std::string_view bytes, std::string& 
         utf8.append(buffer, sizeof buffer - out_left);
         // E2BIG: the buffer filled, and the rest is still to convert. Anything else (an invalid
         // sequence, or one cut short at the end) is bytes the page does not have.
-        if (result == static_cast<std::size_t>(-1) && errno != E2BIG) {
+        if (result == static_cast<std::size_t>(-1)) {
+            if (errno != E2BIG) {
+                ok = false;
+            }
+        } else if (result != 0) {
+            // A count of conversions that cannot be reversed. Every character of these pages has
+            // one in Unicode, so a conversion that put another in a character's place was given
+            // bytes the page does not have: an iconv may substitute and go on, counting it here,
+            // where glibc's and GNU libiconv stop with EILSEQ.
             ok = false;
         }
     }

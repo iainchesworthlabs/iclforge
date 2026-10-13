@@ -2707,8 +2707,12 @@ jobs:
       #
       # The levels are held against the host's
       #   forge decode apps/demos/wasm/assets/demo.ec3 out.wav downmix=loro drcmode=line
-      # 56,673 and 47,346 (x 1e6), which the float32 target reproduced to the
-      # digit on 2026-09-10. Same tolerance as the steps above.
+      # 60,906 and 52,119 (x 1e6). They were 56,673 and 47,346, which the
+      # float32 target reproduced to the digit on 2026-09-10, until 91d7a5904
+      # (2026-10-12) folded an E-AC-3 stream that sends no mixmdate at -3 dB for
+      # the centre and the surrounds, as Dolby's decoder does: the fold is louder
+      # by design, and the board read 60,906 on the first run after it. Same
+      # tolerance as the steps above.
       #
       # QEMU is stopped as soon as the verdict prints rather than left to a
       # timeout: the application returns from app_main into an idle FreeRTOS
@@ -2782,8 +2786,8 @@ jobs:
           if [ "${units:-0}" != "250" ] || [ "${resync:-1}" != "0" ]; then
             fail "expected 250 access units and 0 resynchronised bytes, got ${units:-none} and ${resync:-none}"
           fi
-          check_rms 0 56673
-          check_rms 1 47346
+          check_rms 0 60906
+          check_rms 1 52119
 
           # The control surface, through the port forward. /status must know
           # the run ended; /volume and /play must be taken; the replay must
@@ -2801,9 +2805,9 @@ jobs:
             sleep 5
           done
           [ "$(grep -c '^result=pass' qemu-http.txt)" -ge 2 ] || fail "the replay did not report result=pass"
-          # Half of 56,673 and 47,346; measured 28,336 and 23,673 on 2026-09-10.
-          check_rms 0 28336
-          check_rms 1 23673
+          # Half of 60,906 and 52,119.
+          check_rms 0 30453
+          check_rms 1 26059
           curl -s -m 10 -X POST http://127.0.0.1:8080/stop | grep -q '^stopped' || fail "POST /stop was not accepted"
 
           # Then the console, once the part has nothing left to do. /stop is
@@ -2890,10 +2894,10 @@ jobs:
           (cd "$GITHUB_WORKSPACE/apps/demos/wasm/tests" && ICLFORGE_DEVICE_URL=http://127.0.0.1:8080/ CI=1 npm run test:board) || fail "the page did not drive the board (Playwright's output is above)"
 
           # The play the test started, at the volume it set: a quarter of the
-          # boot play's levels, 56,673 and 47,346.
+          # boot play's levels, 60,906 and 52,119.
           [ "$(grep -c '^result=pass' qemu-ui.txt)" -ge 2 ] || fail "the play the test started did not report result=pass"
-          check_rms 0 14168
-          check_rms 1 11837
+          check_rms 0 15227
+          check_rms 1 13030
 
           # Then the console, once the part has nothing left to do: /status
           # reads "stopped" only after app_main has taken the page's Stop, and
@@ -3333,7 +3337,7 @@ jobs:
           # and no resynchronised byte. The levels check_stream_set.py holds are for the 7.1.4
           # shapes' twelve slots; this shape plays 2.0, so the demo's two are the host's
           # `forge decode demo.ec3 --downmix loro --drc line` figures the HTTP step above holds
-          # (56,673 and 47,346), to the same tolerance.
+          # (60,906 and 52,119), to the same tolerance.
           play() {
             local name="$1" units="$2" before after code
             before=$(grep -c '^result=' "$console" || true)
@@ -3361,8 +3365,8 @@ jobs:
           play ac3-20.ac3 16
           play layout-20.ec3 32
           play demo.ec3 250
-          check_rms 0 56673
-          check_rms 1 47346
+          check_rms 0 60906
+          check_rms 1 52119
 
           # Where the profile put its rings and stacks, as the console says it did.
           python3 "$profile" expect-console s3-n16r8 | while IFS= read -r line; do
