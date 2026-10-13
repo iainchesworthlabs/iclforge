@@ -1090,6 +1090,18 @@ The sections below contain the complete change list and fixes.
   second process ends before it has a window. A launch with no file, with `--seek`, or a capture
   runs on its own, and a Hearth that does not answer is not waited for. Hearth now links Qt
   Network for it (`QLocalServer`).
+- **A capture can be put where a picture needs it.** `forge-gui --smoke-shot <png>
+  project=<file.forgeproj> karaokeStep=parts|levels|hear|save` opens a project as **Project…**,
+  **Open** does and goes to a step of the Karaoke flow, which `tier=karaoke` alone opened empty.
+  The grab waits for the Hear step to build its stream, and the run fails with the reason for a
+  project that does not open as it stands, a step the flow has not got or cannot show, and, as
+  before, a name that is no property. `hearth --smoke-shot` takes `--page singer` (the singer
+  view, drawn in the window at its own size and not on the whole screen), `--page timing` (the
+  window that times the lyrics, opened once the file is loaded), `--size <width>x<height>`, and
+  `--setting <key>=<value>`, which puts a value in the capture's scratch settings store and is
+  dropped, with a line in the log, when there is no capture. What a launch hands to a running
+  Hearth has its `--page` applied as a launch's own is
+  ([Hearth's command line](docs/hearth/index.md#command-line)).
 - **A karaoke duet example, "Leave Her, Johnny"** (`examples/karaoke/leave-her-johnny/`): a
   traditional capstan shanty as printed in Colcord's *Roll and Go* (1924), one verse of 19.2 s, in
   which the shantyman (vocal 1) and the crew (vocal 2) sing different lines and each is silent while
@@ -4418,6 +4430,19 @@ The sections below contain the complete change list and fixes.
 - CONTRIBUTING.md lists the four AC-4 directories and their header layout. The file I/O, Rust API
   and signing pages were checked against their headers and corrected.
 - ROADMAP.md lists the Hearth work as it stands and the gaps found in the documentation.
+- **Every picture in the documentation says how it was made, and the karaoke guide's can be taken
+  again.** `tools/pictures/pictures.json` has an entry for each picture a page shows: the program,
+  the command line and environment that make it, and the build it was last taken from.
+  `tools/pictures/take_pictures.py` takes the ones that are command lines again from a build, on a
+  Windows desktop nobody sees, and `tools/checks/check_doc_pictures.py` fails a page that embeds a
+  PNG with no entry. The [karaoke guide](docs/karaoke/index.md)'s pictures of the Forge GUI were
+  from a harness that was thrown away and showed the program under its old name: they are taken
+  again with the example's parts loaded, at Parts (with its LFE row), Levels, Hear and Save. Its
+  pictures of Hearth's Play page and singer view are taken again, and it has one of the window
+  that times the lyrics. Each caption gives the command that took its picture. The four pictures
+  of Hearth's Karaoke page (two in the guide, and the German and Arabic ones on the Hearth page)
+  are still of 2026-10-12, before the page had its Microphone card, and their captions say so:
+  they wait for the page to fit its window at that width.
 - ROADMAP.md and the plan index were checked against the tree on 2026-10-13. The Hearth table had
   two rows twice over and now has one each, with a row for Hearth for Android; the AC-4 table says
   the decoder runs on the ESP32-P4, ESP32-S3 and (as fixed point) the C6 and that a sink built with
