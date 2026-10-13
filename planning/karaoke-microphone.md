@@ -86,7 +86,7 @@ Each is one statement a test or a recorded check can pass or fail. The IDs are f
 | # | Requirement |
 |---|---|
 | MI1 | **Choose.** The person chooses the input from the enumerated inputs (`DeviceKind::kInput`); the choice is kept as a preference (the endpoint id) and is never opened because it is kept |
-| MI2 | **Off until asked.** A microphone opens only when the person turns it on in this run, and closes when they turn it off, stop the item, leave the singing session or quit. It is never on at start |
+| MI2 | **Off until asked.** A microphone opens only when the person turns it on in this run, and closes when they turn it off, stop the item, leave the singing session or quit. It is never on at start. A capture's `--sing <file>` is not an exception: a recording stands in for the input and no device is opened (the file's samples are placed by where the item is heard, and the sound goes to no output), for a capture and for nothing a person runs |
 | MI3 | **Level.** A meter and a clip indicator show the input before and during a session, and "no signal" is said in words (the silence watchdog the Forge GUI's live session uses) |
 | MI4 | **Loss.** A device that goes away is named, the microphone session ends cleanly, and playback is not stopped |
 | MI5 | **Mono.** A stereo microphone is used as one channel; the tracker runs at 16 kHz on a host and 8 kHz on a board; a recording keeps the device's rate |

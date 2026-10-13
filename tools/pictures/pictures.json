@@ -119,6 +119,10 @@
     "c4fa8b161": {
       "commit": "c4fa8b161ca4e796e338a86b1dfd407b16d095af",
       "what": "Release build on Windows: cl.exe, Qt from C:/Qt/6.8.3/msvc2022_64, taken 2026-10-13 or after"
+    },
+    "9b98a1960": {
+      "commit": "9b98a1960a14941c1eacdca3dcc04e2d8c13d29f",
+      "what": "Release build on Windows: cl.exe, Qt from C:/Qt/6.8.3/msvc2022_64, taken 2026-10-13 or after"
     }
   },
   "pictures": [
@@ -687,6 +691,25 @@
       "environment": "hidden-desktop-living-room",
       "build": "c4fa8b161",
       "note": "A capture draws the singer view in the window at its own size, 1280 by 800, not on the whole screen."
+    },
+    {
+      "path": "docs/karaoke/screenshots/hearth-singer-view-singing.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "singer",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--sing",
+        "examples/karaoke/auld-lang-syne/parts/vocal-1-lead.wav",
+        "--seek",
+        "14900"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "9b98a1960",
+      "note": "There is no singer and nothing is played: the example's own lead vocal is the microphone, sung along to the song as it is heard, and the song goes to an output that plays to nothing, which the window calls \"Speakers\" (no microphone is opened, no sound device is used). The picture is taken as the song reaches --seek, with the performance going on, so the marks and the ribbon are what they are a moment either side of it. A capture draws the singer view in the window at its own size, not on the whole screen."
     },
     {
       "path": "docs/karaoke/screenshots/hearth-timing-window.png",

@@ -88,13 +88,51 @@ public:
         if (room_) {
             return true;
         }
-        room_ = iclforge::hearth::uitest::make_room({
-            {.id = "fake-speakers", .name = "Test speakers", .is_default = true, .channels = 6},
-            {.id = "fake-headphones", .name = "Test headphones", .is_default = false, .channels = 2},
-            {.id = "fake-receiver", .name = "Test receiver", .is_default = false, .channels = 8, .passthrough = true},
-        });
+        room_ = iclforge::hearth::uitest::make_room(standard_endpoints());
         controller->set_test_outputs(iclforge::hearth::uitest::outputs_for(room_));
         return true;
+    }
+
+    // A second HearthController over the settings the first has written, which
+    // is what a restart of the window finds: made and started as the window
+    // starts one, before anything plays, and over a room of its own - the three
+    // endpoints above, less the ids in `without` (a receiver switched off or
+    // unplugged since), and with a second receiver, "fake-other-receiver", when
+    // `otherReceiver` is set: an output that takes a bitstream and is not the
+    // one that was chosen. It plays into that room, not this one, so a suite
+    // reads it through its own properties (state, outputFormat,
+    // currentDeviceId, outputReason, errorText, passthroughDeviceId,
+    // outputGroupName). Null before useFakeRoom(). closeWindow() ends it: a case
+    // closes the one it started, so that nothing of it is still running, or
+    // still listening for the quit, at the next.
+    Q_INVOKABLE QObject* startAnotherWindow(const QStringList& without = {}, bool otherReceiver = false) {
+        if (!room_) {
+            return nullptr;
+        }
+        std::vector<iclforge::hearth::uitest::FakeEndpoint> endpoints;
+        for (auto& endpoint : standard_endpoints()) {
+            if (!without.contains(QString::fromStdString(endpoint.id))) {
+                endpoints.push_back(std::move(endpoint));
+            }
+        }
+        if (otherReceiver) {
+            endpoints.push_back({.id = "fake-other-receiver", .name = "Other receiver", .is_default = false,
+                                 .channels = 8, .passthrough = true});
+        }
+        AnotherWindow another;
+        another.room = iclforge::hearth::uitest::make_room(std::move(endpoints));
+        another.window = std::make_unique<iclforge::hearth::ui::HearthController>();
+        // Ours, not the script engine's to collect when the call returns.
+        QQmlEngine::setObjectOwnership(another.window.get(), QQmlEngine::CppOwnership);
+        another.window->set_test_outputs(iclforge::hearth::uitest::outputs_for(another.room));
+        another.window->start();
+        QObject* started = another.window.get();
+        windows_.push_back(std::move(another));
+        return started;
+    }
+
+    Q_INVOKABLE void closeWindow(QObject* window) {
+        std::erase_if(windows_, [window](const AnotherWindow& another) { return another.window.get() == window; });
     }
 
     // The device clock's rate against real time: 1.0 by default, faster for
@@ -464,9 +502,28 @@ private:
                                                                                QStringLiteral("NetworkController"));
     }
 
+    // The room useFakeRoom() makes and a window started from it by
+    // startAnotherWindow() sees: a default 5.1 set of speakers, a stereo pair
+    // of headphones, and a 7.1 receiver that takes a bitstream.
+    [[nodiscard]] static std::vector<iclforge::hearth::uitest::FakeEndpoint> standard_endpoints() {
+        return {
+            {.id = "fake-speakers", .name = "Test speakers", .is_default = true, .channels = 6},
+            {.id = "fake-headphones", .name = "Test headphones", .is_default = false, .channels = 2},
+            {.id = "fake-receiver", .name = "Test receiver", .is_default = false, .channels = 8, .passthrough = true},
+        };
+    }
+
+    // One window startAnotherWindow() made, and the room it plays into. The
+    // window goes first: its sinks hold the room.
+    struct AnotherWindow {
+        std::shared_ptr<iclforge::hearth::uitest::FakeRoom> room;
+        std::unique_ptr<iclforge::hearth::ui::HearthController> window;
+    };
+
     QQmlEngine* engine_ = nullptr;
     QTemporaryDir scratch_;
     std::shared_ptr<iclforge::hearth::uitest::FakeRoom> room_;
+    std::vector<AnotherWindow> windows_;
     std::vector<std::shared_ptr<iclforge::hearth::uitest::TestSinkHost>> sinks_;
 };
 

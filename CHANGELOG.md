@@ -44,6 +44,20 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth: the output chosen in the picker is kept across starts**
+
+- **Hearth's window plays to the output a person chose last time.** It started on the computer's
+  default output at every start, and a receiver, another device or a network group had to be chosen
+  again. **Play here** now keeps the kind of row (this computer's output, a passthrough output or a
+  group) and its id, and the next start puts it back before anything can play. A choice whose
+  output is not there does not change what is kept. A receiver the computer does not list at a
+  start (switched off, unplugged) starts as a decode to the default output: given an endpoint it
+  does not have, the engine takes every output and would send the stream as a bitstream to
+  whichever takes it. The receiver stays the kept choice and is played to again at the next start
+  it is listed for. A this-computer output that is not there decodes to the default. A group is
+  restored as chosen; the network is found after the window opens, so the engine refuses the item
+  until the group is ready, with the reason in the header, and does not replace a group that was
+  chosen with a local output. Giving a group up, or deleting the one that plays, keeps the default.
 **Crucible: a capture can show the lyric strip, and the Room page's guide has a picture of it**
 
 - **`crucible --shot <png> --lyrics "Name=<file>[@<time>]"` imports a lyrics file against a listed
@@ -3933,6 +3947,41 @@ The sections below contain the complete change list and fixes.
   to one remote mixer; the board's path), eight spikes and eight build steps, and the changes it
   asks of the microphone plan's D2, D3, D17, U7 and build table. No code changes.
 
+**Hearth: a capture of a sung performance, with no singer, no microphone and no sound**
+
+- **`hearth --smoke-shot x.png --page karaoke --open <song> --sing <voice.wav> --seek <ms>` takes a
+  picture of a performance, and `--finish-singing` takes the summary.** The WAV file is the
+  microphone: the first `--open` item plays from its start to the position in real time with the
+  Microphone card on, and the picture is taken as it gets there, with the pitch ribbon, the marks
+  under the lines sung and the score so far as they are while somebody sings; with
+  `--finish-singing` the item is held there and the performance ended, as turning the microphone
+  off ends one, so that the card has its **Last performance**. Those states exist only while the
+  microphone is on and voiced frames arrive, which no capture could reach without a singer.
+  The parser drops `--sing`, and says why in the log, without a capture, a file to sing along to,
+  a `--seek` or a page that has the card (`karaoke` or `singer`), and `--finish-singing` without
+  a `--sing`; a file that is not a WAV file, or a stream with no melody to score against, ends
+  the run with exit code 3.
+- **No microphone is opened and nothing is played**, so the rule that only a person's press opens
+  a microphone (MI2) is not bent. The file is a `MicrophoneInput` of its own (`VoiceFileInput`,
+  `apps/hearth/engine`), and the song goes to `make_silent_sink`, a `PcmSink` that takes the
+  blocks at the rate of the clock and plays them to nothing, handed to
+  `HearthController::set_test_outputs()` as the Qt Quick suites hand it a fake room. The capture is
+  silent, and runs on a computer with no sound output (the window names the output "Speakers").
+- **The file is sung along to the song as the song is heard, not started with it.** Measured on
+  this workstation, the item is heard between 70 ms and 2 s after it is started (the 2 s was a
+  cold start), so a file begun with `play()` would have been early by that much, which a pitch
+  score takes for a flat singer. The session tells its input where the item is heard to be
+  (`MicrophoneInput::heard_position()`, on every anchor), and `VoiceFileInput` places each sample
+  of the file where the item's own time reaches it; held, before the item is heard, or past the
+  end of the file, what arrives is silence, so that the stream is never taken for a stalled
+  device. The example's own lead vocal against its melody guide read a lag of 0 to 10 ms and, over
+  the whole song, a pitch score of 93 %.
+- 18 engine cases (`test_voice_file_input.cpp`, `test_silent_sink.cpp`: where each sample lands,
+  a seek, a report that is late, a held item, the end of the file, a session scoring a voice
+  against a start 380 ms late and not stalling when held; the sink's clock, its capacity, an
+  underrun, a flush and a pause), 3 for the parser, and 2 for the controller (the example sung
+  through, each of its four lines marked at the top level; a file that is not a WAV file).
+
 ### Changed
 
 **Reading decimal numbers: `iclforge::base::parse_double`, which is fast_float**
@@ -4479,6 +4528,12 @@ The sections below contain the complete change list and fixes.
   [Hearth for Android](docs/hearth/android.md) is the page for the Android TV sink: what it needs,
   building it, pairing, what it plays, the lyric screen and its controls, what has been run and what
   it does not do. The support catalogue and the platform tables have rows for it.
+- **The karaoke guide shows a performance.** Its "What you see while you sing" has a picture of the
+  singer view part way through the example's last word, taken with `--sing` (no singer, no
+  microphone, no sound): the marks under the lines already sung and the ribbon with the voice on
+  the tune, with the command that took it and an entry for it in `tools/pictures/pictures.json`.
+  The same two options are in [Hearth's command line](docs/hearth/index.md#command-line), and in
+  the picture tooling's README, which says what a run takes and what its log reports.
 
 **Release engineering**
 

@@ -284,3 +284,83 @@ TEST_CASE("an argument nobody here knows is skipped", "[hearth][command-line]") 
     CHECK(cli.open_files.isEmpty());
     CHECK(cli.warnings.isEmpty());
 }
+
+TEST_CASE("the --sing option names the voice of a performance, sung to the --seek position",
+          "[hearth][command-line]") {
+    const CommandLine cli = parse({"--smoke-shot", "x.png", "--page", "karaoke", "--open", "song.ac3",
+                                   "--sing", "voice.wav", "--seek", "11000"});
+    CHECK(cli.sing_file == QStringLiteral("voice.wav"));
+    CHECK_FALSE(cli.finish_singing);
+    REQUIRE(cli.seek_ms.has_value());
+    CHECK(*cli.seek_ms == 11000);
+    CHECK(cli.warnings.isEmpty());
+    // The value is the option's own: a file after it is still a file, and a capture never plays
+    // at launch, so a performance is not one more reason to start it.
+    CHECK_FALSE(cli.plays_at_launch());
+    const CommandLine singer = parse({"--smoke-shot", "x.png", "--page", "singer", "--sing", "voice.wav",
+                                      "--seek", "9000", "song.ac3", "--finish-singing"});
+    CHECK(singer.sing_file == QStringLiteral("voice.wav"));
+    CHECK(singer.finish_singing);
+    REQUIRE(singer.open_files.size() == 1);
+    CHECK(singer.open_files[0] == QStringLiteral("song.ac3"));
+    CHECK(singer.warnings.isEmpty());
+}
+
+TEST_CASE("the --sing option is dropped where it could not run, each time saying why",
+          "[hearth][command-line]") {
+    struct Case {
+        QStringList args;
+        const char* said;
+    };
+    const Case cases[] = {
+        // No capture: nothing a person runs may play to nothing, or take a microphone's place.
+        {{"--page", "karaoke", "--open", "song.ac3", "--sing", "voice.wav", "--seek", "9000"},
+         "a capture"},
+        {{"--smoke-shot", "x.png", "--page", "karaoke", "--sing", "voice.wav", "--seek", "9000"},
+         "without a file"},
+        {{"--smoke-shot", "x.png", "--page", "karaoke", "--open", "song.ac3", "--sing", "voice.wav"},
+         "--seek"},
+        // The pages with the Microphone card are the Karaoke page and the singer view over it.
+        {{"--smoke-shot", "x.png", "--open", "song.ac3", "--sing", "voice.wav", "--seek", "9000"},
+         "--page karaoke"},
+        {{"--smoke-shot", "x.png", "--page", "play", "--open", "song.ac3", "--sing", "voice.wav",
+          "--seek", "9000"},
+         "--page karaoke"},
+    };
+    for (const Case& c : cases) {
+        const CommandLine cli = parse(c.args);
+        INFO(c.said);
+        CHECK(cli.sing_file.isEmpty());
+        // The first reason that holds is the one said: --seek with no file is said for itself too.
+        REQUIRE_FALSE(cli.warnings.isEmpty());
+        CHECK(cli.warnings.back().contains(QStringLiteral("--sing")));
+        CHECK(cli.warnings.back().contains(QString::fromLatin1(c.said)));
+        CHECK(cli.warnings.back().endsWith(QStringLiteral("and is not used")));
+    }
+    // A --sing with no value says so, and the file after it is not taken for its value.
+    const CommandLine bare = parse({"--smoke-shot", "x.png", "--sing"});
+    CHECK(bare.sing_file.isEmpty());
+    REQUIRE(bare.warnings.size() == 1);
+    CHECK(bare.warnings[0].contains(QStringLiteral("--sing needs a WAV file")));
+}
+
+TEST_CASE("the --finish-singing option ends a performance, and is dropped without one",
+          "[hearth][command-line]") {
+    const CommandLine alone = parse({"--smoke-shot", "x.png", "--page", "karaoke", "--open", "song.ac3",
+                                     "--seek", "9000", "--finish-singing"});
+    CHECK_FALSE(alone.finish_singing);
+    REQUIRE(alone.warnings.size() == 1);
+    CHECK(alone.warnings[0].contains(QStringLiteral("--finish-singing")));
+    // And a --sing that was dropped takes it with it.
+    const CommandLine dropped = parse({"--page", "karaoke", "--open", "song.ac3", "--sing", "voice.wav",
+                                       "--seek", "9000", "--finish-singing"});
+    CHECK(dropped.sing_file.isEmpty());
+    CHECK_FALSE(dropped.finish_singing);
+    REQUIRE(dropped.warnings.size() == 2);
+    // It is a flag: it takes no value, so what follows it is read as it always was.
+    const CommandLine flag = parse({"--smoke-shot", "x.png", "--page", "karaoke", "--sing", "voice.wav",
+                                    "--seek", "9000", "--finish-singing", "song.ac3"});
+    CHECK(flag.finish_singing);
+    REQUIRE(flag.open_files.size() == 1);
+    CHECK(flag.open_files[0] == QStringLiteral("song.ac3"));
+}

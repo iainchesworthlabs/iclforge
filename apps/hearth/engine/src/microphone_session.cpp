@@ -77,7 +77,18 @@ void MicrophoneSession::set_reference(std::optional<pitch::Contour> reference) {
     rebuild_performance();
 }
 
+void MicrophoneSession::use_input(std::unique_ptr<MicrophoneInput> input) {
+    stop();
+    input_ = std::move(input);
+    // A recording sung along to the item has to be told where it is, and was last told before it
+    // was this session's.
+    if (anchor_) {
+        input_->heard_position(anchor_->position_ms, anchor_->speed > 0.0, anchor_->at_ns);
+    }
+}
+
 void MicrophoneSession::anchor(std::int64_t position_ms, bool playing, std::int64_t now_ns) {
+    input_->heard_position(position_ms, playing, now_ns);
     playhead_.anchor(position_ms, now_ns / 1000, playing ? 1.0 : 0.0);
     anchor_ = Anchor{position_ms, playing ? 1.0 : 0.0, now_ns};
     if (performance_) {
