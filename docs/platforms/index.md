@@ -98,7 +98,8 @@ sample rate, metadata field and Annex E tool with its spec citation. Desktop and
 builds expose the full AC-3 and E-AC-3 codec, and the AC-4 decoder and encoder ([AC-4 decoding
 and encoding](../library/ac4.md)). Minimum-footprint and fixed-point builds narrow that surface for
 memory, arithmetic and timing constraints; the variant tables above and the individual bare-metal
-pages record those limits. The AC-4 decoder is an option of the ESP-IDF component
+pages record those limits, and [ESP32 memory layout](bare-metal/memory-layout.md) sets the flash
+and RAM of the three ESP32 kits side by side. The AC-4 decoder is an option of the ESP-IDF component
 (`CONFIG_ICLFORGE_AC4`, for parts with an FPU) that has been measured on the ESP32-P4 only.
 The [application coverage
 matrix](../library/application-coverage.md) shows which broad library capabilities each
