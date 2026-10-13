@@ -290,15 +290,14 @@ std::vector<std::string> NativeSink::drain_log() {
 
 void NativeSink::request_vocals(std::int32_t vocals) {
     namespace player = sendspin::player;
-    player::Request request;
-    request.decoder.karaoke = player::Karaoke::kCapable;
-    request.decoder.karaoke_vocals = vocals == 0   ? player::KaraokeVocals::kNone
-                                     : vocals == 1 ? player::KaraokeVocals::kV1
-                                     : vocals == 2 ? player::KaraokeVocals::kV2
-                                                   : player::KaraokeVocals::kBoth;
+    // 0 is none, 1 and 2 the voices, anything else both (the sheet's row order).
+    const player::KaraokeVocals choice = vocals == 0   ? player::KaraokeVocals::kNone
+                                         : vocals == 1 ? player::KaraokeVocals::kV1
+                                         : vocals == 2 ? player::KaraokeVocals::kV2
+                                                       : player::KaraokeVocals::kBoth;
     const std::lock_guard lock(impl_->mutex);
     if (impl_->sink) {
-        impl_->sink->send_request(request);
+        impl_->sink->send_request(sink::vocals_request(choice));
     }
 }
 

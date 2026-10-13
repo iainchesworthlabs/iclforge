@@ -511,7 +511,7 @@ class LyricView(context: Context) : View(context) {
             title += if (title.isEmpty()) frame.artist else " - ${frame.artist}"
         }
         val widthPx = (right - left).toInt()
-        val timeText = if (frame.mode == LyricFrame.Mode.LINE || frame.mode == LyricFrame.Mode.GAP) {
+        val timeText = if (frame.mode == LyricFrame.Mode.LINE || frame.mode == LyricFrame.Mode.GAP || frame.progress) {
             clockText(frame.positionMs) + (frame.lengthMs?.let { " / ${clockText(it)}" } ?: "")
         } else {
             ""
@@ -544,7 +544,7 @@ class LyricView(context: Context) : View(context) {
         canvas.drawRect(left, bottom - line, right, bottom, fillPaint)
         val length = frame.lengthMs
         if (length != null && length > 0 &&
-            (frame.mode == LyricFrame.Mode.LINE || frame.mode == LyricFrame.Mode.GAP)
+            (frame.mode == LyricFrame.Mode.LINE || frame.mode == LyricFrame.Mode.GAP || frame.progress)
         ) {
             val progress = (frame.positionMs.toFloat() / length).coerceIn(0f, 1f)
             fillPaint.color = Tokens.ACCENT

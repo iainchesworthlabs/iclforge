@@ -62,7 +62,10 @@ class MainActivity : Activity() {
                 statusView.alpha = 1f
             }
             guard(focusTarget, if (showing) frame else statusView.content)
-            handler.postDelayed(this, 1000L / Tokens.framesPerSecond(frame))
+            // The server's clock in the header moves by the second: twice a second, not once, so that a
+            // second is not shown twice or skipped by the poll's own jitter.
+            val rate = if (frame.progress) max(2, Tokens.framesPerSecond(frame)) else Tokens.framesPerSecond(frame)
+            handler.postDelayed(this, 1000L / rate)
         }
     }
 

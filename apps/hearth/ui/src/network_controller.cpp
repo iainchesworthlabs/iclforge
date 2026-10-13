@@ -583,6 +583,8 @@ NetworkController::~NetworkController() {
     NetworkOutputStatus::instance().set_planner({});
     NetworkOutputStatus::instance().set_karaoke_applier({});
     NetworkOutputStatus::instance().set_lyrics_applier({});
+    // Nothing is left to be taken for a host that is gone.
+    static_cast<void>(NetworkOutputStatus::instance().take_requests());
     sinks_engine_.reset();
 }
 
@@ -625,6 +627,12 @@ void NetworkController::start() {
         [sinks](const std::string& group_id, const iclforge::hearth::LyricsUpdate& update) {
             sinks->apply_lyrics(group_id, update);
         });
+    // A member's own control asking for the singer's karaoke choice (D8): HearthController, which
+    // holds the choice, takes it at its next poll.
+    sinks->set_request_handler([](const iclforge::hearth::NetworkSinks::SinkRequest& request) {
+        NetworkOutputStatus::instance().push_request(
+            {.group_id = request.group_id, .sink_name = request.sink_name, .request = request.request});
+    });
     poll_timer_.start();
     poll();
 }
