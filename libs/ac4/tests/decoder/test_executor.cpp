@@ -2,7 +2,9 @@
 // stages over two threads, and what it puts out is what it puts out without one, bit for bit: the
 // executor is a speed, not a change. Every committed stream, through a decoder with a second
 // thread and through one without, under the same output configurations Hearth uses (as coded, and
-// the folds to stereo), compared sample by sample.
+// the folds to stereo), compared sample by sample. Under the sanitizers
+// (tests/support/sanitized.hpp) one stream of each kind, its first frames, and each stream under
+// one of the two configurations in turn.
 //
 // And a decoder that is told the frame after the one it decodes (Decoder::decode()'s `next`)
 // reads it on the second thread while it reconstructs the first (planning/ac4.md, D14i): the same
@@ -338,13 +340,20 @@ TEST_CASE("a frame read ahead on the second lane gives what it gives read where 
     TwoLanes lanes;
     const std::size_t limit = iclforge::test::kSanitized ? iclforge::test::kSanitizedFrames : 60;
     std::size_t compared = 0;
+    std::size_t index = 0;
     for (const fs::path& path : iclforge::test::streams_to_play(streams)) {
         INFO("stream " << path.string());
         const auto frames = frames_of(path);
-        compared += compare_ahead(frames, iclforge::ac4::OutputConfig{}, lanes, limit);
-        compared += compare_ahead(
-            frames, iclforge::ac4::OutputConfig{.downmix = iclforge::ac4::DownmixTarget::kLoRo},
-            lanes, limit);
+        // Under the sanitizers each stream takes one of the two output configurations, in turn.
+        if (!iclforge::test::kSanitized || index % 2 == 0) {
+            compared += compare_ahead(frames, iclforge::ac4::OutputConfig{}, lanes, limit);
+        }
+        if (!iclforge::test::kSanitized || index % 2 == 1) {
+            compared += compare_ahead(
+                frames, iclforge::ac4::OutputConfig{.downmix = iclforge::ac4::DownmixTarget::kLoRo},
+                lanes, limit);
+        }
+        ++index;
     }
     CHECK(compared > 0);
     // Frames really were read on the second lane.
@@ -398,13 +407,20 @@ TEST_CASE("a decoder given a second lane puts out the PCM it puts out without on
     TwoLanes lanes;
     const std::size_t limit = iclforge::test::kSanitized ? iclforge::test::kSanitizedFrames : 60;
     std::size_t compared = 0;
+    std::size_t index = 0;
     for (const fs::path& path : iclforge::test::streams_to_play(streams)) {
         INFO("stream " << path.string());
         const auto frames = frames_of(path);
-        compared += compare(frames, iclforge::ac4::OutputConfig{}, lanes, limit);
-        compared += compare(
-            frames, iclforge::ac4::OutputConfig{.downmix = iclforge::ac4::DownmixTarget::kLoRo},
-            lanes, limit);
+        // Under the sanitizers each stream takes one of the two output configurations, in turn.
+        if (!iclforge::test::kSanitized || index % 2 == 0) {
+            compared += compare(frames, iclforge::ac4::OutputConfig{}, lanes, limit);
+        }
+        if (!iclforge::test::kSanitized || index % 2 == 1) {
+            compared += compare(
+                frames, iclforge::ac4::OutputConfig{.downmix = iclforge::ac4::DownmixTarget::kLoRo},
+                lanes, limit);
+        }
+        ++index;
     }
     CHECK(compared > 0);
     // The work really did go to the second lane, and not only through the first.

@@ -11,8 +11,10 @@
 #include <iterator>
 #include <vector>
 
+#include "iclforge/ac3/decoder/decoder.hpp"
 #include "iclforge/pitch/reference.hpp"
 #include "reference_melody.hpp"
+#include "sanitized.hpp"
 
 // apps/hearth/engine/src/reference_melody.*: the melody a singer is scored against, taken from the
 // karaoke stream's own channels (planning/karaoke-microphone.md, D9). The stream is the
@@ -39,6 +41,21 @@ std::vector<std::byte> read_file(const fs::path& path) {
 
 fs::path example() {
     return fs::path{ICLFORGE_KARAOKE_EXAMPLE_DIR} / "auld-lang-syne.ac3";
+}
+
+// The cases that read a part's first notes take the stream's first ten seconds under the
+// sanitizers (tests/support/sanitized.hpp), in whole syncframes: the eleventh note, the "mind?"
+// that ends the second line, is over at eight. A normal build takes the whole stream.
+std::vector<std::byte> notes_of(const std::vector<std::byte>& stream) {
+    if (!iclforge::test::kSanitized) {
+        return stream;
+    }
+    const auto frames = iclforge::ac3::split_frames(stream);
+    REQUIRE(frames.has_value());
+    constexpr std::size_t kFrames = 10 * 48000 / 1536;
+    REQUIRE(frames->size() > kFrames);
+    const std::byte* end = (*frames)[kFrames - 1].data() + (*frames)[kFrames - 1].size();
+    return {stream.data(), end};
 }
 
 fs::path repo_root() {
@@ -85,7 +102,7 @@ TEST_CASE("reference melody: the guide melody of a karaoke stream is its tune",
 
 TEST_CASE("reference melody: vocal 1 is the same tune, and vocal 2 the harmony",
           "[hearth][reference]") {
-    const auto bytes = read_file(example());
+    const auto bytes = notes_of(read_file(example()));
     {
         const auto result = iclforge::hearth::reference_from_karaoke(bytes, ReferencePart::kVocal1);
         REQUIRE(result.has_value());

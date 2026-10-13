@@ -196,6 +196,19 @@
       // signals and fewer cases (tests/support/sanitized.hpp), which cut their
       // serial time by 71 % in WSL; the 150 stays for the phases still to
       // come.
+      //
+      // On 2026-10-13 (run 38341670892) it was not enough with every test
+      // green: the build took 126 minutes, 7,111 s of them ctest over 4,176
+      // tests, and the codec matrix was cut at 21 of its 30. The 3,172 tests
+      // of the green run of 2026-10-03 took the same 71 minutes; the 997
+      // since took 48 more. `forge monitor` with associated= and with
+      // karaoke= took 561 s of that reading the capture of a software device,
+      // which does not pace its writer (100 to 200 MB of silence for a
+      // second of stream), whole through a byte-at-a-time loop; they read it
+      // in blocks now. The karaoke bleed, pitch and reference-melody tests,
+      // the 22.2, 9.X.4, HSF and executor tests and a few more take less
+      // under the sanitizers (tests/support/sanitized.hpp), about 20 minutes
+      // between them in WSL.
       "timeout_minutes": 150
     },
     {

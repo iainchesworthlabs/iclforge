@@ -272,8 +272,14 @@ constexpr std::array<Mode, 3> kModes = {Mode{1024, CodecMode::kScpl, 0},
 
 TEST_CASE("9.1.4 and 9.0.4 in SCPL, ASPX_SCPL and ASPX_ACPL_2 put each tone on its own channel",
           "[ac4][encoder][immersive][nine-x-four]") {
+    // Under the sanitizers (tests/support/sanitized.hpp) each mode once: SCPL and ASPX_ACPL_2 in
+    // 9.1.4 and ASPX_SCPL in 9.0.4.
     for (const bool lfe : {true, false}) {
+        std::size_t mode_index = 0;
         for (const Mode m : kModes) {
+            if (kSanitized && (mode_index++ % 2 == 0) != lfe) {
+                continue;
+            }
             const bool parametric = m.mode == CodecMode::kAspxAcpl2;
             CAPTURE(lfe, m.kbps);
             const std::vector<Channel> channels = layout(lfe, !parametric);
@@ -358,6 +364,11 @@ TEST_CASE("9.1.4 and 9.0.4 in ASPX_ACPL_1, experimental, put each tone on its ow
     // The residuals below acpl_qmf_band, 3 kHz, above every tone: the pairs come back as simple
     // coupling would make them, the six modules' (L'', M'') among them.
     for (const bool lfe : {true, false}) {
+        // Under the sanitizers (tests/support/sanitized.hpp) 9.0.4 alone, the 9.1.4 of the other
+        // modes being met above.
+        if (kSanitized && lfe) {
+            continue;
+        }
         CAPTURE(lfe);
         const std::vector<Channel> channels = layout(lfe, true);
         const Encoded encoded = encode({.channels = lfe ? 14 : 13,

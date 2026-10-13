@@ -32,6 +32,7 @@
 #include "iclforge/ac3/io/wav.hpp"
 #include "iclforge/ac3/meta/qc.hpp"
 #include "iclforge/objects/scene.hpp"
+#include "sanitized.hpp"
 
 // apps/forge/cli/src/main.cpp compiles directly into the forge executable, everything
 // in an anonymous namespace - there is no library surface parse_options,
@@ -3317,8 +3318,12 @@ TEST_CASE("mode=reference is exactly the two transform off-switches together", "
         return std::vector<char>{std::istreambuf_iterator<char>{in},
                                  std::istreambuf_iterator<char>{}};
     };
+    // Two seconds of sine, or under the sanitizers (tests/support/sanitized.hpp) one: what is
+    // compared is the bytes the switches give, whatever the length.
+    const char* const seconds = iclforge::test::kSanitized ? "1" : "2";
     const auto sine = [&](const fs::path& out, const std::string& tokens) {
-        REQUIRE(run_cli("sine \"" + out.string() + "\" 2 192 440 70 stereo " + tokens, log) == 0);
+        REQUIRE(run_cli("sine \"" + out.string() + "\" " + seconds + " 192 440 70 stereo " + tokens,
+                        log) == 0);
     };
     const auto decode = [&](const fs::path& in, const fs::path& out,
                             const std::string& tokens) {

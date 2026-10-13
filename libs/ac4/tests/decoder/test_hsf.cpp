@@ -402,8 +402,9 @@ TEST_CASE("the 3.0 element's channels at 96 and 192 kHz, by coding_config and ch
     for (const int sf_multiplier : {0, 1}) {
         for (const int sap_mode : {0, 2}) {
             // Table 178's twelve matrices: each puts the tracks on L, R and C another way, which
-            // the extension's lines must follow as the core's do.
-            for (int matsel = 0; matsel < 12; ++matsel) {
+            // the extension's lines must follow as the core's do. Every third under the
+            // sanitizers (tests/support/sanitized.hpp).
+            for (int matsel = 0; matsel < 12; matsel += kSanitized ? 3 : 1) {
                 CAPTURE(sf_multiplier, sap_mode, matsel);
                 HsfCase c = multichannel_case(2, sf_multiplier);
                 c.coding_config = 1;
@@ -427,8 +428,10 @@ TEST_CASE("the 5.X element's channels at 96 and 192 kHz, with and without an LFE
     for (const int ch_mode : {3, 4}) {
         for (const int sf_multiplier : {0, 1}) {
             for (const int sap_mode : {0, 2}) {
-                // Table 179's twelve matrices of five_channel_data(); every third at 192 kHz.
-                for (int matsel = 0; matsel < 12; matsel += sf_multiplier == 0 ? 1 : 3) {
+                // Table 179's twelve matrices of five_channel_data(); every third at 192 kHz, and
+                // under the sanitizers (tests/support/sanitized.hpp) at 96 kHz too.
+                for (int matsel = 0; matsel < 12;
+                     matsel += sf_multiplier == 0 && !kSanitized ? 1 : 3) {
                     CAPTURE(ch_mode, sf_multiplier, sap_mode, matsel);
                     HsfCase c = multichannel_case(ch_mode, sf_multiplier);
                     c.coding_config = 3;
@@ -454,9 +457,13 @@ TEST_CASE("the 5.X element's channels at 96 and 192 kHz, with and without an LFE
 
 TEST_CASE("the 7.X element's additional channels at 96 and 192 kHz", "[ac4][decoder][hsf]") {
     for (const int sf_multiplier : {0, 1}) {
-        // Without b_use_sap_add_ch, and with Table 183's two steps in each sap_mode.
+        // Without b_use_sap_add_ch, and with Table 183's two steps in each sap_mode. Under the
+        // sanitizers (tests/support/sanitized.hpp) each takes stereo processing on or off in turn.
         for (const int step : {-1, 0, 1, 2}) {
             for (const bool proc : {false, true}) {
+                if (kSanitized && proc != (step % 2 == 0)) {
+                    continue;
+                }
                 CAPTURE(sf_multiplier, step, proc);
                 HsfCase c = multichannel_case(5, sf_multiplier);
                 c.use_sap_add_ch = step >= 0;

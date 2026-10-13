@@ -828,10 +828,13 @@ TEST_CASE("ac4-encode's dialogue enhancement substreams stems and EMDF-only pres
     const auto log = dir / "ac4_dialogue_substreams.log";
     const auto trace = dir / "ac4_dialogue_substreams.tsv";
     const fs::path out = dir / "ac4_dialogue_substreams.ac4";
-    // A 5.1 main whose C carries dialogue alone.
+    // A 5.1 main whose C carries dialogue alone. Every run here reads its first frame's syntax
+    // and the table of contents alone, so under the sanitizers (tests/support/sanitized.hpp) its
+    // input is a frame in place of a second.
+    const std::size_t length = kSanitized ? kSanitizedSamples : static_cast<std::size_t>(kRate);
     std::vector<std::vector<float>> main51;
     for (std::size_t c = 0; c < 6; ++c) {
-        main51.push_back(tone(c == 2 ? 1201.0 : 331.0 + 157.0 * static_cast<double>(c), kRate));
+        main51.push_back(tone(c == 2 ? 1201.0 : 331.0 + 157.0 * static_cast<double>(c), length));
     }
     const fs::path main = wav_of("ac4_main51.wav", main51);
     SECTION(
@@ -859,10 +862,10 @@ TEST_CASE("ac4-encode's dialogue enhancement substreams stems and EMDF-only pres
               std::vector<std::uint64_t>{16});  // 0.5 x 31
     }
     SECTION("a later substream's dialogue from a stem by the cross-channel method") {
-        std::vector<std::vector<float>> stem(6, std::vector<float>(kRate, 0.0F));
+        std::vector<std::vector<float>> stem(6, std::vector<float>(length, 0.0F));
         stem[2] = main51[2];
         const fs::path stem_path = wav_of("ac4_main51_stem.wav", stem);
-        const fs::path stereo = tones_wav("ac4_dialogue_stereo.wav", 2);
+        const fs::path stereo = first_frame_tones_wav("ac4_dialogue_stereo.wav", 2, 1);
         REQUIRE(
             run_cli("ac4-encode " + quoted(stereo) + " " + quoted(out) +
                         " 384 substream1-content=main substream2=" + quoted(main) +
@@ -879,8 +882,8 @@ TEST_CASE("ac4-encode's dialogue enhancement substreams stems and EMDF-only pres
         CHECK(first_frame(records, "de_max_gain") == std::vector<std::uint64_t>{1});  // 6 dB
     }
     SECTION("EMDF payloads alone in a presentation of configuration 6") {
-        REQUIRE(run_cli("ac4-encode " + quoted(tones_wav("ac4_emdf_stereo.wav", 2)) + " " +
-                            quoted(out) +
+        REQUIRE(run_cli("ac4-encode " + quoted(first_frame_tones_wav("ac4_emdf_stereo.wav", 2, 1)) +
+                            " " + quoted(out) +
                             " 128 presentation1=1 presentation2-config=6 presentation2-emdf=1:e606"
                             " presentation2-emdf=20: syntax-trace=" +
                             quoted(trace),
@@ -902,9 +905,9 @@ TEST_CASE("ac4-encode's dialogue enhancement substreams stems and EMDF-only pres
         CHECK_FALSE(fs::exists(fragments / "init.mp4"));
     }
     SECTION("3.0 dialogue beside music and effects, with experimental=three-zero") {
-        const fs::path three = tones_wav("ac4_three.wav", 3);
-        REQUIRE(run_cli("ac4-encode " + quoted(tones_wav("ac4_three_me.wav", 6)) + " " +
-                            quoted(out) +
+        const fs::path three = first_frame_tones_wav("ac4_three.wav", 3, 1);
+        REQUIRE(run_cli("ac4-encode " + quoted(first_frame_tones_wav("ac4_three_me.wav", 6, 1)) +
+                            " " + quoted(out) +
                             " 512 experimental=three-zero substream1-content=music-and-effects "
                             "substream2=" +
                             quoted(three) +

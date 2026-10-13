@@ -403,7 +403,8 @@ void require_change_lands_whole(const std::vector<std::vector<std::byte>>& frame
 // a second (Hearth's DecoderAc4::test_downmixIsHeardWithTheStreamsGains).
 TEST_CASE("set_output changes the downmix from the next frame, keeping the stream's own gains",
           "[ac4][decoder][api]") {
-    const auto frames = tones_with_their_own_gains(60);
+    // Encoded once for the two sections, which Catch2 enters one after the other.
+    static const auto frames = tones_with_their_own_gains(60);
     REQUIRE(frames.size() >= 60);
     // Frame 30 is between the I-frames 24 and 48, the only frames that carry
     // the gains.
@@ -492,11 +493,15 @@ TEST_CASE(
     "decode_by_block hands the output over in blocks of 256 samples whatever the frame length",
     "[ac4][decoder][api]") {
     // Index 13's 2 048-sample frames, and 24 fps IMS, whose frames come to 2 000
-    // samples at 48 kHz: seven blocks and 208 held for the next.
+    // samples at 48 kHz: seven blocks and 208 held for the next. Under the
+    // sanitizers (tests/support/sanitized.hpp) the first 48 frames of each.
     for (const std::string_view leg :
          {"ac4-20-tones-192", "ac4-ims-film-96-24", "ac4-ims-music-64-2997"}) {
         CAPTURE(leg);
-        const auto frames = frames_of(baseline(leg));
+        auto frames = frames_of(baseline(leg));
+        if (kSanitized && frames.size() > 48) {
+            frames.resize(48);
+        }
         iclforge::ac4::Decoder whole;
         const Decoded reference = decode_all(whole, frames);
 
@@ -800,7 +805,10 @@ TEST_CASE("presentations() lists each presentation of the table of contents",
 TEST_CASE("metadata() reports the values the selected presentation's frames sent",
           "[ac4][decoder][api]") {
     // Each DEE leg's frames traced: the last value of each element the trace
-    // shows, which is what metadata() holds after the last frame.
+    // shows, which is what metadata() holds after the last frame. Under the
+    // sanitizers (tests/support/sanitized.hpp) the first twelve frames, which are
+    // what it holds after the last of them, and where the trace costs the most.
+    constexpr std::size_t kSanitizedMetadataFrames = 12;
     for (const std::string_view leg : {"ac4-20-music-192", "ac4-20-speech-128", "ac4-51-music-128",
                                        "ac4-51-drc-ltrt-192", "ac4-51-film-96"}) {
         CAPTURE(leg);
@@ -813,7 +821,11 @@ TEST_CASE("metadata() reports the values the selected presentation's frames sent
             ++seen[std::string{r.name}];
         };
         iclforge::ac4::Decoder decoder(config);
-        for (const std::vector<std::byte>& frame : frames_of(baseline(leg))) {
+        std::vector<std::vector<std::byte>> frames = frames_of(baseline(leg));
+        if (kSanitized && frames.size() > kSanitizedMetadataFrames) {
+            frames.resize(kSanitizedMetadataFrames);
+        }
+        for (const std::vector<std::byte>& frame : frames) {
             REQUIRE(decoder.decode(frame).has_value());
         }
         const iclforge::ac4::PresentationMetadata& m = decoder.metadata();

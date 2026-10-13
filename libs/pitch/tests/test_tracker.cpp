@@ -10,6 +10,7 @@
 
 #include "iclforge/pitch/synth.hpp"
 #include "iclforge/pitch/tracker.hpp"
+#include "sanitized.hpp"
 
 // libs/pitch/src/tracker.cpp: the McLeod Pitch Method over a window, its decimator and its gates
 // (planning/karaoke-microphone.md, D7; findings F5).
@@ -244,8 +245,15 @@ TEST_CASE("pitch: synthetic voices are tracked, clean and in noise", "[pitch][tr
     };
     const Range ranges[] = {
         {"bass", 40.0, 52.0}, {"tenor and alto", 48.0, 72.0}, {"soprano", 72.0, 84.0}};
+    // Under the sanitizers (tests/support/sanitized.hpp) each range is tracked at one of its two
+    // noise levels, the bass and the soprano clean and the tenor and alto in noise.
+    std::size_t range_index = 0;
     for (const Range& range : ranges) {
+        std::size_t snr_index = 0;
         for (const double snr : {1000.0, 10.0}) {
+            if (iclforge::test::kSanitized && (range_index + snr_index++) % 2 != 0) {
+                continue;
+            }
             VoiceOptions options;
             options.lead_s = 0.0;
             options.seed = 7;
@@ -290,6 +298,7 @@ TEST_CASE("pitch: synthetic voices are tracked, clean and in noise", "[pitch][tr
             CHECK(errors[errors.size() / 2] < 12.0);
             CHECK(errors[errors.size() * 95 / 100] < 40.0);
         }
+        ++range_index;
     }
 }
 

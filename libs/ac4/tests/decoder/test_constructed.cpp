@@ -28,6 +28,7 @@
 #include <numbers>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <catch2/catch_test_macros.hpp>
@@ -807,9 +808,15 @@ TEST_CASE("dialogue enhancement raises 9.X.4's Lscr, Rscr and C, not L and R (Pa
           "[ac4][decoder][constructed][immersive][fronts][de]") {
     using S = Speaker;
     // de_channel_config's bits are the first, second and third channels of Table 15: 7 is all
-    // three, 4 the first alone and 3 the second and the third.
+    // three, 4 the first alone and 3 the second and the third. Under the sanitizers each config
+    // takes one of the two channel modes, in turn.
+    std::size_t index = 0;
     for (const int config : {7, 4, 3}) {
         for (const int ch_mode : {13, 14}) {
+            const std::size_t position = index++;
+            if (kSanitized && (position / 2 + position % 2) % 2 != 0) {
+                continue;
+            }
             ElementCase c;
             c.ch_mode = ch_mode;
             c.immersive = 0;
@@ -859,6 +866,9 @@ TEST_CASE(
         bool second;
         double front;  // C_L and C_R
     };
+    // Under the sanitizers the simulcast checks at the end, which hold the same of every mode, are
+    // made of the first alone.
+    bool simulcast_checked = false;
     for (const Mode mode : {Mode{3, 0, false, 0.0}, Mode{3, 0, true, 1.0}, Mode{4, 0, false, 0.0},
                             Mode{4, 1, false, 0.0}, Mode{4, 2, false, 1.0}}) {
         ElementCase c;
@@ -886,6 +896,9 @@ TEST_CASE(
                 return out == S::kLeft || out == S::kRight ? mode.front : 0.0;
             });
         CHECK(raised == (mode.front > 0.0 ? 3U : 1U));
+        if (kSanitized && std::exchange(simulcast_checked, true)) {
+            continue;
+        }
         // The core takes b_de_simulcast's second set where there is one: 0 there leaves the core
         // alone while the full decoding is enhanced as before.
         ElementCase simulcast = c;
@@ -939,7 +952,8 @@ TEST_CASE("A-SPX fills the 22.2 element's channels by the pair of Part 2 Table 8
     // the LFEs, which have no aspx_data, and every other pair have nothing.
     const auto elements = ac4_decoder_test::aspx_elements(15);
     REQUIRE(elements.size() == 11);
-    Stride stride(2, 0);
+    // Under the sanitizers every third of the eleven pairs is the loud one.
+    Stride stride(3, 0);
     for (std::size_t loud = 0; loud < elements.size(); ++loud) {
         if (!stride.take()) {
             continue;

@@ -11,6 +11,7 @@
 #include "iclforge/pitch/reference.hpp"
 #include "iclforge/pitch/synth.hpp"
 #include "performance.hpp"
+#include "sanitized.hpp"
 
 // apps/hearth/engine/src/performance.*: a singer's performance placed in an item and scored against
 // a reference melody (planning/karaoke-microphone.md, M4). No device: the voice is synthetic, and
@@ -322,10 +323,12 @@ TEST_CASE("performance: the trace is where the voice was placed, for drawing", "
 TEST_CASE("performance: the trace is bounded and cleared with the singer", "[performance]") {
     Performance performance = make();
     performance.anchor(0, kT0, 1.0);
-    // Far more than the capacity: forty seconds of the voice, over and over.
+    // More than the capacity, which is 3 000 frames of 10 ms: forty seconds of the voice, over and
+    // over, or under the sanitizers (tests/support/sanitized.hpp) thirty-three, which is still
+    // over it.
     const std::vector<float> once = voice_of();
     std::vector<float> long_voice;
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < (iclforge::test::kSanitized ? 9 : 12); ++i) {
         long_voice.insert(long_voice.end(), once.begin(), once.end());
     }
     feed_all(performance, long_voice, kT0);
