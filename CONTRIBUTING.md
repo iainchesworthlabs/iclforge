@@ -194,15 +194,22 @@ an NDK build reaches it; `tools/checks/check_no_std_format.py` (the static job; 
 `cmake/Fmt.cmake`) fails `#include <format>`, `#include <print>` and each `std::format`/
 `std::print` name in first-party C++ instead, comments and string literals aside.
 
-**One exception, for reading rather than writing.** {fmt} only formats *out*; it has no
-`from_chars`-equivalent for parsing text *into* a `double`, and `<charconv>`'s own **floating-point**
-`from_chars` is unavailable both on the NDK's bundled libc++ and at the macOS wheel's deployment
-target (`'from_chars' is unavailable: introduced in macOS 26.0`) — the **integer** overloads are
-fine everywhere and are used directly. Code that has to parse a decimal from user- or
-file-supplied text therefore goes through `strtod` instead (`libs/ac3/src/encoder/plan.cpp`,
-`encoder/assignment.cpp`, `libs/objects/src/scene_text.hpp`). Neither gap shows up on a Windows,
-Linux or Homebrew-macOS build, so the CI legs that catch it are Android (Shield) and Build wheels
-(macos-latest).
+**Reading a number is `iclforge::base::parse_double`.** {fmt} only formats *out*, and
+`<charconv>`'s own **floating-point** `from_chars` is unavailable both on the NDK's bundled libc++
+(r28c included) and at the macOS wheel's deployment target (`'from_chars' is unavailable:
+introduced in macOS 26.0`) — the **integer** overloads are fine everywhere and are used directly.
+Text that has to become a `double` goes through `parse_double`
+(`iclforge/base/number_parse.hpp`), which is [fast_float](https://github.com/fastfloat/fast_float),
+the library `std::from_chars` for floating point was specified from, behind one function: exact,
+the same answer on every toolchain, locale-independent, and the whole token or nothing. Its syntax is
+`std::from_chars`'; a caller reading what a person typed (a command line, a field in a window, a
+hand-written file) passes `kUserNumber`, which also takes the leading `+` and leading space that
+`strtod` took. Not `strtod`, `atof` or `std::stod`: they read the process locale's decimal point
+(a German `LC_NUMERIC` reads `"1.5"` as 1) and each C library's own idea of `ERANGE`, and they take
+hex floats. The two places left on `strtod` say why: `libs/render/include/iclforge/render/layout.hpp`,
+which the ESP-IDF firmware shares and which allocates nothing, and
+`libs/base/src/number_parse_libc.cpp`, which the minimum-footprint profiles take because they link
+no third-party library.
 
 **Warnings are errors.** `iclforge::warnings` is linked privately into every first-party target,
 including `examples/`. That includes `-Wsign-conversion` and its MSVC equivalents, which in

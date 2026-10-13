@@ -410,6 +410,11 @@ if(NOT ICLFORGE_MINIMAL_DECODER AND NOT ICLFORGE_MINIMAL_ENCODER)
     # graph names it; it is resolved wherever iclforge::objects is built, which is everywhere this
     # block is reached.
     include(NlohmannJson)
+    # iclforge::fast_float - fast_float (cmake/FastFloat.cmake), iclforge::base::parse_double's
+    # reader of decimal text (libs/base/src/number_parse.cpp). Header-only and PRIVATE to
+    # iclforge::base through $<BUILD_INTERFACE:...>, like the two above. The minimum-footprint builds
+    # skip it with them and take libs/base/src/number_parse_libc.cpp instead.
+    include(FastFloat)
 endif()
 
 # iclforge::adm (libs/adm) is a READER, not a writer like the three container modules above -

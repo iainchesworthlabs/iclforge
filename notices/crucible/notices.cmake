@@ -59,6 +59,12 @@ else()
 endif()
 # nlohmann/json's, the same way (cmake/NlohmannJson.cmake): iclforge::objects compiles it in for
 # the scene file's reader, and both binaries link that library.
+# fast_float's, the same way (cmake/FastFloat.cmake): iclforge::base compiles it in.
+if(FastFloat_VERSION)
+    set(ICLFORGE_CRUCIBLE_FAST_FLOAT_VERSION "${FastFloat_VERSION}")
+else()
+    set(ICLFORGE_CRUCIBLE_FAST_FLOAT_VERSION "${ICLFORGE_FAST_FLOAT_VERSION}")
+endif()
 if(nlohmann_json_VERSION)
     set(ICLFORGE_CRUCIBLE_JSON_VERSION "${nlohmann_json_VERSION}")
 else()
@@ -88,6 +94,7 @@ ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
         # the reader is holding the window.
         "FMT_USERS=crucible and crucible-run"
         "JSON_USERS=crucible and crucible-run"
+        "FAST_FLOAT_USERS=crucible and crucible-run"
         "FONT_USER=The executable"
         "QT_VERSION=${Qt6_VERSION}"
         "QT_SERIES=${ICLFORGE_CRUCIBLE_QT_SERIES}"
@@ -101,6 +108,7 @@ ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
         "QT_LOOKUP=${ICLFORGE_CRUCIBLE_QT_LOOKUP}"
         "FMT_VERSION=${ICLFORGE_CRUCIBLE_FMT_VERSION}"
         "JSON_VERSION=${ICLFORGE_CRUCIBLE_JSON_VERSION}"
+        "FAST_FLOAT_VERSION=${ICLFORGE_CRUCIBLE_FAST_FLOAT_VERSION}"
         "PIPEWIRE_VERSION=${ICLFORGE_CRUCIBLE_PIPEWIRE_VERSION}"
         "TRACY_VERSION=${ICLFORGE_CRUCIBLE_TRACY_VERSION}"
         # Named explicitly, not left implicit, now that notices/hearth/notices.cmake and
@@ -113,6 +121,7 @@ ac3_generate_notices("${ICLFORGE_CRUCIBLE_NOTICES_FILE}"
         "MSPL=${CMAKE_SOURCE_DIR}/apps/crucible/windows/driver/LICENSE"
         "FMT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fmt.txt"
         "JSON_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-nlohmann-json.txt"
+        "FAST_FLOAT_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-fast-float.txt"
         "PW_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-pipewire.txt"
         "TRACY_BSD=${CMAKE_SOURCE_DIR}/notices/licences/BSD-3-Clause-Tracy.txt"
         "MESA_MIT=${CMAKE_SOURCE_DIR}/notices/licences/MIT-mesa.txt"

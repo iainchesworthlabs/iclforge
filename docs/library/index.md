@@ -86,6 +86,12 @@ leaves the export graph with nothing to declare, and a consumer needs none of it
 carries nlohmann's own ABI tag (`json_abi_v3_12_0_dp`), so a program that has the library of its
 own, of any version, cannot meet this copy.
 
+`iclforge::base` takes in a third the same way: fast_float (`cmake/FastFloat.cmake`), which
+`iclforge::base::parse_double` reads decimal text with. It is linked through
+`$<BUILD_INTERFACE:iclforge::fast_float>`, used in one source file and named by no header; its
+functions are inline templates compiled into that object, so an archive has no undefined symbol for
+it and a consumer needs nothing of its own.
+
 What a static variant does leave to the consumer's link is the C++ runtime. A CMake project links
 an installed static `iclforge::` target with the C++ driver when it enables the CXX language, so a C
 program using `iclforge::c_static` needs `project(your_project LANGUAGES C CXX)`; that driver
