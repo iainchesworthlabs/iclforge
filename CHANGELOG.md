@@ -3941,7 +3941,7 @@ The sections below contain the complete change list and fixes.
   end of the file, what arrives is silence, so that the stream is never taken for a stalled
   device. The example's own lead vocal against its melody guide read a lag of 0 to 10 ms and, over
   the whole song, a pitch score of 93 %.
-- 17 engine cases (`test_voice_file_input.cpp`, `test_silent_sink.cpp`: where each sample lands,
+- 18 engine cases (`test_voice_file_input.cpp`, `test_silent_sink.cpp`: where each sample lands,
   a seek, a report that is late, a held item, the end of the file, a session scoring a voice
   against a start 380 ms late and not stalling when held; the sink's clock, its capacity, an
   underrun, a flush and a pause), 3 for the parser, and 2 for the controller (the example sung

@@ -344,7 +344,8 @@ TEST_CASE("the --sing option is dropped where it could not run, each time saying
     CHECK(bare.warnings[0].contains(QStringLiteral("--sing needs a WAV file")));
 }
 
-TEST_CASE("--finish-singing ends a performance, and is dropped without one", "[hearth][command-line]") {
+TEST_CASE("the --finish-singing option ends a performance, and is dropped without one",
+          "[hearth][command-line]") {
     const CommandLine alone = parse({"--smoke-shot", "x.png", "--page", "karaoke", "--open", "song.ac3",
                                      "--seek", "9000", "--finish-singing"});
     CHECK_FALSE(alone.finish_singing);
