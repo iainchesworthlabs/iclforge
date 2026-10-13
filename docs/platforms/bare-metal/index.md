@@ -46,6 +46,9 @@ C6 / S3 / P4 sink modules on one dual-ES9080 PCB, are on
   like the one this was measured on, the page also has a chip-revision trap worth reading before
   flashing anything. It decodes AC-4 behind a switch, from an HTTP source or a Sendspin group:
   2.0 and 5.1 in real time, 5.1.4 slower ([AC-4](esp32-p4.md#ac-4)).
+- **Porting, tuning or debugging memory on an ESP32 board?**
+  [ESP32 memory layout](memory-layout.md) has the flash map, the internal RAM split, what lives in
+  PSRAM, the heap floors and what each codec costs on the S3, the C6 and the P4, side by side.
 - **Building with ESPHome instead of raw ESP-IDF?** [ESPHome](esphome.md) is the external
   component. It decodes AC-3 only, and it is not a `media_player` or `speaker` source.
 
