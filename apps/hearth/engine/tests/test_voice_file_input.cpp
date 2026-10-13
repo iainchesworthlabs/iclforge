@@ -221,6 +221,24 @@ TEST_CASE("voice file input: past the end of the recording it is silent", "[micr
     CHECK(block.samples.back() == 0.0F);
 }
 
+TEST_CASE("voice file input: the part of a frame that is left over goes to the next block",
+          "[microphone][voice-file]") {
+    Rig r = make();
+    REQUIRE(r.input->start("").has_value());
+    // 100 us is 4.8 frames at 48 kHz: four are delivered, and the 0.8 is not lost.
+    r.now = kT0 + 100'000;
+    InputBlock block;
+    REQUIRE(r.input->read(block));
+    CHECK(block.first_time_ns == kT0);
+    CHECK(block.samples.size() == 4);
+    // 200 us in all is 9.6: the next block begins where the four frames ended (83333 ns) and has
+    // the five that make nine, not the four that "100 us since the last read" would give.
+    r.now = kT0 + 200'000;
+    REQUIRE(r.input->read(block));
+    CHECK(block.first_time_ns == kT0 + 83'333);
+    CHECK(block.samples.size() == 5);
+}
+
 TEST_CASE("voice file input: a read after a long stall is a second, not the whole stall",
           "[microphone][voice-file]") {
     Rig r = make();
