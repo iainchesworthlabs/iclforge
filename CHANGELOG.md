@@ -4452,6 +4452,15 @@ The sections below contain the complete change list and fixes.
   range-for's temporaries before its first iteration (P2718R0 is Clang 19), which left eleven
   `iclforge-containers-tests` cases iterating a freed vector: the test binds the optional first.
 
+**{fmt} everywhere: the last two `std::format` users, and a check that keeps it so**
+
+- **`take_recorder.cpp` and `atmos.cpp` formatted with the standard library's `<format>`, which
+  NDK r26's libc++ lacks and every desktop leg compiles without a word.** Both use `fmt::format`
+  now, with the output byte for byte what it was (the take's `.take.json` and the `atmos-encode`
+  verbose `object N: ch0 x0.500` line are pinned by tests that passed on the old code first), and
+  `tools/checks/check_no_std_format.py` fails `#include <format>`, `#include <print>` and every
+  `std::format`/`std::print` name in first-party C++ in the static job.
+
 **Forge GUI Karaoke flow: a part of another length**
 
 - **The Karaoke flow's warning said the shorter part "is padded with silence"; it is not.** The
