@@ -72,7 +72,11 @@ that question — see [Landscape](landscape.md) and
 .quality-trend-table-wrap { overflow-x: auto; }
 #quality-trend-app table, #ac4-quality-trend-app table, #ac4-encode-quality-trend-app table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
 #quality-trend-app th, #quality-trend-app td, #ac4-quality-trend-app th, #ac4-quality-trend-app td, #ac4-encode-quality-trend-app th, #ac4-encode-quality-trend-app td { padding: 0.35em 0.6em; text-align: left; border-bottom: 1px solid var(--md-default-fg-color--lightest); white-space: nowrap; }
-.quality-trend-regression { color: var(--md-typeset-mark-color, #c62828); font-weight: 600; }
+/* Red, as performance-trend.md's breach colour is: --md-typeset-mark-color is the <mark> highlight's
+   background, not a red, so a fallback after it never applied. A deep step on the light page and a
+   pale one on the dark page, as performance-quality.md's .pq-watch is. */
+.quality-trend-regression { color: #c62828; font-weight: 600; }
+[data-md-color-scheme="slate"] .quality-trend-regression { color: #e57373; }
 .quality-trend-secondary-check { color: var(--md-default-fg-color--light); cursor: help; }
 .quality-trend-release-row { background: color-mix(in srgb, var(--md-accent-fg-color, #7c4dff) 8%, transparent); }
 .quality-trend-release { text-decoration: none; font-weight: 600; }

@@ -224,7 +224,18 @@ follow the same convention, table-only (no chart to style).
 .performance-trend-table-wrap { overflow-x: auto; }
 #performance-trend-app table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
 #performance-trend-app th, #performance-trend-app td { padding: 0.35em 0.6em; text-align: left; border-bottom: 1px solid var(--md-default-fg-color--lightest); white-space: nowrap; }
-.performance-trend-over-budget { color: var(--md-typeset-mark-color, #c62828); font-weight: 600; }
+/* Red is this page's colour for a budget and for a breach of one, orange for a soft drift
+   (.kernel-trend-soft below). Material's own variables cannot supply either: --md-typeset-mark-color
+   is the <mark> highlight's background (pale yellow, translucent blue on the dark scheme) and
+   --md-warning-fg-color is near-black on both schemes, so a fallback written after them never
+   applied. Each colour is a pair, as performance-quality.md's .pq-watch is: a deep step on the
+   light page and a pale one on the dark page. */
+.performance-trend-over-budget { color: #c62828; font-weight: 600; }
+.performance-trend-budget-line { stroke: #c62828; }
+.performance-trend-legend i.performance-trend-budget-swatch { background: none; border: 1.5px dashed #c62828; border-radius: 0; }
+[data-md-color-scheme="slate"] .performance-trend-over-budget { color: #e57373; }
+[data-md-color-scheme="slate"] .performance-trend-budget-line { stroke: #e57373; }
+[data-md-color-scheme="slate"] .performance-trend-legend i.performance-trend-budget-swatch { border-color: #e57373; }
 .performance-trend-release-row { background: color-mix(in srgb, var(--md-accent-fg-color, #7c4dff) 8%, transparent); }
 .performance-trend-release { text-decoration: none; font-weight: 600; }
 .performance-trend-release:hover { text-decoration: underline; }
@@ -424,7 +435,7 @@ follow the same convention, table-only (no chart to style).
     }
     if (budget !== null) {
       const by = y(budget);
-      svg += `<line x1="${pad.left}" y1="${by}" x2="${width - pad.right}" y2="${by}" stroke="var(--md-typeset-mark-color, #c62828)" stroke-width="1" stroke-dasharray="4,3"><title>Budget: ${budget.toFixed(3)} ms/frame</title></line>`;
+      svg += `<line x1="${pad.left}" y1="${by}" x2="${width - pad.right}" y2="${by}" class="performance-trend-budget-line" stroke-width="1" stroke-dasharray="4,3"><title>Budget: ${budget.toFixed(3)} ms/frame</title></line>`;
     }
     svg += `<text x="${pad.left}" y="${height - 6}" text-anchor="start" font-size="10" fill="var(--md-default-fg-color--light)">${new Date(minT).toISOString().slice(0, 10)}</text>`;
     svg += `<text x="${width - pad.right}" y="${height - 6}" text-anchor="end" font-size="10" fill="var(--md-default-fg-color--light)">${new Date(maxT).toISOString().slice(0, 10)}</text>`;
@@ -452,7 +463,7 @@ follow the same convention, table-only (no chart to style).
     const anyRelease = sortedRows.some((r) => releasesBySha[r.commit]);
     const items = [
       `<span><i style="background:${color}"></i>ms/frame</span>`,
-      '<span><i style="background:none;border:1.5px dashed var(--md-typeset-mark-color, #c62828);border-radius:0;"></i>budget</span>',
+      '<span><i class="performance-trend-budget-swatch"></i>budget</span>',
     ];
     if (anyRelease) {
       items.push('<span><i style="background:none;border:1.5px dashed var(--md-default-fg-color--light);"></i>tagged release</span>');
@@ -546,8 +557,12 @@ decode spends; the bare row is what the oracle costs.
 #kernel-trend-app { margin: 1.5em 0; }
 #kernel-trend-app table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
 #kernel-trend-app th, #kernel-trend-app td { padding: 0.35em 0.6em; text-align: left; border-bottom: 1px solid var(--md-default-fg-color--lightest); white-space: nowrap; }
-.kernel-trend-soft { color: var(--md-warning-fg-color, #e65100); font-weight: 600; }
-.kernel-trend-hard { color: var(--md-typeset-mark-color, #c62828); font-weight: 600; }
+/* The memory section's rows use these classes too. Colours as for .performance-trend-over-budget
+   above; the soft tier is the 900 step of orange, not .pq-watch's 800, being small bold text. */
+.kernel-trend-soft { color: #e65100; font-weight: 600; }
+.kernel-trend-hard { color: #c62828; font-weight: 600; }
+[data-md-color-scheme="slate"] .kernel-trend-soft { color: #ffb74d; }
+[data-md-color-scheme="slate"] .kernel-trend-hard { color: #e57373; }
 </style>
 
 <script>
