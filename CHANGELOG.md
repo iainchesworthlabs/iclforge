@@ -304,14 +304,6 @@ The sections below contain the complete change list and fixes.
   the hairline under it fills by it. A host case holds the position, the pause and the document's own
   length winning; `LyricViewRenderTest` holds the pixels.
 
-**Hearth for Android: the first run says what to do next**
-
-- **The idle screen tells a new person where to pair and how to play.** There is no welcome screen. A sink
-  with no pairing says "Not paired yet. In Hearth, open the Network page and choose this sink: a code
-  appears here", and a paired sink that has never played a stream adds "To play, add this sink to a group
-  on Hearth's Network page", which is the desktop's first-run dialog's third step (a paired sink alone is
-  not something Hearth plays to). The first stream sets one preference and the line is not shown again.
-
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
@@ -323,6 +315,14 @@ The sections below contain the complete change list and fixes.
   line and writes them as `container.other_tracks` in its JSON. None of their content is read; it is
   what the container says, so that a person can see whether a karaoke video's words are in a text
   track, a bitmap subtitle track or only in the picture.
+
+**Hearth for Android: the first run says what to do next**
+
+- **The idle screen tells a new person where to pair and how to play.** There is no welcome screen. A sink
+  with no pairing says "Not paired yet. In Hearth, open the Network page and choose this sink: a code
+  appears here", and a paired sink that has never played a stream adds "To play, add this sink to a group
+  on Hearth's Network page", which is the desktop's first-run dialog's third step (a paired sink alone is
+  not something Hearth plays to). The first stream sets one preference and the line is not shown again.
 
 **Subtitle karaoke: who sings an ASS line, and which line at one time is read**
 
