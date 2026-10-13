@@ -54,9 +54,17 @@ public:
     explicit FakeRoom(std::vector<FakeEndpoint> endpoints)
         : endpoints_(std::move(endpoints)),
           clock_([this](const std::stop_token& stop) {
+              // The device's time is the steady clock's, read at each wake: a sleep of one
+              // millisecond lasts a timer tick, 15.6 ms on Windows by default, so counting the
+              // sleeps ran this device at a sixteenth of real time there and made every wait on
+              // its frames cost sixteen times its audio (the AC-4 decoder page's suite took 298 s
+              // of its 300 on the Windows leg, 31 s on Linux).
+              auto last = std::chrono::steady_clock::now();
               while (!stop.stop_requested()) {
                   std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                  tick();
+                  const auto now = std::chrono::steady_clock::now();
+                  tick(std::chrono::duration<double, std::milli>(now - last).count());
+                  last = now;
               }
           }) {}
 
@@ -375,15 +383,15 @@ private:
     // at 48 kHz, enough for the engine's own pump budget to keep it fed.
     static constexpr std::uint64_t kCapacity = 16384;
 
-    // One millisecond of the device's own clock: what it holds is heard
+    // `milliseconds` of the device's own clock: what it holds is heard
     // first, and the clock runs on whether or not there is anything left to
     // hear, as a real device does through an underrun.
-    void tick() {
+    void tick(double milliseconds) {
         const std::scoped_lock lock(mutex_);
         if (link_open_ && !link_paused_ && link_rate_ != 0) {
             // The link's clock counts the content's frames, as
             // iclforge::audio::PassthroughSink::position() does.
-            link_carry_ += static_cast<double>(link_rate_) * speed_ / 1000.0;
+            link_carry_ += static_cast<double>(link_rate_) * speed_ * milliseconds / 1000.0;
             const auto frames = static_cast<std::uint64_t>(link_carry_);
             link_carry_ -= static_cast<double>(frames);
             const std::uint64_t now = std::min(link_submitted_ - link_heard_, frames);
@@ -394,7 +402,7 @@ private:
         if (!open_ || paused_ || sample_rate_ == 0) {
             return;
         }
-        carry_ += static_cast<double>(sample_rate_) * speed_ / 1000.0;
+        carry_ += static_cast<double>(sample_rate_) * speed_ * milliseconds / 1000.0;
         const auto frames = static_cast<std::uint64_t>(carry_);
         carry_ -= static_cast<double>(frames);
         const std::uint64_t now = std::min(submitted_ - heard_, frames);
