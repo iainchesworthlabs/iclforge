@@ -191,6 +191,23 @@ The sections below contain the complete change list and fixes.
   also holds a deterministic synthetic singing voice with a known pitch, which is what its tests and
   the later microphone tests are made of (no recording is bundled). Standard library only, internal,
   and nothing links it yet.
+- **`iclforge::pitch::BleedMonitor`: is the microphone mostly the speakers?** (SC5; findings F6.) A
+  pitch score cannot tell a singer from a loud speaker playing the answer, and a silent singer in
+  front of speakers that play the guide melody is credited with it. The monitor is given the played
+  signal and the microphone (mono, one rate) and answers every 10 ms for the last 64 ms of the
+  microphone: the share of its energy that a delayed, scaled copy of the played signal explains
+  (a normalised correlation, squared, at the best delay within a few milliseconds of the delay it
+  has found), and whether that share is more than half, where the speakers contribute more than
+  the person does and the tracker starts to follow them. The delay is searched coarsely and then
+  at the full rate over the last two seconds every half second, so a device that changes its
+  buffering is followed, and may be a little negative (two clocks that disagree). Standard library
+  only. It does not cancel the echo: a frame it flags is one to give no credit for. Held with
+  synthetic rooms (a delay, a gain, reflections, an inverted echo): a microphone that is the
+  speakers is flagged and the delay found to a millisecond, a singer alone is not, a voice 10 dB
+  above the echo is not and 10 dB below it is, a changed delay is followed, silence is nothing,
+  and the F6 scenario (a silent singer, the guide through speakers 7 dB down) is credited 60 % or
+  more of the tune by the tracker alone and under 10 % with the flagged frames withheld. Seven
+  mutants were applied and all killed. Nothing in Hearth calls it yet.
 **Audio: when a packet was captured**
 
 - **`Capture` stamps each packet with its capture time** (the microphone, scoring and recording
