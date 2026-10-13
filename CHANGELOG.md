@@ -29,6 +29,35 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: what the boards do, and the pages that said otherwise**
+
+- **The Hearth sink pages say what each board does with a karaoke stream.** The S3 reproduces
+  AC-3 and E-AC-3 karaoke itself (levels within 0.25 dB of the host's decode in Hearth's live
+  case). The C6 decodes two channels, so Hearth decodes a 5.1 karaoke stream for it and sends 2.0
+  PCM, for both codecs, and the live case skips it with the reason. A v1.x P4 reproduces both at
+  its 2.0 layout (within 0.2 dB for AC-3 and 0.7 dB for E-AC-3), and cannot open the 3.0 layout
+  the case uses by default. One earlier run on that board, started from its second slot after an
+  update restart, played nothing and is recorded as not explained.
+- **`docs/verification.md` and the development-status row no longer say no outside decoder
+  reproduces karaoke.** Dolby's reference decoder does, for AC-3 and for E-AC-3
+  (`tools/checks/verify_karaoke_oracle.py`, local only); the E-AC-3 row says what is reproduced.
+- **The Hearth page and the Karaoke guide say a sink is sent PCM when it decodes fewer channels of
+  the codec than the stream has**, as well as when it does not list the codec for karaoke. The
+  ROADMAP row and the plan's board cells say what was run.
+
+**Karaoke in E-AC-3: the live karaoke cases take a layout, and skip a board that is not the one decoding**
+
+- **`network sinks live: a karaoke stream is reproduced by the board that decodes it` and its E-AC-3
+  twin read two options.** `ICLFORGE_HEARTH_LIVE_KARAOKE_LAYOUT` sets the layout the board is
+  given (3.0 by default; a v1.x ESP32-P4 cannot open three slots and takes 2.0), and
+  `ICLFORGE_HEARTH_LIVE_KARAOKE_PUSH` names which of routing, trim, delay and crossover are sent
+  with it (all four by default; `none` sends the layout alone).
+- **A board that decodes fewer channels of the codec than the programme has is skipped, with the
+  reason.** The ESP32-C6 decodes two, so Hearth decodes the stream for it and sends PCM, and the
+  case failed at the board's levels, which a PCM player does not report.
+- **"The choice made a difference" compares every reproduction with as-coded.** At a stereo layout
+  aware is the Lo/Ro fold as-coded already is, so comparing those two alone failed there.
+
 **Hearth tells a group's members what is playing**
 
 - **The engine sets `metadata@v1` for a group.** A member that lists the role gets the item's title
@@ -260,6 +289,21 @@ The sections below contain the complete change list and fixes.
   were given.
   This is a move: no message, log line or file the test sink writes is different.
 
+**Hearth for Android: two leftovers of the metadata and the request path**
+
+- **"Both" asks the server for the aware reproduction.** The controls sheet's vocals row sent the
+  capable reproduction for every choice; the owner's call of 2026-10-13 is that "Both" asks for
+  `aware`, which plays both voices as the song's mix does, and V1, V2 and None ask for `capable` with
+  that choice, the only reproduction that has them. The rule is one function, `sink::vocals_request`,
+  and a host case holds the four choices.
+- **An item with no lyrics shows the server's clock in the lyric screen's header.** The header drew a
+  time only for a document's line. `Sink::lyric_frame()` now takes the position and length from the
+  server's `metadata@v1` progress, at the sink's own time on the server's clock (a pause keeps it), for
+  an item with no document or a plain one, and the length for a timed document that names none; the
+  frame says `progress` when the position is the server's. The header's right side shows the time and
+  the hairline under it fills by it. A host case holds the position, the pause and the document's own
+  length winning; `LyricViewRenderTest` holds the pixels.
+
 **Hearth for Android, phase 4: the decode a sink plays is the test sink's**
 
 - **`iclforge::sink::DecodingBurstOutput` (`libs/sink`, target `iclforge::sink_decode`): a burst output
@@ -462,6 +506,15 @@ The sections below contain the complete change list and fixes.
   made until the first take, and a take begun in the same second as another is numbered, not
   written over it. `TakeRecorder` in the engine is Qt-free and is tested with no device.
   Hearth's user guide has a section on it.
+- **The user guide says how to turn a take into a karaoke stream with the singer's voice in it**
+  (the plan's D12, the recipe first). The Forge's Karaoke flow takes the take as Vocal 1 with its
+  start offset, or `forge decode`, `ffmpeg` and `forge encode` do the same from a stream; the page
+  says what a take needs first (FLAC to WAV, the microphone's rate to the backing's, where it
+  starts, and made as long as the backing) and the commands were run on the repository's example
+  stream: the voice starts where `item_start_ms` says and is silent after it. A found difference:
+  `forge encode` and the Forge GUI hold a shorter part's last sample past its end, which is not
+  silence, and the Forge GUI's warning and the page for it said it was padded with silence; the
+  page now says what is done.
 
 **Karaoke in E-AC-3: the choice, and the decoder that reproduces it**
 
@@ -4214,6 +4267,17 @@ The sections below contain the complete change list and fixes.
   installs no file of it and one built with it installs its export and `.pc` file.
 
 ### Fixed
+
+**Footprint probes: the E-AC-3 fold fixtures expect the -3 dB levels**
+
+- **`kEac3FoldRms`, `kEac3714FoldRms` and the fixed-tier pins `eac3_fold` and `eac3_714_fold` are
+  re-measured.** They were taken before an E-AC-3 stream with no `mixmdate` folded at -3 dB centre
+  and -3 dB surround (#1420, D10), so the arm-none-eabi, ESP32-C3 and ESP32-S3 footprint probes
+  failed their level checks on every push since (the 5.1 fold 107,353 / 106,212 to 95,687 / 94,353
+  and the 7.1.4 fold 62,837 / 61,994 to 55,509 / 55,002 per million; the fixed-tier hashes
+  `63f6da64fcb14557` and `3c068ffd950a7e63`). Values are from `forge decode downmix=loro
+  drcmode=line` of the embedded streams and from the fixed-tier probe run natively; no other
+  fixture moved.
 
 **WebAssembly demo: the lyrics test**
 

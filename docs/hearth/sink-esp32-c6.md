@@ -12,6 +12,19 @@ decode 5.1 in real time with WiFi running: see the
 memory since (its 5.1 peak in the fixed tier is 109,806 bytes now, from 164,066), and the sink
 has not been run again on a board to see whether the limit has moved.
 
+## Karaoke streams
+
+A karaoke stream (`bsmod` 7 above 1/0) of AC-3 or E-AC-3 has five coded channels and an LFE at 3/2,
+wider than the two this board decodes, so Hearth decodes it and applies the reproduction there,
+and the C6 plays the stereo PCM it is sent as a plain Sendspin player. That is the same for both
+codecs, and the board lists `eac3` among its karaoke codecs without that changing it: the channel
+limit applies regardless. On a C6 on 2026-10-12 Hearth said "This sink decodes AC-3 up to 2
+channels, and this stream has 6, so it is decoded here and folded to 2.0 PCM" (and the same for
+E-AC-3), and the board reported itself as a `player@v1` and no levels of its own. Hearth's live
+karaoke cases compare a board's own outputs with the host's decode, so they skip a board like
+this one and say why. The reproduction a listener hears from a C6 is the desktop's, and it is the
+same one every other member of a group plays ([Karaoke](../karaoke/index.md)).
+
 The C6 build does not decode AC-4. `CONFIG_ICLFORGE_AC4` builds the decoder for this part in the
 fixed-point tier, and the decoder does not fit beside WiFi: 2.0 peaks at 286,365 bytes, where the
 part has about 236,000 free with WiFi up, and 117 KB with the sink and its player up
