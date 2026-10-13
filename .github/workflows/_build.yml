@@ -2139,6 +2139,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Every step after the first probe is its own check (`if: !cancelled()`), and a red
+      # probe is no reason not to run it: a job's steps stop at the first failure unless told
+      # otherwise, and when the probe went red on 2026-10-12 (a fixture that a decoder change
+      # had outdated) none of the builds and none of the profile guards after it ran, for
+      # fourteen hours, which is how a static-RAM budget that no C6 image could meet went
+      # unflagged (planning/esp32-platform-profiles.md, "The C6's static RAM budget"). It is
+      # `!cancelled()` and not `always()` so that a cancel still stops them. The job ends red
+      # if any of them does.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -2198,6 +2206,7 @@ jobs:
       # breaks, this goes red rather than the break waiting for someone to try
       # it.
       - name: Build and run the ENCODE probe under QEMU
+        if: ${{ !cancelled() }}
         env:
           ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
         run: |
@@ -2214,6 +2223,7 @@ jobs:
       # 2.0's the tightest (decision 29); the runner's AC-4 block has the
       # figures. The run itself takes under a minute of QEMU.
       - name: Build and run the AC-4 probe under QEMU
+        if: ${{ !cancelled() }}
         env:
           ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
         run: |
@@ -2234,6 +2244,7 @@ jobs:
       # DIFFERENT project directory than the probe uses, which is the closest
       # this repo gets to testing the integrator's path.
       - name: Build the I2S player example
+        if: ${{ !cancelled() }}
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2258,6 +2269,7 @@ jobs:
       # does not gate on the capture sink's figures; the capture and render
       # steps below do.
       - name: Build and run the Hearth sink example under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci"
         run: |
@@ -2374,6 +2386,7 @@ jobs:
       # Neither is a stub standing in for the code: both run the real thing with
       # the one unmockable piece - a peripheral, a card - replaced.
       - name: Run the capture sink and flash-backed FAT source under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-tdm"
         run: |
@@ -2457,6 +2470,7 @@ jobs:
       # low byte to leave clear: padding written as zeros, carried slots
       # nonzero, and the converted level against the host's.
       - name: Run the capture sink at 16-bit TDM slots under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-tdm;sdkconfig.ci-tdm16"
         run: |
@@ -2527,6 +2541,7 @@ jobs:
       # expects it, with the six height slots silent because the stream has
       # nothing for them.
       - name: Run the capture sink at sixteen 16-bit TDM slots under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-tdm;sdkconfig.ci-tdm916"
         run: |
@@ -2607,6 +2622,7 @@ jobs:
       # rounding. sdkconfig.ci-render says why one lap and why the MDCT-band
       # domain and no DRC.
       - name: Render a height-object stream onto 7.1.4 under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-render"
         run: |
@@ -2698,6 +2714,7 @@ jobs:
       # timeout: the application returns from app_main into an idle FreeRTOS
       # system and would otherwise sit there for the whole 300 seconds.
       - name: Fetch and decode an E-AC-3 stream over QEMU's Ethernet
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http"
         run: |
@@ -2809,12 +2826,14 @@ jobs:
       # (apps/demos/wasm/tests, device-ui.config.js's board project) comes into this
       # container with Node, which the IDF image does not carry.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ !cancelled() }}
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: apps/demos/wasm/tests/package-lock.json
 
       - name: Drive the web page on the emulated board
+        if: ${{ !cancelled() }}
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2901,6 +2920,7 @@ jobs:
       # stream the manifest marks refused must fail for the reason it names.
       # Then the web page on this twelve-slot board, and the console.
       - name: Play the stream set onto 7.1.4 over QEMU's Ethernet
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-http714"
         run: |
@@ -2988,6 +3008,7 @@ jobs:
       # console must say the lane started, and the part holds a heap floor with the lane's stack
       # and its 23 KB of enhanced coupling scratch in PSRAM.
       - name: Play the decode lane's streams on two cores with PSRAM over QEMU's Ethernet
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-http714;sdkconfig.ci-lane"
         run: |
@@ -3099,6 +3120,7 @@ jobs:
       # than the source list and CONFIG_ is not reliably set in it.
       # main/CMakeLists.txt now lists every component unconditionally.
       - name: Build every sink and source combination
+        if: ${{ !cancelled() }}
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -3364,6 +3386,7 @@ jobs:
       # carry, so the image goes to it as an artifact. The flash and eFuse
       # images are made as the HTTP step makes them.
       - name: Build the Sendspin player for QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin"
         run: |
@@ -3385,6 +3408,7 @@ jobs:
       # board runs before anyone has given it a network. Its images go into
       # the same artifact, under wifi/.
       - name: Build the unprovisioned WiFi player for QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin;sdkconfig.ci-wifi"
         run: |
@@ -3411,6 +3435,7 @@ jobs:
       # so the step costs one full build. QEMU keeps its flash writes in its
       # image, which is what an update needs.
       - name: Update the Sendspin player over the network under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin;sdkconfig.ci-ota"
         run: |
@@ -3456,6 +3481,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload the Sendspin player's QEMU images
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: esp32s3-sendspin-qemu
@@ -3653,6 +3679,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Every step after the first probe is its own check (`if: !cancelled()`), and a red
+      # probe is no reason not to run it: a job's steps stop at the first failure unless told
+      # otherwise, and when the probe went red on 2026-10-12 (a fixture that a decoder change
+      # had outdated) none of the builds and none of the profile guards after it ran, for
+      # fourteen hours, which is how a static-RAM budget that no C6 image could meet went
+      # unflagged (planning/esp32-platform-profiles.md, "The C6's static RAM budget"). It is
+      # `!cancelled()` and not `always()` so that a cancel still stops them. The job ends red
+      # if any of them does.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -3699,6 +3733,7 @@ jobs:
       # one against IDF's radio and lwIP. Same container and toolchain as the
       # C3 step above, so it costs two builds and no setup.
       - name: Build the ESP32-C6 probe, both network loads (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -eu
@@ -3863,6 +3898,7 @@ jobs:
       # It is here because the DSI image above does not compile display_null.cpp, and a development
       # tool nothing builds is one that stops building.
       - name: Build hearth_sink with the panel's frame buffer for the ESP32-P4 (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -eu
@@ -3919,6 +3955,7 @@ jobs:
       # links for the target. Same container and toolchain as the C3 and C6
       # steps above.
       - name: Build the ESP32-P4 probe (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -eu

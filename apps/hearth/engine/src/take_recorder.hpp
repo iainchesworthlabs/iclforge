@@ -78,14 +78,24 @@ class TakeRecorder {
     // Ends it and removes what was written.
     void discard();
 
+    // A test seam: the most bytes the file may hold (the header counts). A write that would pass
+    // it fails, and so does every one after it, as on a full disk; what was written stays, and
+    // finish() still ends the take. 0 is no limit, which is every use outside the tests.
+    void limit_bytes(std::uint64_t bytes) { limit_bytes_ = bytes; }
+
    private:
     struct Encoder;
+
+    // Appends to the file, within the limit; false when it could not.
+    bool append(std::span<const std::uint8_t> bytes);
 
     std::filesystem::path path_;
     std::ofstream out_;
     std::unique_ptr<Encoder> encoder_;
     std::uint32_t rate_ = 0;
     std::uint64_t frames_ = 0;
+    std::uint64_t written_ = 0;
+    std::uint64_t limit_bytes_ = 0;
     std::vector<std::int32_t> scratch_;
 };
 
