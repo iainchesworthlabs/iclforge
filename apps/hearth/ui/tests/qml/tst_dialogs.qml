@@ -83,6 +83,37 @@ TestCase {
         tryCompare(HearthController, "firstRunSeen", true, 2000);
     }
 
+    // The second way to About, beside the chain below: Settings' About card.
+    // It opens the same dialog, with the same Licences... one hop further,
+    // and the keyboard reference is never opened on the way.
+    function test_settingsAboutOpensAboutAndItsLicences() {
+        HearthController.firstRunSeen = true;
+        const win = openWindow();
+        const shortcuts = findChild(win, "shortcutsDialog");
+        const about = findChild(win, "aboutDialog");
+        const licences = findChild(win, "licencesDialog");
+        verify(shortcuts !== null && about !== null && licences !== null);
+
+        win.page = "settings";
+        const card = findChild(win, "settingsAboutButton");
+        verify(card !== null, "Settings has no About button");
+        compare(card.text, "About Hearth…");
+        card.clicked();
+        tryVerify(function() { return about.opened; }, 5000, "About Hearth... did not open About");
+        verify(!shortcuts.visible, "the keyboard reference opened on the way to About");
+        verify(H.textItem(about.contentItem, "Hearth") !== null);
+
+        mouseClick(findChild(win, "aboutLicencesButton"));
+        tryVerify(function() { return licences.opened; }, 5000, "Licences... did not open Licences");
+        compare(findChild(win, "licenceNoticesText").text, HearthController.licenceNotices);
+
+        mouseClick(findChild(win, "licencesCloseButton"));
+        tryVerify(function() { return !licences.visible; }, 5000);
+        mouseClick(findChild(win, "aboutCloseButton"));
+        tryVerify(function() { return !about.visible; }, 5000);
+        compare(win.page, "settings");
+    }
+
     function test_shortcutsAboutLicencesChain() {
         HearthController.firstRunSeen = true;
         const win = openWindow();

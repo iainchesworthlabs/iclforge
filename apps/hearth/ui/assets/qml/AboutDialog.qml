@@ -7,9 +7,10 @@ import Hearth
 // About: what this is, the version and build it came from, the licences it
 // carries. Reached from ShortcutsDialog's own About… button ("? -> Shortcuts
 // -> About -> Licences" - Main.qml's own comment says why there is no
-// second header control for this). The same shape as Crucible's
-// About (apps/crucible/ui/assets/qml/AboutDialog.qml), on Hearth's own theme, for
-// Hearth's own notices.
+// second header control for this) and from the Settings page's About card,
+// which is where Forge and Crucible reach theirs from. The same shape as
+// Crucible's About (apps/crucible/ui/assets/qml/AboutDialog.qml), on
+// Hearth's own theme, for Hearth's own notices.
 Dialog {
     id: root
     objectName: "aboutDialog"

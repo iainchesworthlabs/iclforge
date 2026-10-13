@@ -143,6 +143,7 @@ Status:
 | 116 | Output picker | The next start decodes to the device chosen last time; a device that is not there is the default output, and what is kept does not change | none | UI | OutputPicker::test_theNextStartDecodesToTheDeviceChosenLastTime |
 | 117 | Output picker | A receiver not listed at a start is not replaced by another output that takes a bitstream: the item is decoded to the default output, and the receiver is the choice again at a start it is listed for | none | UI | OutputPicker::test_aReceiverThatIsNotThereIsNotReplacedByAnotherThatTakesABitstream (the second window's room has "Other receiver", which takes one) |
 | 118 | Output picker | A group chosen last time is put back as chosen; until it is ready the item is refused with the reason, and is not played on this computer | none | UI | OutputPicker::test_theNextStartKeepsTheGroupAndRefusesItemsUntilItIsReady |
+| 119 | Settings | About card: "About Hearth…" opens About, whose Licences… opens the notices; the keyboard reference is not opened on the way | none | UI | SettingsPage::test_aboutCardAsksForTheAboutDialog; Dialogs::test_settingsAboutOpensAboutAndItsLicences |
 
 ### Totals
 
