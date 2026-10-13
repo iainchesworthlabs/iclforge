@@ -4038,6 +4038,18 @@ The sections below contain the complete change list and fixes.
 
 ### Changed
 
+**Qt 6.12, the long-term-support release, and macOS 14.4 as the minimum**
+
+- **The three GUI applications are built against Qt 6.12.0** (6.10.3 before it). The Windows and
+  macOS packages carry it, and the Third-party notices in each name the versions of the code in
+  that Qt's own kit. Linux packages use the system's Qt, as before.
+- **The macOS minimum is 14.4**, up from 13.3, which is the floor of Qt 6.12. It applies to the whole
+  macOS package, the command-line program included, and the Homebrew cask now requires macOS 14.
+- **Hearth's and Forge's Windows and macOS packages no longer carry Quick 3D's QML profiler backend
+  and the library it loads.** Qt's deployment tool added both, neither application loads them, and
+  they hold third-party code (meshoptimizer and xatlas) that the notices of those two packages did
+  not name. Crucible, which has a 3D view, still carries them, and its notices cover them.
+
 **The app icon is in the Signal red**
 
 - **The mark is the brand red, `#ec3013`, on the Signal ink, `#201e1d`**, the colours the three apps'
@@ -4097,6 +4109,21 @@ The sections below contain the complete change list and fixes.
   which allocates nothing. fast_float joins {fmt} and nlohmann/json as a header-only dependency
   (`vcpkg.json`, `cmake/FastFloat.cmake`, `ICLFORGE_FETCH_FAST_FLOAT`, the three packaging
   manifests and the notices).
+
+**Settings and Licences: the three programs say the same, and About is reached the same way**
+
+- **Forge's Preferences is Settings.** The header button, the dialog's heading and the sentence
+  that points at the output folder now say Settings, as Crucible's page and Hearth's page do; the
+  six catalogues and the guide's pages follow. The file and the `prefs*` object names keep their
+  names, which nothing shows.
+- **Forge's About says LICENCES, names the repository and opens the third-party notices.** It had
+  LICENSE, no repository link and no Licences. **Licences…** opens a new dialog with the text of
+  the `NOTICES.txt` the package installs, embedded in `forge-gui` as `:/notices/NOTICES.txt` as it
+  is in Crucible and Hearth, and `EncoderController::licenceNotices` reads it.
+- **About is reached from Settings in all three.** Forge's dialog has an **About Forge…** button at
+  its foot, Crucible's page a ninth block, **About**, and Hearth's page a sixth card, **About**.
+  Every route that was there stays: the header's About in Forge, the `?`, F1 and the tray menu in
+  Crucible, the `?` and F1 to the keyboard reference's **About…** in Hearth.
 
 **Android: NDK r28c**
 

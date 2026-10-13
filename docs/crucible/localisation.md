@@ -226,7 +226,7 @@ what they found. What they assert is that every entry has a translation, which i
 than that every translation is right — the review the glossary describes is what settles that, and
 arming these rules does not stand in for it.
 
-**Hearth's six catalogues** (`apps/hearth/ui/assets/translations/hearth_<code>.ts`, 1099 messages
+**Hearth's six catalogues** (`apps/hearth/ui/assets/translations/hearth_<code>.ts`, 1102 messages
 each) are held to the same six rules by the same file, in cases tagged `[hearth][translations]`,
 with Hearth's own list of names that are not translated (Hearth, Sendspin, Opus, IEC 61937,
 Matroska, mDNS, WiFi and the formats; `kHearthBrandTerms`). They were the one set of the three no

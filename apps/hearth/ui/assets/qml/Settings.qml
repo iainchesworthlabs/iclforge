@@ -9,9 +9,10 @@ import HearthLanguage
 // The Settings page (planning/hearth-design.md; issue #853): playback,
 // network (with the pairing records A6's Sendspin server will start filling
 // in), appearance, language and a diagnostics export - the same five cards
-// the mockup shows, in the same order. Playback and network are real engine
-// settings, kept through HearthController's QSettingsStore
-// (apps/hearth/ui/src/hearth_controller.cpp) the way
+// the mockup shows, in the same order - and a sixth, About, whose one button
+// opens the About dialog (the family reaches About from Settings). Playback
+// and network are real engine settings, kept through HearthController's
+// QSettingsStore (apps/hearth/ui/src/hearth_controller.cpp) the way
 // apps/hearth/engine/src/settings_model.hpp says the window has to. Appearance
 // writes straight to Theme, the way apps/crucible/ui/assets/qml/SettingsPage.qml's
 // own theme/palette/textScale trio does - Main.qml binds Theme to it the
@@ -26,6 +27,11 @@ ScrollView {
     // Theme.gap. In pixels scaled by the text-size setting, since a label
     // that grows has to keep its column.
     readonly property int labelWidth: Math.round(110 * Theme.fontScale)
+
+    // About Hearth…: Main.qml opens the AboutDialog over the page. About is
+    // reached from Settings in all three programs; the keyboard reference's
+    // own About… (ShortcutsDialog.qml) is still there beside it.
+    signal showAbout()
 
     // Where the diagnostics file goes. selectedFile is set before open(), so
     // the suggested name and folder appear in the dialog - the same shape as
@@ -651,6 +657,27 @@ ScrollView {
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
                         wrapMode: Text.WordWrap
+                    }
+                }
+
+                // Where About is reached from in the three programs: what
+                // this is, its version and build, and the licences it carries.
+                Card {
+                    ordinal: "06"
+                    title: qsTr("About")
+                    framed: true
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: qsTr("What this is, the version and build it came from, and the licences it carries.")
+                        color: Theme.text
+                        font.pixelSize: Theme.fontNormal
+                        wrapMode: Text.WordWrap
+                    }
+                    AppButton {
+                        objectName: "settingsAboutButton"
+                        text: qsTr("About Hearth…")
+                        onClicked: root.showAbout()
                     }
                 }
             }

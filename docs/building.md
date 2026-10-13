@@ -11,7 +11,7 @@ Every command here has been run on the configuration described under
 | CMake | ≥ 3.28 | `cmake_minimum_required(VERSION 3.28...4.3)`. |
 | Ninja | any recent | The presets hard-code the Ninja generator. |
 | vcpkg | a checkout that contains the commit in `vcpkg.json`'s `builtin-baseline` | Supplies fmt, Catch2, fast-float (decimal text) and nlohmann-json (the Forge programs' project file and the object scene file), and the `hearth` feature's cpp-httplib, mbedTLS, libFLAC, Opus and mdns (selected by every hosted preset), plus the opt-in `adm` (Boost) and `profiling` (Tracy) features. A shallow or old checkout that lacks the baseline commit cannot resolve it. fmt, Catch2 and nlohmann-json can use `FetchContent` when vcpkg is unavailable. See [Options](#options). |
-| Qt | 6.5+ prebuilt for `forge-gui`, 6.8+ for `hearth` and Crucible | GUI applications only. CI pins 6.10.3 (`.github/toolchain-versions.json`). **Never from vcpkg** — see [Qt](#qt). |
+| Qt | 6.5+ prebuilt for `forge-gui`, 6.8+ for `hearth` and Crucible | GUI applications only. CI pins 6.12.0, the LTS (`.github/toolchain-versions.json`). **Never from vcpkg** — see [Qt](#qt). |
 | ALSA (`libasound2-dev`) | any recent | Optional Linux audio backend. See [Linux audio](#linux-audio). |
 | PipeWire (`libpipewire-0.3-dev`) | any recent | Optional Linux audio backend; required by Crucible. See [Linux audio](#linux-audio). |
 | libxcb (`libxcb1-dev`) | any recent | Optional; used by Crucible for X11 full-screen detection. |

@@ -73,8 +73,15 @@ unset(_LLVM_BIN_HINTS)
 # libtool, which emits the ELF -Wl,-soname instead of the Mach-O
 # -Wl,-install_name once it detects lld. Apple's system linker works.
 
-# 13.3 is the floor for unrestricted std::to_chars in Apple's libc++.
-set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3" CACHE STRING "Minimum macOS version")
+# 14.4 is the macOS floor of Qt 6.12, the LTS .github/toolchain-versions.json
+# pins and the three GUI applications link; Qt's own supported-platforms page
+# says "macOS 14.4 or higher", and its kit is built on macOS 26. It sits above
+# the 13.3 this used to be, which was the floor for unrestricted
+# std::to_chars in Apple's libc++, so nothing the C++ code uses is lost.
+# __builtin_available(macOS 14.0 / 14.2, *) gates in the Core Audio code
+# stay: they compile to constant-true under this target without a diagnostic
+# (clang 22, this repo's whole warning set, both slices), and cost nothing.
+set(CMAKE_OSX_DEPLOYMENT_TARGET "14.4" CACHE STRING "Minimum macOS version")
 
 execute_process(
     COMMAND xcrun --show-sdk-path

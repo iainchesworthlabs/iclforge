@@ -330,7 +330,7 @@ fewer as its bed, as an E-AC-3 stream is.
 The window ships in English and in German, Spanish, French, Arabic, Hebrew and Yiddish, chosen in
 Settings. A language switches the layout direction (Arabic, Hebrew and Yiddish read right to
 left), the typeface and the words of every page. The catalogues are
-`apps/hearth/ui/assets/translations/hearth_<code>.ts`; each holds all 1099 strings of the window,
+`apps/hearth/ui/assets/translations/hearth_<code>.ts`; each holds all 1102 strings of the window,
 every one with a rendering. A string a catalogue lacks would show in English, which is what Qt does
 with a message it has no entry for. English has a file too, `hearth_en.ts`, holding only the
 messages that carry a count (below).

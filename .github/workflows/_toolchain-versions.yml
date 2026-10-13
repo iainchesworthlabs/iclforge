@@ -51,6 +51,9 @@ on:
       qt_version:
         description: 'Pinned Qt version, e.g. "6.8.3" (from .github/toolchain-versions.json).'
         value: ${{ jobs.resolve.outputs.qt_version }}
+      aqt_source:
+        description: 'Pinned aqtinstall source (a git commit), passed to install-qt-action as `aqtsource` (from .github/toolchain-versions.json).'
+        value: ${{ jobs.resolve.outputs.aqt_source }}
       llvm_windows_version:
         description: 'Exact pinned LLVM point release for the Windows win64 installer, e.g. "22.1.2" (from .github/toolchain-versions.json; major asserted to match llvm_version).'
         value: ${{ jobs.resolve.outputs.llvm_windows_version }}
@@ -89,6 +92,7 @@ jobs:
       llvm_version: ${{ steps.read.outputs.llvm_version }}
       msvc_toolset: ${{ steps.read.outputs.msvc_toolset }}
       qt_version: ${{ steps.read.outputs.qt_version }}
+      aqt_source: ${{ steps.read.outputs.aqt_source }}
       llvm_windows_version: ${{ steps.read.outputs.llvm_windows_version }}
       cmake_min: ${{ steps.read.outputs.cmake_min }}
       vcpkg_commit: ${{ steps.read.outputs.vcpkg_commit }}
@@ -114,6 +118,10 @@ jobs:
 
           msvc_toolset="$(jq -r '.msvc_toolset' .github/toolchain-versions.json)"
           qt_version="$(jq -r '.qt' .github/toolchain-versions.json)"
+          # Empty when the key is absent, which install-qt-action reads as "take
+          # aqtinstall from PyPI" - never the string "null", which pip would try
+          # to install.
+          aqt_source="$(jq -r '.aqtsource // ""' .github/toolchain-versions.json)"
           llvm_windows_version="$(jq -r '.llvm_windows_version' .github/toolchain-versions.json)"
 
           # Read the compiler pins from the scripts that actually install
@@ -140,6 +148,7 @@ jobs:
             echo "llvm_version=$llvm_version"
             echo "msvc_toolset=$msvc_toolset"
             echo "qt_version=$qt_version"
+            echo "aqt_source=$aqt_source"
             echo "cmake_min=$cmake_min"
             echo "vcpkg_commit=$vcpkg_commit"
             echo "llvm_windows_version=$llvm_windows_version"

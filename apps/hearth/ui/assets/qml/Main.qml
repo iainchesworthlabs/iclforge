@@ -302,8 +302,11 @@ ApplicationWindow {
     // About… chains to AboutDialog, whose own Licences… chains to
     // LicencesDialog one hop further ("? -> Shortcuts -> About ->
     // Licences") - agreed between the #830 and #854 sessions rather than a
-    // second header control. `--page shortcuts`/`about`/`licences`
-    // (main.cpp) open any of the three directly, for a capture.
+    // second header control. The Settings page's About card opens the same
+    // AboutDialog (Settings.qml), which is where About is reached from in
+    // Forge and Crucible too; that route is added to this one, not instead of
+    // it. `--page shortcuts`/`about`/`licences` (main.cpp) open any of the
+    // three directly, for a capture.
     ShortcutsDialog { id: shortcuts; onShowAbout: about.open() }
     function openShortcuts() { shortcuts.open(); }
     property alias shortcutsDialog: shortcuts
@@ -322,7 +325,7 @@ ApplicationWindow {
         Speakers { }
         DecoderPage { format: window.decoderFormat; onKaraokePageRequested: window.page = "karaoke" }
         Network { }
-        Settings { }
+        Settings { onShowAbout: about.open() }
         KaraokePage {
             id: karaokePage
             onOutputPickerRequested: window.openOutputPicker()
