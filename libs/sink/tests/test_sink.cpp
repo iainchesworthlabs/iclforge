@@ -62,7 +62,10 @@ class Lines final : public iclforge::sink::Log {
         changed_.notify_all();
     }
 
-    bool wait(std::string_view needle, std::chrono::milliseconds timeout = 10s) {
+    // Bounded so that a hang is a failure, by what the slowest leg needs: a session on a runner with the
+    // whole suite going, or under a sanitizer, took longer than the 10 s these waits used to give it,
+    // while the waits beside them on "available" and the handshake give 15 s and 30 s.
+    bool wait(std::string_view needle, std::chrono::milliseconds timeout = 30s) {
         std::unique_lock lock(mutex_);
         return changed_.wait_for(lock, timeout, [&] {
             return std::ranges::any_of(lines_,
@@ -254,7 +257,7 @@ class Events final : public iclforge::sendspin::ServerListener {
     void on_pairing_ended(std::optional<iclforge::sendspin::pairing_messages::AbortReason> /*reason*/) override {}
 
     template <class Predicate>
-    bool wait(Predicate&& predicate, std::chrono::milliseconds timeout = 10s) {
+    bool wait(Predicate&& predicate, std::chrono::milliseconds timeout = 30s) {
         std::unique_lock lock(mutex_);
         return changed_.wait_for(lock, timeout, std::forward<Predicate>(predicate));
     }
