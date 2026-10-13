@@ -43,7 +43,8 @@ std::vector<std::byte> read_stream(const std::string& leg) {
 // Each sync frame's raw_ac4_frame, copied so a test can alter it.
 std::vector<std::vector<std::byte>> raw_frames(const std::vector<std::byte>& stream) {
     std::vector<std::vector<std::byte>> frames;
-    for (const iclforge::ac4::SyncFrame& frame : iclforge::ac4::scan(stream).frames) {
+    const auto scanned = iclforge::ac4::scan(stream);
+    for (const iclforge::ac4::SyncFrame& frame : scanned.frames) {
         frames.emplace_back(frame.raw_ac4_frame.begin(), frame.raw_ac4_frame.end());
     }
     return frames;
