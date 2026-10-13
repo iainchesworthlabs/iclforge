@@ -1411,11 +1411,15 @@ TEST_CASE("engine: an AC-4 presentation a sink would not choose reaches a group 
 namespace {
 
 // `count` AC-3 syncframes of a karaoke 3/2+LFE stream: a tone in each channel, each its own pitch
-// and level, so that a reproduction has something to move.
+// and level, so that a reproduction has something to move. Only the first kEncoded are encoded: a
+// longer programme is those again end to end (the frames stand alone), so that a case that needs
+// one that plays for minutes does not pay the encoder for them.
 struct KaraokeProgramme {
     std::vector<std::vector<std::byte>> units;
     std::vector<std::byte> bytes;
 };
+
+constexpr int kEncoded = 150;
 
 KaraokeProgramme karaoke_programme(int count) {
     iclforge::ac3::EncoderConfig config;
@@ -1430,6 +1434,12 @@ KaraokeProgramme karaoke_programme(int count) {
     constexpr std::array<double, 6> kLevel = {0.20, 0.10, 0.20, 0.25, 0.15, 0.10};
     KaraokeProgramme out;
     for (int f = 0; f < count; ++f) {
+        if (f >= kEncoded) {
+            const std::vector<std::byte> again = out.units[static_cast<std::size_t>(f % kEncoded)];
+            out.units.push_back(again);
+            out.bytes.insert(out.bytes.end(), again.begin(), again.end());
+            continue;
+        }
         std::vector<std::vector<float>> by_channel;
         for (int channel = 0; channel < encoder.channel_count(); ++channel) {
             std::vector<float> samples(iclforge::ac3::kSamplesPerFrame);
@@ -1649,10 +1659,31 @@ struct KaraokeGroup {
         group.reset();
     }
 
-    // What each board holds and what each side logged: for a wait that never came true, which
-    // says whether a board was sent less than the item or the item never reached it.
+    // The engine's own account: a wait that never came true while the programme had already
+    // ended is not a board that was sent less than it should have been.
+    [[nodiscard]] std::string engine_line() {
+        const EngineStatus status = engine->status();
+        std::string out = "the engine: " + std::string(iclforge::hearth::describe(status.state)) +
+                          ", current item " +
+                          (status.current == iclforge::hearth::Queue::kNone
+                               ? std::string("none")
+                               : std::to_string(status.current)) +
+                          ", " + std::to_string(status.history.size()) + " in the history";
+        for (const iclforge::hearth::PlayedItem& played : status.history) {
+            out += " [delivered " + std::to_string(played.frames) + " of " +
+                   std::to_string(played.expected_frames) + " frames]";
+        }
+        out += ", note \"" + status.note + "\", error \"" + status.error + "\", output_reason \"" +
+               status.output_reason + "\"\n";
+        return out;
+    }
+
+    // The engine's, then what each board holds and what each side logged: for a wait that never
+    // came true, which says whether a board was sent less than the item or the item never reached
+    // it.
     [[nodiscard]] std::string account() {
-        std::string out = "the boards' totals and the trails of both sides:\n";
+        std::string out = engine_line();
+        out += "the boards' totals and the trails of both sides:\n";
         const auto totals = [&out](const char* name, const testsink::Sink& sink) {
             const testsink::Sink::Totals held = sink.totals();
             out += std::string("  ") + name + ": connections " + std::to_string(held.connections) +
@@ -1693,6 +1724,17 @@ struct KaraokeGroup {
         INFO("output_reason: " << finished.output_reason << " / note: " << finished.note
                                << " / error: " << finished.error);
         REQUIRE(finished.history.size() == plays);
+    }
+
+    // The programme ended by the case rather than by its end, for a case that changes something
+    // while it plays: it is still playing (the changes were made inside it) and a stop leaves it in
+    // the history, as its own end does.
+    void stop_playing() {
+        INFO("before the stop, " << engine_line());
+        REQUIRE(engine->status().state == TransportState::kPlaying);
+        engine->stop();
+        REQUIRE(eventually([&] { return engine->status().state == TransportState::kStopped; }));
+        REQUIRE(engine->status().history.size() == 1);
     }
 };
 
@@ -1938,66 +1980,66 @@ TEST_CASE("engine: a board that takes the karaoke keys and not the levels is sen
 
 TEST_CASE("engine: a part level changed while a karaoke item plays reaches the board that decodes it",
           "[hearth][group][websocket][iclforge][karaoke]") {
-    constexpr int kFrameCount = 150;
+    // Four minutes, and ended by the case: see the case below on why not 4.8 s.
+    constexpr int kFrameCount = 7500;
     iclforge::hearth::DecoderSettings wanted;
     wanted.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
     wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
     KaraokeGroup rig("hearth_engine_group_karaoke_levels_change", kFrameCount, wanted);
     rig.engine->play();
-    REQUIRE(eventually([&] { return rig.decodes->totals().bursts >= 20; }));
+    rig.await([&] { return rig.decodes->totals().bursts >= 20; });
     CHECK(rig.decodes_log.has("applied (karaoke capable, vocals both)"));
     CHECK_FALSE(rig.decodes_log.has("melody"));
 
     // The singer pulls the melody down: told to the board, not by starting the item again.
     wanted.karaoke_melody_db = -9.0;
     rig.engine->set_decoder_settings(wanted);
-    REQUIRE(eventually([&] {
+    rig.await([&] {
         return rig.decodes_log.has("applied (karaoke capable, vocals both, melody -9 dB)");
-    }));
+    });
     // Taking it back to the table clears it: settings replace the board's whole.
     wanted.karaoke_melody_db = 0.0;
     rig.engine->set_decoder_settings(wanted);
-    REQUIRE(eventually([&] { return rig.decodes_log.count("applied (karaoke capable, vocals both)") >= 2; }));
+    rig.await([&] { return rig.decodes_log.count("applied (karaoke capable, vocals both)") >= 2; });
     // A level of a vocal the choice leaves out is not sent.
     wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kV1;
     wanted.karaoke_vocal2_db = -6.0;
     rig.engine->set_decoder_settings(wanted);
-    REQUIRE(eventually([&] { return rig.decodes_log.has("applied (karaoke capable, vocals v1)"); }));
+    rig.await([&] { return rig.decodes_log.has("applied (karaoke capable, vocals v1)"); });
     CHECK_FALSE(rig.decodes_log.has("vocal 2"));
     CHECK_FALSE(rig.legacy_log.has("(karaoke "));
-    REQUIRE(eventually([&] {
-        const EngineStatus status = rig.engine->status();
-        return status.state == TransportState::kStopped && !status.history.empty();
-    }));
+    rig.stop_playing();
 }
 
 TEST_CASE("engine: a change of vocals while a karaoke item plays reaches the board that decodes it",
           "[hearth][group][websocket][iclforge][karaoke]") {
-    // Long enough to change the choice in the middle of: a programme plays in real time.
-    constexpr int kFrameCount = 150;
+    // The choice is changed in the middle of a programme, and a programme plays in real time. At
+    // 150 frames (4.8 s) a loaded machine got to the second change after the item had ended (seen:
+    // the engine stopped with every frame delivered, the first change applied and the second
+    // never), and a choice made while nothing plays is told to no board. So the programme is four
+    // minutes, which the waits below (a minute each at the most) cannot outlast, and the case ends
+    // it itself.
+    constexpr int kFrameCount = 7500;
     iclforge::hearth::DecoderSettings wanted;
     wanted.karaoke = iclforge::ac3::KaraokeReproduction::kCapable;
     wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kBoth;
     KaraokeGroup rig("hearth_engine_group_karaoke_change", kFrameCount, wanted);
     rig.engine->play();
-    REQUIRE(eventually([&] { return rig.decodes->totals().bursts >= 20; }));
+    rig.await([&] { return rig.decodes->totals().bursts >= 20; });
     CHECK(rig.decodes_log.has("applied (karaoke capable, vocals both)"));
     CHECK_FALSE(rig.decodes_log.has("vocals v1"));
 
     // The singer picks the first vocal: told to the board, not by starting the item again.
     wanted.karaoke_vocals = iclforge::ac3::KaraokeVocals::kV1;
     rig.engine->set_decoder_settings(wanted);
-    REQUIRE(eventually([&] { return rig.decodes_log.has("applied (karaoke capable, vocals v1)"); }));
+    rig.await([&] { return rig.decodes_log.has("applied (karaoke capable, vocals v1)"); });
     // And going back to "as coded" tells it to play the coded channels.
     wanted.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
     rig.engine->set_decoder_settings(wanted);
-    REQUIRE(eventually([&] { return rig.decodes_log.has("applied (karaoke off, vocals v1)"); }));
+    rig.await([&] { return rig.decodes_log.has("applied (karaoke off, vocals v1)"); });
     // It went to the board that decodes and not to the one sent PCM.
     CHECK_FALSE(rig.legacy_log.has("(karaoke "));
-    REQUIRE(eventually([&] {
-        const EngineStatus status = rig.engine->status();
-        return status.state == TransportState::kStopped && !status.history.empty();
-    }));
+    rig.stop_playing();
 }
 
 // --- the lyrics beside an item (W7d, planning/karaoke-phase2.md) ----------------------------------
@@ -2034,7 +2076,8 @@ TEST_CASE("engine: the lyrics beside an item reach the boards that hold them, an
     group.play_through();
 
     // The board that decodes for itself is sent the stream as it is, on the role that carries
-    // lyrics; the one sent PCM is on player@v1, which has none, and is sent nothing.
+    // lyrics; the one sent PCM is on player@v1, which has none, and is sent nothing: nor in the
+    // moment before the host has moved it there (the case after this one).
     for (const testsink::Sink* sink : {group.decodes.get()}) {
         const bool got = eventually([&] {
             const auto seen = sink->roles().lyric_commands;
@@ -2069,7 +2112,14 @@ TEST_CASE("engine: the lyrics beside an item reach the boards that hold them, an
             CHECK(anchors[i].lyrics_position.at_us >= anchors[i - 1].lyrics_position.at_us);
         }
     }
-    CHECK(group.legacy->roles().lyric_commands.empty());
+    {
+        const auto sent = group.legacy->roles().lyric_commands;
+        INFO("the board sent PCM was sent "
+             << sent.size() << " lyric commands (" << of_kind(sent, Command::kLyrics).size()
+             << " documents, " << of_kind(sent, Command::kLyricsPosition).size() << " anchors)\n"
+             << group.account());
+        CHECK(sent.empty());
+    }
 
     // An anchor of an item the group was never given a document for is sent to no one.
     iclforge::hearth::LyricsUpdate stray;
@@ -2084,12 +2134,118 @@ TEST_CASE("engine: the lyrics beside an item reach the boards that hold them, an
     }
 }
 
+namespace {
+
+// Holds the host's own thread: the handler of a board's request
+// (NetworkSinks::set_request_handler()) runs on it, and what the host is asked to do waits behind
+// a handler that does not return.
+class HostThreadHold {
+   public:
+    // The handler to give the request handler: it says it is in, and stays until released.
+    void block() {
+        std::unique_lock lock(mutex_);
+        inside_ = true;
+        changed_.notify_all();
+        changed_.wait(lock, [&] { return released_; });
+    }
+    [[nodiscard]] bool wait_inside() {
+        std::unique_lock lock(mutex_);
+        return changed_.wait_for(lock, 60s, [&] { return inside_; });
+    }
+    void release() {
+        {
+            const std::lock_guard lock(mutex_);
+            released_ = true;
+        }
+        changed_.notify_all();
+    }
+
+   private:
+    std::mutex mutex_;
+    std::condition_variable changed_;
+    bool inside_ = false;
+    bool released_ = false;
+};
+
+}  // namespace
+
+TEST_CASE("engine: a member the plan sends PCM is sent no lyrics before the host has moved it onto player@v1",
+          "[hearth][group][websocket][iclforge][lyrics]") {
+    constexpr int kFrameCount = 30;
+    iclforge::hearth::DecoderSettings wanted;
+    wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
+    // The hold is made first and the release after the rig, so that a failed REQUIRE lets the
+    // host's thread go before the rig takes the host down, and the hold outlives both.
+    HostThreadHold hold;
+    // Both boards state lyrics (the fixture gives each the size), and both are on the extension
+    // role with their state in: the group is made and nothing has been played. The board that
+    // decodes may ask for the vocals, which is how the host's thread is held below.
+    KaraokeGroup group("lyrics_moving_group", kFrameCount, wanted, true, 16384, {},
+                       {"karaoke_vocals"});
+    struct ReleaseOnExit {
+        HostThreadHold& held;
+        ~ReleaseOnExit() { held.release(); }
+    } const release_on_exit{hold};
+
+    group.sinks->set_request_handler(
+        [&](const iclforge::hearth::NetworkSinks::SinkRequest& /*request*/) { hold.block(); });
+    iclforge::sendspin::player::Request ask;
+    ask.decoder.karaoke_vocals = iclforge::sendspin::player::KaraokeVocals::kV1;
+    group.decodes->send_request(ask);
+    REQUIRE(hold.wait_inside());
+
+    // The plan the engine makes when it opens the item: the board that takes the karaoke keys is
+    // sent the stream, the other is decoded for and sent PCM. For that one plan_group() only asks
+    // the host to move it onto player@v1 (use_pcm()), and the host's thread does it, which is held;
+    // the engine's first pump sends the lyrics straight behind the plan, as here, whichever thread
+    // is quicker. (Unheld, the move wins most of the time, and a loaded machine decides the rest.)
+    const std::size_t activations = group.legacy_log.count("activated for playback");
+    const iclforge::hearth::KaraokeChoice choice{
+        .reproduction = iclforge::sendspin::player::Karaoke::kAware};
+    const auto variants = group.sinks->plan_group({.group_name = group.group_id,
+                                                   .stream = iclforge::audio::BitstreamFormat::kAc3,
+                                                   .sample_rate = 48000,
+                                                   .coded_channels = 6,
+                                                   .karaoke = choice,
+                                                   .layout = group.master});
+    static_cast<void>(variants);
+    iclforge::hearth::LyricsUpdate document;
+    document.item = 5;
+    document.document = "[00:00.50]Should auld acquaintance\n[00:01.00]be forgot\n";
+    group.sinks->apply_lyrics(group.group_id, document);
+    iclforge::hearth::LyricsUpdate anchor;
+    anchor.item = 5;
+    anchor.anchor =
+        iclforge::hearth::LyricsUpdate::Anchor{.position_ms = 0, .at_us = 1, .speed = 1.0};
+    group.sinks->apply_lyrics(group.group_id, anchor);
+
+    // Now the host moves the member. Whatever was sent it on the role it was leaving came before
+    // the activation on that connection, so once the board is activated again nothing more is to
+    // come.
+    hold.release();
+    group.await([&] { return group.legacy_log.count("activated for playback") > activations; });
+    // The board that decodes holds them, so that the member sent PCM going without is the plan's
+    // doing and not that nothing was sent.
+    group.await([&] {
+        const auto seen = group.decodes->roles().lyric_commands;
+        return !of_kind(seen, Command::kLyrics).empty() &&
+               !of_kind(seen, Command::kLyricsPosition).empty();
+    });
+    const auto sent = group.legacy->roles().lyric_commands;
+    INFO("the member sent PCM was sent "
+         << sent.size() << " lyric commands (" << of_kind(sent, Command::kLyrics).size()
+         << " documents, " << of_kind(sent, Command::kLyricsPosition).size() << " anchors)\n"
+         << group.account());
+    CHECK(sent.empty());
+}
+
 TEST_CASE("engine: an item with no lyrics tells the boards it has none, and a board that takes none is not sent any",
           "[hearth][group][websocket][iclforge][lyrics]") {
     constexpr int kFrameCount = 30;
     iclforge::hearth::DecoderSettings wanted;
     wanted.karaoke = iclforge::ac3::KaraokeReproduction::kAware;
-    // Only the decoding board lists the lyric commands; no lyrics file is beside the item.
+    // No board states a lyrics size, so neither lists the lyric commands; no lyrics file is beside
+    // the item.
     KaraokeGroup group("lyrics_none_group", kFrameCount, wanted, true, 0);
     group.play_through();
     // Neither takes them, so neither is sent any.

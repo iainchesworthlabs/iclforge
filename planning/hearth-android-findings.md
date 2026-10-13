@@ -155,14 +155,17 @@ on a sofa accepts a receiver that changes mode between songs is [a question for 
 a member as PCM and send it the host's decode over `player@v1` (`MemberAction::kPcm`,
 `network_sinks.cpp`), which would give the Android sink the singer's reproduction with no decoder
 of its own. **Such a member is sent no lyrics, and that is tested, not inferred.**
-`apply_lyrics` does not look at the planned form, but its commands go through
-`ServerSession::iclforge_command`, which refuses (`kNoPlayerState`) unless the member's extension
-role is the one activated for playback; a member planned PCM has `player@v1` active, and
-`test_engine_network_group.cpp` ("the lyrics beside an item reach the boards that hold them")
-checks that the `player@v1` member's lyric commands are empty. The converse was run by the lyrics
-session on 2026-10-12: before a stream starts, a member that lists the extension role and the
-commands is active on it and takes a document. So the gate is the session's **active role**, not
-the planner. Host-PCM karaoke on the Android sink is therefore the right sound with no words,
+`apply_lyrics` skips a member the plan sends PCM (it did not until 2026-10-14: the move onto
+`player@v1` is the host's thread's, a moment after the plan, and a member planned PCM that was
+still on the extension role in that moment was sent a document and anchors), and its commands go
+through `ServerSession::iclforge_command`, which refuses (`kNoPlayerState`) unless the member's
+extension role is the one activated for playback; a member planned PCM has `player@v1` active once
+moved, and `test_engine_network_group.cpp` ("the lyrics beside an item reach the boards that hold
+them", and the case after it, for the moment before the move) checks that the `player@v1` member's
+lyric commands are empty. The converse was run by the lyrics session on 2026-10-12: before a
+stream starts, a member that lists the extension role and the commands is active on it and takes a
+document. So the gate is the **plan**, and then the session's **active role**.
+Host-PCM karaoke on the Android sink is therefore the right sound with no words,
 the wrong way round for a karaoke app, unless the host is changed to keep the extension role
 active beside `player@v1` for a member that holds lyrics (a host change, M; the role page allows
 both to be active, and a server "sends a stream to at most one of them at a time").
