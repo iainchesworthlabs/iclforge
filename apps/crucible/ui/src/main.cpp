@@ -13,6 +13,9 @@
 // sung needs (without a time the strip follows the application's media
 // session, whatever that says), and `--language ar` runs the window in one of
 // the languages it ships so a capture can show that language and its layout.
+// `--size 1480x1100` opens the window at that size, for a picture of a page
+// whose rails run on below the 1480x820 it opens at (the Lyrics block of the
+// Room's right rail starts below the fold of the default window).
 // A `--shot` run never shows the first-run dialog unless `--page firstrun`
 // asked for it, so a capture against a fresh settings store is clean. A
 // capture whose `--lyrics` could not be shown (no such application, a file
@@ -169,6 +172,8 @@ int main(int argc, char** argv) {
     QString language;
     QStringList placements;
     QStringList lyrics_specs;
+    int window_width = 0;
+    int window_height = 0;
     const QStringList args = QCoreApplication::arguments();
     for (qsizetype i = 1; i + 1 < args.size(); ++i) {
         if (args[i] == QLatin1String("--shot")) {
@@ -179,6 +184,19 @@ int main(int argc, char** argv) {
             placements.push_back(args[i + 1]);  // name=x,y,z, applied before the shot
         } else if (args[i] == QLatin1String("--lyrics")) {
             lyrics_specs.push_back(args[i + 1]);  // name=file[@time], imported before the shot
+        } else if (args[i] == QLatin1String("--size")) {
+            // width x height in pixels; anything else is said and left out
+            const QStringList parts = args[i + 1].toLower().split(QLatin1Char('x'));
+            bool width_ok = false;
+            bool height_ok = false;
+            const int width = parts.size() == 2 ? parts[0].toInt(&width_ok) : 0;
+            const int height = parts.size() == 2 ? parts[1].toInt(&height_ok) : 0;
+            if (width_ok && height_ok && width >= 320 && width <= 8192 && height >= 320 && height <= 8192) {
+                window_width = width;
+                window_height = height;
+            } else {
+                qWarning("--size: %s is not <width>x<height> in pixels, from 320 to 8192", qPrintable(args[i + 1]));
+            }
         } else if (args[i] == QLatin1String("--language")) {
             language = args[i + 1];  // en, fr, de, es, ar, he, yi
         }
@@ -223,6 +241,10 @@ int main(int argc, char** argv) {
     // its say. `--page firstrun` opens the dialog over the Room page.
     if (!shot_path.isEmpty()) {
         engine.rootObjects().first()->setProperty("suppressFirstRun", true);
+    }
+    if (window_width > 0) {
+        engine.rootObjects().first()->setProperty("width", window_width);
+        engine.rootObjects().first()->setProperty("height", window_height);
     }
     if (page == QLatin1String("firstrun")) {
         engine.rootObjects().first()->setProperty("page", QStringLiteral("room"));

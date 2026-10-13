@@ -327,6 +327,31 @@ TestCase {
         tryCompare(strip, "status", "none", 5000);
     }
 
+    // The Room puts the strip in a rail 280 to 320 pixels wide. A row of buttons that cannot be
+    // narrower than all of them side by side made the strip's column, and so the rail's, wider than
+    // the window, with every card in the rail cut off at its right edge (found taking the picture of
+    // the strip). Whatever the font draws, the column the strip lays out in keeps the strip's own
+    // width and the buttons wrap.
+    function test_theStripsControlsWrapAndNeverMakeItsColumnWiderThanIt() {
+        const strip = newStrip({ app: 7 });
+        strip.width = 280;
+        verify(CrucibleLyrics.importText(7, "song.lrc", song, 12000));
+        // By hand, which is the state with the most buttons: Start again, Stop, Follow the media
+        // session, and the three of the nudge.
+        CrucibleLyrics.startAt(7, CrucibleLyrics.nowMs() - 2250);
+        tryCompare(strip, "following", true, 5000);
+        tryVerify(function() { return findChild(strip, "lyricsUseSession").visible; }, 5000);
+        const controls = findChild(strip, "lyricsControls");
+        verify(controls.visible);
+        waitForItemPolished(strip);
+        verify(controls.parent.width <= strip.width, "the column is " + controls.parent.width + " in a strip of " + strip.width);
+        verify(controls.width <= strip.width, "the controls are " + controls.width + " in a strip of " + strip.width);
+        // The nudge is still all there, in the order a person tabs through it.
+        verify(findChild(strip, "lyricsEarlier").visible);
+        verify(findChild(strip, "lyricsNudge").visible);
+        verify(findChild(strip, "lyricsLater").visible);
+    }
+
     function test_theStripSaysWhyAFileWasNotTakenAndWhenItHasNoTimes() {
         const strip = newStrip({ app: 8 });
         compare(CrucibleLyrics.importText(8, "empty.lrc", "\n"), false);
