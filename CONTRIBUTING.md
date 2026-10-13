@@ -188,7 +188,11 @@ anything computable at build time. (A handful of older call sites already used C
 `%`-specifier output before this convention existed; those keep their existing format strings but
 go through `fmt::printf`/`<fmt/printf.h>`, not `std::printf`, for the same NDK reason.) The
 window tables and several spec-table self-checks are
-`consteval` — a table that is wrong fails the build rather than a test.
+`consteval` — a table that is wrong fails the build rather than a test. A desktop standard library
+does ship `<format>`, so a stray `std::format` compiles on every desktop leg and breaks only where
+an NDK build reaches it; `tools/checks/check_no_std_format.py` (the static job; see
+`cmake/Fmt.cmake`) fails `#include <format>`, `#include <print>` and each `std::format`/
+`std::print` name in first-party C++ instead, comments and string literals aside.
 
 **One exception, for reading rather than writing.** {fmt} only formats *out*; it has no
 `from_chars`-equivalent for parsing text *into* a `double`, and `<charconv>`'s own **floating-point**

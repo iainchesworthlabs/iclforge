@@ -49,6 +49,9 @@ include(CompilerWarnings)
 # a payload with tail padding, among other things. A no-op on every other toolchain.
 include(AndroidNdkMinimum)
 
+# std::jthread and std::stop_token are behind libc++'s experimental switch on the NDK. Android only.
+include(AndroidExperimentalLibrary)
+
 # Empty unless -DICLFORGE_SANITIZERS=<comma-list> is set (see the *-asan-ubsan
 # presets in CMakePresets.json); a plain configure is unaffected.
 set(ICLFORGE_SANITIZERS "" CACHE STRING "Comma-separated -fsanitize= value, e.g. address,undefined")

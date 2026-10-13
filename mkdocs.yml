@@ -189,6 +189,8 @@ nav:
           - ESP32-C3: platforms/bare-metal/esp32-c3.md
           - ESP32-C6: platforms/bare-metal/esp32-c6.md
           - ESPHome: platforms/bare-metal/esphome.md
+          - ESP32 build profiles: platforms/bare-metal/build-profiles.md
+          - Testing and benchmarking the boards: platforms/bare-metal/board-bench.md
       - Windows null-sink driver: platforms/windows-driver-acx.md
   - Project:
       - Contributing: contributing.md

@@ -91,8 +91,9 @@ made that safe). The macOS wheel's own deployment target has the identical `from
 (`'from_chars' is unavailable: introduced in macOS 26.0`) — {fmt}'s own vendored formatting avoids
 the matching `to_chars` gap there (`'to_chars' is unavailable: introduced in macOS 13.3`) that a
 raw `std::format` call would hit — so this leg and **Build wheels (macos-latest)** are the two
-that catch a *parsing* regression; a *formatting* one shows up everywhere, same as any other
-compile error.
+that catch a *parsing* regression. A *formatting* one is a `std::format` or `std::print`, which
+every desktop standard library compiles, so `tools/checks/check_no_std_format.py` fails it in the
+static job instead.
 
 What r28c has that r26b did not, measured by compiling one translation unit per feature against both
 (2026-10-13): `std::format` and `std::print` (r26 only behind `-fexperimental-library`, and only
@@ -101,10 +102,15 @@ true for every value between the first element and the last, llvm-project#61160)
 `std::expected` whose has-value flag survives a trivially copyable payload with tail padding
 (llvm-project#68552 and #70494, android/ndk#1963: r27 has half the fix, r28 both), and Clang 19's
 P2718R0, which keeps a range-for's temporaries alive to the end of the loop. What it still does not
-have: floating-point `from_chars`, `std::views::enumerate`, `std::flat_map`, `std::atomic_ref`, and
-`std::jthread` / `std::stop_token` without `-fexperimental-library` (the header is there; the
-types are behind the flag, which nothing here passes: `libs/audio/src/backend/android/monitor.cpp`
-keeps its own stop flag).
+have: floating-point `from_chars`, `std::views::enumerate`, `std::flat_map` and `std::atomic_ref`.
+`std::jthread` and `std::stop_token` are there but behind libc++'s experimental switch, and
+`cmake/AndroidExperimentalLibrary.cmake` passes `-fexperimental-library` for an Android build, so the
+Windows, ALSA and desktop code that uses them compiles for Android too (measured on a Shield against
+both the static and the shared libc++: a `jthread` that loops on its `stop_token`, a `stop_callback`
+and `request_stop()`). With it the translation units that do not build for Android go from 25 to
+the 3 that use floating-point `from_chars`, and `iclforge-audio-tests`, `iclforge-dsp-tests`,
+`iclforge-app-media-tests` and `iclforge-crucible-tests` link and run on the device.
+`libs/audio/src/backend/android/monitor.cpp` keeps the stop flag it has.
 
 `minSdk = 26` (Oreo) is a hard floor, not a target: `monitor.cpp` depends on AAudio outright, which
 does not exist below API 26, and there is no fallback path. Real Shield TV hardware (2017 model
