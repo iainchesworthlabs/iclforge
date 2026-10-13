@@ -387,6 +387,17 @@ It hears pitch and nothing else: not the words, not the timing, not the feeling.
 and out of time with the words scores well on it. The card also says when you are consistently
 behind or ahead of the tune, which is usually a delay in the microphone and not in you.
 
+Two things on the card change what "within" means, and the card says when either is in use:
+
+- **How close counts** is a semitone unless you choose otherwise: **close** is half a semitone
+  (50 cents), and **loose** is a whole tone (200 cents). It is kept, and it applies to the marks and
+  the summary as well as the score so far.
+- **Score against my key** is for singing a whole song a little sharp or flat of the tune: your own
+  key is taken from your first sung notes (it needs about twenty of them) and allowed for, so that you
+  are judged on the shape of your melody. The card says how far you are from the tune's key while it
+  is in use, and the summary says it was. It is **off every time Hearth starts**, because a score
+  that has allowed for your key is not the same score.
+
 ### What you see while you sing
 
 - **The pitch ribbon**, under the pitch line on the card and under the words in the singer view

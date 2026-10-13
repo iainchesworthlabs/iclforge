@@ -58,6 +58,17 @@ class MicrophoneController : public QObject {
     Q_PROPERTY(int inputDelayMs READ inputDelayMs WRITE setInputDelayMs NOTIFY alignmentChanged)
     Q_PROPERTY(int offsetMs READ offsetMs WRITE setOffsetMs NOTIFY alignmentChanged)
     Q_PROPERTY(int maxAlignmentMs READ maxAlignmentMs CONSTANT)
+    // How close a frame must be to the tune to count, in cents: one of the presets 50, 100 and 200
+    // (a value is snapped to the nearest). Kept. 100 is a semitone.
+    Q_PROPERTY(
+        int toleranceCents READ toleranceCents WRITE setToleranceCents NOTIFY toleranceChanged)
+    // Score against the singer's own key (planning/karaoke-microphone.md, "What a score means"):
+    // the median of how far their first voiced frames were from the tune is taken off every frame,
+    // so that a person who sings consistently flat or sharp is judged on the shape of the melody.
+    // Off at every start of the program: a person should see that it is on. `keyShiftCents` is the
+    // figure in force (0 until it has been taken, which needs 20 sung frames).
+    Q_PROPERTY(bool ownKey READ ownKey WRITE setOwnKey NOTIFY ownKeyChanged)
+    Q_PROPERTY(double keyShiftCents READ keyShiftCents NOTIFY ownKeyChanged)
 
     // The meter: 0 to 1 over -60 to 0 dBFS, whether a sample reached full scale in the last
     // second, and for how long the input has been all zeros (a muted microphone).
@@ -130,6 +141,11 @@ class MicrophoneController : public QObject {
     [[nodiscard]] int inputDelayMs() const { return input_delay_ms_; }
     [[nodiscard]] int offsetMs() const { return offset_ms_; }
     [[nodiscard]] static int maxAlignmentMs() { return kMaxAlignmentMs; }
+    [[nodiscard]] int toleranceCents() const { return tolerance_cents_; }
+    void setToleranceCents(int cents);
+    [[nodiscard]] bool ownKey() const { return own_key_; }
+    void setOwnKey(bool on);
+    [[nodiscard]] double keyShiftCents() const { return key_locked_ ? key_shift_cents_ : 0.0; }
     // A test seam: a take's file may hold this many bytes, and the take then ends by itself as
     // it does when a disk fills. 0 is none; nothing but the tests sets it.
     void limit_take_bytes_for_test(std::uint64_t bytes);
@@ -223,6 +239,8 @@ class MicrophoneController : public QObject {
     void deviceChanged();
     void headphonesChanged();
     void alignmentChanged();
+    void toleranceChanged();
+    void ownKeyChanged();
     void meterChanged();
     void referenceChanged();
     void liveChanged();
@@ -241,6 +259,12 @@ class MicrophoneController : public QObject {
     void remember_take(const iclforge::hearth::TakeInfo& info);
     // Keeps what the performance came to, before the session forgets it.
     void capture_summary();
+    // Hands the tolerance and the key shift in force to the session.
+    void apply_score_options();
+    // Takes the singer's key from what has been sung, once, when it is asked for.
+    void lock_key(const std::optional<double>& offset_cents);
+    // A new performance or another item has its own key.
+    void unlock_key();
 
     std::unique_ptr<State> state_data_;
     QTimer timer_;
@@ -250,6 +274,10 @@ class MicrophoneController : public QObject {
     QVariantList devices_;
     QString device_id_;
     bool headphones_ = false;
+    int tolerance_cents_ = 100;
+    bool own_key_ = false;
+    bool key_locked_ = false;
+    double key_shift_cents_ = 0.0;
     int input_delay_ms_ = 0;
     int offset_ms_ = 0;
     double level_ = 0.0;

@@ -24,6 +24,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -67,6 +68,19 @@ constexpr int kMaxTakesListed = 50;
 
 [[nodiscard]] double level_from_db(double db) {
     return std::clamp((db + 60.0) / 60.0, 0.0, 1.0);
+}
+
+// The tolerances a person can choose, in cents: half a semitone, a semitone, a whole tone.
+constexpr int kTolerancePresets[] = {50, 100, 200};
+
+[[nodiscard]] int nearest_tolerance(int cents) {
+    int best = kTolerancePresets[0];
+    for (const int preset : kTolerancePresets) {
+        if (std::abs(preset - cents) < std::abs(best - cents)) {
+            best = preset;
+        }
+    }
+    return best;
 }
 
 // What the page is told of the score so far.
@@ -168,6 +182,8 @@ MicrophoneController::MicrophoneController(std::unique_ptr<iclforge::hearth::Mic
     QSettings settings = kept();
     device_id_ = settings.value(QStringLiteral("microphone/deviceId")).toString();
     headphones_ = settings.value(QStringLiteral("microphone/headphones"), false).toBool();
+    tolerance_cents_ =
+        nearest_tolerance(settings.value(QStringLiteral("microphone/toleranceCents"), 100).toInt());
     takes_folder_ = settings.value(QStringLiteral("microphone/takesFolder")).toString();
     if (takes_folder_.isEmpty()) {
         // Offered, not made: the person's own documents, under a folder of Hearth's.
@@ -181,6 +197,7 @@ MicrophoneController::MicrophoneController(std::unique_ptr<iclforge::hearth::Mic
     offset_ms_ = std::clamp(settings.value(QStringLiteral("microphone/offsetMs"), 0).toInt(),
                             -kMaxAlignmentMs, kMaxAlignmentMs);
     state_data_->session.set_headphones(headphones_);
+    apply_score_options();
     state_data_->session.set_input_delay_ms(input_delay_ms_);
     state_data_->session.set_offset_ms(offset_ms_);
 
@@ -216,6 +233,61 @@ void MicrophoneController::setHeadphones(bool headphones) {
     state_data_->session.set_headphones(headphones);
     emit headphonesChanged();
     publish(true);
+}
+
+void MicrophoneController::apply_score_options() {
+    iclforge::pitch::ScoreOptions options = state_data_->session.score_options();
+    options.tolerance_cents = static_cast<double>(tolerance_cents_);
+    options.key_shift_cents = key_locked_ ? key_shift_cents_ : 0.0;
+    state_data_->session.set_score_options(options);
+}
+
+void MicrophoneController::setToleranceCents(int cents) {
+    cents = nearest_tolerance(cents);
+    if (cents == tolerance_cents_) {
+        return;
+    }
+    tolerance_cents_ = cents;
+    kept().setValue(QStringLiteral("microphone/toleranceCents"), cents);
+    apply_score_options();
+    emit toleranceChanged();
+    publish(true);
+}
+
+void MicrophoneController::setOwnKey(bool on) {
+    if (on == own_key_) {
+        return;
+    }
+    own_key_ = on;
+    key_locked_ = false;
+    key_shift_cents_ = 0.0;
+    apply_score_options();
+    // A performance that already has enough sung frames gives the key at once.
+    if (on) {
+        lock_key(state_data_->session.snapshot().key_offset_cents);
+    }
+    emit ownKeyChanged();
+    publish(true);
+}
+
+void MicrophoneController::lock_key(const std::optional<double>& offset_cents) {
+    if (!own_key_ || key_locked_ || !offset_cents) {
+        return;
+    }
+    key_shift_cents_ = *offset_cents;
+    key_locked_ = true;
+    apply_score_options();
+    emit ownKeyChanged();
+}
+
+void MicrophoneController::unlock_key() {
+    if (!key_locked_) {
+        return;
+    }
+    key_locked_ = false;
+    key_shift_cents_ = 0.0;
+    apply_score_options();
+    emit ownKeyChanged();
 }
 
 void MicrophoneController::setInputDelayMs(int ms) {
@@ -265,6 +337,7 @@ bool MicrophoneController::start() {
     state_ = QStringLiteral("on");
     error_text_.clear();
     ticks_ = 0;
+    unlock_key();
     // A new performance: the last one's summary is of that one.
     if (!summary_.isEmpty()) {
         summary_.clear();
@@ -286,6 +359,8 @@ void MicrophoneController::capture_summary() {
     }
     QVariantMap summary = score_map(s);
     summary.insert(QStringLiteral("reference"), reference_text_);
+    summary.insert(QStringLiteral("ownKey"), own_key_ && key_locked_);
+    summary.insert(QStringLiteral("keyShiftCents"), key_locked_ ? key_shift_cents_ : 0.0);
     summary.insert(QStringLiteral("toleranceCents"),
                    state_data_->session.score_options().tolerance_cents);
     if (summary != summary_) {
@@ -569,6 +644,7 @@ void MicrophoneController::load(const QString& itemPath, const QString& prefer) 
             emit summaryChanged();
         }
         state_data_->session.clear_singer();
+        unlock_key();
     }
 
     if (state_data_->cancel) {
@@ -726,6 +802,8 @@ void MicrophoneController::publish(bool force) {
         emit liveChanged();
     }
 
+    // The key is taken once, from the first sung frames, when it is asked for.
+    lock_key(s.key_offset_cents);
     const QVariantMap score = score_map(s);
     if (score != score_) {
         score_ = score;

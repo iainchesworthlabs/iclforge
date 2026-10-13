@@ -156,6 +156,17 @@ The sections below contain the complete change list and fixes.
   `timing()` says what was given. Windows only so far: the other backends return no stamps, which a
   consumer must treat as "no time", and a caller that does not use any of it sees no change.
 
+**Hearth: how close counts, and scoring against one's own key**
+
+- **A choice of how close counts, and "Score against my key", on the Microphone card** (the
+  microphone, scoring and recording programme, D10). The tolerance is a preset of 50, 100 (the
+  default, a semitone) or 200 cents, kept, and it applies to the live score, the line marks, the
+  ribbon's solid and dashed line and the summary. "Score against my key" takes the singer's median
+  distance from the tune over their first sung frames (about twenty) and allows for it, which is for a
+  person who sings a whole song a little sharp or flat; the card says how far the key is while it is
+  in use and the summary says it was, and it is off every time Hearth starts. Both are held with a
+  synthetic singer 150 cents sharp: out at 50 and 100, in at 200, and in at 100 against their own key.
+
 **Karaoke: a plan for a microphone, scoring and recording**
 
 - **The requirements and a draft design, with the research behind them** (`planning/karaoke-microphone.md`

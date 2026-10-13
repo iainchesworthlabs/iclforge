@@ -119,6 +119,34 @@ TestCase {
         verify(find(card, "microphoneIndicator") !== find(card, "microphoneRecordingIndicator"));
     }
 
+    function test_how_close_counts_and_whose_key_are_the_controllers() {
+        const card = createTemporaryObject(cardComponent, testCase);
+        verify(card);
+        const box = find(card, "microphoneTolerance");
+        MicrophoneController.toleranceCents = 100;
+        tryCompare(box, "currentValue", 100);
+        // Choosing a preset in the card sets the controller's.
+        box.currentIndex = 2;
+        box.activated(2);
+        compare(MicrophoneController.toleranceCents, 200);
+        // And the controller's setting moves the card.
+        MicrophoneController.toleranceCents = 50;
+        tryCompare(box, "currentValue", 50);
+        MicrophoneController.toleranceCents = 100;
+
+        // The key choice is off, says nothing until it is on, and says what it is waiting for.
+        const own = find(card, "microphoneOwnKey");
+        const inUse = find(card, "microphoneOwnKeyInUse");
+        compare(MicrophoneController.ownKey, false);
+        compare(inUse.visible, false);
+        mouseClick(own);
+        compare(MicrophoneController.ownKey, true);
+        compare(inUse.visible, true);
+        verify(inUse.text.indexOf("Waiting") >= 0, inUse.text);
+        mouseClick(own);
+        compare(MicrophoneController.ownKey, false);
+    }
+
     function test_the_takes_in_the_folder_are_listed_and_removed_after_asking() {
         // Seven takes in a folder of their own, made as files: the list is read from the
         // descriptions beside them.

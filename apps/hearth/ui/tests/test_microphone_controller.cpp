@@ -480,6 +480,111 @@ TEST_CASE("microphone controller: a performance is drawn, marked line by line an
     CHECK(rig->controller->summary().isEmpty());
 }
 
+TEST_CASE("microphone controller: how close counts is a preset, and kept; whose key is not",
+          "[hearth][microphone][score]") {
+    Room room;
+    application();
+    {
+        auto rig = make_rig();
+        CHECK(rig->controller->toleranceCents() == 100);
+        CHECK(!rig->controller->ownKey());
+        // A value is snapped to the nearest preset: half a semitone, a semitone, a whole tone.
+        rig->controller->setToleranceCents(120);
+        CHECK(rig->controller->toleranceCents() == 100);
+        rig->controller->setToleranceCents(175);
+        CHECK(rig->controller->toleranceCents() == 200);
+        rig->controller->setToleranceCents(10);
+        CHECK(rig->controller->toleranceCents() == 50);
+        rig->controller->setOwnKey(true);
+        CHECK(rig->controller->ownKey());
+        // Nothing sung yet: no key to allow for.
+        CHECK(rig->controller->keyShiftCents() == Catch::Approx(0.0));
+    }
+    // The tolerance is a preference and is kept; judging against one's own key is chosen each
+    // time, so that it is seen to be on.
+    auto again = make_rig();
+    CHECK(again->controller->toleranceCents() == 50);
+    CHECK(!again->controller->ownKey());
+}
+
+TEST_CASE("microphone controller: a sharp singer is judged by the tolerance, or by their own key",
+          "[hearth][microphone][score]") {
+    Room room;
+    application();
+    auto rig = make_rig();
+    rig->controller->setHeadphones(true);
+    rig->controller->load(example_stream(), "m");
+    REQUIRE(wait_for([&] { return rig->controller->referenceStatus() == "ready"; }, 60000));
+    const QVariantList notes = rig->controller->ribbon(0, 20000).value("notes").toList();
+    REQUIRE(notes.size() >= 3 * 6);
+    const auto line_start = static_cast<qlonglong>(notes[0].toDouble());
+    const auto line_end = static_cast<qlonglong>(notes[7].toDouble());
+
+    // A singer a semitone and a half sharp of the tune, all the way through (150 cents).
+    REQUIRE(rig->controller->start());
+    perform(*rig, sing(notes, 20000, 1.5), 20000);
+    const auto percent = [&] {
+        return rig->controller->lineResult(line_start, line_end).value("percent").toInt();
+    };
+
+    // A semitone is not enough room, half a semitone less so, and a whole tone is.
+    rig->controller->setToleranceCents(100);
+    CHECK(percent() < 25);
+    rig->controller->setToleranceCents(50);
+    CHECK(percent() < 25);
+    rig->controller->setToleranceCents(200);
+    CHECK(percent() >= 75);
+    rig->controller->setToleranceCents(100);
+
+    // Against their own key, the same singer is on the tune's shape; the figure allowed for is
+    // shown.
+    CHECK(rig->controller->keyShiftCents() == Catch::Approx(0.0));
+    rig->controller->setOwnKey(true);
+    CHECK(rig->controller->keyShiftCents() == Catch::Approx(150.0).margin(35.0));
+    CHECK(percent() >= 75);
+    // And the summary says so.
+    rig->controller->stop();
+    const QVariantMap summary = rig->controller->summary();
+    REQUIRE(summary.contains("percent"));
+    CHECK(summary.value("ownKey").toBool());
+    CHECK(summary.value("keyShiftCents").toDouble() == Catch::Approx(150.0).margin(35.0));
+    CHECK(summary.value("toleranceCents").toDouble() == Catch::Approx(100.0));
+
+    // A new performance has its own key: none until it is sung, and then taken from the first
+    // sung notes as they come, when it was turned on before.
+    REQUIRE(rig->controller->start());
+    CHECK(rig->controller->ownKey());
+    CHECK(rig->controller->keyShiftCents() == Catch::Approx(0.0));
+    perform(*rig, sing(notes, 20000, 1.5), 20000);
+    CHECK(rig->controller->keyShiftCents() == Catch::Approx(150.0).margin(35.0));
+    CHECK(percent() >= 75);
+
+    // Another item is another tune, sung from its first notes: the key is taken again, and the
+    // choice to be judged by it stays.
+    rig->controller->load(plain_stream(), "m");
+    CHECK(rig->controller->ownKey());
+    CHECK(rig->controller->keyShiftCents() == Catch::Approx(0.0));
+
+    // And off again when it is turned off.
+    rig->controller->setOwnKey(false);
+    CHECK(!rig->controller->ownKey());
+    CHECK(rig->controller->keyShiftCents() == Catch::Approx(0.0));
+    rig->controller->stop();
+
+    // A few notes are too few to take a key from: the summary does not say one was used.
+    rig->controller->load(example_stream(), "m");
+    REQUIRE(wait_for([&] { return rig->controller->referenceStatus() == "ready"; }, 60000));
+    rig->controller->setOwnKey(true);
+    REQUIRE(rig->controller->start());
+    perform(*rig, sing(notes, notes[1].toDouble(), 1.5), 150);
+    CHECK(rig->controller->keyShiftCents() == Catch::Approx(0.0));
+    rig->controller->stop();
+    const QVariantMap brief = rig->controller->summary();
+    REQUIRE(brief.contains("percent"));
+    CHECK(!brief.value("ownKey").toBool());
+    CHECK(brief.value("keyShiftCents").toDouble() == Catch::Approx(0.0));
+}
+
 TEST_CASE("microphone controller: a take needs the microphone, is its own switch, and is kept",
           "[hearth][microphone][take]") {
     Room room;
