@@ -529,6 +529,173 @@ TestCase {
         NetworkController.deleteGroup(groupId);
     }
 
+    // The output a person chose is kept across starts (FEATURE_COVERAGE.md row
+    // 91's neighbour). What a restart finds is the settings file, so the keys
+    // are read the way tst_settings_page.qml reads its own; and a restart is
+    // TestServices.startAnotherWindow(): a second controller over the same
+    // settings, started as the window starts one, before anything plays.
+    function kept() {
+        return {kind: TestServices.storedSetting("output/kind") || "default",
+                id: TestServices.storedSetting("output/id") || ""};
+    }
+
+    // The row `id` in the picker's PCM section picked and "Play here" pressed.
+    function playToTheDevice(win, id) {
+        const picker = openPicker(win);
+        mouseClick(rowFor(picker, id));
+        compare(picker.selectedDeviceId, id);
+        mouseClick(findChild(win, "outputPickerPlayHere"));
+        tryVerify(function() { return !picker.visible; }, 5000, "Play here did not close the picker");
+    }
+
+    function test_playHereKeepsTheKindOfRowAndItsId() {
+        const win = openWindow();
+        // Nothing chosen: a start decodes to the default output.
+        compare(kept().kind, "default");
+
+        playToTheReceiver(win);
+        compare(kept().kind, "passthrough");
+        compare(kept().id, "fake-receiver");
+
+        // A PCM row replaces it, whichever kind it was.
+        playToTheDevice(win, "fake-headphones");
+        compare(kept().kind, "device");
+        compare(kept().id, "fake-headphones");
+
+        const groupId = NetworkController.createGroup("Kept group");
+        verify(groupId.length > 0, "the network did not start, so no group could be made");
+        const picker = openPicker(win);
+        let row = null;
+        tryVerify(function() { row = groupRowFor(picker, groupId); return row !== null; }, 5000,
+                  "the picker lists no row for the group");
+        mouseClick(row);
+        mouseClick(findChild(win, "outputPickerPlayHere"));
+        tryVerify(function() { return !picker.visible; }, 5000);
+        tryCompare(HearthController, "outputGroupName", groupId, 5000);
+        compare(kept().kind, "group");
+        compare(kept().id, groupId);
+
+        // Giving the group up is the default again, which is also what deleting
+        // the group that plays does (Network page: "Delete group").
+        HearthController.selectOutputGroup("");
+        compare(kept().kind, "default");
+        compare(kept().id, "");
+        NetworkController.deleteGroup(groupId);
+    }
+
+    function test_theNextStartPlaysToTheReceiverChosenLastTime() {
+        const win = openWindow();
+        playToTheReceiver(win);
+
+        const later = TestServices.startAnotherWindow();
+        verify(later !== null, "a second window could not be started");
+        // Put back in start(), before anything has played.
+        compare(later.passthroughDeviceId, "fake-receiver");
+        compare(later.outputGroupName, "");
+        later.openAndPlay([firstAc3]);
+        tryCompare(later, "state", "playing", 10000);
+        tryVerify(function() { return later.outputFormat.mode === "bitstream"; }, 10000,
+                  "the item was not sent as a bitstream: " + later.outputReason);
+        compare(later.currentDeviceId, "fake-receiver");
+        compare(later.outputFormat.stream, "AC-3");
+        later.stop();
+        TestServices.closeWindow(later);
+    }
+
+    function test_theNextStartDecodesToTheDeviceChosenLastTime() {
+        const win = openWindow();
+        playToTheDevice(win, "fake-headphones");
+
+        const later = TestServices.startAnotherWindow();
+        verify(later !== null);
+        compare(later.passthroughDeviceId, "");
+        later.openAndPlay([firstAc3]);
+        tryCompare(later, "state", "playing", 10000);
+        tryCompare(later, "currentDeviceId", "fake-headphones", 10000);
+        compare(later.outputFormat.mode, "pcm");
+        later.stop();
+        TestServices.closeWindow(later);
+
+        // A device that is no longer there is one the decision ignores: the
+        // default output, still a decode.
+        const gone = TestServices.startAnotherWindow(["fake-headphones"]);
+        verify(gone !== null);
+        gone.openAndPlay([firstAc3]);
+        tryCompare(gone, "state", "playing", 10000);
+        tryCompare(gone, "currentDeviceId", "fake-speakers", 10000);
+        compare(gone.outputFormat.mode, "pcm");
+        gone.stop();
+        TestServices.closeWindow(gone);
+        // And what is kept has not changed for it.
+        compare(kept().id, "fake-headphones");
+    }
+
+    // The receiver chosen is not listed at the next start, and another output
+    // is, which takes a bitstream. Posted as it was chosen, the decision would
+    // ignore the endpoint it does not have and bitstream to that one: a
+    // receiver a person never chose, held exclusively.
+    function test_aReceiverThatIsNotThereIsNotReplacedByAnotherThatTakesABitstream() {
+        const win = openWindow();
+        playToTheReceiver(win);
+        compare(kept().id, "fake-receiver");
+
+        const later = TestServices.startAnotherWindow(["fake-receiver"], true);
+        verify(later !== null);
+        // The choice is not this window's now: it plays where a window with
+        // nothing chosen does.
+        compare(later.passthroughDeviceId, "");
+        later.openAndPlay([firstAc3]);
+        tryCompare(later, "state", "playing", 10000);
+        tryCompare(later, "currentDeviceId", "fake-speakers", 10000);
+        compare(later.outputFormat.mode, "pcm");
+        verify(later.outputReason.indexOf("Decoding here and playing PCM to \"Test speakers\"") === 0,
+               "the item was not decoded to the default output: " + later.outputReason);
+        later.stop();
+        TestServices.closeWindow(later);
+
+        // Kept as it was: the receiver is the choice again once it is listed.
+        compare(kept().kind, "passthrough");
+        compare(kept().id, "fake-receiver");
+        const again = TestServices.startAnotherWindow();
+        verify(again !== null);
+        compare(again.passthroughDeviceId, "fake-receiver");
+        TestServices.closeWindow(again);
+    }
+
+    // A group is put back as it was chosen. The network is found after the
+    // window opens, so it is not ready at first, and the engine does not
+    // replace a group that was chosen with a local output: it refuses the item,
+    // and says why.
+    function test_theNextStartKeepsTheGroupAndRefusesItemsUntilItIsReady() {
+        const win = openWindow();
+        const groupId = NetworkController.createGroup("Kept lounge");
+        verify(groupId.length > 0, "the network did not start, so no group could be made");
+        const picker = openPicker(win);
+        let row = null;
+        tryVerify(function() { row = groupRowFor(picker, groupId); return row !== null; }, 5000,
+                  "the picker lists no row for the group");
+        mouseClick(row);
+        mouseClick(findChild(win, "outputPickerPlayHere"));
+        tryVerify(function() { return !picker.visible; }, 5000);
+        tryCompare(HearthController, "outputGroupName", groupId, 5000);
+        compare(kept().id, groupId);
+
+        const later = TestServices.startAnotherWindow();
+        verify(later !== null);
+        compare(later.outputGroupName, groupId);
+        compare(later.passthroughDeviceId, "");
+        later.openAndPlay([firstAc3]);
+        tryVerify(function() { return later.errorText.indexOf("is not ready") >= 0; }, 10000,
+                  "the item was not refused for the group: state " + later.state + ", error \""
+                  + later.errorText + "\", reason \"" + later.outputReason + "\"");
+        verify(later.errorText.indexOf("Kept lounge") >= 0 || later.errorText.indexOf(groupId) >= 0,
+               "the refusal does not name the group: " + later.errorText);
+        compare(later.state, "stopped");
+        compare(later.currentDeviceId, "");
+        TestServices.closeWindow(later);
+        NetworkController.deleteGroup(groupId);
+    }
+
     function test_networkPageButtonSwitchesToTheNetworkPage() {
         const win = openWindow();
         const picker = openPicker(win);

@@ -806,6 +806,79 @@ bool write_kept_karaoke(QSettings& store, const iclforge::hearth::DecoderSetting
     return true;
 }
 
+// The output a person chose in the output picker, kept across starts: which kind of
+// row it was, and the row's id - an endpoint's for a device or a passthrough row, a
+// network group's id for a group, none for the default. "Play here" keeps it
+// (selectOutputDevice(), selectPassthroughDevice() and selectOutputGroup()) and
+// start() puts it back before anything can play. Only a choice changes what is
+// kept: an endpoint that is not there at one start (a receiver switched off) is
+// still the choice at the next, when it is.
+enum class KeptOutputKind { kDefault, kDevice, kPassthrough, kGroup };
+
+struct KeptOutput {
+    KeptOutputKind kind = KeptOutputKind::kDefault;
+    QString id;
+
+    friend bool operator==(const KeptOutput&, const KeptOutput&) = default;
+};
+
+[[nodiscard]] QString kept_output_kind_name(KeptOutputKind kind) {
+    switch (kind) {
+        case KeptOutputKind::kDevice: return QStringLiteral("device");
+        case KeptOutputKind::kPassthrough: return QStringLiteral("passthrough");
+        case KeptOutputKind::kGroup: return QStringLiteral("group");
+        case KeptOutputKind::kDefault: break;
+    }
+    return QStringLiteral("default");
+}
+
+// Nothing kept, a kind this build does not know (a later build wrote it) and a kind
+// with no id all read as the default, which is what a first start has.
+[[nodiscard]] KeptOutput read_kept_output(const QSettings& store) {
+    const QString name = store.value(QStringLiteral("output/kind")).toString();
+    const QString id = store.value(QStringLiteral("output/id")).toString();
+    for (const KeptOutputKind kind :
+         {KeptOutputKind::kDevice, KeptOutputKind::kPassthrough, KeptOutputKind::kGroup}) {
+        if (name == kept_output_kind_name(kind) && !id.isEmpty()) {
+            return KeptOutput{.kind = kind, .id = id};
+        }
+    }
+    return KeptOutput{};
+}
+
+// Writes it if it differs from what is kept, and says whether it did.
+bool write_kept_output(QSettings& store, const KeptOutput& from) {
+    // The default has no id, whatever a caller put there.
+    const KeptOutput next = from.kind == KeptOutputKind::kDefault ? KeptOutput{} : from;
+    if (read_kept_output(store) == next) {
+        return false;
+    }
+    store.setValue(QStringLiteral("output/kind"), kept_output_kind_name(next.kind));
+    if (next.id.isEmpty()) {
+        store.remove(QStringLiteral("output/id"));
+    } else {
+        store.setValue(QStringLiteral("output/id"), next.id);
+    }
+    return true;
+}
+
+// Keeps `chosen`, syncing so that it survives a hard exit, as the karaoke choice does.
+void keep_output(QSettings& store, const KeptOutput& chosen) {
+    if (write_kept_output(store, chosen)) {
+        store.sync();
+    }
+}
+
+// Whether `devices` (what the picker's own enumeration lists) has the endpoint `id`.
+[[nodiscard]] bool lists_endpoint(const std::vector<iclforge::audio::RenderDeviceInfo>& devices,
+                                  const QString& id) {
+    const std::string wanted = id.toStdString();
+    return std::any_of(devices.begin(), devices.end(),
+                       [&wanted](const iclforge::audio::RenderDeviceInfo& device) {
+                           return device.id == wanted;
+                       });
+}
+
 // A sink's request for the singer's karaoke choice (D8) as the map setDecoderSettings() takes: only
 // the keys it asked for, in the page's own names (the reproduction "off" is "asCoded" here). Empty
 // for a request with none, which is nothing to apply.
@@ -1532,8 +1605,10 @@ void HearthController::start() {
         std::move(outputs), iclforge::hearth::ui::make_file_item_loader(), layout, decoder_settings,
         iclforge::hearth::EngineTiming{}, &log_);
     // Before anything can play: the engine's own starting choice is
-    // automatic, which sends a stream to whichever endpoint takes it.
-    engine_->set_output_preferences(decode_to_default());
+    // automatic, which sends a stream to whichever endpoint takes it. What a
+    // person chose in the picker last time is put back, else it is a decode to
+    // the default output.
+    restore_kept_output();
     // Each reads with its own loader instance (make_file_item_loader()
     // builds a fresh std::function every call, same as the engine's own
     // above) so the Media page's own pick never blocks on whatever
@@ -2221,6 +2296,47 @@ void HearthController::refreshOutputDevices() {
     }
 }
 
+void HearthController::restore_kept_output() {
+    const KeptOutput kept = read_kept_output(settings_);
+    switch (kept.kind) {
+        case KeptOutputKind::kDevice:
+            // As chosen: a decode, pinned to a PCM output, so nothing can be
+            // sent as a bitstream. An endpoint that is not there is one the
+            // decision ignores (output_decision.cpp), and it decodes to the
+            // default output instead.
+            selectOutputDevice(kept.id);
+            return;
+        case KeptOutputKind::kPassthrough: {
+            // Not as chosen unless the endpoint is there. A passthrough choice
+            // names an endpoint and no mode, and the decision ignores a named
+            // endpoint it does not have and takes every endpoint instead: with
+            // the receiver switched off or unplugged, the stream would be
+            // bitstreamed to whichever other output takes it. Decoded to the
+            // default output is where a window with nothing chosen starts. What
+            // is kept stays as it is, so the receiver is the choice again at
+            // the next start it is there for.
+            const auto devices = test_outputs_ ? test_outputs_->enumerate()
+                                               : iclforge::audio::enumerate_render_devices();
+            if (devices.has_value() && lists_endpoint(*devices, kept.id)) {
+                selectPassthroughDevice(kept.id);
+                return;
+            }
+            log_.note("output: the receiver kept as the output (" + kept.id.toStdString() +
+                      ") is not listed, so playback starts decoded to the default output");
+            break;
+        }
+        case KeptOutputKind::kGroup:
+            // As chosen, ready or not. The network has not been started yet, so
+            // the group reads as not ready until it is found; poll() posts the
+            // change once it is, and until then the decision refuses to play
+            // rather than replace a group a person chose with a local output.
+            selectOutputGroup(kept.id);
+            return;
+        case KeptOutputKind::kDefault: break;
+    }
+    engine_->set_output_preferences(decode_to_default());
+}
+
 void HearthController::selectOutputDevice(const QString& deviceId) {
     if (!engine_ || deviceId.isEmpty()) {
         return;
@@ -2228,6 +2344,7 @@ void HearthController::selectOutputDevice(const QString& deviceId) {
     output_group_name_.clear();
     output_group_ready_ = false;
     passthrough_device_id_.clear();
+    keep_output(settings_, KeptOutput{.kind = KeptOutputKind::kDevice, .id = deviceId});
     emit stateChanged();
     engine_->set_output_preferences(
         iclforge::hearth::OutputPreferences{.pinned = iclforge::hearth::OutputMode::kLocalPcm,
@@ -2242,6 +2359,7 @@ void HearthController::selectPassthroughDevice(const QString& deviceId) {
     output_group_name_.clear();
     output_group_ready_ = false;
     passthrough_device_id_ = deviceId;
+    keep_output(settings_, KeptOutput{.kind = KeptOutputKind::kPassthrough, .id = deviceId});
     emit stateChanged();
     // The endpoint, and no mode: the decision takes it with the best mode it
     // carries for each item (output_decision.cpp, "An endpoint the user
@@ -2259,6 +2377,9 @@ void HearthController::selectOutputGroup(const QString& groupId) {
     passthrough_device_id_.clear();
     if (groupId.isEmpty()) {
         output_group_ready_ = false;
+        // Where playback starts is what is kept: a group given up is the
+        // default again at the next start too.
+        keep_output(settings_, KeptOutput{});
         emit stateChanged();
         // Back to where playback starts: decoded, to this machine's default
         // output.
@@ -2267,6 +2388,7 @@ void HearthController::selectOutputGroup(const QString& groupId) {
     }
     const std::string id = groupId.toStdString();
     output_group_ready_ = iclforge::hearth::ui::NetworkOutputStatus::instance().ready(id);
+    keep_output(settings_, KeptOutput{.kind = KeptOutputKind::kGroup, .id = groupId});
     emit stateChanged();
     engine_->set_output_preferences(iclforge::hearth::OutputPreferences{
         .pinned = iclforge::hearth::OutputMode::kNetworkGroup,

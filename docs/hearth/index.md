@@ -35,9 +35,10 @@ The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 The header says where playback goes. Clicking it, or **Choose…** in the signal path, opens the
 output picker: this computer's outputs for decoded audio, the outputs that take AC-3 and E-AC-3 as
 a bitstream, and the network groups. Its **Play here** button moves playback to the row chosen.
-Until a row is chosen the window decodes to the computer's default output, and the choice lasts
-until the window is closed. A row in the passthrough section plays to that output as a receiver
-([Passthrough to a receiver](#passthrough-to-a-receiver)).
+Until a row is chosen the window decodes to the computer's default output, and the choice is kept
+for the next start. A row in the passthrough section plays to that output as a receiver
+([Passthrough to a receiver](#passthrough-to-a-receiver)); a receiver that is not listed at a start
+is not played to, and the window decodes to the default output until it is.
 A network sink that another server holds, such as one Music Assistant holds, shows as in use by
 another server, with a **Take it back** button. From a paired ESP32 sink's settings page the app
 updates that sink's firmware. The engine and the Sendspin protocol are tested in CI, including
@@ -512,8 +513,10 @@ the build, the pairing, the screens and what has been run.
   stream carries object metadata without listing it.
 - **Remove an item from the queue.** The window has no control for it.
 - **Trim the AC-4 decoder's delay** at the start of an item (see above).
-- **Keep the output chosen across starts.** The window starts on the computer's default output,
-  and a receiver, another device or a group is chosen in the output picker each time.
+- **Play to a group before the network is found.** The output chosen in the picker is kept across
+  starts, and a group is one of the choices; but the network starts after the window opens, so the
+  group is not ready for the first moments, and playback is refused with that reason until it is
+  rather than played on this computer.
 - **Send a receiver anything but AC-3 and E-AC-3 as a bitstream.** An AC-4 item is decoded for it
   ([Passthrough to a receiver](#passthrough-to-a-receiver)).
 - **Notice by itself that a receiver was switched on.** What each output takes is read when

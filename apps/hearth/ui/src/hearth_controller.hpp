@@ -468,7 +468,10 @@ public:
     // fields) and decodes to it - the picker's "Play here" on a "this
     // computer" row. The item playing is decided again and moves there if
     // it is not already (Engine::set_output_preferences's own comment);
-    // what changed, or why nothing did, shows up in noteText().
+    // what changed, or why nothing did, shows up in noteText(). This and the
+    // two choices below are kept (the kind of row and its id), and the next
+    // start restores them: restore_kept_output() says how, and what a
+    // choice whose endpoint or group is not there then becomes.
     Q_INVOKABLE void selectOutputDevice(const QString& deviceId);
     [[nodiscard]] QString passthroughDeviceId() const { return passthrough_device_id_; }
     // Plays to `deviceId` as a receiver - the picker's "Play here" on a
@@ -582,6 +585,12 @@ signals:
 
 private:
     void poll();
+    // Puts back the output a person chose in the picker at an earlier start
+    // (selectOutputDevice() and the two beside it keep it), and posts the
+    // decode to the default output where there is none, or where it is a
+    // receiver the machine does not list now. Called once, from start(), before
+    // anything can play.
+    void restore_kept_output();
     // Saves the settings; while resumeQueue is on, the queue and its play
     // position; and the speaker setup (trim/delay/crossover/routing/layout)
     // unconditionally - connected to QCoreApplication::aboutToQuit, since a
