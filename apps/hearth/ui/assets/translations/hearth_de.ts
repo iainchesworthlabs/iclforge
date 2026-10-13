@@ -5174,8 +5174,8 @@ Legen Sie AC-3-, E-AC-3- oder AC-4-Dateien (roh, MP4, Matroska oder MPEG-TS) ode
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="582"/>
-        <source>System follows the language the desktop is set to. Applies at once. The Karaoke page, the lyrics and the singer view are translated; the other pages are not yet, so their words stay in English while the layout direction and the typeface follow the language chosen. The translations are machine-made and have not been read by a speaker.</source>
-        <translation>System folgt der Sprache, auf die der Desktop eingestellt ist. Gilt sofort. Die Karaoke-Seite, der Liedtext und die Sängeransicht sind übersetzt; die übrigen Seiten noch nicht, daher bleiben ihre Wörter englisch, während Layoutrichtung und Schrift der gewählten Sprache folgen. Die Übersetzungen sind maschinell erstellt und wurden nicht von einem Muttersprachler gelesen.</translation>
+        <source>System follows the language the desktop is set to. Applies at once. The translations are machine-made and have not been read by a speaker.</source>
+        <translation>System folgt der Sprache, auf die der Desktop eingestellt ist. Gilt sofort. Die Übersetzungen sind maschinell erstellt und wurden nicht von einem Muttersprachler gelesen.</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="596"/>

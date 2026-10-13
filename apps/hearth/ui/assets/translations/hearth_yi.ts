@@ -5174,8 +5174,8 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="582"/>
-        <source>System follows the language the desktop is set to. Applies at once. The Karaoke page, the lyrics and the singer view are translated; the other pages are not yet, so their words stay in English while the layout direction and the typeface follow the language chosen. The translations are machine-made and have not been read by a speaker.</source>
-        <translation>סיסטעם גייט נאָך דער שפּראַך אויף וועלכער דער דעסקטאָפּ איז אײַנגעשטעלט. ווירקט תיכּף. דער קאַראַאָקע־בלאַט, די ווערטער און די זינגער־אָנזיכט זענען איבערגעזעצט; די אַנדערע בלעטער נאָך ניט, דעריבער בלײַבן זייערע ווערטער אויף ענגליש בעת די ריכטונג פֿון דער אויסלייג און די שריפֿט גייען נאָך דער אויסגעקליבענער שפּראַך. די איבערזעצונגען זײַנען מאַשין־געמאַכט און קיין רעדער האָט זיי נישט איבערגעלייענט.</translation>
+        <source>System follows the language the desktop is set to. Applies at once. The translations are machine-made and have not been read by a speaker.</source>
+        <translation>סיסטעם גייט נאָך דער שפּראַך אויף וועלכער דער דעסקטאָפּ איז אײַנגעשטעלט. ווירקט תיכּף. די איבערזעצונגען זײַנען מאַשין־געמאַכט און קיין רעדער האָט זיי נישט איבערגעלייענט.</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="596"/>

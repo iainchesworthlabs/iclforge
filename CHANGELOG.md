@@ -1057,7 +1057,9 @@ The sections below contain the complete change list and fixes.
   French, Arabic, Hebrew and Yiddish: the Play, Media, Speakers, Decoder, Network and Settings
   pages, the sink pages, the shortcuts and the first-run dialog. They are machine-made and have
   not been read by a speaker, and they use the words the Karaoke entries and the Crucible and Forge
-  catalogues already carry. `test_translations.cpp` reads Hearth's six files with the rules it
+  catalogues already carry. The note under Settings' language chooser, which listed the pages
+  that were not translated, now says only that the translations are machine-made and unread.
+  `test_translations.cpp` reads Hearth's six files with the rules it
   applies to Crucible's (nothing unfinished or dead, nothing empty, placeholders and brand terms
   kept, one source set), and a new or reworded string now fails it until its six entries are
   filled. Six strings that English builds by gluing `s` or `ies` onto a count cannot be translated

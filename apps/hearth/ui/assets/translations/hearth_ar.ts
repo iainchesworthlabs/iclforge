@@ -5174,8 +5174,8 @@ Drop AC-3, E-AC-3 or AC-4 files (raw, MP4, Matroska or MPEG-TS) or a folder here
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="582"/>
-        <source>System follows the language the desktop is set to. Applies at once. The Karaoke page, the lyrics and the singer view are translated; the other pages are not yet, so their words stay in English while the layout direction and the typeface follow the language chosen. The translations are machine-made and have not been read by a speaker.</source>
-        <translation>يتبع خيار النظام اللغة المضبوطة على سطح المكتب. يسري فورًا. صفحة الكاراوكي والكلمات وعرض المغنّي مترجمة؛ أما الصفحات الأخرى فلم تُترجم بعد، فتبقى كلماتها بالإنجليزية بينما يتبع اتجاه التخطيط والخط اللغة المختارة. والترجمات آلية ولم يقرأها ناطق باللغة.</translation>
+        <source>System follows the language the desktop is set to. Applies at once. The translations are machine-made and have not been read by a speaker.</source>
+        <translation>يتبع خيار النظام اللغة المضبوطة على سطح المكتب. يسري فورًا. والترجمات آلية ولم يقرأها ناطق باللغة.</translation>
     </message>
     <message>
         <location filename="../qml/Settings.qml" line="596"/>
