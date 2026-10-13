@@ -76,7 +76,10 @@ settings whole: what the sink's own page set is not kept.
 A sink also says which codecs it reproduces karaoke for (`karaoke_codecs` in its support
 object), and one that says nothing reproduces AC-3's alone. An E-AC-3 karaoke stream is
 therefore decoded here and sent as PCM, with the reproduction applied, to a sink that does not
-list `eac3`, and goes as it is to one that does.
+list `eac3`, and goes as it is to one that does, unless the sink decodes fewer channels of the
+codec than the stream has: a stream of five channels and an LFE is decoded here for an
+ESP32-C6, which decodes two, and for any sink with a limit below six. The boards are in [An ESP32-S3 sink](sink-esp32-s3.md#karaoke),
+[An ESP32-C6 sink](sink-esp32-c6.md#karaoke-streams) and [An ESP32-P4 sink](sink-esp32-p4.md#karaoke-on-the-v1x-board).
 
 The levels of the melody and the vocals (Capable only) travel the same way, as `karaoke_melody_db`,
 `karaoke_vocal1_db` and `karaoke_vocal2_db`, and only the ones that change what is heard: a level

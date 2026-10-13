@@ -344,6 +344,30 @@ class TheFile(unittest.TestCase):
             "a board build in _build.yml spells its own fragment list",
         )
 
+    def test_the_guard_steps_run_after_an_earlier_failure(self) -> None:
+        """A step after a failed step is skipped by default, and on main the minimum-footprint
+        probes failed first, so no sink build was held to its profile (the C6's static RAM budget
+        was wrong for hours). Every step that runs the guard or carries an image to the packager
+        is `!cancelled()`, and so is the packaging job."""
+        text = (REPO / ".github" / "workflows" / "_build.yml").read_text("utf-8")
+        steps = re.split(r"(?m)^      - (?=name:|uses:)", text)[1:]
+        guarded = []
+        for step in steps:
+            runs_guard = re.search(r'"\$profile" (defaults|verify|expect-console) ', step)
+            carries_image = "actions/upload-artifact" in step and re.search(
+                r"name: esp32-firmware-(esp32s3|riscv)\b", step
+            )
+            if not (runs_guard or carries_image):
+                continue
+            head = step.split("\n")[0]
+            guarded.append(head)
+            self.assertIn("if: ${{ !cancelled() }}", step.split("run: |")[0], head)
+        # the S3 profile builds, the QEMU twin and the S3 image upload; the C6 and P4 builds
+        # and their upload
+        self.assertGreaterEqual(len(guarded), 10, guarded)
+        package = text[text.index("\n  package-esp32-firmware:") :]
+        self.assertIn("if: ${{ !cancelled() && inputs.run_esp }}", package.split("steps:")[0])
+
     def test_the_qemu_overlay_moves_no_stack_ring_cache_or_feature(self) -> None:
         """The twin is the release shape because the overlay touches only what QEMU has no
         hardware for. A pattern that could move a stack, a ring or a cache is a different
