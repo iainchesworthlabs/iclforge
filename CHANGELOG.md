@@ -4269,6 +4269,17 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Forge GUI Karaoke flow: a part of another length**
+
+- **The Karaoke flow's warning said the shorter part "is padded with silence"; it is not.** The
+  window and `forge encode` fill a source past its end with its last sample, held, in one function
+  (`fill_source_frame`, chosen by W1 of the karaoke phase 2 plan so that the two cannot differ):
+  `forge encode` with a 6 s 24-bit mono part ending at -0.25 under a 16.5 s backing decodes that
+  channel at a constant -0.2499 to the end, where silence would be 0. The warning now reads "the
+  shorter part holds its last sample for the rest of the programme", in the seven catalogues too.
+  The encoding is unchanged, held by the owner's decision; a part that should fall silent after its
+  end has to be given as long as the backing.
+
 **Footprint probes: the E-AC-3 fold fixtures expect the -3 dB levels**
 
 - **`kEac3FoldRms`, `kEac3714FoldRms` and the fixed-tier pins `eac3_fold` and `eac3_714_fold` are
