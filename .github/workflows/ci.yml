@@ -960,6 +960,15 @@ jobs:
           echo "::error::A workload's heap churn at least doubled against its trailing average (or it leaked past the absolute threshold) - see the job log above and docs/performance-trend.md's memory tables for the recorded numbers."
           exit 1
 
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # A SECOND iclforge-bench series, on arm64 (PR-time performance comparison).
   #
   # ms/frame was measured on exactly one platform - x86-64, GCC, one hosted
@@ -1055,6 +1064,15 @@ jobs:
           name: performance-linux-gcc-arm64
           path: results/performance-linux-gcc-arm64
           retention-days: 7
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
 
   # The one verdict for this run. It is not a required check: branch protection
   # points at pr-gate.yml's `CI Status`, and this one is named differently so the

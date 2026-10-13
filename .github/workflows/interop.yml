@@ -185,3 +185,12 @@ jobs:
           ICLFORGE_CLI: build/config-linux-llvm/bin/forge
           DASH_SCHEMA_CACHE_DIR: ${{ runner.temp }}/dash-schema
         run: python3 tools/checks/verify_dash_schema.py --require
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache

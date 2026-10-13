@@ -488,6 +488,37 @@ workflows is one coherent "does this package still build and pass its own tests"
 shape `build-and-test` folds `_build.yml`'s dozen-plus jobs into. `needs.wheels.result` answering
 "success" or "failure" is as informative as `needs.build-and-test.result` is for the C++ matrix.
 
+## The vcpkg caches
+
+`setup-vcpkg` restores two caches (the built archives, `~/.cache/vcpkg/archives`,
+and the downloaded sources and tools, `~/.cache/vcpkg/downloads`) and
+`save-vcpkg-cache` is the last step of every job that calls it, with
+`if: always()` and `continue-on-error: true`. `actions/cache`'s own post-job
+save runs only when the job succeeds, so a job that built twenty packages and
+then failed (a flaky `codeload` download, a test, a timeout) used to throw all
+of them away and the next attempt started from nothing.
+
+- **The key ends in a hash of the directory's contents**, not of the manifest:
+  `vcpkg-<os>-<arch>-<vcpkg pin>-<hash(vcpkg.json)>-<lineage>-<hash of the file
+  listing>`. A save under the same key as an existing entry is impossible, so
+  the earlier scheme (one exact key per manifest, saved by whichever job got
+  there first) let a job that had built a smaller set lock it in for everyone;
+  a content-addressed key cannot lock anything in, and a job that adds a package
+  saves a new, larger entry.
+- **A restore takes the newest entry of its own lineage**, then of any lineage
+  of the same manifest, vcpkg pin, and OS and arch. The lineage is the
+  `cache-key-suffix` (`adm`, `hearth`, ...) or `core`: jobs whose install sets
+  differ keep their own, because two concurrent jobs sharing one would each
+  restore the other's newest entry and rebuild their own extras every run.
+- **Nothing is saved** when no archive was added since the restore, or when an
+  identical key is already readable from the ref (an exact-key lookup that
+  downloads nothing). A merge-queue entry that started from an older generation
+  used to store its own full copy of a set `main` already had.
+- Archives are never garbage-collected (vcpkg has no notion of "no longer
+  used"), so a lineage only grows until the pin or the manifest changes and
+  starts a new one; `cache-hygiene.yml` removes the superseded generations and
+  can purge a family.
+
 ## Analysis and scanner workflows
 
 CodeQL (`codeql.yml`), MSVC Code Analysis (PREfast, `msvc-analysis.yml`), clang-tidy

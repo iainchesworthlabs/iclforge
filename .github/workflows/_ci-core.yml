@@ -265,6 +265,15 @@ jobs:
         env:
           STATUS: ${{ job.status }}
         run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
   # iclforge::adm (libs/adm) is opt-in - ICLFORGE_BUILD_ADM defaults OFF, unlike every other
   # library component (see the root CMakeLists.txt's own option() and libs/adm/CMakeLists.txt's
   # header comment for why: libadm needs Boost header libraries, a third-party dependency that
@@ -446,6 +455,15 @@ jobs:
         env:
           STATUS: ${{ job.status }}
         run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
   # iclforge::sendspin (libs/sendspin, planning/hearth-reference-player.md A4): ICLFORGE_BUILD_HEARTH
   # defaults ON (root CMakeLists.txt), with vcpkg's "hearth" feature - cpp-httplib, mdns, mbedTLS,
   # libFLAC and Opus - selected by default too, via CMakePresets.json's "core" fragment. Every
@@ -581,6 +599,15 @@ jobs:
         env:
           STATUS: ${{ job.status }}
         run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
   # An ABI gate for the shared libraries, over the
   # linux-llvm-shared build. Two independent checks, both against
   # config-linux-llvm-shared (already Debug - has DWARF - and
@@ -902,6 +929,15 @@ jobs:
           fi
           echo "::notice title=ABI gate::Exported symbols no longer match the allowlist - advisory pre-1.0, would fail once ABI_ENFORCE is true. Regenerate with --update if the change is deliberate."
           exit 0
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
 
   # FFmpeg as an independent oracle (CONTRIBUTING.md's "Oracles" list, #2),
   # automated - previously a manual/developer-only practice. Builds forge
@@ -1380,6 +1416,15 @@ jobs:
         env:
           STATUS: ${{ job.status }}
         run: echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
   # Persists ffmpeg-validate's landscape-trend numbers (see that job's own
   # comment) to the quality-history branch, same mechanism as
   # persist-performance-trend beside it - one job downstream of a single

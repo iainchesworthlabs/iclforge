@@ -223,6 +223,15 @@ jobs:
             --head-dir perf-results/head \
             --base-ref "queue base $BASE_SHORT"
 
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
+
   # The blocking half of performance-compare, split out so that job can keep
   # continue-on-error for its builds while its VERDICT still fails the entry.
   # It builds nothing and runs one script (tools/ci/compare_gate.py, which reads
@@ -439,6 +448,15 @@ jobs:
             --base-dir mem-results/base \
             --head-dir mem-results/head \
             --base-ref "queue base $BASE_SHORT"
+
+      # Saved even when a step above failed, so the packages vcpkg had already
+      # built survive for the next attempt (actions/cache's own post-job save
+      # runs only on success). continue-on-error: a cache that cannot be saved
+      # must never be what fails the job. See .github/actions/save-vcpkg-cache.
+      - name: Save vcpkg caches
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/save-vcpkg-cache
 
   # The blocking half of memory-compare, split out so that job can keep
   # continue-on-error for its builds while its VERDICT still fails the entry.
