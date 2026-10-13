@@ -469,6 +469,15 @@ The sections below contain the complete change list and fixes.
 
 **Hearth: a singer can keep a take of their voice**
 
+- **The card lists the takes in the folder** (the microphone, scoring and recording programme, M6:
+  "a list of takes"). "Your takes" shows the newest five with how long each is and how many more
+  there are; each has **Delete**, which asks again before it removes the file and its description.
+  The list is read from the `.take.json` descriptions, so listing opens no audio: a FLAC with no
+  description, a description of a file that is not there, one that is not JSON and one that names a
+  file outside the folder are not takes, and `deleteTake` refuses a path that is not in the list.
+  The controller gains `takes`, `refreshTakes()` and `deleteTake()`; the list is read again when a
+  take is kept or deleted and when the folder is changed. Fifteen mutants (eleven of the
+  controller, four of the card's asking and counting) were applied and all killed.
 - **"Record a take" keeps the singer's voice from the microphone, and only when pressed** (the
   microphone, scoring and recording programme, M6). The Microphone card gains **Record a take** and
   **Stop recording**, a **Recording** indicator with the elapsed time (a second sign beside
