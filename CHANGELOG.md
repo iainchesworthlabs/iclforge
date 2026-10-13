@@ -3942,9 +3942,12 @@ The sections below contain the complete change list and fixes.
   it force-included and the three `include()` lines that named them are removed, and
   `cmake/AndroidNdkMinimum.cmake` makes an Android Clang older than 19 a configure error
   (`-DICLFORGE_ALLOW_OLD_NDK=ON` to override), so an old NDK in `ANDROID_NDK_HOME` fails at
-  configure and not on a device. What r28c adds is measured in docs/platforms/android.md; what it
-  still lacks is floating-point `from_chars` (`strtod` stays) and `std::jthread`/`std::stop_token`
-  without `-fexperimental-library`. {fmt} stays the one formatting library on every toolchain.
+  configure and not on a device. What r28c adds is measured in docs/platforms/android.md.
+  `cmake/AndroidExperimentalLibrary.cmake` passes `-fexperimental-library` on Android, which is what
+  libc++ 19 gates `std::jthread` and `std::stop_token` behind: the translation units that do not
+  build for Android go from 25 to the 3 that use floating-point `from_chars`, and
+  `iclforge-audio-tests`, `-dsp-tests`, `-app-media-tests` and `-crucible-tests` now link and run on
+  a Shield. {fmt} stays the one formatting library on every toolchain.
 
 **Shared code**
 
@@ -4362,6 +4365,14 @@ The sections below contain the complete change list and fixes.
   rows, and four stale claims corrected.
 - The CLI reference lists all forty-two commands, including the previously-undocumented
   `spatial`.
+- **The locked ESP32 build profiles have a developer page.**
+  [ESP32 build profiles](docs/platforms/bare-metal/build-profiles.md) covers
+  `firmware/hearth-sink/profiles.json`: the seven profiles and their fragments in order, what
+  `locked`, `budget`, `watch` and `free` hold, the guard and where CI runs it, the rule that a new
+  Kconfig key is placed in the profiles at the pull request, how to read a board's profile from
+  `GET /hardware`, the commands that build a board from its profile in WSL and on Windows, and
+  what a change to a profile has to carry. Until now this was written down only in a planning
+  note.
 - The threat model, the WebAssembly page, the ADM page and the building guide no longer describe
   the codec libraries as free of third-party dependencies. {fmt} is compiled into `ac3::forge`
   and `mp4::mp4`.

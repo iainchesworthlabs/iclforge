@@ -6,7 +6,8 @@ iclforge_add_test_binary(iclforge-base-tests PROJECT base SOURCES
     test_meters.cpp
     test_crypto.cpp
     test_expected_payload_padding.cpp
-    test_number_parse.cpp)
+    test_number_parse.cpp
+    test_range_for_temporaries.cpp)
 
 target_link_libraries(iclforge-base-tests PRIVATE iclforge::base iclforge::ac3)
 
