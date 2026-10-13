@@ -5623,6 +5623,19 @@ The sections below contain the complete change list and fixes.
   14 KB free. The floor is 160,796 in both C6 profiles: what a play takes (134,008) and the
   26,788 bytes the network was left at its least beside an E-AC-3 stream. The C6 still refuses
   an HTTP play with `why: memory` and plays over Sendspin.
+- **JOC's float MDCT tables were 4,496 bytes of a C6's RAM that it never reads, and the fixed-point
+  inverse pair's tables were built by the first block that decoded.** The float tables are
+  constants in the read-only data (`kTwiddlesConstant`, `kFastMdctTablesConstant`, made at compile
+  time with dsp's portable cosine and sine) in a build whose decoder is not float: only Atmos object
+  reconstruction in the MDCT domain reads them, and on a part with no objects to place nothing does.
+  The fixed pair's 5,728 bytes are initialised data (`constinit`) and no longer cost 800 software
+  cosines at the first block; they are deliberately **not** read-only constants, which on a C6's
+  16 KB flash cache (shared with the code) cost 15 permille of a burst (AC-3 656 -> 671, E-AC-3
+  751 -> 766). Every entry is the C library's, bit for bit, narrowed (a test holds them to it on
+  MSVC, and the same check under g++ 15 and clang++ 22 with glibc); `float` tables on the S3 and
+  the P4, where float is the decoder's own scalar and the main transform, stay built on first use.
+  `c6-16mb` and `c6-4mb`: DIRAM 116,307 -> 111,823 (budget 117,000), AC-3 658 and E-AC-3 755
+  permille on the board (baseline 656/657 and 751/752).
 - **An E-AC-3 decoder held the spectra of seven streams for every block of every frame, a stereo
   stream's two or three included.** `Eac3Decoder` keeps six blocks of spectra between its two
   passes, and each block's was sized for the most a frame can code (five full-bandwidth channels,

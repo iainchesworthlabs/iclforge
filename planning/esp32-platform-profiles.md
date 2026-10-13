@@ -328,7 +328,7 @@ profile's `budget` is also where the heap table lives:
 | | S3 `s3-n16r8` | C6 `c6-16mb` | Source |
 |---|---|---|---|
 | Largest internal block, Wi-Fi up, Sendspin up | 31,744 | 31,232 | 2026-10-12 deploy, 4065 |
-| Static internal RAM | 176,854 (budget 185,000) | 116,307 (budget 122,000; [corrected in PR 14, then lowered](#the-c6s-static-ram-budget-was-wrong-pr-14)) | `idf.py size` |
+| Static internal RAM | 176,854 (budget 185,000) | 111,823 (budget 117,000; [corrected in PR 14, then lowered twice](#the-c6s-static-ram-budget-was-wrong-pr-14)) | `idf.py size` |
 | Free low-water over the play list | recorded by the first suite run | same | board suite |
 
 The numbers above are today's, from a failing build: the first PR fixes the build and then the
@@ -757,6 +757,21 @@ tables (8,928) are not linked. DIRAM of both C6 images 144,139 -> **116,307**
 (`.dram0.bss` 81,736 -> 53,904), budget 116,307 and 4.9% = 122,000. What is left of the
 library's 11,976 bytes is `fixed_imdct_tables` (5,728), JOC's float MDCT tables (4,496, which
 only an object stream in the MDCT domain reads) and 1,752 of small tables.
+
+**Then 4,484 bytes more, and 117,000.** What was left of the library's tables was
+`fixed_imdct_tables` (5,728, every stream's), JOC's float MDCT tables (4,496) and 1,752 of small
+ones. The float tables are constants now (flash rodata) in a build whose decoder is not float, since
+only an object stream in the MDCT domain reads them and a C6 never does; the fixed pair's tables
+are initialised data (`constinit`, `.data`) and not built by the first block that decodes (800
+software-double cosines on a part with no FPU). They are **not** constants in flash on purpose, and
+the measurement is the reason: on the C6 the flash cache is 16 KB, shared by the code and the data
+with 32-byte lines, and the same tables as read-only constants cost 15 permille of a burst
+(AC-3 656 -> 671, E-AC-3 751 -> 766, bracketed by two runs of the baseline: 656/751 and 657/752),
+against 3 to 5 (noise: 661, 755) as initialised data. DIRAM of both C6 images 116,307 -> **111,823**
+(`.dram0.bss` 53,912 -> 43,664, `.dram0.data` 15,927 -> 21,655, 4,492 net), budget 111,823 and 4.6%
+= 117,000. Timing on the board with the change: AC-3 658, E-AC-3 755 permille. The S3's and the
+P4's float tables are the decoder's own scalar there, so they stay built on first use in RAM (the
+S3 image's `fast_mdct_tables<512, float>` is still `.bss`).
 
 **The play floor went up with it.** The HTTP play's refusal (134,008, above) was a sum of what a
 play takes, and it refused every play because the part had 117 KB free with the Sendspin player

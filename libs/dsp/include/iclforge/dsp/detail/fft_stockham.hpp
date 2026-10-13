@@ -284,7 +284,24 @@ struct StockhamTables {
     std::array<Stage, kPasses> stages{};
     std::array<Complex<W>, factors()> twiddles{};
 
+    // With the C library's cosine and sine, evaluated when the plan is made.
     StockhamTables() {
+        fill([](double angle) { return std::cos(angle); },
+             [](double angle) { return std::sin(angle); });
+    }
+
+    // The same plan with the cosine and the sine of each angle supplied, which is how a plan
+    // is made by a constant evaluator: the standard's functions are not constexpr before C++26,
+    // so a table that is to be data in the program's read-only section (and not .bss, built on
+    // first use) is given functions that are (libs/dsp/src/tiered/portable_math.hpp).
+    template <typename Cos, typename Sin>
+    constexpr StockhamTables(const Cos& cosine, const Sin& sine) {
+        fill(cosine, sine);
+    }
+
+   private:
+    template <typename Cos, typename Sin>
+    constexpr void fill(const Cos& cosine, const Sin& sine) {
         std::size_t n = P;
         std::size_t stride = 1;
         std::size_t count = 0;
@@ -296,8 +313,8 @@ struct StockhamTables {
                 for (std::size_t k = 0; k < r; ++k) {
                     const double angle = -2.0 * std::numbers::pi *
                                          static_cast<double>((p * k) % n) / static_cast<double>(n);
-                    twiddles[count + p * r + k] = Complex<W>{static_cast<W>(std::cos(angle)),
-                                                             static_cast<W>(std::sin(angle))};
+                    twiddles[count + p * r + k] =
+                        Complex<W>{static_cast<W>(cosine(angle)), static_cast<W>(sine(angle))};
                 }
             }
             count += m * r;
