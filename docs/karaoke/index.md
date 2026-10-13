@@ -238,6 +238,13 @@ Two columns are read for what they say and not for how they look:
   style of its own (a translation, a romanisation) is dropped beside the sung one, and where none
   is sung the style that is commonest in the file is the one read. Lines of one style at one time
   are all read, and a line that ends at another time than the sung one is a line of its own.
+- **A script made with Aegisub's karaoke templater.** The templater keeps the timed karaoke it was
+  given as a `Comment:` event with the Effect `karaoke`, and writes the effects it makes from it as
+  `Dialogue:` events with the Effect `fx`, one for each syllable or decoration. Read as they stand,
+  the effects would be the lyrics and the real lines would be skipped as comments. So where a
+  script has a line whose Effect has `karaoke` in it, that line is read as sung, comment or not,
+  and the `fx` lines are not read. The templater's own definitions (a comment whose Effect begins
+  `template`, `code` or `mixin`) are never read. A script with no such line reads as it did.
 
 ### MIDI karaoke
 
