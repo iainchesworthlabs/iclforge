@@ -6,10 +6,11 @@ iclforge_add_test_binary(iclforge-sink-tests PROJECT sink SOURCES
     test_lyric_frame.cpp
     test_lyric_frame_golden.cpp
     test_passthrough.cpp
+    test_decoding_output.cpp
     test_end_to_end.cpp)
 
-target_link_libraries(iclforge-sink-tests PRIVATE iclforge::sink iclforge::sink_passthrough iclforge::sink_harness iclforge::sendspin
-    iclforge::containers)
+target_link_libraries(iclforge-sink-tests PRIVATE iclforge::sink iclforge::sink_passthrough iclforge::sink_decode iclforge::sink_harness
+    iclforge::sendspin iclforge::containers iclforge::ac3 iclforge::render)
 
 # test_lyric_frame_golden.cpp reads the conformance fixtures (lyric-frames/) and the karaoke examples
 # under the repository root, by path; the same two directories can be named from the environment, for
