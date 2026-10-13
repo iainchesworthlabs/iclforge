@@ -1230,9 +1230,18 @@ The sections below contain the complete change list and fixes.
   a voice placed at where the sound it sang along to was (with the microphone's and the output's
   latency and the person's timing), a dropped stretch of quanta, nothing scored while paused. Thirteen
   mutants of `mic.js` were applied and all killed.
-- **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
-  microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
+- **Not in the browser:** recording a take (the plan leaves it out, D16), and a real microphone's
+  echo cancellation, which is the browser's own. The decode page's files are re-copied
   into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
+- **The decode demo marks each line the singer has sung.** Three dots and a percentage after a
+  line, or **not sung** with no number where the voice was voiced for under a fifth of the line's
+  notes' time; none for a line the tune has no notes in, with the microphone off, or without the
+  headphones answer. The percentage is the scorer's share for the line's stretch of the item, the
+  lyrics' own times moved by the lyrics' nudge; 75 % and over is three dots, 45 % and over two,
+  under that one (Hearth's bands). `MicrophoneSession.lineResult(startMs, endMs)` is the call. The
+  `microphone` project holds the three levels with a synthetic voice, the no-note line, the
+  not-sung line and the withheld case; five mutants of `lineResult` and `levelFor` were applied
+  and all killed.
 
 **Hearth: a singer sees the tune as a ribbon, how each line went, and a summary**
 

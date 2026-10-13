@@ -100,6 +100,14 @@ library only, the library Hearth's microphone is built on), bound into the decod
 | `MicrophoneSession`, `readReference` | `mic.js` | `getUserMedia`, the capture worklet, the placing of each frame in the item, the headphones gate, the summary |
 | The card | `index.html`, `demo.js` | The button, the answers, the meter, the ribbon, the score |
 
+**A line's mark.** Once a line has been sung, the lyric view puts three dots and a percentage after it
+(`●●○ 62 %`), or "not sung" with no number where the voice was voiced for under a fifth of the line's
+notes' time. The percentage is the scorer's share for that line's stretch of the item (the lyrics' own
+times, moved by the lyrics' nudge); the dots are presentation: 75 % and over is three, 45 % and over is
+two, under that one, the same bands as Hearth's. A line the tune has no note in has no mark, which is
+not a zero, and there are no marks without the headphones answer or with the microphone off.
+`MicrophoneSession.lineResult(startMs, endMs)` is the call.
+
 **Which channel is the tune.** The decode's channel as coded: the guide melody M where the stream has a
 centre (Annex C, Table C.2.1: L M R, with V1 and V2 where the surrounds would be), the first vocal where
 it has not. A stream with neither shows the pitch and no score, and says so.
@@ -134,13 +142,15 @@ The arithmetic is held with synthetic voices: the tracker finds a vibrato tone a
 contour is read in slices from a known channel and its notes land on the notes sung; the scorer folds an
 octave and counts a tritone away as wrong; a session fed made-up quanta places the C4 half of a melody
 at 1 s, moves it by what the person moved it, ignores a voice while the item is not playing and survives
-a quarter of a second of dropped quanta.
+a quarter of a second of dropped quanta; a line sung right is the top level, sung six semitones off is
+the bottom, sung right for 0.6 s of its second is the middle, a stretch with no note has no mark, and a
+line nothing was sung in is "not sung".
 
 **Not covered.** A real microphone in a real room: the tests do not open one, and the browser's echo
 cancellation is not measured here (the plan's U6 leaves it as the browser's own). Firefox and Safari
 (Chromium only), and `MediaTrackSettings.latency` / `AudioContext.outputLatency`, which browsers give
-differently or not at all, so the delay slider may be the only figure. Per-line marks, which Hearth has,
-and recording a take, which the plan leaves out of the browser (D16).
+differently or not at all, so the delay slider may be the only figure. Recording a take, which the plan
+leaves out of the browser (D16); Hearth has it.
 The reference is read on the page's main thread in two-second slices, so the page stays alive while it
 is.
 
