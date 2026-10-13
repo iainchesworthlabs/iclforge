@@ -31,7 +31,7 @@
 #
 #        vcpkg-binary-cache-<triplet>-<16 hex>        cubeulator
 #        vcpkg-binary-cache-<preset>-<64 hex>         CountdownSolver
-#        vcpkg[-downloads]-<OS>-<ARCH>-<40 hex>-<64 hex>[-<suffix>]
+#        vcpkg[-downloads]-<OS>-<ARCH>-<40 hex>-<64 hex>[-<lineage>][-<16 hex>]
 #                                                     ICL Forge, aqualink-automate
 #        vcpkg-downloads-<40 hex>-<64 hex>            aqualink-automate
 #        ccache-<job>-<OS>-<ARCH>-<40 hex>            ICL Forge
@@ -131,7 +131,7 @@ def family:
     elif ($k | test("^vcpkg-binary-cache-.+-[0-9a-f]{16}$"))
       then "vcpkg:" + ($k | capture("^vcpkg-binary-cache-(?<t>.+)-[0-9a-f]{16}$").t)
     elif ($k | test("^vcpkg(-downloads)?-[A-Za-z0-9]+-[A-Za-z0-9]+-[0-9a-f]{40}-[0-9a-f]{64}"))
-      then ($k | capture("^(?<kind>vcpkg(?:-downloads)?)-(?<os>[A-Za-z0-9]+)-(?<arch>[A-Za-z0-9]+)-[0-9a-f]{40}-[0-9a-f]{64}(?:-(?<suffix>.+))?$")
+      then ($k | capture("^(?<kind>vcpkg(?:-downloads)?)-(?<os>[A-Za-z0-9]+)-(?<arch>[A-Za-z0-9]+)-[0-9a-f]{40}-[0-9a-f]{64}(?:-(?<suffix>.+?))?(?:-[0-9a-f]{16})?$")
             | .kind + ":" + .os + "-" + .arch + (if .suffix then "-" + .suffix else "" end))
     elif ($k | test("^vcpkg-downloads-[0-9a-f]{40}-[0-9a-f]{64}"))
       then "vcpkg-downloads"
