@@ -24,6 +24,7 @@
 #include "iclforge/sink/lyric_frame.hpp"
 #include "iclforge/sink/passthrough.hpp"
 #include "iclforge/sink/sink.hpp"
+#include "iclforge/sink/status_json.hpp"
 
 namespace iclforge::hearth_android {
 
@@ -309,28 +310,7 @@ std::string NativeSink::status_json() const {
             status = impl_->sink->status();
         }
     }
-    std::string out = "{\"connections\":[";
-    for (std::size_t i = 0; i < status.connections.size(); ++i) {
-        const sink::Sink::Status::Peer& peer = status.connections[i];
-        if (i != 0) {
-            out.push_back(',');
-        }
-        const char* activity = peer.activity == sink::Sink::Status::Activity::kPlayback  ? "playback"
-                               : peer.activity == sink::Sink::Status::Activity::kPairing ? "pairing"
-                                                                                         : "nothing";
-        // How the stream leaves the sink: "passthrough" or "pcm" while one the output took is open
-        // (the role's `output` state, D6), null otherwise.
-        const std::string output = peer.output
-                                       ? "\"" + std::string(sendspin::player::output_name(*peer.output)) + "\""
-                                       : std::string("null");
-        out += "{\"id\":" + std::to_string(peer.id) + ",\"address\":" + sink::json_quote(peer.address) +
-               ",\"server_name\":" + sink::json_quote(peer.server_name) + ",\"activity\":\"" + activity +
-               "\",\"streaming\":" + (peer.streaming ? "true" : "false") + ",\"output\":" + output + "}";
-    }
-    out += "],\"pairing_code\":";
-    out += status.pairing_code ? sink::json_quote(*status.pairing_code) : "null";
-    out += ",\"paired_servers\":" + std::to_string(status.paired_servers) + "}";
-    return out;
+    return sink::status_json(status);
 }
 
 std::string NativeSink::lyric_frame_json(std::int32_t delay_ms) const {

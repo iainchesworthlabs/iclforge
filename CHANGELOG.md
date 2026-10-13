@@ -304,6 +304,16 @@ The sections below contain the complete change list and fixes.
   the hairline under it fills by it. A host case holds the position, the pause and the document's own
   length winning; `LyricViewRenderTest` holds the pixels.
 
+**The lyric screen names the stream**
+
+- **The footer's chip says the format with the route.** "Dolby Digital 5.1 · Passing through",
+  "Dolby Digital Plus 5.1 + objects · Decoded here": the Android sink's footer named only how a stream
+  leaves the sink. The output's decoder report (the codec, the coding mode, the LFE, the objects) is now in
+  the sink's status, per connection, and `sink::status_json` in `libs/sink` writes that status for the
+  app's JNI, so the writer is held by a host case and not only on a device. The name is the codec, the
+  front channels and the LFE from the coding mode, "1+1" for two programmes, and "+ objects" for a
+  stream that carries them.
+
 **Containers: what a file holds besides its audio**
 
 - **The MP4 and Matroska readers list the tracks they do not read, and `forge probe` shows them.** A
@@ -336,6 +346,13 @@ The sections below contain the complete change list and fixes.
   dropped, and with no sung line the file's commonest style is read. Lines in one style at one time
   are all read. The reader no longer shows a doubled line or an interleaved translation for such a
   script (planning/karaoke-formats-options.md, D14).
+- **A script made with Aegisub's karaoke templater reads as its lyrics, not as its effects.** The
+  templater keeps the timed karaoke as a `Comment:` with the Effect `karaoke` and writes
+  one `Dialogue:` with the Effect `fx` for each syllable or decoration, so the reader showed the
+  effects and skipped the lyrics. A line whose Effect has `karaoke` in it is now read as sung,
+  comment or not, the `fx` lines are not read, and the templater's own `template`, `code` and
+  `mixin` comments never are. A script without such a line reads as before. Built to the
+  templater's own source and manual, not yet to a real exported script.
 
 **Forge writes the lyrics beside the stream it encodes**
 
@@ -1231,9 +1248,18 @@ The sections below contain the complete change list and fixes.
   a voice placed at where the sound it sang along to was (with the microphone's and the output's
   latency and the person's timing), a dropped stretch of quanta, nothing scored while paused. Thirteen
   mutants of `mic.js` were applied and all killed.
-- **Not in the browser:** recording a take (the plan leaves it out, D16), per-line marks, and a real
-  microphone's echo cancellation, which is the browser's own. The decode page's files are re-copied
+- **Not in the browser:** recording a take (the plan leaves it out, D16), and a real microphone's
+  echo cancellation, which is the browser's own. The decode page's files are re-copied
   into `docs/assets/wasm-decode-demo/` and `mic.js` joins the list the docs workflow checks.
+- **The decode demo marks each line the singer has sung.** Three dots and a percentage after a
+  line, or **not sung** with no number where the voice was voiced for under a fifth of the line's
+  notes' time; none for a line the tune has no notes in, with the microphone off, or without the
+  headphones answer. The percentage is the scorer's share for the line's stretch of the item, the
+  lyrics' own times moved by the lyrics' nudge; 75 % and over is three dots, 45 % and over two,
+  under that one (Hearth's bands). `MicrophoneSession.lineResult(startMs, endMs)` is the call. The
+  `microphone` project holds the three levels with a synthetic voice, the no-note line, the
+  not-sung line and the withheld case; five mutants of `lineResult` and `levelFor` were applied
+  and all killed.
 
 **Hearth: a singer sees the tune as a ribbon, how each line went, and a summary**
 
@@ -4270,6 +4296,17 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Forge GUI Karaoke flow: a part of another length**
+
+- **The Karaoke flow's warning said the shorter part "is padded with silence"; it is not.** The
+  window and `forge encode` fill a source past its end with its last sample, held, in one function
+  (`fill_source_frame`, chosen by W1 of the karaoke phase 2 plan so that the two cannot differ):
+  `forge encode` with a 6 s 24-bit mono part ending at -0.25 under a 16.5 s backing decodes that
+  channel at a constant -0.2499 to the end, where silence would be 0. The warning now reads "the
+  shorter part holds its last sample for the rest of the programme", in the seven catalogues too.
+  The encoding is unchanged, held by the owner's decision; a part that should fall silent after its
+  end has to be given as long as the backing.
+
 **Footprint probes: the E-AC-3 fold fixtures expect the -3 dB levels**
 
 - **`kEac3FoldRms`, `kEac3714FoldRms` and the fixed-tier pins `eac3_fold` and `eac3_714_fold` are
@@ -4297,6 +4334,13 @@ The sections below contain the complete change list and fixes.
   The page and the module are unchanged. Run against a build of the module in headless Chromium,
   the five cases of `decode.spec.js` pass; a page that drops its document on a refused file fails
   the new seek check.
+
+**Forge GUI user guide: the Karaoke page's note on the length warning**
+
+- **The Karaoke page no longer says the window's warning reads "padded with silence".** The
+  note was added with the take recipe, while the warning said a shorter part is padded with
+  silence and the window and `forge encode` hold its last sample. The warning now says what is
+  done, so the page's bullet states the behaviour and nothing else.
 
 **Lyrics on a board**
 

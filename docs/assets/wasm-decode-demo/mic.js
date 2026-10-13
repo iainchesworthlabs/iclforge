@@ -155,6 +155,15 @@ export function drawRibbon(ctx, width, height, { notes, trace, positionMs, windo
     ctx.setLineDash([]);
 }
 
+// A line's mark has three levels: under 45 %, under 75 %, and 75 % or more. Where they fall is
+// presentation, not measurement; the percentage is shown beside the mark (Hearth's bands).
+export function levelFor(percent) {
+    return percent >= 75 ? 3 : (percent >= 45 ? 2 : 1);
+}
+
+// A line the singer was voiced for less than this share of its notes' time is "not sung".
+export const NOT_SUNG_COVERAGE = 0.2;
+
 // MIDI note number of a frequency, and its name with the octave: 69 is A4.
 export function midiOfHz(hz) {
     return 69 + 12 * Math.log2(hz / 440);
@@ -228,6 +237,29 @@ export class MicrophoneSession {
             lagMs: this._scorer.lagMs(),
             counted: total.counted,
         };
+    }
+
+    // A line's result once it has been sung, for [startMs, endMs) of the item: `scored` is false for
+    // a line the tune has no note in (no mark, which is not a zero), when there is no tune, when the
+    // microphone is off, and without the headphones answer (`withheld`); `notSung` is a line the
+    // singer was voiced for under a fifth of its notes' time, which is not a bad score.
+    lineResult(startMs, endMs) {
+        const out = { scored: false, withheld: !this.headphones, notSung: false, percent: -1, level: 0 };
+        if (!this.on || !this._scorer || !this.reference || !this.headphones || !(endMs > startMs)) {
+            return out;
+        }
+        const tally = this._scorer.tally(startMs, endMs);
+        if (!tally.scored) {
+            return out;
+        }
+        out.scored = true;
+        if (tally.coverage < NOT_SUNG_COVERAGE) {
+            out.notSung = true;
+            return out;
+        }
+        out.percent = Math.round(tally.fraction * 100);
+        out.level = levelFor(out.percent);
+        return out;
     }
 
     // What the last performance came to; null before one has been scored, and when the person never

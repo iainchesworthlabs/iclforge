@@ -480,6 +480,27 @@ function lineElement(line, className, state) {
     return row;
 }
 
+// How the line just sung went, as a small mark after it: three dots and a percentage, or "not sung"
+// with no number. Nothing for a line the tune has no notes in, with the microphone off, or without
+// the headphones answer. The line's own times are the lyrics', and the nudge puts them on the
+// item's timeline as it puts the words later.
+function lineMark(line) {
+    if (!micSession || !micSession.on) {
+        return null;
+    }
+    const result = micSession.lineResult(line.startMs + lyricsDelayMs, line.endMs + lyricsDelayMs);
+    if (!result.scored) {
+        return null;
+    }
+    const mark = document.createElement('span');
+    mark.className = 'mark' + (result.notSung ? ' not-sung' : ` level-${result.level}`);
+    mark.textContent = result.notSung ? 'not sung'
+        : `${'●'.repeat(result.level)}${'○'.repeat(3 - result.level)} ${result.percent} %`;
+    mark.setAttribute('aria-label', result.notSung ? 'Pitch: this line was not sung'
+        : `Pitch: ${result.percent} percent`);
+    return mark;
+}
+
 // Draws the previous, current and next lines for the playing position. Only changed when what it
 // would draw has: the key is the line and the word and the fill to the percent.
 function drawLyrics() {
@@ -507,18 +528,30 @@ function drawLyrics() {
             states.push(lyricsDocument.wordState(current, w, at.positionMs));
         }
     }
-    const key = `${current}|${at.inLine}|${states.join('')}|${Math.round(at.fraction * 100)}`;
+    // The mark of the line just sung is part of what is drawn: it moves as frames are scored.
+    const sungLine = current === null ? -1 : (at.inLine ? current - 1 : current);
+    const sungMark = sungLine >= 0 && lines[sungLine].text !== '' ? lineMark(lines[sungLine]) : null;
+    const key = `${current}|${at.inLine}|${states.join('')}|${Math.round(at.fraction * 100)}|` +
+        `${sungMark ? sungMark.textContent : ''}`;
     if (key !== lyricsShownKey) {
         lyricsShownKey = key;
         const rows = [];
         const before = current === null ? -1 : current - 1;
         const after = current === null ? 0 : current + 1;
-        if (before >= 0) rows.push(lineElement(lines[before], 'previous', null));
+        if (before >= 0) {
+            const previous = lineElement(lines[before], 'previous', null);
+            if (at.inLine && sungMark) previous.appendChild(sungMark);
+            rows.push(previous);
+        }
         if (current !== null && lines[current].text !== '') {
             // After a line has ended (the gap a SubRip cue leaves) it is not being sung.
             rows.push(at.inLine
                 ? lineElement(lines[current], 'current', { wordStates: states, fraction: at.fraction })
-                : lineElement(lines[current], 'previous', null));
+                : (() => {
+                    const ended = lineElement(lines[current], 'previous', null);
+                    if (sungMark) ended.appendChild(sungMark);
+                    return ended;
+                })());
         }
         // The next line that has words in it: a line that only marks a time is no line to read.
         for (let n = after; n < lines.length && n < after + 3; n++) {

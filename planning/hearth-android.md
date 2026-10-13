@@ -40,8 +40,8 @@ As of 2026-10-13, `main` at `79a8bdb6f`. Every row is merged unless it says open
 
 **Leftovers that are not phases**, each small and listed with where it stands on the
 [phase 4 and 5 page](hearth-android-phases-4-5.md#the-small-leftovers-before-phase-4): the vocals
-request's "Both asks `aware`" rule, the header's time for an item with no lyrics, the `format`
-chip, a first-run screen, and two quirks (a re-pairing that times out, and 2 to 3 late bursts at
+request's "Both asks `aware`" rule, the header's time for an item with no lyrics and the `format`
+chip (all three built since this table was written), a first-run screen, and two quirks (a re-pairing that times out, and 2 to 3 late bursts at
 about 9.2 s on an AC-3 stream) not yet explained.
 
 ## What it is, and what it is not

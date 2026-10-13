@@ -195,6 +195,7 @@ class MainActivity : Activity() {
         )
         // The footer's route chip: how the server's stream leaves this sink, while it plays one.
         lyrics.route = status.playingFor?.output
+        lyrics.format = status.playingFor?.decoder?.let(StreamFormat::name)
         // The sheet offers the vocals while a stream is open: the sink may ask the server for them.
         lyrics.vocalsEnabled = running && status.playingFor?.streaming == true
     }

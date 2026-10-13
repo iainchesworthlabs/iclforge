@@ -24,6 +24,11 @@ data class SinkStatus(
          * stream the output took is open, and for a sink that does not say.
          */
         val output: String? = null,
+        /**
+         * What the output found in the stream's first syncframe (the role's `decoder` state) while a stream
+         * the output took is open; null otherwise, and until it has found something.
+         */
+        val decoder: StreamFormat.Report? = null,
     )
 
     /** The server this sink is playing for, if one is. */
@@ -52,6 +57,15 @@ data class SinkStatus(
                                 activity = peer.optString("activity", "nothing"),
                                 streaming = peer.optBoolean("streaming", false),
                                 output = if (peer.isNull("output")) null else peer.optString("output"),
+                                decoder = peer.optJSONObject("decoder")?.let {
+                                    StreamFormat.Report(
+                                        dataType = it.optString("data_type"),
+                                        acmod = it.optInt("acmod", -1),
+                                        lfe = it.optBoolean("lfe", false),
+                                        objects = it.optInt("objects", 0),
+                                        objectsPlaced = it.optBoolean("objects_placed", false),
+                                    )
+                                },
                             )
                         }
                     },

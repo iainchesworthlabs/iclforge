@@ -252,7 +252,7 @@ sessions change the firmware" has a shorter answer than the guard's size suggest
 
 | where | what it holds | when | fails a PR? |
 |---|---|---|---|
-| PR Gate, `Static` (`_static.yml`) | `sink_profile.py check-docs`; `test_sink_profile.py` (the file against `_build.yml`'s fragment lists, `check_firmware_package.py`'s image rules, the keys every profile must lock); `test_board_suite.py` (a baseline holds exactly its profile's rows) | every PR | **yes**, but these are checks that the *files agree*, not that a configured build is the profile |
+| PR Gate, `Static` (`_static.yml`) | `sink_profile.py check-docs`; `test_sink_profile.py` (the file against `_build.yml`'s fragment lists, `check_firmware_package.py`'s image rules, the keys every profile must lock); `test_board_suite.py` (a baseline holds exactly its profile's rows, and is under the profile's hash or accepted by the PR against the current one); `sink_profile.py check-change --base` (a Kconfig key the change adds that the guard watches, that a profile has in its configuration and neither locks nor frees; a lock on a key no Kconfig declares) | every PR and queue entry | **yes**, but these are checks that the *files agree*, not that a configured build is the profile |
 | `ci.yml` → `_build.yml`: `build-esp32s3`, `hearth-esp32s3`, `build-esp32c3`, `package-esp32-firmware` | the build **is** the profile: `sink_profile.py defaults`/`identity` configure it, `verify` holds it (asked against given, locked values, watched keys nobody placed, the app, bootloader and static RAM budgets from `idf.py size`), `package_firmware.py --profile` refuses an image that is not one | push to `main` only | **no**: red on `main`. Until #1499 they were skipped there whenever a minimum-footprint leg above them in the same job failed, which is how the C6's budget stood wrong; they run after a footprint failure now |
 | `bench_flash.py build <id>` | the same guard, on a bench build | by hand | no |
 | a booked board | the boot `budget:` line, the identity in `/hardware`, `board_suite.py` (it refuses an image built under another hash) and `compare` | by hand | no |
@@ -262,9 +262,14 @@ fail. What this means for another session's valid change: it is never blocked, a
 makes it *decide* when a configured build sees something new: a locked key whose effective value
 changed (`[locked] KEY is X, the profile says Y`) is locked at its new value in `profiles.json`
 and, by the owner's rule, re-recorded; a new key matching a watch pattern (`[unplaced]`) is locked
-or named `free`; a key added at an inert value is locked and its baselines kept. The gap is *when*
-the decision is forced: after the merge, on `main`, where two PRs that are each valid alone
-can first meet.
+or named `free`; a key added at an inert value is locked and its baselines kept. Where the
+decision is forced depends on what changed. **A key the change adds, or a lock it orphans, at the
+pull request** (`check-change`, which reads the Kconfig at the head and the base and evaluates a
+key's conditions against each profile's locked values and target; what it cannot decide it leaves
+to the configured build). **A baseline the edit moves, at the pull request** (the test above).
+**A changed default of a key a profile locks, or a fragment's value, still after the merge**,
+on `main`, where two PRs that are each valid alone can first meet: that needs a configured
+build, which is the next change (a configure-only guard of every profile in PR Gate).
 
 ## Boot-time budget line
 
@@ -848,7 +853,12 @@ A change to a profile, a fragment it names, or a locked key's Kconfig default is
 2. regenerates the doc tables (`sink_profile.py table`, checked in CI);
 3. attaches `board-run.json` from a board booked for the run, and updates
    `baselines/<profile>.json` if a figure moved;
-4. says in the description which keys moved, why, and what the heap table did.
+4. says in the description which keys moved, why, and what the heap table did;
+5. decides about every baseline the edit moves, in the same PR: it is re-recorded (a locked value
+   that changed), or it is **accepted** in `suite.json` (`profiles.<id>.baseline_accepted`: the
+   profile's new hash and why, for a key added at the value it already had).
+   `test_board_suite.py` holds it at PR time, and an acceptance names the hash it was made
+   against, so the next edit of the profile asks again.
 
 **When a baseline is re-recorded, and when it is only noted (the owner's rule, 2026-10-12).** A
 baseline carries the hash of the profile it was recorded under, and the hash is the fragments and
@@ -862,14 +872,17 @@ same:
   kept**, and `board_suite.py` says on every compare against one that it was recorded under the
   earlier hash and that the figures are compared as recorded. The PR says which keys it locked.
 
-A kept baseline's hash is then not the file's, and that is read from the note, not from a
-failure: the suite still refuses an *image* built under another hash, so a board is only ever
-run on the definition the file has.
+A kept baseline's hash is then not the file's, and the PR that moved it says so in
+`baseline_accepted` (above): a baseline under another hash with no acceptance for the profile's
+current hash fails the PR, so the decision is made where the edit is made and not found later (the
+S3 AC-4 baseline sat under its old hash for seven hours after #1459 because nothing asked). The
+suite still refuses an *image* built under another hash, so a board is only ever run on the
+definition the file has.
 
-**Nothing fails a PR yet for touching a fragment or a locked key's Kconfig default without the
-profile file**: the guard runs after the merge, on `main`
-([where each check runs](#where-each-check-runs)), so such a PR is first seen red on `main`, or not
-at all while the sink steps were skipped there (they are not, since #1499). A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
+**A PR that adds a key the guard watches fails at the pull request until a profile locks or frees
+it** (`sink_profile.py check-change`). **A PR that changes a locked key's Kconfig default, or a
+fragment's value, without the profile file is still first seen by a configured build, after the
+merge** ([where each check runs](#where-each-check-runs)). A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
 reports `<id>+scratch`, is refused by the suite's `--record`, and its overlay is committed beside
 the measurement if the figure is quoted anywhere.
 

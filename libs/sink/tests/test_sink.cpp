@@ -29,6 +29,7 @@
 #include "iclforge/sendspin/session_driver.hpp"
 #include "iclforge/sendspin/websocket.hpp"
 #include "iclforge/sink/sink.hpp"
+#include "iclforge/sink/status_json.hpp"
 #include "iclforge/sink/store.hpp"
 
 // iclforge::sink with no program behind it: outputs that only write down what they were given. What
@@ -116,6 +117,8 @@ struct Recording {
     // What the burst output answers to start(), and what it says its streams do (D6).
     bool burst_takes = true;
     std::optional<ac::Output> burst_output;
+    // What it says it found in a stream it took (the role's `decoder` state).
+    std::optional<ac::DecoderReport> burst_decoder;
     // What the output says it has counted, as the program's would.
     std::uint32_t streams = 0;
     std::uint32_t burst_streams = 0;
@@ -164,6 +167,7 @@ class FakeBursts final : public iclforge::sink::BurstStreamOutput {
         const std::lock_guard lock(recording_->mutex);
         recording_->burst_started.push_back(stream);
         ++recording_->burst_streams;
+        decoder_ = recording_->burst_decoder;
         return recording_->burst_takes;
     }
     void clear() override {}
@@ -568,6 +572,54 @@ TEST_CASE("sink: the role's state says how a stream the output took leaves the s
     const OutputSeen silent = watch_output("output_silent", std::nullopt, true);
     CHECK_FALSE(silent.state_during.has_value());
     CHECK_FALSE(silent.status_during.has_value());
+}
+
+TEST_CASE("sink: the status carries what the output found in the stream, for the screen's format chip",
+          "[sink][websocket]") {
+    const fs::path dir = scratch("status_decoder");
+    Recording recording;
+    recording.burst_output = ac::Output::kPassthrough;
+    recording.burst_decoder = ac::DecoderReport{
+        .data_type = ac::DataType::kAc3, .acmod = 7, .lfe = true, .objects = 0, .objects_placed = false};
+    FakeOutputs outputs(recording);
+    Lines log;
+    auto sink = iclforge::sink::Sink::start(options_in(dir), outputs, log);
+    REQUIRE(sink.has_value());
+
+    const iclforge::sendspin::noise::KeyPair identity = generated();
+    Dialled server(**sink, identity);
+    REQUIRE(server.play({std::string(ac::kRole)}));
+    REQUIRE(log.wait("activated for playback"));
+    REQUIRE(server.events.wait([&] { return server.events.available; }, 15s));
+
+    // No stream: nothing to name.
+    iclforge::sink::Sink::Status status = (*sink)->status();
+    REQUIRE(status.connections.size() == 1);
+    CHECK_FALSE(status.connections[0].decoder.has_value());
+    CHECK(iclforge::sink::status_json(status).find("\"output\":null,\"decoder\":null}") != std::string::npos);
+
+    // A stream the output took: the report it found is the status's, as the role's state sends it.
+    REQUIRE(server.call(
+        [&] { return server.server.start_burst_stream({.data_type = ac::DataType::kAc3, .sample_rate = 48000}); }));
+    CHECK(log.wait("burst stream AC-3 48000 Hz"));
+    status = (*sink)->status();
+    REQUIRE(status.connections.size() == 1);
+    REQUIRE(status.connections[0].decoder.has_value());
+    CHECK(status.connections[0].decoder->data_type == ac::DataType::kAc3);
+    CHECK(status.connections[0].decoder->acmod == 7);
+    CHECK(status.connections[0].decoder->lfe);
+    // The JSON the app's screen reads says the same, in the one object it parses.
+    const std::string json = iclforge::sink::status_json(status);
+    CHECK(json.find("\"streaming\":true,\"output\":\"passthrough\",\"decoder\":{\"data_type\":\"ac3\","
+                    "\"acmod\":7,\"lfe\":true,\"objects\":0,\"objects_placed\":false}}") != std::string::npos);
+    CHECK(json.find("\"paired_servers\":") != std::string::npos);
+
+    // And gone with the stream.
+    REQUIRE(server.call([&] { return server.server.end_burst_stream(); }));
+    CHECK(log.wait("burst stream ended after 0 bursts"));
+    status = (*sink)->status();
+    REQUIRE(status.connections.size() == 1);
+    CHECK_FALSE(status.connections[0].decoder.has_value());
 }
 
 TEST_CASE("sink: a lyric document and its anchors become a frame on the sink's own clock", "[sink][websocket]") {
