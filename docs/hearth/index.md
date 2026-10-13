@@ -330,9 +330,10 @@ fewer as its bed, as an E-AC-3 stream is.
 The window ships in English and in German, Spanish, French, Arabic, Hebrew and Yiddish, chosen in
 Settings. A language switches the layout direction (Arabic, Hebrew and Yiddish read right to
 left), the typeface and the words of every page. The catalogues are
-`apps/hearth/ui/assets/translations/hearth_<code>.ts`; each holds all 1101 strings of the window,
+`apps/hearth/ui/assets/translations/hearth_<code>.ts`; each holds all 1102 strings of the window,
 every one with a rendering. A string a catalogue lacks would show in English, which is what Qt does
-with a message it has no entry for.
+with a message it has no entry for. English has a file too, `hearth_en.ts`, holding only the
+messages that carry a count (below).
 
 ![Hearth's Karaoke page in German](screenshots/karaoke-de.png)
 
@@ -384,12 +385,25 @@ catalogues differ, these pages take the rendering the finished Karaoke entries a
 is *הילכער*, as the Karaoke entries have it, where the Forge GUI's wizard has *רעדער*, which is
 also the plural of *ראָד* (a wheel).
 
-Six messages cannot be translated as they are written. English makes their plural by appending
-a suffix a placeholder carries (`%1 entr%2` with *y* or *ies*, `%2 group%3`, `Slot%1 %2 %3
-silent`), and no other language does. Their renderings are written without the suffix
-(*Gruppen: %2*, *groupes : %2*), leave that placeholder out, and the gate lets exactly these
-six do so. The cure is in the QML and C++: a `%n` message gives each language the plural forms it
-needs, and the six leave that list when they are written that way.
+**A string with a count is a plural message.** English makes a plural by a suffix and other
+languages do not: Arabic has six forms (none, one, two, three to ten, eleven to ninety-nine, a
+hundred and over), French counts 0 and 1 as singular, and the other three here have one form for
+1 and one for everything else (Qt's table gives Hebrew and Yiddish no more, so the Hebrew
+renderings cannot say two or *many* apart). So a count goes through the plural machinery rather
+than through a suffix pasted on:
+
+```qml
+text: qsTr("%n items", "", queue.length)
+```
+
+(`QObject::tr("%n bursts", "", n)` in C++). The source carries the form most counts take;
+`hearth_lupdate` writes one `<numerusform>` per form each language needs, and a translator fills
+them all. A message with two counts holds one of them as the `%n` and the other as an ordinary
+`%1`. **English needs its forms too**, because the source holds only one of the two: they are in
+`hearth_en.ts`, which `hearth_lupdate` keeps (Qt's `PLURALS_TS_FILE`: the plural messages and
+nothing else) and which `main.cpp` installs beneath the language the person chose. Fill its two
+forms by hand like any other; they are English written by the people who wrote the source and not
+a machine draft.
 
 **Adding a string.** `hearth_lupdate` (the CI step "Check the Hearth translations are up to date"
 runs the same target) adds it to the six catalogues as an empty `type="unfinished"` entry, and
@@ -403,9 +417,10 @@ the new renderings make, and the committed files are what a further run leaves u
 `apps/crucible/ui/tests/test_translations.cpp` read the six files and fail on an entry left
 unfinished, on a dead one (`vanished`, `obsolete`), on an empty rendering, on a placeholder
 (`%1` to `%9`, `%n`) a rendering drops or invents, on a plural form left empty, on a name from
-the list above that a rendering loses, and on one language holding a string the others do not.
-So a change that adds or rewords a `qsTr()` string in the window fills the six entries in the
-same pull request. The rules are the ones
+the list above that a rendering loses, and on one language holding a string the others do not;
+a further case fails on a plural message that `hearth_en.ts` lacks or holds unfinished.
+So a change that adds or rewords a `qsTr()` string in the window fills the six entries, and the
+English forms of a plural one, in the same pull request. The rules are the ones
 [Crucible's languages page](../crucible/localisation.md#what-the-gate-checks) lists.
 
 ### Diagnostics
