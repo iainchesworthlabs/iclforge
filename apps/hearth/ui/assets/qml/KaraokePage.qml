@@ -283,6 +283,8 @@ ScrollView {
 
         RowLayout {
             Layout.fillWidth: true
+            // The margin every other page has (Settings.qml's own two columns).
+            Layout.margins: Theme.pad
             spacing: Theme.gap * 2
 
             // --- the reproduction --------------------------------------
@@ -554,7 +556,12 @@ ScrollView {
                         active: root.visible && root.isKaraoke
                     }
 
+                    // The file's name gives way first. A button keeps its whole label up to a
+                    // third of the row and elides past that, so that two long ones in some
+                    // language cannot push the row into the card beside this one.
                     RowLayout {
+                        id: lyricsRow
+                        readonly property real buttonLimit: Math.floor((width - 2 * spacing) / 3)
                         Layout.fillWidth: true
                         spacing: Theme.gap
                         Text {
@@ -575,12 +582,14 @@ ScrollView {
                         }
                         AppButton {
                             objectName: "timeLyricsButton"
+                            Layout.maximumWidth: lyricsRow.buttonLimit
                             enabled: root.loaded
                             text: qsTr("Time the lyrics…")
                             onClicked: timingDialog.open()
                         }
                         AppButton {
                             objectName: "lyricsFullScreenButton"
+                            Layout.maximumWidth: lyricsRow.buttonLimit
                             text: qsTr("Full screen · F11")
                             onClicked: root.lyricsFullScreenRequested()
                         }
@@ -747,15 +756,22 @@ ScrollView {
                             Text { text: partRow.modelData.part; color: Theme.text
                                    font.pixelSize: Theme.fontNormal; font.bold: true
                                    Layout.preferredWidth: Math.round(32 * Theme.fontScale) }
+                            // The name and what is said of it share the row, and each wraps
+                            // where the two do not fit on a line ("not in this stream" at a
+                            // large text size), rather than the row running past the card.
                             Text { text: partRow.modelData.name; color: Theme.text
                                    font.pixelSize: Theme.fontNormal; Layout.fillWidth: true
-                                   elide: Text.ElideRight }
+                                   wrapMode: Text.WordWrap }
                             Text {
                                 objectName: "partState-" + partRow.modelData.part
+                                Layout.fillWidth: true
+                                Layout.maximumWidth: Math.ceil(implicitWidth)
                                 text: !partRow.present ? (root.isKaraoke ? qsTr("not in this stream") : "")
                                       : (root.heard(partRow.modelData.part) ? qsTr("heard") : qsTr("muted"))
                                 color: Theme.textMuted
                                 font.pixelSize: Theme.fontSmall
+                                horizontalAlignment: Text.AlignRight
+                                wrapMode: Text.WordWrap
                             }
                         }
                     }
@@ -777,6 +793,7 @@ ScrollView {
                             spacing: Theme.gap
                             Text { text: speakerRow.modelData; color: Theme.text
                                    font.pixelSize: Theme.fontNormal; font.bold: true
+                                   elide: Text.ElideRight
                                    Layout.preferredWidth: Math.round(32 * Theme.fontScale) }
                             Rectangle {
                                 Layout.fillWidth: true
@@ -804,6 +821,7 @@ ScrollView {
                         text: qsTr("Nothing karaoke is playing.")
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
+                        wrapMode: Text.WordWrap
                     }
                 }
 

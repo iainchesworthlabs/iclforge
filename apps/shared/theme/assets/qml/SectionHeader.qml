@@ -59,11 +59,17 @@ RowLayout {
         color: root.rule ? Theme.divider : "transparent"
     }
 
+    // As wide as its words where the header has the room, and elided where
+    // it has not: a header that could not shrink would set the least width
+    // of the whole card under it.
     Text {
         id: summaryText
         visible: text.length > 0
         color: Theme.textMuted
         font.family: Theme.monoFamily
         font.pixelSize: Theme.fontSmall
+        elide: Text.ElideRight
+        Layout.fillWidth: true
+        Layout.maximumWidth: Math.ceil(implicitWidth)
     }
 }

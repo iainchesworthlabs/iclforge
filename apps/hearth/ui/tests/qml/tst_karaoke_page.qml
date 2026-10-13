@@ -67,6 +67,7 @@ TestCase {
         settle({ karaoke: "aware", karaokeVocals: "both", stereoFold: "loro",
                  karaokeMelodyDb: 0, karaokeVocal1Db: 0, karaokeVocal2Db: 0 });
         useLayout("2.0");
+        HearthController.textScale = "100";
     }
 
     function settle(values) {
@@ -477,6 +478,103 @@ TestCase {
         compare(String(TestServices.storedSetting("karaoke/reproduction")), "capable");
         settle({ karaokeMelodyDb: 0, karaokeVocal1Db: 0, karaokeVocal2Db: 0 });
         tryVerify(function() { return Number(TestServices.storedSetting("karaoke/melodyDb")) === 0; }, 5000);
+    }
+
+    // The page fits its window: nothing on it is laid out or drawn past the
+    // page's left or right edge, each card holds what is in it, and the cards
+    // keep the margin every other page has. At each text size, as it is and
+    // mirrored as a right-to-left language mirrors it, at the window's own
+    // width and at the smallest it goes to; with nothing playing, and for a
+    // stream without a second vocal, whose rows say so at length. The window
+    // starts at the largest text and is then changed as Settings changes it,
+    // so both a first layout and a second are held.
+    //
+    // A row that cannot shrink sets the least width of every row of its card,
+    // which is how two sliders once pushed a whole card past the window.
+    function test_nothingOnThePageRunsPastItsEdges() {
+        HearthController.textScale = "175";
+        const win = openPage();
+        const page = H.find(win.contentItem, function(item) {
+            return item.lyricsFullScreenRequested !== undefined && item.reproduction !== undefined;
+        });
+        verify(page !== null, "no Karaoke page in the window");
+        const cards = H.findAll(page, function(item) {
+            return item.ordinal !== undefined && item.framed !== undefined;
+        });
+        verify(cards.length >= 7, "the page's cards were not found");
+
+        // The page's own edges, and each card's: a row too wide for the left-hand
+        // card runs into the card beside it long before it reaches the window's edge.
+        const spills = function() {
+            const found = H.pastTheEdges(page).map(function(what) { return "the page: " + what; });
+            for (const card of cards) {
+                for (const what of H.pastTheEdges(card)) {
+                    found.push("card " + card.ordinal + ": " + what);
+                }
+            }
+            return found;
+        };
+        const fits = function(when, width, textScale, mirrored) {
+            HearthController.textScale = textScale;
+            win.width = width;
+            win.LayoutMirroring.enabled = mirrored;
+            tryCompare(Theme, "fontScale", Number(textScale) / 100, 2000);
+            tryCompare(page, "width", width, 5000);
+            const where = when + ", " + width + " px at " + textScale + "%"
+                          + (mirrored ? ", right to left" : "");
+            // A change reaches the layouts when they are next polished, and a text that
+            // wraps anew asks for one more: read once they have stopped asking.
+            verify(waitForPolish(win, 5000), where + ": the layouts were never polished");
+            let past = spills();
+            for (let turn = 0; turn < 30 && past.length > 0; ++turn) {
+                wait(100);
+                past = spills();
+            }
+            verify(past.length === 0,
+                   where + ": " + past.length + " past an edge, the first of them: "
+                   + past.slice(0, 6).join("; "));
+            // And that it was this layout that was read, not the one before the change: the
+            // Microphone card is on the side the direction puts it, and a label of one line is
+            // as tall as the text size makes it.
+            const microphone = named(win, "microphoneCard");
+            compare(microphone.mapToItem(page, 0, 0).x < page.width / 2, mirrored,
+                    where + ": the Microphone card is on the wrong side");
+            const label = H.textItem(microphone, qsTr("Input"));
+            verify(label !== null, where + ": no Input label");
+            verify(Math.abs(label.height - label.implicitHeight) <= 1,
+                   where + ": a label is " + label.height + " px tall, for text that needs "
+                   + label.implicitHeight);
+            // The cards, by their outer edges: the margin of the Settings and Speakers pages.
+            let left = page.width;
+            let right = 0;
+            for (const card of cards) {
+                const x = card.mapToItem(page, 0, 0).x;
+                left = Math.min(left, x);
+                right = Math.max(right, x + card.width);
+            }
+            verify(Math.abs(left - Theme.pad) <= 1, where + ": the cards start at " + left);
+            verify(Math.abs(right - (page.width - Theme.pad)) <= 1, where + ": the cards end at " + right);
+        };
+
+        fits("nothing playing", 1280, "175", false);
+
+        play(karaoke21);
+        tryCompare(page, "isKaraoke", true, 5000);
+        tryVerify(function() { return text(win, "partState-V2") === qsTr("not in this stream"); }, 5000);
+        fits("no second vocal", 1280, "175", false);
+        fits("no second vocal", 1280, "175", true);
+        HearthController.stop();
+        HearthController.removeAt(0);
+        tryVerify(function() { return HearthController.queue.length === 0; }, 10000);
+
+        play(karaoke);
+        tryVerify(function() { return text(win, "partState-V2") === qsTr("heard"); }, 5000);
+        for (const textScale of ["175", "150", "125", "100"]) {
+            fits("a karaoke stream", 1280, textScale, false);
+            fits("a karaoke stream", 1280, textScale, true);
+        }
+        fits("a karaoke stream", 960, "100", false);
+        fits("a karaoke stream", 960, "100", true);
     }
 
     function test_theDecoderPageSummarisesTheChoiceAndOpensTheKaraokePage() {

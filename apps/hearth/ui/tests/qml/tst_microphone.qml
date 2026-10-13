@@ -33,6 +33,7 @@ TestCase {
     }
 
     function init() {
+        Theme.fontScale = 1.0;
         MicrophoneController.headphones = false;
         MicrophoneController.inputDelayMs = 0;
         MicrophoneController.offsetMs = 0;
@@ -48,6 +49,24 @@ TestCase {
         const found = findChild(item, name);
         verify(found !== null, "no item named " + name);
         return found;
+    }
+
+    // Takes in the suite's own folder, made as files: the list is read from the descriptions
+    // beside them. Returns the folder.
+    function writeTakes(count) {
+        let folder = "";
+        for (let i = 1; i <= count; ++i) {
+            const stem = "Song - 2020-01-0" + i + " 100000";
+            const audio = TestServices.writeTextFile(stem + ".flac", "fLaC");
+            verify(audio.length > 0, "could not write a take");
+            folder = audio.substring(0, audio.lastIndexOf("/"));
+            const description = JSON.stringify({
+                format: "iclforge-take-1", audio: stem + ".flac", seconds: 60 + i,
+                created_utc: "2020-01-0" + i + "T10:00:00Z", item: { title: "Song" },
+                item_start_ms: 0 });
+            verify(TestServices.writeTextFile(stem + ".take.json", description).length > 0);
+        }
+        return folder;
     }
 
     function test_off_and_it_says_what_it_promises() {
@@ -147,22 +166,58 @@ TestCase {
         compare(MicrophoneController.ownKey, false);
     }
 
-    function test_the_takes_in_the_folder_are_listed_and_removed_after_asking() {
-        // Seven takes in a folder of their own, made as files: the list is read from the
-        // descriptions beside them.
-        let folder = "";
-        for (let i = 1; i <= 7; ++i) {
-            const stem = "Song - 2020-01-0" + i + " 100000";
-            const audio = TestServices.writeTextFile(stem + ".flac", "fLaC");
-            verify(audio.length > 0, "could not write a take");
-            folder = audio.substring(0, audio.lastIndexOf("/"));
-            const description = JSON.stringify({
-                format: "iclforge-take-1", audio: stem + ".flac", seconds: 60 + i,
-                created_utc: "2020-01-0" + i + "T10:00:00Z", item: { title: "Song" },
-                item_start_ms: 0 });
-            verify(TestServices.writeTextFile(stem + ".take.json", description).length > 0);
+    // A label sits beside its control in a card with the room for both, and above it in a card a
+    // third of the window wide or at a large text size. Either way nothing in the card runs past
+    // its edge: not a row of it, and not the two buttons that ask again under a take. The widths
+    // are the card's at a window of 1280 px (408) and of 960 px (301), and a wide one.
+    function test_the_rows_fit_a_narrow_card_and_a_wide_one_data() {
+        return [
+            { tag: "900 px", width: 900, fontScale: 1.0, stacked: false },
+            { tag: "408 px", width: 408, fontScale: 1.0, stacked: true },
+            { tag: "301 px", width: 301, fontScale: 1.0, stacked: true },
+            { tag: "408 px, 175%", width: 408, fontScale: 1.75, stacked: true },
+            { tag: "900 px, 175%", width: 900, fontScale: 1.75, stacked: false }
+        ];
+    }
+
+    function test_the_rows_fit_a_narrow_card_and_a_wide_one(data) {
+        MicrophoneController.setTakesFolder(writeTakes(2));
+        tryVerify(function() { return MicrophoneController.takes.length >= 2; }, 5000);
+        Theme.fontScale = data.fontScale;
+        const card = createTemporaryObject(cardComponent, testCase, { width: data.width });
+        verify(card);
+        compare(card.stacked, data.stacked);
+        // Asked about the first take, so that the two buttons that answer are on show.
+        H.find(card, function(item) { return item.objectName === "microphoneTakeDelete"; }).clicked();
+        compare(find(card, "microphoneTakeDeleteConfirm").visible, true);
+
+        // A layout settles over a few turns after it is made.
+        let past = H.pastTheEdges(card);
+        for (let turn = 0; turn < 30 && past.length > 0; ++turn) {
+            wait(100);
+            past = H.pastTheEdges(card);
         }
-        MicrophoneController.setTakesFolder(folder);
+        verify(past.length === 0,
+               past.length + " past the card's edges, the first of them: " + past.slice(0, 6).join("; "));
+
+        const label = H.textItem(card, qsTr("Input"));
+        verify(label !== null, "no Input label");
+        const box = find(card, "microphoneDevice");
+        const labelAt = label.mapToItem(card, 0, 0);
+        const boxAt = box.mapToItem(card, 0, 0);
+        if (data.stacked) {
+            verify(labelAt.y + label.height <= boxAt.y + 0.5, "the label is not above its control");
+            fuzzyCompare(labelAt.x, boxAt.x, 1);
+        } else {
+            verify(labelAt.x + label.width <= boxAt.x + 0.5, "the label is not beside its control");
+            verify(labelAt.y < boxAt.y + box.height && boxAt.y < labelAt.y + label.height,
+                   "the label and its control are not on one row");
+        }
+    }
+
+    function test_the_takes_in_the_folder_are_listed_and_removed_after_asking() {
+        // Seven takes in a folder of their own.
+        MicrophoneController.setTakesFolder(writeTakes(7));
         compare(MicrophoneController.takes.length, 7);
 
         const card = createTemporaryObject(cardComponent, testCase);
