@@ -3,6 +3,7 @@ import QtQuick.Window
 import QtTest
 
 import Hearth
+import HearthLanguage
 import HearthTest
 
 import "HearthTestHelpers.js" as H
@@ -29,6 +30,9 @@ TestCase {
     property string item: ""
     property string bare: ""        // an item with no lyrics file beside it
     property string words: ""       // a text file to time an item that has none
+    property string hebrew: ""      // a plain Hebrew file, and the item beside it
+    property string hebrewItem: ""
+    property string startLanguage: ""
 
     Component { id: mainComponent; Main { } }
 
@@ -42,15 +46,25 @@ TestCase {
         bare = plain.replace("timing_song.lrc", "timing_bare.ac3");
         words = TestServices.writeTextFile("timing_words.txt", "First line\nSecond line\n");
         verify(words.length > 0);
+        hebrew = TestServices.writeTextFile("timing_hebrew.lrc",
+                "\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd \u05d8\u05d5\u05d1\n"
+                + "\u05e2\u05d5\u05dc\u05dd \u05d8\u05d5\u05d1 \u05e9\u05dc\u05d5\u05dd\n"
+                + "\u05d8\u05d5\u05d1 \u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd\n");
+        verify(hebrew.length > 0);
+        hebrewItem = hebrew.replace(/\.lrc$/, ".ac3");
         HearthController.start();
         tryVerify(function() { return Object.keys(HearthController.decoderSettings).length > 0; }, 15000);
     }
 
     function init() {
+        startLanguage = LanguageManager.currentLanguage;
         KaraokeController.reactionMs = 100;
     }
 
     function cleanup() {
+        if (startLanguage.length > 0 && LanguageManager.currentLanguage !== startLanguage) {
+            LanguageManager.setLanguage(startLanguage);
+        }
         KaraokeController.endTiming();
         KaraokeController.load("", 0);
         KaraokeController.reactionMs = 120;
@@ -257,6 +271,39 @@ TestCase {
         hold(open.dialog, 9100);
         space(open.win);
         compare(open.dialog.mode, "words");
+    }
+
+    // The words of a line run in the line's own direction, by its first strong letter, and not in the
+    // window's (LyricView.qml has the same rule for the singer's own view).
+    function checkTheWordsRunTheWay(open, hebrew) {
+        stampThreeLines(open);
+        const words = H.findAll(open.dialog.contentItem, function(it) {
+            return it.objectName === "timingWord" && it.visible;
+        }, []);
+        verify(words.length >= 9, "the word pass shows " + words.length + " words");
+        // The words of the first line: the Flow is the parent of each word's item.
+        const flow = words[0].parent.parent;
+        compare(flow.LayoutMirroring.enabled, false);
+        compare(flow.layoutDirection, hebrew ? Qt.RightToLeft : Qt.LeftToRight);
+        const a = words[0].parent;
+        const b = words[1].parent;
+        const c = words[2].parent;
+        if (hebrew) {
+            verify(a.x > b.x && b.x > c.x, "the words do not run right to left: " + a.x + " " + b.x + " " + c.x);
+        } else {
+            verify(a.x < b.x && b.x < c.x, "the words do not run left to right: " + a.x + " " + b.x + " " + c.x);
+        }
+    }
+
+    function test_theWordsOfAnEnglishLineRunLeftToRightInAMirroredWindow() {
+        LanguageManager.setLanguage("he");
+        compare(Qt.application.layoutDirection, Qt.RightToLeft);
+        checkTheWordsRunTheWay(openDialog(item, 1100), false);
+    }
+
+    function test_theWordsOfAHebrewLineRunRightToLeftInAWindowReadLeftToRight() {
+        compare(Qt.application.layoutDirection, Qt.LeftToRight);
+        checkTheWordsRunTheWay(openDialog(hebrewItem, 1100), true);
     }
 
     function test_aPressInTheWordPassSetsTheFirstGuessInTheLineBeingSung() {

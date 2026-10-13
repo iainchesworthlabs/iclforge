@@ -250,7 +250,7 @@ Rectangle {
             objectName: "transportVolumeReadout"
             Layout.preferredWidth: 56
             horizontalAlignment: Text.AlignRight
-            text: qsTr("%1 dB").arg(HearthController.volumeDb.toFixed(1))
+            text: qsTr("%1 dB").arg(Theme.ltr(HearthController.volumeDb.toFixed(1)))
             opacity: root.bitstreamOutput ? 0.45 : 1.0
             color: Theme.textMuted
             font.family: Theme.monoFamily

@@ -673,7 +673,7 @@ Item {
                                 required property var modelData
                                 label: loudnessTile.modelData.label
                                 value: HearthController.loudness[loudnessTile.modelData.key] !== undefined
-                                       ? Number(HearthController.loudness[loudnessTile.modelData.key]).toFixed(1)
+                                       ? Theme.ltr(Number(HearthController.loudness[loudnessTile.modelData.key]).toFixed(1))
                                          + " " + loudnessTile.modelData.unit
                                        : qsTr("—")
                             }
@@ -700,20 +700,20 @@ Item {
                         StatTile {
                             label: qsTr("DIALNORM")
                             value: HearthController.thisFrame.dialnorm !== undefined
-                                   ? qsTr("−%1 dB").arg(HearthController.thisFrame.dialnorm) : qsTr("—")
+                                   ? Theme.ltrNumbers(qsTr("−%1 dB").arg(HearthController.thisFrame.dialnorm)) : qsTr("—")
                         }
                         StatTile {
                             label: qsTr("COMPR")
                             value: HearthController.thisFrame.comprDb !== undefined
-                                   ? qsTr("%1 dB").arg(Number(HearthController.thisFrame.comprDb).toFixed(1))
+                                   ? qsTr("%1 dB").arg(Theme.ltr(Number(HearthController.thisFrame.comprDb).toFixed(1)))
                                    : qsTr("—")
                         }
                         StatTile {
                             label: qsTr("DYNRNG")
                             value: HearthController.thisFrame.dynrngMinDb !== undefined
                                    ? qsTr("%1…%2 dB")
-                                         .arg(Number(HearthController.thisFrame.dynrngMinDb).toFixed(1))
-                                         .arg(Number(HearthController.thisFrame.dynrngMaxDb).toFixed(1))
+                                         .arg(Theme.ltr(Number(HearthController.thisFrame.dynrngMinDb).toFixed(1)))
+                                         .arg(Theme.ltr(Number(HearthController.thisFrame.dynrngMaxDb).toFixed(1)))
                                    : qsTr("—")
                         }
                         StatTile {

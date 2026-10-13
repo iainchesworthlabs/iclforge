@@ -303,6 +303,10 @@ QImage KaraokeController::pictureFrame(int /*key*/, qlonglong positionMs) {
     return pictureFrame(positionMs);
 }
 
+bool KaraokeController::isRightToLeft(const QString& text) const {
+    return text.isRightToLeft();
+}
+
 QVariantMap KaraokeController::cursor(qlonglong positionMs) const {
     QVariantMap map;
     const Lyrics& lyrics = state_->lyrics;

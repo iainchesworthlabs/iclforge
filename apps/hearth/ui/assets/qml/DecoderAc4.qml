@@ -102,7 +102,7 @@ ScrollView {
     }
     function signedDb(value) {
         const n = Number(value ?? 0);
-        return (n > 0 ? "+" : (n < 0 ? "−" : "")) + Math.abs(n).toFixed(0);
+        return Theme.ltr((n > 0 ? "+" : (n < 0 ? "−" : "")) + Math.abs(n).toFixed(0));
     }
     function drcModeName(id) {
         switch (id) {
@@ -391,9 +391,9 @@ ScrollView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: qsTr("AC-4 carries a compression curve for each kind of device; this picks which "
+                        text: Theme.ltrNumbers(qsTr("AC-4 carries a compression curve for each kind of device; this picks which "
                                   + "one applies. Automatic takes the one for the output level: home theatre "
-                                  + "to −27 dBFS, flat panel TV to −17, portable above that.")
+                                  + "to −27 dBFS, flat panel TV to −17, portable above that."))
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
                         wrapMode: Text.WordWrap
@@ -440,7 +440,7 @@ ScrollView {
                         visible: root.metadata.dialnormDbfs !== undefined || root.metadata.drcModes !== undefined
                         text: (root.metadata.dialnormDbfs !== undefined
                                ? qsTr("This stream's dialogue is at %1 dBFS.")
-                                     .arg(Number(root.metadata.dialnormDbfs).toFixed(2).replace("-", "−"))
+                                     .arg(Theme.ltr(Number(root.metadata.dialnormDbfs).toFixed(2).replace("-", "−")))
                                : "")
                               + (root.metadata.drcModes !== undefined
                                  ? " " + qsTr("It carries compression for: %1.")

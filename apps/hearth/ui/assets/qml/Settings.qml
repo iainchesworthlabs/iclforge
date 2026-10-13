@@ -207,8 +207,8 @@ ScrollView {
                         }
                         Text {
                             objectName: "settingsLyricDelayValue"
-                            text: qsTr("%1 ms").arg((KaraokeController.delayMs > 0 ? "+" : "")
-                                                    + KaraokeController.delayMs)
+                            text: qsTr("%1 ms").arg(Theme.ltr((KaraokeController.delayMs > 0 ? "+" : "")
+                                                    + KaraokeController.delayMs))
                             color: Theme.text
                             font.family: Theme.monoFamily
                             font.pixelSize: Theme.fontSmall

@@ -822,7 +822,7 @@ Card {
             Text {
                 objectName: "microphoneOffsetText"
                 Layout.preferredWidth: Math.min(root.besideLimit, Math.ceil(widestMs.advanceWidth))
-                text: qsTr("%1 ms").arg(MicrophoneController.offsetMs)
+                text: qsTr("%1 ms").arg(Theme.ltr(MicrophoneController.offsetMs))
                 color: Theme.textMuted
                 font.family: Theme.monoFamily
                 font.pixelSize: Theme.fontNormal

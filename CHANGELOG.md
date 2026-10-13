@@ -4614,6 +4614,31 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Hearth: right to left and the largest text size**
+
+- **A unit was drawn over its number.** In Arabic, Hebrew and Yiddish the unit of a number field
+  ("dBFS" in the RF ceiling) sat over the number: the number was aligned by its first letter, and a
+  number has none, while the unit was put at the mirrored end. The number starts at one end of the
+  box and the unit is at the other, the way the window reads. The field is the family's own
+  (`AppTextField`), so Crucible's and the Forge GUI's fields follow.
+- **A minus sign came after its digits.** Next to Arabic or Hebrew words a minus sign takes their
+  direction, so -3.0 read "3.0-" in the mix levels of the Media and Decoder pages, the dialnorm,
+  the dynamic range, the loudness figures and the volume. A number the window works out is set in a
+  left-to-right isolate when the window reads right to left, and the sentences that were written with
+  their own minus signs are isolated number by number. A window that reads left to right gets the
+  text it always had.
+- **The words of a lyric line ran in the window's direction.** Under Hebrew the words of "Should auld
+  acquaintance be forgot," ran right to left, and the pieces of a word in a syllable-timed file came
+  out in reverse ("quainacauld"); a Hebrew line under English did the same the other way. The words
+  of a line, in the lyric strip, the singer's view and the timing dialog, run in the line's own
+  direction, by its first strong letter, and the part sung grows from the side a word begins at.
+- **Keyboard shortcuts, About and First run lost their buttons at 175%.** In Arabic, Hebrew and
+  Yiddish, whose faces stand taller, each was taller than the window. A dialog is no taller than the
+  window now: its text scrolls above the buttons, which stay where they can be reached, and Page Up,
+  Page Down, Home, End and the arrow keys scroll it from the button that has the keyboard. A dialog
+  that fits looks as it did. No string changed; the translation catalogues' line numbers moved with
+  the files' own lines.
+
 **Crucible: the Room's right rail scrolls, so its Lyrics block can be reached in a short window**
 
 - **The rail was cut off by the window's lower edge.** The right rail (04 Signal path, 05 Signing,

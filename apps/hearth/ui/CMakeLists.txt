@@ -157,6 +157,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkGroupEdit.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlaceholderPage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Settings.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DialogScroll.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ShortcutsDialog.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/TransportBar.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AboutDialog.qml"
