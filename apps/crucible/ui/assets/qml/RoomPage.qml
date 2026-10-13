@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 
 import Crucible
@@ -11,7 +12,7 @@ import Crucible
 // side when there is room for two and stacked when there is not, so a
 // narrow window shrinks the room rather than pushing the right rail off
 // the edge, and a wide one gets a bigger room rather than a gap. The
-// centre scrolls vertically when the window is short.
+// centre and the right rail scroll when the window is short.
 Item {
     id: page
     // The room view the user chose last time, or what the window asks for.
@@ -589,7 +590,7 @@ Item {
             }
         }
 
-        // --- 04 signal path / 05 signing -----------------------------------------
+        // --- 04 signal path / 05 signing / 06 lyrics -------------------------------
         Rectangle {
             Layout.preferredWidth: 280
             Layout.minimumWidth: 220
@@ -598,31 +599,104 @@ Item {
             Layout.fillHeight: true
             color: "transparent"
             Rectangle { anchors.left: parent.left; width: 1; height: parent.height; color: Theme.divider }
-            ColumnLayout {
+            // The rail scrolls when the window is shorter than what is in it, as the centre does.
+            // The Lyrics block is the last thing in it and the one that grows (the first card with
+            // its warnings above it, then the strip's hint and its words), so a short window cuts
+            // that off first, and with nothing to move the rail it could not be reached at all.
+            // The bar is on whenever there is more, so that a control that is cut off reads as one
+            // that is further down and not as one that is not there.
+            Flickable {
+                id: railScroll
+                objectName: "railScroll"
                 anchors.fill: parent
-                anchors.margins: Theme.space4
-                spacing: Theme.space3
-                RailBlock {
-                    ordinal: "04"
-                    label: qsTr("SIGNAL PATH")
-                    Layout.fillWidth: true
-                    Layout.fillHeight: false
-                    Text { Layout.fillWidth: true; text: qsTr("applications → this app → what you hear"); color: Theme.textMuted; font.family: Theme.monoFamily; font.pixelSize: Theme.fontMono; elide: Text.ElideRight }
+                clip: true
+                contentWidth: width
+                contentHeight: railColumn.implicitHeight + Theme.space4 * 2
+                ScrollBar.vertical: ScrollBar {
+                    objectName: "railScrollBar"
+                    policy: railScroll.contentHeight > railScroll.height + 0.5 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                    minimumSize: 0.1
+                    // Square, and in the palette. It sits in the column's own 16 px margin, 10 px
+                    // wide with its padding, so it is never over a control.
+                    contentItem: Rectangle {
+                        implicitWidth: 6
+                        color: Theme.textMuted
+                    }
+                    background: Item {
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: 1
+                            height: parent.height
+                            color: Theme.divider
+                        }
+                    }
                 }
-                SignalPath {
-                    Layout.fillWidth: true
-                    wide: false
-                    onOpenOutput: page.openOutput()
+
+                // Tab walks the rail from the top, and the lyrics are below the fold in a short
+                // window: what has the keyboard is brought into view, with room round it for its
+                // ring, so that the keyboard is never somewhere that cannot be seen.
+                Window.onActiveFocusItemChanged: railScroll.reveal(Window.activeFocusItem)
+                function reveal(item) {
+                    if (!item) {
+                        return;
+                    }
+                    // Only what is in the rail's own column: the rest of the window has the
+                    // keyboard too, and it is none of this area's business.
+                    let inside = false;
+                    for (let at = item; at && !inside; at = at.parent) {
+                        inside = at === railColumn;
+                    }
+                    if (!inside) {
+                        return;
+                    }
+                    const top = item.mapToItem(railScroll.contentItem, 0, 0).y - Theme.space4;
+                    const bottom = item.mapToItem(railScroll.contentItem, 0, item.height).y + Theme.space4;
+                    const most = Math.max(0, railScroll.contentHeight - railScroll.height);
+                    if (top < railScroll.contentY) {
+                        railScroll.contentY = Math.max(0, top);
+                    } else if (bottom > railScroll.contentY + railScroll.height) {
+                        railScroll.contentY = Math.min(most, bottom - railScroll.height);
+                    }
                 }
-                RailBlock { ordinal: "05"; label: qsTr("SIGNING"); Layout.fillWidth: true; Layout.fillHeight: false }
-                Text { Layout.fillWidth: true; text: CrucibleController.objectsEnabled ? qsTr("key loaded · objects on") : qsTr("no key · 5.1 bed only"); color: Theme.text; font.pixelSize: Theme.fontBody; elide: Text.ElideRight }
-                Text { Layout.fillWidth: true; text: CrucibleController.keyPath.length ? CrucibleController.keyPath : qsTr("load one in Settings"); color: Theme.textMuted; font.family: Theme.monoFamily; font.pixelSize: Theme.fontMono; elide: Text.ElideMiddle }
-                RailBlock { ordinal: "06"; label: qsTr("LYRICS"); Layout.fillWidth: true; Layout.fillHeight: false }
-                LyricStrip {
-                    Layout.fillWidth: true
-                    app: page.selected
+                // Page Down and Page Up from any control in the rail: a button leaves both alone, so
+                // they come up to here.
+                Keys.onPressed: function(event) {
+                    if (event.key !== Qt.Key_PageDown && event.key !== Qt.Key_PageUp) {
+                        return;
+                    }
+                    const step = Math.round(railScroll.height * 0.9) * (event.key === Qt.Key_PageDown ? 1 : -1);
+                    const most = Math.max(0, railScroll.contentHeight - railScroll.height);
+                    railScroll.contentY = Math.max(0, Math.min(most, railScroll.contentY + step));
+                    event.accepted = true;
                 }
-                Item { Layout.fillHeight: true }
+
+                ColumnLayout {
+                    id: railColumn
+                    x: Theme.space4
+                    y: Theme.space4
+                    width: railScroll.width - Theme.space4 * 2
+                    spacing: Theme.space3
+                    RailBlock {
+                        ordinal: "04"
+                        label: qsTr("SIGNAL PATH")
+                        Layout.fillWidth: true
+                        Layout.fillHeight: false
+                        Text { Layout.fillWidth: true; text: qsTr("applications → this app → what you hear"); color: Theme.textMuted; font.family: Theme.monoFamily; font.pixelSize: Theme.fontMono; elide: Text.ElideRight }
+                    }
+                    SignalPath {
+                        Layout.fillWidth: true
+                        wide: false
+                        onOpenOutput: page.openOutput()
+                    }
+                    RailBlock { ordinal: "05"; label: qsTr("SIGNING"); Layout.fillWidth: true; Layout.fillHeight: false }
+                    Text { Layout.fillWidth: true; text: CrucibleController.objectsEnabled ? qsTr("key loaded · objects on") : qsTr("no key · 5.1 bed only"); color: Theme.text; font.pixelSize: Theme.fontBody; elide: Text.ElideRight }
+                    Text { Layout.fillWidth: true; text: CrucibleController.keyPath.length ? CrucibleController.keyPath : qsTr("load one in Settings"); color: Theme.textMuted; font.family: Theme.monoFamily; font.pixelSize: Theme.fontMono; elide: Text.ElideMiddle }
+                    RailBlock { ordinal: "06"; label: qsTr("LYRICS"); Layout.fillWidth: true; Layout.fillHeight: false }
+                    LyricStrip {
+                        Layout.fillWidth: true
+                        app: page.selected
+                    }
+                }
             }
         }
     }
