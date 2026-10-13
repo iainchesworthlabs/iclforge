@@ -1,6 +1,6 @@
 # Hearth: a desktop reference player and Sendspin sinks
 
-!!! note "Status as of 2026-10-13: built, with the user guide and three hardware exits open"
+!!! note "Status as of 2026-10-13: built, with passthrough from the window and three hardware exits open"
     Written and decided on 2026-09-15, in one session of questions and answers recorded under
     [Decisions](#decisions). The live status board is [ROADMAP.md](../ROADMAP.md); by chip, and
     each phase below carries its own status line:
@@ -9,9 +9,11 @@
       Speakers, Decoder, Network, Settings, and the Karaoke page of [`karaoke.md`](karaoke.md)),
       packages for Windows, macOS and Linux, network output to Sendspin groups, firmware updates
       for a paired sink, and AC-4 playback: channel-based, immersive and object content (phases I2
-      and I5 of [`planning/ac4.md`](ac4.md)). Not built: a user guide to the pages other than
-      Karaoke, and screenshots of them (the Hearth images under `docs/hearth/design/` are the
-      design mockups). A4's Music Assistant exit, with Music Assistant itself, is open.
+      and I5 of [`planning/ac4.md`](ac4.md)), and a
+      [user guide](../docs/hearth/desktop-player.md) with a picture of each page. Not built:
+      passing AC-3 and E-AC-3 to a receiver from the window. The engine bitstreams and is tested
+      doing it, and the window gives the engine no bitstream output, so every stream is
+      decoded to PCM. A4's Music Assistant exit, with Music Assistant itself, is open.
     - **[The ESP32-S3 sink](#chip-b-the-esp32-s3-sink).** Built: Sendspin player, Improv, groups,
       network OTA, CI and published firmware packaging. TDM DAC hardware exits (ES9080 pair) and
       B3's Music Assistant exit are open.

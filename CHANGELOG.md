@@ -4343,6 +4343,16 @@ The sections below contain the complete change list and fixes.
   P4 panel and the sync measurement pages, the consolidation, monorepo and layout plans under
   built work with their pull request, and the state of each plan that had merged since its row was
   written; the AC-4 plan's state table carries the pull request of each ESP32 phase and of I6.
+- **Hearth has a user guide.** [Using the desktop player](docs/hearth/desktop-player.md) walks
+  through the window page by page, with a picture of each page, the first-run dialog, the output
+  picker and the keyboard reference, taken from a build of main with `--smoke-shot`.
+  [Hearth for Android](docs/hearth/android.md) is the page for the Android TV sink: what it needs,
+  building it, pairing, what it plays, the lyric screen and its controls, what has been run and what
+  it does not do. The support catalogue and the platform tables have rows for it.
+- **Hearth's pages no longer say the desktop player passes AC-3 and E-AC-3 to a receiver.** The
+  engine has that path and tests it; the window gives the engine no bitstream output, so every
+  stream is decoded and leaves as PCM, which the output picker has said all along. The Hearth page,
+  the README, ROADMAP.md, the Hearth plan and the application table say so.
 
 **Release engineering**
 
