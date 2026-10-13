@@ -18,7 +18,7 @@ GRADLE = (
     "android {\n"
     '    namespace = "com.example.shield"\n'
     "    defaultConfig {\n"
-    '        applicationId = "com.example.shield"\n'
+    '        applicationId = "com.iainchesworthlabs.shield"\n'
     "    }\n"
     "}\n"
 )
@@ -86,14 +86,22 @@ class Agreement(Fixture):
 
 
 class Package(Fixture):
-    def test_an_application_id_that_is_not_the_namespace(self) -> None:
+    def test_an_application_id_is_not_the_package_and_need_not_be(self) -> None:
+        # the fixture's id is com.iainchesworthlabs.shield and its code is in com.example.shield
+        self.assertEqual(self.messages(), [])
+
+    def test_an_application_id_outside_the_repositorys_account(self) -> None:
         self.put(
             "apps/demos/android/app/build.gradle.kts",
             GRADLE.replace(
-                'applicationId = "com.example.shield"', 'applicationId = "com.other.shield"'
+                'applicationId = "com.iainchesworthlabs.shield"',
+                'applicationId = "com.iclforge.shield"',
             ),
         )
-        self.assertTrue(any("is not the namespace" in m for m in self.messages()))
+        self.assertTrue(
+            any("is not under com.iainchesworthlabs." in m for m in self.messages()),
+            self.messages(),
+        )
 
     def test_a_source_in_the_old_package(self) -> None:
         self.put(
@@ -223,7 +231,9 @@ class SecondApp(Fixture):
 
     @staticmethod
     def hearth(text: str) -> str:
-        return text.replace("com.example.shield", "com.example.hearth")
+        return text.replace("com.example.shield", "com.example.hearth").replace(
+            "com.iainchesworthlabs.shield", "com.iainchesworthlabs.hearth"
+        )
 
     def setUp(self) -> None:
         super().setUp()

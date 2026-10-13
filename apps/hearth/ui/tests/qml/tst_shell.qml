@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 
 import Hearth
+import HearthLanguage
 import HearthTest
 
 import "HearthTestHelpers.js" as H
@@ -123,6 +124,21 @@ TestCase {
         tryVerify(function() { return picker.opened; }, 5000, "Space on the summary did not open the picker");
         mouseClick(findChild(win, "outputPickerCancel"));
         tryVerify(function() { return !picker.visible; }, 5000);
+    }
+
+    // A number inside text that may read right to left is set in a left-to-right isolate there, so
+    // that its minus sign stays in front of its digits; nothing is added where the window reads left
+    // to right, so a string is the same string for those who never see the isolate.
+    function test_ltrIsolatesANumberOnlyInAWindowThatReadsRightToLeft() {
+        const before = LanguageManager.currentLanguage;
+        compare(Qt.application.layoutDirection, Qt.LeftToRight);
+        compare(Theme.ltr("-3.0"), "-3.0");
+        LanguageManager.setLanguage("he");
+        compare(Qt.application.layoutDirection, Qt.RightToLeft);
+        compare(Theme.ltr("-3.0"), String.fromCharCode(0x2066) + "-3.0" + String.fromCharCode(0x2069));
+        compare(Theme.ltr(-3), String.fromCharCode(0x2066) + "-3" + String.fromCharCode(0x2069));
+        LanguageManager.setLanguage(before);
+        compare(Theme.ltr("-3.0"), "-3.0");
     }
 
     // The appearance settings reach Theme at start and on every change.

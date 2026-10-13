@@ -20,7 +20,7 @@ per language:
 
 English has no `.ts` file — it is the literal `qsTr()` source text. `apps/forge/gui/CMakeLists.txt`'s
 `qt_add_translations()` call wires these in: it scans the target's sources — every QML file
-`AC3_QML_FILES` lists, which is where nearly all of the marked strings are, and the `tr()` calls in
+`ICLFORGE_QML_FILES` lists, which is where nearly all of the marked strings are, and the `tr()` calls in
 `encoder_controller.cpp` — for translatable strings, then compiles each `.ts` to a `.qm` and embeds
 it as a resource under `:/i18n` at build time.
 `LanguageManager` (`apps/shared/preferences/src/language_manager.{hpp,cpp}`) loads the matching `.qm` for the active
@@ -106,7 +106,7 @@ area of a large `.ts` file.
 ## Adding a new language
 
 1. Add `translations/forge_gui_<code>.ts` to the `TS_FILES` list in `qt_add_translations()`
-   (`apps/forge/gui/CMakeLists.txt`'s `AC3_TS_FILES`), then run `forge-gui_lupdate` to generate the initial
+   (`apps/forge/gui/CMakeLists.txt`'s `ICLFORGE_TS_FILES`), then run `forge-gui_lupdate` to generate the initial
    file and translate it as above.
 2. Add `{code, "Native name"}` to the `kLanguages` array in `apps/shared/preferences/src/language_manager.cpp`. Miss
    this and `LanguageManager::setLanguage()` rejects the code as unsupported — the language never
@@ -133,7 +133,7 @@ against. A visible string that reaches the screen *without* that decoration unde
 pseudo-locale either never went through `qsTr()`, or was added after the fixture was last
 generated.
 
-The fixture is not in `AC3_TS_FILES`, so `forge-gui_lupdate` does not touch it and CI's drift check
+The fixture is not in `ICLFORGE_TS_FILES`, so `forge-gui_lupdate` does not touch it and CI's drift check
 cannot see it going stale. It matches the six languages today, at 984 messages, and the
 `[gui][translations]` case above holds it to the same no-unfinished rule. Regenerate it after
 `forge-gui_lupdate` picks up new source strings:
@@ -147,4 +147,4 @@ It is loaded only through an `ICLFORGE_GUI_LOCALE=xx` environment override
 (`LanguageManager::applyInitialLanguage()`, checked ahead of the persisted setting and the system
 locale) — `apps/forge/gui/tests/qml.cmake` sets this for `tst_localisation_pipeline.qml`'s ctest
 entry alone, and it is embedded only into `forge_gui_qmltests`, never into the shipped `forge-gui`
-binary (`apps/forge/gui/CMakeLists.txt`'s own comment on `AC3_PSEUDO_TS_FILE` says why).
+binary (`apps/forge/gui/CMakeLists.txt`'s own comment on `ICLFORGE_PSEUDO_TS_FILE` says why).

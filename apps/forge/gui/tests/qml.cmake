@@ -14,7 +14,7 @@
 # This embeds a second, independent copy of the ForgeGui QML module - not a
 # shared library with forge-gui - for the same WHOLE_ARCHIVE reason
 # ../CMakeLists.txt gives for embedding it directly into the executable
-# rather than a backing plugin. AC3_QML_FILES is the same list forge-gui's own
+# rather than a backing plugin. ICLFORGE_QML_FILES is the same list forge-gui's own
 # qt_add_qml_module call uses, set once in ../CMakeLists.txt, so the two
 # embeddings cannot list a different set of files without both being edited.
 # ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ qt_add_qml_module(forge_gui_qmltests
     # same "<binary dir>/ForgeGui" output directory and collide - forge-gui's
     # own module lives there already.
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests/ForgeGui"
-    QML_FILES ${AC3_QML_FILES})
+    QML_FILES ${ICLFORGE_QML_FILES})
 
 # Forces this target's own POST_BUILD windeployqt step (below) to run only
 # after forge-gui's has finished, not just after forge-gui's LINK step - confirmed
@@ -113,13 +113,13 @@ add_dependencies(forge_gui_qmltests forge-gui)
 
 # ---------------------------------------------------------------------------
 # GUI localisation: a second, independent .qm embedding for this target - same
-# rationale as the AC3_QML_FILES embedding above, and for the same reason
+# rationale as the ICLFORGE_QML_FILES embedding above, and for the same reason
 # that comment gives: a shared library between the two targets would be more
 # machinery than what it wraps. lrelease only, not lupdate - the QML files
-# are the identical list forge-gui already scans (AC3_QML_FILES), so a second
+# are the identical list forge-gui already scans (ICLFORGE_QML_FILES), so a second
 # extraction pass would just regenerate byte-identical .ts content; running
 # it twice buys nothing and doubles the target-name bookkeeping. The pseudo-
-# locale QA fixture (AC3_PSEUDO_TS_FILE) is added here ONLY - see that
+# locale QA fixture (ICLFORGE_PSEUDO_TS_FILE) is added here ONLY - see that
 # variable's own comment in ../CMakeLists.txt for why production forge-gui.exe
 # doesn't carry it.
 #
@@ -133,11 +133,11 @@ add_dependencies(forge_gui_qmltests forge-gui)
 # ".../forge_gui_fr.qm" and Ninja would refuse the second one as "multiple
 # rules generate the same output".
 # ---------------------------------------------------------------------------
-set_source_files_properties(${AC3_TS_FILES} ${AC3_PSEUDO_TS_FILE} PROPERTIES
+set_source_files_properties(${ICLFORGE_TS_FILES} ${ICLFORGE_PSEUDO_TS_FILE} PROPERTIES
     OUTPUT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/tests")
 
 qt6_add_lrelease(forge_gui_qmltests
-    TS_FILES ${AC3_TS_FILES} ${AC3_PSEUDO_TS_FILE}
+    TS_FILES ${ICLFORGE_TS_FILES} ${ICLFORGE_PSEUDO_TS_FILE}
     LRELEASE_TARGET forge_gui_qmltests_lrelease
     QM_FILES_OUTPUT_VARIABLE ICLFORGE_GUI_TEST_QM_FILES)
 
@@ -182,7 +182,7 @@ foreach(source IN LISTS ICLFORGE_GUI_TEST_SOURCES)
 endforeach()
 if(ICLFORGE_GUI_TEST_GENERATED_SOURCES)
     set_source_files_properties(${ICLFORGE_GUI_TEST_GENERATED_SOURCES}
-        PROPERTIES COMPILE_OPTIONS "${AC3_WARNINGS_OFF_FLAG}")
+        PROPERTIES COMPILE_OPTIONS "${ICLFORGE_WARNINGS_OFF_FLAG}")
 endif()
 
 target_link_libraries(forge_gui_qmltests
@@ -328,29 +328,29 @@ endforeach()
 # already covers it, exactly as it does for forge-gui and for --smoke today.
 # ---------------------------------------------------------------------------
 if(WIN32)
-    get_filename_component(AC3_QT_BIN_DIR "${Qt6_DIR}/../../../bin" ABSOLUTE)
-    find_program(AC3_WINDEPLOYQT_EXECUTABLE
+    get_filename_component(ICLFORGE_QT_BIN_DIR "${Qt6_DIR}/../../../bin" ABSOLUTE)
+    find_program(ICLFORGE_WINDEPLOYQT_EXECUTABLE
         NAMES windeployqt6 windeployqt
-        HINTS "${AC3_QT_BIN_DIR}")
+        HINTS "${ICLFORGE_QT_BIN_DIR}")
 
-    if(AC3_WINDEPLOYQT_EXECUTABLE)
-        set(AC3_VCINSTALLDIR "$ENV{VCINSTALLDIR}")
-        string(REGEX REPLACE "[\\\\/]+$" "" AC3_VCINSTALLDIR "${AC3_VCINSTALLDIR}")
-        file(TO_CMAKE_PATH "${AC3_VCINSTALLDIR}" AC3_VCINSTALLDIR)
+    if(ICLFORGE_WINDEPLOYQT_EXECUTABLE)
+        set(ICLFORGE_VCINSTALLDIR "$ENV{VCINSTALLDIR}")
+        string(REGEX REPLACE "[\\\\/]+$" "" ICLFORGE_VCINSTALLDIR "${ICLFORGE_VCINSTALLDIR}")
+        file(TO_CMAKE_PATH "${ICLFORGE_VCINSTALLDIR}" ICLFORGE_VCINSTALLDIR)
 
         add_custom_command(TARGET forge_gui_qmltests POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E env "VCINSTALLDIR=${AC3_VCINSTALLDIR}"
-                "${AC3_WINDEPLOYQT_EXECUTABLE}"
+            COMMAND "${CMAKE_COMMAND}" -E env "VCINSTALLDIR=${ICLFORGE_VCINSTALLDIR}"
+                "${ICLFORGE_WINDEPLOYQT_EXECUTABLE}"
                 --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml"
                 --compiler-runtime
                 "$<TARGET_FILE:forge_gui_qmltests>"
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-                "${AC3_QT_BIN_DIR}/../plugins/platforms/qoffscreen$<$<CONFIG:Debug>:d>.dll"
+                "${ICLFORGE_QT_BIN_DIR}/../plugins/platforms/qoffscreen$<$<CONFIG:Debug>:d>.dll"
                 "$<TARGET_FILE_DIR:forge_gui_qmltests>/platforms/"
             COMMENT "Deploying Qt runtime dependencies for forge_gui_qmltests")
     else()
         message(WARNING
-            "windeployqt not found next to Qt6 (looked in ${AC3_QT_BIN_DIR}); "
+            "windeployqt not found next to Qt6 (looked in ${ICLFORGE_QT_BIN_DIR}); "
             "forge_gui_qmltests.exe will not run standalone from the build tree.")
     endif()
 endif()

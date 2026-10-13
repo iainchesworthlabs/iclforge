@@ -19,7 +19,7 @@
 add_library(iclforge_warnings INTERFACE)
 add_library(iclforge::warnings ALIAS iclforge_warnings)
 
-set(AC3_GNU_CLANG_WARNINGS
+set(ICLFORGE_GNU_CLANG_WARNINGS
     -Wall
     -Wextra
     -Wpedantic
@@ -36,24 +36,24 @@ set(AC3_GNU_CLANG_WARNINGS
 
 # C++-only: no equivalent concept in C (virtual dtors, overloaded virtuals,
 # the C++-style-cast-vs-C-style-cast distinction).
-set(AC3_GNU_CLANG_CXX_ONLY_WARNINGS
+set(ICLFORGE_GNU_CLANG_CXX_ONLY_WARNINGS
     -Wnon-virtual-dtor
     -Woverloaded-virtual
     -Wold-style-cast)
 
-set(AC3_MSVC_WARNINGS
+set(ICLFORGE_MSVC_WARNINGS
     /W4
     /WX)
 
 # /permissive- is a C++ conformance switch, gated to CXX below the same way
 # the GNU/Clang C++-only set is - see this file's header comment.
-set(AC3_MSVC_CXX_ONLY_WARNINGS
+set(ICLFORGE_MSVC_CXX_ONLY_WARNINGS
     /permissive-)
 
 # clang-cl reports CXX_COMPILER_ID "Clang" but binds -Wall to MSVC's /Wall
 # semantics ("everything, including off-by-default groups"), which fails on
 # ordinary C++23 code. /W4 is what clang-cl itself recommends instead.
-set(AC3_CLANG_CL_WARNINGS
+set(ICLFORGE_CLANG_CL_WARNINGS
     /W4
     -Wextra
     -Wpedantic
@@ -68,21 +68,21 @@ set(AC3_CLANG_CL_WARNINGS
     -Wimplicit-fallthrough
     -Wformat=2)
 
-set(AC3_CLANG_CL_CXX_ONLY_WARNINGS
+set(ICLFORGE_CLANG_CL_CXX_ONLY_WARNINGS
     -Wnon-virtual-dtor
     -Woverloaded-virtual
     -Wold-style-cast)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     target_compile_options(iclforge_warnings INTERFACE
-        ${AC3_CLANG_CL_WARNINGS}
-        "$<$<COMPILE_LANGUAGE:CXX>:${AC3_CLANG_CL_CXX_ONLY_WARNINGS}>")
+        ${ICLFORGE_CLANG_CL_WARNINGS}
+        "$<$<COMPILE_LANGUAGE:CXX>:${ICLFORGE_CLANG_CL_CXX_ONLY_WARNINGS}>")
 else()
     target_compile_options(iclforge_warnings INTERFACE
-        "$<$<CXX_COMPILER_ID:MSVC>:${AC3_MSVC_WARNINGS}>"
-        "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:${AC3_MSVC_CXX_ONLY_WARNINGS}>"
-        "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:${AC3_GNU_CLANG_WARNINGS}>"
-        "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:${AC3_GNU_CLANG_CXX_ONLY_WARNINGS}>")
+        "$<$<CXX_COMPILER_ID:MSVC>:${ICLFORGE_MSVC_WARNINGS}>"
+        "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:${ICLFORGE_MSVC_CXX_ONLY_WARNINGS}>"
+        "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:${ICLFORGE_GNU_CLANG_WARNINGS}>"
+        "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:${ICLFORGE_GNU_CLANG_CXX_ONLY_WARNINGS}>")
 endif()
 
 # -Wpedantic on a sufficiently new Clang (first seen on macOS via Homebrew's
@@ -186,7 +186,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_G
 endif()
 
 # ---------------------------------------------------------------------------
-# AC3_WARNINGS_OFF_FLAG - switches every warning off for one source file.
+# ICLFORGE_WARNINGS_OFF_FLAG - switches every warning off for one source file.
 #
 # The note above is true for third-party *headers*, but not for third-party
 # code generators. Qt's moc, rcc, qmltyperegistrar and qmlcachegen emit C++
@@ -215,8 +215,8 @@ endif()
 # non-MSVC's "-w" does. If a later Qt/cl combination stops emitting it, the
 # flag becomes a harmless no-op rather than something that needs removing.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set(AC3_WARNINGS_OFF_FLAG "/wd4702")
+    set(ICLFORGE_WARNINGS_OFF_FLAG "/wd4702")
 else()
     # clang-cl accepts the GNU spelling too, so this covers every non-cl case.
-    set(AC3_WARNINGS_OFF_FLAG "-w")
+    set(ICLFORGE_WARNINGS_OFF_FLAG "-w")
 endif()

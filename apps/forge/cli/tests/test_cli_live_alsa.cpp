@@ -1063,8 +1063,43 @@ fs::path capture_playback_config(const fs::path& path, const fs::path& out) {
         "{ type file slave.pcm \"null\" file \"" + out.string() + "\" format raw }");
 }
 
-bool has_nonzero_byte(const std::vector<std::byte>& bytes) {
-    return std::ranges::any_of(bytes, [](std::byte b) { return b != std::byte{0}; });
+// A capture of the playback device is read in blocks, not whole. A software device does not pace
+// the render thread, which writes silence into the capture as fast as the file takes it for as
+// long as the stream takes to decode: a second of stream leaves 100 to 200 MB of it, more the
+// slower the decode runs, and the sanitizer legs' whole-file read and byte-at-a-time scan took
+// minutes over that where a block is compared with memcmp.
+constexpr std::size_t kCaptureBlock = std::size_t{1} << 20;
+
+bool is_zero(std::span<const char> block) {
+    static const std::vector<char> zeros(kCaptureBlock, 0);
+    return std::memcmp(block.data(), zeros.data(), block.size()) == 0;
+}
+
+// Calls visit(block) on the file's bytes in blocks of kCaptureBlock, the last one shorter, until
+// it returns false; gives the file's length (what was read, when visit did not stop it).
+template <typename Visit>
+std::uintmax_t for_each_capture_block(const fs::path& path, Visit&& visit) {
+    std::ifstream in{path, std::ios::binary};
+    REQUIRE(in.is_open());
+    std::vector<char> block(kCaptureBlock);
+    std::uintmax_t length = 0;
+    while (in.read(block.data(), static_cast<std::streamsize>(block.size())) || in.gcount() > 0) {
+        const auto got = static_cast<std::size_t>(in.gcount());
+        length += got;
+        if (!visit(std::span<const char>{block.data(), got})) {
+            break;
+        }
+    }
+    return length;
+}
+
+bool has_nonzero_byte(const fs::path& path) {
+    bool nonzero = false;
+    for_each_capture_block(path, [&nonzero](std::span<const char> block) {
+        nonzero = !is_zero(block);
+        return !nonzero;
+    });
+    return nonzero;
 }
 
 }  // namespace
@@ -1085,9 +1120,8 @@ TEST_CASE("monitor plays the associated service into the programme, and only whe
         CHECK(contains(text, "played 32 access units"));
         CHECK_FALSE(contains(text, "mixing programme"));
         REQUIRE(fs::exists(out));
-        const auto bytes = read_bytes(out);
-        CHECK_FALSE(bytes.empty());
-        CHECK_FALSE(has_nonzero_byte(bytes));
+        CHECK(fs::file_size(out) > 0);
+        CHECK_FALSE(has_nonzero_byte(out));
     }
     SECTION("with associated= the service is in what reaches the device") {
         const auto out = dir / "associated_mixed.raw";
@@ -1103,7 +1137,7 @@ TEST_CASE("monitor plays the associated service into the programme, and only whe
         CHECK(contains(text, "  mixed programme 1 (associated service: visually impaired"));
         CHECK(contains(text, "played 32 access units"));
         REQUIRE(fs::exists(out));
-        CHECK(has_nonzero_byte(read_bytes(out)));
+        CHECK(has_nonzero_byte(out));
     }
     SECTION("by name, folded to stereo, the service is still in it") {
         const auto out = dir / "associated_folded.raw";
@@ -1119,7 +1153,7 @@ TEST_CASE("monitor plays the associated service into the programme, and only whe
         CHECK(contains(text, "(2 channels, 48000 Hz)"));
         CHECK(contains(text, "associated -3.0 dB"));
         REQUIRE(fs::exists(out));
-        CHECK(has_nonzero_byte(read_bytes(out)));
+        CHECK(has_nonzero_byte(out));
     }
     SECTION("a service the stream does not carry is refused, and nothing plays") {
         const auto log = dir / "associated_missing.log";
@@ -1162,16 +1196,32 @@ fs::path write_melody_only_karaoke_stream(const fs::path& dir, const std::string
     return stream;
 }
 
-// The energy of each of `channels` interleaved float32 channels in a raw capture.
-std::vector<double> channel_energy(const std::vector<std::byte>& raw, std::size_t channels) {
-    std::vector<double> energy(channels, 0.0);
-    const std::size_t samples = raw.size() / sizeof(float);
-    for (std::size_t i = 0; i < samples; ++i) {
-        float value = 0.0F;
-        std::memcpy(&value, raw.data() + i * sizeof(float), sizeof(float));
-        energy[i % channels] += static_cast<double>(value) * static_cast<double>(value);
-    }
-    return energy;
+// The length of a raw capture and the energy of each of its `channels` interleaved float32
+// channels. Read in blocks (see for_each_capture_block), and a block of the device's silence adds
+// nothing to any channel, so it is not summed.
+struct CaptureEnergy {
+    std::uintmax_t bytes = 0;
+    std::vector<double> channels;
+};
+
+CaptureEnergy channel_energy(const fs::path& capture, std::size_t channels) {
+    CaptureEnergy result;
+    result.channels.assign(channels, 0.0);
+    std::size_t sample = 0;
+    result.bytes = for_each_capture_block(capture, [&](std::span<const char> block) {
+        const std::size_t samples = block.size() / sizeof(float);
+        if (!is_zero(block)) {
+            for (std::size_t i = 0; i < samples; ++i) {
+                float value = 0.0F;
+                std::memcpy(&value, block.data() + i * sizeof(float), sizeof(float));
+                result.channels[(sample + i) % channels] +=
+                    static_cast<double>(value) * static_cast<double>(value);
+            }
+        }
+        sample += samples;
+        return true;
+    });
+    return result;
 }
 
 }  // namespace
@@ -1209,10 +1259,10 @@ TEST_CASE("monitor plays a karaoke stream's reproduction as L R C and the LFE, n
         REQUIRE(fs::exists(out));
         // Whole frames of four float32 channels: the device's own padding of silence round the
         // stream is whole periods, so it keeps every sample in the place its channel has.
-        const auto raw = read_bytes(out);
-        REQUIRE(raw.size() % (4 * sizeof(float)) == 0);
-        REQUIRE(raw.size() >= kFrames * 4 * sizeof(float));
-        const auto energy = channel_energy(raw, 4);
+        const auto capture = channel_energy(out, 4);
+        REQUIRE(capture.bytes % (4 * sizeof(float)) == 0);
+        REQUIRE(capture.bytes >= kFrames * 4 * sizeof(float));
+        const auto& energy = capture.channels;
         // The melody and nothing else: the third place of the four, which is a device's centre.
         CHECK(energy[2] > 1.0);
         CHECK(energy[0] == 0.0);
@@ -1228,7 +1278,7 @@ TEST_CASE("monitor plays a karaoke stream's reproduction as L R C and the LFE, n
         const auto text = read_text(log);
         CHECK(contains(text, "(4 channels, 48000 Hz)"));
         CHECK(contains(text, "karaoke (Annex C.2.3.1): melody M to the centre"));
-        const auto energy = channel_energy(read_bytes(out), 4);
+        const auto energy = channel_energy(out, 4).channels;
         CHECK(energy[2] > 1.0);
         CHECK(energy[0] == 0.0);
     }

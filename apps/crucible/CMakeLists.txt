@@ -412,6 +412,10 @@ else()
         ../shared/preferences/src/language_manager.hpp
         ../shared/preferences/src/settings_migration.cpp
         ../shared/preferences/src/settings_migration.hpp
+        ../shared/preferences/src/window_memory.cpp
+        ../shared/preferences/src/window_memory.hpp
+        ../shared/preferences/src/window_placement.cpp
+        ../shared/preferences/src/window_placement.hpp
         # The picture of a CD+G disc the lyric strip draws, shared with Hearth and the Forge GUI
         # (apps/shared/cdg-picture): a QML_ELEMENT is registered only by a target that compiles it.
         ../shared/cdg-picture/src/cdg_frame_source.hpp
@@ -481,8 +485,8 @@ else()
         QML_FILES ${ICLFORGE_CRUCIBLE_QML_FILES}
         RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ui/assets/qml/tray.svg")
     # ui/src for the generated type registrations to find crucible_controller.hpp, the shared
-    # theme for system_theme.hpp and the shared preferences for language_manager.hpp and
-    # settings_migration.hpp.
+    # theme for system_theme.hpp and the shared preferences for language_manager.hpp,
+    # settings_migration.hpp and window_memory.hpp.
     target_include_directories(crucible PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/cdg-picture/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/../shared/preferences/src"
@@ -560,6 +564,10 @@ else()
         set_target_properties(crucible PROPERTIES
             MACOSX_BUNDLE ON
             MACOSX_BUNDLE_BUNDLE_NAME "Crucible"
+            # The repository's account, as forge-gui's and Hearth's bundles have it
+            # (com.iainchesworthlabs.forge-gui, com.iainchesworthlabs.hearth). Unset, the plist
+            # carried no identifier of this program's own.
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.iainchesworthlabs.crucible"
             MACOSX_BUNDLE_ICON_FILE "iclforge.icns")
     endif()
 
@@ -680,7 +688,7 @@ else()
         # SAME COMPONENT immediately before it, only on APPLE since the
         # Windows shape needs no such variable.
         if(APPLE)
-            install(CODE "set(_ac3_macos_bundle_name \"crucible\")" COMPONENT crucible)
+            install(CODE "set(_iclforge_macos_bundle_name \"crucible\")" COMPONENT crucible)
         endif()
         install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/StripQtTestDeployment.cmake"
             COMPONENT crucible)
@@ -734,9 +742,9 @@ elseif(LINUX)
     # package (cmake/Packaging.cmake). No driver scripts: Linux needs no
     # driver, and a PowerShell script in a .deb is a mistake waiting for a
     # reader.
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/crucible.desktop"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.crucible.desktop"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications" COMPONENT crucible)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/crucible.metainfo.xml"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.crucible.metainfo.xml"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo" COMPONENT crucible)
     install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"

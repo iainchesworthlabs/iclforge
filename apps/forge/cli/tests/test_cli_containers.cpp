@@ -346,8 +346,10 @@ TEST_CASE("mkv warns and keeps only the first programme a stream carries", "[cli
 TEST_CASE("mp4, fmp4 and ts carry every programme a stream has", "[cli][mp4][fmp4][ts]") {
     const auto dir = scratch_dir();
     const auto log = dir / "multi_programme_all.log";
-    const auto multi = write_multi_programme_stream(dir, dir / "multi_programme_encode.log");
-    const auto original = read_file(multi);
+    // The stream is the same in each of the sections, which Catch2 enters one after the other.
+    static const auto multi =
+        write_multi_programme_stream(dir, dir / "multi_programme_encode.log");
+    static const auto original = read_file(multi);
 
     // ETSI TS 102 366 F.2 and A/52 Annex G §3.3 define a sample or a PES
     // payload as the syncframes of EVERY substream present, so what comes back

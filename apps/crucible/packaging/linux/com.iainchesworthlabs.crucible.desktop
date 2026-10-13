@@ -9,3 +9,4 @@ Terminal=false
 Categories=AudioVideo;Audio;Mixer;
 Keywords=atmos;surround;spatial;audio;eac3;dolby;
 StartupNotify=true
+StartupWMClass=Crucible

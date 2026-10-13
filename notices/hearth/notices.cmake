@@ -67,7 +67,7 @@ if(ICLFORGE_HEARTH_UI_QT_FOUND AND (WIN32 OR APPLE))
     # loose from the find_package it travels with - the same failure
     # notices/forge/notices.cmake guards against for apps/forge/gui, and for the
     # same reason: an unfilled {{QT_VERSION}} still passes
-    # ac3_generate_notices's leftover check (a token is substituted with
+    # iclforge_generate_notices's leftover check (a token is substituted with
     # nothing, not left as a marker), so a shipped "Qt " with an empty
     # source URL would otherwise pass silently.
     if(NOT ICLFORGE_HEARTH_UI_QT_VERSION)
@@ -175,7 +175,7 @@ list(APPEND ICLFORGE_HEARTH_NOTICE_TOKENS
 # others; notices/licences/ESP-IDF-components.txt is made by
 # tools/generators/gen_esp_idf_notices.py); MATERIAL_SYMBOLS_
 # LICENSE by the unconditional material-symbols fragment; TRACY_BSD only when
-# ICLFORGE_ENABLE_TRACY added tracy above. ac3_generate_notices ignores a {{FILE:...}}
+# ICLFORGE_ENABLE_TRACY added tracy above. iclforge_generate_notices ignores a {{FILE:...}}
 # marker no fragment mentions, so passing all of them here unconditionally is safe
 # regardless of platform, Qt-bundling or ICLFORGE_ENABLE_TRACY.
 list(APPEND ICLFORGE_HEARTH_NOTICE_FILES
@@ -195,7 +195,7 @@ if(NOT ICLFORGE_HEARTH_NOTICES_FILE)
         "add_subdirectory(ui) and include()ing this file, precisely so ui/'s own install() "
         "rules and this generator agree on the same path without either having to run first.")
 endif()
-ac3_generate_notices("${ICLFORGE_HEARTH_NOTICES_FILE}"
+iclforge_generate_notices("${ICLFORGE_HEARTH_NOTICES_FILE}"
     # One directory for all three programs: the trademark paragraph and the Qt section (bundled
     # verbatim, tokenised - cmake/Notices.cmake's header says why it is shared rather than
     # copied) are the same text for every application that includes them, and hearth-header

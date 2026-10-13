@@ -76,7 +76,11 @@ qt_add_executable(forge-gui
     ../../shared/preferences/src/language_manager.cpp
     ../../shared/preferences/src/language_manager.hpp
     ../../shared/preferences/src/settings_migration.cpp
-    ../../shared/preferences/src/settings_migration.hpp)
+    ../../shared/preferences/src/settings_migration.hpp
+    ../../shared/preferences/src/window_memory.cpp
+    ../../shared/preferences/src/window_memory.hpp
+    ../../shared/preferences/src/window_placement.cpp
+    ../../shared/preferences/src/window_placement.hpp)
 # Whether the operating system has been asked to cut back animation, which Theme.reducedMotion
 # binds to: SystemMotion and the platform file that answers it (cmake/SystemMotion.cmake).
 include(SystemMotion)
@@ -128,7 +132,7 @@ iclforge_stage_shared_qml(ForgeGui "${ICLFORGE_GUI_SHARED_DIR}" ICLFORGE_GUI_SHA
 # whichever CMakeLists.txt calls it, and apps/forge/gui/tests/qml.cmake below reuses
 # this same list to embed an identical module into forge_gui_qmltests - a
 # relative path would resolve against the wrong directory from there.
-set(AC3_QML_FILES
+set(ICLFORGE_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Main.qml"
     "${ICLFORGE_GUI_SHARED_DIR}/Theme.qml"
     "${ICLFORGE_GUI_SHARED_DIR}/Card.qml"
@@ -164,7 +168,7 @@ set(AC3_QML_FILES
 # Hebrew/Yiddish - the same set and order LanguageManager's kLanguages uses
 # (../../shared/preferences/src/language_manager.cpp), matching the canonical set already shipped by the
 # sibling CountdownSolver project (R:\CountdownSolver). Shared with
-# apps/forge/gui/tests/qml.cmake below for the same reason AC3_QML_FILES is: that file
+# apps/forge/gui/tests/qml.cmake below for the same reason ICLFORGE_QML_FILES is: that file
 # is include()d into this one's own scope, not a separate directory, so a
 # plain variable set here is already visible there. See
 # docs/forge/gui/localisation.md for how to update or add to this list, and
@@ -172,7 +176,7 @@ set(AC3_QML_FILES
 # separate pseudo-locale QA fixture, which is intentionally NOT part of this
 # list - it is loaded only through the ICLFORGE_GUI_LOCALE test override, never
 # through the real qt_add_translations() pipeline below.
-set(AC3_TS_FILES
+set(ICLFORGE_TS_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_fr.ts"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_de.ts"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_es.ts"
@@ -180,16 +184,16 @@ set(AC3_TS_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_he.ts"
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_yi.ts")
 
-# The pseudo-locale QA fixture (see AC3_TS_FILES's own comment above) -
+# The pseudo-locale QA fixture (see ICLFORGE_TS_FILES's own comment above) -
 # deliberately kept out of that list and out of forge-gui's own
 # qt_add_translations() call below, since production forge-gui.exe has no
 # reason to carry it. apps/forge/gui/tests/qml.cmake embeds it into forge_gui_qmltests
-# ALONGSIDE AC3_TS_FILES instead, purely for tst_localisation_pipeline.qml's
+# ALONGSIDE ICLFORGE_TS_FILES instead, purely for tst_localisation_pipeline.qml's
 # ICLFORGE_GUI_LOCALE=xx suite.
-set(AC3_PSEUDO_TS_FILE
+set(ICLFORGE_PSEUDO_TS_FILE
     "${CMAKE_CURRENT_SOURCE_DIR}/assets/translations/forge_gui_xx.ts")
 
-foreach(qml_file IN LISTS AC3_QML_FILES)
+foreach(qml_file IN LISTS ICLFORGE_QML_FILES)
     get_filename_component(qml_name "${qml_file}" NAME)
     set_source_files_properties("${qml_file}" PROPERTIES QT_RESOURCE_ALIAS "${qml_name}")
 endforeach()
@@ -212,7 +216,7 @@ set_source_files_properties("${ICLFORGE_GUI_SHARED_DIR}/Theme.qml"
 qt_add_qml_module(forge-gui
     URI ForgeGui
     VERSION 1.0
-    QML_FILES ${AC3_QML_FILES})
+    QML_FILES ${ICLFORGE_QML_FILES})
 
 # The handoff's typeface, bundled so the design renders as designed on a
 # machine that never installed it. Archivo is SIL OFL 1.1 (../../shared/theme/assets/fonts/OFL.txt
@@ -254,7 +258,7 @@ qt_add_resources(forge-gui "forge_gui_icons"
 
 # ---------------------------------------------------------------------------
 # GUI localisation: lupdate (scan every source SOURCE_TARGETS' own target already
-# lists - AC3_QML_FILES is the only source of qsTr() calls in this app; no
+# lists - ICLFORGE_QML_FILES is the only source of qsTr() calls in this app; no
 # .cpp file has one) plus lrelease (.ts -> .qm) and a /i18n resource
 # embedding, all in one call. LanguageManager (../../shared/preferences/src/language_manager.cpp) loads
 # the matching forge_gui_<code>.qm at runtime.
@@ -280,7 +284,7 @@ qt_add_resources(forge-gui "forge_gui_icons"
 qt_add_translations(forge-gui
     IMMEDIATE_CALL
     SOURCE_TARGETS forge-gui
-    TS_FILES ${AC3_TS_FILES}
+    TS_FILES ${ICLFORGE_TS_FILES}
     LUPDATE_OPTIONS -no-obsolete
     LUPDATE_TARGET forge-gui_lupdate
     LRELEASE_TARGET forge-gui_lrelease)
@@ -338,7 +342,7 @@ endforeach()
 
 if(ICLFORGE_GUI_GENERATED_SOURCES)
     set_source_files_properties(${ICLFORGE_GUI_GENERATED_SOURCES}
-        PROPERTIES COMPILE_OPTIONS "${AC3_WARNINGS_OFF_FLAG}")
+        PROPERTIES COMPILE_OPTIONS "${ICLFORGE_WARNINGS_OFF_FLAG}")
 else()
     message(WARNING
         "No Qt-generated sources found on forge-gui. If Qt has changed where it "
@@ -465,12 +469,12 @@ endif()
 # that is a packaging step, not a build one.
 # ---------------------------------------------------------------------------
 if(WIN32)
-    get_filename_component(AC3_QT_BIN_DIR "${Qt6_DIR}/../../../bin" ABSOLUTE)
-    find_program(AC3_WINDEPLOYQT_EXECUTABLE
+    get_filename_component(ICLFORGE_QT_BIN_DIR "${Qt6_DIR}/../../../bin" ABSOLUTE)
+    find_program(ICLFORGE_WINDEPLOYQT_EXECUTABLE
         NAMES windeployqt6 windeployqt
-        HINTS "${AC3_QT_BIN_DIR}")
+        HINTS "${ICLFORGE_QT_BIN_DIR}")
 
-    if(AC3_WINDEPLOYQT_EXECUTABLE)
+    if(ICLFORGE_WINDEPLOYQT_EXECUTABLE)
         # --plugindir platforms is implicit, but windeployqt only ships the
         # platform plugin the app will actually use (qwindows). The offscreen
         # plugin is added deliberately so the app can be smoke-tested headless
@@ -490,9 +494,9 @@ if(WIN32)
         # "...\Community\VC\" ends the quoted argument with a backslash, which
         # cmd reads as an escaped quote and swallows the rest of the command
         # line ("cmake -E env: no command given").
-        set(AC3_VCINSTALLDIR "$ENV{VCINSTALLDIR}")
-        string(REGEX REPLACE "[\\\\/]+$" "" AC3_VCINSTALLDIR "${AC3_VCINSTALLDIR}")
-        file(TO_CMAKE_PATH "${AC3_VCINSTALLDIR}" AC3_VCINSTALLDIR)
+        set(ICLFORGE_VCINSTALLDIR "$ENV{VCINSTALLDIR}")
+        string(REGEX REPLACE "[\\\\/]+$" "" ICLFORGE_VCINSTALLDIR "${ICLFORGE_VCINSTALLDIR}")
+        file(TO_CMAKE_PATH "${ICLFORGE_VCINSTALLDIR}" ICLFORGE_VCINSTALLDIR)
 
         # windeployqt prints "Warning: Cannot find any version of the
         # dxcompiler.dll and dxil.dll." on every run. This is not a missing
@@ -505,18 +509,18 @@ if(WIN32)
         # two DLLs windeployqt cannot find are for a code path this app never
         # takes. Safe to ignore.
         add_custom_command(TARGET forge-gui POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E env "VCINSTALLDIR=${AC3_VCINSTALLDIR}"
-                "${AC3_WINDEPLOYQT_EXECUTABLE}"
+            COMMAND "${CMAKE_COMMAND}" -E env "VCINSTALLDIR=${ICLFORGE_VCINSTALLDIR}"
+                "${ICLFORGE_WINDEPLOYQT_EXECUTABLE}"
                 --qmldir "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml"
                 --compiler-runtime
                 "$<TARGET_FILE:forge-gui>"
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-                "${AC3_QT_BIN_DIR}/../plugins/platforms/qoffscreen$<$<CONFIG:Debug>:d>.dll"
+                "${ICLFORGE_QT_BIN_DIR}/../plugins/platforms/qoffscreen$<$<CONFIG:Debug>:d>.dll"
                 "$<TARGET_FILE_DIR:forge-gui>/platforms/"
             COMMENT "Deploying Qt runtime dependencies for forge-gui")
     else()
         message(WARNING
-            "windeployqt not found next to Qt6 (looked in ${AC3_QT_BIN_DIR}); "
+            "windeployqt not found next to Qt6 (looked in ${ICLFORGE_QT_BIN_DIR}); "
             "forge-gui.exe will not run standalone from the build tree.")
     endif()
 endif()
@@ -609,7 +613,7 @@ endif()
 # the strip script needs this bundle name set in the same pass it runs in.
 if(WIN32 OR APPLE)
     if(APPLE)
-        install(CODE "set(_ac3_macos_bundle_name \"forge-gui\")" COMPONENT runtime)
+        install(CODE "set(_iclforge_macos_bundle_name \"forge-gui\")" COMPONENT runtime)
     endif()
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/StripQtTestDeployment.cmake"
         COMPONENT runtime)
@@ -635,10 +639,10 @@ endif()
 # built-in, true only on Linux).
 # ---------------------------------------------------------------------------
 if(LINUX)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/forge-gui.desktop"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.forge-gui.desktop"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
         COMPONENT runtime)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/forge-gui.metainfo.xml"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.forge-gui.metainfo.xml"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo"
         COMPONENT runtime)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/forge-gui-mime.xml"

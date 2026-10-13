@@ -42,9 +42,9 @@ find_file(ICLFORGE_ARM_NANO_SPECS nano.specs
     NO_DEFAULT_PATH)
 if(ICLFORGE_ARM_NANO_SPECS)
     get_filename_component(ICLFORGE_ARM_NEWLIB_DIR "${ICLFORGE_ARM_NANO_SPECS}" DIRECTORY)
-    set(_ac3_arm_prefix "-B ${ICLFORGE_ARM_NEWLIB_DIR}")
+    set(_iclforge_arm_prefix "-B ${ICLFORGE_ARM_NEWLIB_DIR}")
 else()
-    set(_ac3_arm_prefix "")
+    set(_iclforge_arm_prefix "")
 endif()
 
 # -mcpu/-mthumb belong in the FLAGS_INIT rather than in add_compile_options()
@@ -55,8 +55,8 @@ endif()
 # the only sensible choice for a profile whose entire subject is footprint.
 # rdimon.specs is the semihosting host interface - it is what makes printf and
 # exit() reach the QEMU console and the process exit code.
-set(_ac3_arm_arch "-mcpu=cortex-m3 -mthumb")
-set(_ac3_arm_specs "--specs=nano.specs --specs=rdimon.specs")
+set(_iclforge_arm_arch "-mcpu=cortex-m3 -mthumb")
+set(_iclforge_arm_specs "--specs=nano.specs --specs=rdimon.specs")
 
 # Both specs go in the COMPILE flags and nowhere else. They are needed at
 # compile time (nano.specs is what puts newlib's headers on the include path)
@@ -65,8 +65,8 @@ set(_ac3_arm_specs "--specs=nano.specs --specs=rdimon.specs")
 # them to CMAKE_EXE_LINKER_FLAGS_INIT as well makes GCC read nano.specs twice
 # and fail outright: "attempt to rename spec 'link' to already defined spec
 # 'nano_link'".
-set(CMAKE_C_FLAGS_INIT "${_ac3_arm_prefix} ${_ac3_arm_arch} ${_ac3_arm_specs}")
-set(CMAKE_CXX_FLAGS_INIT "${_ac3_arm_prefix} ${_ac3_arm_arch} ${_ac3_arm_specs}")
+set(CMAKE_C_FLAGS_INIT "${_iclforge_arm_prefix} ${_iclforge_arm_arch} ${_iclforge_arm_specs}")
+set(CMAKE_CXX_FLAGS_INIT "${_iclforge_arm_prefix} ${_iclforge_arm_arch} ${_iclforge_arm_specs}")
 
 # Nothing on the host is findable from a bare-metal target, and CMake's
 # default ROOT_PATH search would otherwise happily hand this build an x86-64

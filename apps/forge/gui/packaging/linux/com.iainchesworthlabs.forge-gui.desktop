@@ -8,3 +8,4 @@ Icon=forge-gui
 Terminal=false
 Categories=AudioVideo;Audio;
 StartupNotify=true
+StartupWMClass=forge-gui

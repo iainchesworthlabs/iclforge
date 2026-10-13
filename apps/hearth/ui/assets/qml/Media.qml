@@ -84,7 +84,7 @@ Item {
             return qsTr("not carried");
         }
         const n = digits === undefined ? 1 : digits;
-        return (value >= 0 ? "+" : "") + value.toFixed(n) + " dB";
+        return Theme.ltr((value >= 0 ? "+" : "") + value.toFixed(n) + " dB");
     }
     function formatDuration(seconds) {
         if (!seconds && seconds !== 0) {
@@ -223,6 +223,7 @@ Item {
                 spacing: Theme.gap
 
                 Text {
+                    //: Label before a drop-down that chooses what the page shows: which stream or track of the file.
                     text: qsTr("Showing")
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontMicro
@@ -321,6 +322,7 @@ Item {
                                       + (root.container.codecId ? qsTr(" · %1").arg(root.container.codecId) : "")
                                 color: Theme.text
                             }
+                            //: A track of an MP4 file.
                             Text { text: qsTr("Track"); color: Theme.textMuted }
                             Text {
                                 Layout.fillWidth: true
@@ -332,6 +334,7 @@ Item {
                                 color: Theme.text
                             }
                             Text {
+                                //: The elst box of an MP4 track: a list of edits that trim or shift it. Not a playlist.
                                 text: qsTr("Edit list"); color: Theme.textMuted
                                 visible: root.container.edits !== undefined
                             }
@@ -475,6 +478,7 @@ Item {
                             rowSpacing: 4
                             Layout.fillWidth: true
 
+                            //: The audio service type of an AC-3 or E-AC-3 stream (bsmod), such as main or music and effects.
                             Text { text: qsTr("Service"); color: Theme.textMuted }
                             Text {
                                 Layout.fillWidth: true
@@ -597,6 +601,7 @@ Item {
                                       : (root.ac4 ? qsTr("%1").arg(root.ac4.iframes) : "")
                                 color: Theme.text
                             }
+                            //: Splice points of an AC-4 stream: where two streams were joined.
                             Text { text: qsTr("Splices"); color: Theme.textMuted }
                             Text { text: root.ac4 ? qsTr("%1").arg(root.ac4.splices) : ""; color: Theme.text }
                             Text { text: qsTr("Substreams"); color: Theme.textMuted }
@@ -778,7 +783,7 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: root.ac4Metadata.dialnormDbfs !== undefined
-                                      ? qsTr("dialnorm %1 dBFS").arg(Number(root.ac4Metadata.dialnormDbfs).toFixed(2))
+                                      ? qsTr("dialnorm %1 dBFS").arg(Theme.ltr(Number(root.ac4Metadata.dialnormDbfs).toFixed(2)))
                                       : qsTr("not carried")
                                 color: Theme.text
                             }
@@ -786,9 +791,9 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: root.ac4Metadata.integratedLkfs !== undefined
-                                      ? qsTr("%1 LKFS integrated").arg(Number(root.ac4Metadata.integratedLkfs).toFixed(1))
+                                      ? qsTr("%1 LKFS integrated").arg(Theme.ltr(Number(root.ac4Metadata.integratedLkfs).toFixed(1)))
                                         + (root.ac4Metadata.truePeakDbtp !== undefined
-                                           ? qsTr(" · true peak %1 dBTP").arg(Number(root.ac4Metadata.truePeakDbtp).toFixed(1))
+                                           ? qsTr(" · true peak %1 dBTP").arg(Theme.ltr(Number(root.ac4Metadata.truePeakDbtp).toFixed(1)))
                                            : "")
                                       : qsTr("not carried")
                                 color: Theme.text

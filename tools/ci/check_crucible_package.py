@@ -135,8 +135,8 @@ NOTICES_LINUX_MEMBER = "share/doc/iclforge-crucible/NOTICES.txt"
 REQUIRED_LINUX = (
     "bin/crucible",
     "bin/crucible-run",
-    "share/applications/crucible.desktop",
-    "share/metainfo/crucible.metainfo.xml",
+    "share/applications/com.iainchesworthlabs.crucible.desktop",
+    "share/metainfo/com.iainchesworthlabs.crucible.metainfo.xml",
     "share/icons/hicolor/256x256/apps/crucible.png",
     "share/icons/hicolor/32x32/apps/crucible.png",
     NOTICES_LINUX_MEMBER,

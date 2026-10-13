@@ -25,6 +25,7 @@
 #include "encoder_controller.hpp"
 #include "language_manager.hpp"
 #include "settings_migration.hpp"
+#include "window_memory.hpp"
 
 // Headless self-checks, the reason the offscreen platform plugin is deployed
 // beside the executable. They drive the real controller and the real QML and
@@ -606,6 +607,11 @@ int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("forge-gui"));
     QGuiApplication::setOrganizationName(QStringLiteral("iclforge"));
+    // The id the desktop knows this program by: the name of its .desktop file
+    // (packaging/linux/com.iainchesworthlabs.forge-gui.desktop) without the suffix, which a Wayland
+    // compositor is also told is the window's application. The macOS bundle identifier is the
+    // same string. Nothing on Windows reads it.
+    QGuiApplication::setDesktopFileName(QStringLiteral("com.iainchesworthlabs.forge-gui"));
     QGuiApplication::setApplicationVersion(
         QString::fromUtf8(iclforge::ac3::version_string.data(), static_cast<qsizetype>(iclforge::ac3::version_string.size())));
 
@@ -686,10 +692,19 @@ int main(int argc, char* argv[]) {
     language_manager.applyInitialLanguage();
     engine.rootContext()->setContextProperty(QStringLiteral("languageManager"), &language_manager);
 
+    // The window's size, position and maximised state, kept in the store between starts
+    // (apps/shared/preferences/src/window_placement.hpp has the keys and the rules). Main.qml is
+    // loaded hidden so that attach() places it before it is first shown; a smoke run is on the
+    // scratch store above, which holds nothing, so it opens at Main.qml's own size.
+    iclforge::window_memory::WindowMemory remembered_window;
+    engine.setInitialProperties({{QStringLiteral("visible"), false}});
     engine.loadFromModule("ForgeGui", "Main");
     if (!engine.rootObjects().isEmpty()) {
         if (auto* root_window = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) {
             mark_frames_for_tracy(root_window);
+            remembered_window.attach(root_window);
+        } else {
+            engine.rootObjects().first()->setProperty("visible", true);
         }
     }
 

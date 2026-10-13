@@ -257,6 +257,35 @@ QtObject {
         return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
     }
 
+    // ---- numbers in text that may read right to left ------------------------
+    // A minus sign is a bidi neutral. Beside Arabic or Hebrew words it takes
+    // their direction and lands AFTER the digits, so -3.0 reads "3.0-". `ltr`
+    // wraps a number, sign and all, in a left-to-right isolate (U+2066 to
+    // U+2069), which keeps its own order whatever surrounds it. In a window
+    // that reads left to right it hands the text back as it was: the isolate
+    // is for a right-to-left reader and for nobody else, so the same string
+    // is not changed for them (a copy of it, a test of it, a screen reader).
+    // Built with fromCharCode so the source holds no invisible character.
+    readonly property string _isolateStart: String.fromCharCode(0x2066)
+    readonly property string _isolateEnd: String.fromCharCode(0x2069)
+    function ltr(text) {
+        return Qt.application.layoutDirection === Qt.RightToLeft
+               ? _isolateStart + text + _isolateEnd : text;
+    }
+    // `ltr` for each number in a sentence that was written with its own minus signs ("dialnorm -27:
+    // 4.0 dB down"), where the sign is part of the translated string and cannot be given to `ltr`
+    // with its digits. Every number, with the sign in front of it if it has one, is isolated; the
+    // words are left as they are. A hyphen inside a name ("AC-3") is not a sign.
+    function ltrNumbers(text) {
+        if (Qt.application.layoutDirection !== Qt.RightToLeft) {
+            return text;
+        }
+        return String(text).replace(/(^|[^A-Za-z0-9])([+\-\u2212]?)(\d+(?:\.\d+)?)/g,
+                                    function(whole, before, sign, digits) {
+                                        return before + _isolateStart + sign + digits + _isolateEnd;
+                                    });
+    }
+
     // The accent used as INK - error text, a warning sign, a message - rather
     // than as a fill. The accent itself where it clears 4.5:1 against the
     // background (both dark modes, ink light), the 700 rung where it does not

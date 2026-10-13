@@ -118,6 +118,7 @@ Item {
                     }
                     AppButton {
                         objectName: "networkSinkConnect"
+                        //: Button: make this sink play from Hearth again instead of from the other server that holds it now. 'It' is the sink.
                         text: (NetworkController.selectedSink.notice ?? "").length > 0 ? qsTr("Take it back")
                                                                                         : qsTr("Connect now")
                         onClicked: NetworkController.connectSink(NetworkController.selectedSink.id)
