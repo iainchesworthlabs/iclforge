@@ -12,11 +12,12 @@
 
 // NDK r26's libc++ (LLVM 17) puts std::expected's has-value flag in the tail padding of a
 // trivially copyable payload and then copies the payload, padding included, over it (llvm-project
-// #68552, #70494; android/ndk#1963; cmake/LibcxxExpectedLayout.cmake has the account). A
+// #68552, #70494; android/ndk#1963; docs/platforms/android.md has the account). A
 // std::expected<libs/ac3's FrameMetadata, EditError> came back as "no value, error 0" from a plain
-// `return meta;`, on a Shield and nowhere else. Every toolchain this tree is built with elsewhere
-// is past it, so this is the test that runs where it matters: iclforge-base-tests built for
-// arm64-android (config-android-arm64) and run on a device.
+// `return meta;`, on a Shield and nowhere else. r28 and every toolchain this tree is built with
+// elsewhere are past it, so this is the test that runs where it would matter: iclforge-base-tests
+// built for arm64-android (config-android-arm64) and run on a device, which is where a pin back
+// to an older NDK (cmake/AndroidNdkMinimum.cmake refuses one) would show.
 //
 // The payloads are built in storage whose every byte is set first, so what is in the padding is
 // the test's choice and not whatever the stack held: 0x00 turns a clobbered "has value" into a

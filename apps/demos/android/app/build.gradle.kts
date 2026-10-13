@@ -88,11 +88,11 @@ android {
         }
     }
 
-    // NDK r26.1.10909125 specifically (see docs/platforms/android.md) - the
+    // NDK r28c (28.2.13676358) specifically (see docs/platforms/android.md) - the
     // version this plan targets throughout, pinned here rather than left to
     // "whichever NDK Gradle happens to resolve" so a build failure means
     // something changed, not that a different NDK silently got picked.
-    ndkVersion = "26.1.10909125"
+    ndkVersion = "28.2.13676358"
 
     signingConfigs {
         if (releaseSigningAvailable) {

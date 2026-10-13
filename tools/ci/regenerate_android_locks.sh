@@ -36,7 +36,7 @@ yes | "$sm" --licenses >/dev/null || true
 "$sm" platform-tools
 "$sm" 'platforms;android-36'
 "$sm" 'build-tools;36.0.0'
-"$sm" 'ndk;26.1.10909125'
+"$sm" 'ndk;28.2.13676358'
 "$sm" 'cmake;3.31.6'
 
 printf 'sdk.dir=%s\n' "$sdk" > "$android_dir/local.properties"

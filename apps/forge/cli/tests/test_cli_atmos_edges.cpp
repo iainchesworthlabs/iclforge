@@ -148,6 +148,30 @@ TEST_CASE("verbose atmos-encode with map= lists what feeds each object and shows
           std::string::npos);
 }
 
+TEST_CASE("verbose atmos-encode names an object at unit gain by its channel alone",
+          "[cli][atmos]") {
+    const auto dir = scratch_dir();
+    const auto stereo = tone_wav(dir / "verbose_unit_stereo.wav", 2);
+    const auto out_path = dir / "verbose_unit.ec3";
+    const auto log = dir / "verbose_unit.log";
+    REQUIRE(run_cli("atmos-encode " + quoted(stereo) + " " + quoted(out_path) +
+                        " 448 map=0.0:obj,0.1:obj verbose",
+                    log) == 0);
+    const auto text = read_log(log);
+    INFO(text);
+    // The whole line, so that a gain written after the channel at unity would show.
+    const auto line = [&text](std::string_view head) {
+        const auto at = text.find(head);
+        if (at == std::string::npos) {
+            return std::string{"<missing>"};
+        }
+        const auto end = text.find_first_of("\r\n", at);
+        return text.substr(at, end == std::string::npos ? end : end - at);
+    };
+    CHECK(line("    object 0: ") == "    object 0: ch0");
+    CHECK(line("    object 1: ") == "    object 1: ch1");
+}
+
 TEST_CASE("atmos-encode's single-file map= keeps the scene file's object order",
           "[cli][atmos]") {
     const auto dir = scratch_dir();
