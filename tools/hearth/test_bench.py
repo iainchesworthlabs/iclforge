@@ -26,7 +26,7 @@ import bench
 import sink_profile
 
 SSID = "Testnet-Alpha-9"
-PASSWORD = "correct-horse-battery"
+NETWORK_KEY = "correct-horse-battery"
 
 # The five lock files the rule of 2026-10-11 names.
 RULE_LOCKS = {
@@ -41,7 +41,7 @@ RULE_LOCKS = {
 def fragment_text() -> str:
     return (
         'CONFIG_ICLFORGE_EXAMPLE_WIFI_SSID="' + SSID + '"\n'
-        'CONFIG_ICLFORGE_EXAMPLE_WIFI_PASSWORD="' + PASSWORD + '"\n'
+        'CONFIG_ICLFORGE_EXAMPLE_WIFI_PASSWORD="' + NETWORK_KEY + '"\n'
     )
 
 
@@ -287,7 +287,7 @@ class Status(unittest.TestCase):
 
 class Masking(unittest.TestCase):
     def setUp(self) -> None:
-        self.values = {"<wifi-ssid>": SSID, "<wifi-password>": PASSWORD}
+        self.values = {"<wifi-ssid>": SSID, "<wifi-password>": NETWORK_KEY}
 
     def test_the_fragment_s_values_are_read_by_key_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -337,7 +337,7 @@ class Masking(unittest.TestCase):
         document = {
             "state": "stopped",
             "network": {"ssid": SSID, "bssid": "aa", "address": "192.168.1.45"},
-            "list": [{"password": PASSWORD, "kept": 1}],
+            "list": [{"password": NETWORK_KEY, "kept": 1}],
             "client_token": "t",
         }
         redacted = bench.redact(document)
@@ -384,7 +384,7 @@ class Commands(unittest.TestCase):
 
     def test_scrub_check_counts_and_never_prints_the_value(self) -> None:
         leaky = self.root / "boot.log"
-        leaky.write_text(f"connected with {SSID}\npassword {PASSWORD}\n", "utf-8")
+        leaky.write_text(f"connected with {SSID}\npassword {NETWORK_KEY}\n", "utf-8")
         clean = self.root / "clean.log"
         clean.write_text("nothing here\n", "utf-8")
         code, out, err = run_main(["scrub", "--check", str(leaky), str(clean)], self.env)
@@ -392,7 +392,7 @@ class Commands(unittest.TestCase):
         self.assertIn("2 occurrence(s)", out)
         self.assertIn("0 occurrence(s)", out)
         self.assertNotIn(SSID, out + err)
-        self.assertNotIn(PASSWORD, out + err)
+        self.assertNotIn(NETWORK_KEY, out + err)
         code, _, _ = run_main(["scrub", "--check", str(clean)], self.env)
         self.assertEqual(code, 0)
 
@@ -409,7 +409,7 @@ class Commands(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn(f"'length': {len(SSID)}", out)
         self.assertNotIn(SSID, out)
-        self.assertNotIn(PASSWORD, out)
+        self.assertNotIn(NETWORK_KEY, out)
 
     def test_scrub_with_no_fragment_says_so_rather_than_passing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

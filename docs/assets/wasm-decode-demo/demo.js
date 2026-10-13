@@ -614,7 +614,7 @@ function onKaraokeChange() {
     if (decodedBytes === null) return;
     const wasPlaying = playing;
     const at = decoded ? currentPlaybackSeconds() : 0;
-    handleDecoded(decodedBytes, decodedLabel, { resumeAt: at, play: wasPlaying });
+    void handleDecoded(decodedBytes, decodedLabel, { resumeAt: at, play: wasPlaying });
 }
 
 async function handleDecoded(bytes, label, options = {}) {
@@ -1060,7 +1060,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (micSession) micSession.offsetMs = ms;
     });
     el('lyricsInput').addEventListener('change', (e) => {
-        if (e.target.files.length > 0) loadLyrics(e.target.files[0]);
+        if (e.target.files.length > 0) void loadLyrics(e.target.files[0]);
     });
     el('lyricsDelay').addEventListener('input', (e) => {
         lyricsDelayMs = Number(e.target.value);

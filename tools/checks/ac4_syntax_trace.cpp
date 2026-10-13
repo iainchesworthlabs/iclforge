@@ -23,14 +23,19 @@
 // build tree in <b>:
 //
 //   cl /nologo /std:c++latest /EHsc /utf-8 /MD /O2 /DICLFORGE_AC4_STATIC_DEFINE
-//      /Ilibs/ac4/include /I<b>/libs/ac4/generated tools/checks/ac4_syntax_trace.cpp
-//      /link <b>/libs/ac4/iclforge_ac4_static.lib
+//      /DICLFORGE_BASE_STATIC_DEFINE /Ilibs/ac4/include /I<b>/libs/ac4/generated
+//      /Ilibs/base/include /I<b>/libs/base/generated tools/checks/ac4_syntax_trace.cpp
+//      /link <b>/libs/ac4/iclforge_ac4_static.lib <b>/libs/base/iclforge_base_static.lib
 //
 // With GCC or Clang:
 //
 //   g++ -std=c++23 -O2 -o ac4_syntax_trace tools/checks/ac4_syntax_trace.cpp
-//      -DICLFORGE_AC4_STATIC_DEFINE -Ilibs/ac4/include -I<b>/libs/ac4/generated
-//      <b>/libs/ac4/libiclforge_ac4_static.a
+//      -DICLFORGE_AC4_STATIC_DEFINE -DICLFORGE_BASE_STATIC_DEFINE
+//      -Ilibs/ac4/include -I<b>/libs/ac4/generated -Ilibs/base/include -I<b>/libs/base/generated
+//      <b>/libs/ac4/libiclforge_ac4_static.a <b>/libs/base/libiclforge_base_static.a
+//
+// base is there because the AC-4 library's public headers name its syntax trace; a link that
+// reports an undefined fmt:: symbol wants the {fmt} archive of the build's vcpkg tree as well.
 
 #include <cstddef>
 #include <cstdio>

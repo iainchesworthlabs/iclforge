@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bench
 import bench_flash as bf
 import sink_profile
-from test_bench import PASSWORD, SSID, temp_bench
+from test_bench import NETWORK_KEY, SSID, temp_bench
 
 S3_MAC_OUTPUT = """esptool v5.0
 Connected to ESP32-S3 on COM16:
@@ -466,7 +466,7 @@ class Build(Fixture):
         run = Recorder(
             {
                 "describe": (0, "v1\n"),
-                "-DIDF_TARGET": (0, f"using {SSID} {PASSWORD}"),
+                "-DIDF_TARGET": (0, f"using {SSID} {NETWORK_KEY}"),
                 "verify": (0, f"ok {SSID}"),
             }
         )
@@ -478,7 +478,7 @@ class Build(Fixture):
         self.assertIn("--overlay=wifi-credentials", verified)
         text = "\n".join(self.output)
         log = (self.root / "builds" / "t-s3-n16r8.log").read_text("utf-8")
-        for secret in (SSID, PASSWORD):
+        for secret in (SSID, NETWORK_KEY):
             self.assertNotIn(secret, text)
             self.assertNotIn(secret, log)
         self.assertIn("<network fragment>", text)

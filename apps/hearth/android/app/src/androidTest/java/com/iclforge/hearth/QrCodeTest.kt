@@ -21,7 +21,7 @@ class QrCodeTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     /** A pairing token as the sink shows it: "SP:1" and the 24 bytes in base32, 43 characters. */
-    private val token = "SP:1MFRGGZDFMZTWQ9LKNNWG93TPOBYXE43UOV3HJ5S"
+    private val pairingCode = "SP:1MFRGGZDFMZTWQ9LKNNWG93TPOBYXE43UOV3HJ5S"
 
     private fun bytesOf(length: Int, seed: Int): String {
         var state = seed
@@ -44,13 +44,13 @@ class QrCodeTest {
         assertNull(QrCode.encode(bytesOf(107, 107)))
         assertEquals(106, QrCode.MAX_BYTES)
         // The token is version 4.
-        assertEquals(43, token.length)
-        assertEquals(33, QrCode.encode(token)!!.size)
+        assertEquals(43, pairingCode.length)
+        assertEquals(33, QrCode.encode(pairingCode)!!.size)
     }
 
     @Test
     fun everyCodeHasTheFixedPatternsAndAValidFormatWord() {
-        val payloads = listOf("A", "HELLO", token, bytesOf(42, 7), bytesOf(106, 9), "Héllo wörld ñ 日本語")
+        val payloads = listOf("A", "HELLO", pairingCode, bytesOf(42, 7), bytesOf(106, 9), "Héllo wörld ñ 日本語")
         for (payload in payloads) {
             val m = QrCode.encode(payload)!!
             val n = m.size
@@ -152,13 +152,13 @@ class QrCodeTest {
             "#.....#..#.#..##.....###..#..##..",
             "#######.###....####.#...#.#.#.##.",
         )
-        assertEquals(pinned, QrCode.encode(token)!!.rows())
+        assertEquals(pinned, QrCode.encode(pairingCode)!!.rows())
     }
 
     @Test
     fun theSameTextIsTheSameCodeAndADifferentOneIsNot() {
-        assertEquals(QrCode.encode(token)!!.rows(), QrCode.encode(token)!!.rows())
-        assertTrue(QrCode.encode(token)!!.rows() != QrCode.encode(token.dropLast(1) + "Q")!!.rows())
+        assertEquals(QrCode.encode(pairingCode)!!.rows(), QrCode.encode(pairingCode)!!.rows())
+        assertTrue(QrCode.encode(pairingCode)!!.rows() != QrCode.encode(pairingCode.dropLast(1) + "Q")!!.rows())
     }
 
     /**
@@ -168,7 +168,7 @@ class QrCodeTest {
     @Test
     fun writesTheMatricesForTheOffDeviceDecoder() {
         val payloads = ArrayList<String>()
-        payloads += token
+        payloads += pairingCode
         payloads += listOf("A", "HELLO WORLD", "https://example.org/pair?code=123456", "Héllo wörld ñ 日本語")
         for (length in listOf(14, 15, 26, 27, 42, 43, 62, 63, 84, 85, 106)) {
             payloads += bytesOf(length, length * 31)

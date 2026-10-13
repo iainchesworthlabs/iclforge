@@ -174,10 +174,10 @@ class StatusScreenTest : RenderTestBase() {
 
     @Test
     fun aServerThatAskedForTheQrFormIsShownTheQrAtTheRightAndNotACutOffLine() {
-        val token = "SP:1MFRGGZDFMZTWQ9LKNNWG93TPOBYXE43UOV3HJ5S"
+        val pairingCode = "SP:1MFRGGZDFMZTWQ9LKNNWG93TPOBYXE43UOV3HJ5S"
         val picture = draw(
             "s1-idle-qr",
-            content(StatusScreens.Choice(StatusScreens.Kind.IDLE), SinkStatus(emptyList(), token, 0)),
+            content(StatusScreens.Choice(StatusScreens.Kind.IDLE), SinkStatus(emptyList(), pairingCode, 0)),
         )
         // The card is a large light square at the right of the stage, with dark modules on it.
         val right = Rect((width * 0.6f).toInt(), stage.top, stage.right, stage.bottom)

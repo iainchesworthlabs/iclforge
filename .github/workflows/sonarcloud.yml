@@ -236,11 +236,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # ac4's public headers name base's syntax trace and its speakers (libs/ac4/CMakeLists.txt:
+          # DEPENDS base), so base's headers are on the include path and its archive, with the {fmt}
+          # it keeps private, is at the link. This line named only ac4 until the 2026-09-30
+          # re-layout, and the compile has failed on iclforge/base/syntax_trace.hpp since: the step
+          # is continue-on-error, so the nightly read the loss as coverage and not as a failure.
+          fmt_lib="$(find "${BUILD_DIR}/vcpkg_installed" -name 'libfmt*.a' -print -quit)"
           g++ -std=c++23 --coverage -o "${BUILD_DIR}/ac4_syntax_trace" \
             tools/checks/ac4_syntax_trace.cpp \
-            -DICLFORGE_AC4_STATIC_DEFINE \
+            -DICLFORGE_AC4_STATIC_DEFINE -DICLFORGE_BASE_STATIC_DEFINE \
             -Ilibs/ac4/include -I"${BUILD_DIR}/libs/ac4/generated" \
-            "${BUILD_DIR}/libs/ac4/libiclforge_ac4_static.a"
+            -Ilibs/base/include -I"${BUILD_DIR}/libs/base/generated" \
+            "${BUILD_DIR}/libs/ac4/libiclforge_ac4_static.a" \
+            "${BUILD_DIR}/libs/base/libiclforge_base_static.a" \
+            ${fmt_lib:+"${fmt_lib}"}
           python3 tools/checks/ac4_syntax_differential.py \
             --trace-tool "${BUILD_DIR}/ac4_syntax_trace" \
             --work-dir "${BUILD_DIR}/ac4-differential" \
