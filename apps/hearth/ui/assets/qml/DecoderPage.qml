@@ -73,6 +73,19 @@ Item {
             }
         }
 
+        // Why the controls below are not what is heard, when they are not: a
+        // receiver sent a bitstream decodes it with its own settings. The
+        // sentence is the engine's (EngineStatus::settings_note).
+        Text {
+            objectName: "receiverDecodesNotice"
+            Layout.fillWidth: true
+            visible: HearthController.decoderSettingsNote.length > 0
+            text: HearthController.decoderSettingsNote
+            color: Theme.text
+            font.pixelSize: Theme.fontSmall
+            wrapMode: Text.WordWrap
+        }
+
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true

@@ -11,16 +11,18 @@ import Hearth
 // AboutDialog.qml's shape (modal, centred, squared border) rather than
 // introducing a second dialog style.
 //
-// "This computer · PCM" and "Network · Sendspin" are actionable here:
-// HearthController.outputDevices comes straight from
-// iclforge::audio::enumerate_render_devices(), the same enumeration `forge
-// outputs` prints, and "Play here" pins the engine to whichever row is
-// selected (HearthController.selectOutputDevice); a group row pins it to the
-// group instead (HearthController.selectOutputGroup), whose members each get
-// the stream to decode for themselves. The passthrough rows read that same
-// enumeration's own live probe of each endpoint (RenderDeviceInfo::
-// supports_ac3_passthrough/eac3 - "checked by opening it", not guessed) but
-// stay read-only here. A single sink plays as a group of one: groups are
+// Every section is actionable: HearthController.outputDevices comes straight
+// from iclforge::audio::enumerate_render_devices(), the same enumeration
+// `forge outputs` prints, and "Play here" pins the engine to whichever row is
+// selected. A "This computer · PCM" row decodes to that device
+// (HearthController.selectOutputDevice). A passthrough row plays to it as a
+// receiver (HearthController.selectPassthroughDevice): an AC-3 or E-AC-3 item
+// it takes goes out as IEC 61937 bursts and anything else is decoded to the
+// same endpoint. Those rows are the ones the enumeration's own live probe says
+// take a bitstream (RenderDeviceInfo::supports_ac3_passthrough/eac3 - "checked
+// by opening it", not guessed). A group row pins playback to the group instead
+// (HearthController.selectOutputGroup), whose members each get the stream to
+// decode for themselves. A single sink plays as a group of one: groups are
 // where the Network page puts sinks together.
 Dialog {
     id: root
@@ -43,10 +45,19 @@ Dialog {
     // The row about to be confirmed - not necessarily the one actually
     // playing (currentDeviceId), so that clicking a row is a proposal the
     // user still has to confirm with "Play here" rather than an immediate
-    // switch. At most one of the two is set: a device of this computer, or
-    // a network group (NetworkController.groups's own id).
+    // switch. At most one of the three is set: a device of this computer to
+    // decode to, one to play to as a receiver, or a network group
+    // (NetworkController.groups's own id).
     property string selectedDeviceId: ""
+    property string selectedPassthroughId: ""
     property string selectedGroupId: ""
+
+    // Whether what is playing now is going out as a bitstream: the "playing
+    // here" pill then belongs to the endpoint's passthrough row, not its PCM
+    // one.
+    readonly property string outputMode: HearthController.outputFormat.mode ?? "none"
+    readonly property bool bitstreamNow: root.outputMode === "bitstream"
+                                         || root.outputMode === "bitstreamAsAc3"
 
     background: Rectangle {
         color: Theme.bg
@@ -54,24 +65,37 @@ Dialog {
         border.width: 2
     }
 
+    // The row a person chose last starts selected, so that "Play here"
+    // pressed straight away changes nothing: a group, else the receiver chosen
+    // in the passthrough section while it is still listed there, else the
+    // device playing.
     onOpened: {
         HearthController.refreshOutputDevices();
+        const receiver = HearthController.passthroughDeviceId;
         if (HearthController.outputGroupName.length > 0) {
-            selectedGroupId = HearthController.outputGroupName;
-            selectedDeviceId = "";
+            root.selectGroup(HearthController.outputGroupName);
+        } else if (receiver.length > 0
+                   && root.passthroughDevices.some(function(d) { return d.id === receiver; })) {
+            root.selectPassthrough(receiver);
         } else {
-            selectedGroupId = "";
-            selectedDeviceId = root.defaultSelection();
+            root.selectDevice(root.defaultSelection());
         }
     }
 
     function selectDevice(id) {
         root.selectedDeviceId = id;
+        root.selectedPassthroughId = "";
+        root.selectedGroupId = "";
+    }
+    function selectPassthrough(id) {
+        root.selectedPassthroughId = id;
+        root.selectedDeviceId = "";
         root.selectedGroupId = "";
     }
     function selectGroup(id) {
         root.selectedGroupId = id;
         root.selectedDeviceId = "";
+        root.selectedPassthroughId = "";
     }
 
     readonly property var passthroughDevices: HearthController.outputDevices.filter(
@@ -212,7 +236,7 @@ Dialog {
                             Layout.fillWidth: true
                             readonly property bool selected: modelData.id === root.selectedDeviceId
                             readonly property bool playingHere:
-                                modelData.id.length > 0
+                                modelData.id.length > 0 && !root.bitstreamNow
                                 && modelData.id === HearthController.currentDeviceId
                             implicitHeight: pcmRow.implicitHeight + Theme.gap
                             color: selected ? Theme.accent100 : Theme.surface
@@ -287,7 +311,7 @@ Dialog {
                     }
                 }
 
-                // --- passthrough - informational only ---------------------
+                // --- passthrough - the endpoints that take a bitstream ----
                 SectionHeading { text: qsTr("Passthrough · the receiver decodes") }
 
                 ColumnLayout {
@@ -297,14 +321,40 @@ Dialog {
                     Repeater {
                         model: root.passthroughDevices
                         delegate: Rectangle {
+                            id: passDeviceRow
                             required property var modelData
+                            required property int index
+                            objectName: "passthroughDeviceRow-" + index
                             Layout.fillWidth: true
+                            readonly property bool selected: modelData.id === root.selectedPassthroughId
+                            readonly property bool playingHere:
+                                modelData.id.length > 0 && root.bitstreamNow
+                                && modelData.id === HearthController.currentDeviceId
                             implicitHeight: passRow.implicitHeight + Theme.gap
-                            color: Theme.surface
-                            border.color: Theme.border
-                            border.width: 1
+                            color: selected ? Theme.accent100 : Theme.surface
+                            border.color: selected ? Theme.accent : Theme.border
+                            border.width: selected ? 2 : 1
                             radius: Theme.radius
-                            opacity: 0.85
+
+                            Accessible.role: Accessible.RadioButton
+                            Accessible.name: qsTr("%1, passthrough").arg(passDeviceRow.modelData.name)
+                            Accessible.checkable: true
+                            Accessible.checked: passDeviceRow.selected
+                            Accessible.onPressAction: root.selectPassthrough(passDeviceRow.modelData.id)
+
+                            activeFocusOnTab: true
+                            Keys.onSpacePressed: root.selectPassthrough(passDeviceRow.modelData.id)
+                            Keys.onReturnPressed: root.selectPassthrough(passDeviceRow.modelData.id)
+
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: -Theme.focusRingOffset
+                                visible: passDeviceRow.activeFocus
+                                color: "transparent"
+                                border.color: Theme.focusRing
+                                border.width: Theme.focusRingWidth
+                                z: 100
+                            }
 
                             RowLayout {
                                 id: passRow
@@ -316,18 +366,27 @@ Dialog {
                                 Text {
                                     Layout.preferredWidth: 280
                                     Layout.maximumWidth: 280
-                                    text: modelData.name
+                                    text: passDeviceRow.modelData.name
                                     color: Theme.text
+                                    font.bold: true
                                     elide: Text.ElideRight
                                 }
                                 Text {
                                     Layout.fillWidth: true
                                     Layout.minimumWidth: 120
-                                    text: root.passthroughSummary(modelData)
+                                    text: root.passthroughSummary(passDeviceRow.modelData)
                                     color: Theme.textMuted
                                     font.family: Theme.monoFamily
                                     font.pixelSize: Theme.fontSmall
+                                    elide: Text.ElideRight
                                 }
+                                StatusPill { text: passDeviceRow.playingHere ? qsTr("playing here") : "" }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.selectPassthrough(passDeviceRow.modelData.id)
                             }
                         }
                     }
@@ -342,10 +401,14 @@ Dialog {
                 }
 
                 Text {
+                    objectName: "passthroughNote"
                     Layout.fillWidth: true
                     text: qsTr("Read by asking each endpoint whether it accepts AC-3 and E-AC-3 over "
-                              + "IEC 61937 in exclusive mode. Hearth does not bitstream yet in this "
-                              + "build, so picking a row here has no effect.")
+                              + "IEC 61937 in exclusive mode. An item the receiver takes is sent to it "
+                              + "untouched, and the receiver decodes and renders it: the decoder "
+                              + "settings, the speaker setup and the volume here do not apply, and the "
+                              + "meters show a decode made here. Anything else is decoded and played "
+                              + "to the same output as PCM.")
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontSmall
                     wrapMode: Text.WordWrap
@@ -476,10 +539,13 @@ Dialog {
                 objectName: "outputPickerPlayHere"
                 text: qsTr("Play here")
                 highlighted: true
-                enabled: root.selectedDeviceId.length > 0 || root.selectedGroupId.length > 0
+                enabled: root.selectedDeviceId.length > 0 || root.selectedPassthroughId.length > 0
+                         || root.selectedGroupId.length > 0
                 onClicked: {
                     if (root.selectedGroupId.length > 0) {
                         HearthController.selectOutputGroup(root.selectedGroupId);
+                    } else if (root.selectedPassthroughId.length > 0) {
+                        HearthController.selectPassthroughDevice(root.selectedPassthroughId);
                     } else {
                         HearthController.selectOutputDevice(root.selectedDeviceId);
                     }

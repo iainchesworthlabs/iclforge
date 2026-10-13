@@ -8,6 +8,7 @@
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <mutex>
 #include <numbers>
@@ -22,6 +23,7 @@
 #include "iclforge/audio/passthrough.hpp"
 #include "iclforge/audio/pcm_output.hpp"
 #include "iclforge/audio/speakers.hpp"
+#include "iclforge/containers/iec61937/iec61937.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/routing.hpp"
 #include "iclforge/sendspin/discovery.hpp"
@@ -30,6 +32,7 @@
 #include "iclforge/ac3/encoder/encoder.hpp"
 #include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
+#include "bitstream_sink.hpp"
 #include "network_sinks.hpp"
 #include "output_selector.hpp"
 #include "pcm_sink.hpp"
@@ -67,7 +70,25 @@ public:
     FakeRoom(FakeRoom&&) = delete;
     FakeRoom& operator=(FakeRoom&&) = delete;
 
-    [[nodiscard]] const std::vector<FakeEndpoint>& endpoints() const { return endpoints_; }
+    // A copy, taken under the lock: a suite can change what an endpoint takes
+    // (set_passthrough()) while the engine and the window read the room.
+    [[nodiscard]] std::vector<FakeEndpoint> endpoints() const {
+        const std::scoped_lock lock(mutex_);
+        return endpoints_;
+    }
+
+    // Whether `id` says it takes a bitstream from here on: a receiver switched
+    // on, or off. What is open stays open, as a real link does until it is told.
+    bool set_passthrough(const std::string& id, bool takes) {
+        const std::scoped_lock lock(mutex_);
+        for (FakeEndpoint& endpoint : endpoints_) {
+            if (endpoint.id == id) {
+                endpoint.passthrough = takes;
+                return true;
+            }
+        }
+        return false;
+    }
 
     std::expected<OpenOutputFormat, std::string> open(const PcmSink::Format& format) {
         const std::scoped_lock lock(mutex_);
@@ -227,6 +248,128 @@ public:
         speed_ = std::max(0.0, speed);
     }
 
+    // --- the link: the room's IEC 61937 output, on an endpoint that takes one.
+    // A BitstreamSink is one open link at a time, as the PCM device above is
+    // one open stream; apps/hearth/engine/tests/test_player_bitstream.cpp's
+    // FakeLink is the shape, with the room's clock. Every burst is read back
+    // as a receiver would read it (BurstReader), so a suite can hold what the
+    // window sent to the bytes of the file.
+
+    std::expected<OpenOutputFormat, std::string> open_link(const BitstreamSink::Format& format) {
+        const std::scoped_lock lock(mutex_);
+        const FakeEndpoint* endpoint = find_locked(format.endpoint_id);
+        if (endpoint == nullptr || !endpoint->passthrough) {
+            return std::unexpected("The output would not take " +
+                                   std::string(audio::format_name(format.format)) +
+                                   " over IEC 61937: no such endpoint " + format.endpoint_id + ".");
+        }
+        link_open_ = true;
+        link_paused_ = false;
+        link_endpoint_ = *endpoint;
+        link_format_ = format.format;
+        link_rate_ = format.sample_rate;
+        link_submitted_ = 0;
+        link_heard_ = 0;
+        link_clock_ = 0;
+        link_carry_ = 0.0;
+        ++link_opens_;
+        link_reader_ = containers::iec61937::BurstReader{};
+        link_payload_.clear();
+        return OpenOutputFormat{.sample_rate = format.sample_rate,
+                                .channels = 2,
+                                .mode = OutputMode::kBitstream,
+                                .stream = format.format};
+    }
+
+    void close_link() {
+        const std::scoped_lock lock(mutex_);
+        link_open_ = false;
+    }
+
+    [[nodiscard]] bool link_is_open() const {
+        const std::scoped_lock lock(mutex_);
+        return link_open_;
+    }
+
+    bool submit_burst(std::span<const std::byte> burst) {
+        const std::scoped_lock lock(mutex_);
+        constexpr std::uint64_t kBurstFrames = 1536;
+        if (!link_open_ || (link_submitted_ - link_heard_) / kBurstFrames + 1 > kLinkCapacityBursts) {
+            return false;
+        }
+        const std::size_t expected = link_format_ == audio::BitstreamFormat::kEac3
+                                         ? containers::iec61937::kEac3BurstBytes
+                                         : containers::iec61937::kBurstBytes;
+        if (burst.size() != expected || !link_reader_.push(burst, link_payload_).has_value()) {
+            // Taken all the same, and counted: refused, the player would
+            // offer the same burst at every pump.
+            ++link_bad_bursts_;
+        }
+        ++link_bursts_;
+        link_submitted_ += kBurstFrames;
+        return true;
+    }
+
+    [[nodiscard]] std::optional<audio::MonitorPosition> link_position() const {
+        const std::scoped_lock lock(mutex_);
+        if (!link_open_) {
+            return std::nullopt;
+        }
+        return audio::MonitorPosition{.frames_played = link_clock_,
+                                      .frames_queued = link_submitted_ - link_heard_,
+                                      .latency_frames = 0};
+    }
+
+    void flush_link() {
+        const std::scoped_lock lock(mutex_);
+        link_submitted_ = 0;
+        link_heard_ = 0;
+        link_clock_ = 0;
+    }
+
+    bool pause_link() {
+        const std::scoped_lock lock(mutex_);
+        link_paused_ = true;
+        return link_open_;
+    }
+
+    bool resume_link() {
+        const std::scoped_lock lock(mutex_);
+        link_paused_ = false;
+        return link_open_;
+    }
+
+    [[nodiscard]] LinkReading link_reading() const {
+        const std::scoped_lock lock(mutex_);
+        LinkReading reading;
+        reading.open = link_open_;
+        reading.paused = link_paused_;
+        reading.endpoint = link_open_ ? link_endpoint_.id : std::string();
+        reading.format = link_open_ ? std::string(audio::format_name(link_format_)) : std::string();
+        reading.sample_rate = link_open_ ? link_rate_ : 0;
+        reading.opens = link_opens_;
+        reading.bursts = link_bursts_;
+        reading.bad_bursts = link_bad_bursts_;
+        reading.frames_heard = link_heard_total_;
+        if (const auto type = link_reader_.data_type()) {
+            reading.data_type = std::string(containers::iec61937::data_type_name(*type));
+        }
+        reading.payload_bytes = link_payload_.size();
+        return reading;
+    }
+
+    // Whether what the link has carried since it last opened is the start of
+    // `stream` - or, with `whole`, all of it: the elementary stream's own
+    // bytes, in order, none changed.
+    [[nodiscard]] bool link_carried(std::span<const std::byte> stream, bool whole) const {
+        const std::scoped_lock lock(mutex_);
+        if (link_payload_.empty() || link_payload_.size() > stream.size() ||
+            (whole && link_payload_.size() != stream.size())) {
+            return false;
+        }
+        return std::equal(link_payload_.begin(), link_payload_.end(), stream.begin());
+    }
+
 private:
     // Frames the device holds before submit() refuses - a third of a second
     // at 48 kHz, enough for the engine's own pump budget to keep it fed.
@@ -237,6 +380,17 @@ private:
     // hear, as a real device does through an underrun.
     void tick() {
         const std::scoped_lock lock(mutex_);
+        if (link_open_ && !link_paused_ && link_rate_ != 0) {
+            // The link's clock counts the content's frames, as
+            // iclforge::audio::PassthroughSink::position() does.
+            link_carry_ += static_cast<double>(link_rate_) * speed_ / 1000.0;
+            const auto frames = static_cast<std::uint64_t>(link_carry_);
+            link_carry_ -= static_cast<double>(frames);
+            const std::uint64_t now = std::min(link_submitted_ - link_heard_, frames);
+            link_heard_ += now;
+            link_heard_total_ += now;
+            link_clock_ += frames;
+        }
         if (!open_ || paused_ || sample_rate_ == 0) {
             return;
         }
@@ -260,7 +414,7 @@ private:
         return id.empty() && !endpoints_.empty() ? endpoints_.data() : nullptr;
     }
 
-    const std::vector<FakeEndpoint> endpoints_;
+    std::vector<FakeEndpoint> endpoints_;
     mutable std::mutex mutex_;
     bool open_ = false;
     bool paused_ = false;
@@ -283,6 +437,28 @@ private:
     std::vector<std::vector<float>> recent_;
     std::size_t recent_at_ = 0;
     std::size_t recent_filled_ = 0;
+
+    // Bursts the link holds before submit_burst() refuses: a quarter of a
+    // second, as the device's kCapacity is of its own.
+    static constexpr std::uint64_t kLinkCapacityBursts = 8;
+    bool link_open_ = false;
+    bool link_paused_ = false;
+    FakeEndpoint link_endpoint_{};
+    audio::BitstreamFormat link_format_ = audio::BitstreamFormat::kAc3;
+    std::uint32_t link_rate_ = 0;
+    std::uint64_t link_submitted_ = 0;
+    std::uint64_t link_heard_ = 0;
+    std::uint64_t link_heard_total_ = 0;
+    std::uint64_t link_clock_ = 0;
+    double link_carry_ = 0.0;
+    std::uint32_t link_opens_ = 0;
+    std::uint64_t link_bursts_ = 0;
+    std::uint64_t link_bad_bursts_ = 0;
+    // Since the link last opened: the reader its bursts went through, and the
+    // elementary stream they carried.
+    containers::iec61937::BurstReader link_reader_;
+    std::vector<std::byte> link_payload_;
+
     // Last, so it starts after, and is joined before, everything it reads.
     std::jthread clock_;
 };
@@ -315,6 +491,29 @@ private:
     std::shared_ptr<FakeRoom> room_;
 };
 
+// The engine's passthrough sink over the room's link, as RoomSink is its PCM
+// sink over the room's device.
+class RoomLink final : public BitstreamSink {
+public:
+    explicit RoomLink(std::shared_ptr<FakeRoom> room) : room_(std::move(room)) {}
+
+    std::expected<OpenOutputFormat, std::string> open(const Format& format) override {
+        return room_->open_link(format);
+    }
+    void close() override { room_->close_link(); }
+    [[nodiscard]] bool is_open() const override { return room_->link_is_open(); }
+    bool submit(std::span<const std::byte> burst) override { return room_->submit_burst(burst); }
+    [[nodiscard]] std::optional<audio::MonitorPosition> position() const override {
+        return room_->link_position();
+    }
+    void flush() override { room_->flush_link(); }
+    bool pause() override { return room_->pause_link(); }
+    bool resume() override { return room_->resume_link(); }
+
+private:
+    std::shared_ptr<FakeRoom> room_;
+};
+
 audio::RenderDeviceInfo device_info(const FakeEndpoint& endpoint) {
     audio::RenderDeviceInfo info;
     info.id = endpoint.id;
@@ -339,6 +538,7 @@ std::shared_ptr<iclforge::hearth::ui::TestOutputs> outputs_for(
     const std::shared_ptr<FakeRoom>& room) {
     auto outputs = std::make_shared<iclforge::hearth::ui::TestOutputs>();
     outputs->make_pcm = [room] { return std::make_unique<RoomSink>(room); };
+    outputs->make_bitstream = [room] { return std::make_unique<RoomLink>(room); };
     outputs->endpoints = [room](std::uint32_t /*sample_rate*/) {
         std::vector<EndpointReading> readings;
         for (const FakeEndpoint& endpoint : room->endpoints()) {
@@ -360,8 +560,29 @@ RoomReading read(const FakeRoom& room) {
     return room.reading();
 }
 
+LinkReading read_link(const FakeRoom& room) {
+    return room.link_reading();
+}
+
+bool link_carried(const FakeRoom& room, const std::vector<std::string>& paths, bool whole) {
+    std::vector<char> bytes;
+    for (const std::string& path : paths) {
+        std::ifstream file(std::filesystem::path(path), std::ios::binary);
+        if (!file) {
+            return false;
+        }
+        bytes.insert(bytes.end(), std::istreambuf_iterator<char>(file),
+                     std::istreambuf_iterator<char>());
+    }
+    return room.link_carried(std::as_bytes(std::span<const char>(bytes)), whole);
+}
+
 void reset_peak(FakeRoom& room) {
     room.reset_peak();
+}
+
+bool set_passthrough(FakeRoom& room, const std::string& id, bool takes) {
+    return room.set_passthrough(id, takes);
 }
 
 void set_speed(FakeRoom& room, double speed) {

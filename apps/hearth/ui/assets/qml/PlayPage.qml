@@ -469,10 +469,15 @@ Item {
                     ordinal: "03"
                     title: qsTr("Levels · at play time")
                     flat: true
-                    summary: HearthController.deviceName.length > 0
-                             ? qsTr("%1 · %2 outputs").arg(HearthController.deviceName)
-                                                       .arg(HearthController.routingOutputs)
-                             : qsTr("No output device chosen yet")
+                    // A bitstream is decoded by the receiver: these levels are
+                    // of a decode made here beside it, not of its outputs.
+                    summary: HearthController.deviceName.length === 0
+                             ? qsTr("No output device chosen yet")
+                             : (HearthController.outputFormat.mode === "bitstream"
+                                || HearthController.outputFormat.mode === "bitstreamAsAc3")
+                               ? qsTr("%1 · a decode made here").arg(HearthController.deviceName)
+                               : qsTr("%1 · %2 outputs").arg(HearthController.deviceName)
+                                                         .arg(HearthController.routingOutputs)
 
                     Text {
                         Layout.fillWidth: true

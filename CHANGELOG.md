@@ -4355,10 +4355,6 @@ The sections below contain the complete change list and fixes.
   [Hearth for Android](docs/hearth/android.md) is the page for the Android TV sink: what it needs,
   building it, pairing, what it plays, the lyric screen and its controls, what has been run and what
   it does not do. The support catalogue and the platform tables have rows for it.
-- **Hearth's pages no longer say the desktop player passes AC-3 and E-AC-3 to a receiver.** The
-  engine has that path and tests it; the window gives the engine no bitstream output, so every
-  stream is decoded and leaves as PCM, which the output picker has said all along. The Hearth page,
-  the README, ROADMAP.md, the Hearth plan and the application table say so.
 
 **Release engineering**
 
@@ -5583,6 +5579,27 @@ The sections below contain the complete change list and fixes.
 
 **Hearth**
 
+- **Hearth's window passes AC-3 and E-AC-3 to a receiver.** It was designed to and never did. The
+  window gave its engine no passthrough output (`EngineOutputs::bitstream` had been empty since the
+  window was built), so every output read as taking no bitstream and every item was decoded, while
+  the output picker listed the outputs that take one and said that choosing a row had no effect.
+  The window now opens the engine's passthrough sink, the one `forge play` sends through, and a
+  row in the picker's passthrough section is a choice like any other. An AC-3 or E-AC-3 item the
+  output takes goes to it as IEC 61937 bursts, its access units unchanged (E-AC-3 transcoded to
+  AC-3 for a receiver that takes AC-3 only), and items in one format join on the link without a
+  gap. What a receiver does not take is decoded and played to the same output: an AC-4 item, a
+  programme other than a stream's first, and a karaoke stream with a reproduction chosen, which
+  the engine now decides as a decode (`Player::decide()`); played as coded it is sent, and a
+  change of that choice while it plays moves it. Until a row is chosen the window decodes to the
+  default output, so no output is taken exclusively unasked. While a bitstream goes out, the
+  header's sentence, the signal path, the Decoder and Speakers pages and the volume control, which
+  is closed, say that the receiver decodes and renders it, and `EngineStatus` names the endpoint
+  the link is open on. Opening the picker now has the engine read the outputs again, which it had
+  never been asked to do after its first item, so a receiver switched on since then is one it can
+  be told to play to. The engine's tests cover the karaoke decision and the choices the window
+  posts; the window's own suite plays into a stand-in link that reads each burst back as a
+  receiver would and holds what it carried to the files byte for byte. The window has not yet
+  been run into a receiver.
 - **Hearth's engine plays a 9.X.4 presentation instead of refusing it.** The 9.0.4 and 9.1.4 modes'
   screen pair (Lscr, Rscr) has no location in A/52 Table E2.5, so the engine refused every frame of
   such a presentation when it was asked for the channels as coded. It now reads the selected

@@ -1,6 +1,6 @@
 # Hearth: a desktop reference player and Sendspin sinks
 
-!!! note "Status as of 2026-10-13: built, with passthrough from the window and three hardware exits open"
+!!! note "Status as of 2026-10-13: built, with three hardware exits open"
     Written and decided on 2026-09-15, in one session of questions and answers recorded under
     [Decisions](#decisions). The live status board is [ROADMAP.md](../ROADMAP.md); by chip, and
     each phase below carries its own status line:
@@ -10,10 +10,11 @@
       packages for Windows, macOS and Linux, network output to Sendspin groups, firmware updates
       for a paired sink, and AC-4 playback: channel-based, immersive and object content (phases I2
       and I5 of [`planning/ac4.md`](ac4.md)), and a
-      [user guide](../docs/hearth/desktop-player.md) with a picture of each page. Not built:
-      passing AC-3 and E-AC-3 to a receiver from the window. The engine bitstreams and is tested
-      doing it, and the window gives the engine no bitstream output, so every stream is
-      decoded to PCM. A4's Music Assistant exit, with Music Assistant itself, is open.
+      [user guide](../docs/hearth/desktop-player.md) with a picture of each page. The window
+      passes AC-3 and E-AC-3 to a receiver chosen in its output picker (the engine was given
+      its passthrough output on 2026-10-13; until then the window decoded every stream). That
+      is tested against a stand-in link, and the window has not been run into a receiver.
+      A4's Music Assistant exit, with Music Assistant itself, is open.
     - **[The ESP32-S3 sink](#chip-b-the-esp32-s3-sink).** Built: Sendspin player, Improv, groups,
       network OTA, CI and published firmware packaging. TDM DAC hardware exits (ES9080 pair) and
       B3's Music Assistant exit are open.
@@ -227,8 +228,11 @@ has one (ALSA's ELD) and the live probe elsewhere. The six sink-following gaps i
 [the appliance plan](player-appliance.md#what-ux9-needs-before-it-can-carry-this) apply to this
 mode; each is checked against the tree before it is fixed, since some code has moved since
 2026-09-07. In passthrough the decoder settings are inactive and say why, and the monitor shows a
-local decode. Every stream shape, signed Atmos included, has locked on a receiver from Windows
-(the Onkyo) and from the Raspberry Pi.
+local decode. *As built:* passthrough is a choice of output, a row in the picker's passthrough
+section, and the window decodes to the default output until one is chosen; an item the receiver
+does not take, another programme of a stream and a karaoke stream with a reproduction chosen are
+decoded for the same output. Every stream shape, signed Atmos included, has locked on a receiver
+from Windows (the Onkyo) and from the Raspberry Pi, through `forge play`.
 
 ### Network outputs
 

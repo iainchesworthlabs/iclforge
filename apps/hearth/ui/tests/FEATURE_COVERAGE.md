@@ -14,7 +14,7 @@ Status:
 
 ## How the suites stand in for hardware
 
-- **Audio device**: `TestServices.useFakeRoom()` (`tests/test_room.cpp`) hands `HearthController` a fake room of three endpoints ("Test speakers" 6 ch default, "Test headphones" 2 ch, "Test receiver" 8 ch with AC-3/E-AC-3 passthrough) through `HearthController::set_test_outputs()` - a seam of the same shape as `CrucibleController::set_test_services()`. The REAL engine decodes real golden streams (`testdata/external-baseline/...`, `firmware/hearth-sink/www/objects-mdct.ec3`) into it, and the AC-4 page's suite plays tones that `TestServices.writeAc4Stream()` encodes with `iclforge::ac4::Encoder`; the fake device has its own clock and records frames heard, peak level, the endpoint opened and how many times. So "it plays" is asserted on what the device received.
+- **Audio device**: `TestServices.useFakeRoom()` (`tests/test_room.cpp`) hands `HearthController` a fake room of three endpoints ("Test speakers" 6 ch default, "Test headphones" 2 ch, "Test receiver" 8 ch with AC-3/E-AC-3 passthrough) through `HearthController::set_test_outputs()` - a seam of the same shape as `CrucibleController::set_test_services()`. The REAL engine decodes real golden streams (`testdata/external-baseline/...`, `firmware/hearth-sink/www/objects-mdct.ec3`) into it, and the AC-4 page's suite plays tones that `TestServices.writeAc4Stream()` encodes with `iclforge::ac4::Encoder`; the fake device has its own clock and records frames heard, peak level, the endpoint opened and how many times. So "it plays" is asserted on what the device received. The receiver also has a link (`TestServices.link()`): the engine's passthrough sink in the room, which reads every IEC 61937 burst back as a receiver would and keeps the elementary stream it carried, so "it is sent as a bitstream" is asserted on the bytes the link received (`TestServices.linkCarried()`).
 - **Network sink**: `TestServices.startTestSink()` runs `apps/hearth/testsink`'s real `Sink` in-process on loopback and hands it to `NetworkController`'s own `NetworkSinks` as a found service (`NetworkController::sinks_for_test()` + `NetworkSinks::on_found()`), which is the one step mDNS multicast would otherwise do. After that it is real: WebSocket dial, pairing with the code the sink prints, groups, player commands.
 - **File dialogs**: under `-platform offscreen`, QtQuick.Dialogs shows its non-native dialog. The suites click the page's own button, which opens it, and then `accept()` it. The file is set as the dialog's selection before it opens, because the non-native dialog drops a selection made after it has opened.
 - **Drag and drop**: `TestServices.dropFiles()` sends real DragEnter/DragMove/Drop events that carry file URLs to the window, so the page's own DropArea receives them.
@@ -58,8 +58,8 @@ Status:
 | 32 | Engine | Queue advances by itself at the end of an item, gaplessly (one output open) | none | UI | Playback::test_theQueueAdvancesByItselfAtTheEndOfAnItem |
 | 33 | Output picker | Lists this computer's endpoints (default marked, summary line) | none | UI | OutputPicker::test_headerSummary... |
 | 34 | Output picker | Select a row + Play here moves playback there | none | UI | OutputPicker::test_playHereMovesPlaybackToThePickedEndpoint |
-| 35 | Output picker | Passthrough section lists passthrough-capable endpoints | none | UI | OutputPicker::test_headerSummary... |
-| 36 | Output picker | "playing here" pill on the open endpoint | none | UI | OutputPicker::test_headerSummary..., test_playHere... |
+| 35 | Output picker | Passthrough section lists passthrough-capable endpoints, and a row there + Play here sends the item to the receiver as IEC 61937 bursts | none | UI | OutputPicker::test_headerSummary..., OutputPicker::test_passthroughRowSendsTheItemToTheReceiverAsABitstream (the link opens on the receiver, the bursts read back as E-AC-3, the PCM device closes; a PCM row moves it back) |
+| 36 | Output picker | "playing here" pill on the open endpoint: its passthrough row while a bitstream goes out, its PCM row during a decode | none | UI | OutputPicker::test_headerSummary..., test_playHere..., test_passthroughRow..., test_receiverGetsADecodeOfWhatItDoesNotTake |
 | 37 | Output picker | Cancel closes without changing the output | none | UI | OutputPicker::test_cancelLeavesTheOutputWhereItWas |
 | 38 | Output picker | Network page... switches to Network | none | UI | OutputPicker::test_networkPageButtonSwitchesToTheNetworkPage |
 | 39 | Media | Showing picker inspects another queue item | none | UI | MediaPage::test_showingPickerInspectsAnotherItem |
@@ -132,12 +132,17 @@ Status:
 | 106 | Settings | Diagnostics "View live…" dialog (the report, refreshed every 500 ms while open) | none | none | Not opened by any case. The report it shows is the one the Copy case reads back |
 | 107 | Settings | Diagnostics HTTP endpoint (`ICLFORGE_HEARTH_DIAGNOSTICS_PORT`) | none | none | Not a window feature, so no QML case. `DiagnosticsHttpServer` is tested over a real loopback socket by `apps/hearth/engine/tests/test_diagnostics_server.cpp` (`[hearth][diagnostics]`, in `iclforge_tests_diagnostics_server`); the controller reading the variable is not tested |
 | 108 | Network | Sink Decoder tab: choose Opus in place of PCM for audio Hearth decodes for the sink (offered only where the sink lists Opus) | logic | UI | NetworkPairing::test_pairedSinkDecoderTabOffersOpusForADecodedStream (the choice reaches `NetworkSinks`; that the group is then sent Opus is the engine case `a sink set to Opus is sent the decoded programme as Opus`) |
+| 109 | Output | To a receiver, a queue of AC-3 items is sent byte for byte and the second joins the first on the one link | none | UI | OutputPicker::test_receiverIsSentTheFilesOwnBytesAndTheNextItemJoins (what the link carried is both files whole; it opened once) |
+| 110 | Output | To a receiver, an item it does not take (AC-4) is decoded to the same endpoint, the choice stands, and the AC-3 item after it goes back to the link | none | UI | OutputPicker::test_receiverGetsADecodeOfWhatItDoesNotTake |
+| 111 | Output | To a receiver, a karaoke item with a reproduction chosen is decoded; "As coded" sends it, and changing the choice while it plays moves it | none | UI | OutputPicker::test_receiverGetsADecodeOfAKaraokeReproduction (the choice is written through the controller, not clicked on the Karaoke page) |
+| 112 | Play, Decoder, Speakers | While a bitstream goes out: the header's sentence, the signal path's three stages, the closed volume control, the Decoder page's note and the Speakers page's line say the receiver decodes and renders it | none | UI | OutputPicker::test_passthroughRowSendsTheItemToTheReceiverAsABitstream (the transcode's wording, E-AC-3 sent as AC-3, is not reached: the room's receiver takes both formats) |
+| 113 | Output picker | Opening the picker has the engine read the outputs again: a receiver that is off is decoded for even when chosen, and one switched on since is listed and, chosen, sent the stream | none | UI | OutputPicker::test_receiverSwitchedOnIsSeenWhenThePickerOpens (the room's receiver is switched by `TestServices.setEndpointPassthrough()`; the row kept while a link is held is `keep_held_link_marks`, in `hearth_controller_tests`, since the room's probe does not read a held endpoint as busy) |
 
 ### Totals
 
 | | Before (4 suites, 18 cases) | After (15 suites, 88 cases) |
 |---|---|---|
-| UI | 5 | 102 |
+| UI | 5 | 107 |
 | logic only | 15 | 2 (row 15: no UI control exists; row 93: nothing to select) |
 | none | 87 | 3 (rows 105 to 107) |
 

@@ -238,10 +238,17 @@ OutputChoice Player::decide(const Session& session) const {
     }
     // A receiver decodes a stream's first programme, and a stream cannot be
     // sent to it without the others; another programme is decoded here. So
-    // is an AC-4 presentation a sink would not choose itself.
+    // is an AC-4 presentation a sink would not choose itself, and so is a
+    // karaoke stream the listener has chosen a reproduction for: the
+    // reproduction is this decoder's to make, and a receiver sent the stream
+    // plays it as coded, its vocals on the surround speakers. (A network
+    // group is not decided by the stream, and its members are told the
+    // choice: open_chosen().)
     ItemFacts facts = session.facts();
     const bool other_programme = facts.stream && !sent_stream(session);
-    if (other_programme) {
+    const bool reproduced =
+        facts.stream && !other_programme && karaoke_choice(facts, settings_).has_value();
+    if (other_programme || reproduced) {
         facts.stream = std::nullopt;
     }
     OutputChoice choice = choose_(facts, held_output());
@@ -252,6 +259,15 @@ OutputChoice Player::decide(const Session& session) const {
                              : fmt::format(" Programme {} is chosen, and a receiver plays only a "
                                            "stream's first.",
                                            session.programme());
+    }
+    if (reproduced && choice.mode == OutputMode::kLocalPcm) {
+        // Said only where it changed the answer: where the stream would have
+        // been sent, had it been played as coded.
+        const OutputMode as_coded = choose_(session.facts(), held_output()).mode;
+        if (as_coded == OutputMode::kBitstream || as_coded == OutputMode::kBitstreamAsAc3) {
+            choice.reason += " The karaoke reproduction chosen is made here; sent as a bitstream, "
+                             "the receiver would play the stream as coded.";
+        }
     }
     return choice;
 }
@@ -634,6 +650,22 @@ void Player::set_decoder_settings(const DecoderSettings& settings) {
     if (mode_ == OutputMode::kNetworkGroup && session_ && session_->facts().karaoke &&
         karaoke_words(previous) != karaoke_words(settings)) {
         group_->set_karaoke(karaoke_words(settings));
+    }
+    // A reproduction chosen, or given up for "as coded", decides a karaoke
+    // item's output again (decide()): one a receiver was being sent is decoded
+    // here from where it had got to, and one being decoded goes to the
+    // receiver. The output reopens, so there is a gap; the item's decoder is
+    // built with these settings by that open, and the lines below then find
+    // it fits. The next item's decision was made with the old choice too.
+    if (choose_ && (previous.karaoke == ac3::KaraokeReproduction::kOff) !=
+                       (settings.karaoke == ac3::KaraokeReproduction::kOff)) {
+        prepared_choice_.reset();
+        if (session_ && session_->facts().karaoke && mode_ != OutputMode::kNetworkGroup) {
+            const std::string moved = refollow();
+            if (!moved.empty()) {
+                note(moved);
+            }
+        }
     }
     if (!session_ || !decoder_) {
         // Nothing is being decoded: the next item to start builds its decoder

@@ -1,7 +1,8 @@
 # Hearth
 
-Hearth plays AC-3, E-AC-3, E-AC-3 with Atmos objects, and AC-4 through this computer's outputs or
-synchronised network sinks. The desktop player, `hearth`, decodes a stream for its local outputs
+Hearth plays AC-3, E-AC-3, E-AC-3 with Atmos objects, and AC-4 through this computer's outputs, an
+HDMI or S/PDIF receiver, or synchronised network sinks. The desktop player, `hearth`, decodes a
+stream for its local outputs, passes AC-3 and E-AC-3 to a receiver chosen in its output picker,
 and plays a stream to a group of network sinks over Sendspin, a protocol for synchronised network
 audio. `hearth_sink` is the firmware for the ESP32 boards that join such a group, and
 [Hearth for Android](android.md) is a sink for Android TV that hands the stream to an AV receiver.
@@ -34,13 +35,51 @@ The window has seven pages, chosen in the header or with `Ctrl+1` to `Ctrl+7`.
 The header says where playback goes. Clicking it, or **Choose…** in the signal path, opens the
 output picker: this computer's outputs for decoded audio, the outputs that take AC-3 and E-AC-3 as
 a bitstream, and the network groups. Its **Play here** button moves playback to the row chosen.
-The window decodes every stream itself: it lists the outputs that take a bitstream and does not
-play to them as one ([What it does not do](#what-it-does-not-do)).
+Until a row is chosen the window decodes to the computer's default output, and the choice lasts
+until the window is closed. A row in the passthrough section plays to that output as a receiver
+([Passthrough to a receiver](#passthrough-to-a-receiver)).
 A network sink that another server holds, such as one Music Assistant holds, shows as in use by
 another server, with a **Take it back** button. From a paired ESP32 sink's settings page the app
 updates that sink's firmware. The engine and the Sendspin protocol are tested in CI, including
 against `hearth-testsink` and the aiosendspin 9.1.1 server library that Music Assistant uses;
 Music Assistant itself has not been tested.
+
+### Passthrough to a receiver
+
+With a passthrough row chosen, an AC-3 or E-AC-3 item that the output takes is sent to it as
+IEC 61937 bursts: the access units of the file, unchanged, for the receiver to decode. An E-AC-3
+stream with Atmos objects goes with its object layer. The output is held in exclusive mode while a
+bitstream goes out, so nothing else on the computer plays through it. The header says what each
+item is doing and why.
+
+Everything else is decoded and played to the same output as PCM:
+
+- an AC-4 item, which no receiver found takes;
+- a programme other than the first of an E-AC-3 stream that carries several, since a receiver
+  plays the first;
+- a karaoke stream with **Aware** or **Capable** chosen on the Karaoke page, since the reproduction
+  is the decoder's to make ([Karaoke](#karaoke));
+- any item while the output says it takes neither format. On Linux that includes a receiver that
+  is off or on another input, which reports no descriptor.
+
+A receiver that takes AC-3 and not E-AC-3 is sent an E-AC-3 item transcoded to AC-3: its 5.1, with
+the stream's metadata carried across for the receiver to apply. An object layer does not survive
+that, and the receiver gets the bed the objects were mixed into.
+
+Items sent in the same format at the same sample rate follow one another on the open link with no
+gap, as decoded items do, when Gapless is on. Between an item that is sent and one that is decoded
+the output closes and opens again, and the receiver takes a moment to lock.
+
+While a bitstream goes out the receiver decodes and renders it, so the Decoder page's controls,
+the Speakers page's setup and the volume in the transport bar are not applied; the Decoder page
+says so and the volume control is closed. The levels, the loudness and the frame metadata on the
+Play page are of a decode made here beside the stream. For a transcode they are of what is sent.
+
+This is the path `forge play` uses. On Windows that path locks AC-3, E-AC-3 and signed Atmos on an
+Onkyo TX-RZ740 ([Windows](../platforms/windows.md#audio-backend-wasapi)), and from a Raspberry Pi
+it has played the same stream shapes to a receiver ([Where it runs](#where-it-runs)). From the
+window it is tested in CI against a stand-in link that reads the bursts back as a receiver would;
+the window itself has not yet been run into a receiver.
 
 ### Karaoke
 
@@ -61,9 +100,11 @@ surround speakers. The Karaoke page chooses how the decoder reproduces it:
 
 The page says in words when the choice cannot apply: a stream that is not karaoke (an ordinary
 programme, an AC-4 stream, which has no karaoke mode, or an E-AC-3 stream flagged karaoke whose
-programme has a dependent substream or an object layer, which plays as coded), a bitstream
-output, where the receiver decodes the stream and the reproduction is its to make, and a stereo
-fold of Lt/Rt, for which Annex C defines no reproduction. The choice and the levels are kept across
+programme has a dependent substream or an object layer, which plays as coded), a stream played
+**As coded** to a receiver chosen for passthrough, which goes out as a bitstream for the receiver
+to decode and reproduce as it will, and a stereo fold of Lt/Rt, for which Annex C defines no
+reproduction. With **Aware** or **Capable** chosen, a karaoke stream is decoded here and the
+receiver is sent PCM, so the choice is heard. The choice and the levels are kept across
 starts, the only decoder settings that are. The Decoder page shows the choice in one line with a
 button to the page. What is checked is Annex C's own tables and, for AC-3 and E-AC-3, Dolby's
 reference decoder, which reproduces both ([how it is checked](../karaoke/index.md#how-it-is-checked)).
@@ -430,11 +471,12 @@ ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4 programmes a
 | Windows, Linux and macOS | `hearth` (the desktop window, Qt 6.8+) with its engine and Network page; `hearth-testsink`, `hearth-testserver` and `hearth-render` development tools | Engine and Sendspin interoperability tests run in CI, and the window builds there on all three platforms; each committed AC-4 test stream that the decoder accepts plays through the engine sample for sample as the library decodes it |
 | Android TV | [Hearth for Android](android.md), a Sendspin sink that passes AC-3 and E-AC-3 to the receiver on its HDMI output | One recorded run on an NVIDIA Shield TV (2019) into an Onkyo TX-RZ740: AC-3 5.1 and E-AC-3 5.1 for two minutes each with no underrun, sent by the test server. CI builds a debug APK and runs its tests on an emulator |
 
-The engine's passthrough uses the same path as `forge play`. That command has played the AC-3,
-E-AC-3 and signed Atmos stream shapes listed there to a receiver through a Raspberry Pi 4B without
-an underrun
+The desktop player's passthrough uses the same path as `forge play`. That command has played the
+AC-3, E-AC-3 and signed Atmos stream shapes listed there to a receiver through a Raspberry Pi 4B
+without an underrun
 ([Raspberry Pi passthrough](../platforms/raspberry-pi.md#live-hdmi-passthrough-to-a-real-receiver)).
-The window does not use it yet.
+The window's own use of it is tested against a stand-in link
+([Passthrough to a receiver](#passthrough-to-a-receiver)).
 
 ## Hearth for Android
 
@@ -460,10 +502,15 @@ the build, the pairing, the screens and what has been run.
   stream carries object metadata without listing it.
 - **Remove an item from the queue.** The window has no control for it.
 - **Trim the AC-4 decoder's delay** at the start of an item (see above).
-- **Pass AC-3 or E-AC-3 to a receiver as a bitstream.** The engine has the path, the one
-  `forge play` uses, and its tests bitstream through it. The window gives the engine no bitstream
-  output, so every stream is decoded here and leaves as PCM; the output picker lists the outputs
-  that would take a bitstream and says that choosing one has no effect.
+- **Keep the output chosen across starts.** The window starts on the computer's default output,
+  and a receiver, another device or a group is chosen in the output picker each time.
+- **Send a receiver anything but AC-3 and E-AC-3 as a bitstream.** An AC-4 item is decoded for it
+  ([Passthrough to a receiver](#passthrough-to-a-receiver)).
+- **Notice by itself that a receiver was switched on.** What each output takes is read when
+  playback first starts and again each time the output picker opens, so a receiver switched on
+  while the window is open is taken up when the picker is next opened. The output Hearth is
+  playing to is not read while it is in use: a receiver switched on in the middle of a decode to
+  its own output is sent a bitstream once playback has been stopped and started.
 
 ## Where to go next
 
