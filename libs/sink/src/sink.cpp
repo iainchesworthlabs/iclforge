@@ -501,6 +501,31 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
         return driver().inspect([&] { return metadata_; });
     }
 
+    // Where the server says the item is and how long it is (metadata@v1), at the sink's own time
+    // now on the server's clock. Nothing without a progress or a converged clock.
+    struct MetadataProgress {
+        std::int64_t position_ms = 0;
+        std::optional<std::int64_t> length_ms{};
+    };
+    [[nodiscard]] std::optional<MetadataProgress> metadata_progress() {
+        return driver().inspect([&]() -> std::optional<MetadataProgress> {
+            if (!metadata_ || !metadata_->progress || !session_->clock_converged()) {
+                return std::nullopt;
+            }
+            const std::optional<std::int64_t> position = sendspin::metadata::position_ms(
+                *metadata_, session_->clock().to_server(sink_->clock_.now_us()));
+            if (!position) {
+                return std::nullopt;
+            }
+            MetadataProgress out;
+            out.position_ms = *position;
+            if (metadata_->progress->track_duration_ms > 0) {
+                out.length_ms = metadata_->progress->track_duration_ms;
+            }
+            return out;
+        });
+    }
+
     // Whether this connection holds a lyric document, held or not (the item is known).
     [[nodiscard]] bool has_lyric_item() {
         return driver().inspect([&] { return follower_.item().has_value(); });
@@ -1015,15 +1040,18 @@ LyricFrame Sink::lyric_frame(std::int64_t delay_ms, const iclforge::lyrics::Stag
     bool found = false;
     bool streaming = false;
     std::optional<sendspin::metadata::State> metadata;
+    std::optional<Connection::MetadataProgress> progress;
     for (const std::shared_ptr<Connection>& connection : all) {
         if (!found && connection->has_lyric_item()) {
             frame = connection->lyric_frame(delay_ms, options);
             found = true;
             // What the server that sent the document says is playing, if it says.
             metadata = connection->metadata();
+            progress = connection->metadata_progress();
         } else if (!found && !metadata) {
             // No document held yet: a server that says what is playing still names the item.
             metadata = connection->metadata();
+            progress = connection->metadata_progress();
         }
         streaming = streaming || connection->streaming();
     }
@@ -1040,7 +1068,29 @@ LyricFrame Sink::lyric_frame(std::int64_t delay_ms, const iclforge::lyrics::Stag
         name(metadata->artist, frame.artist);
         name(metadata->album, frame.album);
     }
+    // The header's time. A document's own playhead is the better clock, so the server's progress is
+    // the position only where the stage has none (no document held, or one that is plain text), and
+    // the length only where the document has no `[length:]`.
+    if (progress) {
+        const bool unstaged = frame.mode == iclforge::lyrics::StageMode::kNoLyrics ||
+                              frame.mode == iclforge::lyrics::StageMode::kPlain;
+        if (unstaged) {
+            frame.position_ms = progress->position_ms;
+            frame.length_ms = progress->length_ms;
+            frame.has_progress = true;
+        } else if (!frame.length_ms) {
+            frame.length_ms = progress->length_ms;
+        }
+    }
     return frame;
+}
+
+sendspin::player::Request vocals_request(sendspin::player::KaraokeVocals vocals) {
+    sendspin::player::Request request;
+    request.decoder.karaoke = vocals == sendspin::player::KaraokeVocals::kBoth ? sendspin::player::Karaoke::kAware
+                                                                              : sendspin::player::Karaoke::kCapable;
+    request.decoder.karaoke_vocals = vocals;
+    return request;
 }
 
 void Sink::send_request(const sendspin::player::Request& request) {

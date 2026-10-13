@@ -29,6 +29,19 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Karaoke in E-AC-3: the live karaoke cases take a layout, and skip a board that is not the one decoding**
+
+- **`network sinks live: a karaoke stream is reproduced by the board that decodes it` and its E-AC-3
+  twin read two options.** `ICLFORGE_HEARTH_LIVE_KARAOKE_LAYOUT` sets the layout the board is
+  given (3.0 by default; a v1.x ESP32-P4 cannot open three slots and takes 2.0), and
+  `ICLFORGE_HEARTH_LIVE_KARAOKE_PUSH` names which of routing, trim, delay and crossover are sent
+  with it (all four by default; `none` sends the layout alone).
+- **A board that decodes fewer channels of the codec than the programme has is skipped, with the
+  reason.** The ESP32-C6 decodes two, so Hearth decodes the stream for it and sends PCM, and the
+  case failed at the board's levels, which a PCM player does not report.
+- **"The choice made a difference" compares every reproduction with as-coded.** At a stereo layout
+  aware is the Lo/Ro fold as-coded already is, so comparing those two alone failed there.
+
 **Hearth tells a group's members what is playing**
 
 - **The engine sets `metadata@v1` for a group.** A member that lists the role gets the item's title
@@ -259,6 +272,21 @@ The sections below contain the complete change list and fixes.
   (`sink`, internal, never installed) and a test binary with outputs that only write down what they
   were given.
   This is a move: no message, log line or file the test sink writes is different.
+
+**Hearth for Android: two leftovers of the metadata and the request path**
+
+- **"Both" asks the server for the aware reproduction.** The controls sheet's vocals row sent the
+  capable reproduction for every choice; the owner's call of 2026-10-13 is that "Both" asks for
+  `aware`, which plays both voices as the song's mix does, and V1, V2 and None ask for `capable` with
+  that choice, the only reproduction that has them. The rule is one function, `sink::vocals_request`,
+  and a host case holds the four choices.
+- **An item with no lyrics shows the server's clock in the lyric screen's header.** The header drew a
+  time only for a document's line. `Sink::lyric_frame()` now takes the position and length from the
+  server's `metadata@v1` progress, at the sink's own time on the server's clock (a pause keeps it), for
+  an item with no document or a plain one, and the length for a timed document that names none; the
+  frame says `progress` when the position is the server's. The header's right side shows the time and
+  the hairline under it fills by it. A host case holds the position, the pause and the document's own
+  length winning; `LyricViewRenderTest` holds the pixels.
 
 **Containers: what a file holds besides its audio**
 
@@ -4204,6 +4232,17 @@ The sections below contain the complete change list and fixes.
   shorter part holds its last sample for the rest of the programme", in the seven catalogues too.
   The encoding is unchanged, held by the owner's decision; a part that should fall silent after its
   end has to be given as long as the backing.
+
+**Footprint probes: the E-AC-3 fold fixtures expect the -3 dB levels**
+
+- **`kEac3FoldRms`, `kEac3714FoldRms` and the fixed-tier pins `eac3_fold` and `eac3_714_fold` are
+  re-measured.** They were taken before an E-AC-3 stream with no `mixmdate` folded at -3 dB centre
+  and -3 dB surround (#1420, D10), so the arm-none-eabi, ESP32-C3 and ESP32-S3 footprint probes
+  failed their level checks on every push since (the 5.1 fold 107,353 / 106,212 to 95,687 / 94,353
+  and the 7.1.4 fold 62,837 / 61,994 to 55,509 / 55,002 per million; the fixed-tier hashes
+  `63f6da64fcb14557` and `3c068ffd950a7e63`). Values are from `forge decode downmix=loro
+  drcmode=line` of the embedded streams and from the fixed-tier probe run natively; no other
+  fixture moved.
 
 **WebAssembly demo: the lyrics test**
 

@@ -181,6 +181,7 @@ def command(
     port: int = SENDSPIN_PORT,
     use_code: bool = True,
     poll_status: bool = False,
+    seconds: int | None = None,
 ) -> list[str]:
     argv = [
         str(testserver),
@@ -199,6 +200,9 @@ def command(
         "--play",
         str(programme),
     ]
+    if seconds:
+        # a three-frame file is not a stream: the server plays it over and over for this long
+        argv += ["--seconds", str(seconds)]
     if poll_status:
         argv += [
             "--status",
@@ -256,6 +260,7 @@ def run_row(
     use_code: bool = True,
     connect_s: int = 60,
     log_wait_s: float = 8.0,
+    seconds: int | None = None,
 ) -> SendspinRun:
     """One programme sent to the board by the test server, and what came of it. The server's exit
     status and report, and the board's own totals line from its log, are what it returns."""
@@ -273,6 +278,7 @@ def run_row(
             testserver, state, programme, report, code_log, board.host, status_port, label,
             connect_s,
             use_code=use_code,
+            seconds=seconds,
         )  # fmt: skip
         stop = threading.Event()
         relay = threading.Thread(
@@ -366,6 +372,9 @@ def judge(run: SendspinRun, spec: dict[str, Any]) -> list[str]:
     if stream.get("kind") != "bursts":
         findings.append(f"the stream was {stream.get('kind')!r}, not bursts")
     expected = spec.get("sendspin_units", spec.get("units"))
+    if spec.get("sendspin_seconds"):
+        # a file played over and over: how many bursts that is, is the server's to say
+        expected = ((run.report or {}).get("programme") or {}).get("bursts")
     if expected is not None and accounted(stream) != expected:
         late, dropped = stream.get("late", 0), stream.get("dropped", 0)
         findings.append(
@@ -447,6 +456,7 @@ def play_row(
     popen: Callable[..., Any] = subprocess.Popen,
     relay_every: float = 0.4,
     log_wait_s: float = 8.0,
+    seconds: int | None = None,
 ) -> SendspinRun:
     """One row: by the record where the board holds the suite's, by a code where it does not. A
     record the board does not take (the server's own copy was lost) is forgotten and the row is
@@ -457,6 +467,7 @@ def play_row(
         "popen": popen,
         "relay_every": relay_every,
         "log_wait_s": log_wait_s,
+        "seconds": seconds,
     }
     held = ours_in(pairing_ids(board.pairing()))
     run = run_row(
