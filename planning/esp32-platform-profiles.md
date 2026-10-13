@@ -253,7 +253,7 @@ sessions change the firmware" has a shorter answer than the guard's size suggest
 | where | what it holds | when | fails a PR? |
 |---|---|---|---|
 | PR Gate, `Static` (`_static.yml`) | `sink_profile.py check-docs`; `test_sink_profile.py` (the file against `_build.yml`'s fragment lists, `check_firmware_package.py`'s image rules, the keys every profile must lock); `test_board_suite.py` (a baseline holds exactly its profile's rows) | every PR | **yes**, but these are checks that the *files agree*, not that a configured build is the profile |
-| `ci.yml` → `_build.yml`: `build-esp32s3`, `hearth-esp32s3`, `build-esp32c3`, `package-esp32-firmware` | the build **is** the profile: `sink_profile.py defaults`/`identity` configure it, `verify` holds it (asked against given, locked values, watched keys nobody placed, the app, bootloader and static RAM budgets from `idf.py size`), `package_firmware.py --profile` refuses an image that is not one | push to `main` only | **no**: red on `main`, and skipped there while the minimum-footprint legs above them in the same job fail |
+| `ci.yml` → `_build.yml`: `build-esp32s3`, `hearth-esp32s3`, `build-esp32c3`, `package-esp32-firmware` | the build **is** the profile: `sink_profile.py defaults`/`identity` configure it, `verify` holds it (asked against given, locked values, watched keys nobody placed, the app, bootloader and static RAM budgets from `idf.py size`), `package_firmware.py --profile` refuses an image that is not one | push to `main` only | **no**: red on `main`. Until #1499 they were skipped there whenever a minimum-footprint leg above them in the same job failed, which is how the C6's budget stood wrong; they run after a footprint failure now |
 | `bench_flash.py build <id>` | the same guard, on a bench build | by hand | no |
 | a booked board | the boot `budget:` line, the identity in `/hardware`, `board_suite.py` (it refuses an image built under another hash) and `compare` | by hand | no |
 
@@ -869,7 +869,7 @@ run on the definition the file has.
 **Nothing fails a PR yet for touching a fragment or a locked key's Kconfig default without the
 profile file**: the guard runs after the merge, on `main`
 ([where each check runs](#where-each-check-runs)), so such a PR is first seen red on `main`, or not
-at all while the sink steps are skipped there. A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
+at all while the sink steps were skipped there (they are not, since #1499). A scratch build for a measurement is `sink_profile.py build <id> --overlay <file>`: it
 reports `<id>+scratch`, is refused by the suite's `--record`, and its overlay is committed beside
 the measurement if the figure is quoted anywhere.
 
