@@ -5802,6 +5802,19 @@ The sections below contain the complete change list and fixes.
   for a sink the host has just moved to PCM` fails without the change, the moved sink holding
   9,600 of 14,400 frames each of three times. The karaoke group cases' waits for a board's
   totals now report what each board holds and what both sides logged when they expire.
+- **The group could still begin its timeline without a board it was waiting for, when the board's
+  state arrived while the group was starting its members.** The wait looked at each board a
+  second time, after the members had been passed over, to see whether one was still moving: a
+  board whose `client/state` arrived in between was found on `player@v1` with its state, taken
+  for one that was not moving, and left behind; it was started on the next block and missed the
+  first 4,800 frames of the item. The window is the time the group takes to start the members
+  that are ready, so it grows with the number of boards and with a busy machine. The group now
+  notes whether a board is moving from the one look it started or passed the board over by, and
+  the wait goes by that. `group: a programme waits for a sink the host has just moved to PCM`
+  failed in the nightly ASan+UBSan leg this way on 2026-10-12 (and on a rerun), and reproduces
+  on a machine limited to two busy cores in 4 runs of 8 without the change and none in 25 with
+  it; `group: a moved sink whose state arrives as the timeline would begin is waited for` holds
+  the board's reply between the two looks and fails without the change every time.
 
 **ESP32-C6 internal RAM**
 
