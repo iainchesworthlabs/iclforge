@@ -9,7 +9,10 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSettings>
 #include <QString>
 #include <QTemporaryDir>
@@ -649,6 +652,121 @@ TEST_CASE("microphone controller: turning the microphone off ends a take and kee
     CHECK(QFileInfo::exists(take.value("path").toString()));
 }
 
+TEST_CASE("microphone controller: the takes in the folder are listed, and removed one by one",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    QTemporaryDir takes;
+    REQUIRE(takes.isValid());
+    QTemporaryDir elsewhere;
+    REQUIRE(elsewhere.isValid());
+
+    const auto put = [](const QString& dir, const QString& name, const QByteArray& bytes) {
+        QFile file(QDir(dir).filePath(name));
+        REQUIRE(file.open(QIODevice::WriteOnly));
+        file.write(bytes);
+    };
+    // A take is its file and its description; the description is what is listed.
+    const auto make = [&](const QString& dir, const QString& stem, const QString& created,
+                          double seconds, const QString& title, qlonglong start) {
+        put(dir, stem + ".flac", "fLaC");
+        QJsonObject item;
+        item.insert("title", title);
+        QJsonObject doc;
+        doc.insert("format", "iclforge-take-1");
+        doc.insert("audio", stem + ".flac");
+        doc.insert("seconds", seconds);
+        doc.insert("created_utc", created);
+        doc.insert("item", item);
+        doc.insert("item_start_ms", start >= 0 ? QJsonValue(start) : QJsonValue(QJsonValue::Null));
+        put(dir, stem + ".take.json", QJsonDocument(doc).toJson());
+    };
+    make(takes.path(), "Old - 2020-01-01 090000", "2020-01-01T09:00:00Z", 61.5, "Old", 1200);
+    make(takes.path(), "New - 2020-03-01 211500", "2020-03-01T21:15:00Z", 213.0, "New", -1);
+    make(takes.path(), "Mid - 2020-02-01 120000", "2020-02-01T12:00:00Z", 30.0, "Mid", 0);
+    // Not takes of this folder: a FLAC with no description, a description of a file that is not
+    // there, a description that is not JSON, one that names a file outside the folder, and a
+    // take in another folder.
+    put(takes.path(), "stray.flac", "fLaC");
+    put(takes.path(), "gone.take.json",
+        R"({"format":"iclforge-take-1","audio":"gone.flac","seconds":1,"created_utc":"2020-04-01T00:00:00Z"})");
+    put(takes.path(), "broken.take.json", "this is not json");
+    // Names a take that exists, in another folder, by its whole path.
+    const QByteArray away =
+        "{\"format\":\"iclforge-take-1\",\"audio\":\"" +
+        QDir(elsewhere.path()).filePath("Other - 2020-06-01 100000.flac").toUtf8() +
+        "\",\"seconds\":1,\"created_utc\":\"2020-05-01T00:00:00Z\"}";
+    put(takes.path(), "away.take.json", away);
+    // A description in some other format is not a take of this program's.
+    put(takes.path(), "alien.flac", "fLaC");
+    put(takes.path(), "alien.take.json",
+        R"({"format":"someone-elses-1","audio":"alien.flac","seconds":1,"created_utc":"2020-07-01T00:00:00Z"})");
+    make(elsewhere.path(), "Other - 2020-06-01 100000", "2020-06-01T10:00:00Z", 5.0, "Other", 0);
+
+    auto rig = make_rig();
+    rig->controller->setTakesFolder(takes.path());
+    const QVariantList listed = rig->controller->takes();
+    REQUIRE(listed.size() == 3);
+    CHECK(listed[0].toMap().value("title").toString() == "New");
+    CHECK(listed[1].toMap().value("title").toString() == "Mid");
+    CHECK(listed[2].toMap().value("title").toString() == "Old");
+    CHECK(listed[0].toMap().value("startMs").toLongLong() == -1);
+    CHECK(listed[1].toMap().value("startMs").toLongLong() == 0);
+    CHECK(listed[2].toMap().value("startMs").toLongLong() == 1200);
+    CHECK(listed[2].toMap().value("seconds").toDouble() == Catch::Approx(61.5));
+    CHECK(listed[0].toMap().value("name").toString() == "New - 2020-03-01 211500.flac");
+
+    // Removing one removes its file and its description, and only that.
+    const QString mid = listed[1].toMap().value("path").toString();
+    CHECK(rig->controller->deleteTake(mid));
+    CHECK(!QFileInfo::exists(mid));
+    CHECK(!QFileInfo::exists(QDir(takes.path()).filePath("Mid - 2020-02-01 120000.take.json")));
+    CHECK(rig->controller->takes().size() == 2);
+    CHECK(QFileInfo::exists(QDir(takes.path()).filePath("New - 2020-03-01 211500.flac")));
+
+    // A path that is not in the list is not touched: another folder's take, a stray file.
+    const QString other = QDir(elsewhere.path()).filePath("Other - 2020-06-01 100000.flac");
+    CHECK(!rig->controller->deleteTake(other));
+    CHECK(QFileInfo::exists(other));
+    CHECK(!rig->controller->deleteTake(QDir(takes.path()).filePath("stray.flac")));
+    CHECK(QFileInfo::exists(QDir(takes.path()).filePath("stray.flac")));
+    CHECK(!rig->controller->deleteTake(QDir(takes.path()).filePath("../stray.flac")));
+
+    // A take made now joins the list, and is the newest.
+    REQUIRE(rig->controller->start());
+    REQUIRE(rig->controller->startRecording());
+    rig->now += 1'000'000'000LL;
+    rig->input->set_now_ns(rig->now);
+    rig->controller->tick();
+    rig->controller->stopRecording();
+    const QVariantList after = rig->controller->takes();
+    REQUIRE(after.size() == 3);
+    CHECK(after[0].toMap().value("path").toString() ==
+          rig->controller->lastTake().value("path").toString());
+    CHECK(after[0].toMap().value("seconds").toDouble() > 0.5);
+
+    // Removing the last take leaves the list and the card's last take.
+    CHECK(rig->controller->deleteTake(after[0].toMap().value("path").toString()));
+    CHECK(rig->controller->lastTake().isEmpty());
+    CHECK(rig->controller->takes().size() == 2);
+
+    // A folder with none lists none.
+    rig->controller->setTakesFolder(elsewhere.path() + "/nothing-here");
+    CHECK(rig->controller->takes().isEmpty());
+
+    // Only the newest fifty are listed.
+    QTemporaryDir many;
+    REQUIRE(many.isValid());
+    for (int i = 1; i <= 55; ++i) {
+        const QString day = QString::number(i).rightJustified(2, '0');
+        make(many.path(), "Many " + day, "2020-02-" + day + "T10:00:00Z", 1.0, "Many", 0);
+    }
+    rig->controller->setTakesFolder(many.path());
+    REQUIRE(rig->controller->takes().size() == 50);
+    CHECK(rig->controller->takes().first().toMap().value("name").toString() == "Many 55.flac");
+    CHECK(rig->controller->takes().last().toMap().value("name").toString() == "Many 06.flac");
+}
+
 TEST_CASE("microphone controller: a device that goes away during a take ends it and keeps it",
           "[hearth][microphone][take]") {
     Room room;
@@ -670,6 +788,41 @@ TEST_CASE("microphone controller: a device that goes away during a take ends it 
     const QVariantMap take = rig->controller->lastTake();
     REQUIRE(take.contains("path"));
     CHECK(QFileInfo::exists(take.value("path").toString()));
+}
+
+TEST_CASE("microphone controller: a take the disk cannot hold ends itself, is kept, and says why",
+          "[hearth][microphone][take]") {
+    Room room;
+    application();
+    QTemporaryDir takes;
+    REQUIRE(takes.isValid());
+    auto rig = make_rig();
+    rig->controller->setTakesFolder(takes.path());
+    // Room for the header and a few frames of silence.
+    rig->controller->limit_take_bytes_for_test(100);
+    REQUIRE(rig->controller->start());
+    REQUIRE(rig->controller->startRecording());
+    rig->now += 1'000'000'000LL;
+    rig->input->set_now_ns(rig->now);
+    for (int i = 0; i < 5; ++i) {
+        rig->controller->tick();
+    }
+    CHECK(!rig->controller->recording());
+    CHECK(rig->controller->on());  // the microphone stays on
+    CHECK(rig->controller->takeError().contains("disk"));
+    const QVariantMap take = rig->controller->lastTake();
+    REQUIRE(take.contains("path"));
+    CHECK(QFileInfo::exists(take.value("path").toString()));
+    CHECK(QFileInfo(take.value("path").toString()).size() <= 100);
+    QString sidecar = take.value("path").toString();
+    sidecar.chop(5);
+    CHECK(QFileInfo::exists(sidecar + ".take.json"));
+    // A take begun again with the limit lifted is whole.
+    rig->controller->limit_take_bytes_for_test(0);
+    REQUIRE(rig->controller->startRecording());
+    CHECK(rig->controller->recording());
+    CHECK(rig->controller->takeError().isEmpty());
+    rig->controller->stopRecording();
 }
 
 TEST_CASE("microphone controller: a take is not written over, nor deleted while another runs",

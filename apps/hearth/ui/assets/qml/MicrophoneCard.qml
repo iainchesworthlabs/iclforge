@@ -298,6 +298,67 @@ Card {
             onClicked: MicrophoneController.deleteLastTake()
         }
     }
+    // The takes in the folder, newest first. A few are shown and the rest are counted; removing
+    // one asks again, because a take cannot be got back.
+    ColumnLayout {
+        id: takesList
+        objectName: "microphoneTakesList"
+        Layout.fillWidth: true
+        visible: MicrophoneController.takes.length > 0
+        spacing: Theme.gap
+        readonly property int shown: 5
+        Text {
+            Layout.fillWidth: true
+            text: qsTr("Your takes")
+            color: Theme.text
+            font.pixelSize: Theme.fontNormal
+            font.bold: true
+        }
+        Repeater {
+            model: MicrophoneController.takes.slice(0, takesList.shown)
+            delegate: RowLayout {
+                id: takeRow
+                required property var modelData
+                property bool confirming: false
+                Layout.fillWidth: true
+                spacing: Theme.gap
+                Text {
+                    objectName: "microphoneTakeRow"
+                    Layout.fillWidth: true
+                    text: takeRow.modelData.name + " (" + root.clockText(takeRow.modelData.seconds) + ")"
+                    color: Theme.text
+                    font.pixelSize: Theme.fontNormal
+                    elide: Text.ElideMiddle
+                }
+                AppButton {
+                    objectName: "microphoneTakeDelete"
+                    visible: !takeRow.confirming
+                    text: qsTr("Delete")
+                    onClicked: takeRow.confirming = true
+                }
+                AppButton {
+                    objectName: "microphoneTakeDeleteConfirm"
+                    visible: takeRow.confirming
+                    text: qsTr("Delete for good")
+                    onClicked: MicrophoneController.deleteTake(takeRow.modelData.path)
+                }
+                AppButton {
+                    objectName: "microphoneTakeKeep"
+                    visible: takeRow.confirming
+                    text: qsTr("Keep")
+                    onClicked: takeRow.confirming = false
+                }
+            }
+        }
+        Text {
+            objectName: "microphoneTakesMore"
+            Layout.fillWidth: true
+            visible: MicrophoneController.takes.length > takesList.shown
+            text: qsTr("and %1 more in the folder").arg(MicrophoneController.takes.length - takesList.shown)
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSmall
+        }
+    }
     Text {
         objectName: "microphoneTakeNote"
         Layout.fillWidth: true

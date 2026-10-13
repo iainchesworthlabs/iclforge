@@ -16,6 +16,7 @@ const { test, expect } = require('@playwright/test');
 // flags in playwright.config.js): no real microphone is opened by this suite.
 
 const AULD_LANG_SYNE = path.join(__dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.ac3');
+const AULD_LANG_SYNE_WORDS = path.join(__dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.lrc');
 
 test('the tracker finds a sung pitch at the rates a browser runs at', async ({ page }) => {
     await page.goto('index.html');
@@ -184,13 +185,15 @@ test('a session places the voice where the sound it sang along to was, and score
         // clock, the microphone says 30 ms and the output 20 ms.
         const startCtx = 10.0;
         const firstFrame = Math.round((startCtx + 0.05) * rate);
-        const quanta = (fromSample, toSample, semitones = 0) => {
+        // `awayFrom` is a sample from which the voice is six semitones off: a line half sung right.
+        const quanta = (fromSample, toSample, semitones = 0, awayFrom = Infinity) => {
             const list = [];
             for (let at = fromSample; at < toSample; at += 128) {
                 const samples = new Float32Array(128);
                 for (let i = 0; i < 128; i++) {
                     const n = at + i;
-                    const hz = (n < rate ? 220 : 261.63) * Math.pow(2, semitones / 12);
+                    const off = n >= awayFrom ? 6 : semitones;
+                    const hz = (n < rate ? 220 : 261.63) * Math.pow(2, off / 12);
                     samples[i] = 0.4 * Math.sin((2 * Math.PI * hz * n) / rate);
                 }
                 list.push({ frame: firstFrame + at, samples });
@@ -199,7 +202,8 @@ test('a session places the voice where the sound it sang along to was, and score
         };
 
         const fakeTrack = { readyState: 'live', getSettings: () => ({ latency: 0.03 }), stop() { this.readyState = 'ended'; } };
-        const run = async ({ offsetMs = 0, headphones = true, playing = true, semitones = 0, drop = false }) => {
+        const run = async ({ offsetMs = 0, headphones = true, playing = true, semitones = 0, drop = false,
+                            awayFrom = Infinity }) => {
             const nodes = [];
             const ctx = {
                 sampleRate: rate, outputLatency: 0.02, baseLatency: 0.01, destination: {},
@@ -217,7 +221,7 @@ test('a session places the voice where the sound it sang along to was, and score
             session.headphones = headphones;
             session.offsetMs = offsetMs;
             await session.start();
-            const list = quanta(0, rate * 2, semitones);
+            const list = quanta(0, rate * 2, semitones, awayFrom);
             list.forEach((q, index) => {
                 // A dropped stretch: a quarter of a second of quanta never arrive, in the middle of
                 // the first note. What follows must still be placed where it was sung.
@@ -233,6 +237,10 @@ test('a session places the voice where the sound it sang along to was, and score
                 secondNoteMs: (voiced.find((p) => Math.abs(p.midi - 60) < 0.5) || {}).ms ?? null,
                 hits: voiced.filter((p) => p.hit).length,
                 score: session.score,
+                // A line's result: the first note (0 to 1 s of the item), and a stretch the tune has
+                // no note in.
+                firstLine: session.lineResult(0, 1000),
+                beyondTune: session.lineResult(5000, 6000),
             };
             session.stop();
             result.summary = session.summary;
@@ -248,7 +256,9 @@ test('a session places the voice where the sound it sang along to was, and score
         const octave = await run({ semitones: -12 });
         const notPlaying = await run({ playing: false });
         const dropped = await run({ drop: true });
-        return { onTune, shifted, withheld, away, octave, notPlaying, dropped };
+        // The first line on the tune for 0.6 s of its second, and off it for the rest.
+        const partly = await run({ awayFrom: Math.round(rate * 0.6) });
+        return { onTune, shifted, withheld, away, octave, notPlaying, dropped, partly };
     });
 
     // The track's own latency figure is where the delay starts.
@@ -267,6 +277,27 @@ test('a session places the voice where the sound it sang along to was, and score
     // Closing it ends the track and the capture.
     expect(out.onTune.trackEnded).toBe(true);
     expect(out.onTune.portClosed).toBe(true);
+
+    // A line's mark: on the tune it is the top level with a high percentage; off it, the bottom; a
+    // stretch the tune has no note in has none; and without the headphones answer there is no number.
+    expect(out.onTune.firstLine.scored).toBe(true);
+    expect(out.onTune.firstLine.level).toBe(3);
+    expect(out.onTune.firstLine.percent).toBeGreaterThanOrEqual(75);
+    expect(out.onTune.beyondTune.scored).toBe(false);
+    expect(out.away.firstLine.scored).toBe(true);
+    expect(out.away.firstLine.level).toBe(1);
+    expect(out.away.firstLine.percent).toBeLessThan(25);
+    // In between is the middle level, and its percentage is the share that was right.
+    expect(out.partly.firstLine.level).toBe(2);
+    expect(out.partly.firstLine.percent).toBeGreaterThanOrEqual(45);
+    expect(out.partly.firstLine.percent).toBeLessThan(75);
+    expect(out.withheld.firstLine.scored).toBe(false);
+    expect(out.withheld.firstLine.withheld).toBe(true);
+    // Nothing was sung while paused: the line is "not sung" (the tune has notes in it and the singer
+    // was not voiced for any), which carries no number and is not a bad score.
+    expect(out.notPlaying.firstLine.scored).toBe(true);
+    expect(out.notPlaying.firstLine.notSung).toBe(true);
+    expect(out.notPlaying.firstLine.percent).toBe(-1);
 
     // "Move your timing" moves where the voice is placed, by what was asked.
     expect(Math.abs(out.shifted.firstMs - out.onTune.firstMs - 200)).toBeLessThan(30);
@@ -291,6 +322,41 @@ test('a session places the voice where the sound it sang along to was, and score
     // A dropped stretch of quanta does not shift what follows it: the C4 is still near 1 s.
     expect(Math.abs(out.dropped.secondNoteMs - 1000)).toBeLessThan(100);
     expect(out.dropped.score.percent).toBeGreaterThan(40);
+});
+
+test('a line that was not sung is marked as such under the words, with the headphones answer', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(String(error)));
+    await page.goto('index.html');
+    await page.locator('#fileInput').setInputFiles(AULD_LANG_SYNE);
+    await expect(page.locator('#micStatus')).toContainText('Scored against the melody guide (M).', { timeout: 60000 });
+    await page.locator('#lyricsInput').setInputFiles(AULD_LANG_SYNE_WORDS);
+    await expect(page.locator('#lyricsStatus')).toContainText('timed by word');
+
+    await page.locator('#micHeadphones').check();
+    await page.locator('#micToggle').click();
+    await expect(page.locator('#micIndicator')).toBeVisible({ timeout: 20000 });
+
+    // Start the song at 5.6 s: the first line (1 to 5 s) went by with nobody singing it. The line
+    // being sung is the second, and the one before it is marked.
+    await page.evaluate(() => {
+        const seek = /** @type {HTMLInputElement} */ (document.getElementById('seek'));
+        seek.value = String((5.6 / 16.5) * 1000);
+        seek.dispatchEvent(new Event('input', { bubbles: true }));
+        seek.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.locator('#playPause').click();
+    const mark = page.locator('#lyricsView .lyric.previous .mark');
+    await expect(mark).toHaveText('not sung', { timeout: 15000 });
+    await expect(mark).toHaveClass(/not-sung/);
+
+    // Without the headphones answer there is no mark at all.
+    await page.locator('#micHeadphones').uncheck();
+    await expect(page.locator('#lyricsView .lyric .mark')).toHaveCount(0, { timeout: 5000 });
+
+    await page.locator('#micToggle').click();
+    await expect(page.locator('#micIndicator')).toBeHidden();
+    expect(pageErrors).toEqual([]);
 });
 
 test('the card keeps its promises: off until pressed, score withheld, nothing sent, tracks stopped', async ({ page }) => {
