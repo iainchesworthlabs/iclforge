@@ -1,6 +1,6 @@
 # Hearth for Android, phases 4 and 5: decoding on the device, and the sink as an ordinary player
 
-!!! note "Status as of 2026-10-13: a plan for the owner's veto; nothing here is built"
+!!! note "Status as of 2026-10-13: reviewed with the owner; 4a is built (#1509), and nothing after it"
     [The plan](hearth-android.md) ends its phase list with two rows, phase 4 ("local decode and
     karaoke") and phase 5 ("optional"). Phases 0 to 3 are built, with the protocol additions D6, D7
     and D8 ([the state table](hearth-android.md#where-the-build-stands)). This page turns the two rows

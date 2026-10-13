@@ -1,17 +1,17 @@
 # Hearth: a desktop reference player and Sendspin sinks
 
-!!! note "Status as of 2026-09-30: built, with the user guide and three hardware exits open"
+!!! note "Status as of 2026-10-13: built, with the user guide and three hardware exits open"
     Written and decided on 2026-09-15, in one session of questions and answers recorded under
     [Decisions](#decisions). The live status board is [ROADMAP.md](../ROADMAP.md); by chip, and
     each phase below carries its own status line:
 
     - **[The desktop app](#chip-a-the-desktop-app).** Built: engine, Qt window (Play, Media,
-      Speakers, Decoder, Network, Settings), packages for Windows, macOS and Linux, network
-      output to Sendspin groups, firmware updates for a paired sink, and AC-4 playback:
-      channel-based, immersive and object content (phases I2 and I5 of
-      [`planning/ac4.md`](ac4.md)). Not built: a user guide, and screenshots of the running app
-      (the Hearth images in the repository are the design mockups). A4's Music Assistant exit, with
-      Music Assistant itself, is open.
+      Speakers, Decoder, Network, Settings, and the Karaoke page of [`karaoke.md`](karaoke.md)),
+      packages for Windows, macOS and Linux, network output to Sendspin groups, firmware updates
+      for a paired sink, and AC-4 playback: channel-based, immersive and object content (phases I2
+      and I5 of [`planning/ac4.md`](ac4.md)). Not built: a user guide to the pages other than
+      Karaoke, and screenshots of them (the Hearth images under `docs/hearth/design/` are the
+      design mockups). A4's Music Assistant exit, with Music Assistant itself, is open.
     - **[The ESP32-S3 sink](#chip-b-the-esp32-s3-sink).** Built: Sendspin player, Improv, groups,
       network OTA, CI and published firmware packaging. TDM DAC hardware exits (ES9080 pair) and
       B3's Music Assistant exit are open.
@@ -22,15 +22,17 @@
       `hearth_sink` for silicon revision v1.x with Wi-Fi through the onboard C6. The wide TDM sink
       (tier P2 and later) is not started.
     - **[The AC-4 decoder in Hearth](#chip-d-the-ac-4-decoder).** Built: the plan is
-      [`planning/ac4.md`](ac4.md), and Hearth plays AC-4 through the library decoder. ESP32 sinks
-      in a Sendspin group do not take AC-4 (phase I6, not built); the P4 decodes AC-4 from its HTTP
-      source (D14b).
+      [`planning/ac4.md`](ac4.md), and Hearth plays AC-4 through the library decoder. An ESP32-P4
+      or ESP32-S3 sink built with the decoder takes AC-4 in a Sendspin group (phase I6, #1446); the
+      published firmware images have the decoder off, and a C6 is sent PCM.
+    - **Hearth for Android**, a Sendspin sink for Android TV, has a plan of its own:
+      [`hearth-android.md`](hearth-android.md).
 
-    Names in this plan are the current ones (`ac3hearth`, `ac3hearth-testsink`, `hearth_sink`,
-    `_ac3forge_player@v1`). Phase N1 of the AC-4 plan renames the programs, among them
+    Names in this plan are those of its time (`ac3hearth`, `ac3hearth-testsink`, `hearth_sink`,
+    `_ac3forge_player@v1`). Phase N1 of the AC-4 plan has since renamed the programs, among them
     `ac3hearth` to `hearth` and the test sink and server to `hearth-testsink` and
-    `hearth-testserver`, and its layout study proposes renaming the wire strings with the family;
-    neither has run (see [the recasting plan](recasting.md)).
+    `hearth-testserver`, and the wire string to `_iclforge_player@v1`;
+    [Renamed](../docs/renamed.md) puts each old name beside its new one.
 
     This page replaces the **form** of [the appliance plan](player-appliance.md): its headless
     daemon, web control page, kiosk window and HLS client are dropped. Hearth's name, its place

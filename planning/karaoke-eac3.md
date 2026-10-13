@@ -1,6 +1,6 @@
 # Karaoke in E-AC-3 and AC-4
 
-!!! note "Status as of 2026-10-12: the evidence step is done and D1 to D9 are approved as recommended; the build starts at E1"
+!!! note "Status as of 2026-10-13: part one (E-AC-3) is built and merged, E1 to E9; part two (AC-4) is options only"
     The owner took "karaoke in E-AC-3 or AC-4" off the not-planned list on 2026-10-12. This page is
     the plan: **part one** is E-AC-3, built to AC-3's parity once the decisions below are answered;
     **part two** is AC-4, which is a plan and an options document only, and stays one until part
@@ -14,7 +14,7 @@
     | 0 | The evidence: what E-AC-3 and AC-4 define, what real decoders do | Done 2026-10-12 ([findings](karaoke-eac3-findings.md)) |
     | 1 | The support matrix, AC-3 beside E-AC-3, gaps assigned | Done 2026-10-12 ([matrix](karaoke-support-matrix.md)) |
     | 2 | Decisions D1 to D9 | **Approved as recommended, 2026-10-12** ([below](#decisions)) |
-    | 3 | Part one: E1 to E9, one small pull request each | E1 to E5, E7 and E9 merged 2026-10-12; E4c (#1421), D10 (#1420) and E6 (#1427) merged; E8 is this page's docs pass; the C6 and P4 board runs of E4b are open. The state of each is in [the table](#work-items) |
+    | 3 | Part one: E1 to E9, one small pull request each | E1 to E9 merged, 2026-10-12 and 2026-10-13, with D10 (#1420), E4c (#1421) and E6 (#1427); E8, the docs pass, is #1429 and #1483; E4b ran on the S3, the C6 and a v1.3 P4. The state of each is in [the table](#work-items) |
     | 4 | Part two: the AC-4 options and their decisions | Written ([options](karaoke-ac4-options.md)); no build |
 
 ## What this is
@@ -72,7 +72,7 @@ with its tests, **L** two to four stacked. "Needs" is what the item cannot start
 | E5 | **Authoring flags and the WebAssembly glue**: `eac3-encode ... bsmod=7` writes the mixing group from `cmixlev`/`surmixlev` (D4) and a warning where the layout is 1+1 or mono; the WASM `is_karaoke_unit()` reads E-AC-3 | S | D4; E2 | **Built, PR #1398 (merged)** |
 | E6 | **The Forge GUI's flow offers E-AC-3** (D7): a format choice in the Karaoke flow, default AC-3, a card that says the reproduction is ours for E-AC-3 | M | D7; E2, E5 | **Built, PR #1427 (merged)** |
 | E7 | **The oracle**: a verify script under `tools/checks` (local only, like `quality_race.py`'s Dolby leg) that builds the tone streams, decodes them with the Reference Player and with `forge decode`, and compares **ratios**; the measured ratios of [the findings](karaoke-eac3-findings.md) are constants in the library's tests, so the evidence outlives the installed decoder | S | Nothing; written with E2 | **Built**, in #1394 (merged); local only |
-| E8 | **The docs**: the user guide, `docs/library/decoding.md`, the ROADMAP rows, the [correction list](karaoke-eac3-findings.md#what-the-repository-says-that-this-corrects) | S | E2 to E6 | **This pull request** |
+| E8 | **The docs**: the user guide, `docs/library/decoding.md`, the ROADMAP rows, the [correction list](karaoke-eac3-findings.md#what-the-repository-says-that-this-corrects) | S | E2 to E6 | **Built, PR #1429 (merged)**; the boards' pages in #1483 (merged) |
 | E9 | **The LFE's level in the reproduction** (D8), for both codecs: the library's output stage and its one test | S | D8; review with the AC-3 session [ecf0c9] | **Built**, in #1394 (merged) |
 
 ## Decisions
