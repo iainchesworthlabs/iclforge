@@ -55,7 +55,8 @@ Detail: [Hearth overview](../index.md).
   The engine plays channel-based, immersive and object AC-4 through the decoder's public API,
   decoded for every local output, with the Decoder page's AC-4 controls and the Media page's AC-4
   information. A network group's members on the extension role that list AC-4 are sent the stream
-  as bursts, and its PCM members get the decoded audio. No ESP32 sink lists AC-4 yet (phase I6).
+  as bursts, and its PCM members get the decoded audio. An ESP32-P4 or ESP32-S3 sink built with
+  the AC-4 decoder lists it (phase I6); the published images do not.
 - **`libs/sendspin`.** Shared by the desktop tools and the board.
 - **ESP32-C6.** Decode probe timed on a board. `hearth_sink`'s Sendspin player runs on this board,
   stereo only: a ten-minute group run with an ESP32-S3 had no underruns on either board. Setup:

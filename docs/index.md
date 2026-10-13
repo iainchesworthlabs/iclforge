@@ -3,8 +3,9 @@
 ICL Forge is a clean-room C++23 implementation of AC-3, E-AC-3, and Dolby Atmos decoding and
 encoding, and of AC-4 decoding and encoding. The repository contains the codec library and three
 applications built on it. AC-4 is in the library, in `forge`, in the Forge GUI, in the Hearth
-desktop player, and in the C, Python, Rust, and WebAssembly bindings. Crucible does not use it,
-and no ESP32 network sink decodes it in a Sendspin group.
+desktop player, and in the C, Python, Rust, and WebAssembly bindings. Crucible does not use it.
+An ESP32 network sink decodes it in a Sendspin group when its firmware is built with the decoder;
+the published sink images are built without it.
 
 ## Choose what you need
 
@@ -14,6 +15,7 @@ and no ESP32 network sink decodes it in a Sendspin group.
 | Install or use the CLI and GUI | [Forge](forge/index.md) |
 | Capture desktop applications and position them in an Atmos scene | [Crucible](crucible/index.md) |
 | Play audio through the desktop player or an ESP32 network sink | [Hearth](hearth/index.md) |
+| Play, time, sing or make a karaoke stream | [Karaoke](karaoke/index.md) |
 | Decode or encode AC-4 | [AC-4 in the library](library/ac4.md) |
 | Link the codec from C++, C, Python, Rust, or WebAssembly | [Library](library/index.md) |
 | Compare products and features by platform and architecture | [Platforms](platforms/index.md) |

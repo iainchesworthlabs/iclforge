@@ -250,11 +250,12 @@ the start of an item, so two AC-4 items in a queue play about that far apart.
 In a network group, a member on the Hearth extension role takes the stream itself as IEC 61937
 bursts, and a member that is a standard Sendspin player takes PCM decoded here. An AC-4 item goes
 to an extension-role member as IEC 61937-14 bursts only if the member lists `ac4` among its data
-types (an ESP32-P4 whose image has the AC-4 decoder does, up to 5.1, and states no objects; no
-other board does); otherwise that member gets PCM decoded here where it takes PCM, and else nothing
-for the item. It also gets
-nothing when the presentation chosen on the AC-4 tab is one a sink would not choose with no
-preferences: Hearth decodes that presentation here, and only the PCM members hear it.
+types (an ESP32-P4 whose image has the AC-4 decoder does, up to 5.1, and an ESP32-S3 whose image
+has it and the 64 KB data cache does, at 2.0 and up to 25 frames a second; both state no objects,
+and the published images have no decoder); otherwise that member gets PCM decoded here where it
+takes PCM, and else nothing for the item. It also gets nothing when the presentation chosen on
+the AC-4 tab is one a sink would not choose with no preferences: Hearth decodes that
+presentation here, and only the PCM members hear it.
 
 An extension-role member that cannot take a stream as it is (more channels than it decodes, say)
 is sent it decoded here as PCM, at the layout it takes, and the group editor shows what each
@@ -402,14 +403,15 @@ ESP32-S3, the ESP32-C6, and the ESP32-P4 (one image for each of its two silicon 
 newer with a screen); [Sink firmware](sink-firmware.md) covers installing it and updating a board
 over its network.
 
-**AC-4 on the sinks.** No ESP32 sink takes AC-4 in a Sendspin group: every `hearth_sink` build
-lists `ac3` and `eac3` as its data types and none lists `ac4`, so a group's ESP32 member gets
-nothing for an AC-4 item. Phase I6 of [`planning/ac4.md`](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/ac4.md)
-would change that and is not built. The desktop player sends AC-4 bursts to a member that lists
-`ac4`, which today is the development test sink alone. Separately, a `hearth_sink` built for the
-ESP32-P4 with `sdkconfig.ac4` (CI builds it; the published firmware images have the decoder off)
-plays AC-4 from an HTTP source: 2.0 in the SIMPLE and A-SPX modes in real time at 360 MHz, and
-nothing wider ([AC-4 on the P4](../platforms/bare-metal/esp32-p4.md#ac-4)).
+**AC-4 on the sinks.** A `hearth_sink` built with the AC-4 decoder (`sdkconfig.ac4`; CI builds
+it) lists `ac4` beside `ac3` and `eac3` and decodes an AC-4 stream a group sends it. An ESP32-P4
+at 360 MHz takes 2.0 and 5.1 in real time and states 6 channels
+([AC-4 from a server, on the P4](../platforms/bare-metal/esp32-p4.md#ac-4-from-a-server)); an
+ESP32-S3 with the 64 KB data cache takes 2.0 and states 2 channels and 25 frames a second
+([on the S3](../platforms/bare-metal/esp32-s3.md#ac-4-from-a-server)). Neither decodes a
+presentation's objects, and the desktop player decodes what is past a sink's limits and sends it
+PCM. The published firmware images have the decoder off and list `ac3` and `eac3` alone, and an
+ESP32-C6 has no room for the decoder beside Wi-Fi, so it takes AC-4 programmes as PCM.
 
 ## Where it runs
 
@@ -429,7 +431,9 @@ Raspberry Pi 4B without an underrun. See
 
 ## What it does not do
 
-- **Send AC-4 to an ESP32 sink in a group.** [ESP32 sinks](#esp32-sinks) has the detail.
+- **Send AC-4 as it is to a sink running a published firmware image.** Those images have no AC-4
+  decoder, so such a sink gets PCM decoded here; a board built with the decoder takes the stream
+  itself. [ESP32 sinks](#esp32-sinks) has the detail.
 - **Play every track of a container.** An MP4, Matroska or MPEG-TS file plays its first AC-3,
   E-AC-3 or AC-4 track; the others are not offered, and a Matroska file's codec delay is not
   trimmed.

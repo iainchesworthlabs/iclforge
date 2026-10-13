@@ -35,9 +35,9 @@ standards in C++23, and the applications built on it.
 | Component | What it is | Docs |
 |---|---|---|
 | **The library** — `iclforge::<library>` | Encodes and decodes AC-3 and E-AC-3, including Atmos objects through JOC, and decodes and encodes AC-4. Includes container, metadata, quality, and platform-audio libraries, with C, Python, Rust, and WebAssembly interfaces that decode and encode AC-4 as well as AC-3 and E-AC-3. | [Library](docs/library/index.md), [capabilities](docs/library/capabilities.md) |
-| **Forge** — `forge` + `forge-gui` | CLI and GUI for encoding, decoding, inspection, quality checks, and live audio. `forge` reads and writes AC-4, and so does the GUI: its QC, player, and object pages read it, and its encoder page and Objects tab write it, objects included; substreams, presentations, and the other layouts stay with the command line. | [Forge](docs/forge/index.md), [CLI](docs/forge/cli/index.md), [GUI](docs/forge/gui/index.md) |
+| **Forge** — `forge` + `forge-gui` | CLI and GUI for encoding, decoding, inspection, quality checks, and live audio. `forge` reads and writes AC-4, and so does the GUI: its QC, player, and object pages read it, and its encoder page and Objects tab write it, objects included; substreams, presentations, and the other layouts stay with the command line. Both build AC-3 and E-AC-3 karaoke streams, the GUI in a Karaoke flow. | [Forge](docs/forge/index.md), [CLI](docs/forge/cli/index.md), [GUI](docs/forge/gui/index.md) |
 | **Crucible** — `crucible` | Captures desktop applications separately and positions them in an Atmos scene. Runs on Windows and Linux; macOS code builds in CI but has not run with audio hardware. | [Crucible](docs/crucible/index.md), [install](docs/crucible/install.md) |
-| **Hearth** — `hearth` | Plays streams through speakers, a receiver, or ESP32 network sinks. The desktop player plays to local outputs and to network sinks, and plays AC-4. The ESP32-S3 and ESP32-C6 sinks play in Sendspin groups on hardware. On the ESP32-P4, `hearth_sink` plays AC-4 from an HTTP source on a board; no ESP32 sink takes AC-4 in a group yet. | [Hearth](docs/hearth/index.md) |
+| **Hearth** — `hearth` | Plays streams through speakers, a receiver, or network sinks. The desktop player plays to local outputs and to network sinks, plays AC-4, and has a Karaoke page with timed lyrics and a microphone. The ESP32-S3 and ESP32-C6 sinks play in Sendspin groups on hardware; an ESP32-P4 or ESP32-S3 sink built with the AC-4 decoder takes AC-4 in a group, and the published sink images have that decoder off. Hearth for Android is a sink for Android TV that passes AC-3 and E-AC-3 to a receiver; it is built from source and has no release package. | [Hearth](docs/hearth/index.md), [Karaoke](docs/karaoke/index.md) |
 
 The AC-3, E-AC-3 and AC-4 codecs link no other codec library, FFmpeg included. The FFmpeg
 command-line tools, and a librempeg build for AC-4, are used during development as independent
@@ -120,9 +120,9 @@ Beyond that:
 | Linux x64 / arm64 | Library, `forge`, `forge-gui`, Hearth, Crucible | — | ✅² |
 | Raspberry Pi 4B | Everything Linux arm64 runs | — | ✅³ |
 | macOS arm64 / Intel | Library, `forge`, `forge-gui`, Hearth; Crucible compiles | — | ✗⁴ |
-| Android (NVIDIA Shield) | Shield Atmos Demo only, sideload-only | — | ✅⁵ |
+| Android (NVIDIA Shield) | Shield Atmos Demo, sideload-only; Hearth for Android, a Sendspin sink built from source | — | ✅⁵ |
 | WebAssembly | Decode and encode AC-3 and E-AC-3 in a browser page; the AC-4 module builds and has no page | — | ✅⁶ |
-| ESP32-S3 | Hearth (`hearth_sink` Sendspin player, `i2s_player`); decode (every layout/tool, Atmos objects) or encode (2/0, 5.1); reusable ESP-IDF component | ✅ correct | ✅⁷ |
+| ESP32-S3 | Hearth (`hearth_sink` Sendspin player, `i2s_player`); decode (every layout/tool, Atmos objects) or encode (2/0, 5.1), with AC-4 decode behind `CONFIG_ICLFORGE_AC4`; reusable ESP-IDF component | ✅ correct | ✅⁷ |
 | ESP32-C3 | Decode only, fixed-point tier (no FPU), same component | ✅ correct | —⁸ |
 | ESP32-C6 | Decode, fixed-point tier, same component; timed on a board with and without Wi-Fi | — | ✅⁹ |
 | ESP32-P4 | Decode in the float tier, same component, with AC-4 decode behind `CONFIG_ICLFORGE_AC4`; `hearth_sink` on revision 1.x boards | — | ✅¹⁰ |
@@ -133,7 +133,8 @@ Beyond that:
 2. Bitstream output to a real receiver, on one machine.
 3. Full test suite on the board plus Atmos over HDMI to a powered AVR.
 4. Nothing has captured or played a sound; the Core Audio process tap has never been created.
-5. Live objects out HDMI to a receiver, on real 2017 Shield hardware.
+5. Live objects out HDMI to a receiver, on real 2017 Shield hardware. Hearth for Android has one
+   recorded run on a Shield and a receiver.
 6. Demo pages built and published live.
 7. Real time on the board for every decode fixture. AC-3 2/0 and E-AC-3 2/0 encode in real time,
    AC-3 5.1 encode sits at the real-time line, and the other encode rows run 1.3x to 1.7x over —
@@ -145,14 +146,15 @@ Beyond that:
    emulate the part. [ESP32-C6](docs/platforms/bare-metal/esp32-c6.md).
 10. Every fixture decodes in real time on a board at 360 MHz, the ceiling of the revision 1.3
     silicon it carries, with no network. AC-4 from an HTTP source with Wi-Fi up: 2.0 in SIMPLE mode
-    decodes at 0.28 of a frame's time and in A-SPX mode at 0.37, 5.1 in SIMPLE mode at 0.64, in A-SPX mode at 0.83 and
-    with A-CPL mode 2 at 0.91 (A-CPL mode 3 takes 1.14) and 5.1.4 1.57 to 1.90; no ESP32 sink takes AC-4 in a Sendspin group. QEMU does not emulate the part.
+    decodes at 0.15 of a frame's time and in A-SPX mode at 0.21, 5.1 at 0.42 in SIMPLE mode, 0.53
+    in A-SPX mode and 0.58 and 0.63 with A-CPL modes 2 and 3, and 5.1.4 at 0.94 to 1.15. Built with
+    the decoder, the sink takes AC-4 to 5.1 in a Sendspin group. QEMU does not emulate the part.
     [ESP32-P4](docs/platforms/bare-metal/esp32-p4.md).
 11. Correct under QEMU's `mps2-an385`; no real silicon.
 
-AC-4 has been run on the ESP32-P4 and on the Cortex-M3 leg, and on the ESP32-S3 under QEMU, with
-its state in PSRAM. The C6 builds it in the fixed-point tier, and a decode does not fit beside WiFi. The S3 and
-the C6 have no board measurement yet.
+AC-4 has been run on boards on the ESP32-P4 and the ESP32-S3 (its state in PSRAM, 2.0 in real
+time), and on the Cortex-M3 leg. The C6 builds it in the fixed-point tier; a decode does not fit
+beside WiFi, and on a board the play is refused.
 
 The complete codec surface is in
 [docs/library/capabilities.md](docs/library/capabilities.md). Minimum-footprint targets narrow it
@@ -195,7 +197,8 @@ forge decode out.ac4 out.wav
 `forge`'s commands cover encoding, decoding, muxing, inspection, QC and live capture, for AC-3,
 E-AC-3 and AC-4; run it with no arguments for the full listing.
 `forge-gui` is a Qt Quick front end over the same library: file and live-capture encoding, a plan
-view for placing objects, channel-level metering, QC, a stream player and an object inspector.
+view for placing objects, channel-level metering, QC, a stream player, an object inspector, a
+Karaoke flow and project files.
 AC-4 works in file encoding (objects included), QC, the player and the inspector, and is refused
 in a live session. The pair is [Forge](docs/forge/index.md).
 For the C++ API — two headers and about a dozen lines to encode a frame — see
@@ -229,7 +232,8 @@ and where the raw-pointer boundaries are, the per-access-unit resource limits, a
 ## Repository layout
 
 ```
-# the libraries — libs/ is installable (audio and sendspin are built and linked, never installed),
+# the libraries — libs/ is installable (audio, sendspin, sink, lyrics, pitch and device are built and
+# linked, never installed),
 # apps/ consumes it and never the reverse. Each libs/<name>/ is the CMake target iclforge::<name>, the
 # headers iclforge/<name>/ and the library iclforge_<name>, with its tests in libs/<name>/tests and
 # its libFuzzer harnesses in libs/<name>/fuzz; tools/checks/projects.json says which project may
@@ -263,6 +267,16 @@ libs/sendspin/   iclforge::sendspin — Sendspin player and server for Hearth (d
                 ESP32 sink); built with the hearth feature, not as part of the codec library
 libs/audio/     iclforge::audio — the platform audio backends: WASAPI, ALSA, PipeWire, CoreAudio,
                 Android, null fallback; linked by the programs, not installed
+libs/sink/       iclforge::sink — a Sendspin sink a program runs: it advertises, pairs, and hands
+                each stream to a pass-through output or to a decoding one; Hearth's test sink and
+                Hearth for Android are built on it; not installed
+libs/lyrics/     iclforge::lyrics — timed lyrics: LRC, SubRip, Advanced SubStation Alpha and MIDI
+                karaoke files read into lines of timed words, and the cursor that follows a playing
+                position; standard library only, not installed
+libs/pitch/      iclforge::pitch — a singing voice's pitch, a reference melody and a score of one
+                against the other; standard library only, not installed
+libs/device/     iclforge::device — the logic of the ESP32 sinks that needs no SDK, so that the host
+                tests it; header-only, not installed
 external/       third-party code the tree carries: the Sendspin time filter, vendored unmodified
                 (external/time-filter/VENDORED.md)
 examples/       the programs docs/library/ is written from
@@ -316,8 +330,9 @@ apps/crucible/windows/   the Windows-only pieces of Crucible: the IclForgeNullSi
 apps/crucible/linux/     the Linux-only tooling of Crucible: a scripted VM guest built to find the tray
                 crash; not built or packaged
 
-# Hearth — desktop player and ESP32 Sendspin sinks
-apps/hearth/    hearth engine, window (ui/), hearth-testsink, hearth-testserver, hearth-render
+# Hearth — desktop player and Sendspin sinks
+apps/hearth/    hearth engine, window (ui/), hearth-testsink, hearth-testserver, hearth-render,
+                and Hearth for Android (android/), a Gradle project of its own
 
 # beside those — demonstrations of the library, not products of their own
 apps/demos/android/   Shield Atmos Demo — Android TV app, live Atmos object motion over HDMI
@@ -365,6 +380,7 @@ The published site is
 - [Concepts](docs/concepts/index.md) — AC-3, E-AC-3, Atmos, and JOC without assumed domain knowledge.
 - [Platforms](docs/platforms/index.md) — operating systems, boards, browser support, and evidence.
 - [Capabilities](docs/library/capabilities.md) — the authority for supported codec features and limits.
+- [Karaoke](docs/karaoke/index.md) — playing, timing, singing and making karaoke streams.
 - [AC-4 in the library](docs/library/ac4.md) — the AC-4 decoder and encoder API.
 - [Validation](docs/verification.md) — checks, independent references, and coverage gaps.
 - [Performance and quality](docs/performance-quality.md) — current measures and append-only trend histories.
