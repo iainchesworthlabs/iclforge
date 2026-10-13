@@ -873,6 +873,19 @@ TestCase {
         HearthController.setDecoderSettings({ karaoke: "aware", karaokeVocals: "both" });
     }
 
+    // Presses item until done() holds. The bar can still be settling when it is first pressed,
+    // and a press that lands on nothing is lost (a loaded machine lost the first one for the five
+    // seconds the next line waited). A press that lands is the choice, and pressing the chosen one
+    // again changes nothing, so the second press cannot undo the first.
+    function pressUntil(item, done, message) {
+        tryVerify(function() {
+            if (!done()) {
+                mouseClick(item);
+            }
+            return done();
+        }, 10000, message);
+    }
+
     // The same choice on the singer view's bar, where the mouse is nearer than the page.
     function test_theSingerViewBarChoosesWordsOrPictureWhereBothAreBesideTheItem() {
         const both = TestServices.writeAc3Stream("bar_song.ac3", "karaoke-3/2");
@@ -901,13 +914,13 @@ TestCase {
         const view = named(screen.contentItem, "lyricScreenView");
         compare(view.showingPicture, false);
 
-        mouseClick(picture);
-        tryCompare(KaraokeController, "preferPicture", true, 5000);
+        pressUntil(picture, function() { return KaraokeController.preferPicture === true; },
+                   "the Picture choice never took");
         tryCompare(picture, "selected", true, 5000);
         compare(words.selected, false);
         tryCompare(view, "showingPicture", true, 5000);
-        mouseClick(words);
-        tryCompare(KaraokeController, "preferPicture", false, 5000);
+        pressUntil(words, function() { return KaraokeController.preferPicture === false; },
+                   "the Words choice never took");
         tryCompare(view, "showingPicture", false, 5000);
         win.toggleLyricScreen();
         tryCompare(screen, "visible", false, 5000);
