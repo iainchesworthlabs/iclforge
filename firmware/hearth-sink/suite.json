@@ -51,6 +51,7 @@
   },
   "profiles": {
     "s3-n16r8": {
+      "baseline_accepted": {"profile_hash": "156f7310e8d0", "why": "#1459 added ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE to every profile at 0, an inert key that moves no figure: the baseline is kept under the hash it was recorded under (the owner's rule, 2026-10-12)."},
       "tolerance": {
         "glitched_plays": {"eac3-2.0-sendspin": 2},
         "play_heap_free_bytes": {"eac3-2.0-sendspin": 2048},
@@ -82,6 +83,7 @@
       ]
     },
     "c6-16mb": {
+      "baseline_accepted": {"profile_hash": "0021e64331a6", "why": "#1459 added ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE to every profile at 0, an inert key that moves no figure: the baseline is kept under the hash it was recorded under (the owner's rule, 2026-10-12)."},
       "note": "The C6 refuses an HTTP play on purpose (CONFIG_ICLFORGE_EXAMPLE_PLAY_MIN_FREE_BYTES, #1395): its /play rows are that refusal, clean, with no reboot. Its audio path is Sendspin, so the rows with via sendspin play the same two streams the way the product does: the repository's hearth-testserver pairs the board and sends them as bursts, and the board's sendspin.stream= line is read (tools/hearth/suite_sendspin.py). Both streams are rows, the AC-3 one first and the E-AC-3 one after it, as a user plays them. The E-AC-3 stream used to play with 916 to 4,496 bytes of internal heap spare and, after an AC-3 stream in the same boot, failed to allocate its Wi-Fi receive buffers and ended late (planning/esp32-platform-profiles.md, 'Sendspin rows'): the decoder's feature tables were 27,776 bytes of static RAM, and with them out of it the same plays leave 18,936 to 30,920 bytes at their least (6,836 once in 5, 26,788 the least of 3), against the AC-3 stream's 48,148 to 85,100.",
       "tolerance": {
         "largest_block_bytes": 12288,
@@ -103,6 +105,7 @@
       ]
     },
     "p4-rev1": {
+      "baseline_accepted": {"profile_hash": "60ce70a0bf92", "why": "#1459 added ICLFORGE_EXAMPLE_SENDSPIN_AC4_MAX_FRAME_RATE to every profile at 0, an inert key that moves no figure: the baseline is kept under the hash it was recorded under (the owner's rule, 2026-10-12)."},
       "tolerance": {
         "largest_block_bytes": 8192,
         "note": "The P4's largest internal block at boot steps by 4 KB: on the ten boots read one by one (the OTA's, a reset's and the record's eight, P4a, 2026-10-12) it was 221,184 on eight and 217,088 on two; free RAM read 291,875 to 292,211. Two 4 KB steps is the allowance (twice the one seen) and free RAM keeps the suite's 2,048. The S3's 1,024 would fail one boot in five."

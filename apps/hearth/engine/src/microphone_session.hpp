@@ -113,6 +113,9 @@ class MicrophoneSession {
     [[nodiscard]] std::expected<TakeInfo, std::string> end_take();
     // Ends it and removes the file.
     void discard_take();
+    // A test seam (TakeRecorder::limit_bytes): the take's file may hold this many bytes, and the
+    // take then ends by itself as it does when a disk fills. 0 is none.
+    void limit_take_bytes(std::uint64_t bytes) { recorder_.limit_bytes(bytes); }
     // A take the session ended itself (the disk failed): what was written is a take, handed over
     // once.
     [[nodiscard]] std::optional<TakeInfo> take_ended_by_itself() {

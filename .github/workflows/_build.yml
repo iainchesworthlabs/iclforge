@@ -2139,6 +2139,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Every step after the first probe is its own check (`if: !cancelled()`), and a red
+      # probe is no reason not to run it: a job's steps stop at the first failure unless told
+      # otherwise, and when the probe went red on 2026-10-12 (a fixture that a decoder change
+      # had outdated) none of the builds and none of the profile guards after it ran, for
+      # fourteen hours, which is how a static-RAM budget that no C6 image could meet went
+      # unflagged (planning/esp32-platform-profiles.md, "The C6's static RAM budget"). It is
+      # `!cancelled()` and not `always()` so that a cancel still stops them. The job ends red
+      # if any of them does.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -2198,6 +2206,7 @@ jobs:
       # breaks, this goes red rather than the break waiting for someone to try
       # it.
       - name: Build and run the ENCODE probe under QEMU
+        if: ${{ !cancelled() }}
         env:
           ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-encode-probe.txt
         run: |
@@ -2214,6 +2223,7 @@ jobs:
       # 2.0's the tightest (decision 29); the runner's AC-4 block has the
       # figures. The run itself takes under a minute of QEMU.
       - name: Build and run the AC-4 probe under QEMU
+        if: ${{ !cancelled() }}
         env:
           ICLFORGE_ESP32S3_SUMMARY: firmware/baremetal/platform/esp32s3/build/esp32s3-ac4-probe.txt
         run: |
@@ -2234,6 +2244,7 @@ jobs:
       # DIFFERENT project directory than the probe uses, which is the closest
       # this repo gets to testing the integrator's path.
       - name: Build the I2S player example
+        if: ${{ !cancelled() }}
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2258,6 +2269,7 @@ jobs:
       # does not gate on the capture sink's figures; the capture and render
       # steps below do.
       - name: Build and run the Hearth sink example under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci"
         run: |
@@ -2374,6 +2386,7 @@ jobs:
       # Neither is a stub standing in for the code: both run the real thing with
       # the one unmockable piece - a peripheral, a card - replaced.
       - name: Run the capture sink and flash-backed FAT source under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-tdm"
         run: |
@@ -2457,6 +2470,7 @@ jobs:
       # low byte to leave clear: padding written as zeros, carried slots
       # nonzero, and the converted level against the host's.
       - name: Run the capture sink at 16-bit TDM slots under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-tdm;sdkconfig.ci-tdm16"
         run: |
@@ -2527,6 +2541,7 @@ jobs:
       # expects it, with the six height slots silent because the stream has
       # nothing for them.
       - name: Run the capture sink at sixteen 16-bit TDM slots under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-tdm;sdkconfig.ci-tdm916"
         run: |
@@ -2607,6 +2622,7 @@ jobs:
       # rounding. sdkconfig.ci-render says why one lap and why the MDCT-band
       # domain and no DRC.
       - name: Render a height-object stream onto 7.1.4 under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-render"
         run: |
@@ -2698,6 +2714,7 @@ jobs:
       # timeout: the application returns from app_main into an idle FreeRTOS
       # system and would otherwise sit there for the whole 300 seconds.
       - name: Fetch and decode an E-AC-3 stream over QEMU's Ethernet
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http"
         run: |
@@ -2809,12 +2826,14 @@ jobs:
       # (apps/demos/wasm/tests, device-ui.config.js's board project) comes into this
       # container with Node, which the IDF image does not carry.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ !cancelled() }}
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: apps/demos/wasm/tests/package-lock.json
 
       - name: Drive the web page on the emulated board
+        if: ${{ !cancelled() }}
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -2901,6 +2920,7 @@ jobs:
       # stream the manifest marks refused must fail for the reason it names.
       # Then the web page on this twelve-slot board, and the console.
       - name: Play the stream set onto 7.1.4 over QEMU's Ethernet
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-http714"
         run: |
@@ -2988,6 +3008,7 @@ jobs:
       # console must say the lane started, and the part holds a heap floor with the lane's stack
       # and its 23 KB of enhanced coupling scratch in PSRAM.
       - name: Play the decode lane's streams on two cores with PSRAM over QEMU's Ethernet
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-http714;sdkconfig.ci-lane"
         run: |
@@ -3099,6 +3120,7 @@ jobs:
       # than the source list and CONFIG_ is not reliably set in it.
       # main/CMakeLists.txt now lists every component unconditionally.
       - name: Build every sink and source combination
+        if: ${{ !cancelled() }}
         run: |
           set -eu
           . "$IDF_PATH/export.sh"
@@ -3147,7 +3169,15 @@ jobs:
       # to it before anything is packaged: the fragments it was given, every locked key, any size
       # or placement key nobody placed, the image and the static internal RAM. The repository
       # variable ESP32_PROFILE_GUARD=warn turns a finding into an annotation.
+      # The profile guard (sink_profile.py defaults/identity/verify, and the packaging that refuses
+      # an image that is not its profile) is not a footprint check and must not be skipped by one:
+      # a step after a failed step is skipped by default, and on `main` the minimum-footprint
+      # probes above and below failed first, so no sink build was ever held to its profile and the
+      # C6's static RAM budget was wrong for hours (planning/esp32-platform-profiles.md, "Where each
+      # check runs"). Every step that runs the guard, or carries an image to the packager, is
+      # `!cancelled()`: it runs after an earlier failure and reports its own.
       - name: Build the S3 board's Sendspin player and package its image
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3174,6 +3204,7 @@ jobs:
             --out "$GITHUB_WORKSPACE/esp32-firmware"
 
       - name: Upload the S3 board's image for packaging
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: esp32-firmware-esp32s3
@@ -3187,6 +3218,7 @@ jobs:
       # step builds it, so its decode stack in PSRAM, its 64 KB data cache and its heap are
       # otherwise only what a bench board last ran.
       - name: Build the S3 with the AC-4 decoder and hold it to its profile
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
@@ -3223,6 +3255,7 @@ jobs:
       # What it does not hold: heap. QEMU has no Wi-Fi, so its internal RAM is some 130 KB larger
       # than a board's with the network up, and the board suite owns that budget.
       - name: Play the S3 board's release shape over QEMU's Ethernet
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
@@ -3353,6 +3386,7 @@ jobs:
       # carry, so the image goes to it as an artifact. The flash and eFuse
       # images are made as the HTTP step makes them.
       - name: Build the Sendspin player for QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin"
         run: |
@@ -3374,6 +3408,7 @@ jobs:
       # board runs before anyone has given it a network. Its images go into
       # the same artifact, under wifi/.
       - name: Build the unprovisioned WiFi player for QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin;sdkconfig.ci-wifi"
         run: |
@@ -3400,6 +3435,7 @@ jobs:
       # so the step costs one full build. QEMU keeps its flash writes in its
       # image, which is what an update needs.
       - name: Update the Sendspin player over the network under QEMU
+        if: ${{ !cancelled() }}
         env:
           SDKCONFIG_DEFAULTS: "sdkconfig.defaults;sdkconfig.ci-http;sdkconfig.ci-sendspin;sdkconfig.ci-ota"
         run: |
@@ -3445,6 +3481,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload the Sendspin player's QEMU images
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: esp32s3-sendspin-qemu
@@ -3642,6 +3679,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Every step after the first probe is its own check (`if: !cancelled()`), and a red
+      # probe is no reason not to run it: a job's steps stop at the first failure unless told
+      # otherwise, and when the probe went red on 2026-10-12 (a fixture that a decoder change
+      # had outdated) none of the builds and none of the profile guards after it ran, for
+      # fourteen hours, which is how a static-RAM budget that no C6 image could meet went
+      # unflagged (planning/esp32-platform-profiles.md, "The C6's static RAM budget"). It is
+      # `!cancelled()` and not `always()` so that a cancel still stops them. The job ends red
+      # if any of them does.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -3688,6 +3733,7 @@ jobs:
       # one against IDF's radio and lwIP. Same container and toolchain as the
       # C3 step above, so it costs two builds and no setup.
       - name: Build the ESP32-C6 probe, both network loads (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -eu
@@ -3714,6 +3760,7 @@ jobs:
       # (planning/esp32-ota.md, O8), packaged as build-esp32s3 packages the S3
       # board's; the step after this one builds the 16 MB table's.
       - name: Build hearth_sink's Sendspin player for the ESP32-C6 (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3745,6 +3792,7 @@ jobs:
       # the network. Built for publishing alone: the 4 MB build above already
       # holds that the C6 player compiles.
       - name: Build hearth_sink's Sendspin player for a 16 MB ESP32-C6
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3781,6 +3829,7 @@ jobs:
       # It is also the image the releases publish for a P4 of silicon revision v1.x (O8):
       # sdkconfig.p4's revision settings admit v1.x and nothing newer.
       - name: Build hearth_sink's Sendspin player for the ESP32-P4 (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3817,6 +3866,7 @@ jobs:
       # the profile p4-rev3's (firmware/hearth-sink/profiles.json) and the build is held to it, as
       # the boards' are; the screen's own keys are locked in it by hand, since no board has run them.
       - name: Build hearth_sink's Sendspin player with the panel for an ESP32-P4 of revision v3.x (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           VERSION_TAG: ${{ inputs.version_tag }}
@@ -3848,6 +3898,7 @@ jobs:
       # It is here because the DSI image above does not compile display_null.cpp, and a development
       # tool nothing builds is one that stops building.
       - name: Build hearth_sink with the panel's frame buffer for the ESP32-P4 (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -eu
@@ -3866,6 +3917,7 @@ jobs:
       # and that the option's build leaves the step above's alone. No image is packaged from
       # it: it is a measurement build, and the release images have the decoder off.
       - name: Build hearth_sink with the AC-4 decoder for the ESP32-P4 (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         env:
           ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
@@ -3887,6 +3939,7 @@ jobs:
             --github "${guard[@]}"
 
       - name: Upload the C6 and P4 images for packaging
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: esp32-firmware-riscv
@@ -3902,6 +3955,7 @@ jobs:
       # links for the target. Same container and toolchain as the C3 and C6
       # steps above.
       - name: Build the ESP32-P4 probe (no emulator for this part)
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -eu
@@ -3923,7 +3977,9 @@ jobs:
   package-esp32-firmware:
     name: Package the sink firmware
     needs: [check-runners, build-esp32s3, build-esp32c3]
-    if: inputs.run_esp
+    # `!cancelled()`, so that a footprint failure in a job it needs does not skip the check that
+    # every image is its profile (see build-esp32s3's guard steps); a missing image fails it.
+    if: ${{ !cancelled() && inputs.run_esp }}
     runs-on: ${{ fromJSON(needs.check-runners.outputs.linux_runner_6) }}
     # Newest main commit only when it lands on the GitHub-hosted fallback, as
     # build-esp32s3's leg does (its concurrency comment).

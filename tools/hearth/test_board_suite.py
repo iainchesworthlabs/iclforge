@@ -301,6 +301,38 @@ class Suite(unittest.TestCase):
             for key in ("internal_free", "largest"):
                 self.assertIsInstance(record["boot"].get(key), int, f"{path.name}: boot {key}")
 
+    def test_a_baseline_is_under_the_profiles_hash_or_the_pr_that_moved_it_accepts_it(self) -> None:
+        """A baseline carries the hash of the profile it was recorded under, and the hash moves
+        whenever the profile is edited. A PR that edits a profile has to *decide* about every
+        baseline it moves, here and not on `main`: a locked value that changed carries a re-record,
+        and a key added at the value it already had keeps the baseline and says so, against the
+        profile's new hash, in suite.json (`baseline_accepted`). The acceptance names the hash it
+        was made against, so the next edit of the profile asks again."""
+        data = sink_profile.load()
+        for path in sorted(bs.BASELINES.glob("*.json")):
+            record = json.loads(path.read_text("utf-8"))
+            profile = record["profile"]
+            current = sink_profile.profile_hash(data, profile)
+            accepted = self.suite["profiles"][profile].get("baseline_accepted")
+            if record["profile_hash"] == current:
+                self.assertIsNone(
+                    accepted,
+                    f"{profile}: baseline_accepted is dead: the baseline is under the profile's "
+                    "hash, so the acceptance is removed",
+                )
+                continue
+            how = (
+                f"{profile}: the profile is {current} and its baseline was recorded under "
+                f"{record['profile_hash']}. A locked value that changed carries its re-record "
+                "(board_suite.py run --record); a key added at the value it already had keeps the "
+                f"baseline: set profiles.{profile}.baseline_accepted in suite.json to "
+                f'{{"profile_hash": "{current}", "why": "..."}} '
+                "(planning/esp32-platform-profiles.md, 'Changing a profile')"
+            )
+            self.assertIsNotNone(accepted, how)
+            self.assertEqual(accepted.get("profile_hash"), current, how)
+            self.assertTrue(str(accepted.get("why", "")).strip(), how)
+
     def test_a_pin_layout_belongs_to_a_stream_that_has_a_pin(self) -> None:
         for name, spec in self.suite["streams"].items():
             if "pin_layout" in spec:

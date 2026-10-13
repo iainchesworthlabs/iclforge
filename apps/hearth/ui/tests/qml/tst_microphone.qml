@@ -4,6 +4,8 @@ import QtTest
 import Hearth
 import HearthTest
 
+import "HearthTestHelpers.js" as H
+
 // The microphone card of the Karaoke page (MicrophoneCard.qml; planning/karaoke-microphone.md, M4):
 // what it promises and that its answers reach the controller.
 //
@@ -115,6 +117,59 @@ TestCase {
         verify(note.indexOf("lossless") >= 0, note);
         // The two indicators are two items.
         verify(find(card, "microphoneIndicator") !== find(card, "microphoneRecordingIndicator"));
+    }
+
+    function test_the_takes_in_the_folder_are_listed_and_removed_after_asking() {
+        // Seven takes in a folder of their own, made as files: the list is read from the
+        // descriptions beside them.
+        let folder = "";
+        for (let i = 1; i <= 7; ++i) {
+            const stem = "Song - 2020-01-0" + i + " 100000";
+            const audio = TestServices.writeTextFile(stem + ".flac", "fLaC");
+            verify(audio.length > 0, "could not write a take");
+            folder = audio.substring(0, audio.lastIndexOf("/"));
+            const description = JSON.stringify({
+                format: "iclforge-take-1", audio: stem + ".flac", seconds: 60 + i,
+                created_utc: "2020-01-0" + i + "T10:00:00Z", item: { title: "Song" },
+                item_start_ms: 0 });
+            verify(TestServices.writeTextFile(stem + ".take.json", description).length > 0);
+        }
+        MicrophoneController.setTakesFolder(folder);
+        compare(MicrophoneController.takes.length, 7);
+
+        const card = createTemporaryObject(cardComponent, testCase);
+        verify(card);
+        compare(find(card, "microphoneTakesList").visible, true);
+        // The newest five, and the rest counted.
+        const isRow = function(item) { return item.objectName === "microphoneTakeRow"; };
+        let rows = H.findAll(card, isRow);
+        compare(rows.length, 5);
+        verify(rows[0].text.indexOf("2020-01-07") >= 0, rows[0].text);
+        verify(rows[4].text.indexOf("2020-01-03") >= 0, rows[4].text);
+        compare(find(card, "microphoneTakesMore").visible, true);
+        verify(find(card, "microphoneTakesMore").text.indexOf("2") >= 0);
+
+        // Removing asks again: the first Delete shows the question, Keep takes it back, and
+        // nothing has been removed.
+        const firstOf = function(name) {
+            return H.find(card, function(item) { return item.objectName === name; });
+        };
+        compare(firstOf("microphoneTakeDeleteConfirm").visible, false);
+        firstOf("microphoneTakeDelete").clicked();
+        compare(firstOf("microphoneTakeDeleteConfirm").visible, true);
+        compare(firstOf("microphoneTakeDelete").visible, false);
+        firstOf("microphoneTakeKeep").clicked();
+        compare(firstOf("microphoneTakeDeleteConfirm").visible, false);
+        compare(MicrophoneController.takes.length, 7);
+
+        // Confirmed, the take goes, and the next one is shown in its place.
+        firstOf("microphoneTakeDelete").clicked();
+        firstOf("microphoneTakeDeleteConfirm").clicked();
+        compare(MicrophoneController.takes.length, 6);
+        rows = H.findAll(card, isRow);
+        compare(rows.length, 5);
+        verify(rows[0].text.indexOf("2020-01-06") >= 0, rows[0].text);
+        verify(find(card, "microphoneTakesMore").text.indexOf("1") >= 0);
     }
 
     function test_the_page_shows_the_card() {
