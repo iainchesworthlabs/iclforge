@@ -1162,7 +1162,8 @@ TEST_CASE("stream decoder: the unit report says whether karaoke was reproduced",
 
     iclforge::hearth::DecoderSettings coded;
     coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
-    for (const auto& report : speak(*layout, coded, units).reports) {
+    const Spoken coded_spoken = speak(*layout, coded, units);
+    for (const auto& report : coded_spoken.reports) {
         CHECK(report.karaoke);
         CHECK_FALSE(report.karaoke_reproduced);
     }
@@ -1172,7 +1173,8 @@ TEST_CASE("stream decoder: the unit report says whether karaoke was reproduced",
     REQUIRE(stereo.has_value());
     iclforge::hearth::DecoderSettings ltrt;
     ltrt.stereo_fold = iclforge::ac3::DownmixTarget::kLtRt;
-    for (const auto& report : speak(*stereo, ltrt, units).reports) {
+    const Spoken ltrt_spoken = speak(*stereo, ltrt, units);
+    for (const auto& report : ltrt_spoken.reports) {
         CHECK(report.karaoke);
         CHECK_FALSE(report.karaoke_reproduced);
     }
@@ -1438,7 +1440,8 @@ TEST_CASE("stream decoder: the unit report of an E-AC-3 karaoke stream says whet
 
     iclforge::hearth::DecoderSettings coded;
     coded.karaoke = iclforge::ac3::KaraokeReproduction::kOff;
-    for (const auto& report : speak(*layout, coded, units).reports) {
+    const Spoken coded_spoken = speak(*layout, coded, units);
+    for (const auto& report : coded_spoken.reports) {
         CHECK(report.karaoke);
         CHECK_FALSE(report.karaoke_reproduced);
     }
@@ -1448,7 +1451,8 @@ TEST_CASE("stream decoder: the unit report of an E-AC-3 karaoke stream says whet
     REQUIRE(stereo.has_value());
     iclforge::hearth::DecoderSettings ltrt;
     ltrt.stereo_fold = iclforge::ac3::DownmixTarget::kLtRt;
-    for (const auto& report : speak(*stereo, ltrt, units).reports) {
+    const Spoken ltrt_spoken = speak(*stereo, ltrt, units);
+    for (const auto& report : ltrt_spoken.reports) {
         CHECK(report.karaoke);
         CHECK_FALSE(report.karaoke_reproduced);
     }
