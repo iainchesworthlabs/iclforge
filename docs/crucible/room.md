@@ -21,6 +21,10 @@ The page is six numbered blocks, in the order the window numbers them.
 | **05 SIGNING** | right rail | whether a key is loaded, and which file it came from |
 | **06 LYRICS** | right rail, below | an `.lrc` imported against the selected application, and the line being sung |
 
+![The Room page: the applications list, the plan and elevation views with two applications placed, the bed, the signal path and the signing card](screenshots/crucible-room.png)
+
+*Hearth at slot 1 (front left, raised) and Microsoft Edge at slot 2 (rear right, ear level). This computer has no silent device installed, so the signal path says so.*
+
 `Ctrl+1` comes back to this page from anywhere in the window. The header above it carries the
 path as one line and the status strip below it carries the counters and the Start/Stop button;
 both belong to the window rather than to this page.
@@ -93,6 +97,10 @@ dragging the centre moves both. Where a standard pair's two dots sit on top of e
 elevation, they are nudged apart so both stay reachable.
 
 ## The 3D view
+
+![The Room page in its 3D view: the 7.1.4 speaker ring and the two placed applications as icons in the room](screenshots/crucible-room-3d.png)
+
+*The same placement in 3D.*
 
 The 3D picture is compiled in when the Qt kit that built Crucible has Quick 3D, and left out when
 it does not; the **Plan + elevation / 3D** switch appears only where it is in. A build without it

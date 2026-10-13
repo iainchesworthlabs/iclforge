@@ -4303,6 +4303,11 @@ The sections below contain the complete change list and fixes.
   [Settings](docs/crucible/settings.md)).
 - The Forge page, the Crucible page and the quick start name what they did not: karaoke streams,
   lyrics beside a stream, project files, Crucible's lyric strip, and the Android TV sink.
+- The Crucible guide has pictures: the Room page (plan, elevation and 3D) with two applications
+  placed, the Signal path and Settings pages, the first-run dialog, and the Room page in Arabic.
+  They were taken from a build of main on a computer with no silent device installed, with a
+  throwaway signing key. The localisation page says what a capture reads and writes before one is
+  shared.
 - The library's docs page now presents it as a member in its own right, matching Forge,
   Crucible, and Hearth.
 - The published-asset table now matches the pipeline: a Windows arm64 row, Crucible
