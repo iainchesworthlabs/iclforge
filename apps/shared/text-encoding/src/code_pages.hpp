@@ -28,7 +28,7 @@ struct CodePage {
     std::string_view title;
     // The Windows code page number (MultiByteToWideChar's first argument).
     unsigned windows_id;
-    // The name iconv knows it by (glibc and GNU libiconv, which macOS carries).
+    // The name iconv knows it by: glibc's, GNU libiconv's and macOS's own all take these.
     std::string_view iconv_name;
     // Other names it is known by, separated by spaces, in the same lower-case form as `name`.
     std::string_view aliases;

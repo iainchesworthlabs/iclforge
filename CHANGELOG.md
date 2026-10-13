@@ -4661,6 +4661,20 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**Lyrics in a code page: bytes the page does not have are refused on macOS 15 as they are elsewhere**
+
+- **A Shift-JIS lead byte with no trail byte after it was dropped without a word on macOS 15.**
+  `lyrics-encoding=shift-jis`, and the page chosen on the Forge GUI's Lyrics row, read a file with
+  a lead byte followed by a byte that is no trail byte (a space, or the line end where a line was
+  cut in the middle of a character) as if the two bytes were not there, and wrote the rest: macOS
+  15's `iconv` steps over such a pair when a character comes before it in the same call, with no
+  error and a count of 0, on Apple silicon as on Intel. Linux, Windows and macOS 26 refuse the
+  file, and macOS 15 does now: every character is asked of the conversion alone, where the same
+  `iconv` does refuse the pair, before the text is converted. The text itself is converted whole
+  as before, so nothing a page has reads differently, and a letter and the mark after it are still
+  joined where the system joins them (glibc, for Windows-1255 and Windows-1258). It is what failed
+  four tests on the nightly Intel macOS leg, the one leg on macOS 15.
+
 **Hearth: right to left and the largest text size**
 
 - **A unit was drawn over its number.** In Arabic, Hebrew and Yiddish the unit of a number field
