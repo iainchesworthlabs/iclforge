@@ -10,6 +10,9 @@
 #include "iclforge/ac3/core/window.hpp"
 #include "iclforge/dsp/detail/fft_stockham.hpp"
 #include "iclforge/base/arithmetic/fixed32.hpp"
+// The cosine and sine a constant evaluator can run (the sample rate converter's design and
+// the QMF's constants are made with them): dsp's own, which this reads where it is.
+#include "../../../dsp/src/tiered/portable_math.hpp"
 
 // The fixed-point tier's §7.9.4 inverse pair (planning/arithmetic-tiers.md,
 // Phase B): the same pre-twiddle, N/4-point FFT, post-twiddle and window as
@@ -103,35 +106,58 @@ struct FixedImdctTables {
     std::array<iclforge::internal::Fixed32, kN / 8> cos2{};
     std::array<iclforge::internal::Fixed32, kN / 8> sin2{};
     // The shared kernel's own tables at the two sizes the pair needs.
-    iclforge::dsp::fft::StockhamTables<kN / 4, iclforge::internal::Fixed32> fft128{};
-    iclforge::dsp::fft::StockhamTables<kN / 8, iclforge::internal::Fixed32> fft64{};
+    iclforge::dsp::fft::StockhamTables<kN / 4, iclforge::internal::Fixed32> fft128;
+    iclforge::dsp::fft::StockhamTables<kN / 8, iclforge::internal::Fixed32> fft64;
     // §7.9.4.1 step 5's window, the double table rounded once.
     std::array<iclforge::internal::Fixed32, kN> window{};
 
-    FixedImdctTables() {
+    // Built by a constant evaluator (below), with dsp's portable cosine and sine: 5,728 bytes
+    // that were .bss on every image that links the fixed tier and were built, with 800
+    // software-double cosines on a part with no FPU, by whichever block decoded first. The values
+    // are those of the C library's
+    // cosine and sine rounded to Q7.24 (portable_math.hpp keeps within three units in the last
+    // place of a double, a thousandth of a raw unit), and
+    // libs/ac3/tests/core/test_mdct_fixed.cpp holds every entry to them on whatever machine
+    // runs it.
+    constexpr FixedImdctTables()
+        : fft128(portable_cosine, portable_sine), fft64(portable_cosine, portable_sine) {
         constexpr double kPi = std::numbers::pi;
         for (std::size_t k = 0; k < kN / 4; ++k) {
             const double angle = 2.0 * kPi * (8.0 * static_cast<double>(k) + 1.0) /
                                  (8.0 * static_cast<double>(kN));
-            cos1[k] = iclforge::internal::Fixed32{-std::cos(angle)};
-            sin1[k] = iclforge::internal::Fixed32{-std::sin(angle)};
+            cos1[k] = iclforge::internal::Fixed32{-portable_cosine(angle)};
+            sin1[k] = iclforge::internal::Fixed32{-portable_sine(angle)};
         }
         for (std::size_t k = 0; k < kN / 8; ++k) {
             const double angle = 2.0 * kPi * (8.0 * static_cast<double>(k) + 1.0) /
                                  (4.0 * static_cast<double>(kN));
-            cos2[k] = iclforge::internal::Fixed32{-std::cos(angle)};
-            sin2[k] = iclforge::internal::Fixed32{-std::sin(angle)};
+            cos2[k] = iclforge::internal::Fixed32{-portable_cosine(angle)};
+            sin2[k] = iclforge::internal::Fixed32{-portable_sine(angle)};
         }
         for (std::size_t i = 0; i < kN; ++i) {
             window[i] = iclforge::internal::Fixed32{kAnalysisWindow[i]};
         }
     }
+
+   private:
+    static constexpr double portable_cosine(double angle) {
+        return iclforge::dsp::tiered::portable::cos(angle);
+    }
+    static constexpr double portable_sine(double angle) {
+        return iclforge::dsp::tiered::portable::sin(angle);
+    }
 };
 
-inline const FixedImdctTables& fixed_imdct_tables() {
-    static const FixedImdctTables t;
-    return t;
-}
+// Constant-initialised and NOT const: initialised data (.data), made by the compiler and not by a
+// first call, with no guard to test. Not constexpr on purpose. A constant would be read-only data,
+// which on a part with a flash cache (an ESP32-C6's is 16 KB, shared with the code) is fetched
+// through the cache from flash whenever the code in between has pushed its lines out, and these
+// are read by every block of every stream: measured on a C6, tables as constants cost 15 permille
+// of a burst (AC-3 656 -> 671, E-AC-3 751 -> 766), and as initialised data 3 to 5, which is noise
+// (661, 755): the same RAM as the .bss they were, none of the first call's 800 cosines.
+inline constinit FixedImdctTables kFixedImdctTables{};
+
+inline const FixedImdctTables& fixed_imdct_tables() { return kFixedImdctTables; }
 
 // The largest coefficient magnitude the pair accepts, in raw units: one half.
 // See the header comment for where the bound comes from.
