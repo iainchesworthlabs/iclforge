@@ -15,6 +15,8 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFile>
+#include <QFont>
+#include <QFontDatabase>
 #include <QMimeData>
 #include <QPointF>
 #include <QSettings>
@@ -544,6 +546,24 @@ public slots:
         QCoreApplication::setOrganizationName(QStringLiteral("iclforge"));
         QCoreApplication::setApplicationName(QStringLiteral("Hearth"));
         QQuickStyle::setStyle(QStringLiteral("Basic"));
+        // The family's own typeface, registered and made the default exactly as src/main.cpp
+        // does it, from the same files (tests/CMakeLists.txt embeds them in this binary), so a
+        // layout suite measures the glyphs a person sees whatever fonts the machine has. Without
+        // it a Windows machine with no QT_QPA_FONTDIR has no font at all: Qt.fontFamilies() is
+        // empty and every glyph is a square as wide as its pixel size, about twice an Archivo
+        // one. The list is src/main.cpp's own; a face that is missing here is a face the suites
+        // never see, so a change to one is a change to both.
+        for (const auto* face : {":/fonts/Archivo-Regular.ttf", ":/fonts/Archivo-Medium.ttf",
+                                 ":/fonts/Archivo-SemiBold.ttf", ":/fonts/Archivo-ExtraBold.ttf",
+                                 ":/fonts/MaterialSymbolsSharp-Regular.ttf",
+                                 ":/fonts/NotoSansArabic.ttf", ":/fonts/NotoSansHebrew.ttf"}) {
+            if (QFontDatabase::addApplicationFont(QLatin1String(face)) < 0) {
+                qWarning("could not register bundled font %s", face);
+            }
+        }
+        QFont default_font = QGuiApplication::font();
+        default_font.setFamily(QStringLiteral("Archivo"));
+        QGuiApplication::setFont(default_font);
         scratch_.emplace();
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, scratch_->path());
