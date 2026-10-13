@@ -24,6 +24,7 @@
 #include "ac4_sync_word.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "channel_geometry.hpp"
+#include "sink_wait.hpp"
 #include "stream_playback.hpp"
 
 using splayer_detail::RawResult;
@@ -834,11 +835,76 @@ void StreamPlayerController::play() {
         std::vector<float> chunk(kChunkFrames * channels);
         std::vector<std::span<const float>> views(channels);
 
+        // The position and the meters, at most once a kPublishInterval: from
+        // the submit loop, and from the wait for the clip's tail to play out
+        // below, in which the picture still has to follow what is heard.
+        const auto publish_if_due = [&] {
+            const auto now = std::chrono::steady_clock::now();
+            if (now - published_at < kPublishInterval) {
+                return;
+            }
+            published_at = now;
+            // What the output has been handed and not yet played: the picture follows what
+            // is heard, which is that far behind what was submitted. A device that does not
+            // say counts as no lead, which is what pictureSeconds() then draws.
+            if (const auto at_device = sink_->position()) {
+                lead_frames_.store(at_device->frames_queued + at_device->latency_frames,
+                                   std::memory_order_relaxed);
+            }
+            std::vector<iclforge::ac3::analysis::ChannelLevel> snapshot(meter.levels().begin(),
+                                                               meter.levels().end());
+            QMetaObject::invokeMethod(this, [this, result, snapshot = std::move(snapshot)] {
+                // result_ may have moved on to a different file while
+                // this was queued (openFile() only asks should_play_ to
+                // go false - it does not wait for this worker to notice
+                // before starting its own decode) - a superseded
+                // worker's stale position/levels must never overwrite
+                // the new file's own, so this checks identity against
+                // the exact shared_ptr this worker started with rather
+                // than trusting result_ still means the same file.
+                if (result_ != result) {
+                    return;
+                }
+                emit positionChanged();
+                publishLevels(*result, snapshot);
+            });
+        };
+
+        // Set when the clip's tail was waited for: whether the output went
+        // away under it. Otherwise read from the sink below.
+        bool tail_waited = false;
+        bool sink_lost = false;
+
         while (should_play_.load(std::memory_order_relaxed)) {
             if (seek_pending_.exchange(false, std::memory_order_relaxed)) {
                 at = seek_target_.load(std::memory_order_relaxed);
             }
             if (at >= result->frame_count) {
+                // Everything is handed over, which is not everything heard:
+                // the sink's queue holds more than a second (6 channels at
+                // 48 kHz: 1.8 s), and stop() below throws away what is
+                // queued and what the device holds, so a clip shorter than
+                // the queue used to end, silent, within milliseconds of the
+                // press. The output is let to play out first. A pause, or a
+                // file opened over this one (should_play_), ends the wait at
+                // once; a seek goes on playing from there, as one anywhere
+                // else in the clip does; a device that goes away says so;
+                // one that stops answering is given up on.
+                const auto tail = iclforge::apps::wait_until_played_out(
+                    *sink_, result->sample_rate_hz, iclforge::apps::kPlayOutPoll, [&] {
+                        if (!should_play_.load(std::memory_order_relaxed) ||
+                            seek_pending_.load(std::memory_order_relaxed)) {
+                            return false;
+                        }
+                        publish_if_due();
+                        return true;
+                    });
+                if (tail == iclforge::apps::PlayOut::kStopped &&
+                    should_play_.load(std::memory_order_relaxed)) {
+                    continue;  // a seek: the top of this loop takes it up
+                }
+                tail_waited = true;
+                sink_lost = tail == iclforge::apps::PlayOut::kSinkLost;
                 break;
             }
             const auto len = std::min<std::uint64_t>(kChunkFrames, result->frame_count - at);
@@ -869,41 +935,17 @@ void StreamPlayerController::play() {
             at += len;
             read_frame_.store(at, std::memory_order_relaxed);
 
-            const auto now = std::chrono::steady_clock::now();
-            if (now - published_at >= kPublishInterval) {
-                published_at = now;
-                // What the output has been handed and not yet played: the picture follows what
-                // is heard, which is that far behind what was submitted. A device that does not
-                // say counts as no lead, which is what pictureSeconds() then draws.
-                if (const auto at_device = sink_->position()) {
-                    lead_frames_.store(at_device->frames_queued + at_device->latency_frames,
-                                       std::memory_order_relaxed);
-                }
-                std::vector<iclforge::ac3::analysis::ChannelLevel> snapshot(meter.levels().begin(),
-                                                                   meter.levels().end());
-                QMetaObject::invokeMethod(this, [this, result, snapshot = std::move(snapshot)] {
-                    // result_ may have moved on to a different file while
-                    // this was queued (openFile() only asks should_play_ to
-                    // go false - it does not wait for this worker to notice
-                    // before starting its own decode) - a superseded
-                    // worker's stale position/levels must never overwrite
-                    // the new file's own, so this checks identity against
-                    // the exact shared_ptr this worker started with rather
-                    // than trusting result_ still means the same file.
-                    if (result_ != result) {
-                        return;
-                    }
-                    emit positionChanged();
-                    publishLevels(*result, snapshot);
-                });
-            }
+            publish_if_due();
         }
 
         const bool reached_end = at >= result->frame_count;
         // Read before sink_->stop()/reset() below, which would otherwise
         // make this always false (stop() is itself indistinguishable from
-        // a device that was already gone).
-        const bool sink_lost = sink_ && !sink_->running();
+        // a device that was already gone). A clip's tail that was waited for
+        // has said already.
+        if (!tail_waited) {
+            sink_lost = sink_ && !sink_->running();
+        }
         QMetaObject::invokeMethod(this, [this, result, reached_end, sink_lost] {
             // sink_/worker_active_ are exclusively this worker's to tear
             // down regardless of which file is current: play() refuses to
@@ -925,12 +967,15 @@ void StreamPlayerController::play() {
             emit playingChanged();
             if (reached_end) {
                 read_frame_.store(0, std::memory_order_relaxed);
-            } else if (sink_lost) {
-                // positionSeconds() stays where read_frame_ (what was
-                // actually SUBMITTED) last left it, the same as a pause -
-                // sink_->position() would read no better here, since
+            }
+            if (sink_lost) {
+                // Short of the end, positionSeconds() stays where read_frame_
+                // (what was actually SUBMITTED) last left it, the same as a
+                // pause - sink_->position() would read no better here, since
                 // MonitorSink::position() also answers nothing once
-                // running() is false.
+                // running() is false. At the end - the device went while the
+                // clip's tail was playing - the clip is over all the same,
+                // and the line says its last part was not heard.
                 error_ = QStringLiteral("The playback output device disappeared.");
                 emit resultChanged();
             }

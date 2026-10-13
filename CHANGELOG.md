@@ -4735,6 +4735,23 @@ The sections below contain the complete change list and fixes.
 
 ### Fixed
 
+**The Forge GUI's players play out what they queued**
+
+- **An object's audition, a stream played in the stream player and the motion preview were cut off
+  before their end.** Each hands its audio to the output a chunk at a time and used to close the
+  output as soon as the last chunk was taken. The output's queue holds more than a second (1.4 s for
+  one channel at 48 kHz, 1.8 s for six) and closing it throws away what is in the queue
+  and in the device: an object or a stream shorter than that was taken whole within milliseconds
+  and was never heard, and a longer one lost its last 1.4 s (an audition) or 1.8 s (the player).
+  Each now waits until the output has played what it was given, and the output's own delay, before
+  it closes it. A press of stop, pause or Stop Preview, or another file opened, still ends it at
+  once; a seek in the last second of a stream goes on playing from where it was put; the position
+  and the picture follow the sound to the end; an output that goes away says so; and one that
+  stops answering is given up on after a second. The wait is
+  `iclforge::apps::wait_until_played_out` in `apps/shared/media/src/sink_wait.hpp`, held by
+  `iclforge-app-media-tests`, and the three durations by `tst_e2e_inspect.qml` and
+  `tst_e2e_objects.qml`.
+
 **Lyrics in a code page: bytes the page does not have are refused on macOS 15 as they are elsewhere**
 
 - **A Shift-JIS lead byte with no trail byte after it was dropped without a word on macOS 15.**

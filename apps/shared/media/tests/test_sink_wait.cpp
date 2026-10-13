@@ -1,20 +1,24 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <thread>
 #include <vector>
 
+#include "iclforge/audio/monitor.hpp"
 #include "sink_wait.hpp"
 
-// apps/shared/media/src/sink_wait.hpp: how forge's play, monitor, identify and live
-// wait on a sink. None of those commands reaches its wait without a render
-// device, and a device cannot be pulled on a CI runner, so these cases hold
-// the waits against sinks that refuse and stop on cue. That a real sink stops
-// itself when its device goes is the backends' part, and the hidden
-// "[passthrough-unplug]" and "[monitor-unplug]" cases are where a person
-// checks it.
+// apps/shared/media/src/sink_wait.hpp: how forge's play, monitor, identify and
+// live wait on a sink, and how the GUI's players wait for a clip to play out.
+// None of those reaches its wait without a render device, and a device cannot
+// be pulled on a CI runner, so these cases hold the waits against sinks that
+// refuse and stop on cue. That a real sink stops itself when its device goes
+// is the backends' part, and the hidden "[passthrough-unplug]" and
+// "[monitor-unplug]" cases are where a person checks it.
 
 using namespace std::chrono_literals;
 
@@ -60,6 +64,55 @@ struct RenderThreadSink {
     bool submit(int /*payload*/) { return false; }
 
     [[nodiscard]] bool running() const { return alive.load(std::memory_order_acquire); }
+};
+
+// A sink that plays out what it was handed, one step per look at it: every call
+// of stats() or position() moves its device on by `step` frames, so a case
+// does not depend on how fast the machine runs. The queue drains into the
+// device a step at a time, and the device plays what it holds a step behind.
+// `silent` is a device that stops answering with the sink still running, and
+// `gone_at_look` one that goes away (0: never).
+struct PlayoutSink {
+    std::uint64_t submitted = 0;
+    std::uint32_t latency = 0;
+    std::uint64_t step = 100;
+    bool silent = false;
+    bool answers_position = true;
+    int gone_at_look = 0;
+
+    mutable std::uint64_t rendered = 0;
+    mutable std::uint64_t played = 0;
+    mutable int looks = 0;
+    mutable bool gone = false;
+
+    void advance() const {
+        if (++looks == gone_at_look) {
+            gone = true;
+        }
+        if (gone || silent) {
+            return;
+        }
+        played = std::min(rendered, played + step);
+        rendered = std::min(submitted, rendered + step);
+    }
+
+    [[nodiscard]] iclforge::audio::MonitorStats stats() const {
+        advance();
+        return {.frames_submitted = submitted, .frames_rendered = rendered};
+    }
+
+    [[nodiscard]] std::optional<iclforge::audio::MonitorPosition> position() const {
+        advance();
+        if (gone || !answers_position) {
+            return std::nullopt;
+        }
+        return iclforge::audio::MonitorPosition{
+            .frames_played = played,
+            .frames_queued = (submitted - rendered) + (rendered - played),
+            .latency_frames = latency};
+    }
+
+    [[nodiscard]] bool running() const { return !gone; }
 };
 
 }  // namespace
@@ -143,4 +196,119 @@ TEST_CASE("sink wait: a sink stopped by its own render thread ends both waits",
         });
         CHECK_FALSE(iclforge::apps::wait_while_running(sink, 1ms, [] { return false; }));
     }
+}
+
+TEST_CASE("sink wait: a clip is played out when its queue has emptied and the device has played it",
+          "[sink-wait][play-out]") {
+    // 1000 frames at 100 a look: the queue empties on the tenth look, and the
+    // device is a step behind it. Neither is the answer until both are.
+    const PlayoutSink sink{.submitted = 1000};
+    int polls = 0;
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [&polls] {
+              ++polls;
+              return true;
+          }) == iclforge::apps::PlayOut::kPlayedOut);
+    CHECK(sink.rendered == 1000);
+    CHECK(sink.played == 1000);
+    CHECK(polls > 0);
+}
+
+TEST_CASE("sink wait: a stop request ends the play-out at once, with the tail unplayed",
+          "[sink-wait][play-out]") {
+    const PlayoutSink sink{.submitted = 100'000};
+    int polls = 0;
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms,
+                                                [&polls] { return ++polls < 3; }) ==
+          iclforge::apps::PlayOut::kStopped);
+    CHECK(polls == 3);
+    CHECK(sink.played < sink.submitted);
+}
+
+TEST_CASE("sink wait: a stop request is heard while the device plays out what it holds",
+          "[sink-wait][play-out]") {
+    // Everything is in the device and a long way from played: the second wait.
+    PlayoutSink sink{.submitted = 100, .step = 100};
+    sink.rendered = 100;
+    sink.silent = true;
+    int polls = 0;
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms,
+                                                [&polls] { return ++polls < 4; }) ==
+          iclforge::apps::PlayOut::kStopped);
+    CHECK(polls == 4);
+}
+
+TEST_CASE("sink wait: a device lost with the queue still full ends the play-out",
+          "[sink-wait][play-out]") {
+    const PlayoutSink sink{.submitted = 100'000, .gone_at_look = 5};
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [] { return true; }) ==
+          iclforge::apps::PlayOut::kSinkLost);
+    CHECK(sink.played < sink.submitted);
+}
+
+TEST_CASE("sink wait: a device lost while it plays out what it holds ends the play-out",
+          "[sink-wait][play-out]") {
+    // The queue is empty; the device has 1000 frames and goes on the third look.
+    PlayoutSink sink{.submitted = 1000, .step = 10, .gone_at_look = 3};
+    sink.rendered = 1000;
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [] { return true; }) ==
+          iclforge::apps::PlayOut::kSinkLost);
+}
+
+TEST_CASE("sink wait: a device that stops answering cannot hold the caller for ever",
+          "[sink-wait][play-out]") {
+    // Running, and nothing moves: the queue never empties. The bound is the
+    // time what is queued should take plus the grace given: 1000 frames at
+    // 48 kHz is 20 ms, and the grace 100 ms.
+    {
+        const PlayoutSink sink{.submitted = 1000, .silent = true};
+        const auto begun = std::chrono::steady_clock::now();
+        CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [] { return true; }, 100ms) ==
+              iclforge::apps::PlayOut::kTimedOut);
+        const auto waited = std::chrono::steady_clock::now() - begun;
+        CHECK(waited >= 100ms);
+        CHECK(waited < 5s);
+    }
+    // The queue emptied, and the device's clock stopped with its buffer unplayed.
+    {
+        PlayoutSink sink{.submitted = 1000, .silent = true};
+        sink.rendered = 1000;
+        CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [] { return true; }, 100ms) ==
+              iclforge::apps::PlayOut::kTimedOut);
+    }
+}
+
+TEST_CASE("sink wait: the output path's latency is waited for after the last frame played",
+          "[sink-wait][play-out]") {
+    // Everything played already; the platform says its path adds 100 ms
+    // (4800 frames at 48 kHz), and a period's margin comes with it.
+    PlayoutSink sink{.submitted = 1000, .latency = 4800};
+    sink.rendered = 1000;
+    sink.played = 1000;
+    const auto begun = std::chrono::steady_clock::now();
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [] { return true; }) ==
+          iclforge::apps::PlayOut::kPlayedOut);
+    CHECK(std::chrono::steady_clock::now() - begun >= 100ms + iclforge::apps::kPlayOutPeriod);
+}
+
+TEST_CASE("sink wait: nothing submitted is played out after the margin alone",
+          "[sink-wait][play-out]") {
+    const PlayoutSink sink;
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [] { return true; }) ==
+          iclforge::apps::PlayOut::kPlayedOut);
+}
+
+TEST_CASE("sink wait: a running sink that cannot say where it is is waited for by the margin",
+          "[sink-wait][play-out]") {
+    PlayoutSink sink{.submitted = 500, .answers_position = false};
+    sink.rendered = 500;
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [] { return true; }) ==
+          iclforge::apps::PlayOut::kPlayedOut);
+}
+
+TEST_CASE("sink wait: a sink already stopped has played out nothing", "[sink-wait][play-out]") {
+    PlayoutSink sink{.submitted = 1000};
+    sink.rendered = 1000;
+    sink.gone = true;
+    CHECK(iclforge::apps::wait_until_played_out(sink, 48000, 1ms, [] { return true; }) ==
+          iclforge::apps::PlayOut::kSinkLost);
 }

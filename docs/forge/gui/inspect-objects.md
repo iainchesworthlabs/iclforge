@@ -50,7 +50,8 @@ Once a file decodes, the dialog fills with:
 Each object's own **Audition** button plays that object's JOC-reconstructed audio through an
 ordinary output — the same shared-mode playback path (`iclforge::audio::MonitorSink`) the Objects tab's
 own motion preview uses — so it can be judged by ear, not just by position. Only one object
-auditions at a time; **Audition** on the row already playing becomes **Stop**. This is a parametric
+auditions at a time; **Audition** on the row already playing becomes **Stop**, and an audition that
+is not stopped plays the object to its end. This is a parametric
 reconstruction, not the original source audio recovered losslessly — see
 [Spatial audio & Dolby Atmos](../../library/spatial-and-atmos.md) for what JOC can and cannot pull
 apart.

@@ -24,6 +24,7 @@
 #include "ac4_sync_word.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "container_input.hpp"
+#include "sink_wait.hpp"
 
 using objdec_detail::RawFrame;
 using objdec_detail::RawResult;
@@ -443,7 +444,7 @@ void ObjectDecodeController::auditionObject(int index) {
     auditioning_index_ = index;
     emit auditionChanged();
 
-    jobs_.run([this, samples] {
+    jobs_.run([this, samples, rate = result_->sample_rate_hz] {
         std::size_t at = 0;
         QString error;
         while (at < samples.size()) {
@@ -468,6 +469,21 @@ void ObjectDecodeController::auditionObject(int index) {
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(4));
             }
+        }
+        // Handed over is not heard. The sink's queue holds more than a second
+        // (a mono queue at 48 kHz is 65536 samples), so an object shorter than
+        // that has been taken whole within milliseconds of the press, and
+        // stop() below throws away whatever is queued and whatever the device
+        // holds: the audition used to end, silent, as soon as it began. The
+        // output is let to play out what it was given first. A second press
+        // (stop_audition_) ends that wait at once; a device that goes away
+        // says so; one that stops answering is given up on.
+        if (error.isEmpty() && at >= samples.size() &&
+            iclforge::apps::wait_until_played_out(
+                *audition_sink_, rate, iclforge::apps::kPlayOutPoll,
+                [this] { return !stop_audition_.load(std::memory_order_relaxed); }) ==
+                iclforge::apps::PlayOut::kSinkLost) {
+            error = QStringLiteral("The audition output device disappeared.");
         }
         QMetaObject::invokeMethod(this, [this, error] {
             if (audition_sink_) {
