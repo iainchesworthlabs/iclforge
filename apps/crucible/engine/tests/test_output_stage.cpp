@@ -356,12 +356,16 @@ TEST_CASE("output stage: a sink that has stopped itself is not waited out to the
     devices->burst_sinks[0]->running = false;
     Encoded encoded;
     const auto raw = encoded.next();
-    const auto start = std::chrono::steady_clock::now();
+    const int refusals_left_before = devices->burst_sinks[0]->refuse_submits;
     stage.submit(encoded.unit, raw);
-    const auto elapsed = std::chrono::steady_clock::now() - start;
     CHECK(stage.status().underruns == 1);
     CHECK(devices->burst_sinks[0]->submits == 0);
-    CHECK(elapsed < std::chrono::milliseconds(100));
+    // How many times the sink was asked, not how long the call took: a sink that was waited out
+    // is asked every 2 ms for the whole window (a hundred times), one that is found not to be
+    // running is asked once. A wall-clock bound failed on a machine busy enough to stall this
+    // thread for the length of the window it was measuring, whatever the stage did.
+    const int asked = refusals_left_before - devices->burst_sinks[0]->refuse_submits;
+    CHECK(asked == 1);
 }
 
 TEST_CASE("output stage: stop tears the sink down and submit is then a no-op", "[crucible][output_stage]") {
