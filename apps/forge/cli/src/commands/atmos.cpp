@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
-#include <format>
 #include <fstream>
 #include <ios>
 #include <iterator>
@@ -712,9 +711,9 @@ int run_atmos_encode_multi(std::string_view in_path, std::string_view out_path,
             std::string taps;
             for (const auto& [flat, gain] : slots[i].taps) {
                 taps += taps.empty() ? "" : " + ";
-                taps += std::format("ch{}", flat);
+                taps += fmt::format("ch{}", flat);
                 if (gain != 1.0) {
-                    taps += std::format(" x{:.3f}", gain);
+                    taps += fmt::format(" x{:.3f}", gain);
                 }
             }
             status_println(status, "    object {}: {}", i, taps.empty() ? "silent" : taps);

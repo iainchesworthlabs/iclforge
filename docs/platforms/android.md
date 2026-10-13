@@ -89,8 +89,9 @@ made that safe). The macOS wheel's own deployment target has the identical `from
 (`'from_chars' is unavailable: introduced in macOS 26.0`) — {fmt}'s own vendored formatting avoids
 the matching `to_chars` gap there (`'to_chars' is unavailable: introduced in macOS 13.3`) that a
 raw `std::format` call would hit — so this leg and **Build wheels (macos-latest)** are the two
-that catch a *parsing* regression; a *formatting* one shows up everywhere, same as any other
-compile error.
+that catch a *parsing* regression. A *formatting* one is a `std::format` or `std::print`, which
+every desktop standard library compiles, so `tools/checks/check_no_std_format.py` fails it in the
+static job instead.
 
 `minSdk = 26` (Oreo) is a hard floor, not a target: `monitor.cpp` depends on AAudio outright, which
 does not exist below API 26, and there is no fallback path. Real Shield TV hardware (2017 model
