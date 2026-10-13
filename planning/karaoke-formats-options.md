@@ -1,9 +1,11 @@
 # Karaoke formats: options for the owner (D14 to D17)
 
-!!! note "Status as of 2026-10-12: D15 is built; D14, D16 and D17 are options with costs and wait for an answer"
+!!! note "Status as of 2026-10-13: D15 is built; parts of D14 and D16 have been built since (below); D17 is options with costs and waits for an answer"
     This page is item D, "Formats", of the owner's triage list after [phase 2](karaoke-phase2.md).
-    D15 is a small build and is in its own pull request. D14, D16 and D17 are decisions: nothing
-    below them is built. The numbers are the triage list's, and are separate from the plan's
+    D15 is a small build and is in its own pull request. D14, D16 and D17 were written as decisions
+    with nothing built. Since then, of D14 an ASS duet and a script made with Aegisub's karaoke
+    templater are read (#1416, #1481), and of D16 Forge reads a lyrics file in a named code page and
+    writes the words out as UTF-8 (#1418, #1423, #1428); the rest of both, and D17, are as written. The numbers are the triage list's, and are separate from the plan's
     [D1 to D12](karaoke-phase2.md#decisions). The readers are in `libs/lyrics`; the user-facing
     description of each format is [the karaoke guide](../docs/karaoke/index.md#lyrics).
 

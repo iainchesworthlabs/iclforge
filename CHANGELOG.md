@@ -4275,6 +4275,15 @@ The sections below contain the complete change list and fixes.
 - CONTRIBUTING.md lists the four AC-4 directories and their header layout. The file I/O, Rust API
   and signing pages were checked against their headers and corrected.
 - ROADMAP.md lists the Hearth work as it stands and the gaps found in the documentation.
+- ROADMAP.md and the plan index were checked against the tree on 2026-10-13. The Hearth table had
+  two rows twice over and now has one each, with a row for Hearth for Android; the AC-4 table says
+  the decoder runs on the ESP32-P4, ESP32-S3 and (as fixed point) the C6 and that a sink built with
+  it takes AC-4 in a Sendspin group; the karaoke row has the microphone, the scoring and the takes
+  as built; and the man page row is gone, since `forge man` names AC-4. `planning/README.md` has
+  the E-AC-3 karaoke plan in its table (the row had fallen between two sections), rows for the
+  P4 panel and the sync measurement pages, the consolidation, monorepo and layout plans under
+  built work with their pull request, and the state of each plan that had merged since its row was
+  written; the AC-4 plan's state table carries the pull request of each ESP32 phase and of I6.
 
 **Release engineering**
 
