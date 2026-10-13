@@ -1,0 +1,96 @@
+# Keeps the repository's 10 GB Actions cache quota for entries something can
+# still restore. GitHub evicts the least recently used entries once the quota is
+# exceeded, with no regard for which of them took an hour to build, so the quota
+# has to be defended. On 2026-10-13 this repository held 9.0 GB of it:
+#
+#   - ccache: one 1.0-1.9 GB entry per main commit and compiler (4.8 GB), of
+#     which a restore ever takes the newest;
+#   - Qt installs saved under merge-queue refs (450-530 MB each) that nothing
+#     but that queue entry can read, and that vanish with it;
+#   - the same for a vcpkg set saved on a queue ref, and for every older
+#     vcpkg / downloads generation a manifest or vcpkg-commit bump left behind.
+#
+# tools/ci/prune-actions-cache.sh holds the rules and explains each. A cache
+# entry is readable only from its own ref, a pull request's base and the default
+# branch, so an entry whose ref is gone can never be restored again.
+#
+# Not a gate: nothing waits for it, and a missed run only means the next one
+# catches up.
+#
+# Trust: `workflow_run` runs with a write token in the context of the default
+# branch. As in main-health.yml, this job checks out main and nothing else, runs
+# only code from main, takes nothing from the triggering run, and the
+# pull-request-controlled part of that run is excluded by the `branches` filter.
+name: Cache hygiene
+
+on:
+  # After a post-merge run finished saving its caches: that is when a new
+  # generation exists and the one before it is superseded. (A push trigger would
+  # prune before the new generation is saved and leave two behind.)
+  # zizmor: ignore[dangerous-triggers] see the trust note above: main's own code only, nothing from the event
+  workflow_run:
+    workflows: [ CI, PR Gate ]
+    types: [ completed ]
+    branches: [ main ]
+  # A closed pull request's caches go as soon as it is closed (merged or not).
+  pull_request:
+    types: [ closed ]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only list what would be deleted.
+        type: boolean
+        default: true
+      purge:
+        description: >-
+          Delete every entry whose key starts with this, on every ref: the reset
+          for a cache that has carried stale content too long (for example
+          `vcpkg-Windows-`). The next run on it builds from cold.
+        type: string
+        default: ""
+
+permissions: {}
+
+# One at a time, never cancelled half way through a delete loop.
+concurrency:
+  group: cache-hygiene
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    name: Prune Actions caches
+    # A fork PR's token cannot delete anything, and a fork's caches are not in
+    # this repository's quota in the first place. A cancelled or skipped run
+    # saved nothing new.
+    if: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write # delete cache entries (gh cache delete)
+      contents: read # check out the script
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # main, whatever triggered it: a pull_request run would otherwise run
+          # the script as the PR's branch has it.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: tools/ci/prune-actions-cache.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Prune
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # A manual run defaults to a dry run; every other trigger deletes.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '' }}
+          PURGE: ${{ github.event_name == 'workflow_dispatch' && inputs.purge || '' }}
+        run: |
+          args=()
+          if [ -n "$DRY_RUN" ]; then args+=(--dry-run); fi
+          if [ -n "$PURGE" ]; then args+=(--purge "$PURGE"); fi
+          bash tools/ci/prune-actions-cache.sh "${args[@]}"
