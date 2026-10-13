@@ -163,7 +163,10 @@ class TestServices : public QObject {
     Q_OBJECT
 
 public:
-    explicit TestServices(QQmlEngine& engine) : engine_(&engine) {}
+    // `files_dir` is where writeTextFile() and writeBinaryFile() put what a suite imports: the
+    // process's own scratch directory, so two runs of the suites at once (two build trees, two
+    // ctest jobs on one runner) never write the same file name in a folder they share.
+    TestServices(QQmlEngine& engine, QString files_dir) : engine_(&engine), files_dir_(std::move(files_dir)) {}
 
     // [{ app: 900, name: "Chrome", active: true }, ...]. False when the
     // controller singleton cannot be reached, so a suite can skip rather
@@ -233,6 +236,17 @@ public:
         return true;
     }
 
+    // The scripted full-screen seam saying it cannot answer, the way Wayland does and a machine
+    // with no display does: the reason is what the Room's note then prints, and the rule is off.
+    // Call it after a scripted machine exists and before the engine starts. False before that.
+    Q_INVOKABLE bool setFullscreenUnsupported(const QString& reason) {
+        if (!foreground_) {
+            return false;
+        }
+        foreground_->set_unsupported(reason.toStdString());
+        return true;
+    }
+
     // How many times the scripted machine was asked to open its sound
     // settings: what "Open Sound settings" and a refused move do.
     Q_INVOKABLE int soundSettingsOpened() const {
@@ -258,13 +272,12 @@ public:
         return store.value(key);
     }
 
-    // `text` (UTF-8) as a file called `name` in a folder of this harness's own under the
-    // temporary directory, and its path; empty when it could not be written. For the lyrics
-    // suite, which imports a file by its path.
+    // `text` (UTF-8) as a file called `name` in this process's own scratch directory, and its
+    // path; empty when it could not be written. For the lyrics suite, which imports a file by
+    // its path.
     Q_INVOKABLE QString writeTextFile(const QString& name, const QString& text) const {
-        const QString folder = QDir(QDir::tempPath()).filePath(QStringLiteral("crucible_qmltests_files"));
-        QDir().mkpath(folder);
-        const QString path = QDir(folder).filePath(name);
+        QDir().mkpath(files_dir_);
+        const QString path = QDir(files_dir_).filePath(name);
         QFile file(path);
         if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             return {};
@@ -277,9 +290,8 @@ public:
     // is not text (a MIDI karaoke file). Its path, or empty when it could not be written. A list and
     // not a string, since a script string does not carry a byte above 0x7F through Qt.btoa().
     Q_INVOKABLE QString writeBinaryFile(const QString& name, const QVariantList& bytes) const {
-        const QString folder = QDir(QDir::tempPath()).filePath(QStringLiteral("crucible_qmltests_files"));
-        QDir().mkpath(folder);
-        const QString path = QDir(folder).filePath(name);
+        QDir().mkpath(files_dir_);
+        const QString path = QDir(files_dir_).filePath(name);
         QFile file(path);
         if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             return {};
@@ -450,6 +462,7 @@ private:
     }
 
     QQmlEngine* engine_ = nullptr;
+    QString files_dir_;
     bool scripted_ = false;
     // The scripted machine's seams, kept so a case can change them while
     // the engine runs over them.
@@ -494,7 +507,7 @@ public slots:
                                  new iclforge::crucible::ui::AppIconProvider);
         // The scripted machine, under its own URI so nothing the window
         // itself imports can reach it.
-        test_services_.emplace(*engine);
+        test_services_.emplace(*engine, QDir(scratch_->path()).filePath(QStringLiteral("files")));
         qmlRegisterSingletonInstance("CrucibleTest", 1, 0, "TestServices", &*test_services_);
     }
 
