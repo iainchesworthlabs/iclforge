@@ -51,6 +51,9 @@ C6 / S3 / P4 sink modules on one dual-ES9080 PCB, are on
   PSRAM, the heap floors and what each codec costs on the S3, the C6 and the P4, side by side.
 - **Building with ESPHome instead of raw ESP-IDF?** [ESPHome](esphome.md) is the external
   component. It decodes AC-3 only, and it is not a `media_player` or `speaker` source.
+- **Changing the ESP32 firmware, or a decoder it links?**
+  [Testing and benchmarking the boards](board-bench.md) says what is tested on the host, under
+  QEMU and in CI, what needs a board, and how a board's plays are held to a recorded baseline.
 
 ## Where to go next
 

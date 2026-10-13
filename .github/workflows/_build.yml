@@ -1399,7 +1399,7 @@ jobs:
 
       # The Android SDK cmdline-tools ship preinstalled on this image
       # (ANDROID_HOME already set), but not necessarily the exact NDK version
-      # build.gradle.kts pins (26.1.10909125, see docs/platforms/android.md) -
+      # build.gradle.kts pins (28.2.13676358, r28c; see docs/platforms/android.md) -
       # install it explicitly rather than trust whatever the image happens to
       # have cached, the same reasoning every other toolchain step in this
       # workflow already follows. `yes | sdkmanager --licenses` can exit
@@ -1411,7 +1411,7 @@ jobs:
         run: |
           set -euo pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.1.10909125"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
 
       # The Shield app signs Atmos objects on-device, so the key has to be in
       # the APK as an asset (src/main/assets/signing.key, gitignored). Runs
@@ -1631,7 +1631,7 @@ jobs:
         run: |
           set -euo pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.1.10909125"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
 
       - uses: ./.github/actions/setup-vcpkg
         with:
@@ -1644,7 +1644,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125"
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
           cmake --preset config-android-arm64
 
       - name: Build
@@ -1692,7 +1692,7 @@ jobs:
         run: |
           set -euo pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;26.1.10909125"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
 
       # Exports VCPKG_ROOT and the binary cache, which the app's CMakeLists.txt reads.
       - uses: ./.github/actions/setup-vcpkg

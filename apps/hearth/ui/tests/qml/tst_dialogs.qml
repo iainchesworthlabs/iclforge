@@ -41,8 +41,15 @@ TestCase {
         verify(notNow !== null);
         // Opened one event-loop turn after the window comes up.
         tryVerify(function() { return notNow.visible; }, 5000, "the first-run dialog did not open on a first start");
-        // Its first step names the output it will play to.
-        verify(findChild(win, "firstRunOutputRow") !== null);
+        // Its first step names the output it will play to, and says where
+        // the output name is without naming a side of the window: the header
+        // it sits in is mirrored in a language written right to left.
+        const outputRow = findChild(win, "firstRunOutputRow");
+        verify(outputRow !== null);
+        verify(outputRow.body.indexOf("at the top of the window") >= 0,
+               "the first-run dialog does not say where the output name is: " + outputRow.body);
+        verify(!/\b(left|right)\b/i.test(outputRow.body),
+               "the first-run dialog names a side of the window: " + outputRow.body);
         // Its third step says a GROUP, not just pairing, is what a network
         // sink needs to play - the gap behind the report that a paired
         // sink's first Play fell back to the local output with nothing said

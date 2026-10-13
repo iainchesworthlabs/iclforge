@@ -3,7 +3,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <format>
+#include <fmt/chrono.h>  // IWYU pragma: keep - fmt::formatter<time_point> for utc_now() below
+#include <fmt/format.h>
 #include <system_error>
 #include <utility>
 
@@ -45,7 +46,7 @@ std::string json_string(const std::string& text) {
                 break;
             default:
                 if (static_cast<unsigned char>(c) < 0x20) {
-                    out += std::format("\\u{:04x}",
+                    out += fmt::format("\\u{:04x}",
                                        static_cast<unsigned>(static_cast<unsigned char>(c)));
                 } else {
                     out += c;
@@ -63,7 +64,7 @@ std::string utf8(const fs::path& path) {
 
 std::string utc_now() {
     const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
-    return std::format("{:%Y-%m-%dT%H:%M:%SZ}", now);
+    return fmt::format("{:%Y-%m-%dT%H:%M:%SZ}", now);
 }
 
 }  // namespace
@@ -200,23 +201,23 @@ std::expected<TakeInfo, std::string> TakeRecorder::finish(const TakeMetadata& me
     json += "  \"format\": \"iclforge-take-1\",\n";
     json += "  \"audio\": " + json_string(utf8(path_.filename())) + ",\n";
     json += "  \"dry_voice\": true,\n";
-    json += std::format("  \"sample_rate\": {},\n  \"channels\": 1,\n  \"bit_depth\": {},\n", rate_,
+    json += fmt::format("  \"sample_rate\": {},\n  \"channels\": 1,\n  \"bit_depth\": {},\n", rate_,
                         kBitDepth);
-    json += std::format("  \"frames\": {},\n  \"seconds\": {:.3f},\n", frames_, info.seconds);
+    json += fmt::format("  \"frames\": {},\n  \"seconds\": {:.3f},\n", frames_, info.seconds);
     json += "  \"created_utc\": " + json_string(utc_now()) + ",\n";
     json += "  \"item\": {\"path\": " + json_string(metadata.item_path) +
             ", \"title\": " + json_string(metadata.item_title) + "},\n";
     if (metadata.item_start_ms) {
-        json += std::format("  \"item_start_ms\": {},\n", *metadata.item_start_ms);
+        json += fmt::format("  \"item_start_ms\": {},\n", *metadata.item_start_ms);
     } else {
         json += "  \"item_start_ms\": null,\n";
     }
-    json += std::format(
+    json += fmt::format(
         "  \"alignment\": {{\"input_delay_ms\": {}, \"offset_ms\": {}, \"timing_estimated\": "
         "{}}},\n",
         metadata.input_delay_ms, metadata.offset_ms, metadata.timing_estimated ? "true" : "false");
     json += "  \"reference\": " + json_string(metadata.reference) + ",\n";
-    json += std::format("  \"headphones\": {}\n", metadata.headphones ? "true" : "false");
+    json += fmt::format("  \"headphones\": {}\n", metadata.headphones ? "true" : "false");
     json += "}\n";
     std::ofstream side(info.sidecar, std::ios::binary | std::ios::trunc);
     side.write(json.data(), static_cast<std::streamsize>(json.size()));

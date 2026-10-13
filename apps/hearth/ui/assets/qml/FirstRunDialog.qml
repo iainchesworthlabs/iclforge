@@ -104,6 +104,10 @@ Dialog {
 
         // 01. Where it plays. deviceName is the same fact the Speakers page
         // heads itself with, so both agree on what "the default output" is.
+        // The body names no side for the output name: the header has it
+        // beside the title, before the page buttons, which is the left of the
+        // window in a language read left to right and the right of it in
+        // Arabic, Hebrew and Yiddish (Main.qml's LayoutMirroring).
         Step {
             objectName: "firstRunOutputRow"
             ordinal: "01"
@@ -111,8 +115,8 @@ Dialog {
                 ? qsTr("It plays to %1").arg(HearthController.deviceName)
                 : qsTr("It plays to your default output")
             body: qsTr("That is this computer's default output. The output name at the top "
-                      + "right opens the list of receivers, passthrough devices and network "
-                      + "sinks.")
+                      + "of the window opens the list of receivers, passthrough devices and "
+                      + "network sinks.")
         }
 
         // 02. Where per-output setup lives - real, on the Speakers page
