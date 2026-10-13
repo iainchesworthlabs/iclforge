@@ -4318,6 +4318,14 @@ The sections below contain the complete change list and fixes.
   rows, and four stale claims corrected.
 - The CLI reference lists all forty-two commands, including the previously-undocumented
   `spatial`.
+- **The locked ESP32 build profiles have a developer page.**
+  [ESP32 build profiles](docs/platforms/bare-metal/build-profiles.md) covers
+  `firmware/hearth-sink/profiles.json`: the seven profiles and their fragments in order, what
+  `locked`, `budget`, `watch` and `free` hold, the guard and where CI runs it, the rule that a new
+  Kconfig key is placed in the profiles at the pull request, how to read a board's profile from
+  `GET /hardware`, the commands that build a board from its profile in WSL and on Windows, and
+  what a change to a profile has to carry. Until now this was written down only in a planning
+  note.
 - The threat model, the WebAssembly page, the ADM page and the building guide no longer describe
   the codec libraries as free of third-party dependencies. {fmt} is compiled into `ac3::forge`
   and `mp4::mp4`.
@@ -4331,14 +4339,6 @@ The sections below contain the complete change list and fixes.
 - The Hearth page describes the desktop player as it is: it plays to network sinks, plays
   channel-based AC-4, packages for Windows, macOS and Linux, and updates a sink's firmware. The
   ESP32-P4 has its row, and its page is in the navigation.
-- **The locked ESP32 build profiles have a developer page.**
-  [ESP32 build profiles](docs/platforms/bare-metal/build-profiles.md) covers
-  `firmware/hearth-sink/profiles.json`: the seven profiles and their fragments in order, what
-  `locked`, `budget`, `watch` and `free` hold, the guard and where CI runs it, the rule that a new
-  Kconfig key is placed in the profiles at the pull request, how to read a board's profile from
-  `GET /hardware`, the commands that build a board from its profile in WSL and on Windows, and
-  what a change to a profile has to carry. Until now this was written down only in a planning
-  note.
 - The front page, the README and the site description name AC-4 and say where it is and is not
   supported.
 - The pages that still said no ESP32 sink takes AC-4 in a Sendspin group say what is built: a sink
