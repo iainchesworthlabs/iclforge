@@ -210,9 +210,11 @@
     {
       "name": "sanitize-asan-ubsan",
       "hidden": true,
-      "description": "AddressSanitizer + UndefinedBehaviorSanitizer, fatal on first violation (-fno-sanitize-recover=all in cmake/Sanitizers.cmake) rather than logging and continuing. Deliberately does NOT add -fsanitize=integer's unsigned-integer-overflow check: this codec relies on intentional unsigned wraparound (CRC16, ring-buffer indices, the splice counter), and blanket-enabling it drowns real findings in expected wraparound. Signed overflow and out-of-range shifts - the precedent bug's own category (commit 8386c8f) - are already part of the default 'undefined' set.",
+      "description": "AddressSanitizer + UndefinedBehaviorSanitizer, fatal on first violation (-fno-sanitize-recover=all in cmake/Sanitizers.cmake) rather than logging and continuing. Deliberately does NOT add -fsanitize=integer's unsigned-integer-overflow check: this codec relies on intentional unsigned wraparound (CRC16, ring-buffer indices, the splice counter), and blanket-enabling it drowns real findings in expected wraparound. Signed overflow and out-of-range shifts - the precedent bug's own category (commit 8386c8f) - are already part of the default 'undefined' set. Built at -O1, not the debug preset's -O0: an unoptimised build leaves every std::vector::operator[] and every f64x2 wrapper a call, and the codec tests took 6 to 12 times as long as at -O1 (the 4,176-test leg's ctest alone, 118 minutes). -O1 is what the AddressSanitizer documentation recommends and assertions stay on (no NDEBUG). What it gives up: AddressSanitizer instruments late in the pipeline, so a load whose result nothing uses can be folded away before it is checked, where -O0 would have checked it; UBSan checks are emitted by the front end and are unchanged.",
       "cacheVariables": {
-        "ICLFORGE_SANITIZERS": "address,undefined"
+        "ICLFORGE_SANITIZERS": "address,undefined",
+        "CMAKE_C_FLAGS_DEBUG": "-O1 -g",
+        "CMAKE_CXX_FLAGS_DEBUG": "-O1 -g"
       }
     },
     {

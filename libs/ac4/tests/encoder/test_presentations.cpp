@@ -45,7 +45,6 @@
 #include "iclforge/ac4/core/syntax.hpp"
 #include "iclforge/ac4/decoder/decoder.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
-#include "sanitized.hpp"
 
 namespace {
 
@@ -55,9 +54,7 @@ using iclforge::ac4::Speaker;
 
 constexpr int kRate = 48000;
 constexpr std::size_t kFrameLength = 2048;
-// Under the sanitizers (tests/support/sanitized.hpp) fourteen frames of tone, which still leave a
-// steady state of eleven to measure the tones over; a normal build takes twenty.
-constexpr std::size_t kInputFrames = iclforge::test::kSanitized ? 14 : 20;
+constexpr std::size_t kInputFrames = 20;
 // The frames before the steady state: the encoder's and the decoder's delays
 // and the first frames' overlap.
 constexpr std::size_t kSkippedSamples = 5 * kFrameLength;

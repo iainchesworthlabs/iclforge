@@ -493,15 +493,11 @@ TEST_CASE(
     "decode_by_block hands the output over in blocks of 256 samples whatever the frame length",
     "[ac4][decoder][api]") {
     // Index 13's 2 048-sample frames, and 24 fps IMS, whose frames come to 2 000
-    // samples at 48 kHz: seven blocks and 208 held for the next. Under the
-    // sanitizers (tests/support/sanitized.hpp) the first 48 frames of each.
+    // samples at 48 kHz: seven blocks and 208 held for the next.
     for (const std::string_view leg :
          {"ac4-20-tones-192", "ac4-ims-film-96-24", "ac4-ims-music-64-2997"}) {
         CAPTURE(leg);
-        auto frames = frames_of(baseline(leg));
-        if (kSanitized && frames.size() > 48) {
-            frames.resize(48);
-        }
+        const auto frames = frames_of(baseline(leg));
         iclforge::ac4::Decoder whole;
         const Decoded reference = decode_all(whole, frames);
 
@@ -805,10 +801,7 @@ TEST_CASE("presentations() lists each presentation of the table of contents",
 TEST_CASE("metadata() reports the values the selected presentation's frames sent",
           "[ac4][decoder][api]") {
     // Each DEE leg's frames traced: the last value of each element the trace
-    // shows, which is what metadata() holds after the last frame. Under the
-    // sanitizers (tests/support/sanitized.hpp) the first twelve frames, which are
-    // what it holds after the last of them, and where the trace costs the most.
-    constexpr std::size_t kSanitizedMetadataFrames = 12;
+    // shows, which is what metadata() holds after the last frame.
     for (const std::string_view leg : {"ac4-20-music-192", "ac4-20-speech-128", "ac4-51-music-128",
                                        "ac4-51-drc-ltrt-192", "ac4-51-film-96"}) {
         CAPTURE(leg);
@@ -821,11 +814,7 @@ TEST_CASE("metadata() reports the values the selected presentation's frames sent
             ++seen[std::string{r.name}];
         };
         iclforge::ac4::Decoder decoder(config);
-        std::vector<std::vector<std::byte>> frames = frames_of(baseline(leg));
-        if (kSanitized && frames.size() > kSanitizedMetadataFrames) {
-            frames.resize(kSanitizedMetadataFrames);
-        }
-        for (const std::vector<std::byte>& frame : frames) {
+        for (const std::vector<std::byte>& frame : frames_of(baseline(leg))) {
             REQUIRE(decoder.decode(frame).has_value());
         }
         const iclforge::ac4::PresentationMetadata& m = decoder.metadata();

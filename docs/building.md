@@ -135,10 +135,13 @@ The heaviest AC-4 tests take less under it: fewer frames, shorter signals, a str
 cases, one leg per frame rate, one committed stream of each kind (`tests/support/ac4_stream_kinds.hpp`,
 which the decoder's engine test and Hearth's share), the first frames of a stream, one frame of
 input for a CLI run that reads its first frame's syntax alone, each still running every code
-path it covers, to the same tolerances; so do the karaoke pitch, bleed and reference-melody tests,
-which play seconds fewer of their synthetic signals. A debug build under ASan and UBSan runs the
-codecs many times slower, and CI's sanitizer leg runs ctest serially; a new test that takes
-minutes there takes the flag the same way.
+path it covers, to the same tolerances. The preset builds at `-O1` (`CMAKE_CXX_FLAGS_DEBUG` in
+the `sanitize-asan-ubsan` fragment), not at the debug preset's `-O0`: unoptimised, every
+`std::vector::operator[]` and every SIMD wrapper is a call, and the codec tests took 6 to 12
+times as long. The whole suite (4,392 tests) is 27 minutes of test time at `-O1`, against
+118 minutes at `-O0`. A sanitizer build still runs the codecs several times slower than a
+release one, and CI's sanitizer leg runs ctest serially; a new test that takes minutes there
+takes the flag the same way. The ThreadSanitizer preset is still `-O0`.
 
 A test that reads what a software playback device was given reads it in blocks and not whole:
 the device does not pace the render thread, so the capture of a one-second stream is 100 to

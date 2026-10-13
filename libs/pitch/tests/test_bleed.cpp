@@ -15,17 +15,11 @@
 #include "iclforge/pitch/scorer.hpp"
 #include "iclforge/pitch/synth.hpp"
 #include "iclforge/pitch/tracker.hpp"
-#include "sanitized.hpp"
 
 // libs/pitch/src/bleed.cpp: is the microphone mostly the speakers? (planning/karaoke-microphone.md,
 // SC5; findings F6.) Every signal is synthetic: a played "backing", a singer, and a room that is a
 // delay, a gain and a few reflections. The numbers hold for these signals and say nothing of a
 // particular room.
-//
-// The monitor searches the delay again over two seconds of microphone every half second, and under
-// the sanitizers that search is most of what a case costs. A case there plays a shorter signal
-// and reads the share over the same stretch of it that follows the first seconds, where the delay
-// is known: a normal build plays every case at full length (tests/support/sanitized.hpp).
 
 namespace {
 
@@ -34,11 +28,6 @@ using iclforge::pitch::BleedMonitor;
 using iclforge::pitch::BleedOptions;
 
 constexpr std::uint32_t kRate = 16000;
-
-// The seconds of signal a case plays: its own in a normal build, the shorter under the sanitizers.
-constexpr double seconds(double normal, double sanitized) {
-    return iclforge::test::kSanitized ? sanitized : normal;
-}
 
 // A played signal: a melody on one voice and another a fifth above it on a second, as a backing
 // with a guide would be, for `seconds`.
@@ -157,8 +146,7 @@ double share_bleed(const std::vector<BleedFrame>& frames, double from_s, double 
 
 TEST_CASE("bleed: a microphone that is the speakers is bleed, and the delay is found",
           "[pitch][bleed]") {
-    const double length = seconds(10.0, 6.0);
-    const std::vector<float> played = backing(length, 3);
+    const std::vector<float> played = backing(10.0, 3);
     const std::vector<float> mic = sum(room(played, 130.0, 0.3), noise(played.size(), 0.0005, 1));
     BleedMonitor monitor;
     const auto frames = run(monitor, played, mic);
@@ -166,12 +154,12 @@ TEST_CASE("bleed: a microphone that is the speakers is bleed, and the delay is f
     REQUIRE(monitor.delay_ms().has_value());
     CHECK(*monitor.delay_ms() == Catch::Approx(130.0).margin(1.0));
     // From the second the delay is known, every frame that has anything in it is bleed.
-    CHECK(share_bleed(frames, 1.5, length) > 0.95);
+    CHECK(share_bleed(frames, 1.5, 10.0) > 0.95);
     CHECK(monitor.recent_explained() > 0.9F);
     // And its gain is the room's: 0.3 is -10.5 dB.
     float gain = -120.0F;
     for (const BleedFrame& f : frames) {
-        if (f.bleed && static_cast<double>(f.centre_sample) / kRate > length / 2.0) {
+        if (f.bleed && static_cast<double>(f.centre_sample) / kRate > 5.0) {
             gain = f.gain_db;
             break;
         }
@@ -180,8 +168,7 @@ TEST_CASE("bleed: a microphone that is the speakers is bleed, and the delay is f
 }
 
 TEST_CASE("bleed: a singer alone is not bleed", "[pitch][bleed]") {
-    const double length = seconds(10.0, 6.0);
-    const std::vector<float> played = backing(length, 5);
+    const std::vector<float> played = backing(10.0, 5);
     iclforge::pitch::VoiceOptions options;
     options.sample_rate = kRate;
     options.lead_s = 0.0;
@@ -192,13 +179,11 @@ TEST_CASE("bleed: a singer alone is not bleed", "[pitch][bleed]") {
     const std::vector<float> mic = sum(voice, noise(played.size(), 0.0005, 2));
     BleedMonitor monitor;
     const auto frames = run(monitor, played, mic);
-    CHECK(share_bleed(frames, 0.0, length) < 0.02);
+    CHECK(share_bleed(frames, 0.0, 10.0) < 0.02);
 }
 
 TEST_CASE("bleed: a voice above the speakers is not bleed, and below them is", "[pitch][bleed]") {
-    const int note_count = iclforge::test::kSanitized ? 16 : 24;
-    const double length = 0.5 * note_count;
-    const std::vector<float> played = backing(length, 7, true);
+    const std::vector<float> played = backing(12.0, 7, true);
     const std::vector<float> echo = room(played, 110.0, 0.2);
     iclforge::pitch::VoiceOptions options;
     options.sample_rate = kRate;
@@ -208,14 +193,12 @@ TEST_CASE("bleed: a voice above the speakers is not bleed, and below them is", "
     options.amplitude = 0.5;
     // Notes without gaps, so that the voice is there in every frame measured.
     std::vector<iclforge::pitch::VoiceNote> notes;
-    for (int i = 0; i < note_count; ++i) {
+    for (int i = 0; i < 24; ++i) {
         notes.push_back({0.5 * i, 0.5, 57.0 + (i % 5)});
     }
     const std::vector<float> voice = iclforge::pitch::synthesize_voice(notes, options).samples;
-    // The second to the second from the end.
-    const auto measured = static_cast<std::size_t>((length - 2.0) * kRate);
-    const double echo_rms = rms(std::span<const float>(echo).subspan(16000, measured));
-    const double voice_rms = rms(std::span<const float>(voice).subspan(16000, measured));
+    const double echo_rms = rms(std::span<const float>(echo).subspan(16000, 160000));
+    const double voice_rms = rms(std::span<const float>(voice).subspan(16000, 160000));
 
     // The voice 10 dB above the echo.
     {
@@ -223,7 +206,7 @@ TEST_CASE("bleed: a voice above the speakers is not bleed, and below them is", "
         const std::vector<float> mic = sum(echo, voice, gain);
         BleedMonitor monitor;
         const auto frames = run(monitor, played, mic);
-        CHECK(share_bleed(frames, 3.0, length - 1.0) < 0.1);
+        CHECK(share_bleed(frames, 3.0, 11.0) < 0.1);
     }
     // The voice 10 dB below it.
     {
@@ -231,7 +214,7 @@ TEST_CASE("bleed: a voice above the speakers is not bleed, and below them is", "
         const std::vector<float> mic = sum(echo, voice, gain);
         BleedMonitor monitor;
         const auto frames = run(monitor, played, mic);
-        CHECK(share_bleed(frames, 3.0, length - 1.0) > 0.9);
+        CHECK(share_bleed(frames, 3.0, 11.0) > 0.9);
     }
 }
 
@@ -239,8 +222,6 @@ TEST_CASE("bleed: a singer in tune with the guide is not bleed", "[pitch][bleed]
     // The singer sings the guide's own notes, at the pitch it is played at, and in time with it as
     // heard. A statistic that matches the best lag within a few milliseconds sees a voice that
     // resembles the played signal as a copy of it; the room's fitted path does not.
-    const int note_count = iclforge::test::kSanitized ? 20 : 30;
-    const double length = 0.4 * note_count;
     iclforge::pitch::VoiceOptions options;
     options.sample_rate = kRate;
     options.lead_s = 0.0;
@@ -248,7 +229,7 @@ TEST_CASE("bleed: a singer in tune with the guide is not bleed", "[pitch][bleed]
     options.amplitude = 0.4;
     options.seed = 51;
     std::vector<iclforge::pitch::VoiceNote> notes;
-    for (int i = 0; i < note_count; ++i) {
+    for (int i = 0; i < 30; ++i) {
         notes.push_back({0.4 * i, 0.4, 57.0 + static_cast<double>((i * 5) % 9)});
     }
     const std::vector<float> guide = iclforge::pitch::synthesize_voice(notes, options).samples;
@@ -270,20 +251,19 @@ TEST_CASE("bleed: a singer in tune with the guide is not bleed", "[pitch][bleed]
     for (std::size_t i = 0; i + delay_samples < voice.size() && i < voice_raw.size(); ++i) {
         voice[i + delay_samples] = voice_raw[i];
     }
-    const std::size_t measured = iclforge::test::kSanitized ? 80000 : 100000;
-    const double echo_rms = rms(std::span<const float>(echo).subspan(32000, measured));
-    const double voice_rms = rms(std::span<const float>(voice).subspan(32000, measured));
+    const double echo_rms = rms(std::span<const float>(echo).subspan(32000, 100000));
+    const double voice_rms = rms(std::span<const float>(voice).subspan(32000, 100000));
     const float gain = static_cast<float>(echo_rms / voice_rms * std::pow(10.0, 15.0 / 20.0));
     const std::vector<float> mic = sum(sum(echo, voice, gain), noise(played.size(), 0.0005, 7));
     BleedMonitor monitor;
     const auto frames = run(monitor, played, mic);
-    CHECK(share_bleed(frames, 3.0, length - 1.0) < 0.05);
+    CHECK(share_bleed(frames, 3.0, 11.0) < 0.05);
 
     // And with the singer silent, the same room is flagged.
     const std::vector<float> only_echo = sum(echo, noise(played.size(), 0.0005, 8));
     BleedMonitor other;
     const auto echo_frames = run(other, played, only_echo);
-    CHECK(share_bleed(echo_frames, 3.0, length - 1.0) > 0.9);
+    CHECK(share_bleed(echo_frames, 3.0, 11.0) > 0.9);
 }
 
 TEST_CASE("bleed: a loud stretch that resembles the played signal does not move the delay",
@@ -291,7 +271,7 @@ TEST_CASE("bleed: a loud stretch that resembles the played signal does not move 
     // A quarter of a second, five times as loud as the echo, that is the played signal at another
     // delay: a voice in unison with it, or a second path. The window's strongest single vote is
     // there; the echo is the lag whose votes agree.
-    const std::vector<float> played = backing(seconds(10.0, 7.0), 61, true);
+    const std::vector<float> played = backing(10.0, 61, true);
     const std::vector<float> echo = room(played, 130.0, 0.3);
     const std::vector<float> other = room(played, 107.0, 1.5);
     std::vector<float> mic = sum(echo, noise(played.size(), 0.04, 9));
@@ -318,16 +298,12 @@ TEST_CASE("bleed: a loud stretch that resembles the played signal does not move 
 }
 
 TEST_CASE("bleed: a delay that changes is followed", "[pitch][bleed]") {
-    // 130 ms for the first 8 s and 180 ms after, read from 4 s after the change, once the monitor
-    // has followed it, to the end: 12 s to 16 s. Under the sanitizers the change is at 5 s and the
-    // stream ends at 11 s, which is two seconds of it read from the same 4 s after the change.
-    const double switch_s = seconds(8.0, 5.0);
-    const double length = switch_s + seconds(8.0, 6.0);
-    const std::size_t switch_at = static_cast<std::size_t>(switch_s) * kRate;
-    const std::vector<float> played = backing(length, 21);
+    const std::vector<float> played = backing(16.0, 21);
+    // 130 ms for the first 8 s and 180 ms after.
     std::vector<float> first = room(played, 130.0, 0.3);
     std::vector<float> second = room(played, 180.0, 0.3);
     std::vector<float> mic(played.size());
+    const std::size_t switch_at = 8 * kRate;
     for (std::size_t i = 0; i < mic.size(); ++i) {
         mic[i] = i < switch_at ? first[i] : second[i];
     }
@@ -347,11 +323,11 @@ TEST_CASE("bleed: a delay that changes is followed", "[pitch][bleed]") {
     CHECK(*before == Catch::Approx(130.0).margin(1.5));
     REQUIRE(monitor.delay_ms().has_value());
     CHECK(*monitor.delay_ms() == Catch::Approx(180.0).margin(1.5));
-    CHECK(share_bleed(frames, switch_s + 4.0, length) > 0.9);
+    CHECK(share_bleed(frames, 12.0, 16.0) > 0.9);
 }
 
 TEST_CASE("bleed: silence is nothing to attribute", "[pitch][bleed]") {
-    const std::vector<float> played = backing(seconds(6.0, 4.0), 4);
+    const std::vector<float> played = backing(6.0, 4);
     const std::vector<float> mic(played.size(), 0.0F);
     BleedMonitor monitor;
     const auto frames = run(monitor, played, mic);
@@ -373,7 +349,7 @@ TEST_CASE("bleed: silence is nothing to attribute", "[pitch][bleed]") {
 
 TEST_CASE("bleed: an echo too quiet to hear is silence, whatever it is a copy of",
           "[pitch][bleed]") {
-    const std::vector<float> played = backing(seconds(8.0, 5.0), 8, true);
+    const std::vector<float> played = backing(8.0, 8, true);
     const std::vector<float> mic = room(played, 100.0, 0.0001);  // -80 dB: under the floor
     BleedMonitor monitor;
     const auto frames = run(monitor, played, mic);
@@ -383,21 +359,19 @@ TEST_CASE("bleed: an echo too quiet to hear is silence, whatever it is a copy of
 }
 
 TEST_CASE("bleed: an inverted echo is still the speakers", "[pitch][bleed]") {
-    const double length = seconds(8.0, 5.0);
-    const std::vector<float> played = backing(length, 9, true);
+    const std::vector<float> played = backing(8.0, 9, true);
     const std::vector<float> mic = sum(room(played, 120.0, -0.3), noise(played.size(), 0.0005, 4));
     BleedMonitor monitor;
     const auto frames = run(monitor, played, mic);
     REQUIRE(monitor.delay_ms().has_value());
     CHECK(*monitor.delay_ms() == Catch::Approx(120.0).margin(1.0));
-    CHECK(share_bleed(frames, 2.0, length) > 0.95);
+    CHECK(share_bleed(frames, 2.0, 8.0) > 0.95);
 }
 
 TEST_CASE("bleed: a microphone a little ahead of the played stamps is found", "[pitch][bleed]") {
     // Two clocks that disagree by a few milliseconds put the echo before the played sample it is
     // of.
-    const double length = seconds(8.0, 5.5);
-    const std::vector<float> played = backing(length, 10, true);
+    const std::vector<float> played = backing(8.0, 10, true);
     const std::size_t ahead = 8 * kRate / 1000;  // 8 ms
     std::vector<float> mic(played.size(), 0.0F);
     for (std::size_t i = 0; i + ahead < played.size(); ++i) {
@@ -408,12 +382,11 @@ TEST_CASE("bleed: a microphone a little ahead of the played stamps is found", "[
     const auto frames = run(monitor, played, mic);
     REQUIRE(monitor.delay_ms().has_value());
     CHECK(*monitor.delay_ms() == Catch::Approx(-8.0).margin(1.0));
-    CHECK(share_bleed(frames, 2.0, length - 0.5) > 0.95);
+    CHECK(share_bleed(frames, 2.0, 7.5) > 0.95);
 }
 
 TEST_CASE("bleed: a room with reflections is still the speakers", "[pitch][bleed]") {
-    const double length = seconds(10.0, 6.0);
-    const std::vector<float> played = backing(length, 31);
+    const std::vector<float> played = backing(10.0, 31);
     const std::vector<float> mic =
         sum(room(played, 95.0, 0.25, 4), noise(played.size(), 0.0005, 6));
     BleedMonitor monitor;
@@ -422,7 +395,7 @@ TEST_CASE("bleed: a room with reflections is still the speakers", "[pitch][bleed
     CHECK(*monitor.delay_ms() == Catch::Approx(95.0).margin(3.0));
     // The filter reaches a millisecond: what is later than that is not predicted, and a room of
     // reflections is flagged a little less than a dry one.
-    CHECK(share_bleed(frames, 2.0, length) > 0.8);
+    CHECK(share_bleed(frames, 2.0, 10.0) > 0.8);
 }
 
 TEST_CASE("bleed: speakers that play the guide give a silent singer no credit",
@@ -437,8 +410,6 @@ TEST_CASE("bleed: speakers that play the guide give a silent singer no credit",
     options.amplitude = 0.4;
     options.seed = 41;
     std::vector<iclforge::pitch::VoiceNote> notes;
-    // At full length in every build: the stretch before the monitor has found the delay is credited
-    // whatever the tune, and its share of the score is what is held under 0.1 below.
     for (int i = 0; i < 16; ++i) {
         notes.push_back({0.6 * i, 0.5, 60.0 + (i % 4) * 2});
     }

@@ -390,16 +390,9 @@ TEST_CASE("22.2 in SIMPLE and ASPX puts each channel's tone on its own channel",
 
 TEST_CASE("22.2 at 25 fps and at 44.1 kHz puts each channel's tone on its own channel",
           "[ac4][encoder][twenty-two-two]") {
-    // Under the sanitizers (tests/support/sanitized.hpp) 25 fps in SIMPLE and 44.1 kHz in ASPX,
-    // the other leg of each section left out: each frame rate, sample rate and codec mode is
-    // still met once.
     SECTION("25 fps in SIMPLE and 50 fps in ASPX") {
-        std::size_t leg = 0;
         for (const auto& [index, kbps, mode] :
              {std::tuple{2, 1536, CodecMode::kSimple}, std::tuple{7, 1408, CodecMode::kAspx}}) {
-            if (kSanitized && leg++ != 0) {
-                continue;
-            }
             CAPTURE(index, kbps);
             iclforge::ac4::EncoderConfig config = config_at(kbps, mode);
             config.frame_rate_index = index;
@@ -410,12 +403,8 @@ TEST_CASE("22.2 at 25 fps and at 44.1 kHz puts each channel's tone on its own ch
         }
     }
     SECTION("44.1 kHz in SIMPLE and ASPX") {
-        std::size_t leg = 0;
         for (const auto& [kbps, mode] :
              {std::pair{1536, CodecMode::kSimple}, std::pair{1056, CodecMode::kAspx}}) {
-            if (kSanitized && leg++ != 1) {
-                continue;
-            }
             CAPTURE(kbps);
             iclforge::ac4::EncoderConfig config = config_at(kbps, mode);
             config.sample_rate_hz = 44100;

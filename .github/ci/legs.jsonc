@@ -177,9 +177,9 @@
       // and there should not be one - a sanitizer-instrumented debug build
       // is a diagnostic tool, not something to ship.
       "name": "Linux LLVM ASan+UBSan",
-      // Nightly only: the slowest leg (over 100 minutes on the fleet in the last few days),
-      // and its cost is in running the tests under the sanitizers, which a compiler cache
-      // does not help.
+      // Nightly only: the slowest leg (over 100 minutes on the fleet in October, at -O0; see
+      // timeout_minutes), and its cost is in running the tests under the sanitizers, which a
+      // compiler cache does not help.
       "tier": "deep",
       "runner_slot": "linux_runner_3",
       "container": "ubuntu:26.04",
@@ -201,14 +201,16 @@
       // green: the build took 126 minutes, 7,111 s of them ctest over 4,176
       // tests, and the codec matrix was cut at 21 of its 30. The 3,172 tests
       // of the green run of 2026-10-03 took the same 71 minutes; the 997
-      // since took 48 more. `forge monitor` with associated= and with
-      // karaoke= took 561 s of that reading the capture of a software device,
-      // which does not pace its writer (100 to 200 MB of silence for a
-      // second of stream), whole through a byte-at-a-time loop; they read it
-      // in blocks now. The karaoke bleed, pitch and reference-melody tests,
-      // the 22.2, 9.X.4, HSF and executor tests and a few more take less
-      // under the sanitizers (tests/support/sanitized.hpp), about 20 minutes
-      // between them in WSL.
+      // since took 48 more. What makes them slow is that the preset built at
+      // -O0, where every vector index and SIMD wrapper is a call: the preset
+      // builds at -O1 now (CMakePresets.json, sanitize-asan-ubsan), and the
+      // whole suite is 27 minutes of test time in WSL, four tests at a time,
+      // against 118. Separately, `forge monitor` with associated= and with
+      // karaoke= took 561 s of the 7,111 reading the capture of a software
+      // device, which does not pace its writer (100 to 200 MB of silence for
+      // a second of stream), through a byte-at-a-time loop; they read it in
+      // blocks. The 150 has not been lowered: a run at -O1 on this leg is
+      // what says how far, and 90 is the number to go back to.
       "timeout_minutes": 150
     },
     {
