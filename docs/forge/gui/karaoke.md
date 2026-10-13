@@ -58,9 +58,7 @@ through (L, C, R and then the LFE, scaled down with them), and a stereo fold lea
   multichannel file that does not say which speakers it has.
 - A part at another sample rate or of another length is a **warning** that says what will happen:
   it is resampled to the backing's rate, or the shorter part holds its last sample for the rest of
-  the programme. (The warning on the page says "padded with silence"; the encoding is the command
-  line's, which holds the last sample. A part that should be silent after its end is given as long as
-  the backing.)
+  the programme.
 - Next stays off until the parts can be built.
 
 **2 · Levels.** The two levels Annex C reads from the stream: the **centre level** (`cmixlev`),
