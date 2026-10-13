@@ -1015,6 +1015,9 @@ struct Group::State {
     struct Member {
         std::string client_id;
         bool started = false;
+        // Not started because its client is still moving onto player@v1 (use_pcm()): what
+        // try_start() found the last time it looked, which is what the timeline's wait goes by.
+        bool moving = false;
         // Plays _iclforge_player@v1's bursts rather than player@v1's PCM.
         bool bursts = false;
         std::optional<m::AudioFormat> format;
@@ -1379,14 +1382,38 @@ struct Group::State {
         return (std::max(minimum, wanted) * 1000) + kNetworkLead;
     }
 
-    // Starts `member`'s stream if its client can play the programme now.
+    // Starts `member`'s stream if its client can play the programme now. Of a member it does not
+    // start it notes whether the host asked its client onto player@v1 (use_pcm()) and the client
+    // is still moving there (Member::moving): on the extension role it is leaving, or on player@v1
+    // without the state it owes before a stream (ServerSession::start_stream()). The note is made
+    // from the one view of the client the start was decided by, and from what the session answered.
+    // A second look for it, taken after the member had been passed over, saw the client's state
+    // arrive in between and called a member that had not been started one that was not moving.
     void try_start(Member& member) {
+        member.moving = false;
         const std::shared_ptr<HostConnection> connection = host->find(member.client_id);
         if (!connection || !playing()) {
             return;
         }
         const ClientView client = connection->view();
-        if (!client.playing || !client.available || held.contains(member.client_id)) {
+        if (!client.playing || held.contains(member.client_id)) {
+            return;
+        }
+        // What use_pcm() asked of this client, if it asked: the most audio a chunk to it may
+        // carry, the width of PCM it is to get and the codec it is to get it in.
+        std::optional<ServerHost::State::PcmRequest> asked;
+        {
+            const std::lock_guard lock(host->mutex);
+            if (const auto found = host->pcm_clients.find(client.client_key);
+                found != host->pcm_clients.end()) {
+                asked = found->second;
+            }
+        }
+        // Whether the host has this client on player@v1, or on its way there.
+        const bool moved =
+            asked && client.player_support && contains(client.supported_roles, kPlayerRole);
+        member.moving = moved && (client.bursts || !client.player_state);
+        if (!client.available) {
             return;
         }
         if (client.bursts) {
@@ -1394,9 +1421,7 @@ struct Group::State {
             // which takes a moment on the live connection: until it has, it is not started on
             // the burst stream it is still on, which it would be sent in the form the host
             // meant it not to have.
-            if (const std::lock_guard lock(host->mutex);
-                host->pcm_clients.contains(client.client_key) && client.player_support &&
-                contains(client.supported_roles, kPlayerRole)) {
+            if (moved) {
                 return;
             }
             if (!bursts || !client.iclforge_support || !client.iclforge_state ||
@@ -1412,16 +1437,8 @@ struct Group::State {
             if (!pcm || !client.player_support || !client.player_state) {
                 return;
             }
-            // What use_pcm() asked of this client: the most audio a chunk to it may carry, and
-            // the width of PCM it is to get.
-            ServerHost::State::PcmRequest request;
-            {
-                const std::lock_guard lock(host->mutex);
-                if (const auto found = host->pcm_clients.find(client.client_key);
-                    found != host->pcm_clients.end()) {
-                    request = found->second;
-                }
-            }
+            const ServerHost::State::PcmRequest request =
+                asked.value_or(ServerHost::State::PcmRequest{});
             // The first of its listed formats the programme can make, at the width and in the
             // codec asked for when one was, from whichever of the programme's variants has that
             // width.
@@ -1486,7 +1503,12 @@ struct Group::State {
                 return;
             }
             const m::PlayerStream stream{.format = *chosen, .codec_header = encoder->codec_header()};
-            if (!connection->driver().call([&] { return connection->session().start_stream(stream); }).has_value()) {
+            if (const auto begun = connection->driver().call(
+                    [&] { return connection->session().start_stream(stream); });
+                !begun.has_value()) {
+                // The view may hold the state from an earlier time on player@v1, which the session
+                // does not take for the one the client owes since it took the role again.
+                member.moving = moved && begun.error() == Refusal::kNoPlayerState;
                 return;
             }
             const m::PlayerState& state = *client.player_state;
@@ -1507,35 +1529,14 @@ struct Group::State {
         host->log(client.name + " joined group " + name);
     }
 
-    // Whether a member the host asked to move onto player@v1 (use_pcm()) is still moving: on the
-    // extension role it is leaving, or on player@v1 without the state it owes before a stream
-    // (ServerSession::start_stream()). Such a member is not started, and one that is started after
-    // the timeline has begun is sent the programme from the frame the group has reached, and is
-    // never sent what went before: so the timeline waits for it, for no longer than kSettleWait
-    // from the first time it does.
+    // Whether a member the host asked to move onto player@v1 (use_pcm()) is still moving, as
+    // try_start() found it when it passed the member over just now. Such a member is not started,
+    // and one that is started after the timeline has begun is sent the programme from the frame
+    // the group has reached, and is never sent what went before: so the timeline waits for it, for
+    // no longer than kSettleWait from the first time it does.
     [[nodiscard]] bool settling(std::int64_t now) {
-        bool moving = false;
-        for (const Member& member : members) {
-            if (member.started || held.contains(member.client_id)) {
-                continue;
-            }
-            const std::shared_ptr<HostConnection> connection = host->find(member.client_id);
-            if (!connection) {
-                continue;
-            }
-            const ClientView client = connection->view();
-            bool asked = false;
-            {
-                const std::lock_guard lock(host->mutex);
-                asked = host->pcm_clients.contains(client.client_key);
-            }
-            if (asked && client.playing && client.player_support &&
-                contains(client.supported_roles, kPlayerRole) && (client.bursts || !client.player_state)) {
-                moving = true;
-                break;
-            }
-        }
-        if (!moving) {
+        if (std::none_of(members.begin(), members.end(),
+                         [](const Member& member) { return !member.started && member.moving; })) {
             return false;
         }
         if (!settle_until) {
@@ -1600,6 +1601,7 @@ struct Group::State {
 
     static void forget(Member& member) {
         member.started = false;
+        member.moving = false;
         member.bursts = false;
         member.encoder.reset();
         member.queued.clear();
