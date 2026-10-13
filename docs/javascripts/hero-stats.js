@@ -1,4 +1,4 @@
-/* Homepage "Measured on every merge" stat strip.
+/* Homepage "Measured on main" stat strip.
    The rules that pick each figure - worst case of one codec, per-channel headroom
    not raw SNR, thresholds always borrowed from a gate that exists, never invented -
    are the ones performance-quality.md's own page-local script applies, and the text
@@ -283,6 +283,42 @@
     }
     return best;
   }
+
+  // How old the newest record is, in whole hours, or null with no date to count from. `latest`
+  // is newestSeries()'s pick and `now` the reader's clock in milliseconds.
+  function recordAgeHours(latest, now) {
+    const at = latest ? Date.parse(latest.date) : NaN;
+    return Number.isNaN(at) ? null : Math.max(0, Math.floor((now - at) / 3600000));
+  }
+
+  // An age in words: hours up to two days, days after.
+  function agoWords(hours) {
+    if (hours < 1) return "within the last hour";
+    if (hours < 48) return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+    return `${Math.floor(hours / 24)} days ago`;
+  }
+
+  // The line under the cards: the commit the newest figures are from, the day that commit was
+  // made and how long ago that is. CI writes the series after merges and nightly, and when it
+  // has written nothing for a while (main red, a failed nightly) the cards go on showing the
+  // last figures recorded: this line is what says how old they are. Past STALE_AFTER_DAYS it
+  // says that nothing newer has been recorded, and `stale` tells the caller to colour it. Speed,
+  // memory and the gold-reference gate are recorded after merges and nightly, so the newest
+  // record is normally a day old at the most. The date is the commit's own, which is all a
+  // record carries; its figures were measured within hours of it.
+  const STALE_AFTER_DAYS = 2;
+  function measuredOn(latest, now) {
+    const hours = recordAgeHours(latest, now);
+    if (hours === null || !latest.commit) return { html: "", stale: false };
+    const stale = hours > STALE_AFTER_DAYS * 24;
+    return {
+      stale,
+      html: `Measured on <a href="https://github.com/${REPO}/commit/${esc(latest.commit)}">` +
+        `<code>main@${esc(String(latest.commit).slice(0, 8))}</code></a>, committed ` +
+        `${new Date(latest.date).toISOString().slice(0, 10)} (${agoWords(hours)}).` +
+        (stale ? " Nothing newer has been recorded since." : ""),
+    };
+  }
   // <<< measurement summary
 
   function rawUrl(file) {
@@ -487,5 +523,14 @@
       guarded("Allocation per frame", () => allocationTile(m.rows, since(m))),
       guarded("Live growth", () => growthTile(m.rows, since(m))),
     ].join("");
+
+    // Under the tiles: the commit the newest figures are from and how old it is (measuredOn).
+    // The strip had no date on it at all, so figures a week old read as today's.
+    const asof = document.getElementById("ac3f-stats-asof");
+    if (asof && latest) {
+      const measured = measuredOn(latest, Date.now());
+      asof.innerHTML = measured.html + " A line recorded on an older commit says which.";
+      if (measured.stale) asof.className = "ac3f-stat-asof ac3f-stat-asof-stale";
+    }
   })();
 })();

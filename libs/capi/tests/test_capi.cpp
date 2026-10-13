@@ -4636,20 +4636,6 @@ TEST_CASE("decode_frame_into writes a reproduction's channels first, and says ho
     iclforge_decoder_destroy(decoder);
 }
 
-namespace {
-
-// An enumerator no enumeration has, as a C caller can build one: a cast would be
-// -Wconversion's "unspecified", so the bytes are copied in.
-template <class Enum>
-Enum outside_the_enum(int value) {
-    static_assert(sizeof(Enum) == sizeof(int));
-    Enum result{};
-    std::memcpy(&result, &value, sizeof(result));
-    return result;
-}
-
-}  // namespace
-
 TEST_CASE("iclforge_decoder_create_with_karaoke refuses what it cannot make sense of",
           "[capi][karaoke]") {
     iclforge_decoder_config_t config;
@@ -4665,14 +4651,17 @@ TEST_CASE("iclforge_decoder_create_with_karaoke refuses what it cannot make sens
     CHECK(iclforge_decoder_create_with_karaoke(&config, &karaoke, nullptr) ==
           ICLFORGE_ERROR_INVALID_ARGUMENT);
 
-    karaoke.reproduction = outside_the_enum<iclforge_karaoke_reproduction_t>(3);
+    // An enumerator neither enumeration has, as a C caller can store one: set_raw() above writes
+    // the bytes, because an enumeration returned or assigned with such a value has been read as
+    // one, which is undefined (and what the sanitizer leg stopped at on 2026-10-12).
+    set_raw(karaoke.reproduction, 3);
     CHECK(iclforge_decoder_create_with_karaoke(&config, &karaoke, &decoder) ==
           ICLFORGE_ERROR_INVALID_ARGUMENT);
-    karaoke.reproduction = outside_the_enum<iclforge_karaoke_reproduction_t>(-1);
+    set_raw(karaoke.reproduction, -1);
     CHECK(iclforge_decoder_create_with_karaoke(&config, &karaoke, &decoder) ==
           ICLFORGE_ERROR_INVALID_ARGUMENT);
     iclforge_karaoke_config_init(&karaoke);
-    karaoke.vocals = outside_the_enum<iclforge_karaoke_vocals_t>(4);
+    set_raw(karaoke.vocals, 4);
     CHECK(iclforge_decoder_create_with_karaoke(&config, &karaoke, &decoder) ==
           ICLFORGE_ERROR_INVALID_ARGUMENT);
     CHECK(decoder == nullptr);

@@ -486,13 +486,39 @@ a row toward 0 dB, not by a fraction of one. See `REGRESSION_DROP_DB` and
     const allLegRecords = allRecords.filter((r) => r.leg === state.leg);
     const visible = visibleRecords(allRecords);
     const tracks = buildTracks(visible);
+    // These scores come from the nightly scoring run: three days is longer than usual.
     root.innerHTML = `
+      ${asOfLine(allRecords, 3)}
       ${buildControls()}
       <div class="object-trend-chart-wrap">${buildChart(tracks, releasesBySha)}</div>
       ${buildLegend(tracks, releasesBySha)}
       ${buildTable(visible, allLegRecords, releasesBySha)}
     `;
     attachControlListeners(allRecords, releasesBySha);
+  }
+
+  // When the newest figures below are from: the newest commit recorded on main, the day it was
+  // made and how long ago that is. CI writes this history after merges or nightly, and when it
+  // has written nothing for a while (main red, a failed nightly) the chart and the table still
+  // end at the last record: this line is what says how old that is, and past `staleAfterDays`
+  // it says nothing newer has been recorded. The date is the commit's own, which is all a record
+  // carries; its figures were measured within hours of it. Empty with no record on main.
+  function asOfLine(records, staleAfterDays) {
+    let last = null;
+    for (const r of records) {
+      if (r.branch !== "main" || Number.isNaN(Date.parse(r.commit_date))) continue;
+      if (!last || Date.parse(r.commit_date) >= Date.parse(last.commit_date)) last = r;
+    }
+    if (!last) return "";
+    const hours = Math.max(0, Math.floor((Date.now() - Date.parse(last.commit_date)) / 3600000));
+    // Hours up to two days, days after.
+    const ago = hours < 1 ? "within the last hour" : hours === 1 ? "1 hour ago"
+      : hours < 48 ? `${hours} hours ago` : `${Math.floor(hours / 24)} days ago`;
+    const stale = hours > staleAfterDays * 24;
+    return `<p class="trend-asof${stale ? " trend-asof-stale" : ""}">Newest record: ` +
+      `<a href="https://github.com/${REPO}/commit/${last.commit}"><code>main@${String(last.commit).slice(0, 8)}</code></a>, ` +
+      `committed ${new Date(Date.parse(last.commit_date)).toISOString().slice(0, 10)} (${ago}).` +
+      `${stale ? " Nothing newer has been recorded since." : ""}</p>`;
   }
 
   // Both files are always fetched - main to render, develop so the

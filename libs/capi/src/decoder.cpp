@@ -67,11 +67,12 @@ iclforge_status_t iclforge_decoder_create_with_karaoke(const iclforge_decoder_co
     if (config == nullptr || karaoke == nullptr || out_decoder == nullptr) {
         return ICLFORGE_ERROR_INVALID_ARGUMENT;
     }
-    // An enum a caller built out of range is not a reproduction to guess at.
-    const auto reproduction = static_cast<unsigned>(karaoke->reproduction);
-    const auto vocals = static_cast<unsigned>(karaoke->vocals);
-    if (reproduction > static_cast<unsigned>(ICLFORGE_KARAOKE_CAPABLE) ||
-        vocals > static_cast<unsigned>(ICLFORGE_KARAOKE_VOCALS_BOTH)) {
+    // An enum a caller built out of range is not a reproduction to guess at. The stored ints are
+    // what is checked: reading such a value as the enumeration is the undefined step.
+    const int reproduction = iclforge_c::stored_value(karaoke->reproduction);
+    const int vocals = iclforge_c::stored_value(karaoke->vocals);
+    if (reproduction < 0 || reproduction > static_cast<int>(ICLFORGE_KARAOKE_CAPABLE) || vocals < 0 ||
+        vocals > static_cast<int>(ICLFORGE_KARAOKE_VOCALS_BOTH)) {
         return ICLFORGE_ERROR_INVALID_ARGUMENT;
     }
     return guard([&config, &karaoke, &out_decoder] {

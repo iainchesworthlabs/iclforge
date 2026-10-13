@@ -34,6 +34,15 @@ std::string bytes(std::initializer_list<int> values) {
     return out;
 }
 
+// A text's bytes as numbers, for a failure's message.
+std::string numbers(std::string_view text) {
+    std::string out;
+    for (const char c : text) {
+        out += (out.empty() ? "" : " ") + std::to_string(static_cast<unsigned char>(c));
+    }
+    return out;
+}
+
 // The UTF-8 of a list of code points.
 std::string utf8(std::initializer_list<std::uint32_t> points) {
     std::string out;
@@ -231,7 +240,12 @@ TEST_CASE("code pages: bytes a page does not have are refused and leave nothing"
         const CodePage* page = find_code_page(item.page);
         REQUIRE(page != nullptr);
         std::string out = "left over";
-        CHECK_FALSE(code_page_to_utf8(*page, item.input, out));
+        const bool converted = code_page_to_utf8(*page, item.input, out);
+        // What went in and what came back, as numbers: on a platform whose conversion takes
+        // these bytes (macOS 15 on Intel did, for shift-jis, on 2026-10-12) the failure says what
+        // it made of them.
+        CAPTURE(numbers(item.input), numbers(out));
+        CHECK_FALSE(converted);
         CHECK(out.empty());
     }
 }

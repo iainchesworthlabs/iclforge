@@ -304,6 +304,9 @@ jobs:
       # t2 for the run after a merge, all for the nightly run and a dispatch (or the
       # tier the dispatch asked for). Passed to _build.yml and _ci-core.yml.
       tier: ${{ steps.detect.outputs.tier }}
+      # Whether this run writes what it measures to the trend on quality-history. Decided once,
+      # in the step below, and read by every publisher.
+      record_trend: ${{ steps.detect.outputs.record_trend }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -340,6 +343,21 @@ jobs:
           fi
           echo "tier=$tier" >> "$GITHUB_OUTPUT"
           echo "tier=$tier"
+
+          # Whether this run writes what it measures to the trend on quality-history. Every run of
+          # main's own matrix does: the run after a merge, the nightly run, and a dispatch on main,
+          # which is how a full set of records is asked for by hand (`gh workflow run ci.yml --ref
+          # main`). A dispatch that names legs builds those and measures nothing, and a branch's
+          # numbers are not main's. Each series holds a commit once (the append scripts skip what
+          # a commit already has), so a second run of a commit adds only what the first lacked.
+          record_trend=false
+          if [ "$REF" = "refs/heads/main" ] && [ -z "${LEGS:-}" ]; then
+            case "$EVENT_NAME" in
+              push|schedule|workflow_dispatch) record_trend=true ;;
+            esac
+          fi
+          echo "record_trend=$record_trend" >> "$GITHUB_OUTPUT"
+          echo "record_trend=$record_trend"
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
             files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename')
@@ -452,6 +470,7 @@ jobs:
       vcpkg_commit: ${{ needs.toolchain-versions.outputs.vcpkg_commit }}
       llvm_version: ${{ needs.toolchain-versions.outputs.llvm_version }}
       tier: ${{ needs.changes.outputs.tier }}
+      record_trend: ${{ needs.changes.outputs.record_trend == 'true' }}
 
   # CI lane partitions plan (docs/ci-lanes.md), fold-satellites phase:
   # wheels.yml/npm.yml/esp-component.yml were each triggered independently
@@ -533,12 +552,11 @@ jobs:
       contents: write
       actions: read
     with:
-      # Computed here, not inside _build.yml: github.event_name/github.ref
-      # reflect the reusable workflow's own call context once inside it, and
-      # this caller site is the unambiguous place to ask "is this a direct
-      # push to main" - see persist_quality_trend's own
-      # description in _build.yml.
-      persist_quality_trend: ${{ (github.event_name == 'push' || github.event_name == 'schedule') && github.ref == 'refs/heads/main' }}
+      # Decided by the `changes` job (its record_trend output), not inside
+      # _build.yml: the one rule for which runs write to the trend is there, and
+      # every publisher reads it. See persist_quality_trend's own description in
+      # _build.yml.
+      persist_quality_trend: ${{ needs.changes.outputs.record_trend == 'true' }}
       quality_trend_branch: ${{ github.ref_name }}
       # CI lane partitions (docs/ci-lanes.md): the `changes` job's own
       # per-lane outputs, `== 'true'` the same way every other job in this
@@ -616,24 +634,37 @@ jobs:
   # with no auth.
   persist-performance-trend:
     name: Publish performance trend
-    needs: [build-and-test, toolchain-versions, performance-trend-arm64]
-    # Explicit results under !cancelled() instead of the implicit success():
-    # build-and-test reads "cancelled" whenever one of its GitHub-hosted legs
-    # gave way to a newer main run (docs/ci-lanes.md, "Only the newest main
-    # commit runs the hosted jobs"), which says nothing about the Linux build
-    # this job measures. A real failure there still skips the publish.
+    needs: [changes, toolchain-versions, performance-trend-arm64]
+    # It does not wait for build-and-test and does not read its result. This
+    # job builds the three benchmarks itself and measures them itself, so what
+    # it needs to be true of the commit it finds out by doing it: a commit that
+    # does not build records nothing. It used to need the whole of
+    # build-and-test green, which is some forty jobs, none of them this
+    # measurement: from 2026-10-12 02:12Z main was red for over a day on a
+    # browser test, the wheels, an ESP32 image and a macOS test, and none of
+    # the 19 runs after a merge that finished in that time (136 merges)
+    # recorded a speed or memory figure, though the Linux GCC, Linux LLVM and
+    # Windows MSVC legs passed in every one of them. main-health.yml says
+    # which commits were red; the trend says what they measured.
+    #
+    # On every run that records the trend (the `changes` job's record_trend:
+    # after a merge, nightly, and a dispatch on main), with code in it. The
+    # nightly run is what puts a point on the series on a day when no run
+    # after a merge got this far.
+    #
+    # The arm64 leg's result is not held to success: its artifact is optional
+    # below (continue-on-error on the download), and a failed arm64 runner
+    # must not cost the x86 series its record. It is still in `needs`, so
+    # this job starts when that one has finished and its artifact is there.
     #
     # No newest-main-only group here or on performance-trend-arm64, though
     # both are GitHub-hosted: each records this commit's own point in the
-    # trend and takes a few minutes. Both also start only once build-and-test
-    # finishes, so an older commit's run can reach them after a newer one's,
-    # and a shared group hands the waiting place to the latest arrival, not
-    # to the newest commit.
+    # trend and takes a few minutes.
     if: >-
-      ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      ${{ !cancelled() && needs.changes.outputs.record_trend == 'true'
+      && needs.changes.outputs.code == 'true'
       && needs.toolchain-versions.result == 'success'
-      && needs.performance-trend-arm64.result == 'success'
-      && (needs.build-and-test.result == 'success' || needs.build-and-test.result == 'cancelled') }}
+      && needs.performance-trend-arm64.result != 'cancelled' }}
     runs-on: ubuntu-latest
     container: ubuntu:26.04
     permissions:
@@ -946,15 +977,14 @@ jobs:
   # records both legs in its single existing commit.
   performance-trend-arm64:
     name: Publish performance trend (arm64 measurements)
-    needs: [build-and-test, toolchain-versions]
-    # Same explicit-results condition as persist-performance-trend's, for the
-    # same reason: a GitHub-hosted leg giving way to a newer main run leaves
-    # build-and-test "cancelled", not failed. No concurrency group either -
-    # see persist-performance-trend's comment.
+    needs: [changes, toolchain-versions]
+    # The same runs as persist-performance-trend, and for its reason it does
+    # not wait for build-and-test either: it builds and measures by itself. No
+    # concurrency group - see persist-performance-trend's comment.
     if: >-
-      ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-      && needs.toolchain-versions.result == 'success'
-      && (needs.build-and-test.result == 'success' || needs.build-and-test.result == 'cancelled') }}
+      ${{ !cancelled() && needs.changes.outputs.record_trend == 'true'
+      && needs.changes.outputs.code == 'true'
+      && needs.toolchain-versions.result == 'success' }}
     runs-on: ubuntu-24.04-arm
     container: ubuntu:26.04
     env:
