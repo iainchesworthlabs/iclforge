@@ -158,12 +158,15 @@ jobs:
       # (planning/layout.md, planning/monorepo.md) for adapting an open branch to
       # it: their suite runs each rewrite over a miniature tree and pins where
       # every kind of path goes.
+      # tools/pictures holds the scripts that take the documentation's pictures again from
+      # tools/pictures/pictures.json: its suite holds how an entry becomes a command line and
+      # an environment, and that the files the pictures play are made the same every time.
       - name: Oracle unit tests
         if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
-          for suite in tools/checks tools/ci tools/hearth tools/adapt; do
+          for suite in tools/checks tools/ci tools/hearth tools/adapt tools/pictures; do
             printf '\n=== %s ===\n' "$suite"
             python3 -m unittest discover --start-directory "$suite" --pattern 'test_*.py' --verbose
           done
@@ -187,6 +190,19 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         run: python3 tools/checks/check_doc_paths.py
+
+      # A screenshot goes stale without anybody editing it, and whether it can then be taken
+      # again depends on something having written down how it was made. Every PNG a page under
+      # docs/ or README.md embeds has an entry in tools/pictures/pictures.json: the program, the
+      # command line and environment that make it (or, for a picture no command line on a desk
+      # can take, how it was made) and the build it was last taken from, which must be a commit
+      # this repository has. An entry for a picture no page shows any more fails too, so the
+      # manifest does not go stale in its turn. tools/pictures/take_pictures.py takes the
+      # entries that are command lines. Its own suite runs in the Oracle unit tests step above.
+      - name: Documentation pictures
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 tools/checks/check_doc_pictures.py
 
       # The platform selection matrix, docs/platforms/index.md, routes a reader
       # from what they have to the page for it. The step above proves its links

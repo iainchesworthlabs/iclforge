@@ -1,0 +1,976 @@
+{
+  "format": "iclforge-doc-pictures",
+  "version": 1,
+  "about": "Every picture a page under docs/ or README.md shows: the program that drew it, the command line and environment that make it, and the build it was last taken from. tools/pictures/README.md says how to read and use this; tools/pictures/take_pictures.py takes the entries that have \"args\", and tools/checks/check_doc_pictures.py holds this file to the pages.",
+  "environments": {
+    "hidden-desktop": {
+      "what": "A real window on Windows, drawn by Qt's Windows platform plugin on a second desktop nobody sees (tools/pictures/hidden_desktop.py), not by the offscreen plugin, which draws a missing-glyph box for a drop-down arrow. darkmode=0 is the light theme whatever the desktop is set to; gray keeps coloured subpixel edges out of the text; QT_QPA_FONTDIR is for the offscreen plugin and is taken out.",
+      "set": {
+        "QT_QPA_PLATFORM": "windows:darkmode=0",
+        "QSG_DISTANCEFIELD_ANTIALIASING": "gray"
+      },
+      "unset": [
+        "QT_QPA_FONTDIR"
+      ]
+    },
+    "hidden-desktop-living-room": {
+      "what": "The same, for Hearth, whose Settings and Network pages say the computer's name: the three _CLUSTER_NETWORK_ variables make that name living-room for the run.",
+      "set": {
+        "QT_QPA_PLATFORM": "windows:darkmode=0",
+        "QSG_DISTANCEFIELD_ANTIALIASING": "gray",
+        "_CLUSTER_NETWORK_NAME_": "LIVING-ROOM",
+        "_CLUSTER_NETWORK_HOSTNAME_": "living-room",
+        "_CLUSTER_NETWORK_FQDN_": "living-room"
+      },
+      "unset": [
+        "QT_QPA_FONTDIR"
+      ]
+    }
+  },
+  "builds": {
+    "262363c4a": {
+      "commit": "262363c4a59fee83ae61b6a922d6a9b7a055a66f",
+      "what": "Release build on Windows from cmake --preset config-windows-msvc (MSVC, Ninja) with Qt 6.8.3 msvc2022_64: forge, forge-gui, hearth and crucible, built and used on 2026-10-13"
+    },
+    "6c14c0b96": {
+      "commit": "6c14c0b96b78d4f8be3c6db5cfc86ec1ea87e087",
+      "what": "the tree the picture was last taken from, on 2026-10-12, with the offscreen platform plugin (QT_QPA_PLATFORM=offscreen, the system fonts on QT_QPA_FONTDIR)"
+    },
+    "ce3178872": {
+      "commit": "ce3178872a48c35f869c645b769df85d9d66137c",
+      "what": "the tree the picture was last taken from, on 2026-10-12, with the offscreen platform plugin (QT_QPA_PLATFORM=offscreen, the system fonts on QT_QPA_FONTDIR)"
+    },
+    "1fdad58ae": {
+      "commit": "1fdad58aeb47f0dee1e786151093fdc70eaf7bfe",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-13"
+    },
+    "b973dbf7d": {
+      "commit": "b973dbf7d87f6aceb21b09195552e14aeb0d4910",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-13"
+    },
+    "c56dc0192": {
+      "commit": "c56dc0192a6f598dd27ed58346a6a2bf042e28d6",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-12"
+    },
+    "a71adcc49": {
+      "commit": "a71adcc499ec904db17dea53fe2f448e842f5abf",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-13"
+    },
+    "24d51df67": {
+      "commit": "24d51df671c6e6fc33c4a2d58b4f9d3dc737c4ee",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-13"
+    },
+    "5bd59a2ce": {
+      "commit": "5bd59a2cecfff42ec0cc50870c7cda07c1296be1",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-12"
+    },
+    "68e1d670e": {
+      "commit": "68e1d670e1e8cfa1eb217030eccd81ed36a39eb5",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-12"
+    },
+    "da375d5cd": {
+      "commit": "da375d5cd8ac22c493c6688f457d1d283a558001",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-12"
+    },
+    "2868404eb": {
+      "commit": "2868404eb9c728ecb342177d28e4ce65cfbfd5a9",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-13"
+    },
+    "5a89f61fa": {
+      "commit": "5a89f61fafbbad4c104c54a1def853fc61a73055",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-12"
+    },
+    "54fd33f78": {
+      "commit": "54fd33f789dfe50df235a364c7d6782001f8d5b7",
+      "what": "the tree whose tests drew the picture: the commit that last changed it, 2026-10-12"
+    },
+    "808f66137": {
+      "commit": "808f661374e07af3f4a055a432dc4ee74becffc1",
+      "what": "the tree panel_preview was built from: the commit that last changed the picture, 2026-10-12"
+    },
+    "6f9a3a51d": {
+      "commit": "6f9a3a51d8dda59d02de058e0ff27cd501a09017",
+      "what": "the tree panel_preview was built from: the commit that last changed the picture, 2026-10-12"
+    },
+    "d1cba724a": {
+      "commit": "d1cba724acc5a977b7e8317a3f2397739ddc493c",
+      "what": "the tree panel_preview was built from: the commit that last changed the picture, 2026-10-12"
+    },
+    "b0fe0feda": {
+      "commit": "b0fe0feda6909393ec7702651e66fbac361af6dc",
+      "what": "the app as installed on the device: the commit that added the picture, 2026-08-11"
+    },
+    "2ffd07409": {
+      "commit": "2ffd0740938be9b1b3e7e296f8abea6004053d87",
+      "what": "the demo as built that day: the commit that last changed the picture, 2026-09-04"
+    },
+    "39ee87f72": {
+      "commit": "39ee87f72dff207165631f1fdf05ed4339b49475",
+      "what": "the demo as built that day: the commit that last changed the picture, 2026-09-03"
+    }
+  },
+  "pictures": [
+    {
+      "path": "docs/forge/gui/screenshots/firstrun.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/overview-default.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "tier=advanced"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/guided-wizard-source.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/loading-a-source-loaded.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/format-eac3-714.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "tier=advanced",
+        "codecIndex=1",
+        "preset=7.1.4"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/format-dual-mono.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-stereo.wav",
+        "tier=advanced",
+        "bedIndex=0"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/format-expert-passthrough.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "tier=expert",
+        "height=1710"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/coding-tools-off.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "tier=expert",
+        "codecIndex=1",
+        "currentTab=coding"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/coding-tools-enabled.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "tier=expert",
+        "codecIndex=1",
+        "currentTab=coding",
+        "coupling=true",
+        "spx=true",
+        "spxAtten=true"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/metadata-tab.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "tier=expert",
+        "codecIndex=1",
+        "atmosEnabled=true",
+        "currentTab=meta"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/objects-tab.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "tier=advanced",
+        "codecIndex=1",
+        "atmosEnabled=true",
+        "currentTab=objects",
+        "height=1500"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/source-assignment.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-stereo.wav",
+        "tier=advanced",
+        "src2={media}/roundtrip-51.wav",
+        "smokeScrollY=600"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/karaoke-parts-empty.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "tier=karaoke",
+        "height=1010"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/forge/gui/screenshots/channel-levels-live.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke",
+        "{media}/roundtrip-51.wav",
+        "{scratch}/roundtrip-714.ec3",
+        "{out}",
+        "codecIndex=1",
+        "preset=7.1.4"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a",
+      "note": "--smoke encodes the file and takes the picture when the run has finished, so the strip shows a run."
+    },
+    {
+      "path": "docs/forge/gui/screenshots/format-advanced-postrun.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke",
+        "{media}/roundtrip-51.wav",
+        "{scratch}/roundtrip-51.ac3",
+        "{out}",
+        "tier=advanced",
+        "height=1930"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a",
+      "note": "A window is no taller than its screen: on the 1920-pixel screen this was taken on, height=1930 came out 1901 pixels."
+    },
+    {
+      "path": "docs/forge/gui/screenshots/format-vbr.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "inputMode=live",
+        "tier=advanced",
+        "codecIndex=1",
+        "vbrEnabled=true",
+        "vbrQuality=75"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a",
+      "note": "Not the same on every machine: with the live input shown, the rail lists this computer's capture devices by name. Nothing is opened or recorded."
+    },
+    {
+      "path": "docs/forge/gui/screenshots/live-session-idle.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "inputMode=live",
+        "tier=advanced",
+        "currentTab=session",
+        "codecIndex=1"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a",
+      "note": "Not the same on every machine: with the live input shown, the rail lists this computer's capture devices by name. Nothing is opened or recorded."
+    },
+    {
+      "path": "docs/forge/gui/screenshots/live-session-vbr-note.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "{media}/roundtrip-51.wav",
+        "inputMode=live",
+        "tier=advanced",
+        "currentTab=session",
+        "codecIndex=1",
+        "vbrEnabled=true",
+        "vbrQuality=75"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a",
+      "note": "Not the same on every machine: with the live input shown, the rail lists this computer's capture devices by name. Nothing is opened or recorded."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-play.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "play",
+        "--open",
+        "{media}/night-garden.ec3",
+        "--open",
+        "{media}/harbour.ac4",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "9000"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on. --seek 9000 parks where the file has sound, for the meters, and plays a moment of it."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-media.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "media",
+        "--open",
+        "{media}/night-garden.ec3",
+        "--open",
+        "{media}/harbour.ac4",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1500"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-speakers.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "speakers",
+        "--open",
+        "{media}/night-garden.ec3",
+        "--open",
+        "{media}/harbour.ac4",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1500"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-decoder.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "decoder",
+        "--decoder-format",
+        "eac3",
+        "--open",
+        "{media}/night-garden.ec3",
+        "--open",
+        "{media}/harbour.ac4",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1500"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-decoder-ac4.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "decoder",
+        "--decoder-format",
+        "ac4",
+        "--open",
+        "{media}/harbour.ac4",
+        "--seek",
+        "1500"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-network.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "network",
+        "--open",
+        "{media}/night-garden.ec3",
+        "--open",
+        "{media}/harbour.ac4",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1500"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-settings.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "settings",
+        "--open",
+        "{media}/night-garden.ec3",
+        "--open",
+        "{media}/harbour.ac4",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1500"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-output-picker.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "play",
+        "--open-output-picker",
+        "--open",
+        "{media}/night-garden.ec3",
+        "--open",
+        "{media}/harbour.ac4",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1500"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Lists the sound outputs of the computer it was taken on."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-first-run.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "firstrun"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/hearth/screenshots/hearth-shortcuts.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "shortcuts",
+        "--open",
+        "{media}/night-garden.ec3",
+        "--open",
+        "{media}/harbour.ac4",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1500"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/karaoke/screenshots/hearth-karaoke-page.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "karaoke",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1800"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "6c14c0b96",
+      "note": "The committed picture is older than this command line: it was taken offscreen, before the Karaoke page had its Microphone card. It is to be taken again with this command once the page fits a window of this width; on main as this is written the card's column is cut off at 1280 pixels."
+    },
+    {
+      "path": "docs/karaoke/screenshots/hearth-karaoke-duet.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "karaoke",
+        "--open",
+        "examples/karaoke/leave-her-johnny/leave-her-johnny.ac3",
+        "--seek",
+        "6300"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "6c14c0b96",
+      "note": "The committed picture is older than this command line: it was taken offscreen, before the Karaoke page had its Microphone card. It is to be taken again with this command once the page fits a window of this width; on main as this is written the card's column is cut off at 1280 pixels."
+    },
+    {
+      "path": "docs/hearth/screenshots/karaoke-de.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "karaoke",
+        "--open",
+        "examples/karaoke/leave-her-johnny/leave-her-johnny.ac3",
+        "--seek",
+        "6300"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "ce3178872",
+      "env": {
+        "ICLFORGE_GUI_LOCALE": "de"
+      },
+      "note": "The committed picture is older than this command line: it was taken offscreen, before the Karaoke page had its Microphone card. It is to be taken again with this command once the page fits a window of this width; on main as this is written the card's column is cut off at 1280 pixels."
+    },
+    {
+      "path": "docs/hearth/screenshots/karaoke-ar.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "karaoke",
+        "--open",
+        "examples/karaoke/leave-her-johnny/leave-her-johnny.ac3",
+        "--seek",
+        "6300"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "ce3178872",
+      "env": {
+        "ICLFORGE_GUI_LOCALE": "ar"
+      },
+      "note": "The committed picture is older than this command line: it was taken offscreen, before the Karaoke page had its Microphone card. It is to be taken again with this command once the page fits a window of this width; on main as this is written the card's column is cut off at 1280 pixels."
+    },
+    {
+      "path": "docs/karaoke/screenshots/hearth-play-lyrics.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "play",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--seek",
+        "1800"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "Names the sound output of the computer it was taken on."
+    },
+    {
+      "path": "docs/karaoke/screenshots/hearth-singer-view.png",
+      "program": "hearth",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "--page",
+        "singer",
+        "--open",
+        "examples/karaoke/auld-lang-syne/auld-lang-syne.ac3",
+        "--open",
+        "examples/karaoke/leave-her-johnny/leave-her-johnny.ac3",
+        "--seek",
+        "5200"
+      ],
+      "environment": "hidden-desktop-living-room",
+      "build": "262363c4a",
+      "note": "A capture draws the singer view in the window at its own size, 1280 by 800, not on the whole screen."
+    },
+    {
+      "path": "docs/karaoke/screenshots/forge-karaoke-parts.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj",
+        "karaokeStep=parts",
+        "height=1100"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/karaoke/screenshots/forge-karaoke-hear.png",
+      "program": "forge-gui",
+      "args": [
+        "--smoke-shot",
+        "{out}",
+        "project=examples/karaoke/auld-lang-syne/auld-lang-syne.forgeproj",
+        "karaokeStep=hear"
+      ],
+      "environment": "hidden-desktop",
+      "build": "262363c4a",
+      "note": "The grab waits for the Hear step to build its stream and decode it. Nothing is played."
+    },
+    {
+      "path": "docs/crucible/screenshots/crucible-room.png",
+      "program": "crucible",
+      "by_hand": "crucible --shot <png> --page room --place \"Hearth=0.2,0.15,0.6\" --place \"Microsoft Edge=0.85,0.7,0.0\", staged as tools/pictures/README.md says under \"Crucible\". Not taken by the script: the capture reads the person's own settings, starts the engine and lists what is running.",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/crucible/screenshots/crucible-room-3d.png",
+      "program": "crucible",
+      "by_hand": "crucible --shot <png> --page room3d --place \"Hearth=0.2,0.15,0.6\" --place \"Microsoft Edge=0.85,0.7,0.0\", staged as tools/pictures/README.md says under \"Crucible\". Not taken by the script: the capture reads the person's own settings, starts the engine and lists what is running.",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/crucible/screenshots/crucible-signal-path.png",
+      "program": "crucible",
+      "by_hand": "crucible --shot <png> --page output, staged as tools/pictures/README.md says under \"Crucible\". Not taken by the script: the capture reads the person's own settings, starts the engine and lists what is running.",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/crucible/screenshots/crucible-settings.png",
+      "program": "crucible",
+      "by_hand": "crucible --shot <png> --page settings, staged as tools/pictures/README.md says under \"Crucible\". Not taken by the script: the capture reads the person's own settings, starts the engine and lists what is running.",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/crucible/screenshots/crucible-first-run.png",
+      "program": "crucible",
+      "by_hand": "crucible --shot <png> --page firstrun, staged as tools/pictures/README.md says under \"Crucible\". Not taken by the script: the capture reads the person's own settings, starts the engine and lists what is running.",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/crucible/screenshots/crucible-room-ar.png",
+      "program": "crucible",
+      "by_hand": "crucible --shot <png> --page room --language ar --place \"Hearth=0.2,0.15,0.6\" --place \"Microsoft Edge=0.85,0.7,0.0\", staged as tools/pictures/README.md says under \"Crucible\". Not taken by the script: the capture reads the person's own settings, starts the engine and lists what is running.",
+      "build": "262363c4a"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-idle-first-run.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "1fdad58ae"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-idle-qr.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "b973dbf7d"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-count-in.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "c56dc0192"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-duet.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "c56dc0192"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-format.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "a71adcc49"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-hebrew.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "c56dc0192"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-no-lyrics-clock.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "24d51df67"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-no-lyrics-titled.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "5bd59a2ce"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-route.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "68e1d670e"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-scripts.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "da375d5cd"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-sheet-vocals.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "2868404eb"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-sheet.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "5a89f61fa"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-lyric-singing.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "c56dc0192"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-status-attention.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "54fd33f78"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-status-idle-code.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "54fd33f78"
+    },
+    {
+      "path": "docs/hearth/screenshots/android-status-starting.png",
+      "program": "the Hearth for Android app's instrumented tests",
+      "by_hand": "Drawn by the Android app's own tests at 1920 by 1080, with no display and no server (apps/hearth/android/README.md, \"How it is checked\"): build and install the debug app and its tests, run them with `adb shell am instrument -w com.iclforge.hearth.test/androidx.test.runner.AndroidJUnitRunner` (LyricViewRenderTest, LyricConformanceTest, LyricControlsTest, StatusScreenTest and QrCodeTest write the pictures), then `adb pull /sdcard/Android/data/com.iclforge.hearth/files/lyric-renders`. This file is one of those renders, copied under this name. Needs an Android device or emulator.",
+      "build": "54fd33f78"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-controls.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "808f66137"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-cyrillic-greek.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "6f9a3a51d"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-duet.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "d1cba724a"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-gap.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "808f66137"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-idle-pairing.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "808f66137"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-line-timed.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "d1cba724a"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-no-lyrics.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "808f66137"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-plain.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "808f66137"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-right-to-left.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "808f66137"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-script.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "808f66137"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-sheet.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "d1cba724a"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-singing.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "d1cba724a"
+    },
+    {
+      "path": "docs/hearth/screenshots/p4-panel-waiting.png",
+      "program": "panel_preview (firmware/hearth-sink/preview)",
+      "by_hand": "Drawn by the firmware's own screen code against LVGL's software renderer (docs/hearth/sink-esp32-p4.md, \"Developing the screen without a panel\"): `cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>`, `cmake --build build-preview`, `build-preview/panel_preview <folder>`. It writes one 24-bit BMP a screen, converted to PNG; p4-panel-sheet.png is those pictures on one sheet. Needs the LVGL that a P4 build of the firmware fetches.",
+      "build": "808f66137"
+    },
+    {
+      "path": "docs/platforms/screenshots/android-dashboard.png",
+      "program": "the Android demo app",
+      "by_hand": "A screenshot of the Android demo app (apps/demos/android) running on a device, by `adb shell screencap -p`. A record of the app as it was that day (docs/platforms/android.md); needs the device and a receiver.",
+      "build": "b0fe0feda"
+    },
+    {
+      "path": "docs/platforms/screenshots/android-orientation-cue.png",
+      "program": "the Android demo app",
+      "by_hand": "A screenshot of the Android demo app (apps/demos/android) running on a device, by `adb shell screencap -p`. A record of the app as it was that day (docs/platforms/android.md); needs the device and a receiver.",
+      "build": "b0fe0feda"
+    },
+    {
+      "path": "docs/platforms/screenshots/android-waiting-for-receiver.png",
+      "program": "the Android demo app",
+      "by_hand": "A screenshot of the Android demo app (apps/demos/android) running on a device, by `adb shell screencap -p`. A record of the app as it was that day (docs/platforms/android.md); needs the device and a receiver.",
+      "build": "b0fe0feda"
+    },
+    {
+      "path": "docs/platforms/screenshots/windows-demo-room.png",
+      "program": "the Windows demo (now Crucible)",
+      "by_hand": "`--shot` of the Windows demo, the program Crucible was before it was renamed, with its --page and --place options. docs/platforms/windows-demo.md is a phase record and this is a picture of the demo as it was, not retaken. Taken in the throwaway driver-test virtual machine, with the virtual sound device's driver installed and a signing key loaded, by the machine's Deploy-Desk.ps1 (-ExtraPages, -Place).",
+      "build": "2ffd07409"
+    },
+    {
+      "path": "docs/platforms/screenshots/windows-demo-room-3d-driver.png",
+      "program": "the Windows demo (now Crucible)",
+      "by_hand": "`--shot` of the Windows demo, the program Crucible was before it was renamed, with its --page and --place options. docs/platforms/windows-demo.md is a phase record and this is a picture of the demo as it was, not retaken. Taken in the throwaway driver-test virtual machine, with the virtual sound device's driver installed and a signing key loaded, by the machine's Deploy-Desk.ps1 (-ExtraPages, -Place).",
+      "build": "2ffd07409"
+    },
+    {
+      "path": "docs/platforms/screenshots/windows-demo-output.png",
+      "program": "the Windows demo (now Crucible)",
+      "by_hand": "`--shot` of the Windows demo, the program Crucible was before it was renamed, with its --page and --place options. docs/platforms/windows-demo.md is a phase record and this is a picture of the demo as it was, not retaken. Taken in the throwaway driver-test virtual machine, with the virtual sound device's driver installed and a signing key loaded, by the machine's Deploy-Desk.ps1 (-ExtraPages, -Place).",
+      "build": "2ffd07409"
+    },
+    {
+      "path": "docs/platforms/screenshots/windows-demo-settings.png",
+      "program": "the Windows demo (now Crucible)",
+      "by_hand": "`--shot` of the Windows demo, the program Crucible was before it was renamed, with its --page and --place options. docs/platforms/windows-demo.md is a phase record and this is a picture of the demo as it was, not retaken. Taken in the throwaway driver-test virtual machine, with the virtual sound device's driver installed and a signing key loaded, by the machine's Deploy-Desk.ps1 (-ExtraPages, -Place).",
+      "build": "2ffd07409"
+    },
+    {
+      "path": "docs/platforms/screenshots/windows-demo-room-split.png",
+      "program": "the Windows demo (now Crucible)",
+      "by_hand": "`--shot` of the Windows demo, the program Crucible was before it was renamed, with its --page and --place options. docs/platforms/windows-demo.md is a phase record and this is a picture of the demo as it was, not retaken. Taken on the development workstation, with another program's virtual device standing in for the driver.",
+      "build": "39ee87f72"
+    },
+    {
+      "path": "docs/platforms/screenshots/windows-demo-room-3d.png",
+      "program": "the Windows demo (now Crucible)",
+      "by_hand": "`--shot` of the Windows demo, the program Crucible was before it was renamed, with its --page and --place options. docs/platforms/windows-demo.md is a phase record and this is a picture of the demo as it was, not retaken. Taken on the development workstation, with another program's virtual device standing in for the driver.",
+      "build": "39ee87f72"
+    },
+    {
+      "path": "docs/platforms/screenshots/windows-demo-room-fr.png",
+      "program": "the Windows demo (now Crucible)",
+      "by_hand": "`--shot` of the Windows demo, the program Crucible was before it was renamed, with its --page and --place options. docs/platforms/windows-demo.md is a phase record and this is a picture of the demo as it was, not retaken. Taken on the development workstation, with another program's virtual device standing in for the driver.",
+      "build": "39ee87f72"
+    }
+  ]
+}
