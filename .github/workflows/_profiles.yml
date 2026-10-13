@@ -1,0 +1,79 @@
+# The ESP32 sinks' profiles, configured and held to their definition, at the pull request.
+#
+# sink_profile.py verify (planning/esp32-platform-profiles.md) is what makes a profile a canon: a
+# configured build must carry the fragments the profile names, the locked values, and no watched
+# key nobody placed. That ran only after the merge, in ci.yml's ESP jobs, behind the footprint
+# probes, so two pull requests that were each valid alone first met on main, and a change to a
+# locked key's default was first seen there. This runs the same guard before the merge, for every
+# profile, and without compiling: `idf.py reconfigure` resolves the configuration and `verify`
+# holds it (the app, bootloader and static RAM budgets need a build and are the post-merge jobs').
+#
+# Called from pr-gate.yml, for a change the planner marks `esp` (firmware/hearth-sink,
+# firmware/esp-idf, the profile tools), in a pull request and in the merge queue. ci-status reads
+# its result and fails closed when the plan asked for it.
+#
+# `runner` is a JSON runner-label array, as _static.yml's: GitHub-hosted for a fork's pull request,
+# vars.GATE_RUNNER_JSON otherwise. The IDF image is the one ci.yml's ESP jobs use.
+name: ESP32 profile guard
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: 'Runner labels as a JSON array, e.g. ["ubuntu-latest"].'
+        type: string
+        default: '["ubuntu-latest"]'
+
+permissions:
+  contents: read
+
+jobs:
+  profiles:
+    name: ESP32 profiles
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    container: espressif/idf:v6.1
+    # Seven configures, each about two minutes: the limit is a backstop against a hang.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Every profile is configured and verified before the step fails, so one run reports every
+      # profile a change breaks. ESP32_PROFILE_GUARD=warn turns a finding into a warning, as it
+      # does in the build jobs.
+      - name: Configure each profile and hold it to its definition
+        shell: bash
+        env:
+          ESP32_PROFILE_GUARD: ${{ vars.ESP32_PROFILE_GUARD }}
+        run: |
+          set -u
+          . "$IDF_PATH/export.sh" > /dev/null
+          profile="$GITHUB_WORKSPACE/tools/hearth/sink_profile.py"
+          guard=()
+          if [ "${ESP32_PROFILE_GUARD:-}" = warn ]; then guard=(--warn-only); fi
+          failed=0
+          while IFS=$'\t' read -r id target _; do
+            dir="$RUNNER_TEMP/profile-$id"
+            echo "::group::$id ($target)"
+            defaults="$(python3 "$profile" defaults "$id")"
+            read -r -a identity <<< "$(python3 "$profile" identity "$id" --cmake)"
+            if (
+              cd "$GITHUB_WORKSPACE/firmware/hearth-sink" &&
+              idf.py -B "$dir" -DSDKCONFIG="$dir/sdkconfig" -DIDF_TARGET="$target" \
+                "-DSDKCONFIG_DEFAULTS=$defaults" "${identity[@]}" \
+                -DPROJECT_VER=profile-guard reconfigure
+            ) > "$dir.log" 2>&1; then
+              python3 "$profile" verify "$id" --build-dir "$dir" --github "${guard[@]}" || failed=1
+            else
+              echo "::error title=profile $id::the configure failed; its last lines follow"
+              tail -n 40 "$dir.log"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done < <(python3 "$profile" list)
+          if [ "$failed" -ne 0 ]; then
+            echo "A profile does not hold: see the groups above."
+            exit 1
+          fi
+          echo "Every profile's configuration holds to its definition."

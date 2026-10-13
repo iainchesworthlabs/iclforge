@@ -19,6 +19,10 @@ ready for `$GITHUB_OUTPUT`:
     compare    true when the change touches the library (COMPARE_PREFIXES), so a queue entry
                also runs the performance and memory comparisons (_compare.yml); the
                workflow decides whether the event is one that runs them
+    esp        true when the change touches the ESP32 sinks' profiles, their Kconfig or
+               their fragments (ESP_PREFIXES), so the gate configures every profile
+               in the IDF container and holds it to its definition (_profiles.yml);
+               a configure, not a build: nothing here compiles for a board
     reason     the first path that forced `build`, for the run's summary
     gui_reason the first path that pulled Qt in
 
@@ -66,6 +70,17 @@ GATE_MACHINERY = (
     ".github/actions/",
     ".github/toolchain/",
     ".github/toolchain-versions.json",
+)
+
+# What a profile's configuration is read from: the sink's own Kconfig, fragments and profile
+# file, the ESP-IDF component's Kconfig, and the tools that hold one to the other. A
+# library's C++ is not here: it does not change what a configure resolves.
+ESP_PREFIXES = (
+    "firmware/hearth-sink/",
+    "firmware/esp-idf/",
+    "tools/hearth/sink_profile.py",
+    "tools/hearth/kconfig_scan.py",
+    ".github/workflows/_profiles.yml",
 )
 
 # The projects whose change can alter how fast the encoder runs or how much it allocates:
@@ -177,6 +192,8 @@ def plan(
             "docs_only": "false",
             "machinery": "false",
             "compare": "false",
+            "esp": "true",
+            "esp_reason": "full run (queue entry, push to main or dispatch)",
             "reason": "full run (queue entry, push to main or dispatch)",
             "gui_reason": "full run (queue entry, push to main or dispatch)",
         }
@@ -185,6 +202,7 @@ def plan(
     all_docs = True
     machinery = False
     compare = False
+    esp_reason = ""
     build_reason = ""
     gui_reason = ""
 
@@ -197,6 +215,8 @@ def plan(
         if _is_docs(path):
             continue
         all_docs = False
+        if path.startswith(ESP_PREFIXES):
+            esp_reason = esp_reason or path
 
         if path.startswith(GATE_MACHINERY):
             machinery = True
@@ -243,6 +263,8 @@ def plan(
             "docs_only": "false",
             "machinery": "false",
             "compare": "false",
+            "esp": "true",
+            "esp_reason": "no file list; running everything",
             "reason": "no file list; building everything",
             "gui_reason": "no file list; building everything",
         }
@@ -254,6 +276,8 @@ def plan(
             "docs_only": "true",
             "machinery": "false",
             "compare": "false",
+            "esp": "false",
+            "esp_reason": "",
             "reason": "documentation only",
             "gui_reason": "",
         }
@@ -267,6 +291,8 @@ def plan(
         "docs_only": "false",
         "machinery": "true" if machinery else "false",
         "compare": "true" if compare else "false",
+        "esp": "true" if esp_reason else "false",
+        "esp_reason": esp_reason,
         "reason": build_reason or "nothing a Linux C++ build reads (lint only)",
         "gui_reason": gui_reason,
     }
@@ -291,7 +317,18 @@ def main(argv: list[str]) -> int:
     paths = [] if args.force_all else sys.stdin.read().splitlines()
     result = plan(paths, force_all=args.force_all, gui_on_build=args.gui_on_build)
 
-    for key in ("build", "gui", "docs_only", "machinery", "compare", "reason", "gui_reason"):
+    keys = (
+        "build",
+        "gui",
+        "docs_only",
+        "machinery",
+        "compare",
+        "esp",
+        "reason",
+        "gui_reason",
+        "esp_reason",
+    )
+    for key in keys:
         print(f"{key}={result[key]}")
     print(
         f"plan: build={result['build']} gui={result['gui']} "
