@@ -1106,6 +1106,112 @@ TEST_CASE("decoder settings: the karaoke choice and its levels are kept across s
     CHECK(read_again.karaoke_melody_db == -9.0);
 }
 
+// --- the output chosen in the picker (selectOutputDevice() and the two beside it) ---
+
+TEST_CASE("kept output: the kind of row and its id are kept across starts",
+          "[hearth][hearth-controller][output]") {
+    using iclforge::hearth::ui::KeptOutput;
+    using iclforge::hearth::ui::KeptOutputKind;
+
+    QTemporaryDir folder;
+    REQUIRE(folder.isValid());
+    const QString path = QDir(folder.path()).filePath(QStringLiteral("kept-output.ini"));
+
+    // Nothing kept is the default, and keeping the default writes nothing.
+    {
+        QSettings store(path, QSettings::IniFormat);
+        CHECK(iclforge::hearth::ui::read_kept_output(store) == KeptOutput{});
+        CHECK_FALSE(iclforge::hearth::ui::write_kept_output(store, KeptOutput{}));
+        CHECK_FALSE(store.contains(QStringLiteral("output/kind")));
+    }
+
+    // Each kind comes back as it was, from the file itself, and keeping what is already kept
+    // writes nothing; another id of the same kind is a change.
+    const KeptOutput choices[] = {
+        {KeptOutputKind::kDevice, QStringLiteral("{0.0.0.00000000}.{headphones}")},
+        {KeptOutputKind::kPassthrough, QStringLiteral("{0.0.0.00000000}.{onkyo}")},
+        {KeptOutputKind::kGroup, QStringLiteral("group-7f3a")},
+    };
+    for (const KeptOutput& chosen : choices) {
+        {
+            QSettings store(path, QSettings::IniFormat);
+            CHECK(iclforge::hearth::ui::write_kept_output(store, chosen));
+            CHECK_FALSE(iclforge::hearth::ui::write_kept_output(store, chosen));
+            store.sync();
+        }
+        const QSettings later(path, QSettings::IniFormat);
+        CHECK(iclforge::hearth::ui::read_kept_output(later) == chosen);
+    }
+    {
+        QSettings store(path, QSettings::IniFormat);
+        KeptOutput other = choices[2];
+        other.id = QStringLiteral("group-0b11");
+        CHECK(iclforge::hearth::ui::write_kept_output(store, other));
+        CHECK(iclforge::hearth::ui::read_kept_output(store) == other);
+    }
+
+    // Giving the choice up is the default, with no id left behind.
+    {
+        QSettings store(path, QSettings::IniFormat);
+        CHECK(iclforge::hearth::ui::write_kept_output(store, KeptOutput{}));
+        CHECK(iclforge::hearth::ui::read_kept_output(store) == KeptOutput{});
+        CHECK_FALSE(store.contains(QStringLiteral("output/id")));
+        CHECK(store.value(QStringLiteral("output/kind")).toString().toStdString() == "default");
+        // An id given with the default is not kept either.
+        CHECK_FALSE(iclforge::hearth::ui::write_kept_output(
+            store, KeptOutput{KeptOutputKind::kDefault, QStringLiteral("stray")}));
+        CHECK_FALSE(store.contains(QStringLiteral("output/id")));
+    }
+}
+
+TEST_CASE("kept output: what cannot be read as a choice is the default",
+          "[hearth][hearth-controller][output]") {
+    using iclforge::hearth::ui::KeptOutput;
+
+    QTemporaryDir folder;
+    REQUIRE(folder.isValid());
+    const QString path = QDir(folder.path()).filePath(QStringLiteral("damaged-output.ini"));
+    QSettings store(path, QSettings::IniFormat);
+
+    // A kind a later build wrote.
+    store.setValue(QStringLiteral("output/kind"), QStringLiteral("hologram"));
+    store.setValue(QStringLiteral("output/id"), QStringLiteral("somewhere"));
+    CHECK(iclforge::hearth::ui::read_kept_output(store) == KeptOutput{});
+
+    // A kind with no id: nothing to play to.
+    for (const char* kind : {"device", "passthrough", "group"}) {
+        store.setValue(QStringLiteral("output/kind"), QString::fromLatin1(kind));
+        store.setValue(QStringLiteral("output/id"), QString());
+        CHECK(iclforge::hearth::ui::read_kept_output(store) == KeptOutput{});
+        store.remove(QStringLiteral("output/id"));
+        CHECK(iclforge::hearth::ui::read_kept_output(store) == KeptOutput{});
+    }
+
+    // An id with no kind.
+    store.remove(QStringLiteral("output/kind"));
+    store.setValue(QStringLiteral("output/id"), QStringLiteral("{onkyo}"));
+    CHECK(iclforge::hearth::ui::read_kept_output(store) == KeptOutput{});
+}
+
+TEST_CASE("kept output: a receiver counts as there only when the machine lists its endpoint",
+          "[hearth][hearth-controller][output]") {
+    iclforge::audio::RenderDeviceInfo speakers;
+    speakers.id = "{speakers}";
+    iclforge::audio::RenderDeviceInfo receiver;
+    receiver.id = "{receiver}";
+    receiver.supports_ac3_passthrough = true;
+
+    const std::vector<iclforge::audio::RenderDeviceInfo> both{speakers, receiver};
+    CHECK(iclforge::hearth::ui::lists_endpoint(both, QStringLiteral("{receiver}")));
+    CHECK(iclforge::hearth::ui::lists_endpoint(both, QStringLiteral("{speakers}")));
+    // Another endpoint's id is not a match, nor a part of one, nor its name.
+    CHECK_FALSE(iclforge::hearth::ui::lists_endpoint(both, QStringLiteral("{receiver")));
+    CHECK_FALSE(iclforge::hearth::ui::lists_endpoint(both, QStringLiteral("{other-receiver}")));
+    CHECK_FALSE(iclforge::hearth::ui::lists_endpoint(both, QString()));
+    // A machine that lists nothing has none of them.
+    CHECK_FALSE(iclforge::hearth::ui::lists_endpoint({}, QStringLiteral("{receiver}")));
+}
+
 TEST_CASE("media_info_to_map: a karaoke programme names its coding mode and its parts",
           "[hearth][hearth-controller][karaoke]") {
     iclforge::hearth::MediaInfo info;

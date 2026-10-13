@@ -44,6 +44,21 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**Hearth: the output chosen in the picker is kept across starts**
+
+- **Hearth's window plays to the output a person chose last time.** It started on the computer's
+  default output at every start, and a receiver, another device or a network group had to be chosen
+  again. **Play here** now keeps the kind of row (this computer's output, a passthrough output or a
+  group) and its id, and the next start puts it back before anything can play. A choice whose
+  output is not there does not change what is kept. A receiver the computer does not list at a
+  start (switched off, unplugged) starts as a decode to the default output: given an endpoint it
+  does not have, the engine takes every output and would send the stream as a bitstream to
+  whichever takes it. The receiver stays the kept choice and is played to again at the next start
+  it is listed for. A this-computer output that is not there decodes to the default. A group is
+  restored as chosen; the network is found after the window opens, so the engine refuses the item
+  until the group is ready, with the reason in the header, and does not replace a group that was
+  chosen with a local output. Giving a group up, or deleting the one that plays, keeps the default.
+
 **Karaoke in E-AC-3: what the boards do, and the pages that said otherwise**
 
 - **The Hearth sink pages say what each board does with a karaoke stream.** The S3 reproduces

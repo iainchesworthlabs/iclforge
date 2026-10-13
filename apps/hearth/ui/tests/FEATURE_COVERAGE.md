@@ -19,6 +19,7 @@ Status:
 - **File dialogs**: under `-platform offscreen`, QtQuick.Dialogs shows its non-native dialog. The suites click the page's own button, which opens it, and then `accept()` it. The file is set as the dialog's selection before it opens, because the non-native dialog drops a selection made after it has opened.
 - **Drag and drop**: `TestServices.dropFiles()` sends real DragEnter/DragMove/Drop events that carry file URLs to the window, so the page's own DropArea receives them.
 - **Keys into Main.qml's window**: `TestServices.keyClick()` (`QTest::keyClick` on that `QWindow`). `TestCase.keyClick()` only ever reaches the test case's own window.
+- **A restart**: a suite has one `HearthController` for its whole process, so `TestServices.startAnotherWindow()` makes a second one over the same settings file (what a restart finds), starts it as the window does, and plays it into a room of its own (`without` leaves an endpoint out, `otherReceiver` adds a second one that takes a bitstream). A case reads it through the controller's own properties and ends it with `closeWindow()`.
 
 ## Coverage
 
@@ -137,6 +138,11 @@ Status:
 | 111 | Output | To a receiver, a karaoke item with a reproduction chosen is decoded; "As coded" sends it, and changing the choice while it plays moves it | none | UI | OutputPicker::test_receiverGetsADecodeOfAKaraokeReproduction (the choice is written through the controller, not clicked on the Karaoke page) |
 | 112 | Play, Decoder, Speakers | While a bitstream goes out: the header's sentence, the signal path's three stages, the closed volume control, the Decoder page's note and the Speakers page's line say the receiver decodes and renders it | none | UI | OutputPicker::test_passthroughRowSendsTheItemToTheReceiverAsABitstream (the transcode's wording, E-AC-3 sent as AC-3, is not reached: the room's receiver takes both formats) |
 | 113 | Output picker | Opening the picker has the engine read the outputs again: a receiver that is off is decoded for even when chosen, and one switched on since is listed and, chosen, sent the stream | none | UI | OutputPicker::test_receiverSwitchedOnIsSeenWhenThePickerOpens (the room's receiver is switched by `TestServices.setEndpointPassthrough()`; the row kept while a link is held is `keep_held_link_marks`, in `hearth_controller_tests`, since the room's probe does not read a held endpoint as busy) |
+| 114 | Output picker | Play here keeps the kind of row (this computer's output, a passthrough output, a group) and its id; giving a group up keeps the default | none | UI | OutputPicker::test_playHereKeepsTheKindOfRowAndItsId (read from the settings file, the way a restart finds it; the keys' own read and write, and a damaged value, are `kept output:` in `hearth_controller_tests`) |
+| 115 | Output picker | The next start plays to the receiver chosen last time, before anything has played: the item is sent as a bitstream | none | UI | OutputPicker::test_theNextStartPlaysToTheReceiverChosenLastTime (a second controller over the same settings, `TestServices.startAnotherWindow()`) |
+| 116 | Output picker | The next start decodes to the device chosen last time; a device that is not there is the default output, and what is kept does not change | none | UI | OutputPicker::test_theNextStartDecodesToTheDeviceChosenLastTime |
+| 117 | Output picker | A receiver not listed at a start is not replaced by another output that takes a bitstream: the item is decoded to the default output, and the receiver is the choice again at a start it is listed for | none | UI | OutputPicker::test_aReceiverThatIsNotThereIsNotReplacedByAnotherThatTakesABitstream (the second window's room has "Other receiver", which takes one) |
+| 118 | Output picker | A group chosen last time is put back as chosen; until it is ready the item is refused with the reason, and is not played on this computer | none | UI | OutputPicker::test_theNextStartKeepsTheGroupAndRefusesItemsUntilItIsReady |
 
 ### Totals
 
