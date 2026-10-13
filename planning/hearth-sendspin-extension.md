@@ -497,6 +497,8 @@ decoder object of a settings command with only these keys. Rules:
   reproduction). There is no reply: a sink that decodes for itself and lists the decoder keys sees
   the result as the settings command it is sent next, and every sink hears it in the audio. A
   server that does not act on requests ignores them, and a sink must not assume otherwise.
+  Hearth applies a request from a member of the group it is playing to, as the singer's change (and
+  keeps it, as it keeps the singer's), and ignores one from a sink in another group or in none.
 - **A passed-through stream is not changed by it.** A sink that hands the coded bits to a receiver
   plays every vocal whatever is chosen ([the sink screen's SS7](hearth-sink-screen.md)); its request
   changes what the group's decoding members play and what the server's own screens show.

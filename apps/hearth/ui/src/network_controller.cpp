@@ -37,6 +37,7 @@
 #include "server_identity.hpp"
 #include "settings_model.hpp"
 #include "sink_lyrics_text.hpp"
+#include "sink_output_text.hpp"
 #include "shared_pairing_store.hpp"
 #include "sink_firmware.hpp"
 #include "sink_firmware_view.hpp"
@@ -379,6 +380,7 @@ struct LayoutFields {
         dialogue_text = QObject::tr("dialnorm %1").arg(decoder.dialnorm, 0, 'f', 0);
     }
     map[QStringLiteral("streamText")] = stream_text;
+    map[QStringLiteral("outputText")] = sink_output_text(facts);
     map[QStringLiteral("objectsText")] = objects_text;
     map[QStringLiteral("dialogueText")] = dialogue_text;
     map[QStringLiteral("lyricsText")] = sink_lyrics_text(facts);
@@ -581,6 +583,8 @@ NetworkController::~NetworkController() {
     NetworkOutputStatus::instance().set_planner({});
     NetworkOutputStatus::instance().set_karaoke_applier({});
     NetworkOutputStatus::instance().set_lyrics_applier({});
+    // Nothing is left to be taken for a host that is gone.
+    static_cast<void>(NetworkOutputStatus::instance().take_requests());
     sinks_engine_.reset();
 }
 
@@ -623,6 +627,12 @@ void NetworkController::start() {
         [sinks](const std::string& group_id, const iclforge::hearth::LyricsUpdate& update) {
             sinks->apply_lyrics(group_id, update);
         });
+    // A member's own control asking for the singer's karaoke choice (D8): HearthController, which
+    // holds the choice, takes it at its next poll.
+    sinks->set_request_handler([](const iclforge::hearth::NetworkSinks::SinkRequest& request) {
+        NetworkOutputStatus::instance().push_request(
+            {.group_id = request.group_id, .sink_name = request.sink_name, .request = request.request});
+    });
     poll_timer_.start();
     poll();
 }
