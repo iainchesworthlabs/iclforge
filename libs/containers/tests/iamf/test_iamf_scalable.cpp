@@ -153,7 +153,11 @@ constexpr std::array<double, 11> kWeights{0.0,    0.0179, 0.0391, 0.0658, 0.1038
 // The channel names of a layout, in the order of its substreams.
 [[nodiscard]] std::vector<std::string> names_of(std::uint8_t layout) {
     std::vector<std::string> names;
-    for (const auto& s : iamf::layout_info(layout)->substreams) {
+    // Bound before the loop: layout_info() returns an optional by value, and Clang 17 (NDK r26)
+    // ends a range-for's temporaries before its first iteration (P2718R0 is Clang 19), which left
+    // this loop reading a freed vector.
+    const auto info = iamf::layout_info(layout);
+    for (const auto& s : info->substreams) {
         names.emplace_back(s.first);
         if (!s.second.empty()) {
             names.emplace_back(s.second);

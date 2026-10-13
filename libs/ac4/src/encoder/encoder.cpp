@@ -3558,8 +3558,11 @@ struct Encoder::Impl {
     }
 
     [[nodiscard]] bool iframe(std::int64_t frame) const {
+        // std::binary_search, not the ranges one: NDK r26's libc++ compares against the first
+        // element and not the one lower_bound found (llvm-project#61160), so every frame between
+        // the first named I-frame and the last was one (test_frame_rates.cpp, on a Shield).
         return frame % config.iframe_interval == 0 ||
-               std::ranges::binary_search(forced_iframes, frame);
+               std::binary_search(forced_iframes.begin(), forced_iframes.end(), frame);
     }
 
     // The table of contents of frame f, with `wait_frames` (and br_code where
