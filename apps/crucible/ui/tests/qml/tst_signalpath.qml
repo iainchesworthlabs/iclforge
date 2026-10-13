@@ -162,9 +162,13 @@ TestCase {
         // Stereo and the silent device only: nothing takes a bitstream.
         machine(["realtek", "null"]);
         const page = makePage();
+        const before = CrucibleController.outputReason;
         choosePin(page, "atmos");
         compare(CrucibleController.pinned, "atmos");
-        wait(300);  // a few polls: the engine keeps what it can carry
+        // The engine answers the pin on one of its next polls, and its reason is the one thing
+        // that changes when it has: wait for that and not for a fixed few polls.
+        tryVerify(function() { return CrucibleController.outputReason !== before; }, 5000,
+                  "the engine answered the pin: " + CrucibleController.outputReason);
         verify(CrucibleController.modeKey !== "atmos", "no endpoint here carries Atmos: " + CrucibleController.modeKey);
         verify(CrucibleController.outputReason.length > 0, "the fallback is explained");
     }

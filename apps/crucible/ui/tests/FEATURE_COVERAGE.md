@@ -116,7 +116,7 @@ A headless session never shows the menu, so each entry is fired through its
 | 54 | Size track keys | UI | UI | keyboard::test_sizeSliderRespondsToKeys |
 | 55 | Room keys: arrows, Shift/Ctrl steps, clamp, Home, Enter, Delete, ± | UI (fake entry) | UI (through the engine) | keyboard::test_roomKeys*; roomworkflow::test_roomKeysMoveHeightRecentreResizeAndReturnThroughTheEngine |
 | 56 | Full-screen application locked in the bed (card, chip, drag, keys) | Logic (fake entry) | UI | roomworkflow::test_aFullScreenApplicationIsLockedInTheBed (scripted full-screen seam); keyboard::test_roomKeysRefuseAFullScreenApplicationAndSayWhy |
-| 57 | Full-screen rule note / platform reason | UI | UI | room::test_fullscreenRuleNoteSaysWhetherTheRuleApplies (engine-dependent half skips here) |
+| 57 | Full-screen rule note / platform reason | UI | UI | room::test_fullscreenRuleNoteStatesTheRuleOnAMachineThatCanAnswer; room::test_fullscreenRuleNotePrintsTheReasonOnAMachineThatCannot (the foreground seam is scripted both ways) |
 | 58 | Silent and background applications follow their Settings checks | None | UI | roomworkflow::test_silentAndBackgroundApplicationsFollowTheirSettings |
 | 59 | Listing rule in the platform's words | UI | UI | platform::test_theListingRuleIsThePlatformsOwn |
 | 60 | Plan / 3D switch, remembered in the store | Logic (`page.threeD`) | UI | roomworkflow::test_theRoomViewSwitchPersistsAndTheThreeDViewTakesADrop |
@@ -210,7 +210,7 @@ belongs to one platform skips on the others.
 | room::test_emptyRoomWithTheEngineStopped | With the engine stopped there are no applications, none placed and none in the bed, and the Room page renders. |
 | room::test_runningRoomCountsAddUp | Placed plus bed equals the number of applications, and each has an id, a name and a slot of -1 or 0 to 9. Commands for an unknown application are ignored. |
 | room::test_splitTakesTwoSlotsAndMonoGivesOneBack | Split gives an application a width of 2 and a slot, mono gives it a width of 1, and the placed count stays the same. An object's size reads back as set and is clamped to 1. |
-| room::test_placementRoundTripsForALiveApplication | Placing an application at (0.25, 0.75) reads back within 0.02, and returning it puts it back in the bed. |
+| room::test_placementRoundTripsForAScriptedApplication | Placing an application at (0.25, 0.75) reads back within 0.02, and returning it puts it back in the bed. |
 | room::test_pairSidesPlaceOnTheirOwnAndResetToTheSpread | A split pair starts at the standard spread. Placing one side makes the pair custom, and resetting the pair returns it to the standard spread. |
 | settings::test_defaults | A fresh store gives pin `auto`, low latency off, codec bypass off, bitrate 0, theme `system`, palette `signal`, silent-device name "Crucible Silent Output", keep running on, move on launch off, no key path and the first-run dialog not yet seen. |
 | settings::test_settingsRoundTripAndNotify | Written settings read back and each write emits `settingsChanged`. Writing the same value again does not. |
