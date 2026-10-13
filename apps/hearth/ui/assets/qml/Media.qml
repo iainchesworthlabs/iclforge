@@ -341,9 +341,9 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 visible: root.container.edits !== undefined
+                                //: How many edits an MP4 track's edit list holds, beside the label 'Edit list'.
                                 text: root.container.edits > 0
-                                      ? qsTr("%1 entr%2").arg(root.container.edits)
-                                                         .arg(root.container.edits === 1 ? "y" : "ies")
+                                      ? qsTr("%n entries", "", root.container.edits)
                                       : qsTr("none")
                                 color: Theme.text
                             }
@@ -354,12 +354,12 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 visible: root.container.codecBox !== undefined
+                                //: The dec3 box of an MP4 track. %n counts the independent substreams; %2 is the number of dependent ones.
                                 text: root.container.codecBox
-                                      ? qsTr("data rate %1 kbit/s · %2 independent substream%3, %4 dependent "
-                                            + "· bsid %5 · %6%7")
+                                      ? qsTr("data rate %1 kbit/s · %n independent substreams, %2 dependent "
+                                            + "· bsid %3 · %4%5", "",
+                                             root.container.codecBox.independentSubstreams)
                                             .arg(root.container.codecBox.dataRateKbps)
-                                            .arg(root.container.codecBox.independentSubstreams)
-                                            .arg(root.container.codecBox.independentSubstreams === 1 ? "" : "s")
                                             .arg(root.container.codecBox.numDepSub)
                                             .arg(root.container.codecBox.bsid)
                                             .arg(root.container.codecBox.bsmodLabel)

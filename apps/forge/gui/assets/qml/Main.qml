@@ -1601,6 +1601,10 @@ ApplicationWindow {
     PreferencesDialog {
         id: preferencesDialog
         settings: appSettings
+        // About Forge… over the open dialog: About is reached from Settings
+        // here as it is in Crucible and Hearth. The two stack, and closing
+        // About returns to Settings with its working copy as it was left.
+        onShowAbout: aboutDialog.open()
         // Item 31: a default here applies to a field ONLY while nothing has
         // explicitly touched it this session yet - the exact loudnessTouched
         // contract applyGuidedLoudnessContract already follows, generalised
@@ -1654,8 +1658,16 @@ ApplicationWindow {
         id: streamPlayerDialog
     }
 
+    // Reached from the header's About, and from Settings' About Forge….
+    // Licences… chains to the dialog below, which stacks over this one.
     AboutDialog {
         id: aboutDialog
+        onShowLicences: licencesDialog.open()
+    }
+
+    // The notices this build ships - NOTICES.txt, embedded at build time.
+    LicencesDialog {
+        id: licencesDialog
     }
 
     Dialog {
@@ -2012,7 +2024,8 @@ ApplicationWindow {
                 onClicked: streamPlayerDialog.open()
             }
             Button {
-                text: qsTr("Preferences")
+                objectName: "prefsOpenButton"
+                text: qsTr("Settings")
                 onClicked: preferencesDialog.open()
             }
             Button {
@@ -8097,7 +8110,7 @@ ApplicationWindow {
                         // nothing is sent anywhere.
                         Accessible.description: EncoderController.busy
                             ? qsTr("An encode is running. The runs strip shows its progress.")
-                            : qsTr("Encodes the loaded sources into the output folder set in Preferences. The runs strip reports the result.")
+                            : qsTr("Encodes the loaded sources into the output folder set in Settings. The runs strip reports the result.")
                         enabled: EncoderController.sourceReady && !EncoderController.busy
                         highlighted: true
                         // implicitContentHeight, not contentItem.implicitHeight:

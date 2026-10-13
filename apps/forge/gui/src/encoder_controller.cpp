@@ -8462,3 +8462,22 @@ bool EncoderController::exportDiagnostics(const QString& fileUrl) {
     emit diagnosticsChanged();
     return ok;
 }
+
+// Last in the file on purpose: forge-gui_lupdate stamps every tr() with its line, and
+// the Forge catalogue gate is strict, so a function placed above the others would
+// restamp all six catalogues for no change in any message.
+QString EncoderController::licenceNotices() const {
+    // The same file the package installs, embedded by apps/forge/gui/CMakeLists.txt
+    // (and by the QML test binary), so the dialog cannot say something the
+    // package does not. A binary built without the embedding gets a sentence
+    // that says so rather than an empty view - the same fallback, word for
+    // word, that CrucibleController::licenceNotices() and
+    // HearthController::licenceNotices() use.
+    QFile file(QStringLiteral(":/notices/NOTICES.txt"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return tr("This build carries no embedded notices file (:/notices/NOTICES.txt was not "
+                  "compiled in); the NOTICES.txt beside the application and the repository's "
+                  "LICENSE say what it ships.");
+    }
+    return QString::fromUtf8(file.readAll());
+}

@@ -5,13 +5,19 @@ import QtQuick.Layouts
 
 import ForgeGui
 
-// Preferences — a modal on the standard backdrop, squared corners, three
+// Settings — a modal on the standard backdrop, squared corners, three
 // columns: appearance, what happens when the app opens (plus files and
 // runs), and the defaults a new encode starts from (plus capture and the
 // command line). Values live in the Settings object Main.qml owns
 // (`settings`); this dialog edits a working copy and writes it back on Save,
 // so Cancel genuinely cancels. Every row here is wired to real behaviour —
 // nothing is a checkbox for a feature that does not exist.
+//
+// The window calls this "Settings", as Crucible and Hearth do. The file, the
+// component and the prefs* object names kept the name they were written with
+// (the tests, the catalogues' context and docs/forge/gui/localisation.md
+// all name them), and none of it is shown to anyone. Why it keeps Save and
+// Cancel when the other two apply at once: docs/forge/gui/index.md, "Settings".
 Dialog {
     id: root
 
@@ -19,6 +25,11 @@ Dialog {
     // signal (declaring a fresh `signal applied()` here would collide with
     // that inherited signal - Qt flags it as an invalid override).
     property var settings
+
+    // About Forge…: Main.qml opens the AboutDialog over this one. An act, not
+    // a setting, so it runs on the press and leaves the working copy below as
+    // it is - Cancel and Save still mean what they did when it closes again.
+    signal showAbout()
 
     modal: true
     anchors.centerIn: parent
@@ -122,13 +133,13 @@ Dialog {
         // attached to an Item or an Action" at runtime otherwise) - its
         // contentItem is, and is what a screen reader actually reaches
         // when the dialog opens. title is "" (a styled Text below draws
-        // the visible "Preferences" heading instead), so Dialog's own
+        // the visible "Settings" heading instead), so Dialog's own
         // title-derived accessible name has nothing to read without this.
         Accessible.role: Accessible.Dialog
-        Accessible.name: qsTr("Preferences")
+        Accessible.name: qsTr("Settings")
 
         Text {
-            text: qsTr("Preferences")
+            text: qsTr("Settings")
             font.pixelSize: Math.round(20 * Theme.fontScale)
             font.family: Theme.headingFamily
             font.weight: Font.ExtraBold
@@ -553,6 +564,12 @@ Dialog {
         RowLayout {
             Layout.fillWidth: true
             spacing: Theme.space3
+
+            Button {
+                objectName: "prefsAboutButton"
+                text: qsTr("About Forge…")
+                onClicked: root.showAbout()
+            }
 
             Item { Layout.fillWidth: true }
 

@@ -62,5 +62,20 @@ runs:
         if ($LASTEXITCODE -ne 0) {
             throw "get-pip.py exited $LASTEXITCODE installing pip into $($exe.FullName)"
         }
+        # pip's build isolation cannot work on this interpreter: the ._pth
+        # file makes it ignore PYTHONPATH, which is how pip hands an isolated
+        # build environment to the build backend, so a package built from
+        # source sees only what is installed here. install-qt-action's
+        # aqtinstall comes from a git commit (aqtsource in
+        # .github/toolchain-versions.json), which pip has to build, and with
+        # no setuptools_scm visible that build "succeeds" as aqtinstall 0.0.0
+        # with no aqt/version.py - `python -m aqt` then dies on its own
+        # import. Taking the ._pth away does not help, it makes the build
+        # fail outright. These are that package's [build-system] requires;
+        # installed here the build finds them and writes the version file.
+        & $exe.FullName -m pip install --quiet 'setuptools>=80' 'setuptools_scm[toml]>=9.2.0'
+        if ($LASTEXITCODE -ne 0) {
+            throw "pip exited $LASTEXITCODE installing setuptools and setuptools_scm into $($exe.FullName)"
+        }
         Write-Host "Found python.exe at $($exe.FullName)"
         $exe.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8

@@ -78,7 +78,7 @@ Card {
                           .arg(HearthController.thisFrame.dialnorm)
                           .arg((31 - HearthController.thisFrame.dialnorm).toFixed(1))
                           .arg(HearthController.hasObjectMetadata
-                               ? qsTr(" · %1 objects").arg(HearthController.objectsPlaced) : ""))
+                               ? qsTr(" · %n objects", "", HearthController.objectsPlaced) : ""))
                 color: Theme.textMuted
                 font.pixelSize: Theme.fontSmall
                 wrapMode: Text.WordWrap

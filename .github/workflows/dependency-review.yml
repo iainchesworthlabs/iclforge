@@ -29,7 +29,13 @@ concurrency:
 jobs:
   dependency-review:
     name: Scan dependency diff
-    runs-on: ubuntu-latest
+    # Control-plane job: a seconds-long scan that only calls the dependency-graph API. It is a
+    # required check on every pull request and on every merge-queue entry, so leaving it on the
+    # shared hosted pool let the queue head wait behind other repositories' builds (observed
+    # 2026-10-13: queued 35 minutes with the merge group otherwise green). Routed by
+    # vars.CONTROL_RUNNER_JSON like ci.yml's deciders - unset means ubuntu-latest, deleting the
+    # variable is the kill switch - and a fork pull request is pinned to GitHub-hosted.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && fromJSON('["ubuntu-latest"]') || fromJSON(vars.CONTROL_RUNNER_JSON || '["ubuntu-latest"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -359,7 +359,7 @@ ApplicationWindow {
         currentIndex: window.page === "room" ? 0 : window.page === "output" ? 1 : 2
         RoomPage { id: roomPage; threeD: window.roomThreeD || CrucibleController.roomView === "3d"; onOpenOutput: window.page = "output" }
         OutputPage {}
-        SettingsPage {}
+        SettingsPage { onShowAbout: about.open() }
     }
 
     // --- status strip -----------------------------------------------------------

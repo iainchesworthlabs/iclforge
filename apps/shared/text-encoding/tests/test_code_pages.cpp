@@ -234,6 +234,14 @@ TEST_CASE("code pages: bytes a page does not have are refused and leave nothing"
         {"shift-jis", bytes({'a', 0x82, 0x20})},
         {"gbk", bytes({'a', 0x81, 0x20})},
         {"big5", bytes({'a', 0xA4, 0x20})},
+        // The same wherever it stands: with a line end for the trail, first in the text, and
+        // between two characters. macOS 15's iconv refuses such a pair of Shift-JIS at the start
+        // of a call and steps over it without a word after a character.
+        {"shift-jis", bytes({'a', 0x82, 0x0A})},
+        {"shift-jis", bytes({0x82, 0x20, 'a'})},
+        {"shift-jis", bytes({0x82, 0xA0, 0x82, 0x20, 0x82, 0xA2})},
+        {"gbk", bytes({0xC4, 0xE3, 0x81, 0x20, 0xBA, 0xC3})},
+        {"big5", bytes({0xA7, 0x41, 0xA4, 0x20, 0xA6, 0x6E})},
     };
     for (const Bad& item : cases) {
         INFO(item.page);
@@ -242,9 +250,48 @@ TEST_CASE("code pages: bytes a page does not have are refused and leave nothing"
         std::string out = "left over";
         const bool converted = code_page_to_utf8(*page, item.input, out);
         // What went in and what came back, as numbers: on a platform whose conversion takes
-        // these bytes (macOS 15 on Intel did, for shift-jis, on 2026-10-12) the failure says what
-        // it made of them.
+        // these bytes (macOS 15 did, for shift-jis, until 2026-10-13) the failure says what it
+        // made of them.
         CAPTURE(numbers(item.input), numbers(out));
+        CHECK_FALSE(converted);
+        CHECK(out.empty());
+    }
+}
+
+TEST_CASE("code pages: a letter held for a mark that may follow it is not lost or refused", "[text-encoding]") {
+    // glibc's windows-1258 and windows-1255 write nothing for a letter until they have seen
+    // whether a mark follows it: a conversion that takes a character and writes nothing has not
+    // refused it. A text of one letter is the plainest case, and the last letter of any text.
+    std::string out;
+    REQUIRE(code_page_to_utf8(*find_code_page("windows-1258"), "a", out));
+    CHECK(out == "a");
+    REQUIRE(code_page_to_utf8(*find_code_page("windows-1255"), bytes({0xF9}), out));
+    CHECK(out == utf8({0x5E9}));
+    REQUIRE(code_page_to_utf8(*find_code_page("windows-1258"), "Viet Nam", out));
+    CHECK(out == "Viet Nam");
+
+    // A letter and its mark are the one letter where the system joins them (glibc) and the two
+    // where it does not (Windows): the same text to a reader, and both are held here.
+    REQUIRE(code_page_to_utf8(*find_code_page("windows-1258"), bytes({'a', 0xEC, 'b'}), out));
+    CAPTURE(numbers(out));
+    CHECK((out == utf8({0xE1, 'b'}) || out == utf8({'a', 0x301, 'b'})));
+}
+
+TEST_CASE("code pages: a character of four bytes is read, and one cut short is refused", "[text-encoding]") {
+    // GB18030 has the longest character of the table. Two of the first plane, which every system
+    // has: macOS 15 and 26 have none of the planes above it (they refuse 90 30 81 30, U+10000,
+    // which glibc and Windows read), and that is the system's to say.
+    const CodePage* page = find_code_page("gb18030");
+    REQUIRE(page != nullptr);
+    std::string out;
+    REQUIRE(code_page_to_utf8(*page, bytes({'a', 0x81, 0x30, 0x86, 0x38, 0x81, 0x30, 0x8B, 0x37, 'b'}), out));
+    CHECK(out == utf8({'a', 0xC0, 0xFF, 'b'}));
+
+    for (const std::string& cut : {bytes({'a', 0x81, 0x30, 0x86}), bytes({'a', 0x81, 0x30}),
+                                   bytes({'a', 0x81, 0x30, 0x86, 0x20}), bytes({'a', 0x81, 0x30, 0x86, 0x38, 0x81})}) {
+        out = "left over";
+        const bool converted = code_page_to_utf8(*page, cut, out);
+        CAPTURE(numbers(cut), numbers(out));
         CHECK_FALSE(converted);
         CHECK(out.empty());
     }
