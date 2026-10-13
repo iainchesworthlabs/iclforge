@@ -4772,6 +4772,31 @@ The sections below contain the complete change list and fixes.
   the five cases of `decode.spec.js` pass; a page that drops its document on a refused file fails
   the new seek check.
 
+**WebAssembly demo: the microphone test**
+
+- **The browser demo's microphone test failed on some runs of a commit and passed on others,
+  because it sampled a meter that is back at 0% twice a second.** Its comment said Chromium's
+  fake microphone is a tone. It is a beep of about 20 ms every 500 ms with digital silence between
+  (measured in Chromium 151 and 153, on Linux and on Windows), and through the echo cancellation
+  the page asks for, the page's meter is above 0% for 250 to 270 ms of each 500 ms and reads 0%
+  for the rest. The test read the meter's width with `expect.poll`, which looks after 100, 250 and
+  500 ms and then once a second, which is two beeps exactly: from the third look on, every look
+  fell at the same point between two beeps, moving on only by what a look costs (a look came every
+  1012 to 1048 ms here). A run whose looks fell in the silence saw 0% each time while the meter
+  rose and fell beside it. Where they fall follows from how long the machine takes from the press
+  to the first look, so a job failed on the first try and on the retry, and the same commit
+  passed on another runner. The failing jobs were not slow: they reached the check in about 1.5 s
+  and then sat through two 15 s timeouts, which is what made them twice as long.
+  The test now watches the meter from inside the page, from before the button is pressed, and
+  holds that it rose; when it looks no longer matters. The page and the module are unchanged (the
+  indicator says the microphone is open, and shows before the first sound, as it should). Run in
+  headless Chromium on Linux with no sound device, four copies at a time on four cores: before,
+  the poll saw 0% after the meter had risen in each of 16 runs, for up to 9 looks over 8.5 s in
+  which the meter rose 17 times; after, 16 of 16 pass in 3.2 s (median, from 10.8 s), as do 8 of 8
+  under 4x CPU throttling and 30 of 30 with the check started 0 to 450 ms later. Against a page
+  whose meter never moves, the test fails at this check. The 15 s failure itself was not seen on
+  the machine this was done on: there the looks leave the silence in under 14 s.
+
 **Forge GUI user guide: the Karaoke page's note on the length warning**
 
 - **The Karaoke page no longer says the window's warning reads "padded with silence".** The

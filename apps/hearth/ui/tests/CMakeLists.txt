@@ -79,6 +79,17 @@ qt_add_qml_module(hearth_qmltests
     OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tests/Hearth"
     QML_FILES ${ICLFORGE_HEARTH_QML_FILES})
 
+# The faces hearth itself embeds (ICLFORGE_HEARTH_FONT_FILES, set beside its own
+# qt_add_resources()), which qml_test_main.cpp registers the way src/main.cpp does. Without
+# them this binary has no font at all on a machine with no QT_QPA_FONTDIR ("QFontDatabase:
+# Cannot find font directory"): Qt.fontFamilies() is empty and every glyph is a square as wide as
+# its pixel size, about twice an Archivo glyph, so a layout suite measures a window no person
+# sees. A name of its own, since both targets generate their qrc_*.cpp into this directory.
+qt_add_resources(hearth_qmltests "hearth_qmltests_fonts"
+    PREFIX "/fonts"
+    BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts"
+    FILES ${ICLFORGE_HEARTH_FONT_FILES})
+
 # Forces this target's own POST_BUILD windeployqt step (below) to run only
 # after hearth's has finished - apps/forge/gui/tests/qml.cmake's own
 # add_dependencies(forge_gui_qmltests forge-gui) comment explains why: two
