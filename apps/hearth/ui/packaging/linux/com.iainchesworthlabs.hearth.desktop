@@ -9,3 +9,4 @@ Terminal=false
 Categories=AudioVideo;Audio;Player;
 MimeType=audio/ac3;audio/eac3;
 StartupNotify=true
+StartupWMClass=Hearth

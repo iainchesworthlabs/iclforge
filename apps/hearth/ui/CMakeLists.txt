@@ -98,6 +98,12 @@ else()
         # shared by the three programs the same way.
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/settings_migration.hpp"
+        # Where the window opens and what it remembers (size, position, maximised), shared by the
+        # three programs the same way.
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_memory.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_memory.hpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_placement.cpp"
+        "${PROJECT_SOURCE_DIR}/apps/shared/preferences/src/window_placement.hpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.cpp"
         "${PROJECT_SOURCE_DIR}/apps/shared/media/src/container_input.hpp"
         # The picture of a CD+G disc, shared with Crucible's lyric strip and the Forge GUI's
@@ -157,6 +163,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/NetworkGroupEdit.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/PlaceholderPage.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/Settings.qml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/DialogScroll.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/ShortcutsDialog.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/TransportBar.qml"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/qml/AboutDialog.qml"
@@ -188,21 +195,28 @@ else()
     # skip_next e044, create_new_folder e2cc, add e145, volume_up e050) via
     # fontTools - 2 KB rather than the upstream file's 8.46 MB. Only Hearth
     # ships this today, so it is not in apps/forge/gui's own font resource list.
+    #
+    # A variable, like ICLFORGE_HEARTH_QML_FILES above, because tests/CMakeLists.txt
+    # embeds the same faces in hearth_qmltests (and tests/qml_test_main.cpp
+    # registers them, as src/main.cpp does): without them that binary has no
+    # font on a machine with no QT_QPA_FONTDIR, and every layout suite measures
+    # glyphs twice the width of the typeface a person sees.
+    set(ICLFORGE_HEARTH_FONT_FILES
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Regular.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Medium.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-SemiBold.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-ExtraBold.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Regular.ttf"
+        # Archivo has no Arabic or Hebrew coverage, and Yiddish is
+        # written in Hebrew script, so without these two faces three of
+        # the six languages below render as tofu. apps/forge/gui bundles the
+        # same pair for the same reason.
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansArabic.ttf"
+        "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansHebrew.ttf")
     qt_add_resources(hearth "hearth_fonts"
         PREFIX "/fonts"
         BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts"
-        FILES
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Regular.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-Medium.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-SemiBold.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/Archivo-ExtraBold.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/MaterialSymbolsSharp-Regular.ttf"
-            # Archivo has no Arabic or Hebrew coverage, and Yiddish is
-            # written in Hebrew script, so without these two faces three of
-            # the six languages below render as tofu. apps/forge/gui bundles the
-            # same pair for the same reason.
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansArabic.ttf"
-            "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/fonts/NotoSansHebrew.ttf")
+        FILES ${ICLFORGE_HEARTH_FONT_FILES})
     qt_add_resources(hearth "hearth_icons"
         PREFIX "/icons"
         BASE "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons"
@@ -236,19 +250,19 @@ else()
     # whose source string is gone is kept as translation memory otherwise,
     # and git history is that memory.
     #
-    # They carry every source string and NO assets/translations yet - each entry is
-    # marked unfinished, which is what Qt calls an untranslated message, and
-    # what it does with one is fall back to the English source. So choosing a
-    # language today changes the layout direction and the font (which is why
-    # the two Noto faces are bundled above) but leaves the words in English
-    # until a translator fills these in. That is a content task, not a build
-    # one; the machinery is what was missing.
+    # They are filled: every entry has a rendering. The renderings are machine
+    # drafts that no speaker has read (the language note in Settings says so).
+    # An entry marked unfinished is what Qt calls an untranslated message, and
+    # what it does with one is fall back to the English source.
     #
-    # Deliberately no test asserting the catalogues are complete, unlike
-    # apps/crucible/ui/tests/test_translations.cpp: Crucible's are filled, and
-    # holding these to the same bar would fail from the first commit.
+    # apps/crucible/ui/tests/test_translations.cpp holds these six files to the
+    # rules it holds Crucible's to: nothing unfinished or dead, nothing empty,
+    # placeholders and brand terms kept, one source set across the six. So a new
+    # or reworded string arrives unfinished from hearth_lupdate, and that case
+    # fails until the entry has a rendering in all six - fill it in the same
+    # change (docs/crucible/localisation.md, "Regenerating the catalogues").
     #
-    # CI does check that they match the sources: the windows-msvc leg
+    # CI also checks that they match the sources: the windows-msvc leg
     # reruns hearth_lupdate and fails if the result differs from what is
     # committed in anything but <location> lines
     # (.github/workflows/_ci-windows.yml, "Check the Hearth assets/translations are
@@ -394,7 +408,7 @@ else()
         # the SAME COMPONENT immediately before it, only on APPLE since the
         # Windows shape needs no such variable.
         if(APPLE)
-            install(CODE "set(_ac3_macos_bundle_name \"hearth\")" COMPONENT hearth)
+            install(CODE "set(_iclforge_macos_bundle_name \"hearth\")" COMPONENT hearth)
         endif()
         install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/StripQtTestDeployment.cmake"
             COMPONENT hearth)
@@ -433,9 +447,9 @@ else()
         # anything, so this component only CLAIMS the types (.desktop's
         # MimeType=, this metainfo.xml's <provides><mediatype>), which is
         # this package's own thing to state.
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/hearth.desktop"
+        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.hearth.desktop"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/applications" COMPONENT hearth)
-        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/hearth.metainfo.xml"
+        install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/com.iainchesworthlabs.hearth.metainfo.xml"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo" COMPONENT hearth)
         install(FILES "${CMAKE_SOURCE_DIR}/apps/shared/theme/assets/icons/iclforge-256.png"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"

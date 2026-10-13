@@ -14,9 +14,9 @@
 # (the compiler checks, try_compile, ninja) inherit it, so a preset configures
 # identically from a plain shell and from a Developer PowerShell.
 #
-# Sets AC3_MSVC_TOOLS_DIR: VCToolsInstallDir with the trailing separator removed
+# Sets ICLFORGE_MSVC_TOOLS_DIR: VCToolsInstallDir with the trailing separator removed
 # and forward slashes, ready for a subdirectory to be appended. Also sets
-# AC3_MSVC_TARGET_ARCH ("x64" or "arm64"), read by windows.msvc.toolchain.cmake
+# ICLFORGE_MSVC_TARGET_ARCH ("x64" or "arm64"), read by windows.msvc.toolchain.cmake
 # to pick the matching Hostxxx/xxx compiler directory - computed here, once,
 # rather than separately in each toolchain file, so the vcvarsall import below
 # and the compiler/linker directories resolved afterwards can never disagree
@@ -30,13 +30,13 @@
 # host so a bare configure still targets what it's actually running on rather
 # than quietly assuming x64.
 if(VCPKG_TARGET_ARCHITECTURE STREQUAL "arm64")
-    set(AC3_MSVC_TARGET_ARCH "arm64")
+    set(ICLFORGE_MSVC_TARGET_ARCH "arm64")
 elseif(VCPKG_TARGET_ARCHITECTURE STREQUAL "x64")
-    set(AC3_MSVC_TARGET_ARCH "x64")
+    set(ICLFORGE_MSVC_TARGET_ARCH "x64")
 elseif(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
-    set(AC3_MSVC_TARGET_ARCH "arm64")
+    set(ICLFORGE_MSVC_TARGET_ARCH "arm64")
 else()
-    set(AC3_MSVC_TARGET_ARCH "x64")
+    set(ICLFORGE_MSVC_TARGET_ARCH "x64")
 endif()
 
 # Both VCToolsInstallDir and INCLUDE are required to consider the environment
@@ -46,7 +46,7 @@ endif()
 # inherits the environment we already built.
 if(NOT (DEFINED ENV{VCToolsInstallDir} AND DEFINED ENV{INCLUDE}))
 
-    find_program(AC3_VSWHERE_EXECUTABLE
+    find_program(ICLFORGE_VSWHERE_EXECUTABLE
         NAMES vswhere.exe
         PATHS
             "$ENV{ProgramFiles\(x86\)}/Microsoft Visual Studio/Installer"
@@ -54,7 +54,7 @@ if(NOT (DEFINED ENV{VCToolsInstallDir} AND DEFINED ENV{INCLUDE}))
             "C:/Program Files (x86)/Microsoft Visual Studio/Installer"
         NO_DEFAULT_PATH)
 
-    if(NOT AC3_VSWHERE_EXECUTABLE)
+    if(NOT ICLFORGE_VSWHERE_EXECUTABLE)
         message(FATAL_ERROR
             "No MSVC developer environment and vswhere.exe was not found, so one "
             "cannot be created. Install the Visual Studio Build Tools, or configure "
@@ -72,35 +72,35 @@ if(NOT (DEFINED ENV{VCToolsInstallDir} AND DEFINED ENV{INCLUDE}))
     # authoring time, unconfirmed - not guessed here. The -listComponents dump
     # just below exists to answer that from a real CI run instead; see
     # docs/platforms/windows.md's ARM64 section for what it found.
-    if(AC3_MSVC_TARGET_ARCH STREQUAL "arm64")
+    if(ICLFORGE_MSVC_TARGET_ARCH STREQUAL "arm64")
         execute_process(
-            COMMAND "${AC3_VSWHERE_EXECUTABLE}" -latest -products * -all -listComponents
-            OUTPUT_VARIABLE _ac3_vswhere_components
+            COMMAND "${ICLFORGE_VSWHERE_EXECUTABLE}" -latest -products * -all -listComponents
+            OUTPUT_VARIABLE _iclforge_vswhere_components
             ERROR_QUIET)
         message(STATUS "vswhere -listComponents (ARM64 target - for confirming the exact "
-            "ARM64 toolset component id, see this file's header):\n${_ac3_vswhere_components}")
-        unset(_ac3_vswhere_components)
+            "ARM64 toolset component id, see this file's header):\n${_iclforge_vswhere_components}")
+        unset(_iclforge_vswhere_components)
     endif()
 
     execute_process(
-        COMMAND "${AC3_VSWHERE_EXECUTABLE}"
+        COMMAND "${ICLFORGE_VSWHERE_EXECUTABLE}"
                 -latest
                 -products *
                 -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64
                 -property installationPath
-        OUTPUT_VARIABLE _ac3_vs_install
+        OUTPUT_VARIABLE _iclforge_vs_install
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET)
 
-    if(NOT _ac3_vs_install)
+    if(NOT _iclforge_vs_install)
         message(FATAL_ERROR
             "vswhere found no Visual Studio install carrying the x64 MSVC toolset "
             "(Microsoft.VisualStudio.Component.VC.Tools.x86.x64).")
     endif()
 
-    set(_ac3_vcvarsall "${_ac3_vs_install}/VC/Auxiliary/Build/vcvarsall.bat")
-    if(NOT EXISTS "${_ac3_vcvarsall}")
-        message(FATAL_ERROR "Expected vcvarsall.bat at ${_ac3_vcvarsall}, but it is not there.")
+    set(_iclforge_vcvarsall "${_iclforge_vs_install}/VC/Auxiliary/Build/vcvarsall.bat")
+    if(NOT EXISTS "${_iclforge_vcvarsall}")
+        message(FATAL_ERROR "Expected vcvarsall.bat at ${_iclforge_vcvarsall}, but it is not there.")
     endif()
 
     # vcvarsall's own argument selects which target architecture's CRT/Windows
@@ -117,14 +117,14 @@ if(NOT (DEFINED ENV{VCToolsInstallDir} AND DEFINED ENV{INCLUDE}))
     # tried in order (not just the first one assumed to work) and the loop
     # below keeps whichever one actually set VCToolsInstallDir - see
     # docs/platforms/windows.md's ARM64 section for what a real CI run found.
-    if(AC3_MSVC_TARGET_ARCH STREQUAL "arm64")
+    if(ICLFORGE_MSVC_TARGET_ARCH STREQUAL "arm64")
         if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
-            set(_ac3_vcvars_candidates "arm64" "amd64_arm64")
+            set(_iclforge_vcvars_candidates "arm64" "amd64_arm64")
         else()
-            set(_ac3_vcvars_candidates "amd64_arm64")
+            set(_iclforge_vcvars_candidates "amd64_arm64")
         endif()
     else()
-        set(_ac3_vcvars_candidates "x64")
+        set(_iclforge_vcvars_candidates "x64")
     endif()
 
     # Run vcvarsall through a generated .bat rather than passing the command
@@ -132,35 +132,35 @@ if(NOT (DEFINED ENV{VCToolsInstallDir} AND DEFINED ENV{INCLUDE}))
     # emits when it quotes an argument containing spaces, so an inline
     # `call "..." x64 && set` breaks the moment the VS install path contains a
     # space - which it always does.
-    set(_ac3_vcvars_bat "${CMAKE_BINARY_DIR}/ac3-vcvars.bat")
-    set(_ac3_vcvars_result 1)
+    set(_iclforge_vcvars_bat "${CMAKE_BINARY_DIR}/ac3-vcvars.bat")
+    set(_iclforge_vcvars_result 1)
 
-    foreach(_ac3_vcvars_arg IN LISTS _ac3_vcvars_candidates)
-        file(WRITE "${_ac3_vcvars_bat}" "@echo off\r\ncall \"${_ac3_vcvarsall}\" ${_ac3_vcvars_arg} >NUL\r\nset\r\n")
+    foreach(_iclforge_vcvars_arg IN LISTS _iclforge_vcvars_candidates)
+        file(WRITE "${_iclforge_vcvars_bat}" "@echo off\r\ncall \"${_iclforge_vcvarsall}\" ${_iclforge_vcvars_arg} >NUL\r\nset\r\n")
 
         execute_process(
-            COMMAND "$ENV{COMSPEC}" /c "${_ac3_vcvars_bat}"
-            OUTPUT_VARIABLE _ac3_vcvars_env
-            RESULT_VARIABLE _ac3_vcvars_result
-            ERROR_VARIABLE _ac3_vcvars_error)
+            COMMAND "$ENV{COMSPEC}" /c "${_iclforge_vcvars_bat}"
+            OUTPUT_VARIABLE _iclforge_vcvars_env
+            RESULT_VARIABLE _iclforge_vcvars_result
+            ERROR_VARIABLE _iclforge_vcvars_error)
 
-        if(_ac3_vcvars_result EQUAL 0)
-            message(STATUS "vcvarsall.bat ${_ac3_vcvars_arg} succeeded")
+        if(_iclforge_vcvars_result EQUAL 0)
+            message(STATUS "vcvarsall.bat ${_iclforge_vcvars_arg} succeeded")
             break()
         else()
-            message(STATUS "vcvarsall.bat ${_ac3_vcvars_arg} failed (${_ac3_vcvars_result}); "
+            message(STATUS "vcvarsall.bat ${_iclforge_vcvars_arg} failed (${_iclforge_vcvars_result}); "
                 "trying the next candidate architecture argument, if any")
         endif()
     endforeach()
 
-    if(NOT _ac3_vcvars_result EQUAL 0)
+    if(NOT _iclforge_vcvars_result EQUAL 0)
         message(FATAL_ERROR
             "vcvarsall.bat failed for every candidate architecture argument tried "
-            "(${_ac3_vcvars_candidates}): ${_ac3_vcvars_error}")
+            "(${_iclforge_vcvars_candidates}): ${_iclforge_vcvars_error}")
     endif()
 
-    unset(_ac3_vcvars_candidates)
-    unset(_ac3_vcvars_arg)
+    unset(_iclforge_vcvars_candidates)
+    unset(_iclforge_vcvars_arg)
 
     # Walk the `set` dump one line at a time, peeling the head off the remainder.
     #
@@ -170,31 +170,31 @@ if(NOT (DEFINED ENV{VCToolsInstallDir} AND DEFINED ENV{INCLUDE}))
     # routinely end in a backslash (VCToolsInstallDir does). That trailing
     # backslash escapes the very separator the split relies on, silently welding
     # the next variable onto the end of the previous one's value.
-    set(_ac3_rest "${_ac3_vcvars_env}")
-    set(_ac3_imported 0)
+    set(_iclforge_rest "${_iclforge_vcvars_env}")
+    set(_iclforge_imported 0)
 
-    while(_ac3_rest MATCHES "^([^\r\n]*)\r?\n(.*)$")
-        set(_ac3_line "${CMAKE_MATCH_1}")
-        set(_ac3_rest "${CMAKE_MATCH_2}")
+    while(_iclforge_rest MATCHES "^([^\r\n]*)\r?\n(.*)$")
+        set(_iclforge_line "${CMAKE_MATCH_1}")
+        set(_iclforge_rest "${CMAKE_MATCH_2}")
 
         # Requiring a leading letter or underscore skips cmd's internal
         # pseudo-variables ("=C:=C:\...", "=ExitCode=..."), which are not real
         # environment entries.
-        if(_ac3_line MATCHES "^([A-Za-z_][A-Za-z0-9_()]*)=(.*)$")
+        if(_iclforge_line MATCHES "^([A-Za-z_][A-Za-z0-9_()]*)=(.*)$")
             # Copy the captures out before the next if(): every MATCHES resets
             # CMAKE_MATCH_<n>, so reading them after the VCPKG_ test below would
             # read that test's captures instead of this one's.
-            set(_ac3_name "${CMAKE_MATCH_1}")
-            set(_ac3_value "${CMAKE_MATCH_2}")
+            set(_iclforge_name "${CMAKE_MATCH_1}")
+            set(_iclforge_value "${CMAKE_MATCH_2}")
 
             # Everything except VCPKG_*. vcvarsall exports VCPKG_ROOT pointing at
             # the cut-down vcpkg bundled with Visual Studio, which is not a git
             # checkout and refuses manifest work without a builtin-baseline. We
             # are here to find a compiler; which package manager the developer
             # chose is not vcvarsall's to decide.
-            if(NOT _ac3_name MATCHES "^VCPKG_")
-                set(ENV{${_ac3_name}} "${_ac3_value}")
-                math(EXPR _ac3_imported "${_ac3_imported} + 1")
+            if(NOT _iclforge_name MATCHES "^VCPKG_")
+                set(ENV{${_iclforge_name}} "${_iclforge_value}")
+                math(EXPR _iclforge_imported "${_iclforge_imported} + 1")
             endif()
         endif()
     endwhile()
@@ -205,28 +205,28 @@ if(NOT (DEFINED ENV{VCToolsInstallDir} AND DEFINED ENV{INCLUDE}))
             "environment is not usable.")
     endif()
 
-    message(STATUS "Imported MSVC environment from ${_ac3_vs_install} (${_ac3_imported} variables)")
+    message(STATUS "Imported MSVC environment from ${_iclforge_vs_install} (${_iclforge_imported} variables)")
 
-    unset(_ac3_vs_install)
-    unset(_ac3_vcvarsall)
-    unset(_ac3_vcvars_bat)
-    unset(_ac3_vcvars_env)
-    unset(_ac3_vcvars_result)
-    unset(_ac3_vcvars_error)
-    unset(_ac3_rest)
-    unset(_ac3_line)
-    unset(_ac3_name)
-    unset(_ac3_value)
-    unset(_ac3_imported)
+    unset(_iclforge_vs_install)
+    unset(_iclforge_vcvarsall)
+    unset(_iclforge_vcvars_bat)
+    unset(_iclforge_vcvars_env)
+    unset(_iclforge_vcvars_result)
+    unset(_iclforge_vcvars_error)
+    unset(_iclforge_rest)
+    unset(_iclforge_line)
+    unset(_iclforge_name)
+    unset(_iclforge_value)
+    unset(_iclforge_imported)
 
 endif()
 
 # vcvarsall leaves a trailing backslash on its directory variables, which turns
 # into "...\/bin/Hostx64/x64" the moment a subdirectory is appended. Normalise
 # once here so every consumer can just append.
-set(AC3_MSVC_TOOLS_DIR "$ENV{VCToolsInstallDir}")
-string(REGEX REPLACE "[\\\\/]+$" "" AC3_MSVC_TOOLS_DIR "${AC3_MSVC_TOOLS_DIR}")
-file(TO_CMAKE_PATH "${AC3_MSVC_TOOLS_DIR}" AC3_MSVC_TOOLS_DIR)
+set(ICLFORGE_MSVC_TOOLS_DIR "$ENV{VCToolsInstallDir}")
+string(REGEX REPLACE "[\\\\/]+$" "" ICLFORGE_MSVC_TOOLS_DIR "${ICLFORGE_MSVC_TOOLS_DIR}")
+file(TO_CMAKE_PATH "${ICLFORGE_MSVC_TOOLS_DIR}" ICLFORGE_MSVC_TOOLS_DIR)
 
 #------------------------------------------------------------------------------
 # Bake the CRT and Windows SDK search paths into the generated build rules
@@ -244,23 +244,23 @@ file(TO_CMAKE_PATH "${AC3_MSVC_TOOLS_DIR}" AC3_MSVC_TOOLS_DIR)
 # into a CMake list; it rewrites the separators first, so the trailing
 # backslashes MSVC leaves on these entries never get a chance to escape one.
 #------------------------------------------------------------------------------
-file(TO_CMAKE_PATH "$ENV{INCLUDE}" AC3_MSVC_INCLUDE_DIRS)
-file(TO_CMAKE_PATH "$ENV{LIB}" AC3_MSVC_LIBRARY_DIRS)
+file(TO_CMAKE_PATH "$ENV{INCLUDE}" ICLFORGE_MSVC_INCLUDE_DIRS)
+file(TO_CMAKE_PATH "$ENV{LIB}" ICLFORGE_MSVC_LIBRARY_DIRS)
 
-set(CMAKE_C_STANDARD_INCLUDE_DIRECTORIES ${AC3_MSVC_INCLUDE_DIRS})
-set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${AC3_MSVC_INCLUDE_DIRS})
-set(CMAKE_RC_STANDARD_INCLUDE_DIRECTORIES ${AC3_MSVC_INCLUDE_DIRS})
+set(CMAKE_C_STANDARD_INCLUDE_DIRECTORIES ${ICLFORGE_MSVC_INCLUDE_DIRS})
+set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${ICLFORGE_MSVC_INCLUDE_DIRS})
+set(CMAKE_RC_STANDARD_INCLUDE_DIRECTORIES ${ICLFORGE_MSVC_INCLUDE_DIRS})
 
-set(_ac3_libpath "")
-foreach(_ac3_dir IN LISTS AC3_MSVC_LIBRARY_DIRS)
-    string(APPEND _ac3_libpath " /LIBPATH:\"${_ac3_dir}\"")
+set(_iclforge_libpath "")
+foreach(_iclforge_dir IN LISTS ICLFORGE_MSVC_LIBRARY_DIRS)
+    string(APPEND _iclforge_libpath " /LIBPATH:\"${_iclforge_dir}\"")
 endforeach()
 
-set(CMAKE_EXE_LINKER_FLAGS_INIT "${_ac3_libpath}")
-set(CMAKE_SHARED_LINKER_FLAGS_INIT "${_ac3_libpath}")
-set(CMAKE_MODULE_LINKER_FLAGS_INIT "${_ac3_libpath}")
+set(CMAKE_EXE_LINKER_FLAGS_INIT "${_iclforge_libpath}")
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "${_iclforge_libpath}")
+set(CMAKE_MODULE_LINKER_FLAGS_INIT "${_iclforge_libpath}")
 
-unset(_ac3_libpath)
-unset(_ac3_dir)
+unset(_iclforge_libpath)
+unset(_iclforge_dir)
 
-message(STATUS "MSVC toolset: ${AC3_MSVC_TOOLS_DIR}")
+message(STATUS "MSVC toolset: ${ICLFORGE_MSVC_TOOLS_DIR}")

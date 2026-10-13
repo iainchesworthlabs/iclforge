@@ -12,8 +12,9 @@ const { test, expect } = require('@playwright/test');
 // from a channel in slices, and the scorer counts what is on the tune with octaves folded. And what
 // the page promises: the microphone is off until the button is pressed, the score is withheld
 // until the person says they wear headphones, nothing is sent anywhere, and closing it stops the
-// tracks. The device is Chromium's fake one (a tone, with the permission prompt granted by the
-// flags in playwright.config.js): no real microphone is opened by this suite.
+// tracks. The device is Chromium's fake one (with the permission prompt granted by the flags in
+// playwright.config.js): no real microphone is opened by this suite. That device is not a tone: it
+// is a beep of about 20 ms twice a second, and silence between.
 
 const AULD_LANG_SYNE = path.join(__dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.ac3');
 const AULD_LANG_SYNE_WORDS = path.join(__dirname, '../../../../examples/karaoke/auld-lang-syne/auld-lang-syne.lrc');
@@ -403,6 +404,19 @@ test('the card keeps its promises: off until pressed, score withheld, nothing se
     await expect(page.locator('#micIndicator')).toBeHidden();
     expect(await page.evaluate(() => (/** @type {any} */ (window)).__micCalls)).toBe(0);
 
+    // The meter is watched from before the press, in the page, and the widest it has been is kept.
+    // It is back at 0% between two beeps of the fake device, so what it reads at the moment of a
+    // look says nothing: expect.poll settles at a look a second, which is two beeps exactly, and
+    // every look can then fall in the same silence.
+    await page.evaluate(() => {
+        const w = /** @type {any} */ (window);
+        const fill = /** @type {HTMLElement} */ (document.getElementById('micMeterFill'));
+        w.__micMeterPeak = 0;
+        new MutationObserver(() => {
+            w.__micMeterPeak = Math.max(w.__micMeterPeak, parseFloat(fill.style.width) || 0);
+        }).observe(fill, { attributes: true, attributeFilter: ['style'] });
+    });
+
     // Press it: on, with the headphones answer not given.
     await page.locator('#micToggle').click();
     await expect(page.locator('#micIndicator')).toBeVisible({ timeout: 20000 });
@@ -413,9 +427,9 @@ test('the card keeps its promises: off until pressed, score withheld, nothing se
     expect(constraints.audio.echoCancellation).toBe(true);
     expect(constraints.audio.noiseSuppression).toBe(false);
     expect(constraints.audio.autoGainControl).toBe(false);
-    // Sound reaches the meter (the fake device is a tone).
-    await expect.poll(async () => page.locator('#micMeterFill').evaluate((e) => e.style.width), { timeout: 15000 })
-        .not.toBe('0%');
+    // Sound reaches the meter: it has risen since the press (the first beep is half a second in).
+    await expect.poll(async () => page.evaluate(() => (/** @type {any} */ (window)).__micMeterPeak), { timeout: 15000 })
+        .toBeGreaterThan(0);
     // And the score is withheld, in words.
     await expect(page.locator('#micScore')).toHaveText('Say you are wearing headphones to see a score.');
 

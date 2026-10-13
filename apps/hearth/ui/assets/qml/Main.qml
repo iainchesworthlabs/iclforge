@@ -269,10 +269,13 @@ ApplicationWindow {
 
             SegmentedControl {
                 id: pageSwitch
+                //: Accessible name of the control that switches between the pages.
                 accessibleName: qsTr("Page")
                 currentValue: window.page
                 model: [
+                    //: Name of the page that plays the queue. Not the verb: the Play button is in the transport bar.
                     { value: "play", label: qsTr("Play") },
+                    //: Name of the page that shows what a media file contains: its streams, presentations and metadata.
                     { value: "media", label: qsTr("Media") },
                     { value: "speakers", label: qsTr("Speakers") },
                     { value: "decoder", label: qsTr("Decoder") },

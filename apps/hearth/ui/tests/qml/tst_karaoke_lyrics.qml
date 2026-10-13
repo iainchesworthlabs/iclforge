@@ -24,10 +24,24 @@ TestCase {
 
     property string words: ""       // the lyrics file's path
     property string item: ""        // the item it belongs to (same stem)
+    property string hebrew: ""      // a word-timed file in Hebrew, and the item beside it
+    property string hebrewItem: ""
     property string stream: ""      // a real AC-3 karaoke stream with its own file
 
     Component { id: mainComponent; Main { } }
     Component { id: viewComponent; LyricView { width: 900; height: 400; follow: false } }
+    // The view in a window mirrored the way Main.qml mirrors itself for Arabic, Hebrew and Yiddish.
+    Component {
+        id: mirroredViewComponent
+        Item {
+            property alias view: inner
+            width: 900
+            height: 400
+            LayoutMirroring.enabled: true
+            LayoutMirroring.childrenInherit: true
+            LyricView { id: inner; anchors.fill: parent; follow: false }
+        }
+    }
     Component { id: clockComponent; LyricClock { live: false; active: false; running: true } }
 
     // The first line is word-timed (five words, the last running to the next
@@ -47,6 +61,12 @@ TestCase {
         words = TestServices.writeTextFile("words.lrc", lyrics());
         verify(words.length > 0, "the lyrics file could not be written");
         item = words.replace(/\.lrc$/, ".ac3");
+        // Three Hebrew words, "shalom olam tov", each with the space written after it but the last.
+        hebrew = TestServices.writeTextFile("hebrew.lrc",
+                "[00:01.00]<00:01.00>\u05e9\u05dc\u05d5\u05dd <00:01.50>\u05e2\u05d5\u05dc\u05dd "
+                + "<00:02.00>\u05d8\u05d5\u05d1\n[00:04.00]\u05e9\u05dc\u05d5\u05dd\n");
+        verify(hebrew.length > 0, "the Hebrew lyrics file could not be written");
+        hebrewItem = hebrew.replace(/\.lrc$/, ".ac3");
         stream = TestServices.writeAc3Stream("song.ac3", "karaoke-3/2");
         verify(stream.length > 0, "the stream could not be written");
         // Three 0.5 s words, then a line, inside the stream's ten seconds.
@@ -164,6 +184,68 @@ TestCase {
         // The line after is shown, muted, and the one before the first is not.
         verify(H.find(view, function(item) { return item.objectName === "lyricNext"; }) !== null);
         compare(H.find(view, function(item) { return item.objectName === "lyricPast"; }), null);
+    }
+
+    // The words of a line are set out in the line's own direction, by its first strong letter, and
+    // not in the window's. The report: under Hebrew the words of "Should auld acquaintance be
+    // forgot," ran right to left, and a syllable-timed file's pieces of a word came out in reverse.
+    function test_aLineIsSetOutInItsOwnDirectionWhateverWayTheWindowReads_data() {
+        return [
+            { tag: "English in a window read left to right", mirrored: false, hebrew: false },
+            { tag: "English in a mirrored window", mirrored: true, hebrew: false },
+            { tag: "Hebrew in a window read left to right", mirrored: false, hebrew: true },
+            { tag: "Hebrew in a mirrored window", mirrored: true, hebrew: true }
+        ];
+    }
+
+    function test_aLineIsSetOutInItsOwnDirectionWhateverWayTheWindowReads(data) {
+        const host = data.mirrored ? createTemporaryObject(mirroredViewComponent, testCase.parent) : null;
+        const view = data.mirrored ? host.view : newView();
+        verify(view !== null);
+        // "Should auld acquaintance be forgot," sung from 1 s on; the Hebrew line has three words.
+        KaraokeController.load(data.hebrew ? hebrewItem : item, 10000);
+        view.positionMs = data.hebrew ? 1750 : 2500;
+        const count = data.hebrew ? 3 : 5;
+        tryVerify(function() {
+            return wordItem(view, count - 1) !== null && wordItem(view, count - 1).width > 0;
+        }, 5000);
+        waitForRendering(data.mirrored ? host : view);
+        compare(view.currentRtl, data.hebrew);
+        const flow = H.find(view, function(it) { return it.objectName === "lyricWords"; });
+        compare(flow.layoutDirection, data.hebrew ? Qt.RightToLeft : Qt.LeftToRight);
+
+        // Each word follows the one before it on the side the line runs to, and none is over another.
+        for (let i = 1; i < count; ++i) {
+            const before = wordItem(view, i - 1);
+            const word = wordItem(view, i);
+            if (data.hebrew) {
+                verify(word.x + word.width <= before.x + 0.5, "word " + i + " is not left of word " + (i - 1));
+            } else {
+                verify(word.x >= before.x + before.width - 0.5, "word " + i + " is not right of word " + (i - 1));
+            }
+        }
+        // The word sits at the end of its item the line begins at, and the space written after it is
+        // between it and the next word.
+        const first = wordItem(view, 0);
+        const text = H.find(first, function(it) { return it.objectName === "lyricWordText"; });
+        verify(text !== null);
+        if (data.hebrew) {
+            fuzzyCompare(text.x, first.width - text.implicitWidth, 0.5);
+            verify(text.x > 0, "the space written after the word is not on its far side");
+        } else {
+            compare(text.x, 0);
+        }
+        // The part sung grows from the side the word begins at: here half of the word, the second.
+        const second = wordItem(view, 1);
+        const secondText = H.find(second, function(it) { return it.objectName === "lyricWordText"; });
+        const fill = H.find(second, function(it) { return it.objectName === "lyricWordFill"; });
+        fuzzyCompare(second.fill, data.hebrew ? 0.5 : 1.0, 0.001);
+        if (data.hebrew) {
+            fuzzyCompare(fill.x + fill.width, secondText.x + secondText.implicitWidth, 0.5);
+            fuzzyCompare(fill.width, secondText.implicitWidth * 0.5, 0.5);
+        } else {
+            compare(fill.x, 0);
+        }
     }
 
     function test_theFillAdvancesWithThePositionAndAWordIsSungOnceItEnds() {

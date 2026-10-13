@@ -791,13 +791,17 @@ TEST_CASE("hearth ac4: a stereo or mono layout takes the downmix Part 1 clause 6
     const iclforge::render::OutputLayout wide = layout_of("5.1");
     const iclforge::render::OutputLayout stereo = layout_of("2.0");
     const iclforge::render::OutputLayout mono = layout_of("1.0");
-    const Played coded = play_item(tones(), wide, as_coded());
-    // Each coded tone, as it came out of its own channel.
-    std::array<std::complex<double>, 6> source{};
-    for (std::size_t c = 0; c < kTonesHz.size(); ++c) {
-        source[c] = tone_in(coded, wide, kToneLocations[c], kTonesHz[c]);
-        REQUIRE(std::abs(source[c]) > kAmplitude / 2.0);
-    }
+    // The coded decode and each tone as it came out of its own channel are the same in every
+    // section, which Catch2 enters one after the other: made once.
+    static const Played coded = play_item(tones(), wide, as_coded());
+    static const std::array<std::complex<double>, 6> source = [&] {
+        std::array<std::complex<double>, 6> tones_out{};
+        for (std::size_t c = 0; c < kTonesHz.size(); ++c) {
+            tones_out[c] = tone_in(coded, wide, kToneLocations[c], kTonesHz[c]);
+            REQUIRE(std::abs(tones_out[c]) > kAmplitude / 2.0);
+        }
+        return tones_out;
+    }();
     // 5.1 in the encoder's order, L R C LFE Ls Rs, as each tone reaches an
     // output: Tables 217 and 218 with the stream's gains.
     const auto holds = [&](const Played& played, const iclforge::render::OutputLayout& layout,

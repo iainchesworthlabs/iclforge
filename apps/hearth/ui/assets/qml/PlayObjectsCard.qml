@@ -86,6 +86,7 @@ Card {
         Row {
             spacing: 4
             Rectangle { width: 8; height: 8; anchors.verticalCenter: parent.verticalCenter; color: Theme.bad }
+            //: Legend of the object plot: the marker of an object at ear level. A noun.
             Text { text: qsTr("object"); color: Theme.textMuted; font.pixelSize: Theme.fontFine }
         }
         Row {
@@ -94,6 +95,7 @@ Card {
                 width: 8; height: 8; anchors.verticalCenter: parent.verticalCenter
                 color: "transparent"; border.color: Theme.bad; border.width: 1
             }
+            //: Legend of the object plot: a hollow marker is an object that is raised, above ear level.
             Text { text: qsTr("raised"); color: Theme.textMuted; font.pixelSize: Theme.fontFine }
         }
         Row {
@@ -102,6 +104,7 @@ Card {
                 width: 8; height: 8; anchors.verticalCenter: parent.verticalCenter
                 color: Theme.neutral800
             }
+            //: Legend of the object plot: the marker of a speaker at ear level.
             Text { text: qsTr("speaker"); color: Theme.textMuted; font.pixelSize: Theme.fontFine }
         }
         Row {
@@ -110,6 +113,7 @@ Card {
                 width: 8; height: 8; anchors.verticalCenter: parent.verticalCenter
                 color: "transparent"; border.color: Theme.neutral800; border.width: 1
             }
+            //: Legend of the object plot: a hollow marker is a height speaker, one above ear level.
             Text { text: qsTr("height"); color: Theme.textMuted; font.pixelSize: Theme.fontFine }
         }
     }

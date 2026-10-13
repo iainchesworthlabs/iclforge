@@ -1341,4 +1341,17 @@ cmp -s "$PROJECT_EXAMPLE/auld-lang-syne.ac3" project_karaoke.ac3 || {
 run_ffmpeg_check project_karaoke.ac3
 run project "$PROJECT_EXAMPLE/auld-lang-syne.forgeproj" print
 
+# --- A lyrics file written as UTF-8 LRC (forge lyrics-to-lrc) -----------------------------------
+# The command is libs/lyrics' reader and its LRC writer, with no stream in it. The karaoke
+# example's word-timed file goes through once, and what that wrote goes through again: a file the
+# writer made must read back to the same file, or a player given the converted lyrics and one
+# given the original would not show the same words at the same times. A second write to a name
+# that is there is refused without overwrite=1 (exit 3), so the second pass has a name of its own.
+run lyrics-to-lrc "$PROJECT_EXAMPLE/auld-lang-syne.lrc" lyrics_once.lrc
+run lyrics-to-lrc lyrics_once.lrc lyrics_twice.lrc
+cmp -s lyrics_once.lrc lyrics_twice.lrc || {
+    echo "forge lyrics-to-lrc did not write the file it had written back as the same file" >&2
+    exit 1
+}
+
 echo "codec matrix: $count commands completed cleanly in $WORKDIR"
