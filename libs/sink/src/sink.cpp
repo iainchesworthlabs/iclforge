@@ -404,7 +404,6 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
     }
 
     void on_server_state(const m::ServerState& state) override {
-        std::string text;
         {
             const std::lock_guard lock(sink_->roles_mutex_);
             Sink::Roles& roles = sink_->roles_;
@@ -414,19 +413,30 @@ class Connection final : public sendspin::PlayerListener, public std::enable_sha
                 // This connection's, for the title a screen shows when it holds no document (D7).
                 // Called with the session's lock held, as inspect() takes it to read.
                 metadata_ = *state.metadata;
-                text += roles.metadata ? " metadata \"" + roles.metadata->title.value_or("") + "\""
-                                       : std::string(" metadata cleared");
             }
             if (state.controller) {
                 roles.controller = *state.controller;
-                text += roles.controller ? " controller volume " + std::to_string(roles.controller->volume) +
-                                               (roles.controller->muted ? " muted" : "")
-                                         : std::string(" controller cleared");
             }
             if (state.color) {
                 roles.colors = *state.color;
-                text += roles.colors ? std::string(" colours") : std::string(" colours cleared");
             }
+        }
+        // What the update says, for the log: built once the lock is let go, from the update
+        // itself, so the locked scope holds only the stores and ends in nothing that can throw.
+        std::string text;
+        if (state.metadata) {
+            const auto& metadata = *state.metadata;
+            text += metadata ? " metadata \"" + metadata->title.value_or("") + "\""
+                             : std::string(" metadata cleared");
+        }
+        if (state.controller) {
+            const auto& controller = *state.controller;
+            text += controller ? " controller volume " + std::to_string(controller->volume) +
+                                     (controller->muted ? " muted" : "")
+                               : std::string(" controller cleared");
+        }
+        if (state.color) {
+            text += *state.color ? std::string(" colours") : std::string(" colours cleared");
         }
         log("state:" + text);
     }

@@ -119,7 +119,9 @@ struct FixedImdctTables {
     // place of a double, a thousandth of a raw unit), and
     // libs/ac3/tests/core/test_mdct_fixed.cpp holds every entry to them on whatever machine
     // runs it.
-    constexpr FixedImdctTables()
+    // noexcept: it only ever runs in the constant evaluator (kFixedImdctTables is constinit), and
+    // a constructor that may throw is what makes a static initialisation one that may.
+    constexpr FixedImdctTables() noexcept
         : fft128(portable_cosine, portable_sine), fft64(portable_cosine, portable_sine) {
         constexpr double kPi = std::numbers::pi;
         for (std::size_t k = 0; k < kN / 4; ++k) {

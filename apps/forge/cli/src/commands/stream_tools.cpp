@@ -40,6 +40,7 @@
 #include "iclforge/ac3/io/elementary.hpp"
 #include "iclforge/ac3/io/metadata_edit.hpp"
 #include "iclforge/ac3/io/wav.hpp"
+#include "iclforge/ac3/meta/bsi.hpp"
 #include "iclforge/ac3/meta/drc.hpp"
 #include "iclforge/ac3/meta/loudness.hpp"
 #include "iclforge/ac3/meta/mixing.hpp"

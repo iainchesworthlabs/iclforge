@@ -1,5 +1,6 @@
 #include "lyrics.hpp"
 
+#include <cstdio>
 #include <filesystem>
 #include <fmt/base.h>
 #include <optional>
@@ -7,6 +8,7 @@
 #include <string_view>
 
 #include "../exit_codes.hpp"
+#include "../support.hpp"
 #include "code_pages.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 

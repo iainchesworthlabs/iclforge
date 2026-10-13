@@ -32,7 +32,7 @@ import sink_profile
 import suite_sendspin as ss
 from test_bench import temp_bench
 
-SECRET = "TheHomeNetwork-5GHz"
+NETWORK_NAME = "TheHomeNetwork-5GHz"
 
 
 class Behaviour:
@@ -108,7 +108,7 @@ class StandIn:
                         "finished": stand_in.state == "finished",
                         "failed": stand_in.state == "failed",
                         "layout": stand_in.layout,
-                        "network": {"kind": "wifi", "ssid": SECRET, "address": "192.168.1.9"},
+                        "network": {"kind": "wifi", "ssid": NETWORK_NAME, "address": "192.168.1.9"},
                         **stand_in.status_extra,
                     }
                     self._send(200, json.dumps(body).encode())
@@ -419,9 +419,9 @@ class Reading(unittest.TestCase):
             "heap: internal free 90931 (largest block 31744), psram free 6341784",
             "sink.writes=760 sink.underruns=1 sink.dry_ms=88 sink.min_headroom_ms=0 sink.dma_ms=64",
             "sink.writes=5628 sink.underruns=1 sink.dry_ms=88 sink.min_headroom_ms=0 "
-            "sink.dma_ms=64",
+            + "sink.dma_ms=64",
             "stream.units=938 stream.held=0 stream.resync_bytes=0 stream.sink=i2s "
-            "stream.decode_stack_free=18260 stream.audio_ms=30016 stream.wall_ms=30130",
+            + "stream.decode_stack_free=18260 stream.audio_ms=30016 stream.wall_ms=30130",
             "result=pass",
         ]
         found = bs.parse_play_lines(lines)
@@ -722,9 +722,9 @@ class FoldedPin(unittest.TestCase):
         result.lines = bs.parse_play_lines(
             [
                 "sink.writes=24 sink.underruns=0 sink.dry_ms=0 sink.min_headroom_ms=5 "
-                "sink.dma_ms=64",
+                + "sink.dma_ms=64",
                 "stream.units=3 stream.held=0 stream.resync_bytes=0 stream.sink=i2s_wide "
-                "stream.decode_stack_free=17020 stream.audio_ms=128 stream.wall_ms=17",
+                + "stream.decode_stack_free=17020 stream.audio_ms=128 stream.wall_ms=17",
                 f"ac4.lap=1 frames=3 decoder_permille=604 worst_frame_us=33624 pcm_hash={pcm_hash}",
                 "result=pass",
             ]
@@ -1313,7 +1313,7 @@ class CommandLine(unittest.TestCase):
             *self.run_args("--lock", str(self.lock), "--session", "16d036")
         )
         self.assertEqual(code, 0)
-        self.assertNotIn(SECRET, out + err + self.out.read_text("utf-8"))
+        self.assertNotIn(NETWORK_NAME, out + err + self.out.read_text("utf-8"))
         self.assertNotIn("192.168.1.9", self.out.read_text("utf-8"))
 
     def test_without_a_lock_and_a_session_it_refuses_before_touching_the_board(self) -> None:
@@ -1560,10 +1560,10 @@ class CommandLine(unittest.TestCase):
         found = bs.parse_play_lines(
             [
                 "sink.writes=5628 sink.underruns=0 sink.dry_ms=0 sink.min_headroom_ms=5 "
-                "sink.dma_ms=64",
+                + "sink.dma_ms=64",
                 "sink.writes=5628 sink.underruns=3 sink.dry_",
                 "stream.units=938 stream.held=0 stream.resync_bytes=0 stream.sink=i2s "
-                "stream.decode_stack_free=18260 stream.audio_ms=30016 stream.wall_ms=30130",
+                + "stream.decode_stack_free=18260 stream.audio_ms=30016 stream.wall_ms=30130",
                 "stream.units=1 stream.held=0 stream.resy",
             ]
         )

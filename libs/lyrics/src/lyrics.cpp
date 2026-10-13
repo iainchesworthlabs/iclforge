@@ -412,7 +412,8 @@ constexpr std::string_view kMidiNotUtf8Reason =
         return std::unexpected(std::string{"The lyrics file is UTF-32, which is not read. Save it as UTF-8 or UTF-16."});
     }
     std::string converted;
-    if (text.starts_with("\xFF\xFE") || text.starts_with("\xFE\xFF")) {
+    if (text.starts_with(std::string_view{"\xFF\xFE", 2}) ||
+        text.starts_with(std::string_view{"\xFE\xFF", 2})) {
         const bool big_endian = static_cast<unsigned char>(text[0]) == 0xFE;
         auto utf8 = utf16_to_utf8(text.substr(2), big_endian);
         if (!utf8) {

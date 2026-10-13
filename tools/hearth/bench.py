@@ -418,6 +418,13 @@ def cmd_scrub(bench: Bench, args: argparse.Namespace) -> int:
     return 0 if args.mode == "mask" or total == 0 else 1
 
 
+def rewrite_dtr(connection) -> None:
+    """Write DTR with the value it already has. Windows' usbser.sys driver sends the line state
+    only when DTR is written, so a change to RTS is not seen until it is."""
+    state = connection.dtr
+    connection.dtr = state
+
+
 def cmd_console(bench: Bench, args: argparse.Namespace) -> int:
     board = bench.board(args.board)
     try:
@@ -462,13 +469,13 @@ def cmd_console(bench: Bench, args: argparse.Namespace) -> int:
                         pulse_pending = False
                         # idf.py monitor's sequence, with its usbser.sys workaround: Windows'
                         # driver sends the line state only when DTR is written.
-                        connection.dtr = connection.dtr
+                        rewrite_dtr(connection)
                         connection.dtr = False
                         connection.rts = True
-                        connection.dtr = connection.dtr
+                        rewrite_dtr(connection)
                         time.sleep(0.2)
                         connection.rts = False
-                        connection.dtr = connection.dtr
+                        rewrite_dtr(connection)
                         emit("-- RTS pulse sent (EN low for 0.2 s)")
                 chunk = connection.read(512)
                 if chunk:

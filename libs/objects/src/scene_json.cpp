@@ -19,7 +19,6 @@
 
 #include "iclforge/objects/oamd.hpp"
 #include "iclforge/objects/scene.hpp"
-#include "scene_text.hpp"
 
 // The serialised form of an ObjectScene. RFC 8259 JSON, tokenised by nlohmann/json (cmake/
 // NlohmannJson.cmake: header-only, compiled into this library, nothing in the export graph) and
