@@ -47,8 +47,7 @@ ScrollView {
             if (output < 0) { unassignedSpeakers++; } else { patched[output] = true; }
         }
         if (unassignedSpeakers > 0) {
-            return qsTr("%1 speaker%2 reaches no slot and will not be heard.")
-                       .arg(unassignedSpeakers).arg(unassignedSpeakers === 1 ? "" : "s");
+            return qsTr("%n speakers reach no slot and will not be heard.", "", unassignedSpeakers);
         }
         const silent = [];
         for (let o = 0; o < root.outputs; o++) {
@@ -60,8 +59,8 @@ ScrollView {
         const list = silent.length === 1
                      ? String(silent[0])
                      : silent.slice(0, -1).join(", ") + qsTr(" and ") + silent[silent.length - 1];
-        return qsTr("✓ Every speaker reaches a slot. Slot%1 %2 %3 silent.")
-                   .arg(silent.length === 1 ? "" : "s").arg(list).arg(silent.length === 1 ? qsTr("is") : qsTr("are"));
+        //: %n is how many slots are silent; %1 names them, as '7' or '7, 8 and 9'.
+        return qsTr("✓ Every speaker reaches a slot. Slots %1 are silent.", "", silent.length).arg(list);
     }
 
     ColumnLayout {

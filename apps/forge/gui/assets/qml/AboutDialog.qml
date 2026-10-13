@@ -4,7 +4,10 @@ import QtQuick.Layouts
 
 import ForgeGui
 
-// About — reachable from Main.qml's control row, beside Preferences.
+// About — reachable from Main.qml's control row, beside Settings, and from
+// the Settings dialog's own About Forge… button, which is where Crucible's and
+// Hearth's About is reached from too. Its Licences… button chains to
+// LicencesDialog.qml (Main.qml opens that one over this one).
 // appVersionDetails is a context property main.cpp sets once at startup
 // from iclforge::ac3::version_details() (build-time-immutable text: version, git
 // commit/branch/dirty state, build target) - no C++ round trip needed here
@@ -13,6 +16,9 @@ import ForgeGui
 // than introducing a second dialog style.
 Dialog {
     id: root
+
+    // Licences…: Main.qml opens the LicencesDialog over this one.
+    signal showLicences()
 
     modal: true
     anchors.centerIn: parent
@@ -123,7 +129,7 @@ Dialog {
 
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 2; color: Theme.divider }
 
-        AboutKicker { text: qsTr("LICENSE") }
+        AboutKicker { text: qsTr("LICENCES") }
         AboutBody {
             textFormat: Text.RichText
             text: qsTr("ICL Forge is free software: you can redistribute it and/or modify it "
@@ -140,10 +146,23 @@ Dialog {
             // travel with the font; this is that attribution.
             text: qsTr("Includes the Archivo typeface, licensed under the SIL Open Font License 1.1.")
         }
+        AboutBody {
+            // The same address Crucible's and Hearth's About give. A link the
+            // person follows, not a sentence: no qsTr, so nothing to translate.
+            objectName: "aboutRepositoryLink"
+            textFormat: Text.RichText
+            text: "<a href=\"https://github.com/iainchesworthlabs/iclforge\">github.com/iainchesworthlabs/iclforge</a>"
+        }
 
         RowLayout {
             Layout.fillWidth: true
+            spacing: Theme.space2
             Item { Layout.fillWidth: true }
+            Button {
+                objectName: "aboutLicencesButton"
+                text: qsTr("Licences…")
+                onClicked: root.showLicences()
+            }
             Button {
                 objectName: "aboutCloseButton"
                 text: qsTr("Close")

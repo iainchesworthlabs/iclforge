@@ -159,6 +159,7 @@ A headless session never shows the menu, so each entry is fired through its
 | 87 | Show silent apps / Show background processes checks | None | UI | roomworkflow::test_silentAndBackgroundApplicationsFollowTheirSettings |
 | 88 | Save diagnostics… → dialog → file written or reason shown | Logic (`exportDiagnostics`) | UI | settingsdialogs::test_saveDiagnosticsWritesTheFileThePageSuggests; settings::test_exportWritesAFile, settings::test_diagnosticsReportWithholdsTheKeyPath |
 | 89 | Settings persist to the store a relaunch reads | Logic (controller getters) | UI | every `settingsworkflow`/`signalpath`/`roomworkflow` case that reads `TestServices.storedSetting` |
+| 90 | The page's About block ("About Crucible…") asks for About, and the window opens the same dialog the `?` does | None | UI | settingsworkflow::test_theAboutBlockAsksForTheAboutDialog; about::test_aboutOpensFromTheSettingsPage |
 
 ## Cases without a feature row of their own
 

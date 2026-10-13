@@ -10,7 +10,7 @@ palettes and the focus ring are the same thing in both; the rest of this page is
 
 ## Text size
 
-**Preferences → Appearance → Text size** is 100%, 125%, 150%, 175% or System, the same five choices
+**Settings → Appearance → Text size** is 100%, 125%, 150%, 175% or System, the same five choices
 Crucible offers and stored under the same name, so a person who has set one is not surprised by the
 other.
 
@@ -41,7 +41,7 @@ scale:
 
 These do not, and can clip at the larger sizes: the Guided wizard (twenty-one fixed heights), the
 Objects and Live session tabs, the assignment table, the channel meters, and the QC, Inspect
-objects, Stream player and About dialogs. Preferences holds one. They are on the list.
+objects, Stream player and About dialogs. Settings holds one. They are on the list.
 
 ## What can be done without a mouse
 
@@ -50,7 +50,7 @@ with `Space` or `Return`:
 
 | Where | What Tab reaches |
 | --- | --- |
-| Header | The Guided / Advanced / Expert switch, and the QC, Inspect, Open stream, Preferences and About buttons. |
+| Header | The Guided / Advanced / Expert switch, and the QC, Inspect, Open stream, Settings and About buttons. |
 | Input rail | The File / Live capture switch, Choose WAV, Assign, and per source its own Remove and Start offset. |
 | Format tab | The presets, the codec, rate and container controls, the bed chips, the low-frequency chips and the extras. |
 | The tab bar | Format, AC-4, Objects, Live session, Coding tools, Metadata — whichever the current tier and codec show. |
@@ -58,7 +58,7 @@ with `Space` or `Return`:
 | Runs strip | Each run's own chip, which opens that run's details, and its Cancel, Play, Show in folder, Details and More… buttons. |
 
 Inside a segmented control — the tier switch, the File / Live capture switch, the meters' Coded /
-Rendered switch, and Preferences' Theme, Text size and Meters switches — `Left`, `Right`, `Home`
+Rendered switch, and Settings' Theme, Text size and Meters switches — `Left`, `Right`, `Home`
 and `End` choose, and `Left` from the first wraps to the last. That behaviour is
 `SegmentedControl.qml`'s and predates this pass.
 
@@ -100,7 +100,7 @@ no two share a name.
 
 ## Saving a diagnostics file
 
-**Preferences → Diagnostics → Save diagnostics…** writes a plain-text file wherever you choose.
+**Settings → Diagnostics → Save diagnostics…** writes a plain-text file wherever you choose.
 Nothing is sent anywhere; the file is yours to read before you attach it to anything.
 
 It carries the versions, this machine's platform and Qt build, what is loaded, the encode plan, the
@@ -200,7 +200,7 @@ What they hold, in full:
   every string `lupdate` found, and asserts that the Guided segment's accessible name carries that
   decoration — so that name is the translated label rather than an English copy typed beside it.
   `tst_e2e_settings.qml` makes the same point from the other side: it picks another language in
-  Preferences and asserts that the same segment's accessible name changes at once and comes back
+  Settings and asserts that the same segment's accessible name changes at once and comes back
   when English is chosen again.
 - `tst_e2e_inspect.qml` asserts that the accessible description of the first object row in the
   Inspect objects list begins with that object's decoded `x`, `y` and `z`.

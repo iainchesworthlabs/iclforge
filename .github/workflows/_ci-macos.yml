@@ -47,6 +47,9 @@ on:
       qt_version:
         type: string
         required: true
+      aqt_source:
+        type: string
+        required: true
       vcpkg_commit:
         type: string
         required: true
@@ -134,7 +137,8 @@ jobs:
         uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ inputs.qt_version }}
-          modules: qtquick3d qtshadertools
+          aqtsource: ${{ inputs.aqt_source }}
+          modules: qtquick3d qtshadertools qttasktree
           cache: true
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

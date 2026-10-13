@@ -5,8 +5,9 @@ import QtQuick.Layouts
 import Crucible
 
 // About: what this is, the version and build it came from, the licences it
-// carries. Reached from the header's "?" and the tray menu. The same shape
-// as the Forge GUI's About, on this app's own theme.
+// carries. Reached from the header's "?" and F1, the tray menu and the
+// Settings page's About block. The same shape as the Forge GUI's About, on
+// this app's own theme.
 Dialog {
     id: root
     objectName: "aboutDialog"

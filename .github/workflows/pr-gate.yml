@@ -453,7 +453,8 @@ jobs:
         uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ needs.toolchain-versions.outputs.qt_version }}
-          modules: qtquick3d qtshadertools
+          aqtsource: ${{ needs.toolchain-versions.outputs.aqt_source }}
+          modules: qtquick3d qtshadertools qttasktree
           cache: true
           setup-python: false
 
