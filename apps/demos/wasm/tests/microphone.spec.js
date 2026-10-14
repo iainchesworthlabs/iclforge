@@ -590,10 +590,13 @@ test('a session closed while it is still opening lets go of it and never opens',
             });
             // Answers every wait there is, and every one that follows, until `promise` settles.
             const through = async (promise) => {
-                let settled = false;
-                const mark = () => { settled = true; };
+                // A property of an object, and not a variable the loop never assigns: a callback
+                // ends this loop, which a condition on a bare variable reads as endless
+                // (SonarCloud's javascript:S2189, a BLOCKER, failed the nightly's gate on it).
+                const outcome = { settled: false };
+                const mark = () => { outcome.settled = true; };
                 promise.then(mark, mark);
-                while (!settled) {
+                while (!outcome.settled) {
                     for (const list of [asks, loads]) {
                         while (list.length > 0) {
                             list.shift().resolve();

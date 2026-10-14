@@ -895,6 +895,21 @@ jobs:
           EOF
           cmake -P "${RUNNER_TEMP}/assert-cmake-version.cmake"
 
+      # aqtinstall is installed from a git commit (toolchain-versions.json's
+      # aqtsource, since #1564), which pip has to BUILD, and 22.04's own pip 22.0
+      # and setuptools 59.6 cannot: setuptools 59.6 does not read the project's
+      # pyproject.toml metadata (the egg-info it makes is named UNKNOWN), and the
+      # setuptools_scm pip then fetches into the build environment fails on it with
+      # `AttributeError: ignore_egg_info_in_manifest`. This job went red on exactly
+      # that in the nightly of 2026-10-13, at "Install Qt (prebuilt)". Newer
+      # copies go to /usr/local, which sits ahead of /usr/lib/python3 on this
+      # python3's path, so they are the ones the build environment finds, and
+      # --ignore-installed leaves apt's own copies alone rather than trying to
+      # uninstall files it does not own.
+      - name: Upgrade pip and setuptools
+        shell: bash
+        run: python3 -m pip install --ignore-installed --upgrade pip 'setuptools>=70' wheel
+
       # Decouples the Qt version entirely from the base image's age (the
       # same tool, same pinned commit and same version input the Windows leg
       # above already uses) - 22.04's own qt6-base-dev is both too old for
