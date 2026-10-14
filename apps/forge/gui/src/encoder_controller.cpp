@@ -58,6 +58,7 @@
 #include "iclforge/containers/mp4/mp4.hpp"
 #include "iclforge/containers/mpegts/mpegts.hpp"
 #include "ac4_encode_core.hpp"
+#include "sink_wait.hpp"
 #include "source_frame.hpp"
 #include "iclforge/ac4/encoder/encoder.hpp"
 #include "channel_geometry.hpp"
@@ -3260,6 +3261,21 @@ void EncoderController::startMotionPreview() {
                     publishLevels(snapshot);
                 });
             }
+        }
+
+        // The source is read to its end, which is not the preview heard to
+        // its end: the sink's queue holds more than a second (6 channels at
+        // 48 kHz: 1.8 s), and stop() below throws away what is queued and
+        // what the device holds. The output is let to play out what it was
+        // given first. Stop Preview (stop_motion_preview_) ends that wait at
+        // once; a device that goes away says so; one that stops answering is
+        // given up on.
+        if (problem.isEmpty() && !stop_motion_preview_.load(std::memory_order_relaxed) &&
+            iclforge::apps::wait_until_played_out(
+                *motion_preview_monitor_sink_, sample_rate, iclforge::apps::kPlayOutPoll,
+                [this] { return !stop_motion_preview_.load(std::memory_order_relaxed); }) ==
+                iclforge::apps::PlayOut::kSinkLost) {
+            problem = QStringLiteral("The preview output device disappeared.");
         }
 
         QMetaObject::invokeMethod(this, [this, problem] {

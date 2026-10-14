@@ -94,11 +94,11 @@ TestCase {
         return dialog;
     }
 
-    function openObjectsTab() {
+    function openObjectsTab(source = wavUrl) {
         const win = createTemporaryObject(mainWindowComponent, testCase);
         verify(win !== null);
         click(findByName(win.contentItem, "firstRun-file"));
-        pickFile(win, "openDialog", wavUrl);
+        pickFile(win, "openDialog", source);
         tryCompare(EncoderController, "sourceReady", true, 10000);
         click(findByName(win.contentItem, "seg-expert"));
         click(findByName(win.contentItem, "tab-objects"));
@@ -217,5 +217,79 @@ TestCase {
         press(del);
         tryVerify(() => EncoderController.objectKeyframes(objIndex).length === before);
         compare(del.enabled, false);
+    }
+
+    // A preview nobody stops lasts the source's own length. The first case above takes the
+    // short seed file and presses Preview a second time at once, which is the same either way;
+    // here the source is two seconds, and the output's queue holds one of them: the preview has
+    // read the whole source by about one second, and used to stop the output there with the
+    // second still queued. Only the lower bound is asserted, since a loaded machine makes a
+    // preview late, never shorter than its audio.
+    function test_aPreviewNobodyStopsPlaysTheWholeSource() {
+        const seconds = 2.0;
+        const source = audioFixtures.writeTones("preview-length.wav", 48000, seconds, [440, 620]);
+        verify(source.toString().length > 0);
+        const win = openObjectsTab(source);
+        press(findByName(win.contentItem, "atmosSwitch"));
+        tryVerify(() => EncoderController.objectModel.length === 2);
+
+        const preview = findByName(win.contentItem, "previewButton");
+        verify(preview.enabled, "the preview button is disabled");
+        focusIn(preview);
+        const began = Date.now();
+        keyClick(Qt.Key_Space);
+        const refused = "Could not open the preview output";
+        tryVerify(() => EncoderController.motionPreviewActive
+                        || EncoderController.status.indexOf(refused) === 0, 5000);
+        if (!EncoderController.motionPreviewActive) {
+            // No output on this machine: refused on the status line, nothing started.
+            compare(EncoderController.busy, false);
+            return;
+        }
+        tryCompare(EncoderController, "motionPreviewActive", false, seconds * 1000 + 8000);
+        const lasted = Date.now() - began;
+        verify(lasted >= seconds * 1000 * 0.9,
+               "a " + seconds + " s source was previewed for " + lasted + " ms");
+        compare(EncoderController.busy, false);
+    }
+
+    // Stop Preview does not wait for the clip either. Three and a half seconds into five, the
+    // source has been read and encoded to its end (the queue holds 1.8 s of it, and the encoder
+    // is faster than the clock) and the output is only playing what it was given: where the wait
+    // for it is. A press that a loaded machine delivers within the last 300 ms has no distance
+    // to show, and the case is skipped.
+    function test_stopPreviewInTheTailOfAPreviewEndsItAtOnce() {
+        const seconds = 5.0;
+        const source = audioFixtures.writeTones("preview-stop.wav", 48000, seconds, [440, 620]);
+        verify(source.toString().length > 0);
+        const win = openObjectsTab(source);
+        press(findByName(win.contentItem, "atmosSwitch"));
+        tryVerify(() => EncoderController.objectModel.length === 2);
+
+        const preview = findByName(win.contentItem, "previewButton");
+        verify(preview.enabled, "the preview button is disabled");
+        focusIn(preview);
+        const began = Date.now();
+        keyClick(Qt.Key_Space);
+        const refused = "Could not open the preview output";
+        tryVerify(() => EncoderController.motionPreviewActive
+                        || EncoderController.status.indexOf(refused) === 0, 5000);
+        if (!EncoderController.motionPreviewActive) {
+            compare(EncoderController.busy, false);
+            return;
+        }
+        tryVerify(() => Date.now() - began >= 3500 || !EncoderController.motionPreviewActive, 8000);
+        const pressed = Date.now() - began;
+        if (!EncoderController.motionPreviewActive || pressed > seconds * 1000 - 300) {
+            skip("the preview was over, or nearly, by the time it could be stopped");
+        }
+        focusIn(preview);
+        keyClick(Qt.Key_Space);
+        tryCompare(EncoderController, "motionPreviewActive", false, 5000);
+        const lasted = Date.now() - began;
+        verify(lasted < seconds * 1000 - 100,
+               "stopped at " + pressed + " ms of a " + seconds + " s source, it ended after "
+               + lasted + " ms");
+        compare(EncoderController.busy, false);
     }
 }

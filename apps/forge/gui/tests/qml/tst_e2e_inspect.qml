@@ -18,13 +18,14 @@ import ForgeGui
 // gives: the dialog's own error line naming the output it could not open, or
 // a real playing state that the same button then stops. Neither is faked.
 //
-// An audition is not waited for by its state. The worker queues the object's
-// samples into the output and is done as soon as the last one is taken, and
-// the output's queue holds a second: a clip that short is over, and
-// auditioningIndex back at -1, within a few milliseconds of the press, before
-// a loaded test thread has looked. What is waited for is the press's answer,
-// which stays true: the controller said its audition changed state twice (it
-// began and it ended), is still auditioning, or says why it could not.
+// An audition is waited for by its answer, not by looking at its state. It
+// lasts the object's own length, and a loaded test thread can look at any
+// moment of that; what stays true whenever it does is that the controller said
+// its audition changed state twice (it began and it ended), is still
+// auditioning, or says why it could not. The cases at the end of the file hold
+// the length itself, and the same for a stream played to its end: both used to
+// be over, and the output stopped with its queue (a second deep) unplayed, a
+// few milliseconds after the worker had handed the last sample over.
 TestCase {
     id: testCase
     name: "E2eInspect"
@@ -35,6 +36,18 @@ TestCase {
         Main {}
     }
     Component { id: spyComponent; SignalSpy {} }
+
+    // When the controller said its audition began (index 0) and ended (-1), by the wall clock:
+    // read off its own signal, so a loaded test thread that looks late cannot read a short
+    // audition long, only the end of a long one late.
+    property var auditionStamps: []
+    Connections {
+        target: ObjectDecodeController
+        function onAuditionChanged() {
+            testCase.auditionStamps.push({ at: Date.now(),
+                                           index: ObjectDecodeController.auditioningIndex });
+        }
+    }
 
     readonly property url ac3StreamUrl:
         Qt.resolvedUrl("../../../../../libs/base/fuzz/seeds/fuzz_wav_read/roundtrip-stereo.ac3")
@@ -437,5 +450,163 @@ TestCase {
         }
         tryCompare(ObjectDecodeController, "auditioningIndex", -1, 5000);
         dialog.close();
+    }
+
+    // ---- playing a clip out ----------------------------------------------
+    //
+    // These five are about how long, not about what was drawn, so they drive the controllers
+    // directly (the cases above are the UI path to the same buttons) and, like them, take
+    // whichever honest outcome the machine gives: the controller's own line naming the output it
+    // could not open, or the real thing. The fixture is 40 E-AC-3 frames, 1.28 s, and the output's
+    // queue holds one second of it: the worker has handed every sample over by about 0.3 s, which
+    // is all the controllers used to wait for before they stopped the output and threw the
+    // unplayed second away.
+
+    // The length of the inspected stream in milliseconds, from the decode's own frame times.
+    function inspectedClipMs() {
+        const frames = ObjectDecodeController.frames;
+        verify(frames.length > 1);
+        return frames.length * (frames[1].time - frames[0].time) * 1000;
+    }
+
+    // Opens the fixture in the object inspector's controller and begins an audition of object 0.
+    // False, with the refusal checked, where the machine has no output to open.
+    function beginAudition() {
+        tryCompare(ObjectDecodeController, "auditioningIndex", -1, 5000);
+        ObjectDecodeController.inspectFile(atmosStreamUrl);
+        tryCompare(ObjectDecodeController, "busy", false, 15000);
+        compare(ObjectDecodeController.error, "");
+        auditionStamps = [];
+        ObjectDecodeController.auditionObject(0);
+        if (ObjectDecodeController.error.length > 0) {
+            verify(ObjectDecodeController.error.indexOf("Could not open the audition output") === 0,
+                   ObjectDecodeController.error);
+            return false;
+        }
+        compare(ObjectDecodeController.auditioningIndex, 0);
+        compare(auditionStamps.length, 1);
+        return true;
+    }
+
+    // An audition that nobody stops lasts the object's own length. Only the lower bound is
+    // asserted: a loaded machine makes an audition late, never shorter than its audio.
+    function test_anAuditionNotStoppedLastsAsLongAsTheObject() {
+        if (!beginAudition()) {
+            return;
+        }
+        const clipMs = inspectedClipMs();
+        tryCompare(ObjectDecodeController, "auditioningIndex", -1, clipMs + 8000);
+        compare(auditionStamps.length, 2);
+        const lasted = auditionStamps[1].at - auditionStamps[0].at;
+        verify(lasted >= clipMs * 0.9,
+               "an audition of a " + clipMs + " ms object ended after " + lasted + " ms");
+        // It ended by itself, having played: not for want of an output.
+        compare(ObjectDecodeController.error, "");
+    }
+
+    // The press that stops an audition is not made to wait for the clip. The whole object fits
+    // the output's queue, so from the first moment the worker has nothing left to submit and is
+    // waiting for the output to play it, and the press ends that wait at once: well before the
+    // clip would have ended by itself. (What the case times is the audition's end, which has the
+    // output closed first, so a machine too busy to close it for most of a second reads as slow.)
+    // A press that a loaded machine delivers within the clip's last 300 ms has no such distance
+    // to show, and the case is skipped.
+    function test_aSecondPressInTheTailOfAnAuditionStopsItAtOnce() {
+        if (!beginAudition()) {
+            return;
+        }
+        const clipMs = inspectedClipMs();
+        const begun = auditionStamps[0].at;
+        tryVerify(() => Date.now() - begun >= 150
+                        || ObjectDecodeController.auditioningIndex !== 0, 5000);
+        if (ObjectDecodeController.auditioningIndex !== 0) {
+            skip("the audition was over before it could be stopped: a machine that loaded");
+        }
+        const pressed = Date.now() - begun;
+        if (pressed > clipMs - 300) {
+            skip("the second press came " + pressed + " ms into a " + clipMs + " ms object");
+        }
+        ObjectDecodeController.auditionObject(0);
+        tryCompare(ObjectDecodeController, "auditioningIndex", -1, 5000);
+        compare(auditionStamps.length, 2);
+        const lasted = auditionStamps[1].at - begun;
+        verify(lasted < clipMs - 100,
+               "pressed at " + pressed + " ms of a " + clipMs + " ms object, it ended after "
+               + lasted + " ms");
+    }
+
+    // The same for the stream player: a clip nobody pauses is played to its end, which is when
+    // it says it has finished and goes back to the top.
+    function test_aStreamNotPausedIsPlayedToItsEnd() {
+        StreamPlayerController.openFile(atmosStreamUrl);
+        tryCompare(StreamPlayerController, "busy", false, 15000);
+        compare(StreamPlayerController.error, "");
+        const clipMs = StreamPlayerController.durationSeconds * 1000;
+        verify(clipMs > 1000);
+        const began = Date.now();
+        StreamPlayerController.play();
+        if (StreamPlayerController.error.length > 0) {
+            verify(StreamPlayerController.error.indexOf("Could not open the playback output") === 0,
+                   StreamPlayerController.error);
+            return;
+        }
+        compare(StreamPlayerController.playing, true);
+        tryCompare(StreamPlayerController, "playing", false, clipMs + 8000);
+        const lasted = Date.now() - began;
+        verify(lasted >= clipMs * 0.9,
+               "a " + clipMs + " ms stream stopped playing after " + lasted + " ms");
+        compare(StreamPlayerController.error, "");
+        compare(StreamPlayerController.positionSeconds, 0);
+    }
+
+    // What happens in the clip's last second, which is only being heard: a pause ends the
+    // playback as quickly as it does anywhere else (a new play is accepted once the worker has
+    // let go of the output, which is what the wait for the tail ends on), and a seek plays on
+    // from there, as one anywhere else in the clip does.
+    function beginStreamTail() {
+        StreamPlayerController.openFile(atmosStreamUrl);
+        tryCompare(StreamPlayerController, "busy", false, 15000);
+        compare(StreamPlayerController.error, "");
+        StreamPlayerController.play();
+        if (StreamPlayerController.error.length > 0) {
+            verify(StreamPlayerController.error.indexOf("Could not open the playback output") === 0,
+                   StreamPlayerController.error);
+            return false;
+        }
+        // Everything is submitted when the position is at the end; the output has not played it.
+        tryVerify(() => StreamPlayerController.positionSeconds
+                        >= StreamPlayerController.durationSeconds - 0.001, 5000);
+        verify(StreamPlayerController.playing, "the clip's tail was not being played");
+        return true;
+    }
+
+    function test_pausingInTheTailOfAStreamLetsGoOfTheOutputAtOnce() {
+        if (!beginStreamTail()) {
+            return;
+        }
+        StreamPlayerController.pause();
+        compare(StreamPlayerController.playing, false);
+        // play() is refused while the worker still holds the output, so a play that takes means
+        // it has let go: well inside the second that is left of the clip.
+        tryVerify(() => {
+            StreamPlayerController.play();
+            return StreamPlayerController.playing;
+        }, 600);
+        StreamPlayerController.pause();
+    }
+
+    // Not the end of the clip, and not a stop at 0.1 s either: the position is somewhere past the
+    // place sought and short of the end, and it is still playing, a moment after.
+    function test_aSeekInTheTailOfAStreamPlaysOnFromThere() {
+        if (!beginStreamTail()) {
+            return;
+        }
+        StreamPlayerController.seek(0.1);
+        tryVerify(() => StreamPlayerController.positionSeconds > 0.1
+                        && StreamPlayerController.positionSeconds
+                           < StreamPlayerController.durationSeconds - 0.001, 3000);
+        compare(StreamPlayerController.playing, true);
+        StreamPlayerController.pause();
+        verify(StreamPlayerController.positionSeconds > 0.1);
     }
 }
