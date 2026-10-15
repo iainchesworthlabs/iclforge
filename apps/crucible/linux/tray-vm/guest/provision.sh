@@ -210,7 +210,7 @@ chown -R crucible:crucible /home/crucible/.config /home/crucible/.bash_profile
 # A full clone, not a shallow one: vcpkg has to reach the manifest's
 # builtin-baseline commit.
 if [[ ! -d /opt/vcpkg/.git ]]; then
-    git clone --quiet https://github.com/microsoft/vcpkg /opt/vcpkg \
+    git clone --quiet https://github.com/iainchesworthlabs/vcpkg /opt/vcpkg \
         && /opt/vcpkg/bootstrap-vcpkg.sh -disableMetrics >/dev/null
 fi
 chown -R crucible:crucible /opt/vcpkg 2>/dev/null || true

@@ -60,7 +60,7 @@ runs:
         set -euo pipefail
         VCPKG_DIR="${RUNNER_TEMP}/vcpkg"
         if [ ! -d "$VCPKG_DIR/.git" ]; then
-          git clone https://github.com/microsoft/vcpkg.git "$VCPKG_DIR"
+          git clone https://github.com/iainchesworthlabs/vcpkg.git "$VCPKG_DIR"
         fi
         git -C "$VCPKG_DIR" fetch --tags origin
         git -C "$VCPKG_DIR" checkout --force "$VCPKG_COMMIT"
