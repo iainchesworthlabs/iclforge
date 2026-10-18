@@ -116,7 +116,7 @@ jobs:
           python tools/packaging/pack_esp_component.py --version 0.0.0-ci --with-ac4 --verify \
             --verify-targets esp32p4,esp32c3,esp32c6 --output "$RUNNER_TEMP/esp-component-ac4"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: esp-component
           path: dist/esp-component/*.tgz

@@ -460,13 +460,13 @@ jobs:
       contents: read
     steps:
       - name: Download arm64 runtime install tree
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: macos-install-runtime-arm64
           path: arm64-runtime
 
       - name: Download x64 runtime install tree
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: macos-install-runtime-x64
           path: x64-runtime
@@ -665,7 +665,7 @@ jobs:
       - name: Download arm64/x64 dev install trees
         id: download_dev
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: macos-install-dev-*
           path: dev
@@ -725,7 +725,7 @@ jobs:
       # !inputs.do_package now - see the matrix job's own comment), so there
       # is no collision.
       - name: Upload universal macOS package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-macos-llvm
           path: |
@@ -1197,7 +1197,7 @@ jobs:
       # further wiring needed there beyond the *.AppImage glob additions
       # release.yml itself needs (see that file).
       - name: Upload AppImage artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-linux-appimage
           path: |
@@ -1612,7 +1612,7 @@ jobs:
 
       - name: Upload package artifacts
         if: inputs.do_package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-android
           path: |
@@ -1815,7 +1815,7 @@ jobs:
       # wasm_decode_demo/ directory - the demo is a consumer of the package
       # (see docs/platforms/wasm.md), not a parallel implementation, so its
       # build output has to exist first.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -1860,14 +1860,14 @@ jobs:
       # Unconditional (ahead of the browser tests below) so a failing test
       # still leaves the build it tested inspectable.
       - name: Upload decode demo artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wasm-decode-demo
           path: build/config-wasm-emscripten/bin/wasm_decode_demo
           if-no-files-found: error
 
       - name: Upload encode demo artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wasm-encode-demo
           path: build/config-wasm-emscripten/bin/wasm_encode_demo
@@ -1886,7 +1886,7 @@ jobs:
       # project drives the Embind API directly, checking the real encoded
       # byte count, QC verdict against a known signal, and round-trip
       # decode.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -1931,7 +1931,7 @@ jobs:
           persist-credentials: false
           fetch-depth: ${{ inputs.fetch_depth }}
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -1956,7 +1956,7 @@ jobs:
 
       - name: Upload the coverage report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: device-ui-coverage
           path: apps/demos/wasm/tests/test-results/device-ui-coverage
@@ -2117,7 +2117,7 @@ jobs:
           if ($defects -gt 0) { throw "Code Analysis reported $defects defect(s); see the build log" }
 
       - name: Upload the test-signed package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: iclforge-nullsink-driver-testsigned
           path: |
@@ -2874,7 +2874,7 @@ jobs:
       # the one above stays as it is. The WASM demos' Playwright harness
       # (apps/demos/wasm/tests, device-ui.config.js's board project) comes into this
       # container with Node, which the IDF image does not carry.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ !cancelled() }}
         with:
           node-version: "24"
@@ -3254,7 +3254,7 @@ jobs:
 
       - name: Upload the S3 board's image for packaging
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: esp32-firmware-esp32s3
           path: esp32-firmware/
@@ -3522,7 +3522,7 @@ jobs:
 
       - name: Upload the update test's consoles
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: esp32s3-ota-qemu-run
           path: ota-qemu-run/
@@ -3531,7 +3531,7 @@ jobs:
 
       - name: Upload the Sendspin player's QEMU images
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: esp32s3-sendspin-qemu
           path: sendspin-qemu-image/
@@ -3540,7 +3540,7 @@ jobs:
 
       - name: Upload the ESP32-S3 map and console output
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: footprint-esp32s3
           path: |
@@ -3628,7 +3628,7 @@ jobs:
             -DICLFORGE_BUILD_EXAMPLES=OFF
           cmake --build --preset build-linux-gcc --target hearth-testserver
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: esp32s3-sendspin-qemu
           path: sendspin-qemu-image
@@ -3675,7 +3675,7 @@ jobs:
 
       - name: Upload the run
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hearth-esp32s3-sendspin
           path: |
@@ -3686,7 +3686,7 @@ jobs:
 
       - name: Upload the Improv run
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hearth-esp32s3-improv
           path: |
@@ -3998,7 +3998,7 @@ jobs:
 
       - name: Upload the C6 and P4 images for packaging
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: esp32-firmware-riscv
           path: esp32-firmware/
@@ -4054,7 +4054,7 @@ jobs:
           persist-credentials: false
 
       - name: Download the images
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: esp32-firmware-*
           path: esp32-firmware
@@ -4069,7 +4069,7 @@ jobs:
           ls -l esp32-firmware
 
       - name: Upload the sink firmware
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: esp32-firmware
           path: |
@@ -4081,7 +4081,7 @@ jobs:
 
       - name: Upload the sink firmware for the release
         if: inputs.do_package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-esp32-firmware
           path: |
@@ -4264,7 +4264,7 @@ jobs:
 
       - name: Upload footprint artifacts
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: footprint-arm-none-eabi
           path: |
@@ -4329,7 +4329,7 @@ jobs:
           persist-credentials: false
 
       - name: Download gold-reference results
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: gold-reference-*
           path: results

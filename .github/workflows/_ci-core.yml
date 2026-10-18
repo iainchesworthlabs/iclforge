@@ -238,7 +238,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-report
           path: build/config-linux-gcc-coverage/coverage*.html
@@ -1116,7 +1116,7 @@ jobs:
       # failed): there is no file, and a second red step would only repeat the first.
       - name: Upload AC-4 decode quality results
         if: ${{ !cancelled() && steps.ac4-decode-score.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ac4-quality-decode-linux-llvm
           path: ac4-quality/ac4-decode-quality.json
@@ -1159,7 +1159,7 @@ jobs:
       # score_ac4_encode.py writes --json-out before it exits non-zero.
       - name: Upload AC-4 encode quality results
         if: ${{ !cancelled() && steps.ac4-encode-score.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ac4-quality-encode-linux-llvm
           path: ac4-quality/ac4-encode-quality.json
@@ -1321,7 +1321,7 @@ jobs:
 
       - name: Upload failing encoder-space inputs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: encoder-space-artifacts
           path: |
@@ -1353,14 +1353,14 @@ jobs:
 
       - name: Upload landscape trend
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: external-encoder-landscape-trend
           path: results/trend.json
 
       - name: Upload quality spectrograms
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: quality-spectrograms
           path: results/spectrograms
@@ -1389,7 +1389,7 @@ jobs:
 
       - name: Upload object-reconstruction quality
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: object-reconstruction-quality
           path: results/objects.json
@@ -1476,7 +1476,7 @@ jobs:
       # missing one fails here as it always did.
       - name: Download landscape trend
         continue-on-error: ${{ needs.ffmpeg-validate.result != 'success' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: external-encoder-landscape-trend
           path: results
@@ -1488,7 +1488,7 @@ jobs:
       # artifact. Tolerated on a failed run for the reason above.
       - name: Download quality spectrograms
         continue-on-error: ${{ needs.ffmpeg-validate.result != 'success' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: quality-spectrograms
           path: results/spectrograms
@@ -1505,14 +1505,14 @@ jobs:
       # comparison above being published.
       - name: Download AC-4 encode quality
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ac4-quality-encode-linux-llvm
           path: ac4-encode-results
 
       - name: Download AC-4 decode quality
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ac4-quality-decode-linux-llvm
           path: ac4-decode-results
@@ -1755,7 +1755,7 @@ jobs:
           persist-credentials: false
 
       - name: Download object-reconstruction quality
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: object-reconstruction-quality
           path: results
