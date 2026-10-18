@@ -543,7 +543,7 @@ jobs:
       # pushing its own commit.
       - name: Upload gold-reference results
         if: matrix.gold_reference && inputs.persist_quality_trend
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gold-reference-${{ matrix.preset }}
           path: ${{ runner.temp }}/gold-reference-results/*.json
@@ -711,7 +711,7 @@ jobs:
 
       - name: Upload conformance vectors
         if: matrix.conformance_vectors && inputs.publish_conformance_vectors
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: conformance-vectors
           path: dist/*.tar.gz
@@ -954,7 +954,7 @@ jobs:
       # require it.
       - name: Upload the Crucible Linux package
         if: matrix.crucible && runner.os == 'Linux'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-crucible-${{ matrix.preset }}
           # The .sha512 side-cars too, the same way the main "Upload package
@@ -1258,7 +1258,7 @@ jobs:
           (matrix.preset == 'windows-msvc' ||
            (inputs.do_package && matrix.release_package) ||
            ((matrix.preset == 'macos-llvm' || matrix.preset == 'macos-llvm-x64') && !inputs.do_package))
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-${{ matrix.preset }}
           # An explicit extension allowlist, not packages/* - CPack leaves its
