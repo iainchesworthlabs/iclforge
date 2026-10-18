@@ -2,7 +2,7 @@
 # and Opus codecs, and numpy and Pillow, which its server half imports (aiosendspin_server.py).
 aiosendspin==9.1.1
 av==19.0.1
-numpy==2.5.3
+numpy==2.5.4
 pillow==12.3.0
 
 # Not imported directly. aiosendspin 9.1.1 (still the latest release as of 2026-09-23) declares
