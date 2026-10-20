@@ -130,10 +130,12 @@ A C6 has no AC-4 profile: the decoder's floor (286,365 bytes) never fits beside 
 
 **A P4 of revision 3.x is a profile of its own, `p4-rev3`** (PR 13, once #1400 was on main). Its
 image is `hearth-sink-esp32p4-rev3` (chips 3.01 to 3.99, `panel` and `panel-dsi` fragments over
-`p4-rev3`, 400 MHz, the bootloader at warn level to fit). It has never run on a board, so it has
-its guard and its budgets and **no play list and no baseline**; `suite.json` has its entry with
-an empty list and says why, and the first board that runs the image adds the rows, as the v1.x
-profiles' were added. What it is:
+`p4-rev3`, 400 MHz, the bootloader at warn level to fit). It first ran on a board on 2026-10-20,
+the P4X kit (`P4X` in `bench.json`), and has its guard and its budgets, a play list of three rows
+and a baseline (`baselines/p4-rev3.json`): the two 2.0 streams as the other profiles play them,
+and a 5.1 stream on the layout `9.1.6`, whose row names the `layout` to set for the play and the
+`slots` the sink must open for (16, the full TDM frame, which a chip below v3.0 cannot open). What
+it is:
 
 - **133 locked keys**, snapshotted from a real configured build (2026-10-12): the two revision
   bounds (`ESP32P4_REV_MIN_FULL` 301 and `ESP32P4_REV_MAX_FULL` 399, so it refuses a v1.x chip,
@@ -467,6 +469,12 @@ its serial console is not needed for it. The 5.1 and
 wider rows (`demo.ec3` with objects) wait for the baselines; the AC-4 rows need an image built with
 `CONFIG_ICLFORGE_EXAMPLE_AC4_PCM_HASH=1` (the `measure` overlay) and say so when the hash is not on
 the line; and a Sendspin play list for the C6 needs a server on the bench.
+
+A row may name a `layout`, set with `PUT /layout` for its play and put back after it, and the `slots`
+the sink must open for: `p4-rev3`'s 5.1 stream on `9.1.6` is the one, and fails when the sink opens
+for fewer than sixteen. `--fixtures-url` plays the streams from a server that is already running
+and serves the repository's paths, where the suite would otherwise start one over the whole
+repository on the LAN.
 
 The play list, in `suite.json`: AC-3 2.0 and E-AC-3 2.0 (30 s of music each) on every profile with
 an HTTP play, the C6's two rows as the refusal they are, and on the AC-4 profiles the pinned
@@ -947,7 +955,7 @@ lock file in `D:/ac3bld` before anything is run on it, and restored and released
 | 7 | Baselines: `s3-n16r8`, `c6-16mb`, `p4-rev1`, then the AC-4 profiles, one PR each with its board run attached | yes | **`s3-n16r8` built** (S3b; see [the ratchet](#3-the-board-suite)) and **`c6-16mb` built** (the C6, the refusal rows and the worst of eight boots) and **`p4-rev1` built** (P4a, by watchdog-reset boots) and **`p4-rev1-ac4` built** (P4a, with the `measure` image and its new fragment, the 5.1 row held to its own hash) and **`s3-n16r8-ac4` built** (S3a, cross-checked on S3b; `s3-n16r8` re-recorded under its new hash); **both AC-4 baselines re-recorded** under the hashes the 40 KB Sendspin decode stack gave them (P4a, S3a). `c6-4mb` has no board: its guard and budgets only, the suite's rows run on `c6-16mb`, which differs in flash and table alone |
 | 8 | Board scripts out of `D:\ac3bld` into `tools/hearth/` (build, OTA, the lock), and the process page | no | **Built**: [the board bench](esp32-board-bench.md): `bench.json` (the five boards, their locks, MAC tails), `bench.py` (status, lock, log, snapshot, console, scrub; the lock code the suite now shares), `bench_flash.py` (build from a profile, flash after a MAC check, verify, OTA with the lock). The build and the redaction were run for real; flash, `--app-only` and OTA through the tool were not, because they write a board |
 
-| 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; no board has run the image, so no list and no baseline |
+| 9 | The v3.x profile, `p4-rev3`, once #1400 was on main | no | **Built**: the profile, its budgets, CI reading it, the test's exception gone; the P4X kit ran the image on 2026-10-20 and its list and baseline were recorded then |
 | 10 | Sendspin rows: the suite plays a stream the way the C6's product path does, with the test server | yes | **Built** (the harness, tests, the C6's AC-3 row and its baseline); the E-AC-3 row joined it in PR 16, once the decoder's feature tables were out of static RAM, see [Sendspin rows](#sendspin-rows-pr-14) |
 | 11 | Sendspin rows for the S3 and the P4 profiles, and their baselines | yes | **Built** (S3a and P4a, the four baselines re-recorded); the S3's E-AC-3 stream starts late in two plays of five, see [PR 15](#sendspin-rows-for-the-s3-and-the-p4-pr-15) |
 | 12 | AC-4 over Sendspin rows for the two AC-4 profiles, and the S3 AC-4 baseline re-recorded under its #1459 hash | yes | **Built** (S3a and P4a); see [PR 16](#ac-4-over-sendspin-and-the-s3s-ac-4-baseline-re-recorded-pr-16) |
