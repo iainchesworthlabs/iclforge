@@ -101,6 +101,7 @@ STATUS_FIELDS = (
     "ring_low",
     "resync_bytes",
     "layout",
+    "stream",
 )
 
 CHECKLIST = (
@@ -208,6 +209,17 @@ class Board:
 
     def play(self, url: str) -> int:
         return self._request("POST", "/play", url.encode("utf-8"))[0]
+
+    def layout(self) -> str:
+        """GET /layout: the output layout the next play renders onto, as text."""
+        status, _, data = self._request("GET", "/layout")
+        if status != 200:
+            raise SuiteError(f"{self.host}: GET /layout answered {status}")
+        return data.decode("utf-8", "replace").strip()
+
+    def set_layout(self, name: str) -> int:
+        """PUT /layout: the status code (200, or 409 for a layout the sink has no slots for)."""
+        return self._request("PUT", "/layout", name.encode("utf-8"))[0]
 
     def sendspin(self) -> dict[str, Any]:
         """/status's `sendspin` object, the fields the suite reads by name (the network object is
@@ -673,6 +685,36 @@ def run_play(
     """One row, played; returns its result and the log offset to carry on from."""
     if row.get("via") == "sendspin":
         return run_sendspin_play(board, row, suite, sendspin, mark)
+    layout = row.get("layout")
+    if not layout:
+        return _play_http(board, row, base_url, counter, mark, suite, pins, timeout, sleep)
+    # A row on another layout (the P4X's full TDM frame, where the board's own is 2.0): set for the
+    # play and put back after it, so that the next row is played as it would have been without it.
+    previous = board.layout()
+    code = board.set_layout(layout)
+    if code != 200:
+        refused = PlayResult(id=row["id"], stream=row["stream"], expect=row.get("expect", "pass"))
+        refused.state = "refused"
+        refused.findings.append(f"PUT /layout {layout} answered {code}, expected 200")
+        return refused, mark
+    try:
+        return _play_http(board, row, base_url, counter, mark, suite, pins, timeout, sleep)
+    finally:
+        board.set_layout(previous)
+
+
+def _play_http(
+    board: Board,
+    row: dict[str, Any],
+    base_url: str,
+    counter: int,
+    mark: int | None,
+    suite: dict[str, Any],
+    pins: dict[str, str],
+    timeout: float,
+    sleep: float,
+) -> tuple[PlayResult, int | None]:
+    """One row over POST /play: the location is the play's own, the verdict is read from the log."""
     spec = row["stream_spec"]
     result = PlayResult(id=row["id"], stream=row["stream"], expect=row.get("expect", "pass"))
     # Advance the mark past anything printed between plays.
@@ -725,12 +767,16 @@ def run_play(
             break
         time.sleep(sleep)
     result.lines = parse_play_lines(text.splitlines())
-    _judge(result, status, spec, pins)
+    _judge(result, status, spec, pins, row.get("slots"))
     return result, offset
 
 
 def _judge(
-    result: PlayResult, status: dict[str, Any], spec: dict[str, Any], pins: dict[str, str]
+    result: PlayResult,
+    status: dict[str, Any],
+    spec: dict[str, Any],
+    pins: dict[str, str],
+    expected_slots: int | None = None,
 ) -> None:
     lines = result.lines
     if result.rebooted:
@@ -746,6 +792,14 @@ def _judge(
     if result.state != "finished" or status.get("failed"):
         result.findings.append(f"the play did not finish: state {result.state}, why {result.why!r}")
         return
+    if expected_slots is not None:
+        # The sink opened for this many slots: a TDM frame past two channels, which the board with
+        # no clock for it cannot open (the P4 below v3.0), shows as a play on fewer or none.
+        played_slots = (status.get("stream") or {}).get("slots")
+        if played_slots != expected_slots:
+            result.findings.append(
+                f"the play was rendered onto {played_slots} slots, expected {expected_slots}"
+            )
     if lines.verdict != "pass":
         result.findings.append(f"the verdict line says result={lines.verdict}")
     if spec.get("units") is not None and lines.units != spec["units"]:
@@ -1120,9 +1174,12 @@ def cmd_run(args: argparse.Namespace) -> int:
                 status_port=args.port,
             )
             print(f"sendspin rows: the test server is {sendspin.testserver}")
-        address = args.serve_host or lan_address_for(args.host)
-        server = serve_fixtures(REPO, address)
-        base_url = f"http://{address}:{server.server_address[1]}"
+        if args.fixtures_url:
+            base_url = args.fixtures_url.rstrip("/")
+        else:
+            address = args.serve_host or lan_address_for(args.host)
+            server = serve_fixtures(REPO, address)
+            base_url = f"http://{address}:{server.server_address[1]}"
         pins = json.loads(PINS.read_text("utf-8")).get("hashes", {}) if PINS.is_file() else {}
         results = run_suite(
             board,
@@ -1231,7 +1288,15 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--repeat", type=int, default=1, help="plays of each row; the median is held")
     run.add_argument("--timeout", type=float, default=10.0, help="one HTTP request, seconds")
     run.add_argument("--play-timeout", type=float, default=120.0, help="one play, seconds")
-    run.add_argument("--serve-host", help="the address to serve the streams on")
+    serving = run.add_mutually_exclusive_group()
+    serving.add_argument("--serve-host", help="the address to serve the streams on")
+    serving.add_argument(
+        "--fixtures-url",
+        help="play the streams from a server that is already running, which serves the "
+        "repository's paths (testdata/..., libs/...) from this URL, and start none: the suite's "
+        "own serves the whole repository on the LAN, which a bench that wants only the streams "
+        "it plays on offer can do without",
+    )
     run.add_argument(
         "--testserver",
         help="hearth-testserver, for rows with via sendspin (else ICLFORGE_TESTSERVER, else the "

@@ -1,0 +1,74 @@
+{
+  "format": 1,
+  "profile": "p4-rev3",
+  "profile_hash": "785bfe183100",
+  "version": "v0.10.0-beta.1-5120-gc6e72b127-",
+  "chip": "ESP32-P4",
+  "board": "P4X",
+  "recorded": "2026-10-20T06:24Z",
+  "boot": {
+    "when": "boot",
+    "net": 1,
+    "internal_free": 307147,
+    "largest": 278528,
+    "ask_total": 40960,
+    "ask_biggest": 32768,
+    "headroom": 245760,
+    "verdict": "ok",
+    "floor": 0
+  },
+  "plays": {
+    "ac3-2.0": {
+      "state": "finished",
+      "frames": 938,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        56,
+        56,
+        56
+      ],
+      "decoder_permille": 56,
+      "units": 938,
+      "decode_stack_free": 18468,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0
+    },
+    "eac3-2.0": {
+      "state": "finished",
+      "frames": 938,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        38,
+        38,
+        38
+      ],
+      "decoder_permille": 38,
+      "units": 938,
+      "decode_stack_free": 18372,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 5,
+      "resync_bytes": 0
+    },
+    "ac3-5.1-tdm16": {
+      "state": "finished",
+      "frames": 79,
+      "why": "end of stream",
+      "decoder_permille_samples": [
+        138,
+        137,
+        138
+      ],
+      "decoder_permille": 138,
+      "units": 79,
+      "decode_stack_free": 18468,
+      "underruns": 0,
+      "dry_ms": 0,
+      "min_headroom_ms": 4,
+      "resync_bytes": 0
+    }
+  },
+  "findings": {}
+}
