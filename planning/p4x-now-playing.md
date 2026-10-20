@@ -261,3 +261,34 @@ backlight is a PWM that no picture shows. A finger's tap on the glass in place o
 same pointer path, and the sheet's buttons were found under a finger on the first day). A glow
 moving with real 5.1 music: the 5.1 programme is a test stream. The scan-out's cost, which is the
 same whatever is drawn and is what dimming leaves alone.
+
+**The time of day and the clock view, 2026-10-21, the kit over the cable.** `p4-rev3` with the time on every
+board (v0.10.0-beta.1-5170-g3b92a7511), sent with `ota.py push`, accepted on its 30 s trial; the kit's name is
+`hearth-e753f9`, its router `192.168.1.5` gives a time server over DHCP (option 42).
+
+| Tried | Result |
+|---|---|
+| Nothing touched: the board has just booted, sync is on by default | asking from boot, `servers` = `192.168.1.5 (from DHCP), pool.ntp.org`, first answer within seconds; the board's `22:04:35` against the PC's `22:04:34` UTC |
+| `PUT /ntp-server 0.au.pool.ntp.org`, then `none` | answered 2.1 s after naming it (the server list became `0.au.pool.ntp.org [162.159.200.123], 192.168.1.5 (from DHCP)`), and 5.3 s after `none`; `pool.ntp.org:123` is a 400 |
+| `PUT /time-sync off`, 30 s, then `on` | `asking` and `synced` false and the time gone at once; **answers 3 and 3 thirty seconds later (no request went out)**; back on, synced in 3.2 s |
+| `PUT /timezone AEST-10AEDT,M10.1.0,M4.1.0/3` | `2026-10-21 09:05:20` against the PC's local `09:05:18`; JST-9, `<+0530>-5:30` and `EST5EDT,...` moved it by the right hours |
+| Every zone the page lists (42), and 15 others (negative daylight saving, quoted names, rule times past a day) | 57 of 57 read by picolibc as written (the January/July check passed); a string that is not a zone, `AEST-10AEDT` without rules and `AEST-25` are 400s |
+| `POST /restart` with the zone set | zone, server and sync came back as stored, and the time again 2.1 s after the board answered |
+| The clock view on the glass, a Sendspin play (`GET :8081/panel.bmp`) | the designed picture with the real time: `09:06 Wednesday 21 October` in AEDT, `21:09 Tuesday 20 October` and the UTC sentence before a zone was set |
+
+**What the clock costs a stream.** The 5.1 E-AC-3 programme over Sendspin, 60 s, layout 5.1, the view
+`clock` against `off` in alternating order, three plays each (time sync on in both, since it is on in all):
+
+| | `clock` | `off` |
+|---|---|---|
+| Burst, `/status`'s `burst_us` | 4,561, 4,573, 4,565 (mean 4,566) | 4,551, 4,577, 4,565 (mean 4,564) |
+| Late, underruns, resyncs, invalid | 0 in all three | 0 in all three |
+| Free internal heap at the end | 99,067, 98,687, 96,419 | 97,231, 96,851, 97,867 |
+
+**The clock view costs a burst 2 µs (0.04%)**, which the spread of the plays of one view (26 µs) hides, with the
+same heap. The test server's sockets while it played: one outbound TCP connection to the board's Sendspin
+port and one unbound-peer UDP socket on an ephemeral port; no listening TCP socket.
+
+**Not checked on the kit.** A finger's tap on the glass in place of an injected one; the dim with the clock
+chosen (the preview checks it: backlight at its floor, the clock still lit, a touch wakes it); the S3, C6 and
+P4 boards of the bench were built (S3 and QEMU's shape fit and hold to their profiles) and not flashed.

@@ -239,6 +239,13 @@ catches the tap that wakes the screen, and the time goes on changing under it.
 
 **On the kit** (2026-10-21): over Sendspin, a 5.1 E-AC-3 test programme with no lyrics drew exactly this picture; with the speakers showing, a burst took 4,573 µs against 4,555 µs with the view off (three 60 s plays each, no late burst, underrun or resynchronisation, and the same least free heap), and at 2.0 with a stereo music programme 2,099 against 2,114 µs. With `dim-after` at one minute the screen went dark 60.4 s after the speakers began to show, and a tap woke it. The glass's brightness at 4% and a finger's tap in place of an injected one were not looked at; the scan-out is the same whatever is drawn, and dimming leaves it alone.
 
+**The time and the clock** (2026-10-21, with the time on every board): the clock view drew `09:06 Wednesday 21
+October` against the PC's local `09:06`, and a 5.1 Sendspin play with it chosen took a burst 4,566 µs against
+4,564 µs with the view off (three 60 s plays each, no late burst or underrun). The board asked a time server
+from boot, answered within seconds, stopped asking at once on `PUT /time-sync off` (no request in the next 30 s),
+kept its zone, server and sync through `POST /restart`, and read all 42 zones of the page's list and 15 others as
+written.
+
 **Fonts.** Archivo, the apps' own, for Latin (Basic, Latin-1 and Extended-A, most of Extended-B and
 the Vietnamese block, and the punctuation and currency signs a lyric uses); Noto Sans behind it for
 Greek (modern, with its tonos) and Cyrillic (with its supplement), and Noto Sans Hebrew behind that;
