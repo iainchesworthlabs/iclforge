@@ -241,6 +241,43 @@ wired. **Not in this work:** the I2C programming of the DACs (nothing programs o
 P4X board's own ES8311 codec as an output so the kit makes sound before the DACs arrive
 ([Later](#later)).
 
+### D9. The kit's cable beside its radio (2026-10-20)
+
+The owner's plan for the kit is a PoE splitter: its Ethernet leg into the RJ45 and its USB-C leg into
+the *power* input, with no USB console and no USB flashing. So the sink takes the RJ45 as a network
+(`net/wired/ethernet.cpp`: the chip's EMAC and the board's IP101GR on RMII, DHCP, the board's name as
+its host name) next to the Wi-Fi the C6 gives it, and everything that answers on Wi-Fi answers on the
+cable. The decisions, each one a line to change if the owner would have it otherwise:
+
+- **Both are up, the cable is preferred.** The cable's interface has route priority 200 and the
+  station's is 100; ESP-IDF's own number for Ethernet (50) would have put a board with both on Wi-Fi.
+  A cable pulled falls back to the station (kept joined for it) and a cable put back returns the
+  board to the cable, with no restart. A board with the cable in and no Wi-Fi network stored comes
+  up on the cable alone.
+- **A stored `network preference`: auto, ethernet or wifi** (NVS, `GET` and `PUT /network-preference`,
+  and `network.preference` in `GET /status`). `auto` is the policy above. `ethernet` and `wifi` **pin**
+  the board to one interface and switch the other off (the radio idle, or the EMAC stopped), which is
+  what a person who wants the radio off near the DACs, or the cable out of a mixed network, asks for.
+  The reading not taken: all three as a priority with the other interface kept as a fallback, in which
+  case `ethernet` would be `auto` under another name. Because a pin has nothing to fall back to, a
+  change made over REST is verified: the named interface is brought up first and the other switched
+  off only once it holds an address; otherwise the change is undone.
+- **The pins are Kconfig's, defaulted to the board's** (`ICLFORGE_EXAMPLE_ETH_*`): SMI MDC 31, MDIO
+  52, PHY reset 51, PHY address 1, the reference clock in on GPIO50 (the PHY makes it), TX_EN 49,
+  TXD0 34, TXD1 35, CRS_DV 28, RXD0 29, RXD1 30. They are ESP-IDF v6.1's `examples/ethernet/basic`
+  defaults for the P4 and agree with Zephyr's devicetree for this board; the first run on the board
+  reads the PHY's ID over SMI and logs it.
+- **The PHY driver is ESP-IDF's generic 802.3 one**, the one its example uses on this board. `esp_eth`
+  in v6.1 ships only that driver (the vendor ones, the IP101's among them, are registry components),
+  so there is nothing more to fetch.
+- **The profile locks it**: `CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y` in `sdkconfig.p4-rev3` and
+  in `p4-rev3`'s locked keys, so the profile's hash moved and its baseline is recorded again on the
+  kit. The FireBeetle P4s, the S3s and the C6 do not have the key and their profiles are unchanged.
+- **Not built** (the owner's separate tasks): a diagnostics view opened by three taps on the name,
+  which would show the network and a control for the preference, and a screen for songs with no
+  lyrics. What they read is `GET /status`'s `network.preference` and `network.interfaces`, and what
+  they write is `PUT /network-preference`.
+
 ## The screen
 
 **Panel:** 1024 by 600, landscape, about 170 pixels an inch (7 inches across the diagonal):
