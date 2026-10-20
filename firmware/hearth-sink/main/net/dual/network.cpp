@@ -111,6 +111,17 @@ void apply(NetworkPreference want) {
     const auto refuse = [&](const char* why) {
         std::printf("network: %s; the preference stays %s\n", why,
                     network_preference_name(preference()));
+        // The attempt may have started the interface the preference leaves out: switch it off again.
+        switch (preference()) {
+            case NetworkPreference::ethernet:
+                net::station_stop();
+                break;
+            case NetworkPreference::wifi:
+                net::ethernet_stop();
+                break;
+            case NetworkPreference::automatic:
+                break;
+        }
     };
     switch (want) {
         case NetworkPreference::automatic:
