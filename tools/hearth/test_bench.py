@@ -28,10 +28,11 @@ import sink_profile
 SSID = "Testnet-Alpha-9"
 NETWORK_KEY = "correct-horse-battery"
 
-# The five lock files the rule of 2026-10-11 names.
+# The five lock files the rule of 2026-10-11 names, and the P4X kit's of 2026-10-20.
 RULE_LOCKS = {
     "p4-board.lock",
     "p4-board2.lock",
+    "p4x-board.lock",
     "s3-board-156.lock",
     "s3-board-45.lock",
     "c6-board.lock",
@@ -79,8 +80,8 @@ class Table(unittest.TestCase):
         cls.table = bench.load(bench.BENCH_FILE)
         cls.profiles = sink_profile.load()
 
-    def test_there_are_five_boards_with_the_rule_s_five_locks(self) -> None:
-        self.assertEqual(len(self.table.boards), 5)
+    def test_there_are_six_boards_with_the_rule_s_locks(self) -> None:
+        self.assertEqual(len(self.table.boards), 6)
         self.assertEqual({b.lock.name for b in self.table.boards.values()}, RULE_LOCKS)
 
     def test_names_addresses_ports_locks_and_mac_tails_are_each_unique(self) -> None:
@@ -229,11 +230,11 @@ class Status(unittest.TestCase):
     def test_boards_prints_the_table(self) -> None:
         code, out, _ = run_main(["boards"], self.env)
         self.assertEqual(code, 0)
-        for name in ("S3a", "S3b", "C6", "P4a", "P4b"):
+        for name in ("S3a", "S3b", "C6", "P4a", "P4b", "P4X"):
             self.assertIn(name, out)
         self.assertIn("no OTA", out)
 
-    def test_status_reads_all_five_locks_and_flags_an_overdue_one(self) -> None:
+    def test_status_reads_every_lock_and_flags_an_overdue_one(self) -> None:
         (self.root / "locks" / "p4-board.lock").write_text(
             "session=32ab95 (P4 restart) | purpose=link | start=2026-10-12T03:22Z | "
             "expected_end=2026-10-12T05:35Z\n",
@@ -246,7 +247,7 @@ class Status(unittest.TestCase):
         self.assertIn("OVERDUE", out)
         self.assertIn("do not take the board over", out)
         self.assertIn("S3b  booked by 16d036", out)
-        self.assertIn("3 of 5 free", out)
+        self.assertIn("4 of 6 free", out)
         self.assertIn("ListAgents", out)
 
     def test_lock_take_show_release_by_board_name(self) -> None:

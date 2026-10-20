@@ -1,6 +1,6 @@
 # Karaoke on an ESP32-P4 (chip revision v3.x) with a 7-inch panel
 
-!!! note "Status as of 2026-10-20: on the kit, the image starts and the panel and touch are found; the glass, a tap and TDM are not yet checked"
+!!! note "Status as of 2026-10-20: on the kit, the screen, touch and a 16-slot TDM play work; the clocks on the pins, a karaoke play and tearing are not yet checked"
     This is W12 of [karaoke phase 2](karaoke-phase2.md#w12-the-esp32-p4-with-a-panel), taken
     off the shelf because the owner's development kit was on its way and the firmware could be ready
     for it. The owner's brief, on 2026-10-12: a P4 of chip revision v3.2 or newer ("P4X") at
@@ -451,10 +451,10 @@ The 16 MB of flash was read back before anything was written, so the vendor imag
 | Bring-up step ([above](#bring-up-on-the-kit)) | First result |
 |---|---|
 | 1. Flash `hearth-sink-esp32p4-rev3` | Done over USB from main `fd3c51169`, profile `p4-rev3`. The vendor's table sits where Hearth's NVS partition is, so that region was erased first. The chip takes the image: minimum v3.1, chip v3.2, no revision notice; `/hardware` says revision 3.2, 400 MHz, 32 MiB PSRAM, `sink_max_slots_bits` 16 |
-| 2. The probe at 400 MHz | Not run |
-| 3. TDM at 16 x 32 on GPIO 20, 21, 22 | **Not run.** It needs a scope or a logic analyser on the pins; nothing has been measured |
-| 4. The panel | See below: a crash first, then the bus and the EK79007 start. The glass has not been looked at |
-| 5. Touch | The GT911 answers at **0x14** (product ID "911", config version 130). A tap has not been tried |
+| 2. The probe at 400 MHz | Not run; the board suite's decode figures at 400 MHz are [below](#the-board-suite-on-the-kit) |
+| 3. TDM at 16 x 32 on GPIO 20, 21, 22 | The sink **opens 16 slots of 32 bits (TDM)** and plays a 5.1 stream through them in real time ([TDM](#tdm)). **The clocks on the pins are not measured**: that needs a scope or a logic analyser |
+| 4. The panel | A crash first, then the bus and the EK79007 start. The owner's photos show the screen as designed ([The glass](#the-glass)); tearing is not checked |
+| 5. Touch | The GT911 answers at **0x14**. Its axes were turned half a turn from the display's and it was read too seldom: both fixed, and every button of the controls sheet answers a tap ([Touch](#touch)) |
 | 6. A karaoke play | Not run |
 | 7. The ES9080 pair | Not wired |
 
@@ -470,17 +470,95 @@ CI could not have found this: it builds the `panel-dsi` image and does not run i
 with no underrun, late chunk or crash. The panel opens its bus on two lanes at 900 Mbit/s, the
 EK79007 initialises, the GT911 is found, and `GET :8081/panel.bmp` returns the idle screen as the
 design draws it (name, address, network, the server it is connected to, the firmware version, the
-footer with the delay and *Adjust*). **That read-back is the frame buffer in PSRAM, so it shows what
-was drawn and not what the glass shows.** Orientation, colour, tearing, the backlight and a tap are
-the next checks, and need someone looking at the panel.
+footer with the delay and *Adjust*). That read-back is the frame buffer in PSRAM, so it shows what
+was drawn and not what the glass shows; the glass is next.
 
 A first core dump, from the `ipc0` task (5,888 bytes), was already in flash when the DSI crash wrote
-its own over it; it was not read, and no dump has appeared since the fix, over the few minutes the
-board was watched.
+its own over it; it was not read, and no dump has appeared since the fix, over the hours the board
+has been run.
+
+#### The glass
+
+The owner's photos, the same day, with the transparent protective film still on the panel (it is the
+glare in them): the picture is upright and landscape, the background is dark, the words already sung
+are in the accent orange, the word being sung is white with its underline, the progress hairline
+runs under the header, and the footer has the board's name, the line, the delay and *Adjust* at the
+right. That is the design's screen, in the demo song (`POST :8081/panel/demo?mode=2`). The backlight
+is on. Not checked: tearing or flicker (stills do not show it), and the screen with the film off.
+The panel's render time with the DSI engine reading the frame buffer out of PSRAM was 1.65 ms on
+average over 3,627 refreshes (`GET :8081/panel`, a demo song filling; the first, whole frame took 60
+ms), against 1.7 ms on the FireBeetle with no panel. The two are not the same chip or clock, and
+nothing yet says what the scan-out costs the decoder.
+
+#### Touch
+
+The first taps did almost nothing: the owner tapped all over the glass and, once, *Adjust* opened,
+and its buttons did not answer. Counters added to `GET :8081/panel` (`touch_reads`, `touch_failures`,
+`touch_points` and where the last eight presses began) found two causes.
+
+1. **The pointer was read too seldom.** LVGL reads it inside `lv_timer_handler()`, which the task
+   called once a period: every 100 ms with nothing filling, on a 10 ms scheduler tick, while a finger
+   is down for 50 to 150 ms. The controller answered every read (no failure) and reported 98 points
+   over about three and a half minutes of tapping. The rest of each period is now waited out in 20 ms slices with
+   a call after each, and the controller's bus runs at 400 kHz (the vendor BSP's speed): 25 reads a
+   second on the idle screen, measured.
+2. **The touch layer's axes are turned half a turn from the display's.** Presses came back at the
+   opposite corner. A bottom-right tap was reported at the top left, bottom-left at the top right,
+   top-right at the bottom left; the owner tapped bottom-right once, top-right twice and bottom-left
+   three times and the board recorded one press at (20,17), three at (993,7), (982,8) and (994,34),
+   and two at (21,585) and (30,587). `CONFIG_ICLFORGE_EXAMPLE_PANEL_TOUCH_MIRROR_X` and `_MIRROR_Y`
+   are 1 for this board and `_SWAP_XY` is 0.
+
+After both, the owner tapped *Adjust*, the delay's plus and minus, *Smaller* and *Larger* twice and
+*Close*. The board recorded the last eight presses at (906,572), (395,469), (79,476), (628,469),
+(807,464), (638,468), (803,455) and (896,567): each inside the button it was meant for, in that
+order, on the 1024 by 600 layout. The sheet opened at once and the delay changed. *Smaller* and
+*Larger* showed nothing on the idle screen, which has no lyric to resize, and the sheet did not say
+what the size was: it now does ("Smaller", "Normal", "Larger", beside the delay's), and the line
+being sung is rebuilt at the new size at once. Seen on the board's read-back with a simulated tap;
+not yet seen on the glass with a song.
+
+#### TDM
+
+On the image carrying its profile, `PUT /layout 9.1.6` (sixteen slots) and a 30 s 5.1 AC-3 stream
+(twelve copies of the suite's 5.1 fixture) played from this PC by `POST /play`:
+
+- The sink logs `i2s-wide 48000 Hz 32-bit, 16 channels: 16 slots (tdm), master, bclk=20 ws=21
+  dout=22`: the full 512-bit frame, which is the one that needs the 160 MHz PLL, and which a v1.3
+  chip cannot open.
+- 948 units, no resynchronised byte, no underrun, the least headroom in the 64 ms queue 4 ms.
+- 30,336 ms of audio in 30,185 ms of wall clock. The sink blocks until the DAC has taken the samples,
+  so this is the I2S controller's own pace, and it is the pace asked, to within 0.5% (the queue still
+  draining at the end is some of the 151 ms).
+- The levels: slots 0 to 4 (L C R Ls Rs) and slot 15 (LFE) carry audio and the ten others read zero,
+  which is the ES9080 contract.
+
+**What this does not show is the signal.** The clocks on GPIO 20, 21 and 22 (BCLK 24.576 MHz, WS
+48 kHz) are not measured, and nothing yet says they leave the pins; that needs a scope or a logic
+analyser.
+
+#### The board suite on the kit
+
+`p4-rev3` has a play list and a baseline, recorded on the kit with the image of this change
+(`firmware/hearth-sink/baselines/p4-rev3.json`): the two 2.0 streams, as the other profiles play
+them, and a row only this profile can play, the 5.1 stream on `9.1.6`, which fails if the sink opens
+for fewer than sixteen slots. Three plays a row, no underrun, no resynchronised byte, the decode
+stack 18 KB free:
+
+| Row | Decoder, permille of a frame | The v1.3 board (360 MHz) |
+|---|---|---|
+| AC-3 2.0, 30 s | 56 | 61 |
+| E-AC-3 2.0, 30 s | 38 | 41 |
+| AC-3 5.1 on 16 slots, 2.5 s | 138 | not playable |
+
+The kit takes 7 to 8% less time to decode where the clock is 11% higher. Why is not isolated: the
+decoders run their code from PSRAM, which is 200 MHz hex here and does not scale with the clock. The
+Sendspin rows and the AC-4 profile were not played on the kit.
 
 **What the first run answers, and does not.** The display's driver is the EK79007 and its touch
-controller is a GT911, at 0x14 and not 0x5D (Q1). Nothing in this run measured the I2S clocks, the
-decode at 400 MHz or the scan-out's cost to the decoder (Q4, Q5).
+controller is a GT911 at 0x14 and not 0x5D, turned half a turn from the display (Q1). Not measured:
+the I2S clocks on the pins, the scan-out's cost to the decoder (Q4, Q5), tearing, the AC-4 5.1
+decode, and a karaoke play with the screen.
 
 ## Risks and open questions
 

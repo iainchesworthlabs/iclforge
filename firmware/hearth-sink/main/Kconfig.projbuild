@@ -1000,6 +1000,26 @@ config ICLFORGE_EXAMPLE_PANEL_TOUCH_RST_GPIO
     default -1
     range -1 54
 
+config ICLFORGE_EXAMPLE_PANEL_TOUCH_SWAP_XY
+    int "Touch controller's x and y are the other way round (0 or 1)"
+    default 0
+    range 0 1
+
+config ICLFORGE_EXAMPLE_PANEL_TOUCH_MIRROR_X
+    int "Touch controller's x runs right to left (0 or 1)"
+    default 1
+    range 0 1
+    help
+        The touch layer of the ESP32-P4X-Function-EV-Board's 7-inch panel is mounted turned half a
+        turn from its display: a press at the bottom right is reported at the top left. The first run
+        on the kit found it (a tap on the Adjust button did nothing), and 1 here and for the y axis
+        undoes it. Another board's profile sets what its own touch layer needs.
+
+config ICLFORGE_EXAMPLE_PANEL_TOUCH_MIRROR_Y
+    int "Touch controller's y runs bottom to top (0 or 1)"
+    default 1
+    range 0 1
+
 config ICLFORGE_EXAMPLE_PANEL_DSI_LDO_CHANNEL
     int "LDO channel that powers the DSI PHY (-1 = already on)"
     default 3

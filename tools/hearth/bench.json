@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "note": "The bench: the five ESP32 boards on the owner's desk and where the tools find them (tools/hearth/bench.py, planning/esp32-board-bench.md). A board is addressed by name, so that the lock that guards it, its address and its serial port come from one row and cannot be mixed. ICLFORGE_BENCH names another file of this shape for another machine. mac_tail is the last three octets of the chip's MAC: bench_flash.py reads the MAC of the chip on the port and writes nothing when the tail differs. No Wi-Fi value is in this file; the network fragment is named by path.",
+  "note": "The bench: the six ESP32 boards on the owner's desk and where the tools find them (tools/hearth/bench.py, planning/esp32-board-bench.md). A board is addressed by name, so that the lock that guards it, its address and its serial port come from one row and cannot be mixed. ICLFORGE_BENCH names another file of this shape for another machine. mac_tail is the last three octets of the chip's MAC: bench_flash.py reads the MAC of the chip on the port and writes nothing when the tail differs. No Wi-Fi value is in this file; the network fragment is named by path.",
   "locks": "D:/ac3bld",
   "idf": "D:/esp/esp-idf",
   "idf_tools": "D:/esp/tools",
@@ -48,6 +48,14 @@
       "after_flash": "watchdog-reset",
       "ota": false,
       "note": "An OTA restart killed this board's link to its C6 (2026-10-10): it is put back by USB, app image and otadata only, and started with a watchdog reset, because its RTS and hard resets land in the ROM's download mode."
+    },
+    "P4X": {
+      "chip": "esp32p4",
+      "host": "192.168.1.251",
+      "port": "COM7",
+      "lock": "p4x-board.lock",
+      "mac_tail": "e753f9",
+      "note": "The ESP32-P4X-Function-EV-Board kit (chip v3.2, 7-inch panel, planning/karaoke-p4x-panel.md): the only board that runs the p4-rev3 image. Its USB-Serial/JTAG connector is the one marked JTAG. Whether a restart or an OTA update keeps its link to the C6 is not tried yet, so neither is assumed to work."
     }
   }
 }

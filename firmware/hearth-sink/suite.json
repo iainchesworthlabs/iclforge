@@ -24,6 +24,12 @@
       "units": 938,
       "what": "E-AC-3 2/0, 96 kbit/s, 30 s of music (FFmpeg)"
     },
+    "ac3-5.1": {
+      "file": "testdata/external-baseline/ac3-51-448/ffmpeg.ac3",
+      "codec": "AC-3",
+      "units": 79,
+      "what": "AC-3 3/2 and LFE, 448 kbit/s, 2.5 s of music (FFmpeg): short, for a TDM frame to open and carry, not for a speed figure"
+    },
     "ac4-20-music": {
       "file": "libs/ac4/fuzz/seeds/fuzz_ac4_parse/ac4-20-music-192-3frames.ac4",
       "codec": "AC-4",
@@ -137,8 +143,23 @@
       ]
     },
     "p4-rev3": {
-      "note": "No board of silicon revision v3.x is on the bench (the owner's kit has not arrived): the profile is held by its guard and its budgets and has no play list and no baseline. The first board that runs the image adds its rows, as the v1.x profiles' were.",
-      "plays": []
+      "note": "The owner's kit (P4X, chip v3.2), first played and baselined 2026-10-20. Its HTTP rows are the release profiles' two 2.0 streams, plus the row only a v3.x chip can play: a 5.1 stream rendered onto 9.1.6, which is sixteen 32-bit TDM slots, the full 512-bit frame of the ES9080 pair (a 24.576 MHz bit clock, from the 160 MHz PLL the older silicon has no I2S source for). The row fails if the sink opens for fewer slots. The Sendspin rows wait for a test server on the bench.",
+      "plays": [
+        {
+          "id": "ac3-2.0",
+          "stream": "ac3-2.0"
+        },
+        {
+          "id": "eac3-2.0",
+          "stream": "eac3-2.0"
+        },
+        {
+          "id": "ac3-5.1-tdm16",
+          "stream": "ac3-5.1",
+          "layout": "9.1.6",
+          "slots": 16
+        }
+      ]
     }
   }
 }

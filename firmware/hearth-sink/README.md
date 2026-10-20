@@ -92,7 +92,7 @@ it, and the other stacks this page spells are held to it too. The list, generate
 | `c6-4mb` | `hw`, `sendspin`, `c6`, `sendspin-c6` | `hearth-sink-esp32c6` | none |
 | `p4-rev1` | `hw`, `p4`, `sendspin` | `hearth-sink-esp32p4-rev1` | P4a, P4b |
 | `p4-rev1-ac4` | `hw`, `p4`, `sendspin`, `ac4` | none | P4a, P4b |
-| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | none |
+| `p4-rev3` | `hw`, `p4`, `p4-rev3`, `sendspin`, `panel`, `panel-dsi` | `hearth-sink-esp32p4-rev3` | P4X |
 | `s3-n16r8` | `hw`, `psram`, `sendspin`, `s3-fast` | `hearth-sink-esp32s3` | S3a, S3b |
 | `s3-n16r8-ac4` | `hw`, `psram`, `sendspin`, `ac4`, `s3-fast`, `s3-dcache` | none | S3a, S3b |
 
@@ -1080,8 +1080,9 @@ A chip of revision v3.x (v3.1 and newer, the generation with the errata fixes) i
 image** from the one above: `sdkconfig.p4-rev3` after `sdkconfig.p4` takes it to 400 MHz, to
 revisions v3.1 to v3.99 and, in `sink/i2s_wide`, to the 160 MHz PLL as the I2S clock so that TDM
 opens at the full sixteen 32-bit slots. The two images refuse each other's chips at boot. First run
-on a v3.2 chip on 2026-10-20: it boots at 400 MHz, joins Wi-Fi and reports revision 3.2; TDM on the
-pins is **not measured yet** ([planning/karaoke-p4x-panel.md](../../planning/karaoke-p4x-panel.md)).
+on a v3.2 chip on 2026-10-20: it boots at 400 MHz, joins Wi-Fi, reports revision 3.2, and plays a 5.1
+stream through sixteen 32-bit TDM slots in real time; the clocks on the pins are **not measured
+yet** ([planning/karaoke-p4x-panel.md](../../planning/karaoke-p4x-panel.md)).
 
 `main/panel/` is a screen for the lyrics of the item playing, picked by CMake like the sink and the
 source: `none` (every image but a P4's with a panel), and `lvgl`, LVGL 9 drawing

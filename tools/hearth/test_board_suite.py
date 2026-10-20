@@ -53,6 +53,13 @@ class Behaviour:
         self.decoder_permille = kwargs.get("decoder_permille", 480)
         self.resync = kwargs.get("resync", 0)
         self.verdict = kwargs.get("verdict", "pass")
+        # the slots the sink opened for the play; None is what the layout needs (SLOTS)
+        self.slots = kwargs.get("slots")
+
+
+# The slots a layout needs, for the layouts the rows name (planning/karaoke-p4x-panel.md): a name is
+# its ring, its heights and its LFE feeds, and 9.1.6 is the sixteen a P4X's TDM frame carries.
+SLOTS = {"2.0": 2, "5.1": 6, "9.1.6": 16}
 
 
 class StandIn:
@@ -72,6 +79,8 @@ class StandIn:
         self.frames = 0
         self.status_extra: dict = {}
         self.layout = "2.0"
+        self.layout_puts: list[str] = []  # every PUT /layout, in order
+        self.refused_layouts: set[str] = set()  # the layouts PUT /layout answers 409 to
         self.restarts = 0
         self.log = bytearray(
             b"boot line\n"
@@ -122,8 +131,23 @@ class StandIn:
                     )
                     nxt = start + len(data) if start <= len(stand_in.log) else len(stand_in.log)
                     self._send(200, data, {"X-Log-Next": str(nxt)})
+                elif path == "/layout":
+                    self._send(200, stand_in.layout.encode())
                 else:
                     self._send(404, b"")
+
+            def do_PUT(self) -> None:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length).decode().strip()
+                if self.path != "/layout":
+                    self._send(404, b"")
+                    return
+                stand_in.layout_puts.append(body)
+                if body in stand_in.refused_layouts:
+                    self._send(409, b"more slots than this sink has\n")
+                    return
+                stand_in.layout = body
+                self._send(200, b"ok; takes effect at the next play\n")
 
             def do_POST(self) -> None:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -171,6 +195,11 @@ class StandIn:
                 "render_us_per_frame": behaviour.render_us,
                 "sink_us_per_frame": behaviour.sink_us,
                 "resync_bytes": behaviour.resync,
+                "stream": {
+                    "codec": "AC-3",
+                    "slots": behaviour.slots or SLOTS.get(self.layout, 2),
+                    "layout": self.layout,
+                },
             }
             lines.append("heap: internal free 90931 (largest block 31744), psram free 6341784")
             for _ in range(behaviour.alloc_failures):
@@ -256,6 +285,19 @@ class Suite(unittest.TestCase):
                 self.assertIn(
                     row.get("via", "play"), ("play", "sendspin"), f"{profile}/{row['id']}"
                 )
+
+    def test_a_row_on_a_layout_says_how_many_slots_it_opens_for(self) -> None:
+        for profile, spec in self.suite["profiles"].items():
+            for row in spec["plays"]:
+                if row.get("layout"):
+                    self.assertIsInstance(row.get("slots"), int, f"{profile}/{row['id']}")
+                    self.assertNotIn("via", row, f"{profile}/{row['id']}: a layout is a /play's")
+
+    def test_only_the_v3_profile_plays_a_tdm_row(self) -> None:
+        # A chip below v3.0 has no I2S clock for a frame past two channels, so its rows would fail.
+        for profile, spec in self.suite["profiles"].items():
+            has_layout = any(row.get("layout") for row in spec["plays"])
+            self.assertEqual(has_layout, profile == "p4-rev3", profile)
 
     def test_a_sendspin_row_s_stream_says_how_many_bursts_it_is_or_how_long_it_loops(self) -> None:
         # The bursts the board accounted for are held to it, as a /play's units are: a file
@@ -504,6 +546,32 @@ class Run(unittest.TestCase):
             self.assertEqual(r.state, "finished")
             self.assertEqual(r.decoder_permille, 223)
             self.assertEqual(r.lines.decode_stack_free, 18268)
+
+    def test_a_row_on_a_layout_sets_it_for_the_play_and_puts_the_board_s_own_back(self) -> None:
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"])
+        self.assertEqual(results[0].findings, [])
+        self.assertEqual(results[0].state, "finished")
+        self.assertEqual(stand_in.layout_puts, ["9.1.6", "2.0"])
+        self.assertEqual(stand_in.layout, "2.0")
+
+    def test_a_board_that_opens_for_fewer_slots_than_the_row_says_is_a_finding(self) -> None:
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79, slots=2)})
+        results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"])
+        self.assertTrue(
+            any("rendered onto 2 slots, expected 16" in f for f in results[0].findings),
+            results[0].findings,
+        )
+        self.assertEqual(stand_in.layout, "2.0", "the layout is put back after a failing play too")
+
+    def test_a_layout_the_board_refuses_is_a_refusal_and_nothing_is_played(self) -> None:
+        stand_in = self.board("p4-rev3", {"ffmpeg.ac3": Behaviour(units=79)})
+        stand_in.refused_layouts = {"9.1.6"}
+        results = self.run_rows(stand_in, "p4-rev3", only=["ac3-5.1-tdm16"])
+        self.assertEqual(results[0].state, "refused")
+        self.assertTrue(any("PUT /layout 9.1.6 answered 409" in f for f in results[0].findings))
+        self.assertEqual(stand_in.plays, [])
+        self.assertEqual(stand_in.layout_puts, ["9.1.6"], "nothing to put back: it was refused")
 
     def test_an_underrun_is_a_finding_with_its_figures(self) -> None:
         stand_in = self.board("s3-n16r8", {**standard(), "ffmpeg.ac3": Behaviour(underruns=1)})
@@ -1315,6 +1383,26 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertNotIn(NETWORK_NAME, out + err + self.out.read_text("utf-8"))
         self.assertNotIn("192.168.1.9", self.out.read_text("utf-8"))
+
+    def test_streams_are_played_from_a_server_that_is_already_running_when_one_is_named(
+        self,
+    ) -> None:
+        argv = list(self.run_args("--lock", str(self.lock), "--session", "16d036"))
+        at = argv.index("--serve-host")
+        del argv[at : at + 2]  # the suite starts none when it is given one
+        argv += ["--fixtures-url", "http://127.0.0.1:9/"]
+        code, out, err = self.run_cli(*argv)
+        self.assertEqual((code, err), (0, ""), out)
+        self.assertEqual(len(self.stand_in.plays), 2)
+        for url in self.stand_in.plays:
+            self.assertTrue(url.startswith("http://127.0.0.1:9/testdata/"), url)
+            self.assertNotIn("//testdata", url)
+
+    def test_serving_its_own_and_naming_a_server_are_one_or_the_other(self) -> None:
+        argv = self.run_args("--lock", str(self.lock), "--session", "16d036")
+        with self.assertRaises(SystemExit):
+            self.run_cli(*argv, "--fixtures-url", "http://127.0.0.1:9")
+        self.assertEqual(self.stand_in.plays, [])
 
     def test_without_a_lock_and_a_session_it_refuses_before_touching_the_board(self) -> None:
         code, _, err = self.run_cli(*self.run_args())

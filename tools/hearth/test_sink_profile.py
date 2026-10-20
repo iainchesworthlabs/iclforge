@@ -210,13 +210,16 @@ class TheFile(unittest.TestCase):
         names = sp.fragment_names(self.data, "p4-rev1-ac4", ("measure",))
         self.assertEqual(names[-1], "sdkconfig.measure")
 
-    def test_the_v3_profile_has_the_screen_s_fragments_in_order_and_no_board_yet(self) -> None:
+    def test_the_v3_profile_has_the_screen_s_fragments_in_order_and_the_kit_as_its_board(
+        self,
+    ) -> None:
         spec = self.data["profiles"]["p4-rev3"]
         self.assertEqual(
             spec["fragments"], ["hw", "p4", "p4-rev3", "sendspin", "panel", "panel-dsi"]
         )
         self.assertEqual(spec["target"], "esp32p4")
-        self.assertEqual(spec["boards"], [], "a board is named when one has run the image")
+        # The kit (chip v3.2) ran this image on 2026-10-20; it is the only board of that silicon.
+        self.assertEqual(spec["boards"], ["P4X"], "a board is named when one has run the image")
         self.assertEqual(spec["image"]["name"], "hearth-sink-esp32p4-rev3")
 
     def test_the_two_p4_images_refuse_each_other_s_chips(self) -> None:

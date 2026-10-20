@@ -1,7 +1,7 @@
 # ESP32 board bench: booking a board, using it, handing it back
 
 **Status, 2026-10-12:** built, as PR 8 of [esp32-platform-profiles.md](esp32-platform-profiles.md).
-The five boards on the owner's desk are a table in the repository
+The six boards on the owner's desk (the sixth, the P4X kit, was added on 2026-10-20) are a table in the repository
 ([`tools/hearth/bench.json`](../tools/hearth/bench.json)), the booking is one module that the board
 suite and the flash tool share, and the scripts that built, flashed and read boards from
 `D:\ac3bld\esp-reflash` are in `tools/hearth/` and read the build from the profile instead of a
@@ -9,7 +9,7 @@ hand-kept list of fragments.
 
 ## Why this page
 
-Five boards are shared by every session that touches firmware, and they cannot be shared by
+Six boards are shared by every session that touches firmware, and they cannot be shared by
 looking: a board that is being flashed, played or restarted by one session fails in ways that look
 like a defect in another's work. The rule that keeps that from happening lived in the owner's
 instruction to each session and in the head of whoever had last done it right. This page is the
@@ -25,6 +25,7 @@ tools are.
 | C6 | ESP32-C6 16 MB | 192.168.1.117 | COM9 | `c6-board.lock` | `/log` holds 2 KB: a restart a moment before still has the boot line in it |
 | P4a | ESP32-P4 rev v1.x | 192.168.1.99 | COM10 | `p4-board.lock` | a restart can leave it with no Wi-Fi |
 | P4b | ESP32-P4 rev v1.x | 192.168.1.76 | COM13 | `p4-board2.lock` | no OTA: USB flash, app and otadata only |
+| P4X | ESP32-P4 rev v3.2, 7-inch panel | 192.168.1.251 | COM7 | `p4x-board.lock` | the only board for the `p4-rev3` image; whether a restart or an OTA update keeps its C6 link is not tried |
 
 `bench.json` is the source and a test holds this table to it. A board is addressed by name
 (`S3b`), so that its lock, its address and its port come from one row and cannot be mixed: a lock
@@ -35,7 +36,7 @@ the same shape for another machine.
 
 The owner's, 2026-10-11. Before touching **any** board:
 
-1. Read all five lock files: `python tools/hearth/bench.py status`.
+1. Read every lock file: `python tools/hearth/bench.py status`.
 2. `ListAgents`: is a peer building or testing near the board?
 3. No `idf.py`, `esptool`, `ota.py` or serial capture of that board is running (nothing here can
    see a process; look).

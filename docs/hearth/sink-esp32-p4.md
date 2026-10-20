@@ -6,14 +6,14 @@ whose TDM frame holds 512 bits, which reaches sixteen 32-bit channels into both 
 planned pair from one line, and, on a board with a panel, it draws the words of a karaoke song as
 they are sung.
 
-!!! note "Status as of 2026-10-20: the v1.x board plays; the v3.x kit starts, and its glass, touch and TDM are not yet checked"
+!!! note "Status as of 2026-10-20: the v1.x board plays; the v3.x kit shows the screen, takes a tap and plays through 16 TDM slots; the clocks on the pins, a karaoke play and tearing are not yet checked"
     The sink runs on a DFRobot FireBeetle 2 (chip revision v1.3), stereo, over Wi-Fi hosted on its
     onboard ESP32-C6. The v3.x kit arrived on 2026-10-20 and the v3.x image ran on it the same day:
-    it boots on a v3.2 chip at 400 MHz, joins Wi-Fi, is found by Music Assistant, opens the MIPI DSI
-    bus, initialises the panel and finds the touch controller. **Not yet checked on the kit: what the
-    glass shows, a tap, TDM on the pins, decode at 400 MHz and a karaoke play.** Until they are,
-    the screen's drawing cost is the FireBeetle's figure (a board with no panel), which says how much
-    the drawing costs and not what the glass shows.
+    it boots on a v3.2 chip at 400 MHz, joins Wi-Fi, is found by Music Assistant, draws the idle and
+    the lyric screens on the panel, answers a tap on every button of the controls sheet, and plays a
+    5.1 stream through the full sixteen 32-bit TDM slots in real time with no underrun. **Not yet
+    checked on the kit: the TDM clocks on the pins (it needs a scope), a karaoke play with the screen,
+    and tearing.** The board suite is played on it, with a baseline.
     [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
     has the plan, the first run and the list of what it runs next.
 
@@ -34,7 +34,7 @@ release carries one for each.
 | CPU | 360 MHz (400 MHz asserts in its boot) | 400 MHz |
 | I2S clock source | APLL, 125 MHz at most: **no TDM above two channels** | the 160 MHz PLL: TDM at the full 16 × 32 bits |
 | Screen | none | the 7-inch 1024 by 600 panel, with touch |
-| Verified | on a board | starts on a board (a v3.2 kit, 2026-10-20); **glass, touch and TDM not yet checked** |
+| Verified | on a board | on a board (a v3.2 kit, 2026-10-20): screen, touch, 16-slot TDM in real time; **the clocks on the TDM pins not yet measured** |
 
 `GET /hardware` tells which a board is, and `ota.py` chooses the image from it, so a board updated
 over its network gets the right one ([Sink firmware](sink-firmware.md#which-image)).
@@ -99,20 +99,24 @@ the first slot, and its cause is not known.
 
 ## On the v3.x kit
 
-!!! warning "Started on a v3.2 chip and a panel; mostly not checked yet"
-    What follows is built from ESP-IDF's headers, the v3.x user guide and the vendor drivers' own
-    values. The first run on the kit (2026-10-20) found one crash in the DSI code, fixed, and that
-    the touch controller answers at 0x14; the rest below is not checked yet, and each later run
-    confirms or corrects a line.
+!!! warning "Run on a v3.2 chip and a panel; the pins' clocks and a karaoke play are not checked yet"
+    What follows was built from ESP-IDF's headers, the v3.x user guide and the vendor drivers' own
+    values, and the first run on the kit (2026-10-20) corrected it in four places: a crash in the DSI
+    code, the touch controller's address (0x14), its axes (turned half a turn from the display's)
+    and how often it must be read, all fixed. A line below that says what the kit did was seen on it;
+    one that says what the chip should do was not.
 
 ### What changes for the audio
 
 - **400 MHz**, and PSRAM at 200 MHz by ESP-IDF's default for this chip. The decoders scale with the
   clock almost exactly, so the v1.3 board's timings are a floor.
-- **TDM should open**: the `i2s_wide` sink takes the 160 MHz PLL (`I2S_CLK_SRC_PLL_160M`) as the
-  clock source on this silicon, which the 16 × 32-bit frame needs (a 147 MHz source at least). The
-  source is chosen when the image is built, because the two revisions are two images. Whether a
-  frame that wide really leaves the pins at 24.576 MHz is the first thing the kit checks.
+- **TDM opens**: the `i2s_wide` sink takes the 160 MHz PLL (`I2S_CLK_SRC_PLL_160M`) as the clock
+  source on this silicon, which the 16 × 32-bit frame needs (a 147 MHz source at least). The source
+  is chosen when the image is built, because the two revisions are two images. On the kit, a 5.1
+  stream rendered onto the layout `9.1.6` opened sixteen 32-bit slots and played for 30 s in real
+  time with no underrun, 30,336 ms of audio in 30,185 ms of wall clock, the six coded channels in
+  their slots and the other ten at zero. **Whether the clocks leave the pins at 24.576 MHz (BCLK) and
+  48 kHz (WS) is not measured:** it needs a scope or a logic analyser.
 - **The DACs** are not wired and no firmware programs an ES9080 over I2C: the board plays to a
   frame whose unused slots are zero, which is what the ES9080 contract is
   ([sink tiers](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/esp32-sink-tiers.md#shared-es9080-contract-all-tiers)).
@@ -148,8 +152,8 @@ apart. The picture above and the others on this page are drawn by the firmware's
 | ![No lyrics](screenshots/p4-panel-no-lyrics.png) | **Playing, and the server sent no lyrics** |
 | ![The controls](screenshots/p4-panel-controls.png) | **Adjust.** The lyric delay in 50 ms steps and the text size; put away after eight seconds untouched |
 
-**Controls.** Touch changes only what the board owns: its lyric delay (±1,000 ms), its text size, and
-(later) its brightness. Which vocals sound and the reproduction are the server's settings and are
+**Controls.** Touch changes only what the board owns: its lyric delay (±1,000 ms), its text size
+(Smaller, Normal or Larger, which the sheet says beside its buttons), and (later) its brightness. Which vocals sound and the reproduction are the server's settings and are
 shown, not changed, until the role has a way to carry a request back.
 
 **Fonts.** Archivo, the apps' own, for Latin (Basic, Latin-1 and Extended-A, most of Extended-B and
