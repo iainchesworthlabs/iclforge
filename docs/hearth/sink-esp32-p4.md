@@ -432,7 +432,7 @@ second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 fo
 | Request | Answer |
 |---|---|
 | `GET /panel.bmp` | the picture, as a 24-bit BMP |
-| `GET /panel` | what drawing has cost: refreshes, microseconds a refresh, the longest rebuild, late cycles, the task's stack left |
+| `GET /panel` | what drawing has cost: refreshes, pixels, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; and which no-lyrics `view` is chosen and whether the screen is `dimmed` |
 | `POST /panel/tap?x=..&y=..` | a tap, for a board with no touch controller |
 
 The same screen code runs on both and on the glass; what the computer and the board with no panel
