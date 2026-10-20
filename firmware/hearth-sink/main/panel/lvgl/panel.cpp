@@ -39,6 +39,7 @@
 #include "../../network.hpp"
 #include "../../sendspin.hpp"
 #include "../../settings.hpp"
+#include "../../wall_clock.hpp"
 #include "board_info.hpp"
 #include "dev_info.hpp"
 #include "display.hpp"
@@ -222,6 +223,8 @@ NowSettings read_now_settings() {
     return settings;
 }
 
+iclforge::wallclock::Reading read_wall_clock() { return player::wall_clock_read(); }
+
 void set_backlight(int percent) { display_set_backlight(percent); }
 
 void choose_now_view(iclforge::nowview::View view) {
@@ -385,13 +388,15 @@ void run(void* /*arg*/) {
         }
         std::snprintf(recent + used, sizeof recent - used, "]");
     }
-    char buffer[1280];
+    const WallClockStats clock = wall_clock_stats();
+    char buffer[1536];
     std::snprintf(buffer, sizeof buffer,
                   "{\"kind\":\"%s\",\"running\":%s,\"width\":%d,\"height\":%d,\"touch\":%s,"
                   "\"touch_reads\":%lu,\"touch_failures\":%lu,\"touch_points\":%lu,"
                   "\"touch_x\":%d,\"touch_y\":%d,\"touch_error\":%d,\"touch_recent\":%s,"
                   "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"backlight\":%d,\"dev_view\":%s,\"dev_refreshes\":%lu,"
-                  "\"dev_refresh_us_last\":%lu,\"dev_refresh_us_max\":%lu,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
+                  "\"dev_refresh_us_last\":%lu,\"dev_refresh_us_max\":%lu,"
+                  "\"clock_enabled\":%s,\"clock_asking\":%s,\"clock_synced\":%s,\"clock_syncs\":%lu,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
                   "\"render_us_mean\":%lu,\"render_us_max\":%lu,\"rebuilds\":%lu,"
                   "\"rebuild_us_max\":%lu,\"late_cycles\":%lu,\"cycle_us_max\":%lu,"
                   "\"stack_free\":%lu}\n",
@@ -405,7 +410,9 @@ void run(void* /*arg*/) {
                   stats.dimmed ? "true" : "false", stats.backlight, stats.dev_view ? "true" : "false",
                   static_cast<unsigned long>(stats.dev_refreshes),
                   static_cast<unsigned long>(stats.dev_refresh_us_last),
-                  static_cast<unsigned long>(stats.dev_refresh_us_max), panel::demo_mode(),
+                  static_cast<unsigned long>(stats.dev_refresh_us_max), clock.enabled ? "true" : "false",
+                  clock.asking ? "true" : "false", clock.synced ? "true" : "false",
+                  static_cast<unsigned long>(clock.syncs), panel::demo_mode(),
                   static_cast<unsigned long>(stats.refreshes),
                   static_cast<unsigned long long>(stats.pixels),
                   static_cast<unsigned long>(stats.render_us_last),

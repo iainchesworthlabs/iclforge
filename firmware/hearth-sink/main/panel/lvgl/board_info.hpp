@@ -6,6 +6,7 @@
 
 #include "iclforge/now_view.hpp"
 #include "iclforge/render/room_plan.hpp"
+#include "iclforge/wall_clock.hpp"
 
 #include "../lyrics_reader.hpp"
 #include "lv_alloc.hpp"
@@ -92,6 +93,10 @@ struct NowSettings {
     int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
 };
 [[nodiscard]] NowSettings read_now_settings();
+
+// What the clock view shows (iclforge/wall_clock.hpp, wall_clock.hpp): no time until a time server has
+// answered, and the time on the board's zone after. Read twice a second while that view shows.
+[[nodiscard]] iclforge::wallclock::Reading read_wall_clock();
 
 // The backlight, percent (display.hpp's display_set_backlight on the firmware).
 void set_backlight(int percent);

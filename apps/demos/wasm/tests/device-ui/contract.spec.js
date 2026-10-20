@@ -24,6 +24,7 @@ const {
     firmwareTrial,
     cableNetwork,
     screenBoard,
+    timeBoard,
 } = require('./stub');
 
 const COMPONENT = path.resolve(__dirname, '../../../../../firmware/esp-idf/iclforge');
@@ -146,7 +147,10 @@ test('every request the page makes is to a route the firmware registers', () => 
         'PUT /layout',
         'PUT /name',
         'PUT /network',
+        'PUT /ntp-server',
         'PUT /slot-width',
+        'PUT /time-sync',
+        'PUT /timezone',
         'PUT /wiring',
     ]);
     for (const route of made) {
@@ -197,7 +201,7 @@ test("the stand-in writes GET /status's keys in the firmware's order", async () 
             stub.device.sendspin = sendspin;
             const body = JSON.parse(await (await fetch(`${stub.url}status`)).text());
             const keys = Object.keys(body).flatMap((key) =>
-                ['stream', 'sendspin', 'network'].includes(key) ? [key, ...Object.keys(body[key])] : [key],
+                ['stream', 'sendspin', 'network', 'time'].includes(key) ? [key, ...Object.keys(body[key])] : [key],
             );
             expect(keys).toEqual(firmware);
         }
@@ -351,6 +355,174 @@ test('the stand-in answers /network-preference as the firmware does', async () =
     }
 });
 
+// Zones the firmware takes and refuses: the same lists as libs/device/tests/test_wall_clock.cpp, which holds
+// the grammar itself, so that the stand-in's copy of it cannot drift from the board's.
+const ZONES_TAKEN = [
+    'AEST-10AEDT,M10.1.0,M4.1.0/3',
+    'EST5EDT,M3.2.0,M11.1.0',
+    'JST-9',
+    'UTC0',
+    '<+0530>-5:30',
+    'ACST-9:30ACDT,M10.1.0,M4.1.0/3',
+    'LHST-10:30LHDT-11,M10.1.0,M4.1.0',
+    'IST-1GMT0,M10.5.0,M3.5.0/1',
+    '<-03>3',
+    'EST5EDT,J60,J300/2:30:00',
+    'EST5EDT,M3.2.0/-1,M11.1.0/25',
+];
+const ZONES_REFUSED = [
+    '',
+    'AEST',
+    '-10',
+    'None',
+    'Australia/Sydney',
+    'AE-10',
+    '<>-10',
+    'AEST-25',
+    'AEST-10:60',
+    'AEST-10AEDT',
+    'AEST-10AEDT,M10.1.0',
+    'AEST-10AEDT,M13.1.0,M4.1.0',
+    'AEST-10AEDT,M10.6.0,M4.1.0',
+    'AEST-10AEDT,M10.1.7,M4.1.0',
+    'AEST-10AEDT,J0,J300',
+    'AEST-10AEDT,366,300',
+    'AEST-10AEDT,M10.1.0,M4.1.0,M1.1.1',
+    'UTC0x',
+    'AEST -10',
+    'ABCDEFGHIJKLMNOPQ-10',
+    `AEST-10AEDT,M10.1.0/${'1'.repeat(63)},M4.1.0`,
+];
+
+const SERVERS_TAKEN = ['pool.ntp.org', '192.168.1.5', 'ntp', 'my-router.lan', 'NTP1.Example.COM', '0.au.pool.ntp.org', '255.255.255.255'];
+const SERVERS_REFUSED = [
+    '',
+    'None',
+    'NONE',
+    '256.1.1.1',
+    '1.2.3',
+    '192.168.01.5',
+    '-pool.ntp.org',
+    'pool-.ntp.org',
+    'pool..ntp.org',
+    'pool.ntp.org.',
+    'pool.ntp.org:123',
+    'http://pool.ntp.org',
+    'pool_ntp.org',
+    '[::1]',
+    'ntp.123',
+    `${'a'.repeat(64)}`,
+];
+
+test("every zone the page offers is one the firmware takes", async () => {
+    const listed = SCRIPT.match(/const ZONES = \(([\s\S]*?)\)\s*\.split/);
+    expect(listed, 'the page has its list of zones').not.toBeNull();
+    const zones = [...listed[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]).join('').split(';').map((z) => z.split('|'));
+    expect(zones.length).toBeGreaterThan(30);
+    const stub = await startStub();
+    try {
+        for (const [label, zone] of zones) {
+            const reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: zone });
+            expect(reply.status, `${label}: ${zone}`).toBe(200);
+        }
+        expect(new Set(zones.map((z) => z[1])).size, 'a zone listed twice').toBe(zones.length);
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in answers /timezone, /ntp-server and /time-sync as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board that keeps no time (no network, or QEMU's) has nothing to set: what parses is told so, and
+        // what does not is refused first, as the routes read the body before they ask whether there is a clock.
+        stub.device.time = undefined;
+        for (const [route, good, bad] of [
+            ['timezone', 'JST-9', 'Sydney'],
+            ['ntp-server', 'pool.ntp.org', 'pool.ntp.org:123'],
+            ['time-sync', 'off', 'maybe'],
+        ]) {
+            let reply = await fetch(`${stub.url}${route}`);
+            expect(reply.status).toBe(404);
+            expect(await reply.text()).toBe(REPLIES.noClock);
+            reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: good });
+            expect(reply.status).toBe(409);
+            expect(await reply.text()).toBe(REPLIES.noClock);
+            reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+        }
+
+        // One that keeps it starts as a board should: asking, on, no zone, no server of its own.
+        stub.device.time = timeBoard();
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
+        expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe('none\n');
+        expect(await (await fetch(`${stub.url}time-sync`)).text()).toBe('on\n');
+
+        // The zone: a POSIX string or `none`.
+        let reply;
+        for (const zone of ZONES_TAKEN) {
+            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: `${zone}\n` });
+            expect(reply.status, zone).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.timeZoneOk);
+            expect(await (await fetch(`${stub.url}timezone`)).text()).toBe(`${zone}\n`);
+        }
+        for (const zone of ZONES_REFUSED) {
+            reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: zone });
+            expect(reply.status, JSON.stringify(zone)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.timeZoneBad);
+        }
+        // A refusal changes nothing: the last zone taken is still the one.
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('EST5EDT,M3.2.0/-1,M11.1.0/25\n');
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'none\n' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
+        // A zone the grammar takes and the board's C library reads differently is refused with a 409 and kept
+        // out.
+        stub.device.time.zoneRefused = true;
+        reply = await fetch(`${stub.url}timezone`, { method: 'PUT', body: 'JST-9' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.timeZoneRefused);
+        expect(await (await fetch(`${stub.url}timezone`)).text()).toBe('none\n');
+        stub.device.time.zoneRefused = false;
+
+        // The server: a host name or an IPv4 address, or `none` for the router's and then the pool.
+        for (const server of SERVERS_TAKEN) {
+            reply = await fetch(`${stub.url}ntp-server`, { method: 'PUT', body: `${server}\r\n` });
+            expect(reply.status, server).toBe(200);
+            expect(await reply.text()).toBe(REPLIES.ntpServerOk);
+            expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe(`${server}\n`);
+        }
+        for (const server of SERVERS_REFUSED) {
+            reply = await fetch(`${stub.url}ntp-server`, { method: 'PUT', body: server });
+            expect(reply.status, JSON.stringify(server)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.ntpServerBad);
+        }
+        expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe('255.255.255.255\n');
+        reply = await fetch(`${stub.url}ntp-server`, { method: 'PUT', body: 'none' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}ntp-server`)).text()).toBe('none\n');
+
+        // Whether to ask at all: on or off.
+        for (const bad of ['', 'On', '1', 'true', 'off now']) {
+            reply = await fetch(`${stub.url}time-sync`, { method: 'PUT', body: bad });
+            expect(reply.status, JSON.stringify(bad)).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.timeSyncBad);
+        }
+        reply = await fetch(`${stub.url}time-sync`, { method: 'PUT', body: 'off\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.timeSyncOk);
+        expect(await (await fetch(`${stub.url}time-sync`)).text()).toBe('off\n');
+        const off = JSON.parse(await (await fetch(`${stub.url}status`)).text()).time;
+        expect(off.sync).toBe(false);
+        expect(off.asking).toBe(false);
+        expect(off.local).toBe(null);
+        reply = await fetch(`${stub.url}time-sync`, { method: 'PUT', body: 'on' });
+        expect(reply.status).toBe(200);
+    } finally {
+        await stub.close();
+    }
+});
+
 test('the stand-in answers /now-playing and /dim-after as the firmware does', async () => {
     const stub = await startStub();
     try {
@@ -371,9 +543,13 @@ test('the stand-in answers /now-playing and /dim-after as the firmware does', as
         reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'Speakers' });
         expect(reply.status).toBe(400);
         expect(await reply.text()).toBe(REPLIES.nowPlayingBad);
-        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'clock' });
+        // The title card is not built yet, so a build refuses it; the clock is.
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'title' });
         expect(reply.status).toBe(409);
         expect(await reply.text()).toBe(REPLIES.nowPlayingRefused);
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'clock' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}now-playing`)).text()).toBe('clock\n');
         reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'off\n' });
         expect(reply.status).toBe(200);
         expect(await reply.text()).toBe(REPLIES.nowPlayingOk);

@@ -55,15 +55,23 @@ endif()
 # net/dual, which is the WiFi station (net/wifi/station.cpp, the code a board with the station
 # alone has too) and the cable (net/wired/ethernet.cpp) with the choice between them. The IP stack
 # they share is net/stack.cpp.
+#
+# The time of day (main/wall_clock.hpp) follows the network: every build with a radio or a cable keeps
+# its time with a time server (clock/sntp), which is all the hardware; QEMU's network has no time server
+# to ask and CI must not depend on one, and a build with no network has nothing to ask over (clock/none).
 if(CONFIG_ICLFORGE_EXAMPLE_SOURCE_HTTP AND CONFIG_ICLFORGE_EXAMPLE_NETWORK_OPENETH)
     set(ICLFORGE_NETWORK_SRCS "net/openeth/network.cpp")
+    set(ICLFORGE_CLOCK_SRCS "clock/none/wall_clock.cpp")
 elseif(CONFIG_ICLFORGE_EXAMPLE_SOURCE_HTTP AND CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET)
     set(ICLFORGE_NETWORK_SRCS "net/dual/network.cpp" "net/wifi/station.cpp" "net/wired/ethernet.cpp"
                               "net/stack.cpp")
+    set(ICLFORGE_CLOCK_SRCS "clock/sntp/wall_clock.cpp")
 elseif(CONFIG_ICLFORGE_EXAMPLE_SOURCE_HTTP)
     set(ICLFORGE_NETWORK_SRCS "net/wifi/network.cpp" "net/wifi/station.cpp" "net/stack.cpp")
+    set(ICLFORGE_CLOCK_SRCS "clock/sntp/wall_clock.cpp")
 else()
     set(ICLFORGE_NETWORK_SRCS "net/none/network.cpp")
+    set(ICLFORGE_CLOCK_SRCS "clock/none/wall_clock.cpp")
 endif()
 
 # And the Sendspin player, which needs the component's (CONFIG_ICLFORGE_SENDSPIN)
@@ -134,6 +142,7 @@ idf_component_register(
          "${ICLFORGE_SINK_DIR}/audio_sink.cpp"
          "${ICLFORGE_SOURCE_DIR}/byte_source.cpp"
          ${ICLFORGE_NETWORK_SRCS}
+         ${ICLFORGE_CLOCK_SRCS}
          ${ICLFORGE_SENDSPIN_SRCS}
          ${ICLFORGE_PANEL_SRCS}
          ${ICLFORGE_STAGE_TIMER_SRCS}
@@ -142,7 +151,7 @@ idf_component_register(
              esp_system esp_hw_support esp_hal_wdt
              esp_partition esp_psram app_update espcoredump heap
              esp_driver_sdmmc sdmmc fatfs wear_levelling
-             esp_wifi esp_eth esp_http_client esp_netif esp_event nvs_flash
+             esp_wifi esp_eth esp_http_client esp_netif esp_event lwip nvs_flash
              esp_app_format espressif__mdns
              esp_lcd esp_driver_ledc esp_driver_i2c esp_driver_gpio esp_http_server)
 

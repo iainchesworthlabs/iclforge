@@ -24,6 +24,7 @@
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/room_plan.hpp"
 #include "iclforge/title_card.hpp"
+#include "iclforge/wall_clock.hpp"
 #include "panel/lvgl/board_info.hpp"
 #include "panel/lvgl/dev_info.hpp"
 #include "panel/lvgl/fonts.hpp"
@@ -58,6 +59,10 @@ int g_backlight = 80;
 iclforge::nowview::TitleStore g_title;
 bool g_title_held = false;
 std::optional<std::int64_t> g_title_position;
+// The clock view's time (what the board's wall clock would say), and what LVGL has flushed so far.
+iclforge::wallclock::Reading g_wall;
+std::uint64_t g_flushed_pixels = 0;
+std::uint32_t g_flushed_areas = 0;
 
 std::vector<std::uint16_t> g_frame(static_cast<std::size_t>(kWidth) * kHeight, 0);
 
@@ -89,6 +94,8 @@ player::panel::FontFile load_font(const char* name) {
 
 void flush(lv_display_t* disp, const lv_area_t* area, std::uint8_t* px_map) {
     const int width = lv_area_get_width(area);
+    g_flushed_pixels += static_cast<std::uint64_t>(width) * static_cast<std::uint64_t>(lv_area_get_height(area));
+    ++g_flushed_areas;
     const auto* src = reinterpret_cast<const std::uint16_t*>(px_map);
     for (int y = area->y1; y <= area->y2; ++y) {
         std::copy(src, src + width, g_frame.begin() + static_cast<std::ptrdiff_t>(y) * kWidth + area->x1);
@@ -354,6 +361,8 @@ bool read_now_title(NowTitle& out) {
 
 NowSettings read_now_settings() { return g_settings; }
 
+iclforge::wallclock::Reading read_wall_clock() { return g_wall; }
+
 void set_backlight(int percent) { g_backlight = percent; }
 
 void choose_now_view(iclforge::nowview::View view) { g_settings.view = view; }
@@ -507,6 +516,15 @@ int main(int argc, char** argv) {
              g_settings.view = iclforge::nowview::View::kSpeakers;
              say_title("Blue in Green", "Miles Davis", "Kind of Blue", 1959, 83'000, 337'000);
          }, 10'000'000},
+        // The clock view (stage 3): Tuesday 20 October 2026, 21:47 in Sydney, the prototype's picture; the same
+        // with no time zone set, which says UTC; and before a time server has answered, which says nothing.
+        {"s16-clock", [&] {
+             g_settings.view = iclforge::nowview::View::kClock;
+             play_room("5.1", kDolbyFiveOne, kFiveOne);
+             g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true};
+         }},
+        {"s16-clock-utc", [&] { g_wall = {.known = true, .local = {2026, 10, 20, 10, 47, 12, 2}, .zone_set = false}; }},
+        {"s16-clock-waiting", [&] { g_wall = {}; }},
         {"s0-waiting", [&] {
              g_board.stream = "bursts";
              hold(auld, std::nullopt);
@@ -607,6 +625,65 @@ int main(int argc, char** argv) {
         g_settings.dim_after_minutes = 5;
         // The sheet below shows the default choice, as a board out of the box does.
         g_settings.view = iclforge::nowview::View::kSpeakers;
+    }
+
+    // S16: the clock. A minute that changes redraws the time and nothing else, which is what keeps it cheap
+    // beside the audio; a second that changes redraws nothing; and a dim leaves the clock on the glass.
+    {
+        g_settings.view = iclforge::nowview::View::kClock;
+        g_settings.dim_after_minutes = 5;
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        g_wall = {.known = true, .local = {2026, 10, 20, 21, 47, 12, 2}, .zone_set = true};
+        g_now_us += 10'000'000;
+        pump(6);
+        const std::uint64_t before_seconds = g_flushed_pixels;
+        g_wall.local.second = 40;
+        g_now_us += 1'000'000;
+        pump(6);
+        const std::uint64_t by_a_second = g_flushed_pixels - before_seconds;
+        const std::uint64_t before_minute = g_flushed_pixels;
+        const std::uint32_t areas_before = g_flushed_areas;
+        g_wall.local.minute = 48;
+        g_wall.local.second = 1;
+        g_now_us += 1'000'000;
+        pump(6);
+        const std::uint64_t by_a_minute = g_flushed_pixels - before_minute;
+        const std::uint32_t minute_areas = g_flushed_areas - areas_before;
+        const auto bright_pixels = [](int x0, int y0, int x1, int y1) {
+            int count = 0;
+            for (int y = y0; y < y1; ++y) {
+                for (int x = x0; x < x1; ++x) {
+                    const std::uint16_t p = g_frame[static_cast<std::size_t>(y) * kWidth + static_cast<std::size_t>(x)];
+                    count += ((p >> 11) & 0x1F) > 8 ? 1 : 0;
+                }
+            }
+            return count;
+        };
+        const int lit_pixels = bright_pixels(240, 140, 780, 330);
+        // Dim: the backlight goes down and the clock stays.
+        g_now_us += 6LL * 60 * 1'000'000;
+        g_wall.local.minute = 54;
+        pump(6);
+        const bool dimmed = player::panel::screen_stats().dimmed && g_backlight == 4;
+        const int dim_pixels = bright_pixels(240, 140, 780, 330);
+        tap(500, 300);
+        pump(6);
+        const bool woken = !player::panel::screen_stats().dimmed && g_backlight == 80;
+        std::printf("%2d  %-26s a second flushed %llu px, a minute %llu px in %u areas, %d clock pixels lit, dimmed %s "
+                    "with %d still lit, a touch wakes it %s\n",
+                    ++number, "s16-clock", static_cast<unsigned long long>(by_a_second),
+                    static_cast<unsigned long long>(by_a_minute), static_cast<unsigned>(minute_areas), lit_pixels,
+                    dimmed ? "yes" : "NO", dim_pixels, woken ? "yes" : "NO");
+        // One rectangle (the time's), about 300,000 pixels at most, and nothing for the seconds.
+        if (by_a_second != 0 || by_a_minute == 0 || by_a_minute > 300'000 || lit_pixels < 2000 || !dimmed ||
+            dim_pixels < 2000 || !woken) {
+            return 3;
+        }
+        // Chosen away from the clock, the clock is gone and the speakers are back.
+        g_settings.view = iclforge::nowview::View::kSpeakers;
+        g_now_us += 1'000'000;
+        pump(6);
+        g_settings.dim_after_minutes = 5;
     }
 
     // S14b: the dark view. Dark from the moment a song with no lyrics begins, however long nothing has

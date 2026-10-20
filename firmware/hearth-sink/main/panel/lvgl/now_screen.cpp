@@ -11,10 +11,13 @@
 #include <cstddef>
 #include <cstdio>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "iclforge/render/room_plan.hpp"
+#include "iclforge/wall_clock.hpp"
 
+#include "fonts.hpp"
 #include "lv_alloc.hpp"
 
 namespace player::panel {
@@ -51,6 +54,33 @@ struct View {
 };
 
 View g;
+
+// The clock view: three labels with a fixed size each, so that a change of text changes one rectangle and
+// moves nothing. What they say is remembered as the broken-down time it was made from, and a reading that
+// is the same to the minute is not looked at again.
+constexpr int kClockSize = 200;
+// The time is the muted colour at about 80 % and the date at about 60 %: the prototype's two steps, quiet in a
+// dim room (planning/p4x-now-playing.md, option D).
+constexpr lv_opa_t kClockTimeOpa = 200;
+constexpr lv_opa_t kClockDateOpa = 150;
+// How wide each of the three labels is: the widest time ("00:00" in the 200 px face is about 560 px) with room,
+// and no wider, so that a minute's redraw is the width of the digits and not of the screen.
+constexpr int kClockLabelWidth = 720;
+
+struct Clock {
+    lv_obj_t* time = nullptr;
+    lv_obj_t* date = nullptr;
+    lv_obj_t* note = nullptr;
+    // What the labels were set from: nothing at all (known false) until a reading with a time arrives.
+    iclforge::wallclock::Reading shown;
+    iclforge::wallclock::Face face;
+    bool painted = false;
+};
+
+Clock ck;
+// The 200 px face, made when the clock view is first built: it is the largest on the screen, and a board that
+// never shows a clock never pays for it. Semibold Archivo only: the clock draws digits and a colon.
+lv_font_t* clock_font = nullptr;
 
 lv_color_t color(std::uint32_t rgb) { return lv_color_hex(rgb); }
 
@@ -252,7 +282,96 @@ void now_copy_title(NowTitle& out, const iclforge::nowview::TitleStore* held, st
     out.length_ms = held->length_ms();
 }
 
-void now_forget() { g.nodes.clear(); }
+bool now_build_clock(lv_obj_t* parent, int width, int height, const NowStyle& style) {
+    now_forget();
+    if (clock_font == nullptr) {
+        const FontFile file = archivo_semibold();
+        if (file.data == nullptr) {
+            return false;
+        }
+        clock_font = lv_tiny_ttf_create_data(file.data, file.size, kClockSize);
+        if (clock_font == nullptr) {
+            return false;
+        }
+    }
+    g.style = style;
+    // One column, centred on the stage: the time, the date under it, and the note under that.
+    lv_obj_t* const block = lv_obj_create(parent);
+    lv_obj_remove_flag(block, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(block, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_opa(block, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(block, 0, 0);
+    lv_obj_set_style_outline_width(block, 0, 0);
+    lv_obj_set_style_shadow_width(block, 0, 0);
+    lv_obj_set_style_pad_all(block, 0, 0);
+    lv_obj_set_style_pad_row(block, 4, 0);
+    lv_obj_set_size(block, width, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(block, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(block, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    const int label_width = std::min(width, kClockLabelWidth);
+    const auto make = [block, label_width](const lv_font_t* font, std::uint32_t rgb, lv_opa_t opa) {
+        lv_obj_t* const label = lv_label_create(block);
+        lv_label_set_text(label, "");
+        lv_obj_set_style_text_font(label, font, 0);
+        lv_obj_set_style_text_color(label, color(rgb), 0);
+        lv_obj_set_style_text_opa(label, opa, 0);
+        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_CLIP);
+        lv_obj_set_size(label, label_width, lv_font_get_line_height(font));
+        return label;
+    };
+    ck.time = make(clock_font, style.muted, kClockTimeOpa);
+    ck.date = make(style.date, style.muted, kClockDateOpa);
+    ck.note = make(style.label, style.muted, LV_OPA_COVER);
+    lv_obj_set_style_margin_top(ck.note, 28, 0);
+    lv_obj_update_layout(block);
+    // The note's room is kept whether or not it says anything, so that setting a zone moves nothing; the
+    // block is put a little low of centre so that the time and the date, which are what is there with a zone,
+    // sit where the prototype put them.
+    lv_obj_align(block, LV_ALIGN_CENTER, 0, 28);
+    (void)height;
+    ck.shown = {};
+    ck.face = {};
+    ck.painted = false;
+    return true;
+}
+
+void now_update_clock(const iclforge::wallclock::Reading& reading) {
+    if (ck.time == nullptr) {
+        return;
+    }
+    // The same to the minute, in the same zone: nothing to look at. A reading has no seconds in it that the
+    // view shows, so this is the whole of a quiet minute.
+    const iclforge::wallclock::LocalTime& at = reading.local;
+    const iclforge::wallclock::LocalTime& was = ck.shown.local;
+    if (ck.painted && reading.known == ck.shown.known && reading.zone_set == ck.shown.zone_set &&
+        (!reading.known || (at.year == was.year && at.month == was.month && at.day == was.day &&
+                            at.hour == was.hour && at.minute == was.minute))) {
+        return;
+    }
+    ck.shown = reading;
+    ck.painted = true;
+    iclforge::wallclock::Face face = iclforge::wallclock::face(reading);
+    // Only the label whose words changed is set, so only its rectangle is redrawn.
+    if (face.time != ck.face.time) {
+        lv_label_set_text(ck.time, face.time.c_str());
+    }
+    if (face.date != ck.face.date) {
+        lv_label_set_text(ck.date, face.date.c_str());
+    }
+    if (face.note != ck.face.note) {
+        lv_label_set_text(ck.note, face.note.c_str());
+    }
+    ck.face = std::move(face);
+}
+
+void now_forget() {
+    g.nodes.clear();
+    ck.time = nullptr;
+    ck.date = nullptr;
+    ck.note = nullptr;
+    ck.painted = false;
+}
 
 std::uint32_t now_room_key(const NowPlaying& now) {
     // FNV-1a over what decides the picture's shape: each slot's name, its place and whether it is wired.

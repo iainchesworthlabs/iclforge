@@ -128,8 +128,10 @@ network the same way.
 - **Now:** the board's own player, which plays a location sent to `POST /play`: its state, and the
   stream's path from source through decode to the output.
 - **Settings:** the wiring, the slot width and the output layout under *Speakers*; the network the
-  board is on, its name and the network to join under *Network*. A choice is sent as it is made;
-  a name, a layout typed in full or a network is sent with its button.
+  board is on, its name and the network to join under *Network*; and under *Time* the time the
+  board keeps, whether it asks a time server (on by default), its time zone and the server to ask
+  ([the time of day](sink-esp32-p4.md#the-time-of-day)). A choice is sent as it is made; a name, a
+  layout typed in full, a network, a zone or a server is sent with its button.
 - **Real time**, **Hardware** and **Counters:** how long each frame takes, what the board is -
   chip, memory, the sink's ceiling and the firmware - and the player's counters.
 
