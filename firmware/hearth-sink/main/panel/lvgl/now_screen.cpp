@@ -201,7 +201,8 @@ bool now_build_clock(lv_obj_t* parent, int width, int height, const NowStyle& st
     lv_obj_set_size(block, width, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(block, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(block, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    const auto make = [block](const lv_font_t* font, std::uint32_t rgb, lv_opa_t opa) {
+    const int label_width = std::min(width, kClockLabelWidth);
+    const auto make = [block, label_width](const lv_font_t* font, std::uint32_t rgb, lv_opa_t opa) {
         lv_obj_t* const label = lv_label_create(block);
         lv_label_set_text(label, "");
         lv_obj_set_style_text_font(label, font, 0);
@@ -209,7 +210,7 @@ bool now_build_clock(lv_obj_t* parent, int width, int height, const NowStyle& st
         lv_obj_set_style_text_opa(label, opa, 0);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_CLIP);
-        lv_obj_set_size(label, kClockLabelWidth, lv_font_get_line_height(font));
+        lv_obj_set_size(label, label_width, lv_font_get_line_height(font));
         return label;
     };
     ck.time = make(clock_font, style.muted, kClockTimeOpa);

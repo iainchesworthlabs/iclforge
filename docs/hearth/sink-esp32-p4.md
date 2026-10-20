@@ -583,7 +583,7 @@ second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 fo
 | Request | Answer |
 |---|---|
 | `GET /panel.bmp` | the picture, as a 24-bit BMP |
-| `GET /panel` | what drawing has cost: refreshes, pixels, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; which no-lyrics `view` is chosen and whether the screen is `dimmed`; and whether the [developer view](#the-developer-view) is open (`dev_view`) and what its refreshes cost |
+| `GET /panel` | what drawing has cost: refreshes, pixels, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; which no-lyrics `view` is chosen and whether the screen is `dimmed`; the [time of day](#the-time-of-day)'s state (`clock_enabled`, `clock_asking`, `clock_synced` and `clock_syncs`); and whether the [developer view](#the-developer-view) is open (`dev_view`) and what its refreshes cost |
 | `POST /panel/tap?x=..&y=..` | a tap, for a board with no touch controller (or to try one: three of them within 600 ms at `x=100&y=568` open the developer view, and a tap on it half a second later closes it) |
 
 The same screen code runs on both and on the glass; what the computer and the board with no panel

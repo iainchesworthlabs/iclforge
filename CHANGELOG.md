@@ -57,6 +57,8 @@ The sections below contain the complete change list and fixes.
 - **The clock view.** The time in 24 hours at 200 px in the muted tone, the date under it, and no seconds, so that the
   screen redraws one rectangle a minute. Until a time server has first answered the view shows only the stream's heading,
   never a time it made up. A dim lowers the backlight and leaves the clock on the glass.
+**Every ESP board keeps its time with a time server**
+
 - **Every ESP board that has a network now keeps its time with a time server.** On by default, from the moment the board
   holds an address and every hour after: lwIP's SNTP client asks the server a person named, else the one the router gives
   over DHCP (option 42), and `pool.ntp.org` behind them when nobody named one. `GET` and `PUT /ntp-server` (a host name or
