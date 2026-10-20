@@ -41,6 +41,8 @@ bool sendspin_read_lyrics(LyricsReader& /*reader*/, std::int64_t /*delay_ms*/,
     return false;
 }
 
+bool sendspin_read_title(TitleReader& /*reader*/) { return false; }
+
 void sendspin_poll() {}
 
 }  // namespace player

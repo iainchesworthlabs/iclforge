@@ -51,12 +51,21 @@ The sections below contain the complete change list and fixes.
   named), the glow following the board's own peak and RMS over the last 100 ms in a few slow steps, a speaker with nothing on
   it hollow, and a line saying what arrives and what it is played on (*Dolby Digital Plus 5.1 to 7.1.4*). After five minutes
   with nothing touched the backlight goes to 4% under a black screen with one line, and any tap wakes it. `GET` and `PUT
-  /now-playing` (`speakers`, `clock`, `off`; `title` is planned) and `GET` and `PUT /dim-after` (`never`, or minutes)
+  /now-playing` (`speakers`, `title`, `clock`, `off`) and `GET` and `PUT /dim-after` (`never`, or minutes)
   set it, as does the Adjust sheet, which is taller and has a third row for them. The plan is
-  `planning/p4x-now-playing.md`; the title card needs the sink to ask the server for metadata, and is not built.
+  `planning/p4x-now-playing.md`.
+- **The title card.** The sink lists `metadata@v1` in its hello (a board with a screen only), so a server tells it what is
+  playing, and the panel can show the title, the artist, and the album and year, with the song's time and a progress line
+  as the lyric screens have. The card is the third choice in Adjust (`PUT /now-playing title`); until a server has said a
+  title, or when the fonts cannot draw it, the speakers show in its place, never an empty card, and with a title known
+  the speakers' header says "Title - Artist". Both kinds of server are read as they mean the object: the
+  specification's (and aiosendspin 10's, which Music Assistant runs now) is the whole state each time, and aiosendspin
+  9.1.1's sent only what changed, a cleared field as null.
+  `hearth-testserver` takes `--title`, `--artist`, `--album`, `--year` and `--track-seconds` to say a song to a board.
 - **The clock view.** The time in 24 hours at 200 px in the muted tone, the date under it, and no seconds, so that the
   screen redraws one rectangle a minute. Until a time server has first answered the view shows only the stream's heading,
   never a time it made up. A dim lowers the backlight and leaves the clock on the glass.
+
 **Every ESP board keeps its time with a time server**
 
 - **Every ESP board that has a network now keeps its time with a time server.** On by default, from the moment the board

@@ -300,6 +300,9 @@ struct ServerState {
     RoleObject<metadata::State> metadata = std::nullopt;
     RoleObject<controller::State> controller = std::nullopt;
     RoleObject<color::State> color = std::nullopt;
+    // Read only, and not part of what is written: the metadata object's fields that were null rather
+    // than left out (metadata::null_fields), for a client that merges what it is told.
+    std::uint8_t metadata_nulls = 0;
 };
 
 [[nodiscard]] std::string write_server_state(const ServerState& state, Dialect dialect);

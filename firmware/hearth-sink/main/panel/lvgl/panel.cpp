@@ -199,6 +199,23 @@ bool read_now_playing(NowPlaying& out) {
     return true;
 }
 
+bool read_now_title(NowTitle& out) {
+    // The player calls the reader under its lock, so it copies and returns (now_copy_title copies the
+    // strings only when the store's revision moved).
+    class Copy final : public TitleReader {
+       public:
+        explicit Copy(NowTitle& to) : to_(to) {}
+        void on_title(const iclforge::nowview::TitleStore* held, std::optional<std::int64_t> position_ms) override {
+            now_copy_title(to_, held, position_ms);
+        }
+
+       private:
+        NowTitle& to_;
+    };
+    Copy copy(out);
+    return sendspin_read_title(copy);
+}
+
 NowSettings read_now_settings() {
     NowSettings settings;
     settings.view = static_cast<iclforge::nowview::View>(g_now_view.load());

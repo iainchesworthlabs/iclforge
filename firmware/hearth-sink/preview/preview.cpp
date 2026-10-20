@@ -23,11 +23,13 @@
 #include "iclforge/now_view.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/room_plan.hpp"
+#include "iclforge/title_card.hpp"
 #include "iclforge/wall_clock.hpp"
 #include "panel/lvgl/board_info.hpp"
 #include "panel/lvgl/dev_info.hpp"
 #include "panel/lvgl/fonts.hpp"
 #include "panel/lvgl/lyric_screen.hpp"
+#include "panel/lvgl/now_screen.hpp"
 #include "panel/lyrics_reader.hpp"
 
 namespace fs = std::filesystem;
@@ -53,6 +55,10 @@ player::panel::NowPlaying g_now;
 bool g_now_playing = false;
 player::panel::NowSettings g_settings;
 int g_backlight = 80;
+// What the server says is playing (metadata@v1): the player's store, and where the song is on the clock.
+iclforge::nowview::TitleStore g_title;
+bool g_title_held = false;
+std::optional<std::int64_t> g_title_position;
 // The clock view's time (what the board's wall clock would say), and what LVGL has flushed so far.
 iclforge::wallclock::Reading g_wall;
 std::uint64_t g_flushed_pixels = 0;
@@ -197,6 +203,37 @@ void play_room(const char* layout, const iclforge::nowview::StreamFacts& facts, 
 }
 
 // A music mix over a few rooms: sample levels, not measurements.
+// The server says a song is playing (the specification's whole object), and where it is: the title card's
+// and the speakers' header's data. An empty artist or album is not said.
+void say_title(const char* title, const char* artist, const char* album, std::int32_t year,
+               std::optional<std::int64_t> position_ms, std::int64_t length_ms) {
+    namespace nv = iclforge::nowview;
+    g_title.clear();
+    nv::TitleUpdate update;
+    update.whole = true;
+    const auto text = [](const char* value) {
+        return *value == '\0' ? nv::TitleUpdate::Text{} : nv::TitleUpdate::Text{.say = nv::Say::kSet, .value = value};
+    };
+    update.title = text(title);
+    update.artist = text(artist);
+    update.album = text(album);
+    if (year != 0) {
+        update.year = {.say = nv::Say::kSet, .value = year};
+    }
+    if (position_ms) {
+        update.progress = {.say = nv::Say::kSet, .position_ms = *position_ms, .duration_ms = length_ms, .speed = 1000};
+    }
+    g_title.apply(update);
+    g_title_held = true;
+    g_title_position = position_ms;
+}
+
+void say_no_title() {
+    g_title.clear();
+    g_title_held = false;
+    g_title_position.reset();
+}
+
 const std::vector<Level> kStereo = {{-9, -19}, {-11, -21}};
 const std::vector<Level> kFiveOne = {{-10, -19}, {-14, -24}, {-11, -20}, {-28, -37}, {-26, -35}, {-16, -27}};
 const std::vector<Level> kFiveOneNoCentre = {{-10, -19}, {-120, -120}, {-11, -20}, {-27, -36}, {-26, -35}, {-16, -27}};
@@ -314,6 +351,11 @@ bool read_now_playing(NowPlaying& out) {
         return false;
     }
     out = g_now;
+    return true;
+}
+
+bool read_now_title(NowTitle& out) {
+    now_copy_title(out, g_title_held && g_title.known() ? &g_title : nullptr, g_title_position);
     return true;
 }
 
@@ -448,6 +490,32 @@ int main(int argc, char** argv) {
                        kSevenOneFour);
          }, 10'000'000},
         {"s13-speakers-9-1-6", [&] { play_room("9.1.6", kDolbyFiveOne, kNineOneSix); }, 10'000'000},
+        // Stage 2: the title card, once a server has said a title. A song of a record's length, partway.
+        {"s16-title-card", [&] {
+             g_settings.view = iclforge::nowview::View::kTitle;
+             play_room("5.1", kDolbyFiveOne, kFiveOne);
+             say_title("Blue in Green", "Miles Davis", "Kind of Blue", 1959, 83'000, 337'000);
+         }},
+        // A long title is cut at two rows with three dots, and the type steps down to fit.
+        {"s16-title-card-long", [&] {
+             say_title("Symphony No. 9 in D minor, Op. 125 \"Choral\": IV. Finale - Presto - Allegro assai - "
+                       "Allegro energico, sempre ben marcato",
+                       "Berliner Philharmoniker, Herbert von Karajan",
+                       "Beethoven: The Nine Symphonies (Remastered 2018, Deutsche Grammophon)", 1963, 1'412'000, 1'485'000);
+         }},
+        // Only a title and an artist: nothing is made up for the lines the server did not send.
+        {"s16-title-card-no-album", [&] { say_title("Bohemian Rhapsody", "Queen", "", 0, 15'000, 355'000); }},
+        // A title and nothing else, no progress: no time and no line over it.
+        {"s16-title-card-title-only", [&] { say_title("Untitled radio programme", "", "", 0, std::nullopt, 0); }},
+        // A title in a script the fonts lack is not drawn as boxes: the speakers stand in its place.
+        {"s16-title-card-undrawable", [&] { say_title("\xE3\x83\x9C\xE3\x83\x98\xE3\x83\x9F\xE3\x82\xA2\xE3\x83\xB3", "Queen", "", 0, 15'000, 355'000); }},
+        // The title card is chosen and no server has said anything: the speakers, never an empty card.
+        {"s16-title-chosen-none-said", [&] { say_no_title(); }},
+        // The speakers with a title said: the header is the song, with its time and the progress line.
+        {"s16-speakers-with-title", [&] {
+             g_settings.view = iclforge::nowview::View::kSpeakers;
+             say_title("Blue in Green", "Miles Davis", "Kind of Blue", 1959, 83'000, 337'000);
+         }, 10'000'000},
         // The clock view (stage 3): Tuesday 20 October 2026, 21:47 in Sydney, the prototype's picture; the same
         // with no time zone set, which says UTC; and before a time server has answered, which says nothing.
         {"s16-clock", [&] {
@@ -523,6 +591,40 @@ int main(int argc, char** argv) {
             return 3;
         }
         g_settings.dim_after_minutes = 5;
+    }
+
+    // S16: the title card dims as the speakers do, its dark screen names the song, and a touch wakes it.
+    {
+        g_settings.view = iclforge::nowview::View::kTitle;
+        g_settings.dim_after_minutes = 5;
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        say_title("Blue in Green", "Miles Davis", "Kind of Blue", 1959, 83'000, 337'000);
+        // The last scenario left the screen untouched for an hour: a touch is what starts the count.
+        tap(500, 300);
+        g_now_us += 10'000'000;
+        pump(6);
+        const bool card = std::string(player::panel::screen_stats().name) == "nolyrics" && !player::panel::screen_stats().dimmed;
+        g_now_us += 6LL * 60 * 1'000'000;
+        pump(6);
+        write_bmp(out / "s16-title-card-dimmed.bmp");
+        const bool dark = player::panel::screen_stats().dimmed && g_backlight == 4;
+        tap(500, 300);
+        pump(6);
+        const bool woken = !player::panel::screen_stats().dimmed && g_backlight == 80;
+        std::printf("%2d  %-26s card %s, dark at 6 min %s, a touch wakes it %s\n", ++number, "s16-title-dimmed",
+                    card ? "yes" : "NO", dark ? "yes" : "NO", woken ? "yes" : "NO");
+        if (!card || !dark || !woken) {
+            return 3;
+        }
+        // The server says nothing is playing: the card gives way to the speakers.
+        say_no_title();
+        g_now_us += 1'000'000;
+        pump(6);
+        write_bmp(out / "s16-title-cleared.bmp");
+        say_no_title();
+        g_settings.dim_after_minutes = 5;
+        // The sheet below shows the default choice, as a board out of the box does.
+        g_settings.view = iclforge::nowview::View::kSpeakers;
     }
 
     // S16: the clock. A minute that changes redraws the time and nothing else, which is what keeps it cheap

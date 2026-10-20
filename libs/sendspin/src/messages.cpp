@@ -998,6 +998,9 @@ std::expected<ServerState, MessageError> read_server_state(json::Value payload) 
         !read("controller", state.controller, controller::read_state) || !read("color", state.color, color::read_state)) {
         return malformed();
     }
+    if (state.metadata && *state.metadata) {
+        state.metadata_nulls = metadata::null_fields(payload["metadata"]);
+    }
     return state;
 }
 

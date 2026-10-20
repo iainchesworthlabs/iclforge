@@ -305,6 +305,10 @@ class HostConnection final : public ss::PlayerListener {
             burst_stream_ = false;
             host_->events->on_burst_stream_end();
         }
+        if (metadata_) {
+            metadata_ = false;
+            host_->events->on_metadata_gone();
+        }
     }
 
     // --- PlayerListener, on the server's task -----------------------------------
@@ -451,6 +455,15 @@ class HostConnection final : public ss::PlayerListener {
     }
     void on_settings_refused(const ac::SettingsError& error) override { host_->events->on_settings_refused(error); }
 
+    // The session passes the object of metadata@v1 only when the role is active, so a board that does not
+    // list it gets none. A connection that is closing says nothing more.
+    void on_server_state(const m::ServerState& state) override {
+        if (state.metadata && !closing_) {
+            metadata_ = true;
+            host_->events->on_metadata(state, session_->dialect());
+        }
+    }
+
    private:
     SendspinHost::Impl* host_;
     int fd_;
@@ -461,6 +474,7 @@ class HostConnection final : public ss::PlayerListener {
     bool closing_ = false;
     bool pcm_stream_ = false;
     bool burst_stream_ = false;
+    bool metadata_ = false;
     std::optional<ss::PlayerSession> session_;
 };
 
