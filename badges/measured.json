@@ -1,6 +1,6 @@
 {
   "color": "blue",
   "label": "figures measured on",
-  "message": "speed, memory, accuracy: 2026-10-20 main@f6faa8a7 | AC-4 accuracy: 2026-10-18 main@fd3c5116",
+  "message": "speed, memory: 2026-10-20 main@9a061114 | accuracy, AC-4 accuracy: 2026-10-20 main@f6faa8a7",
   "schemaVersion": 1
 }
