@@ -189,6 +189,7 @@ the board the image is for.**
 | Backlight (PWM), panel reset | GPIO26, GPIO27 | the user guide: J1 pins 31 and 38, to the LCD adapter |
 | Touch (GT911) | I2C SDA GPIO7, SCL GPIO8; address 0x5D, then 0x14; polled | board header |
 | TDM BCLK, WS, DOUT | GPIO20, 21, 22, the FireBeetle defaults | on J1 (pins 13, 11, 12), free in the user guide's table; **not yet checked on the bench** |
+| Ethernet (`ICLFORGE_EXAMPLE_ETH_*`) | IP101GR on RMII: SMI MDC 31 and MDIO 52, PHY reset 51, PHY address 1, the 50 MHz reference clock in on 50, TX_EN 49, TXD0 34, TXD1 35, CRS_DV 28, RXD0 29, RXD1 30 | ESP-IDF v6.1's `examples/ethernet/basic` for the P4, and Zephyr's devicetree for this board; **read on the kit: the PHY answers at address 1 with ID 0243 0c54** |
 
 Two things the user guide does not settle, and the first power-on checks: **which driver IC the
 screen has** (it links both an EK73217BCGA and an EK79007AD datasheet; this image has the EK79007's
@@ -226,17 +227,21 @@ update, and it is changed over REST, in the style of `PUT /name`:
 
 ```bash
 curl http://192.168.1.251/network-preference                     # auto
-curl -X PUT -d ethernet http://192.168.1.251/network-preference  # ok; takes effect at once, ...
+curl -X PUT -d ethernet http://192.168.1.251/network-preference  # ok; takes effect in a moment, ...
 ```
 
 A pinned preference leaves the board with one network and nothing to fall back to, so a change made
 while the board runs is checked before it is kept. `ethernet` brings the cable up first (it waits
-for a link and an address) and only then switches the Wi-Fi off; `wifi` joins the stored network
-first and only then stops the cable. A change whose interface does not come up is **undone**: the
-preference goes back to what it was, and the console says so. `PUT /network-preference wifi` with
-no Wi-Fi network stored is refused (`409`). Improv over USB and `PUT /network` still store a Wi-Fi
-network, and a board on the cable alone reports Improv's *ready* state (it has no Wi-Fi), so a
-client still offers its Wi-Fi form.
+for a link and an address) and only then stores the preference and switches the Wi-Fi off; `wifi`
+joins the stored network first and only then stores it and stops the cable. A change whose interface
+does not come up is **not kept**: the preference stays what it was, the other interface stays on, and
+the console says so (`network: no cable answered, so the WiFi station is not switched off`). The
+reply (`200`) is sent before any of this, so it comes back over the interface the change may switch
+off; read `GET /network-preference` a few seconds later to see what was kept.
+`PUT /network-preference wifi` with no Wi-Fi network stored is refused (`409`). Improv over USB and
+`PUT /network` still store a Wi-Fi network, and a board on the cable alone reports Improv's *ready*
+state (it has no Wi-Fi), so a client still offers its Wi-Fi form; the Wi-Fi it is given joins while
+the cable stays in use.
 
 **What `GET /status` says.** The `network` object keeps its four fields (`kind`, `ssid`,
 `rssi_dbm`, `address`), which now describe the interface **in use** (`kind` is `"ethernet"` or
@@ -246,21 +251,23 @@ one network `preference` and `interfaces` are `null`.
 
 ```json
 "network": {
-  "kind": "ethernet", "ssid": "", "rssi_dbm": null, "address": "192.168.1.250",
+  "kind": "ethernet", "ssid": "", "rssi_dbm": null, "address": "192.168.1.163",
   "preference": "auto",
   "interfaces": {
-    "ethernet": {"enabled": true, "link": true, "address": "192.168.1.250",
-                 "mac": "e8:f6:0a:e7:53:fb", "speed_mbps": 100, "full_duplex": true},
+    "ethernet": {"enabled": true, "link": true, "address": "192.168.1.163",
+                 "mac": "e8:f6:0a:e7:53:f9", "speed_mbps": 100, "full_duplex": true},
     "wifi":     {"enabled": true, "link": true, "address": "192.168.1.251",
-                 "mac": "...", "configured": true, "ssid": "...", "rssi_dbm": -40}
+                 "mac": "98:88:e0:72:59:b0", "configured": true, "ssid": "...", "rssi_dbm": -40}
   }
 }
 ```
 
 `enabled` is "not switched off by the preference", `link` is a cable with a partner on it
 (Ethernet) or an association with the access point (Wi-Fi), `configured` says a Wi-Fi network is
-stored, and `mac` is the interface's own address, for a DHCP reservation. A diagnostics view or a
-control for the preference reads these two routes and nothing else.
+stored, and `mac` is the interface's own address, for a DHCP reservation (the cable's is the chip's
+base MAC, the one the board's name is made from; the Wi-Fi's is the C6's). A diagnostics view or a
+control for the preference reads `GET /status` and `GET` and `PUT /network-preference` and nothing
+else.
 
 !!! warning "Moving a kit to PoE: it is safe once the checklist below is true"
     Wired up, the kit has no USB console and no USB flashing, so a bad image can only be rescued by

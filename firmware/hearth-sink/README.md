@@ -733,6 +733,36 @@ the board rejoined from there. The play that followed the rejoin started with 9
 chunks late and 3 underruns while the clock filter converged again, about a
 second of audio; the next play was clean (630 of 630 bursts, nothing late).
 
+### Ethernet
+
+A board with an EMAC and a PHY has a cable as well as the station
+(`CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET`, the ESP32-P4 only; the pins are
+`CONFIG_ICLFORGE_EXAMPLE_ETH_*`, defaulted to the ESP32-P4X-Function-EV-Board's
+IP101GR). The code is three files under `main/net/`: `wired/ethernet.cpp` is
+the cable (MAC, PHY, DHCP, the board's name as its host name), `wifi/station.cpp`
+is the station that every board with Wi-Fi shares, and `dual/network.cpp`
+chooses between them, so `network.hpp`'s functions answer for the pair. A board
+without a PHY builds `wifi/network.cpp`, a thin adapter over the same station,
+and is unchanged.
+
+- **auto** (the default): both are up when the cable is in and a network is
+  stored. The cable has route priority 200 and the station 100, so the board
+  uses the cable while it holds an address, falls back to the station at once
+  when the cable is pulled (the station has been joined all along) and returns
+  to the cable when it is put back, with no restart. A board with the cable in
+  and no Wi-Fi network stored comes up on the cable alone.
+- **ethernet** and **wifi** pin the board to one interface and switch the other
+  off (the radio idle, or the EMAC stopped). Stored in NVS (`net_pref`), set by
+  `PUT /network-preference`, and kept only once the interface they name holds an
+  address: a pin that cannot be met is not kept and the other interface stays on.
+- `network_ready()`, the address, the panel's idle line and mDNS follow the
+  interface in use; Improv asks about the station alone
+  (`network_wifi_ready()`, `network_wifi_up()`), so a board on the cable still
+  offers its Wi-Fi form.
+- `GET /status` says the interface in use and, under `network.interfaces`, how
+  each stands (link, address, MAC; the Wi-Fi's SSID, signal and whether a network
+  is stored; the cable's speed and duplex). Never the passphrase.
+
 ### Pairing
 
 Every connection is encrypted with Noise (`KKpsk2`, ChaChaPoly by default;
