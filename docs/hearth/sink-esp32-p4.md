@@ -6,13 +6,16 @@ whose TDM frame holds 512 bits, which reaches sixteen 32-bit channels into both 
 planned pair from one line, and, on a board with a panel, it draws the words of a karaoke song as
 they are sung.
 
-!!! note "Status as of 2026-10-12: the v1.x board plays; the v3.x board and its panel have not arrived"
+!!! note "Status as of 2026-10-20: the v1.x board plays; the v3.x kit starts, and its glass, touch and TDM are not yet checked"
     The sink runs on a DFRobot FireBeetle 2 (chip revision v1.3), stereo, over Wi-Fi hosted on its
-    onboard ESP32-C6. **Nothing under "On the v3.x kit" has run on the v3.x chip or on a panel**:
-    the image for it is built by CI, and the screen is drawn and measured on a board with no panel,
-    which says how much the drawing costs and not what the glass shows. The kit is on its way;
+    onboard ESP32-C6. The v3.x kit arrived on 2026-10-20 and the v3.x image ran on it the same day:
+    it boots on a v3.2 chip at 400 MHz, joins Wi-Fi, is found by Music Assistant, opens the MIPI DSI
+    bus, initialises the panel and finds the touch controller. **Not yet checked on the kit: what the
+    glass shows, a tap, TDM on the pins, decode at 400 MHz and a karaoke play.** Until they are,
+    the screen's drawing cost is the FireBeetle's figure (a board with no panel), which says how much
+    the drawing costs and not what the glass shows.
     [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
-    has the plan and the list of what it runs first.
+    has the plan, the first run and the list of what it runs next.
 
 Pairing, groups and firmware updates work the same as on the S3; see
 [An ESP32-S3 sink](sink-esp32-s3.md) and [Sink firmware](sink-firmware.md). This page covers what
@@ -31,7 +34,7 @@ release carries one for each.
 | CPU | 360 MHz (400 MHz asserts in its boot) | 400 MHz |
 | I2S clock source | APLL, 125 MHz at most: **no TDM above two channels** | the 160 MHz PLL: TDM at the full 16 × 32 bits |
 | Screen | none | the 7-inch 1024 by 600 panel, with touch |
-| Verified | on a board | built by CI; **not run on a board yet** |
+| Verified | on a board | starts on a board (a v3.2 kit, 2026-10-20); **glass, touch and TDM not yet checked** |
 
 `GET /hardware` tells which a board is, and `ota.py` chooses the image from it, so a board updated
 over its network gets the right one ([Sink firmware](sink-firmware.md#which-image)).
@@ -96,9 +99,11 @@ the first slot, and its cause is not known.
 
 ## On the v3.x kit
 
-!!! warning "Not run on a v3.x chip or a panel"
+!!! warning "Started on a v3.2 chip and a panel; mostly not checked yet"
     What follows is built from ESP-IDF's headers, the v3.x user guide and the vendor drivers' own
-    values, and checked by compiling it. The first run on the kit confirms or corrects every line.
+    values. The first run on the kit (2026-10-20) found one crash in the DSI code, fixed, and that
+    the touch controller answers at 0x14; the rest below is not checked yet, and each later run
+    confirms or corrects a line.
 
 ### What changes for the audio
 

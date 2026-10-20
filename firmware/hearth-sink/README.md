@@ -1079,8 +1079,9 @@ source cannot open TDM at all on this revision) are otherwise unchanged and corr
 A chip of revision v3.x (v3.1 and newer, the generation with the errata fixes) is a **different
 image** from the one above: `sdkconfig.p4-rev3` after `sdkconfig.p4` takes it to 400 MHz, to
 revisions v3.1 to v3.99 and, in `sink/i2s_wide`, to the 160 MHz PLL as the I2S clock so that TDM
-opens at the full sixteen 32-bit slots. The two images refuse each other's chips at boot. **Not run
-on a v3.x chip yet.**
+opens at the full sixteen 32-bit slots. The two images refuse each other's chips at boot. First run
+on a v3.2 chip on 2026-10-20: it boots at 400 MHz, joins Wi-Fi and reports revision 3.2; TDM on the
+pins is **not measured yet** ([planning/karaoke-p4x-panel.md](../../planning/karaoke-p4x-panel.md)).
 
 `main/panel/` is a screen for the lyrics of the item playing, picked by CMake like the sink and the
 source: `none` (every image but a P4's with a panel), and `lvgl`, LVGL 9 drawing
