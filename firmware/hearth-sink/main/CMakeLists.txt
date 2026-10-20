@@ -50,10 +50,18 @@ endif()
 # main/network.hpp. A sink is FOUND before it is played to - mDNS answering and
 # the control surface reachable while the board sits idle - so the network
 # comes up at boot, and a build with no network says so once and costs nothing.
+#
+# A board with an Ethernet PHY as well as the radio (CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET) has
+# net/dual, which is the WiFi station (net/wifi/station.cpp, the code a board with the station
+# alone has too) and the cable (net/wired/ethernet.cpp) with the choice between them. The IP stack
+# they share is net/stack.cpp.
 if(CONFIG_ICLFORGE_EXAMPLE_SOURCE_HTTP AND CONFIG_ICLFORGE_EXAMPLE_NETWORK_OPENETH)
     set(ICLFORGE_NETWORK_SRCS "net/openeth/network.cpp")
+elseif(CONFIG_ICLFORGE_EXAMPLE_SOURCE_HTTP AND CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET)
+    set(ICLFORGE_NETWORK_SRCS "net/dual/network.cpp" "net/wifi/station.cpp" "net/wired/ethernet.cpp"
+                              "net/stack.cpp")
 elseif(CONFIG_ICLFORGE_EXAMPLE_SOURCE_HTTP)
-    set(ICLFORGE_NETWORK_SRCS "net/wifi/network.cpp")
+    set(ICLFORGE_NETWORK_SRCS "net/wifi/network.cpp" "net/wifi/station.cpp" "net/stack.cpp")
 else()
     set(ICLFORGE_NETWORK_SRCS "net/none/network.cpp")
 endif()

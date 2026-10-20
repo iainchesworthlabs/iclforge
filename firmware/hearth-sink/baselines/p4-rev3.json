@@ -1,19 +1,19 @@
 {
   "format": 1,
   "profile": "p4-rev3",
-  "profile_hash": "785bfe183100",
-  "version": "v0.10.0-beta.1-5120-gc6e72b127-",
+  "profile_hash": "ff9b27a6c4fd",
+  "version": "v0.10.0-beta.1-5140-ge2943c092",
   "chip": "ESP32-P4",
   "board": "P4X",
-  "recorded": "2026-10-20T06:24Z",
+  "recorded": "2026-10-20T12:08Z",
   "boot": {
     "when": "boot",
     "net": 1,
-    "internal_free": 307147,
-    "largest": 278528,
+    "internal_free": 278659,
+    "largest": 253952,
     "ask_total": 40960,
     "ask_biggest": 32768,
-    "headroom": 245760,
+    "headroom": 221184,
     "verdict": "ok",
     "floor": 0
   },
@@ -23,11 +23,11 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        56,
-        56,
-        56
+        58,
+        57,
+        57
       ],
-      "decoder_permille": 56,
+      "decoder_permille": 57,
       "units": 938,
       "decode_stack_free": 18468,
       "underruns": 0,
@@ -40,11 +40,11 @@
       "frames": 938,
       "why": "end of stream",
       "decoder_permille_samples": [
-        38,
-        38,
-        38
+        40,
+        40,
+        40
       ],
-      "decoder_permille": 38,
+      "decoder_permille": 40,
       "units": 938,
       "decode_stack_free": 18372,
       "underruns": 0,
@@ -57,18 +57,30 @@
       "frames": 79,
       "why": "end of stream",
       "decoder_permille_samples": [
-        138,
-        137,
-        138
+        142,
+        142,
+        142
       ],
-      "decoder_permille": 138,
+      "decoder_permille": 142,
       "units": 79,
-      "decode_stack_free": 18468,
+      "decode_stack_free": 18472,
       "underruns": 0,
       "dry_ms": 0,
       "min_headroom_ms": 4,
       "resync_bytes": 0
     }
   },
-  "findings": {}
+  "findings": {},
+  "boot_samples": {
+    "internal_free": [
+      278659,
+      278675,
+      278659
+    ],
+    "largest": [
+      253952,
+      253952,
+      253952
+    ]
+  }
 }

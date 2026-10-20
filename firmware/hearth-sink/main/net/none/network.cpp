@@ -28,4 +28,12 @@ const char* network_source() { return "none"; }
 
 void network_adopt_built_in() {}
 
+bool network_has_choice() { return false; }
+
+bool network_set_preference(NetworkPreference) { return false; }
+
+bool network_wifi_ready() { return false; }
+
+bool network_wifi_up() { return false; }
+
 }  // namespace player

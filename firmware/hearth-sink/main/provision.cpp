@@ -86,7 +86,7 @@ void send_result(improv::Command command, std::span<const std::string_view> stri
 // its Wi-Fi form only for ready, and a spinner for provisioning until the
 // state changes.
 [[nodiscard]] improv::State current_state() {
-    return network_ready() ? improv::State::provisioned : improv::State::ready;
+    return network_wifi_ready() ? improv::State::provisioned : improv::State::ready;
 }
 
 // "http://192.168.1.45/" - where the board's own page is, which is what a
@@ -120,8 +120,8 @@ void answer(const improv::Rpc& rpc) {
             // straight away. A board that is on a network stays on it and
             // joins the new one at its next boot, as with PUT /network: the
             // answer is where its page is now.
-            const bool on_network = network_ready();
-            if (!network_up()) {
+            const bool on_network = network_wifi_ready();
+            if (!network_wifi_up()) {
                 send_error(improv::Error::cannot_connect);
                 send_state(improv::State::ready);
                 return;
@@ -258,7 +258,7 @@ void provisioning_start(ConsoleCommands commands) {
         return;
     }
     g_commands = commands;
-    if (network_ready() && commands == nullptr) {
+    if (network_wifi_ready() && commands == nullptr) {
         // Already on a network, so there is nothing for a client to hand this
         // board that it does not have - and the 4 KB is worth more to the
         // decoder. See provision.hpp.
@@ -271,7 +271,7 @@ void provisioning_start(ConsoleCommands commands) {
         task = nullptr;
         return;
     }
-    if (network_ready()) {
+    if (network_wifi_ready()) {
         std::printf("console: listening for commands (pair list, pair reset, pair cancel, pair forget, pair token, "
                     "sendspin)\n");
     } else {

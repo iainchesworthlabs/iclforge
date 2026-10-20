@@ -362,6 +362,90 @@ config ICLFORGE_EXAMPLE_WIFI_RETRIES
         restarts, or that boots before its access point after a power cut,
         joins once the network is back.
 
+# WIRED ETHERNET, next to the WiFi station and not instead of it: a board with an EMAC and a PHY
+# (the ESP32-P4X-Function-EV-Board's IP101GR) keeps the station for when the cable is out, and
+# main/net/dual/network.cpp chooses between the two (planning/esp32-board-bench.md). The defaults
+# are that board's; another P4 board with a PHY sets its own. The PHY driver is ESP-IDF's generic
+# 802.3 one, which is what the IDF example for this board uses.
+config ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    bool "Wired Ethernet next to the WiFi station"
+    depends on ICLFORGE_EXAMPLE_NETWORK_WIFI && SOC_EMAC_SUPPORTED && SOC_EMAC_USE_MULTI_IO_MUX
+    default n
+    help
+        Drives the chip's own Ethernet MAC through an RMII PHY. The board takes an address by DHCP
+        on whichever interface has a link, prefers the cable when both have one, and goes on by WiFi
+        when the cable is out (and back to the cable when it returns) with no restart. The
+        preference between the two is a setting of the board (PUT /network-preference), stored in
+        NVS like its name and its network.
+
+config ICLFORGE_EXAMPLE_ETH_MDC_GPIO
+    int "SMI MDC GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 31
+    range 0 54
+
+config ICLFORGE_EXAMPLE_ETH_MDIO_GPIO
+    int "SMI MDIO GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 52
+    range 0 54
+
+config ICLFORGE_EXAMPLE_ETH_PHY_RESET_GPIO
+    int "PHY reset GPIO (-1 = none)"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 51
+    range -1 54
+
+config ICLFORGE_EXAMPLE_ETH_PHY_ADDR
+    int "PHY address on the SMI bus (-1 = find it)"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 1
+    range -1 31
+
+config ICLFORGE_EXAMPLE_ETH_RMII_CLK_GPIO
+    int "RMII reference clock input GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 50
+    range 0 54
+    help
+        The PHY makes the 50 MHz reference clock and the MAC takes it in on this pin.
+
+config ICLFORGE_EXAMPLE_ETH_RMII_TX_EN_GPIO
+    int "RMII TX_EN GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 49
+    range 0 54
+
+config ICLFORGE_EXAMPLE_ETH_RMII_TXD0_GPIO
+    int "RMII TXD0 GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 34
+    range 0 54
+
+config ICLFORGE_EXAMPLE_ETH_RMII_TXD1_GPIO
+    int "RMII TXD1 GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 35
+    range 0 54
+
+config ICLFORGE_EXAMPLE_ETH_RMII_CRS_DV_GPIO
+    int "RMII CRS_DV GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 28
+    range 0 54
+
+config ICLFORGE_EXAMPLE_ETH_RMII_RXD0_GPIO
+    int "RMII RXD0 GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 29
+    range 0 54
+
+config ICLFORGE_EXAMPLE_ETH_RMII_RXD1_GPIO
+    int "RMII RXD1 GPIO"
+    depends on ICLFORGE_EXAMPLE_NETWORK_ETHERNET
+    default 30
+    range 0 54
+
 config ICLFORGE_EXAMPLE_HTTP_URL
     string "URL of the bitstream"
     depends on ICLFORGE_EXAMPLE_SOURCE_HTTP

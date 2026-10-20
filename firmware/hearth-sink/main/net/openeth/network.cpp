@@ -140,4 +140,13 @@ const char* network_source() { return "wired"; }
 
 void network_adopt_built_in() {}
 
+// One network, and no station beside it.
+bool network_has_choice() { return false; }
+
+bool network_set_preference(NetworkPreference) { return false; }
+
+bool network_wifi_ready() { return false; }
+
+bool network_wifi_up() { return false; }
+
 }  // namespace player

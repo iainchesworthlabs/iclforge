@@ -44,6 +44,37 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
+
+- **The `p4-rev3` Hearth sink uses the kit's RJ45 port as well as its Wi-Fi.** The chip's EMAC and the
+  board's IP101GR (RMII; the pins are `CONFIG_ICLFORGE_EXAMPLE_ETH_*`, defaulted to the board's) take
+  an address by DHCP under the board's name, and everything that answers on Wi-Fi answers on the
+  cable: the page and the control surface on port 80, `GET /log`, `PUT /firmware`, mDNS
+  (`_sendspin._tcp` on 8928 and `hearth-<mac tail>.local`, now with an address for each interface),
+  the Sendspin player and its pairing, and the idle screen, which names the interface in use. So the
+  kit can sit on a PoE splitter with no USB cable: a board with the cable in and no Wi-Fi network
+  stored comes up on the cable alone, and an image is updated over it like any other (`ota.py push`
+  to the cable's address; the update, its rollback and the rollback of a bad image were tried on the
+  kit, over the cable as well). By default the cable is used while it holds an address (its route
+  priority is 200 against the station's 100; ESP-IDF's own number for Ethernet, 50, would have
+  chosen Wi-Fi) and the Wi-Fi when only that does, switching back and forth with no restart: a
+  cable pulled and put back four times moved the board to Wi-Fi within half a second and back to the
+  cable in 4 to 5 s. A PoE splitter itself is not yet tried.
+- **A stored network preference: `auto`, `ethernet` or `wifi`**, `GET` and `PUT /network-preference`
+  (text, like `/name`) and `network.preference` in `GET /status`. `ethernet` and `wifi` pin the board to
+  one interface and switch the other off, and a change is kept only once the interface it names holds
+  an address, so a pin cannot cut a board off from the network it was asked over. `GET /status`'s
+  `network` object keeps its four fields (the interface in use) and adds `interfaces`: each one's
+  link, address, MAC and, for the Wi-Fi, its SSID, signal and whether a network is stored; for the
+  cable, its speed and duplex. A diagnostics view or a control for the preference reads those and
+  nothing else. Improv asks about the Wi-Fi station alone, so a board on the cable still offers its
+  Wi-Fi form and joins the network it is given while the cable stays in use.
+- **The profile locks it.** `p4-rev3` locks `CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y`, its hash
+  moves, and its baseline is recorded again on the kit. The other profiles are unchanged. The Wi-Fi
+  station is now its own file (`net/wifi/station.cpp`) that a board with the station alone builds
+  through a thin adapter, the same code as before.
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#the-cable-and-wi-fi), planning/karaoke-p4x-panel.md, D9.)
+
 **The Forge GUI, Hearth and Crucible open where they were left**
 
 - **Each remembers its window's size, position and whether it was maximised**, in the settings

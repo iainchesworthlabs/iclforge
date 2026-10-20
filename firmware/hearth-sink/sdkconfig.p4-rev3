@@ -37,3 +37,9 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_400=y
 # sdkconfig.p4's own note measured as the way back (20,896 bytes on v1.x): the bootloader says
 # nothing on a good boot and still says what is wrong on a bad one.
 CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+
+# The kit's RJ45 port (planning/karaoke-p4x-panel.md, "Ethernet"): the EMAC and the IP101GR PHY on
+# RMII, next to the Wi-Fi the C6 gives it. The pins are Kconfig's defaults, which are this board's
+# (ICLFORGE_EXAMPLE_ETH_*), so a kit on a PoE splitter is reached by the cable and falls back to
+# Wi-Fi when the cable is out. Only this profile has it: the FireBeetle boards have no PHY.
+CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y

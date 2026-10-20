@@ -55,7 +55,7 @@
       "port": "COM7",
       "lock": "p4x-board.lock",
       "mac_tail": "e753f9",
-      "note": "The ESP32-P4X-Function-EV-Board kit (chip v3.2, 7-inch panel, planning/karaoke-p4x-panel.md): the only board that runs the p4-rev3 image. Its USB-Serial/JTAG connector is the one marked JTAG. Whether a restart or an OTA update keeps its link to the C6 is not tried yet, so neither is assumed to work."
+      "note": "The ESP32-P4X-Function-EV-Board kit (chip v3.2, 7-inch panel, planning/karaoke-p4x-panel.md): the only board that runs the p4-rev3 image. Its USB-Serial/JTAG connector is the one marked JTAG. A restart and an OTA update keep its link to the C6 (tried 2026-10-20: 8 restarts, 8 updates, 4 USB flashes each followed by an update, with the system reset of #1434), so it takes OTA and is not marked restart_kills_c6_link. It has an RJ45 port as well: the p4-rev3 image uses it beside the Wi-Fi (docs/hearth/sink-esp32-p4.md)."
     }
   }
 }

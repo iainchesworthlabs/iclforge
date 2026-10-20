@@ -241,6 +241,43 @@ wired. **Not in this work:** the I2C programming of the DACs (nothing programs o
 P4X board's own ES8311 codec as an output so the kit makes sound before the DACs arrive
 ([Later](#later)).
 
+### D9. The kit's cable beside its radio (2026-10-20)
+
+The owner's plan for the kit is a PoE splitter: its Ethernet leg into the RJ45 and its USB-C leg into
+the *power* input, with no USB console and no USB flashing. So the sink takes the RJ45 as a network
+(`net/wired/ethernet.cpp`: the chip's EMAC and the board's IP101GR on RMII, DHCP, the board's name as
+its host name) next to the Wi-Fi the C6 gives it, and everything that answers on Wi-Fi answers on the
+cable. The decisions, each one a line to change if the owner would have it otherwise:
+
+- **Both are up, the cable is preferred.** The cable's interface has route priority 200 and the
+  station's is 100; ESP-IDF's own number for Ethernet (50) would have put a board with both on Wi-Fi.
+  A cable pulled falls back to the station (kept joined for it) and a cable put back returns the
+  board to the cable, with no restart. A board with the cable in and no Wi-Fi network stored comes
+  up on the cable alone.
+- **A stored `network preference`: auto, ethernet or wifi** (NVS, `GET` and `PUT /network-preference`,
+  and `network.preference` in `GET /status`). `auto` is the policy above. `ethernet` and `wifi` **pin**
+  the board to one interface and switch the other off (the radio idle, or the EMAC stopped), which is
+  what a person who wants the radio off near the DACs, or the cable out of a mixed network, asks for.
+  The reading not taken: all three as a priority with the other interface kept as a fallback, in which
+  case `ethernet` would be `auto` under another name. Because a pin has nothing to fall back to, a
+  change made over REST is verified: the named interface is brought up first and the other switched
+  off only once it holds an address; otherwise the change is undone.
+- **The pins are Kconfig's, defaulted to the board's** (`ICLFORGE_EXAMPLE_ETH_*`): SMI MDC 31, MDIO
+  52, PHY reset 51, PHY address 1, the reference clock in on GPIO50 (the PHY makes it), TX_EN 49,
+  TXD0 34, TXD1 35, CRS_DV 28, RXD0 29, RXD1 30. They are ESP-IDF v6.1's `examples/ethernet/basic`
+  defaults for the P4 and agree with Zephyr's devicetree for this board; the first run on the board
+  reads the PHY's ID over SMI and logs it.
+- **The PHY driver is ESP-IDF's generic 802.3 one**, the one its example uses on this board. `esp_eth`
+  in v6.1 ships only that driver (the vendor ones, the IP101's among them, are registry components),
+  so there is nothing more to fetch.
+- **The profile locks it**: `CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y` in `sdkconfig.p4-rev3` and
+  in `p4-rev3`'s locked keys, so the profile's hash moved and its baseline is recorded again on the
+  kit. The FireBeetle P4s, the S3s and the C6 do not have the key and their profiles are unchanged.
+- **Not built** (the owner's separate tasks): a diagnostics view opened by three taps on the name,
+  which would show the network and a control for the preference, and a screen for songs with no
+  lyrics. What they read is `GET /status`'s `network.preference` and `network.interfaces`, and what
+  they write is `PUT /network-preference`.
+
 ## The screen
 
 **Panel:** 1024 by 600, landscape, about 170 pixels an inch (7 inches across the diagonal):
@@ -552,6 +589,8 @@ stack 18 KB free:
 | E-AC-3 2.0, 30 s | 38 | 41 |
 | AC-3 5.1 on 16 slots, 2.5 s | 138 | not playable |
 
+(Recorded again with the Ethernet image: 57, 40 and 142 permille, see [the cable](#the-cable-on-the-kit-2026-10-20).)
+
 The kit takes 7 to 8% less time to decode where the clock is 11% higher. Why is not isolated: the
 decoders run their code from PSRAM, which is 200 MHz hex here and does not scale with the clock. The
 Sendspin rows and the AC-4 profile were not played in the first session on the kit; the second
@@ -734,6 +773,62 @@ filling where there is a screen:
   mixed: 2.0 and the stereo fold are clean at 74% of a frame, 5.1 to the TDM slots glitches one play
   in five or six with the glass on and the heap is 10 KB. **No profile was added**; it is the
   owner's call.
+
+### The cable on the kit (2026-10-20)
+
+D9 built and run on the kit: the owner's cable to their router (100 Mbit/s full duplex), the Wi-Fi
+and the USB cable on as well, image `v0.10.0-beta.1-5131-gbb6d603fd` (profile hash `ff9b27a6c4fd`).
+The order was the owner's: the update path first, over Wi-Fi with the USB attached, then the cable.
+
+**Before the cable: does the kit restart and update?** (`bench.json` said "not tried"; on the
+v1.x boards a restart once left the C6 link dead, #1434.)
+
+| Tried | Result |
+|---|---|
+| `ota.py push` of p4-rev3 images, ten times: eight accepted (the baseline image, a second one, the Ethernet image six times) and two that were meant to fail (below) | each accepted one restarted, came back on Wi-Fi 7 s after the restart, ran its 30 s trial and was accepted |
+| `ota.py rollback` | restarted into the image before, on trial, accepted |
+| An image that never reports healthy (`ICLFORGE_FIRMWARE_TEST=unhealthy`) | rolled back at the 300 s deadline, Wi-Fi up |
+| An image that panics on its trial (`=panic`) | the bootloader rolled it back in about 25 s, Wi-Fi up, the core dump readable |
+| `POST /restart`, eight times | the C6 link was back 10.3 s after each (reset reason `wdt`: the system reset of #1434) |
+| A USB flash, 20 s, an OTA push (the sequence that failed 8 times in 16 on the v1.x boards), four times | all four accepted |
+
+So the kit's restart and update are as good as the old boards' with #1434, and `bench.json` no longer
+marks it as unknown.
+
+**The cable.**
+
+| Tried | Result |
+|---|---|
+| The PHY on the chosen pins | answers at SMI address 1 with ID `0243 0c54` (the IP101's); the pins are ESP-IDF's example defaults for the P4 and Zephyr's for this board |
+| A cable put in while the board runs (auto) | the link seen, DHCP done and the board using the cable within about 6 s of each other, no restart; the Wi-Fi stays joined |
+| Boot with the cable in and a Wi-Fi network stored | the cable up and answering 9.9 s after reset, the Wi-Fi joined behind it at 14 s |
+| Boot with the cable out | waits 4 s for a link, then the Wi-Fi as before: network at about 16 s |
+| Boot with the cable in and **no Wi-Fi network stored** (NVS erased, an image with none built in) | up on the cable alone, address at 8.9 s (the router's DHCP took 4.4 s of that), the player and mDNS started, `network: "wired"` in `GET /firmware`; Improv said *ready*, and a network handed over USB joined while the cable stayed in use (Improv answered with the cable's page address) |
+| The page, `/api`, `/hardware`, `GET /log` | answer on the cable's address and the Wi-Fi's |
+| mDNS | `hearth-e753f9.local` has an A record for each address |
+| A Sendspin play (`hearth-testserver` dialling the board, the suite's way, its 30 s AC-3 2.0 stream) | four plays on the cable (three with the Wi-Fi joined as well, one with no Wi-Fi stored), 938 of 938 bursts and no underrun each, one of them with 1 late burst and 1 resync at its start; one on the Wi-Fi address, 938 of 938, clean |
+| `ota.py push` to the cable's address | the same image with `--force`: the board restarted, answered on the cable 9.9 s after reset, the trial was accepted |
+| `PUT /network-preference` wifi / ethernet / auto with the cable in | each took effect in a few seconds: `wifi` left only the Wi-Fi (the cable's address stopped answering), `ethernet` only the cable (the Wi-Fi off), `auto` both again; the setting survived a restart |
+| `PUT /network-preference ethernet` with no cable | not kept: the preference stayed `auto` and `wifi` stayed on throughout (the first design stored it first and undid it, and `/status` read "no address" for five seconds; the order was changed) |
+| **The cable pulled and put back**, four times by the owner (the board idle, three times; playing, once) | the Wi-Fi was reported as the interface in use at the first poll after each pull (half a second apart), with no restart (uptime ran on unbroken); each return to the cable took 4.1 to 4.9 s from the link to the address, same address. A Sendspin play over the Wi-Fi with the cable out: 938 of 938, clean. `PUT ethernet` with the cable out: not kept, the Wi-Fi stayed on. A play over the cable pulled out from under it: 926 bursts and no underrun until the pull; the board was `idle` with no connection afterwards, and the next play (cable) was 938 of 938 (one underrun and a resync at its start) |
+| A bad **Ethernet** image pushed to the cable's address: one that panics on its trial and one that never reports healthy | the first was rolled back by the bootloader (about 25 s), the second at the 300 s deadline; the board was back on the cable each time. (The earlier bad-image rows used the images without the cable) |
+| **A kit on the cable alone**: `PUT ethernet`, then an update to the cable's address | the Wi-Fi off (its address stopped answering), the update restarted the board, which answered on the cable alone and passed its trial with the preference still `ethernet`; `PUT auto` brought the Wi-Fi back in a few seconds |
+| The board suite, `p4-rev3`, three plays a row, the HTTP source fetched over the cable | AC-3 2.0 57 permille (56 before the cable), E-AC-3 2.0 40 (38), AC-3 5.1 on sixteen slots 142 (138): no underrun, no resynchronised byte, the decode stack 18.4 KB free; boot: 278,659 bytes free, largest block 253,952 (worst of three boots). The baseline is recorded again |
+
+What it costs: the image is 2,518,416 bytes against 2,466,880 (the budget is 2,600,000); at boot the
+internal heap reads 279,103 to 284,487 bytes free with a largest block of 253,952 to 258,048,
+against 295,779 to 307,147 and 270,336 to 278,528 for the image without it, so the cable's
+driver, its DMA buffers and its task take about 15 to 25 KB, and the headroom the budget line prints
+(the largest block less the biggest single ask) is 221 to 225 KB against 245 KB.
+
+A Sendspin play starts with a late burst or an underrun and a resync about one time in four, on
+either interface (cable 3 of 9 plays, Wi-Fi 1 of 5 in this session); the suite counts it as a
+glitched play, not a failure, and it is not the cable's.
+
+**Not tried:** a PoE splitter (the owner's next step: the USB cable stays in the drawer, but the
+update path above has been run with the cable alone); 10 Mbit/s or half duplex; a static address;
+IPv6; a long soak; a DHCP server that is slow (boot waits 15 s for the cable's address under `auto`
+and then joins the Wi-Fi, the cable going on asking).
 
 ## Risks and open questions
 

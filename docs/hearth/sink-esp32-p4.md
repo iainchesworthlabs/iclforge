@@ -19,7 +19,10 @@ they are sung.
     time moves by 5 to 12% (under 1% of a frame); AC-4 5.1 plays clean at layout 2.0 and glitched on
     5 of 18 plays at layout 5.1 with the glass on, against 1 of 30 without a scan-out.
     **Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
-    owner's look.** The board suite is played on it, with a baseline.
+    owner's look.** The board suite is played on it, with a baseline. Its RJ45 port works beside the
+    Wi-Fi ([the cable](#the-cable-and-wi-fi)): the sink answers on it, plays Sendspin through it,
+    takes an update over it, falls back to Wi-Fi when the cable is pulled and returns to the cable
+    when it is put back, so the kit can run on a PoE splitter; **the splitter itself is not yet tried.**
     [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
     has the plan, the first run and the list of what it runs next.
 
@@ -189,11 +192,134 @@ the board the image is for.**
 | Backlight (PWM), panel reset | GPIO26, GPIO27 | the user guide: J1 pins 31 and 38, to the LCD adapter |
 | Touch (GT911) | I2C SDA GPIO7, SCL GPIO8; address 0x5D, then 0x14; polled | board header |
 | TDM BCLK, WS, DOUT | GPIO20, 21, 22, the FireBeetle defaults | on J1 (pins 13, 11, 12), free in the user guide's table; **not yet checked on the bench** |
+| Ethernet (`ICLFORGE_EXAMPLE_ETH_*`) | IP101GR on RMII: SMI MDC 31 and MDIO 52, PHY reset 51, PHY address 1, the 50 MHz reference clock in on 50, TX_EN 49, TXD0 34, TXD1 35, CRS_DV 28, RXD0 29, RXD1 30 | ESP-IDF v6.1's `examples/ethernet/basic` for the P4, and Zephyr's devicetree for this board; **read on the kit: the PHY answers at address 1 with ID 0243 0c54** |
 
 Two things the user guide does not settle, and the first power-on checks: **which driver IC the
 screen has** (it links both an EK73217BCGA and an EK79007AD datasheet; this image has the EK79007's
 driver) and which touch controller (the older board's has a GT911). **Secure Download is not
 supported on a v3.1 chip, and the image never enables it.**
+
+### The cable, and Wi-Fi
+
+The kit's RJ45 port (the chip's own Ethernet MAC and an IP101GR PHY on RMII, 10/100 Mbit/s) is a
+network of the sink as the Wi-Fi is, so the kit can sit on a PoE splitter with no USB cable: the
+splitter's Ethernet leg into the RJ45, its USB-C leg into the kit's **power** input (not the
+connector marked JTAG, which is the console and the flashing port). The image is updated over the
+same network, the way [Sink firmware](sink-firmware.md) describes, and everything that answers on
+Wi-Fi answers on the cable: the control surface and the page on port 80, `GET /log`, `PUT /firmware`,
+mDNS (`_sendspin._tcp` on 8928 and `hearth-<mac tail>.local`), the Sendspin player and its pairing,
+and the idle screen, which shows the address and then `Ethernet` or `Wi-Fi <network>`.
+
+**Which one it uses.** The board takes an address on whichever has a link, by DHCP, under the name
+it is called (`hearth-<mac tail>`). With **auto**, the default, it uses the cable while the cable
+holds an address and the Wi-Fi when only that does, and goes back to the cable when it returns, with
+no restart. Both are up when the cable is in and a Wi-Fi network is stored, the cable's interface
+with the higher route priority (200 against the Wi-Fi's 100; ESP-IDF's own number for Ethernet, 50,
+would have put a board with both on Wi-Fi). A board with the cable in and **no Wi-Fi network
+stored** comes up on the cable alone and needs nothing else. The setting, `network preference`,
+chooses what the board does:
+
+| Preference | The cable | The Wi-Fi station |
+|---|---|---|
+| `auto` | used while it holds an address | joined as the way out if the cable goes; used when only it holds an address |
+| `ethernet` | the only network | switched off: no radio, nothing joined |
+| `wifi` | switched off | the only network |
+
+It is stored in the board's NVS like its name and its Wi-Fi network, so it survives a restart and an
+update, and it is changed over REST, in the style of `PUT /name`:
+
+```bash
+curl http://192.168.1.251/network-preference                     # auto
+curl -X PUT -d ethernet http://192.168.1.251/network-preference  # ok; takes effect in a moment, ...
+```
+
+A pinned preference leaves the board with one network and nothing to fall back to, so a change made
+while the board runs is checked before it is kept. `ethernet` brings the cable up first (it waits
+for a link and an address) and only then stores the preference and switches the Wi-Fi off; `wifi`
+joins the stored network first and only then stores it and stops the cable. A change whose interface
+does not come up is **not kept**: the preference stays what it was, the other interface stays on, and
+the console says so (`network: no cable answered, so the WiFi station is not switched off`). The
+reply (`200`) is sent before any of this, so it comes back over the interface the change may switch
+off; read `GET /network-preference` a few seconds later to see what was kept.
+`PUT /network-preference wifi` with no Wi-Fi network stored is refused (`409`). Improv over USB and
+`PUT /network` still store a Wi-Fi network, and a board on the cable alone reports Improv's *ready*
+state (it has no Wi-Fi), so a client still offers its Wi-Fi form; the Wi-Fi it is given joins while
+the cable stays in use.
+
+**What `GET /status` says.** The `network` object keeps its four fields (`kind`, `ssid`,
+`rssi_dbm`, `address`), which now describe the interface **in use** (`kind` is `"ethernet"` or
+`"wifi"`, and while none holds an address it is the one the board is waiting on), and adds
+`preference` and `interfaces`: how each interface stands, and never the passphrase. On a board with
+one network `preference` and `interfaces` are `null`.
+
+```json
+"network": {
+  "kind": "ethernet", "ssid": "", "rssi_dbm": null, "address": "192.168.1.163",
+  "preference": "auto",
+  "interfaces": {
+    "ethernet": {"enabled": true, "link": true, "address": "192.168.1.163",
+                 "mac": "e8:f6:0a:e7:53:f9", "speed_mbps": 100, "full_duplex": true},
+    "wifi":     {"enabled": true, "link": true, "address": "192.168.1.251",
+                 "mac": "98:88:e0:72:59:b0", "configured": true, "ssid": "...", "rssi_dbm": -40}
+  }
+}
+```
+
+`enabled` is "not switched off by the preference", `link` is a cable with a partner on it
+(Ethernet) or an association with the access point (Wi-Fi), `configured` says a Wi-Fi network is
+stored, and `mac` is the interface's own address, for a DHCP reservation (the cable's is the chip's
+base MAC, the one the board's name is made from; the Wi-Fi's is the C6's). A diagnostics view or a
+control for the preference reads `GET /status` and `GET` and `PUT /network-preference` and nothing
+else.
+
+!!! warning "Moving a kit to PoE"
+    On a PoE splitter the kit has no USB console and no USB flashing, so a bad image can only be
+    rescued by the update's own rollback (an image that does not reach the network, the HTTP server
+    and the Sendspin player inside five minutes goes back to the one before it, and so does one that
+    panics on its first boot; both were tried on the kit) or by putting the USB cable back. Keep the
+    Wi-Fi network stored, so the board has a way out if the cable goes. See
+    [What was tested](#what-was-tested-on-the-cable) for what was and was not tried.
+
+#### What was tested on the cable
+
+On the v3.2 kit, 2026-10-20, with the owner's cable to their router (100 Mbit/s, full duplex), the
+Wi-Fi and the USB cable on as well. Details and the numbers:
+[the plan](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-cable-on-the-kit-2026-10-20).
+
+- **The update path, before the cable:** ten `ota.py push` runs (eight accepted, an image that never
+  becomes healthy rolled back at its 300 s deadline, and one that panics rolled back by the
+  bootloader in about 25 s), a `PUT` rollback, eight `POST /restart` and four rounds of a USB flash
+  followed 20 s later by an update: the C6 link was back each time, 7 to 10 s after the restart.
+- **The PHY** answers on the default pins at SMI address 1 with the IP101's ID, and negotiates 100
+  Mbit/s full duplex.
+- **Boot:** with the cable in, it answers on the cable 10 s after reset and the Wi-Fi joins behind it
+  at 14 s; with no cable it waits 4 s for a link and is on Wi-Fi at about 16 s; with the cable in and
+  **no Wi-Fi network stored** it comes up on the cable alone, with the page, mDNS and the Sendspin
+  player, and Improv over USB then gives it a Wi-Fi network that joins while the cable stays in use.
+- **A cable put in while the board runs** is in use within about 6 s, with no restart. **A cable
+  pulled** (four times, by the owner, three with the board idle and one in the middle of a play)
+  made the Wi-Fi the interface in use within half a second, with no restart, and the cable returned
+  4 to 5 s after it was put back. A play cut by the pull ended there (926 bursts, no underrun until
+  it) and the board was idle and answering; the next play ran in full.
+- **Everything that answers on Wi-Fi answers on the cable:** the page, `/api`, `/hardware`, `GET /log`,
+  `PUT /firmware` (an update over the cable restarted the board, which answered on the cable 10 s
+  later and passed its trial), mDNS (`hearth-<mac tail>.local` has an A record for each address) and
+  Sendspin, which played four 30 s AC-3 streams through the cable, 938 of 938 bursts each with no
+  underrun (one with a late burst and a resync at its start).
+- **The preference** set to each of the three words with the cable in did what the table says, and
+  survived a restart; `ethernet` with no cable in was not kept and left the Wi-Fi on throughout.
+  With `ethernet` set (the Wi-Fi radio off), an update sent to the cable's address restarted the
+  board, which came back on the cable alone and passed its trial: the PoE case with the radio off.
+- **Bad images on the cable:** an image that panics on its trial and one that never reports healthy,
+  both built with the cable, pushed to the cable's address, were rolled back (about 25 s, and at the
+  300 s deadline) and the board returned on the cable.
+- **Cost:** the image grew by 51 KB (2,518,416 bytes) and the internal heap at boot is 15 to 25 KB
+  smaller (about 281 KB free, largest block about 256 KB).
+
+**Not tested:** a PoE splitter, 10 Mbit/s or half duplex, a static address, IPv6 and a long soak. A
+board whose DHCP server is slow gives the cable 15 s at boot before the Wi-Fi is joined as well
+(the cable goes on asking). **A kit on PoE should keep its Wi-Fi network stored, so that it has a way
+out if the cable goes, and the first move to PoE should be done with the USB cable at hand.**
 
 ### Memory and time
 

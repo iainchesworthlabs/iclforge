@@ -154,7 +154,8 @@ struct ControlPairings {
 // that offers to move it to another network and for someone asking why its
 // stream stutters. Plain values, which the owner fills in.
 struct ControlNetwork {
-    // "wifi", or "ethernet" for the MAC QEMU emulates.
+    // The interface the board is using: "wifi", or "ethernet" (a cable, or the
+    // MAC QEMU emulates). While none holds an address, the one it is waiting on.
     std::string kind;
     // The access point's SSID; empty on Ethernet and while the station is not
     // associated.
@@ -164,6 +165,35 @@ struct ControlNetwork {
     std::optional<int> rssi_dbm;
     // The board's IPv4 address as text; empty while it holds none.
     std::string address;
+
+    // A board with both a cable and a station reports the rest; one with a single
+    // network leaves `preference` empty and the interfaces absent, and GET /status
+    // has them as null.
+    //
+    // Which interface the board uses when both could be used: "auto" (the cable,
+    // else the station), "ethernet" or "wifi" (that one alone).
+    std::string preference;
+    // How each interface stands. Never the passphrase.
+    struct Interface {
+        // Not switched off by the preference.
+        bool enabled = false;
+        // Wifi: associated. Ethernet: a cable with a partner on it.
+        bool link = false;
+        // As text; empty while the interface holds none.
+        std::string address;
+        // As text ("e8:f6:0a:e7:53:fb"), or empty before the interface is up.
+        std::string mac;
+        // Wifi only: a network is stored or built in. Absent from Ethernet's.
+        std::optional<bool> configured;
+        // Wifi only, while associated.
+        std::string ssid;
+        std::optional<int> rssi_dbm;
+        // Ethernet only, while there is a link.
+        std::optional<int> speed_mbps;
+        std::optional<bool> full_duplex;
+    };
+    std::optional<Interface> wifi;
+    std::optional<Interface> ethernet;
 };
 
 struct ControlHandlers {
@@ -218,6 +248,17 @@ struct ControlHandlers {
     // someone already on the network who wants to move the board to another.
     // Takes effect at the next boot: the station is already associated.
     std::function<bool(std::string_view ssid, std::string_view password)> set_network;
+
+    // GET and PUT /network-preference: which of its networks a board with a
+    // cable and a WiFi station uses, "auto", "ethernet" or "wifi" (ControlNetwork).
+    // A board with one network leaves both empty, and the route answers that it
+    // has none to choose between. set_network_preference is handed one of those
+    // three words; false means the board refused it (the station has no network
+    // to join, or the setting could not be stored). It acts at once, with no
+    // restart, but not before the reply is sent: the reply may have come over the
+    // interface the change switches off.
+    std::function<std::string()> network_preference;
+    std::function<bool(std::string_view preference)> set_network_preference;
 
     // GET /status draws on these. Any may be left empty; the field is then
     // omitted or reported as null.

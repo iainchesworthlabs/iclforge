@@ -25,7 +25,7 @@ tools are.
 | C6 | ESP32-C6 16 MB | 192.168.1.117 | COM9 | `c6-board.lock` | `/log` holds 2 KB: a restart a moment before still has the boot line in it |
 | P4a | ESP32-P4 rev v1.x | 192.168.1.99 | COM10 | `p4-board.lock` | a restart can leave it with no Wi-Fi |
 | P4b | ESP32-P4 rev v1.x | 192.168.1.76 | COM13 | `p4-board2.lock` | no OTA: USB flash, app and otadata only |
-| P4X | ESP32-P4 rev v3.2, 7-inch panel | 192.168.1.251 | COM7 | `p4x-board.lock` | the only board for the `p4-rev3` image; whether a restart or an OTA update keeps its C6 link is not tried |
+| P4X | ESP32-P4 rev v3.2, 7-inch panel | 192.168.1.251 | COM7 | `p4x-board.lock` | the only board for the `p4-rev3` image; a restart and an OTA update keep its C6 link (tried 2026-10-20); an RJ45 port as well as the Wi-Fi, so it can sit on PoE with no USB |
 
 `bench.json` is the source and a test holds this table to it. A board is addressed by name
 (`S3b`), so that its lock, its address and its port come from one row and cannot be mixed: a lock
