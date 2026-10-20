@@ -44,6 +44,10 @@ constexpr unsigned kLinkWaitMs = 4000;
 // How long a cable with a link gets to take an address. DHCP on a quiet network answers inside a
 // second; a slow switch that is still spanning-tree blocking its port takes up to thirty.
 constexpr unsigned kAddressWaitMs = 30000;
+// And how long boot waits for one under `auto` before it joins the Wi-Fi as well: a cable on a port
+// that has a link and no DHCP (another VLAN, a switch still blocking) must not hold the control
+// surface back for the thirty. The cable goes on asking, and the board uses it when it answers.
+constexpr unsigned kAutoAddressWaitMs = 15000;
 // How long a change of preference waits before it acts, so that the reply to the request that
 // made it, which may have come over the interface being switched off, leaves first.
 constexpr TickType_t kReplyGrace = pdMS_TO_TICKS(750);
@@ -111,7 +115,8 @@ void apply(NetworkPreference want) {
     const auto refuse = [&](const char* why) {
         std::printf("network: %s; the preference stays %s\n", why,
                     network_preference_name(preference()));
-        // The attempt may have started the interface the preference leaves out: switch it off again.
+        // The attempt may have started the interface the preference leaves out: switch it off
+        // again.
         switch (preference()) {
             case NetworkPreference::ethernet:
                 net::station_stop();
@@ -212,7 +217,9 @@ bool network_up() {
     if (p == NetworkPreference::wifi) {
         return net::station_up();
     }
-    if (cable && net::ethernet_wait(kLinkWaitMs, kAddressWaitMs)) {
+    if (cable &&
+        net::ethernet_wait(
+            kLinkWaitMs, p == NetworkPreference::automatic ? kAutoAddressWaitMs : kAddressWaitMs)) {
         // On the cable already. The station is joined behind it, as the board's way out if the
         // cable goes, and nothing waits for it.
         if (station) {
