@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -39,6 +40,7 @@
 #include "iclforge/log.hpp"
 #include "iclforge/playout.hpp"
 #include "iclforge/sendspin_host.hpp"
+#include "iclforge/title_card.hpp"
 
 #include "audio_sink.hpp"
 #include "network.hpp"
@@ -90,6 +92,14 @@ constexpr std::int32_t kLeadMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_LEAD_MS;
 constexpr std::int32_t kBufferMs = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_BUFFER_MS;
 constexpr bool kUnpairedAccess = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_UNPAIRED_ACCESS != 0;
 constexpr bool kOfferPcm = CONFIG_ICLFORGE_EXAMPLE_SENDSPIN_PCM != 0;
+// Whether the hello lists metadata@v1, which only a board with a screen to draw it on does: the title
+// card (planning/p4x-now-playing.md). A board with none would be sent a message at every track and pause
+// for nothing, and would keep a title it never shows.
+#if defined(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI) || defined(CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
+constexpr bool kListMetadata = true;
+#else
+constexpr bool kListMetadata = false;
+#endif
 constexpr int kSuite = CONFIG_ICLFORGE_SENDSPIN_SUITE;
 constexpr BaseType_t kDecodeCore = CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE < 0 ? tskNO_AFFINITY
                                                                            : CONFIG_ICLFORGE_EXAMPLE_DECODE_CORE;
@@ -169,6 +179,10 @@ std::int64_t g_last_role_report_us = 0;
 // document arrives, and not as a static: an S3 with Wi-Fi up has no internal block over 31,744 bytes
 // to spare for the decode task's 32 KB stack, and a few hundred bytes of .bss is what that margin is.
 std::unique_ptr<iclforge::lyrics::Follower> g_lyrics;
+// What the server says is playing (metadata@v1), when the hello lists the role: made when the first
+// object arrives, in PSRAM where the part has it (its strings keep their capacity, so the heap a decoder
+// leaves little of is spent once, and not at all by an update or a read).
+std::unique_ptr<iclforge::nowview::TitleStore> g_title;
 // What the control surface asked for while no player was running, for
 // start_player to take up: a layout, on the heap only while one waits (a
 // layout is some 600 bytes, which internal RAM would otherwise hold for
@@ -302,6 +316,9 @@ bool g_board_changed = false;
     config.supported_roles = {std::string(ac::kRole)};
     if (kOfferPcm) {
         config.supported_roles.emplace_back("player@v1");
+    }
+    if (kListMetadata) {
+        config.supported_roles.emplace_back(ss::metadata::kRole);
     }
     const std::uint64_t capacity = player.buffer_capacity();
     // PCM, and Opus where the build decodes it (CONFIG_ICLFORGE_SENDSPIN_OPUS): FLAC would need its
@@ -566,6 +583,117 @@ class Events final : public iclforge::SendspinEvents {
             g_role_reported.settings_error = error;
         }
         report_now();
+    }
+
+    // metadata@v1: what the server says is playing, for the title card (planning/p4x-now-playing.md).
+    // The store takes the object as the server's dialect means it (title_card.hpp): the specification's
+    // is the whole state, and aiosendspin 9.1.1's (Music Assistant) only what changed, a cleared field as
+    // null. A field is `kSet` when it came with a value, `kClear` when it came as null and `kLeave` when the
+    // object did not name it. The console says what arrived, since what a server sends this role is the
+    // one thing that had not been seen on a board.
+    void on_metadata(const m::ServerState& state, ss::Dialect dialect) override {
+        if (!state.metadata) {
+            return;
+        }
+        namespace md = ss::metadata;
+        namespace nv = iclforge::nowview;
+        nv::TitleUpdate update;
+        update.whole = dialect == ss::Dialect::kSpecification;
+        const std::optional<md::State>& object = *state.metadata;
+        std::array<char, 200> said{};
+        if (!object) {
+            update.clear_all = true;
+            std::snprintf(said.data(), said.size(), " none");
+        } else {
+            const std::uint8_t nulls = state.metadata_nulls;
+            const auto text = [nulls](const std::optional<std::string>& value, std::uint8_t bit) {
+                if (value) {
+                    return nv::TitleUpdate::Text{.say = nv::Say::kSet, .value = *value};
+                }
+                return nv::TitleUpdate::Text{.say = (nulls & bit) != 0 ? nv::Say::kClear : nv::Say::kLeave, .value = {}};
+            };
+            update.timestamp_us = object->timestamp;
+            update.title = text(object->title, md::kNullTitle);
+            update.artist = text(object->artist, md::kNullArtist);
+            update.album = text(object->album, md::kNullAlbum);
+            if (object->year) {
+                // A year a server has not got is 0 or nonsense, and is no year.
+                const bool real = *object->year >= 1000 && *object->year <= 9999;
+                update.year = {.say = real ? nv::Say::kSet : nv::Say::kClear, .value = *object->year};
+            } else if ((nulls & md::kNullYear) != 0) {
+                update.year = {.say = nv::Say::kClear, .value = 0};
+            }
+            if (object->progress) {
+                update.progress = {.say = nv::Say::kSet,
+                                   .position_ms = object->progress->track_progress_ms,
+                                   .duration_ms = object->progress->track_duration_ms,
+                                   .speed = object->progress->playback_speed};
+            } else if ((nulls & md::kNullProgress) != 0) {
+                update.progress = {.say = nv::Say::kClear};
+            }
+            // A line of the console: what the object named, a title cut short, and where its time is
+            // against the board's clock (a stamp in the future is a scheduled change).
+            const iclforge::SendspinHost* const clock = g_clock.load();
+            const std::optional<std::int64_t> server =
+                clock != nullptr ? clock->server_time(esp_timer_get_time()) : std::nullopt;
+            std::array<char, 80> piece{};
+            const auto append = [&said, &piece] {
+                const std::size_t have = std::strlen(said.data());
+                std::snprintf(said.data() + have, said.size() - have, "%s", piece.data());
+            };
+            const auto named = [&](const char* name, const nv::TitleUpdate::Text& field) {
+                if (field.say == nv::Say::kSet) {
+                    std::snprintf(piece.data(), piece.size(), " %s \"%.*s\"", name,
+                                  static_cast<int>(std::min<std::size_t>(field.value.size(), 40)), field.value.data());
+                    append();
+                } else if (field.say == nv::Say::kClear) {
+                    std::snprintf(piece.data(), piece.size(), " %s null", name);
+                    append();
+                }
+            };
+            named("title", update.title);
+            named("artist", update.artist);
+            named("album", update.album);
+            if (update.year.say == nv::Say::kSet) {
+                std::snprintf(piece.data(), piece.size(), " year %d", static_cast<int>(update.year.value));
+                append();
+            } else if (update.year.say == nv::Say::kClear) {
+                std::snprintf(piece.data(), piece.size(), " year null");
+                append();
+            }
+            if (update.progress.say == nv::Say::kSet) {
+                std::snprintf(piece.data(), piece.size(), " progress %lld/%lld x%d",
+                              static_cast<long long>(update.progress.position_ms),
+                              static_cast<long long>(update.progress.duration_ms),
+                              static_cast<int>(update.progress.speed));
+                append();
+            } else if (update.progress.say == nv::Say::kClear) {
+                std::snprintf(piece.data(), piece.size(), " progress null");
+                append();
+            }
+            if (server) {
+                std::snprintf(piece.data(), piece.size(), ", stamped %+lld ms",
+                              static_cast<long long>((update.timestamp_us - *server) / 1000));
+                append();
+            }
+        }
+        {
+            const std::lock_guard lock(g_mutex);
+            if (!g_title) {
+                std::optional<iclforge::player::PsramScope> scope;
+                scope.emplace();
+                g_title = std::make_unique<iclforge::nowview::TitleStore>();
+            }
+            g_title->apply(update);
+        }
+        std::printf("sendspin: metadata (%s):%s\n", dialect == ss::Dialect::kSpecification ? "whole state" : "changes", said.data());
+    }
+
+    void on_metadata_gone() override {
+        const std::lock_guard lock(g_mutex);
+        if (g_title) {
+            g_title->clear();
+        }
     }
 
     void on_pairing_code(std::string_view /*digits*/) override {}
@@ -972,6 +1100,21 @@ bool sendspin_read_lyrics(LyricsReader& reader, std::int64_t delay_ms,
     const iclforge::lyrics::Stage stage = iclforge::lyrics::make_stage(lyrics, position, delay_ms, options);
     const std::int64_t item = (g_lyrics && g_lyrics->item()) ? *g_lyrics->item() : -1;
     reader.on_lyrics(item, lyrics, stage);
+    return true;
+}
+
+bool sendspin_read_title(TitleReader& reader) {
+    // The song's position is on the server's clock, which the host's time filter gives for the board's.
+    // Without a converged clock the song has no position, and the card has no time to show.
+    const iclforge::SendspinHost* const clock = g_clock.load();
+    const std::optional<std::int64_t> server =
+        clock != nullptr ? clock->server_time(esp_timer_get_time()) : std::nullopt;
+    const std::lock_guard lock(g_mutex);
+    if (!g_title || !g_title->known()) {
+        reader.on_title(nullptr, std::nullopt);
+        return true;
+    }
+    reader.on_title(g_title.get(), server ? g_title->position_ms(*server) : std::nullopt);
     return true;
 }
 

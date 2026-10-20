@@ -152,6 +152,28 @@ std::optional<State> read_state(json::Value value) {
     return state;
 }
 
+std::uint8_t null_fields(json::Value value) {
+    struct NullBit {
+        std::string_view key;
+        std::uint8_t bit;
+    };
+    static constexpr std::array<NullBit, 8> kFields{{{"title", kNullTitle},
+                                                     {"artist", kNullArtist},
+                                                     {"album_artist", kNullAlbumArtist},
+                                                     {"album", kNullAlbum},
+                                                     {"artwork_url", kNullArtworkUrl},
+                                                     {"year", kNullYear},
+                                                     {"track", kNullTrack},
+                                                     {"progress", kNullProgress}}};
+    std::uint8_t mask = 0;
+    for (const NullBit& field : kFields) {
+        if (const json::Value member = value[field.key]; member.exists() && member.is_null()) {
+            mask = static_cast<std::uint8_t>(mask | field.bit);
+        }
+    }
+    return mask;
+}
+
 std::optional<std::int64_t> position_ms(const State& state, std::int64_t now) {
     if (!state.progress) {
         return std::nullopt;

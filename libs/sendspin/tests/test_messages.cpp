@@ -646,9 +646,35 @@ TEST_CASE("messages: server/state and client/command", "[sendspin][messages][rol
         REQUIRE(read->color.has_value());
         CHECK(read->color->value() == colours);
     }
+    // A client that keeps what it was told needs a field that was null apart from one left out (C36): the
+    // specification's object leaves the absent ones out, aiosendspin 9.1.1's sends them as null, and a
+    // delta from its server names only what changed. Both read as an absent field; the mask says which.
+    namespace md = iclforge::sendspin::metadata;
+    CHECK(m::read_server_state(Parsed(spec).payload())->metadata_nulls == 0);
+    CHECK(m::read_server_state(Parsed(aio).payload())->metadata_nulls ==
+          (md::kNullArtist | md::kNullAlbumArtist | md::kNullAlbum | md::kNullArtworkUrl | md::kNullYear |
+           md::kNullTrack | md::kNullProgress));
+    const auto delta = m::read_server_state(
+        Parsed(R"({"type":"server/state","payload":{"metadata":{"timestamp":9,"title":"So What","artist":null,)"
+               R"("progress":{"track_progress":1000,"track_duration":545000,"playback_speed":1000}}}})")
+            .payload());
+    REQUIRE(delta.has_value());
+    REQUIRE(delta->metadata.has_value());
+    REQUIRE(delta->metadata->has_value());
+    CHECK(delta->metadata->value().title == "So What");
+    CHECK_FALSE(delta->metadata->value().artist.has_value());
+    CHECK(delta->metadata->value().progress.has_value());
+    CHECK(delta->metadata_nulls == md::kNullArtist);
+    // The whole object null is the cleared state, with nothing to say about its fields.
+    const auto cleared = m::read_server_state(Parsed(R"({"type":"server/state","payload":{"metadata":null}})").payload());
+    REQUIRE(cleared.has_value());
+    REQUIRE(cleared->metadata.has_value());
+    CHECK_FALSE(cleared->metadata->has_value());
+    CHECK(cleared->metadata_nulls == 0);
     const auto partial = m::read_server_state(Parsed(R"({"type":"server/state","payload":{}})").payload());
     REQUIRE(partial.has_value());
     CHECK_FALSE(partial->metadata.has_value());
+    CHECK(partial->metadata_nulls == 0);
     CHECK_FALSE(m::read_server_state(Parsed(R"({"type":"server/state","payload":{"color":{"accent":[1,2,3]}}})").payload()));
 
     m::ClientCommand command;

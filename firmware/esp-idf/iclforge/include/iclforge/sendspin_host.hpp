@@ -10,6 +10,7 @@
 
 #include "freertos/FreeRTOS.h"
 
+#include "iclforge/sendspin/dialect.hpp"
 #include "iclforge/sendspin/iclforge_player.hpp"
 #include "iclforge/sendspin/chunks.hpp"
 #include "iclforge/sendspin/messages.hpp"
@@ -73,6 +74,17 @@ class SendspinEvents {
     virtual void on_iclforge_command(
         const iclforge::sendspin::player::CommandMessage& command) = 0;
     virtual void on_settings_refused(const iclforge::sendspin::player::SettingsError& error) = 0;
+
+    // metadata@v1, for a board whose hello lists the role: what the admitted server says is playing, as
+    // its server/state object carries it. `dialect` says how to read what the object leaves out
+    // (planning/hearth-sendspin-extension.md, C36): the specification's object is the whole state, and
+    // aiosendspin 9.1.1's only what changed. Only the role's own object is delivered, and on the server's
+    // task, so an implementation copies what it needs and returns.
+    virtual void on_metadata(const iclforge::sendspin::messages::ServerState& /*state*/,
+                             iclforge::sendspin::Dialect /*dialect*/) {}
+    // The connection that was saying it has ended, or another server has taken the board: what it said
+    // is no longer said, and another server's first object is the whole state.
+    virtual void on_metadata_gone() {}
 
     // A pairing attempt showed a dynamic code (digits), was held back for the
     // operator, or ended ("paired", or why not). For the console and the page;

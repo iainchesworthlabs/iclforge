@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "iclforge/now_view.hpp"
@@ -59,6 +60,31 @@ struct NowPlaying {
 
 // Fills `out` from the player, called five times a second. False when no stream is playing.
 [[nodiscard]] bool read_now_playing(NowPlaying& out);
+
+// What the server says is playing (metadata@v1), for the title card and the speakers' header
+// (planning/p4x-now-playing.md, stage 2): the player's store copied in place five times a second, the
+// strings only when the store's own revision moved, into containers that keep their capacity.
+struct NowTitle {
+    // The server has said a title.
+    bool known = false;
+    LvString title;
+    LvString artist;
+    // The third line of the card: the album, and the year after it when there is one ("Kind of Blue - 1959").
+    LvString detail;
+    // Bumped whenever a string changed, so that the screen rebuilds the card (and composes its header)
+    // only then.
+    std::uint32_t generation = 0;
+    // The store's revision the strings were copied at.
+    std::uint32_t revision = 0;
+    // Where the song is on the board's own clock and how long it is, when the server gave a progress and
+    // the board's clock has converged; they move every read, so they are not part of the generation.
+    std::optional<std::int64_t> position_ms;
+    std::optional<std::int64_t> length_ms;
+};
+
+// Fills `out` from the player, called five times a second while a no-lyrics view that wants it shows.
+// False in a build without a player.
+bool read_now_title(NowTitle& out);
 
 // The settings the no-lyrics screen follows (settings.hpp), read every frame.
 struct NowSettings {

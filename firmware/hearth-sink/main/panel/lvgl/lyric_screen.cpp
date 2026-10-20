@@ -55,6 +55,8 @@ constexpr std::uint32_t kFaint = 0x4B4645;
 
 constexpr int kMargin = 32;
 constexpr int kHeaderHeight = 64;
+// The song's time at the header's right, "23:32 / 24:45" for a long piece: 120 px cut its first figure.
+constexpr int kHeaderClockWidth = 176;
 constexpr int kFooterHeight = 64;
 constexpr int kDuetIndent = 184;  // 18 % of 1024, the desktop's rule for the second vocal
 // A line already sung is the accent colour at this opacity of 255: 70 %, which is 3.5 : 1 against the
@@ -268,6 +270,8 @@ struct Signature {
     // The no-lyrics screen: which view, and the room it draws (a new layout is a rebuild; levels are not).
     int view = 0;
     std::uint32_t room_key = 0;
+    // The title card's words (what a rebuild draws), 0 for any other view.
+    std::uint32_t card_generation = 0;
 
     bool operator==(const Signature&) const = default;
 };
@@ -348,8 +352,21 @@ struct Screen {
     bool now_known = false;
     std::uint64_t now_read_us = 0;
     std::uint32_t now_key = 0;
-    // The speakers view is what the stage holds, and since when (the dim time counts from there).
+    // What the server says is playing (metadata@v1), read with the speakers' levels while the speakers or
+    // the title card is the view chosen, and the three lines of it the fonts can draw. The card needs a
+    // title; the header over the speakers says "Title - Artist" once there is one.
+    NowTitle now_title;
+    LvString card_title;
+    LvString card_artist;
+    LvString card_detail;
+    std::uint32_t card_generation = 0;
+    // The header's "Title - Artist", composed when the title changes.
+    LvString np_header;
+    std::uint32_t np_header_generation = 0;
+    // A no-lyrics view is what the stage holds (the speakers or the title card, which dim and hide the
+    // lyric delay), whether it is the card, and since when (the dim time counts from there).
     bool np_active = false;
+    bool np_card = false;
     bool np_was_showing = false;
     std::uint32_t np_since_ms = 0;
     // Dimmed: a black cover over everything, the backlight at its floor.
@@ -718,8 +735,10 @@ void set_dimmed(bool dim) {
     }
     g.dimmed = dim;
     if (dim) {
-        const std::string line = g.now.heading.empty() ? std::string("Playing")
-                                                       : "Playing  -  " + std::string(g.now.heading.data(), g.now.heading.size());
+        // The title card's dark screen names the song, the speakers' the stream and its room.
+        const std::string_view said = g.np_card ? std::string_view(g.np_header)
+                                                : std::string_view(g.now.heading.data(), g.now.heading.size());
+        const std::string line = said.empty() ? std::string("Playing") : "Playing  -  " + std::string(said);
         if (line != g.dim_text_shown) {
             g.dim_text_shown = line;
             lv_label_set_text(g.dim_text, line.c_str());
@@ -740,12 +759,12 @@ void build_frame() {
 
     // Header: the title at the left, the time at the right, a hairline for the progress under both.
     g.title = make_label(g.root, "", g.small, kText);
-    lv_obj_set_width(g.title, g.width - 2 * kMargin - 140);
+    lv_obj_set_width(g.title, g.width - 2 * kMargin - kHeaderClockWidth - 20);
     lv_obj_set_pos(g.title, kMargin, 18);
     g.clock = make_label(g.root, "", g.small, kMuted);
     lv_obj_set_style_text_align(g.clock, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_width(g.clock, 120);
-    lv_obj_set_pos(g.clock, g.width - kMargin - 120, 18);
+    lv_obj_set_width(g.clock, kHeaderClockWidth);
+    lv_obj_set_pos(g.clock, g.width - kMargin - kHeaderClockWidth, 18);
     lv_obj_t* const back = make_box(g.root);
     lv_obj_set_size(back, g.width, 2);
     lv_obj_set_pos(back, 0, kHeaderHeight - 2);
@@ -798,6 +817,7 @@ void clear_stage() {
     lv_obj_clean(g.stage_box);
     now_forget();
     g.np_active = false;
+    g.np_card = false;
     g.words.clear();
     g.dots.fill(nullptr);
     g.dot_count = 0;
@@ -1067,15 +1087,53 @@ void build_plain(int content_w) {
 }
 
 // What a song with no lyrics shows (planning/p4x-now-playing.md): the view the board is set to, and where
-// that cannot be drawn (the view is off, or the player has not said what room it plays in) the sentence
-// the screen has always had.
+// that cannot be drawn the one it falls back to. The title card needs a title the server has said and the
+// fonts can draw, and with none the speakers show in its place (never an empty card); the speakers need
+// the room the player plays to, and with none, or with the view off, the sentence the screen has always
+// had stands.
+enum class NoLyrics : int { kSentence = 0, kSpeakers = 1, kTitle = 2 };
+
+NoLyrics no_lyrics_shown() {
+    using iclforge::nowview::View;
+    const View chosen = g.now_set.view;
+    if (chosen == View::kTitle && !g.card_title.empty()) {
+        return NoLyrics::kTitle;
+    }
+    if ((chosen == View::kSpeakers || chosen == View::kTitle) && g.now_known) {
+        return NoLyrics::kSpeakers;
+    }
+    return NoLyrics::kSentence;
+}
+
 void build_no_lyrics(int content_w) {
-    if (g.now_set.view == iclforge::nowview::View::kSpeakers && g.now_known) {
-        const NowStyle style{.text = kText, .accent = kAccent, .muted = kMuted, .faint = kFaint, .label = g.small.latin};
-        if (now_build_speakers(g.stage_box, g.width, lv_obj_get_height(g.stage_box), g.now, style)) {
-            g.np_active = true;
-            return;
-        }
+    const NowStyle style{.text = kText,
+                         .accent = kAccent,
+                         .muted = kMuted,
+                         .faint = kFaint,
+                         .label = g.small.latin,
+                         .title = g.current.latin,
+                         .artist = g.context.latin,
+                         .margin = kMargin};
+    switch (no_lyrics_shown()) {
+        case NoLyrics::kTitle:
+            // The title's size is the lyric line's rule on its length (72 down to 34 px, then the singer's
+            // own step), and the face is the lyric line's, which nothing else is using on this stage.
+            set_size(g.current, current_size(utf8_length(g.card_title), g.scale));
+            if (now_build_title(g.stage_box, g.width, lv_obj_get_height(g.stage_box), g.card_title, g.card_artist,
+                                g.card_detail, style)) {
+                g.np_active = true;
+                g.np_card = true;
+                return;
+            }
+            break;
+        case NoLyrics::kSpeakers:
+            if (now_build_speakers(g.stage_box, g.width, lv_obj_get_height(g.stage_box), g.now, style)) {
+                g.np_active = true;
+                return;
+            }
+            break;
+        case NoLyrics::kSentence:
+            break;
     }
     build_message("No lyrics for this item", "The server sent none with it.", content_w);
 }
@@ -1247,26 +1305,59 @@ void update_dots(const Stage& stage) {
     }
 }
 
-void update_header_and_footer(const Stage& stage) {
-    std::string title = drawable_title(g.snap.title);
-    const std::string artist = drawable_title(g.snap.artist);
-    if (!artist.empty()) {
-        title += title.empty() ? artist : " - " + artist;
+// The header's "Title - Artist" for the song the server says is playing, composed when the title changes:
+// what the fonts can draw of each, a title with none of it left out.
+void compose_np_header() {
+    if (g.np_header_generation == g.card_generation) {
+        return;
     }
-    // The speakers screen says what is arriving and what it is played on.
+    g.np_header_generation = g.card_generation;
+    g.np_header.assign(g.card_title.data(), g.card_title.size());
+    if (!g.card_title.empty() && !g.card_artist.empty()) {
+        g.np_header += " - ";
+        g.np_header.append(g.card_artist.data(), g.card_artist.size());
+    }
+}
+
+void update_header_and_footer(const Stage& stage) {
+    std::string lyric_title;
+    std::string_view wanted;
     if (g.np_active) {
-        title.assign(g.now.heading.data(), g.now.heading.size());
+        // The title card is the title, so its header says nothing; the speakers say the song when a server
+        // has said one, and what is arriving and what it is played on until then.
+        if (!g.np_card) {
+            wanted = g.np_header.empty() ? std::string_view(g.now.heading.data(), g.now.heading.size())
+                                         : std::string_view(g.np_header);
+        }
+    } else {
+        lyric_title = drawable_title(g.snap.title);
+        const std::string artist = drawable_title(g.snap.artist);
+        if (!artist.empty()) {
+            lyric_title += lyric_title.empty() ? artist : " - " + artist;
+        }
+        wanted = lyric_title;
     }
     static std::string shown_title = "\x01";
-    if (title != shown_title) {
-        shown_title = title;
-        lv_label_set_text(g.title, title.c_str());
+    if (wanted != shown_title) {
+        shown_title.assign(wanted);
+        lv_label_set_text(g.title, shown_title.c_str());
+    }
+    // The song's time: the lyric stage's while one is shown, and the server's (metadata@v1) over a view
+    // with no lyrics once it gave a progress and the board's clock can say where the song is.
+    std::optional<std::int64_t> position_ms;
+    std::optional<std::int64_t> length_ms;
+    if (stage.mode == StageMode::kLine || stage.mode == StageMode::kGap) {
+        position_ms = stage.position_ms;
+        length_ms = g.snap.length_ms;
+    } else if (g.np_active && !g.card_title.empty()) {
+        position_ms = g.now_title.position_ms;
+        length_ms = g.now_title.length_ms;
     }
     std::string clock_text;
-    if (stage.mode == StageMode::kLine || stage.mode == StageMode::kGap) {
-        clock_text = clock_string(stage.position_ms);
-        if (g.snap.length_ms) {
-            clock_text += " / " + clock_string(*g.snap.length_ms);
+    if (position_ms) {
+        clock_text = clock_string(*position_ms);
+        if (length_ms) {
+            clock_text += " / " + clock_string(*length_ms);
         }
     }
     if (clock_text != g.clock_text) {
@@ -1274,9 +1365,8 @@ void update_header_and_footer(const Stage& stage) {
         lv_label_set_text(g.clock, clock_text.c_str());
     }
     int progress = 0;
-    if (g.snap.length_ms && *g.snap.length_ms > 0 && (stage.mode == StageMode::kLine || stage.mode == StageMode::kGap)) {
-        progress = static_cast<int>(std::clamp<std::int64_t>(
-            stage.position_ms * g.width / *g.snap.length_ms, 0, g.width));
+    if (position_ms && length_ms && *length_ms > 0) {
+        progress = static_cast<int>(std::clamp<std::int64_t>(*position_ms * g.width / *length_ms, 0, g.width));
     }
     if (progress != g.progress_width) {
         g.progress_width = progress;
@@ -1357,16 +1447,43 @@ bool screen_update() {
     // while the speakers are what it shows, what the player says about the stream five times a second.
     g.now_set = read_now_settings();
     const bool no_lyrics = stage.mode == StageMode::kNoLyrics && playing;
-    if (no_lyrics && g.now_set.view == iclforge::nowview::View::kSpeakers) {
+    // The speakers, and the title card (which stands on the speakers until a server has said a title).
+    const bool wants_now = g.now_set.view == iclforge::nowview::View::kSpeakers ||
+                           g.now_set.view == iclforge::nowview::View::kTitle;
+    if (no_lyrics && wants_now) {
         if (g.now_read_us == 0 || now_us - g.now_read_us >= 200'000) {
             g.now_read_us = now_us;
             g.now_known = read_now_playing(g.now) && !g.now.spots.empty();
             g.now_key = g.now_known ? now_room_key(g.now) : 0;
+            // What the server says is playing, in the same read; a change of the words is the card's
+            // (and the speakers' header's) due, the position and length are not.
+            static_cast<void>(read_now_title(g.now_title));
+            if (g.card_generation != g.now_title.generation) {
+                g.card_generation = g.now_title.generation;
+                const std::string title = drawable_title(g.now_title.title);
+                g.card_title.assign(title.data(), title.size());
+                // Where the title cannot be drawn there is no card, and its artist and album go with it.
+                const std::string artist = title.empty() ? std::string() : drawable_title(g.now_title.artist);
+                g.card_artist.assign(artist.data(), artist.size());
+                const std::string detail = title.empty() ? std::string() : drawable_title(g.now_title.detail);
+                g.card_detail.assign(detail.data(), detail.size());
+                compose_np_header();
+            }
         }
     } else {
         g.now_read_us = 0;
         g.now_known = false;
         g.now_key = 0;
+        // Nothing the server said is shown here, so none of it is kept as shown: the next time a view
+        // wants it, it is read afresh.
+        if (g.now_title.known || !g.card_title.empty()) {
+            now_copy_title(g.now_title, nullptr, std::nullopt);
+            g.card_generation = g.now_title.generation;
+            g.card_title.clear();
+            g.card_artist.clear();
+            g.card_detail.clear();
+            compose_np_header();
+        }
     }
 
     Signature sig;
@@ -1382,8 +1499,12 @@ bool screen_update() {
     sig.after = stage.after;
     sig.generation = g.snap.generation;
     sig.scale = g.scale;
-    sig.view = no_lyrics ? static_cast<int>(g.now_set.view) : 0;
+    // The view as drawn, not as chosen: the card stands on the speakers until a title has come, and a
+    // change of the title is a rebuild of the card (and of nothing else).
+    const NoLyrics shown = no_lyrics ? no_lyrics_shown() : NoLyrics::kSentence;
+    sig.view = no_lyrics ? 1 + static_cast<int>(shown) : 0;
     sig.room_key = g.now_key;
+    sig.card_generation = shown == NoLyrics::kTitle ? g.card_generation : 0;
     // The idle screen says what the board is: a change in it is a rebuild of the idle screen.
     static BoardInfo shown_info;
     const bool info_changed = idle && !(shown_info == g.info);
@@ -1401,7 +1522,7 @@ bool screen_update() {
             update_words(stage);
         } else if (stage.mode == StageMode::kGap) {
             update_dots(stage);
-        } else if (g.np_active && !g.dimmed) {
+        } else if (g.np_active && !g.np_card && !g.dimmed) {
             now_update_speakers(g.now, now_us);
         }
     }

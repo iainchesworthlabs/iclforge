@@ -101,6 +101,21 @@ _iclforge_player@v1, and writes a report of what each said about it.
                        lists the lyrics command) this .lrc document for the
                        programme, and the playhead as anchors every two seconds and
                        at each pass, as Hearth's engine sends them
+  --title TEXT         also tell each player that lists metadata@v1 (the P4X
+                       panel's title card) what is playing, as the specification's
+                       whole server/state object: this title, with --artist,
+                       --album, --year and --track-seconds (the song's length,
+                       default the programme's) for the rest, and the position
+                       from the play's start
+  --artist TEXT        (see --title)
+  --album TEXT         (see --title)
+  --year N             (see --title)
+  --track-seconds N    (see --title)
+  --then-after N       N seconds into the play, say the next song: --then-title
+                       with --then-artist and nothing else, which the whole
+                       object makes a song with no album or year
+  --then-title TEXT    (see --then-after)
+  --then-artist TEXT   (see --then-after)
   --seconds N          play the file over and over for at least N seconds
                        (default: once through)
   --stall-after N      N seconds into the play, send nothing for --stall-ms, then
@@ -940,6 +955,15 @@ int main(int argc, char** argv) {
     fs::path programme;
     // --lyrics: the document sent each player that takes one, as item 1.
     std::optional<fs::path> lyrics_path;
+    // --title and the rest: what metadata@v1 says is playing, and the next song partway through.
+    std::optional<std::string> meta_title;
+    std::string meta_artist;
+    std::string meta_album;
+    std::optional<std::int32_t> meta_year;
+    std::optional<long> meta_track_seconds;
+    std::optional<long> then_after;
+    std::string then_title;
+    std::string then_artist;
     bool tone = false;
     std::int32_t tone_bits = 24;
     std::optional<long> seconds;
@@ -1009,6 +1033,29 @@ int main(int argc, char** argv) {
         };
         if (argument == "--player") {
             players.push_back({.url = value});
+        } else if (argument == "--title") {
+            meta_title = value;
+        } else if (argument == "--artist") {
+            meta_artist = value;
+        } else if (argument == "--album") {
+            meta_album = value;
+        } else if (argument == "--then-title") {
+            then_title = value;
+        } else if (argument == "--then-artist") {
+            then_artist = value;
+        } else if (argument == "--year" || argument == "--track-seconds" || argument == "--then-after") {
+            const std::optional<long> number = parse_number(value);
+            if (!number || *number < 0) {
+                std::cerr << argument << " takes a whole number\n";
+                return kExitUsage;
+            }
+            if (argument == "--year") {
+                meta_year = static_cast<std::int32_t>(*number);
+            } else if (argument == "--track-seconds") {
+                meta_track_seconds = *number;
+            } else {
+                then_after = *number;
+            }
         } else if (argument == "--tone-bits") {
             const std::optional<long> bits = parse_number(value);
             if (!bits || (*bits != 16 && *bits != 24)) {
@@ -1386,6 +1433,35 @@ int main(int argc, char** argv) {
              " s, to " + std::to_string(runs.size()) + " player(s)");
     }
 
+    // metadata@v1: what is playing, as the whole object the specification sends, from the start of the play
+    // (the position is the play's own, on the server's clock); a player that does not list the role is
+    // sent nothing. The next song, when asked for, goes from the loop below.
+    const ss::SteadyClock metadata_clock;
+    const auto say_song = [&](const std::string& title, const std::string& artist, const std::string& album,
+                              std::optional<std::int32_t> year, long position_ms) {
+        ss::metadata::State state;
+        state.timestamp = metadata_clock.now_us();
+        state.title = title;
+        if (!artist.empty()) {
+            state.artist = artist;
+        }
+        if (!album.empty()) {
+            state.album = album;
+        }
+        state.year = year;
+        const long length_seconds = meta_track_seconds.value_or(static_cast<long>(programme_seconds));
+        state.progress = ss::metadata::Progress{.track_progress_ms = position_ms,
+                                                .track_duration_ms = length_seconds * 1000,
+                                                .playback_speed = 1000};
+        group->set_metadata(std::move(state));
+        note("metadata: \"" + title + "\"" + (artist.empty() ? "" : ", " + artist) +
+             (album.empty() ? "" : ", " + album) + ", " + std::to_string(length_seconds) + " s");
+    };
+    if (meta_title) {
+        say_song(*meta_title, meta_artist, meta_album, meta_year, 0);
+    }
+    bool then_said = false;
+
     // The boards' status, once a second, on a thread of its own.
     std::atomic<bool> playing{true};
     std::mutex samples_mutex;
@@ -1467,6 +1543,12 @@ int main(int argc, char** argv) {
     std::optional<SteadyClock::time_point> stall_until;
     bool stalled = false;
     while (failure.empty()) {
+        if (meta_title && then_after && !then_said &&
+            SteadyClock::now() >= play_started + std::chrono::seconds(*then_after)) {
+            then_said = true;
+            say_song(then_title.empty() ? std::string("Next song") : then_title, then_artist, std::string(),
+                     std::nullopt, 0);
+        }
         if (stall_after && !stalled &&
             SteadyClock::now() >= play_started + std::chrono::seconds(*stall_after)) {
             stalled = true;

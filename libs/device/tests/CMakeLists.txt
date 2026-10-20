@@ -21,6 +21,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_playout.cpp
     test_sink_plan.cpp
     test_tcp_arrivals.cpp
+    test_title_card.cpp
     test_unit_hold.cpp)
 
 target_link_libraries(iclforge-device-tests PRIVATE iclforge::device)

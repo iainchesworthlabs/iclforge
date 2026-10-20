@@ -1,4 +1,4 @@
-// The speakers view. See now_screen.hpp and planning/p4x-now-playing.md.
+// The speakers view and the title card. See now_screen.hpp and planning/p4x-now-playing.md.
 //
 // A speaker is three objects: a halo (the peak, a few steps of faint accent behind it), a core (the RMS,
 // a few steps of accent, with the speaker's border) and its name inside. All of them are made when the
@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
+#include <string>
 #include <vector>
 
 #include "iclforge/render/room_plan.hpp"
@@ -142,6 +144,112 @@ void now_update_speakers(const NowPlaying& now, std::uint64_t now_us) {
             lv_obj_set_style_bg_opa(node.halo, static_cast<lv_opa_t>(halo == 0 ? 0 : kHaloOpaBase + kHaloOpaStep * halo), 0);
         }
     }
+}
+
+namespace {
+
+// How a line of the card sits against the others: the gap under the title and under the artist, pixels,
+// and the opacity of the title and of the third line (the card is for a dim room: the title is not full
+// white and the album is the muted tone a little back).
+constexpr int kGapAfterTitle = 14;
+constexpr int kGapAfterArtist = 8;
+constexpr lv_opa_t kTitleOpa = 217;
+constexpr lv_opa_t kDetailOpa = 204;
+
+// A label of `text` set in `font`, `width` wide and at most `max_lines` rows: a text that needs more is
+// cut with three dots, which LVGL does only for a label of fixed height.
+lv_obj_t* make_card_text(lv_obj_t* parent, std::string_view text, const lv_font_t* font, std::uint32_t rgb,
+                         lv_opa_t opa, int width, int max_lines) {
+    lv_obj_t* const label = lv_label_create(parent);
+    lv_label_set_text(label, std::string(text).c_str());
+    lv_obj_set_style_text_font(label, font, 0);
+    lv_obj_set_style_text_color(label, color(rgb), 0);
+    lv_obj_set_style_text_opa(label, opa, 0);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_WRAP);
+    lv_obj_set_width(label, width);
+    lv_obj_update_layout(label);
+    const int row = lv_font_get_line_height(font);
+    if (lv_obj_get_height(label) > max_lines * row) {
+        lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
+        lv_obj_set_height(label, max_lines * row);
+    }
+    return label;
+}
+
+}  // namespace
+
+bool now_build_title(lv_obj_t* parent, int width, int height, std::string_view title, std::string_view artist,
+                     std::string_view detail, const NowStyle& style) {
+    now_forget();
+    if (title.empty()) {
+        return false;
+    }
+    const int content_w = width - 2 * style.margin;
+    lv_obj_t* const title_label = make_card_text(parent, title, style.title, style.text, kTitleOpa, content_w, 2);
+    lv_obj_t* const artist_label =
+        artist.empty() ? nullptr : make_card_text(parent, artist, style.artist, style.muted, LV_OPA_COVER, content_w, 1);
+    lv_obj_t* const detail_label =
+        detail.empty() ? nullptr : make_card_text(parent, detail, style.label, style.muted, kDetailOpa, content_w, 1);
+    // The block in the middle of the stage: its rows one under the other with a little air between.
+    int block = lv_obj_get_height(title_label);
+    if (artist_label != nullptr) {
+        block += kGapAfterTitle + lv_obj_get_height(artist_label);
+    }
+    if (detail_label != nullptr) {
+        block += (artist_label != nullptr ? kGapAfterArtist : kGapAfterTitle) + lv_obj_get_height(detail_label);
+    }
+    int y = std::max(0, (height - block) / 2);
+    lv_obj_set_pos(title_label, style.margin, y);
+    y += lv_obj_get_height(title_label);
+    if (artist_label != nullptr) {
+        y += kGapAfterTitle;
+        lv_obj_set_pos(artist_label, style.margin, y);
+        y += lv_obj_get_height(artist_label);
+    }
+    if (detail_label != nullptr) {
+        y += artist_label != nullptr ? kGapAfterArtist : kGapAfterTitle;
+        lv_obj_set_pos(detail_label, style.margin, y);
+    }
+    return true;
+}
+
+LvString now_title_detail(const iclforge::nowview::TitleStore& held) {
+    LvString detail;
+    detail.assign(held.album().data(), held.album().size());
+    if (const auto year = held.year()) {
+        char digits[16];
+        std::snprintf(digits, sizeof digits, "%d", static_cast<int>(*year));
+        if (!detail.empty()) {
+            detail += " - ";
+        }
+        detail += digits;
+    }
+    return detail;
+}
+
+void now_copy_title(NowTitle& out, const iclforge::nowview::TitleStore* held, std::optional<std::int64_t> position_ms) {
+    if (held == nullptr) {
+        if (out.known) {
+            out.known = false;
+            out.title.clear();
+            out.artist.clear();
+            out.detail.clear();
+            ++out.generation;
+        }
+        out.position_ms.reset();
+        out.length_ms.reset();
+        return;
+    }
+    if (!out.known || out.revision != held->revision()) {
+        out.title.assign(held->title().data(), held->title().size());
+        out.artist.assign(held->artist().data(), held->artist().size());
+        out.detail = now_title_detail(*held);
+        out.revision = held->revision();
+        out.known = true;
+        ++out.generation;
+    }
+    out.position_ms = position_ms;
+    out.length_ms = held->length_ms();
 }
 
 void now_forget() { g.nodes.clear(); }

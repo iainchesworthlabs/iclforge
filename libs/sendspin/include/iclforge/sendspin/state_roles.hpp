@@ -68,6 +68,21 @@ void write_state(json::Writer& w, const State& state, Dialect dialect);
 // without a progress.
 [[nodiscard]] std::optional<std::int64_t> position_ms(const State& state, std::int64_t now);
 
+// The fields an object gave as null, as a mask of these bits. read_state() reads a null as it does a
+// field left out (the field is absent), and a client that keeps what it was told needs the two apart: an
+// aiosendspin 9.1.1 server sends only what changed, and a cleared field as null (C36), where the
+// specification's object is the whole state and a field left out is a cleared one. A title that
+// changes to one with no artist is `artist: null` from the first and nothing at all from the second.
+inline constexpr std::uint8_t kNullTitle = 1U << 0;
+inline constexpr std::uint8_t kNullArtist = 1U << 1;
+inline constexpr std::uint8_t kNullAlbumArtist = 1U << 2;
+inline constexpr std::uint8_t kNullAlbum = 1U << 3;
+inline constexpr std::uint8_t kNullArtworkUrl = 1U << 4;
+inline constexpr std::uint8_t kNullYear = 1U << 5;
+inline constexpr std::uint8_t kNullTrack = 1U << 6;
+inline constexpr std::uint8_t kNullProgress = 1U << 7;
+[[nodiscard]] std::uint8_t null_fields(json::Value value);
+
 }  // namespace metadata
 
 // --- controller@v1 -----------------------------------------------------------------------------

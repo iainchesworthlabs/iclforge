@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+
+#include "iclforge/title_card.hpp"
 
 // The library's types by name only (libs/lyrics: lyrics.hpp and stage.hpp), which is all a pointer and
 // two references need. sendspin.hpp includes this header in every build, and an image with no Sendspin
@@ -37,5 +40,21 @@ class LyricsReader {
 // later). False, with nothing called, in a build without a player.
 bool sendspin_read_lyrics(LyricsReader& reader, std::int64_t delay_ms,
                           const iclforge::lyrics::StageOptions& options);
+
+// What the server says is playing (metadata@v1), for the title card (planning/p4x-now-playing.md). Read the
+// same way, and under the same lock: the reader copies what it needs, and only what changed (the store's
+// revision says so), since it is asked five times a second and the heap it copies into is the one a
+// decoder leaves little of.
+class TitleReader {
+   public:
+    virtual ~TitleReader() = default;
+    // `held` is what the server said, null before it has said anything or once it says nothing is playing;
+    // `position_ms` is where the song is on the board's own clock, when the server gave a progress and the
+    // board's clock has converged on it.
+    virtual void on_title(const iclforge::nowview::TitleStore* held, std::optional<std::int64_t> position_ms) = 0;
+};
+
+// Calls `reader` once. False, with nothing called, in a build without a player.
+bool sendspin_read_title(TitleReader& reader);
 
 }  // namespace player
