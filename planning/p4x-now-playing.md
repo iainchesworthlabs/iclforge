@@ -218,8 +218,28 @@ the board's mean time to decode and render one, `/status`'s `burst_us`:
   lwIP receive mailbox change in PR #1610 is for, with the screen not drawing anything. The first play
   of the series, at 5.1 with the speakers, had it too (2 late, 3,072 frames lost at the start).
 
+**With levels that move (the same day).** A 90 s 5.1 E-AC-3 programme made with ffmpeg from the 30 s stereo music clip
+`testdata/external-baseline/ac3-music-stereo-192`, played three times and upmixed with decorrelated surrounds and the
+LFE low-passed at 120 Hz (a stand-in for a real 5.1 mix, not one; per-channel RMS L -21.8, R -21.6, C -22.5, LFE -31, Ls -27, Rs -26.7 dB), to layout 5.1, three plays
+with the speakers and three with the view off in alternating order:
+
+- **The glow follows the music, quietly.** In ten read-backs eight seconds apart the speakers brighten
+  and dim by a step or two together (the fronts louder than the surrounds), nothing jumps, and a
+  redraw is about 0.75 a second (64 to 80 in a 98 s play), which is about 7,000 pixels a second.
+- **A burst took 5,408 µs with the view off** (5,393 to 5,424, three plays) **and 5,437 µs with the
+  speakers** (5,423 to 5,451, two plays; the third lost its first second to the start-of-stream delay
+  above): +29 µs, 0.5%, the same as with the test programme. No underrun or resynchronisation, and the
+  least free heap was 96.6 to 100.0 KB with the view off and 99.0 to 100.5 KB with it on.
+
+**Can a dark screen stop the scan-out?** Not with what ESP-IDF 6.1 gives. The DPI engine has no stop or
+start: it starts in `dpi_panel_init()` and runs until `esp_lcd_panel_del()`, and its refresh rate, so
+its bandwidth, is fixed when the panel is made (`esp_lcd_panel_dpi.c`). A dark screen could stop it by
+deleting and remaking the panel (a black flash and bus and frame-buffer work on waking, on the cores
+the audio runs on) or by a slower pixel clock chosen at build for every screen. Neither is tried, and
+neither belongs in this stage.
+
 **Not checked.** The brightness of the glass at 4%: the read-back is the frame buffer, and the
 backlight is a PWM that no picture shows. A finger's tap on the glass in place of an injected one (the
 same pointer path, and the sheet's buttons were found under a finger on the first day). A glow
-moving with real 5.1 music: the 5.1 programme is a test stream. The scan-out's cost, which is the
+moving with a real 5.1 music programme (an upmix of stereo music was tried above). The scan-out's cost, which is the
 same whatever is drawn and is what dimming leaves alone.
