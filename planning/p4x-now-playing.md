@@ -12,7 +12,7 @@
     | Stage | What | State |
     |---|---|---|
     | 1 | The setting (`GET` and `PUT /now-playing`, `/dim-after`, the Adjust sheet), the **speakers** view, dimming | Built; run on the kit: see [On the kit](#on-the-kit) |
-    | 1b | The **dark** view: the backlight off until a touch lights the speakers for 30 s | Built, the rule tested on the host and in the preview tool; see [The dark view](#the-dark-view) for what has run on the kit |
+    | 1b | The **dark** view: the backlight off until a touch lights the speakers for 30 s | Built; the rule tested on the host and in the preview tool, and run on the kit with a stream and injected taps; a finger and the glass not yet looked at: [The dark view](#the-dark-view) |
     | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Not started; [what it needs](#stage-2-the-title-card) |
     | 3 | The **clock**: the board gets the time and a time zone | Built, and widened by the owner to every ESP board; run on the kit: see [Stage 3, as built](#stage-3-the-clock) |
 
@@ -181,6 +181,30 @@ which fails its run if the screen is not dark at the start, is not lit by a touc
 is not dark at 32 s, or a second touch does not move it on (all pass); and a picture of the sheet:
 
 ![The Adjust sheet with Dark chosen](../docs/hearth/screenshots/p4-panel-controls-dark.png)
+
+**On the kit (2026-10-21, over the cable, the bench lock held).** The image of this change (`p4-rev3`,
+profile hash `ff9b27a6c4fd`, 2,562,880 bytes) was sent with `ota.py push` and accepted on its 30 s
+trial. `PUT /now-playing dark` answered 200 and the panel's read-back said `view: dark`; a 400 for
+`Dark` (the words are lower case) and for anything else. Then `hearth-testserver` played the E-AC-3 5.1
+test programme (`testdata/external-baseline/eac3-51-256`, no lyrics) over Sendspin to layout 5.1 for
+190 s, on a panel nobody had touched for hours, while the panel's read-back (`GET :8081/panel`: `dimmed`,
+`backlight`) was sampled twice a second and taps were injected (`POST :8081/panel/tap`); `T1`, `T2` and
+`T3` are the taps:
+
+| Tried | Result |
+|---|---|
+| The song begins on an untouched panel | dark at once (backlight 0, 5 s after the request, as soon as the screen showed) |
+| `T1`: a tap on *Adjust* while dark | lit (backlight 80) within 0.8 s, and **the sheet did not open** (the frame's Close button was not there) |
+| Left alone after `T1` | dark again **30.1 s** after the tap |
+| `T2`, then `T3` 20 s later | still lit at 20 s; lit 27 s after `T3` (47 s after `T2`); dark **30.2 s** after `T3` |
+| `PUT /now-playing speakers` while dark | lit at once and kept |
+| `PUT /now-playing dark` again, nothing touched for over 30 s | dark at once |
+
+Nine checks, nine passes (`scratchpad` script, not in the repository). The timings are the read-back's, at
+half a second, and the injected tap is not a finger. **Not looked at on the kit:** a real finger's tap, the
+glass with its backlight off (the read-back is the frame buffer and the PWM duty, not the light), and
+whether the idle screen lights up between two songs of a real playlist. The kit was put back as found
+(view `speakers`, dim after 5 minutes, the test server's pairing record forgotten).
 
 ## Stage 2: the title card
 
