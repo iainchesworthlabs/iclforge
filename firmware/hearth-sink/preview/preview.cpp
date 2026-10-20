@@ -19,6 +19,9 @@
 
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
+#include "iclforge/now_view.hpp"
+#include "iclforge/render/layout.hpp"
+#include "iclforge/render/room_plan.hpp"
 #include "panel/lvgl/board_info.hpp"
 #include "panel/lvgl/fonts.hpp"
 #include "panel/lvgl/lyric_screen.hpp"
@@ -39,6 +42,11 @@ std::optional<std::int64_t> g_position;
 std::int64_t g_item = 1;
 std::int64_t g_now_us = 0;
 player::panel::BoardInfo g_board;
+// The no-lyrics screen's data: what the player says is playing, and what the settings say to show.
+player::panel::NowPlaying g_now;
+bool g_now_playing = false;
+player::panel::NowSettings g_settings;
+int g_backlight = 80;
 
 std::vector<std::uint16_t> g_frame(static_cast<std::size_t>(kWidth) * kHeight, 0);
 
@@ -148,9 +156,53 @@ void tap(int x, int y) {
     pump(4);
 }
 
+// One output's level over the last 100 ms, in dB of full scale: the peak and the RMS.
+struct Level {
+    float peak;
+    float rms;
+};
+
+// A stream playing to the room `layout` names, with the decoder's findings and a level for every slot.
+void play_room(const char* layout, const iclforge::nowview::StreamFacts& facts, const std::vector<Level>& levels) {
+    const auto parsed = iclforge::render::OutputLayout::parse(layout);
+    if (!parsed) {
+        std::fprintf(stderr, "scenario layout %s\n", layout);
+        std::exit(2);
+    }
+    g_now = {};
+    const auto spots = iclforge::render::plan_spots(*parsed);
+    g_now.spots.assign(spots.begin(), spots.end());
+    const std::string heading = iclforge::nowview::heading(facts, layout, spots.size());
+    g_now.heading.assign(heading.data(), heading.size());
+    for (const Level& level : levels) {
+        g_now.peak_db.push_back(level.peak);
+        g_now.rms_db.push_back(level.rms);
+    }
+    g_now_playing = true;
+    g_board.stream = "bursts";
+    g_held = false;
+    g_position.reset();
+}
+
+// A music mix over a few rooms: sample levels, not measurements.
+const std::vector<Level> kStereo = {{-9, -19}, {-11, -21}};
+const std::vector<Level> kFiveOne = {{-10, -19}, {-14, -24}, {-11, -20}, {-28, -37}, {-26, -35}, {-16, -27}};
+const std::vector<Level> kFiveOneNoCentre = {{-10, -19}, {-120, -120}, {-11, -20}, {-27, -36}, {-26, -35}, {-16, -27}};
+const std::vector<Level> kSevenOneFour = {{-12, -21}, {-17, -27}, {-13, -22}, {-24, -33}, {-22, -31}, {-30, -40},
+                                          {-31, -41}, {-36, -46}, {-35, -45}, {-42, -52}, {-44, -54}, {-18, -29}};
+// 9.1.6: L C R Ls Rs Lrs Rrs Lw Rw, six heights, the LFE.
+const std::vector<Level> kNineOneSix = {{-12, -21}, {-17, -27}, {-13, -22}, {-24, -33}, {-22, -31}, {-30, -40}, {-31, -41},
+                                        {-26, -35}, {-27, -36}, {-36, -46}, {-35, -45}, {-38, -48}, {-42, -52}, {-44, -54},
+                                        {-46, -56}, {-18, -29}};
+
+constexpr iclforge::nowview::StreamFacts kDolbyFiveOne{.codec = iclforge::nowview::Codec::kEac3, .have_decoder = true,
+                                                       .acmod = 7, .lfe = true, .objects = 0};
+
 struct Scenario {
     const char* name;
     std::function<void()> set_up;
+    // How far the clock moves before the picture, so that a glow settles on the levels it is given.
+    std::int64_t settle_us = 1'000'000;
 };
 
 }  // namespace
@@ -167,6 +219,22 @@ bool read_lyrics(LyricsReader& reader, std::int64_t delay_ms,
 }
 
 BoardInfo read_board_info() { return g_board; }
+
+bool read_now_playing(NowPlaying& out) {
+    if (!g_now_playing) {
+        return false;
+    }
+    out = g_now;
+    return true;
+}
+
+NowSettings read_now_settings() { return g_settings; }
+
+void set_backlight(int percent) { g_backlight = percent; }
+
+void choose_now_view(iclforge::nowview::View view) { g_settings.view = view; }
+
+void choose_dim_after(int minutes) { g_settings.dim_after_minutes = minutes; }
 
 std::int64_t time_us() { return g_now_us; }
 
@@ -275,7 +343,20 @@ int main(int argc, char** argv) {
         {"s7-no-lyrics", [&] {
              g_board.stream = "bursts";
              g_held = false;
+             g_settings.view = iclforge::nowview::View::kOff;
          }},
+        {"s13-speakers-2-0", [&] {
+             g_settings.view = iclforge::nowview::View::kSpeakers;
+             play_room("2.0", {.codec = iclforge::nowview::Codec::kPcm}, kStereo);
+         }, 10'000'000},
+        {"s13-speakers-5-1", [&] { play_room("5.1", kDolbyFiveOne, kFiveOne); }, 10'000'000},
+        {"s13-speakers-5-1-silent-centre", [&] { play_room("5.1", kDolbyFiveOne, kFiveOneNoCentre); }, 10'000'000},
+        {"s13-speakers-7-1-4", [&] {
+             play_room("7.1.4", {.codec = iclforge::nowview::Codec::kEac3, .have_decoder = true, .acmod = 7, .lfe = true,
+                                 .objects = 15},
+                       kSevenOneFour);
+         }, 10'000'000},
+        {"s13-speakers-9-1-6", [&] { play_room("9.1.6", kDolbyFiveOne, kNineOneSix); }, 10'000'000},
         {"s0-waiting", [&] {
              g_board.stream = "bursts";
              hold(auld, std::nullopt);
@@ -301,11 +382,47 @@ int main(int argc, char** argv) {
     int number = 0;
     for (const Scenario& scenario : scenarios) {
         scenario.set_up();
-        g_now_us += 1'000'000;  // so that the board's info is read again
+        g_now_us += scenario.settle_us;  // so that the board's info is read again, and a glow has settled
         pump(6);
         write_bmp(out / (std::string(scenario.name) + ".bmp"));
         const player::panel::ScreenStats stats = player::panel::screen_stats();
         std::printf("%2d  %-26s screen %-9s rebuilds %u\n", ++number, scenario.name, stats.name, stats.rebuilds);
+    }
+
+    // S14: the speakers dimmed after six minutes of nothing touched, and a touch waking them. Checked
+    // as well as drawn: a screen that stayed dark, or a backlight that stayed down, is a failure.
+    {
+        g_settings.view = iclforge::nowview::View::kSpeakers;
+        g_settings.dim_after_minutes = 5;
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        g_now_us += 10'000'000;
+        pump(6);
+        const bool lit_before = !player::panel::screen_stats().dimmed && g_backlight == 80;
+        g_now_us += 4LL * 60 * 1'000'000;
+        pump(6);
+        const bool lit_at_four = !player::panel::screen_stats().dimmed && g_backlight == 80;
+        g_now_us += 2LL * 60 * 1'000'000;
+        pump(6);
+        write_bmp(out / "s14-dimmed.bmp");
+        const bool dark = player::panel::screen_stats().dimmed && g_backlight == 4;
+        tap(500, 300);
+        pump(6);
+        const bool woken = !player::panel::screen_stats().dimmed && g_backlight == 80;
+        std::printf("%2d  %-26s lit %s, lit at 4 min %s, dark at 6 min %s, a touch wakes it %s\n", ++number,
+                    "s14-dimmed", lit_before ? "yes" : "NO", lit_at_four ? "yes" : "NO", dark ? "yes" : "NO",
+                    woken ? "yes" : "NO");
+        if (!lit_before || !lit_at_four || !dark || !woken) {
+            return 3;
+        }
+        // Never dims: the same quiet, no dark.
+        g_settings.dim_after_minutes = 0;
+        g_now_us += 60LL * 60 * 1'000'000;
+        pump(6);
+        if (player::panel::screen_stats().dimmed) {
+            std::puts("dim after never dimmed the screen");
+            return 3;
+        }
+        g_settings.dim_after_minutes = 5;
     }
 
     // S9: the sheet, over a line being sung.

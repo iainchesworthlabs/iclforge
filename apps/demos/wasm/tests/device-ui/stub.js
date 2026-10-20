@@ -48,6 +48,8 @@ const REPLIES = {
         'GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0',
         'PUT  /network       body: an SSID, a newline, a passphrase; next boot',
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
+        'GET  /now-playing   speakers, title, clock or off on a board with a screen; PUT one to change it',
+        'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
         'GET  /pairing       the servers this board is paired with, as JSON',
         'POST /pairing       body: reset, cancel, forget, or forget and a server_id (Sendspin pairing)',
         'GET  /firmware      both app slots, a trial, an upload and the last update, as JSON',
@@ -88,6 +90,13 @@ const REPLIES = {
     networkPreferenceRefused:
         'that preference could not be set: wifi needs a WiFi network stored, and the board may be busy joining one\n',
     networkPreferenceOk: 'ok; takes effect in a moment, and is not kept if the interface it names does not come up\n',
+    noScreen: 'this board has no screen\n',
+    nowPlayingBad: 'PUT /now-playing wants speakers, title, clock or off\n',
+    nowPlayingRefused: 'that view is not in this build, or the setting could not be stored\n',
+    nowPlayingOk: 'ok; the screen follows at once\n',
+    dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
+    dimAfterRefused: 'that time could not be stored\n',
+    dimAfterOk: 'ok; takes effect at once\n',
     nextPlay: 'ok; takes effect at the next play\n',
     nextBoot: 'ok; takes effect at the next boot\n',
     pairingBad: 'POST /pairing wants reset, cancel, forget, or forget and a server_id\n',
@@ -149,6 +158,10 @@ const ROUTES = [
     'PUT /network',
     'GET /network-preference',
     'PUT /network-preference',
+    'GET /now-playing',
+    'PUT /now-playing',
+    'GET /dim-after',
+    'PUT /dim-after',
     'GET /pairing',
     'POST /pairing',
     'GET /firmware',
@@ -395,6 +408,13 @@ function cableNetwork(preference = 'auto') {
     };
 }
 
+// The panel of a board with a screen (firmware/hearth-sink/main/panel/): what it shows while a song has
+// no lyrics, which of the four views this build has, and when it dims, in the words GET /now-playing
+// and GET /dim-after use.
+function screenBoard() {
+    return { view: 'speakers', views: ['speakers', 'off'], dimAfter: '5' };
+}
+
 // One of GET /pairing's servers, as on_pairing_get writes it
 // (firmware/esp-idf/iclforge/src/control.cpp): the same keys in the same order.
 function pairedServer(fields) {
@@ -541,6 +561,9 @@ async function startStub() {
         // What /status says the board is joined to: undefined for a firmware
         // that does not report it, null for a build with no network.
         network: wifiNetwork(),
+        // A board with a screen (a test sets screenBoard()): the view it shows while a song has no
+        // lyrics, the views this build has, and when it dims. Null for a board with none.
+        screen: null,
         hardware: defaultHardware(),
         // GET /firmware's body (defaultFirmware), or undefined for a firmware
         // that takes no updates.
@@ -872,6 +895,43 @@ async function startStub() {
                 device.network = cableNetwork(body);
                 return send(res, 200, REPLIES.networkPreferenceOk);
             }
+            case 'GET /now-playing':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.view + '\n');
+            case 'PUT /now-playing': {
+                const word = body.trim();
+                if (!['speakers', 'title', 'clock', 'off'].includes(word)) {
+                    return send(res, 400, REPLIES.nowPlayingBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                // A build shows the views it has; the others are refused.
+                if (!device.screen.views.includes(word)) {
+                    return send(res, 409, REPLIES.nowPlayingRefused);
+                }
+                device.screen.view = word;
+                return send(res, 200, REPLIES.nowPlayingOk);
+            }
+            case 'GET /dim-after':
+                if (!device.screen) {
+                    return send(res, 404, REPLIES.noScreen);
+                }
+                return send(res, 200, device.screen.dimAfter + '\n');
+            case 'PUT /dim-after': {
+                const word = body.trim();
+                const minutes = /^[0-9]{1,3}$/.test(word) ? Number.parseInt(word, 10) : word === 'never' ? 0 : -1;
+                if (minutes < 0 || minutes > 240 || (word !== 'never' && minutes < 1)) {
+                    return send(res, 400, REPLIES.dimAfterBad);
+                }
+                if (!device.screen) {
+                    return send(res, 409, REPLIES.noScreen);
+                }
+                device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
+                return send(res, 200, REPLIES.dimAfterOk);
+            }
             case 'GET /pairing':
                 if (!device.sendspin) {
                     return send(res, 404, REPLIES.pairingRefused);
@@ -1099,6 +1159,7 @@ module.exports = {
     pairedServer,
     wifiNetwork,
     cableNetwork,
+    screenBoard,
     defaultHardware,
     defaultFirmware,
     firmwareSlot,

@@ -23,6 +23,7 @@ const {
     pairedServer,
     firmwareTrial,
     cableNetwork,
+    screenBoard,
 } = require('./stub');
 
 const COMPONENT = path.resolve(__dirname, '../../../../../firmware/esp-idf/iclforge');
@@ -345,6 +346,52 @@ test('the stand-in answers /network-preference as the firmware does', async () =
         reply = await fetch(`${stub.url}network-preference`, { method: 'PUT', body: 'wifi' });
         expect(reply.status).toBe(409);
         expect(await reply.text()).toBe(REPLIES.networkPreferenceRefused);
+    } finally {
+        await stub.close();
+    }
+});
+
+test('the stand-in answers /now-playing and /dim-after as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with no screen has nothing to set.
+        for (const route of ['now-playing', 'dim-after']) {
+            let reply = await fetch(`${stub.url}${route}`);
+            expect(reply.status).toBe(404);
+            expect(await reply.text()).toBe(REPLIES.noScreen);
+            reply = await fetch(`${stub.url}${route}`, { method: 'PUT', body: route === 'dim-after' ? '5' : 'off' });
+            expect(reply.status).toBe(409);
+            expect(await reply.text()).toBe(REPLIES.noScreen);
+        }
+        // One with a screen takes the four words, of which a build may have fewer.
+        stub.device.screen = screenBoard();
+        let reply = await fetch(`${stub.url}now-playing`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe('speakers\n');
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'Speakers' });
+        expect(reply.status).toBe(400);
+        expect(await reply.text()).toBe(REPLIES.nowPlayingBad);
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'clock' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.nowPlayingRefused);
+        reply = await fetch(`${stub.url}now-playing`, { method: 'PUT', body: 'off\n' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.nowPlayingOk);
+        expect(await (await fetch(`${stub.url}now-playing`)).text()).toBe('off\n');
+        // And a time to dim after: never, or minutes from 1 to 240.
+        expect(await (await fetch(`${stub.url}dim-after`)).text()).toBe('5\n');
+        for (const bad of ['soon', '0', '241', '-5', '5 min', '']) {
+            reply = await fetch(`${stub.url}dim-after`, { method: 'PUT', body: bad });
+            expect(reply.status).toBe(400);
+            expect(await reply.text()).toBe(REPLIES.dimAfterBad);
+        }
+        reply = await fetch(`${stub.url}dim-after`, { method: 'PUT', body: 'never' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.dimAfterOk);
+        expect(await (await fetch(`${stub.url}dim-after`)).text()).toBe('never\n');
+        reply = await fetch(`${stub.url}dim-after`, { method: 'PUT', body: '30\n' });
+        expect(reply.status).toBe(200);
+        expect(await (await fetch(`${stub.url}dim-after`)).text()).toBe('30\n');
     } finally {
         await stub.close();
     }

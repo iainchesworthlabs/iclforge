@@ -3,7 +3,11 @@
 #include <cstdint>
 #include <string>
 
+#include "iclforge/now_view.hpp"
+#include "iclforge/render/room_plan.hpp"
+
 #include "../lyrics_reader.hpp"
+#include "lv_alloc.hpp"
 
 // What the lyric screen needs to know of the board beyond the lyrics (planning/karaoke-p4x-panel.md,
 // "The screen", S1): its name and address, the network and the server, and whether anything is
@@ -37,6 +41,39 @@ struct BoardInfo {
 
 // Called a couple of times a second.
 [[nodiscard]] BoardInfo read_board_info();
+
+// What the speakers view draws while a stream plays and no lyrics are held (planning/p4x-now-playing.md):
+// the room the layout in force describes, the last 100 ms of each output's level, and the line over it.
+// The containers are LVGL's (PSRAM on the firmware): the one NowPlaying the screen keeps is filled in
+// place five times a second, and its capacity stays, so that a read allocates nothing from the heap
+// a decoder leaves little of.
+struct NowPlaying {
+    // "Dolby Digital Plus 5.1 to 7.1.4": what arrives and what it is played on.
+    LvString heading;
+    // One per output slot, in slot order; empty while the board does not know its layout.
+    LvVector<iclforge::render::PlanSpot> spots;
+    // Per slot, in dB of full scale (-120 is silence); empty before the first 100 ms window has closed.
+    LvVector<float> peak_db;
+    LvVector<float> rms_db;
+};
+
+// Fills `out` from the player, called five times a second. False when no stream is playing.
+[[nodiscard]] bool read_now_playing(NowPlaying& out);
+
+// The settings the no-lyrics screen follows (settings.hpp), read every frame.
+struct NowSettings {
+    iclforge::nowview::View view = iclforge::nowview::kDefaultView;
+    int dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
+};
+[[nodiscard]] NowSettings read_now_settings();
+
+// The backlight, percent (display.hpp's display_set_backlight on the firmware).
+void set_backlight(int percent);
+
+// A choice made on the sheet: stored (settings.hpp) and followed at once, as PUT /now-playing and
+// PUT /dim-after do.
+void choose_now_view(iclforge::nowview::View view);
+void choose_dim_after(int minutes);
 
 // A monotonic clock, microseconds.
 [[nodiscard]] std::int64_t time_us();

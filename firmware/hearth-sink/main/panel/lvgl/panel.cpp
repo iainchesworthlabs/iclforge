@@ -9,13 +9,16 @@
 #include "../panel.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
@@ -29,12 +32,28 @@
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
 
+#include "iclforge/now_view.hpp"
+#include "iclforge/render/layout.hpp"
+#include "iclforge/render/room_plan.hpp"
+
 #include "../../network.hpp"
 #include "../../sendspin.hpp"
 #include "../../settings.hpp"
 #include "board_info.hpp"
 #include "display.hpp"
 #include "lyric_screen.hpp"
+#include "now_screen.hpp"
+
+namespace player {
+namespace {
+
+// What the no-lyrics screen follows: set from the control surface's task (PUT /now-playing, /dim-after)
+// and read by the panel's, every frame.
+std::atomic<int> g_now_view{static_cast<int>(iclforge::nowview::kDefaultView)};
+std::atomic<int> g_dim_after_minutes{iclforge::nowview::kDefaultDimMinutes};
+
+}  // namespace
+}  // namespace player
 
 namespace player::panel {
 
@@ -141,6 +160,64 @@ BoardInfo read_board_info() {
     return info;
 }
 
+bool read_now_playing(NowPlaying& out) {
+    const SendspinPlaying playing = sendspin_now_playing();
+    if (!playing.active) {
+        return false;
+    }
+    // The room is parsed again only when the layout text changes, and the heading made again only when
+    // what it says does: this is called five times a second, and what it saves is the heap.
+    static std::array<char, iclforge::render::OutputLayout::kTextBytes> room_text{};
+    static iclforge::nowview::StreamFacts heading_facts{};
+    static std::size_t heading_outputs = 0;
+    static bool first = true;
+    const bool room_changed = first || playing.layout != room_text;
+    if (room_changed) {
+        room_text = playing.layout;
+        out.spots.clear();
+        if (const auto layout = iclforge::render::OutputLayout::parse(playing.layout.data())) {
+            const std::vector<iclforge::render::PlanSpot> spots = iclforge::render::plan_spots(*layout);
+            out.spots.assign(spots.begin(), spots.end());
+        }
+    }
+    if (room_changed || first || !(playing.facts == heading_facts) || playing.outputs != heading_outputs) {
+        heading_facts = playing.facts;
+        heading_outputs = playing.outputs;
+        const std::string heading = iclforge::nowview::heading(playing.facts, playing.layout.data(), playing.outputs);
+        out.heading.assign(heading.data(), heading.size());
+    }
+    first = false;
+    if (playing.have_levels) {
+        out.peak_db.assign(playing.peak_db.begin(), playing.peak_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));
+        out.rms_db.assign(playing.rms_db.begin(), playing.rms_db.begin() + static_cast<std::ptrdiff_t>(playing.outputs));
+    } else {
+        out.peak_db.clear();
+        out.rms_db.clear();
+    }
+    return true;
+}
+
+NowSettings read_now_settings() {
+    NowSettings settings;
+    settings.view = static_cast<iclforge::nowview::View>(g_now_view.load());
+    settings.dim_after_minutes = g_dim_after_minutes.load();
+    return settings;
+}
+
+void set_backlight(int percent) { display_set_backlight(percent); }
+
+void choose_now_view(iclforge::nowview::View view) {
+    // A tap is followed even where the store is refused (the console says so): the screen does what it
+    // was told until the next boot.
+    (void)settings_set_now_view(view);
+    g_now_view.store(static_cast<int>(view));
+}
+
+void choose_dim_after(int minutes) {
+    (void)settings_set_dim_after(minutes);
+    g_dim_after_minutes.store(minutes);
+}
+
 std::int64_t time_us() { return esp_timer_get_time(); }
 
 int demo_mode() { return g_demo.load(); }
@@ -227,6 +304,7 @@ void run(void* /*arg*/) {
             (void)lv_timer_handler();
             const panel::ScreenStats screen = panel::screen_stats();
             g_stats.screen = screen.name;
+            g_stats.dimmed = screen.dimmed;
             g_stats.rebuilds = screen.rebuilds;
             g_stats.rebuild_us_max = screen.rebuild_us_max;
             g_stats.stack_free = static_cast<std::uint32_t>(uxTaskGetStackHighWaterMark(nullptr));
@@ -284,12 +362,12 @@ void run(void* /*arg*/) {
         }
         std::snprintf(recent + used, sizeof recent - used, "]");
     }
-    char buffer[1024];
+    char buffer[1280];
     std::snprintf(buffer, sizeof buffer,
                   "{\"kind\":\"%s\",\"running\":%s,\"width\":%d,\"height\":%d,\"touch\":%s,"
                   "\"touch_reads\":%lu,\"touch_failures\":%lu,\"touch_points\":%lu,"
                   "\"touch_x\":%d,\"touch_y\":%d,\"touch_error\":%d,\"touch_recent\":%s,"
-                  "\"screen\":\"%s\",\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
+                  "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
                   "\"render_us_mean\":%lu,\"render_us_max\":%lu,\"rebuilds\":%lu,"
                   "\"rebuild_us_max\":%lu,\"late_cycles\":%lu,\"cycle_us_max\":%lu,"
                   "\"stack_free\":%lu}\n",
@@ -299,7 +377,8 @@ void run(void* /*arg*/) {
                   static_cast<unsigned long>(counters.failures.load()),
                   static_cast<unsigned long>(counters.touches.load()), counters.x.load(),
                   counters.y.load(), counters.last_error.load(), recent, stats.screen,
-                  panel::demo_mode(),
+                  iclforge::nowview::view_name(static_cast<iclforge::nowview::View>(g_now_view.load())),
+                  stats.dimmed ? "true" : "false", panel::demo_mode(),
                   static_cast<unsigned long>(stats.refreshes),
                   static_cast<unsigned long long>(stats.pixels),
                   static_cast<unsigned long>(stats.render_us_last),
@@ -488,6 +567,12 @@ void start_capture_server() {
 
 bool panel_built() { return true; }
 
+bool panel_has_view(iclforge::nowview::View view) { return panel::now_view_drawn(view); }
+
+void panel_set_view(iclforge::nowview::View view) { g_now_view.store(static_cast<int>(view)); }
+
+void panel_set_dim_after(int minutes) { g_dim_after_minutes.store(minutes); }
+
 bool panel_start() {
     if (g_started.exchange(true)) {
         return g_stats.running;
@@ -496,6 +581,8 @@ bool panel_start() {
         std::printf("panel: no PSRAM, which LVGL's heap is; no screen\n");
         return false;
     }
+    g_now_view.store(static_cast<int>(settings().now_view));
+    g_dim_after_minutes.store(settings().dim_after_minutes);
     lv_init();
     lv_tick_set_cb(&tick_ms);
     if (!panel::display_open(g_display)) {

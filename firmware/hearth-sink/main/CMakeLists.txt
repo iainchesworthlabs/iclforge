@@ -113,7 +113,7 @@ endif()
 # picks panel/none links none of them.
 if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
     set(ICLFORGE_PANEL_SRCS "panel/lvgl/panel.cpp" "panel/lvgl/lyric_screen.cpp"
-                            "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp"
+                            "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp" "panel/lvgl/now_screen.cpp"
                             "panel/lvgl/lv_memory.cpp")
     if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI)
         list(APPEND ICLFORGE_PANEL_SRCS "panel/lvgl/display_dsi.cpp")

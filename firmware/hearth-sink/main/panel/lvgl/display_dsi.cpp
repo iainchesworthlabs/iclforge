@@ -291,7 +291,7 @@ bool display_open(Display& out) {
     lv_indev_set_display(pointer, g_disp);
 
     open_backlight();
-    display_set_backlight(80);
+    display_set_backlight(kBacklightNormalPercent);
 
     out.lv = g_disp;
     out.width = kWidth;
