@@ -200,7 +200,7 @@ clock view reads it.
 **What the owner did not say, and was decided:** with a server named the pool is not asked (a person who
 names a server is saying where the time comes from; the router's, a local server too, is still second); a
 board that is turned `off` shows no time at all rather than an old one; the page budget went from 57,344 to
-65,536 bytes for the Time section and its list of zones (the image has room); a zone is a string and not a name, so the page offers a list of 40 zones and cities (*UTC+10 Melbourne,
+65,536 bytes for the Time section and its list of zones (the image has room); a zone is a string and not a name, so the page offers a list of 42 zones and cities (*UTC+10 Melbourne,
 Sydney, Hobart, Canberra*) that sets the string, and a field for any other, and the 400 says why.
 
 ## Open
