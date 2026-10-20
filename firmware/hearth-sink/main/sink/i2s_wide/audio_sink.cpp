@@ -33,10 +33,13 @@
 // TDM MODE IS NOT REACHABLE ON PRE-PRODUCTION (< v3.0) P4 SILICON AT ALL,
 // found on a board 2026-09-23, not specific to sixteen slots. TDM always
 // opens at the line's FULL width regardless of how many of those slots a
-// layout actually uses (slot_mask below is "always the full width, not the
+// layout actually uses (total_slot below is "always the full width, not the
 // channel count" - see sink/i2s/audio_sink.cpp's own copy of that rule,
 // because a real TDM DAC is set up for one fixed frame shape and a play
-// cannot change it out from under it). That full width is
+// cannot change it out from under it). The slot MASK is another matter: only
+// the layout's channels are enabled, so the DMA queue (internal RAM) holds
+// those and not sixteen slots a frame, and the controller sends zeros in the
+// rest - the frame on the wire is the same (dma_slots, below). That full width is
 // I2S_LL_SLOT_FRAME_BIT_MAX - 512 bits, fixed by the part, not by the
 // layout - and this chip revision's I2S peripheral has no PLL clock source
 // at all (components/esp_hal_i2s/esp32p4/include/hal/i2s_ll.h: "No PLL
@@ -193,6 +196,28 @@ i2s_tdm_slot_mask_t slot_mask(std::size_t slots) {
     return static_cast<i2s_tdm_slot_mask_t>(mask);
 }
 
+// What one frame of the DMA queue holds, in slots (iclforge::dma_slots). A standard line carries
+// the slots it clocks. A TDM line clocks the layout's full frame (plan.slots: sixteen 32-bit slots,
+// 512 bits, whatever the layout) but only the first `channels` of them are enabled, and the
+// driver's DMA buffer holds those alone: with the skip mask off, the controller takes one sample
+// per enabled slot from the buffer, in order, and sends zeros in the others (i2s_ll.h: "Disable,
+// just output 0"; i2s_tdm.c sizes the buffer by popcount(slot_mask), `active_slot`). The queue is
+// the same depth in time (kDmaDescriptors x kDmaFrames frames) and costs 4 bytes a frame for each
+// channel and not for each slot of the frame: 73,728 bytes of internal RAM for a 5.1 layout where
+// all sixteen slots took 196,608 (planning/karaoke-p4x-panel.md, "Where the internal RAM goes").
+[[nodiscard]] std::size_t dma_slots(const Line& line) {
+    return iclforge::dma_slots(line.tdm, line.slots, line.channels);
+}
+
+// The TDM slot configuration for a plan: the frame is `plan.slots` slots wide and `plan.channels`
+// of them carry audio.
+[[nodiscard]] i2s_tdm_slot_config_t tdm_slot_config(const iclforge::SinkLinePlan& plan) {
+    i2s_tdm_slot_config_t cfg = I2S_TDM_PHILIPS_SLOT_DEFAULT_CONFIG(
+        data_bits(), I2S_SLOT_MODE_STEREO, slot_mask(plan.channels));
+    cfg.total_slot = static_cast<uint32_t>(plan.slots);
+    return cfg;
+}
+
 // Brings the line to exactly `plan.slots` slots in `plan.tdm` mode - see
 // sink/i2s/audio_sink.cpp's configure_line for the full reasoning on the
 // reconfigure-in-place preference. Identical logic, one line instead of two.
@@ -208,6 +233,7 @@ void close_line(Line& line) {
 
 bool configure_line(Line& line, const iclforge::SinkLinePlan& plan, const LineGpio& gpio,
                     std::uint32_t sample_rate) {
+    const std::size_t carried_before = line.channels;
     line.channels = plan.channels;
 
     if (plan.slots == 0) {
@@ -215,7 +241,10 @@ bool configure_line(Line& line, const iclforge::SinkLinePlan& plan, const LineGp
         return true;
     }
 
-    if (line.chan != nullptr && line.tdm == plan.tdm && line.slots == plan.slots) {
+    // A TDM line's DMA queue holds the channels it carries and not the slots it clocks
+    // (dma_slots), so another channel count is another buffer even in the same frame.
+    if (line.chan != nullptr && line.tdm == plan.tdm && line.slots == plan.slots &&
+        (!plan.tdm || carried_before == plan.channels)) {
         return true;
     }
 
@@ -226,8 +255,7 @@ bool configure_line(Line& line, const iclforge::SinkLinePlan& plan, const LineGp
         restart_clock(sample_rate);
         esp_err_t err;
         if (plan.tdm) {
-            i2s_tdm_slot_config_t slot_cfg = I2S_TDM_PHILIPS_SLOT_DEFAULT_CONFIG(
-                data_bits(), I2S_SLOT_MODE_STEREO, slot_mask(plan.slots));
+            const i2s_tdm_slot_config_t slot_cfg = tdm_slot_config(plan);
             err = i2s_channel_reconfig_tdm_slot(line.chan, &slot_cfg);
         } else {
             i2s_std_slot_config_t slot_cfg =
@@ -235,8 +263,11 @@ bool configure_line(Line& line, const iclforge::SinkLinePlan& plan, const LineGp
             err = i2s_channel_reconfig_std_slot(line.chan, &slot_cfg);
         }
         if (err != ESP_OK || i2s_channel_enable(line.chan) != ESP_OK) {
-            std::printf("error: could not reconfigure the I2S line to %u slots\n",
-                        static_cast<unsigned>(plan.slots));
+            std::printf("error: could not reconfigure the I2S line to %u slots (%u carried)\n",
+                        static_cast<unsigned>(plan.slots), static_cast<unsigned>(plan.channels));
+            // A buffer that was freed and not made again would be taken for an open line by the
+            // next open of the same plan: the line is closed and the next open makes it afresh.
+            close_line(line);
             return false;
         }
         line.slots = plan.slots;
@@ -301,8 +332,7 @@ bool configure_line(Line& line, const iclforge::SinkLinePlan& plan, const LineGp
 #else
         tdm_cfg.clk_cfg.clk_src = I2S_CLK_SRC_APLL;
 #endif
-        tdm_cfg.slot_cfg = I2S_TDM_PHILIPS_SLOT_DEFAULT_CONFIG(data_bits(), I2S_SLOT_MODE_STEREO,
-                                                               slot_mask(plan.slots));
+        tdm_cfg.slot_cfg = tdm_slot_config(plan);
         tdm_cfg.gpio_cfg.mclk = I2S_GPIO_UNUSED;
         tdm_cfg.gpio_cfg.bclk = gpio.bclk;
         tdm_cfg.gpio_cfg.ws = gpio.ws;
@@ -333,11 +363,11 @@ std::size_t write_line(const Line& line, std::span<const std::span<const float>>
                        std::size_t frames, LineBuffer& buffer) {
     std::size_t bytes = 0;
     const void* data = nullptr;
+    const std::size_t stride = dma_slots(line);
     if (g_slot_bits == 16 && line.tdm) {
-        iclforge::interleave_16in16(channels, line.slots, frames,
-                                    std::span<std::int16_t>(buffer.narrow)
-                                        .first(frames * line.slots));
-        bytes = frames * line.slots * sizeof(std::int16_t);
+        iclforge::interleave_16in16(channels, stride, frames,
+                                    std::span<std::int16_t>(buffer.narrow).first(frames * stride));
+        bytes = frames * stride * sizeof(std::int16_t);
         data = buffer.narrow.data();
     } else if (g_slot_bits == 16) {
         const std::array<std::span<const float>, 2> pair = {
@@ -346,9 +376,9 @@ std::size_t write_line(const Line& line, std::span<const std::span<const float>>
         bytes = frames * 2 * sizeof(std::int16_t);
         data = buffer.narrow.data();
     } else {
-        iclforge::interleave_24in32(channels, line.slots, frames,
-                                    std::span<std::int32_t>(buffer.wide).first(frames * line.slots));
-        bytes = frames * line.slots * sizeof(std::int32_t);
+        iclforge::interleave_24in32(channels, stride, frames,
+                                    std::span<std::int32_t>(buffer.wide).first(frames * stride));
+        bytes = frames * stride * sizeof(std::int32_t);
         data = buffer.wide.data();
     }
     std::size_t written = 0;
@@ -380,23 +410,24 @@ bool sink_open(std::uint32_t sample_rate, int channels) {
         return false;
     }
 
-    const std::size_t bytes_per_frame = g_line.slots * bytes_per_slot();
+    const std::size_t bytes_per_frame = dma_slots(g_line) * bytes_per_slot();
     const std::size_t dma_bytes = static_cast<std::size_t>(g_dma_plan.descriptors) *
                                   static_cast<std::size_t>(g_dma_plan.frames) * bytes_per_frame;
     g_model.open(sample_rate * static_cast<std::uint32_t>(bytes_per_frame), dma_bytes);
 
     const bool fixed = kFrame == iclforge::SinkFrame::fixed;
-    const char* mode = "";
+    char mode[48] = "";
     if (g_line.tdm) {
-        mode = fixed ? " (tdm, fixed frame)" : " (tdm)";
+        std::snprintf(mode, sizeof mode, " (tdm%s, %u carried)", fixed ? ", fixed frame" : "",
+                      static_cast<unsigned>(g_line.channels));
     }
     std::printf("sink: i2s-wide %lu Hz %d-bit, %d channels: %u slots%s, %s, bclk=%d ws=%d "
-                "dout=%d, dma=%dx%d frames (%ld ms)\n",
+                "dout=%d, dma=%dx%d frames of %u bytes (%ld ms)\n",
                 static_cast<unsigned long>(sample_rate), g_slot_bits, channels,
                 static_cast<unsigned>(g_line.slots), mode,
                 kSlave ? "slave (the DAC clocks)" : "master", kLineGpio.bclk, kLineGpio.ws,
                 kLineGpio.dout, g_dma_plan.descriptors, g_dma_plan.frames,
-                static_cast<long>(g_model.capacity_ms()));
+                static_cast<unsigned>(bytes_per_frame), static_cast<long>(g_model.capacity_ms()));
     return true;
 }
 
