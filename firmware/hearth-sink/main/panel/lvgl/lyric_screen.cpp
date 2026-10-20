@@ -319,6 +319,7 @@ struct Screen {
     std::string clock_text;
     std::string line_text;
     std::string delay_text;
+    std::string size_text;
     int progress_width = -1;
 
     const char* name = "idle";
@@ -367,6 +368,12 @@ Screen g;
     char buffer[32];
     std::snprintf(buffer, sizeof buffer, "Delay %+d ms", static_cast<int>(ms));
     return buffer;
+}
+
+// The text size step as the sheet says it. The idle screen draws no lyrics to resize, so without
+// this the Smaller and Larger buttons showed nothing there (the first run on the kit, 2026-10-20).
+[[nodiscard]] const char* size_string(int scale) {
+    return scale == 0 ? "Smaller" : scale == 2 ? "Larger" : "Normal";
 }
 
 void plain_box(lv_obj_t* object) {
@@ -533,6 +540,8 @@ void build_sheet() {
 
     lv_obj_t* const size_title = make_label(g.sheet, "Text size", g.small, kMuted);
     lv_obj_set_pos(size_title, 560, 18);
+    g.sheet_size = make_label(g.sheet, size_string(g.scale), g.small, kText);
+    lv_obj_set_pos(g.sheet_size, 560 + 130, 18);
     make_button(g.sheet, "Smaller", 150, 72, Button::kSmaller, false);
     lv_obj_set_pos(lv_obj_get_child(g.sheet, -1), 560, 60);
     make_button(g.sheet, "Larger", 150, 72, Button::kLarger, false);
@@ -1075,6 +1084,13 @@ void update_header_and_footer(const Stage& stage) {
         lv_label_set_text(g.chip_delay, delay.c_str());
         if (g.sheet_delay != nullptr) {
             lv_label_set_text(g.sheet_delay, delay.c_str());
+        }
+    }
+    const char* const size = size_string(g.scale);
+    if (g.size_text != size) {
+        g.size_text = size;
+        if (g.sheet_size != nullptr) {
+            lv_label_set_text(g.sheet_size, size);
         }
     }
 }
