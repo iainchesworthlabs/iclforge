@@ -39,6 +39,8 @@ void display_set_backlight(int percent);
 // at arm's length in a dark room.
 inline constexpr int kBacklightNormalPercent = 80;
 inline constexpr int kBacklightDimPercent = 4;
+// The dark view (planning/p4x-now-playing.md): the backlight off, for a listener who wants no light.
+inline constexpr int kBacklightOffPercent = 0;
 
 // A pointer that something other than the glass moved (a tap that POST /panel/tap made): read in
 // preference to the touch controller while it is down. A board with no touch controller has only

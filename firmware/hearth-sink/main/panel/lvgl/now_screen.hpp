@@ -27,11 +27,13 @@ struct NowStyle {
     const lv_font_t* label = nullptr;
 };
 
-// The views this build draws: the speakers, and "off" (the sentence the screen has always had). The
-// title card and the clock come with what they need (planning/p4x-now-playing.md); until then the sheet
-// does not offer them and PUT /now-playing refuses them.
+// The views this build draws: the speakers, "dark" (nothing lit until a touch lights the speakers) and
+// "off" (the sentence the screen has always had). The title card and the clock come with what they need
+// (planning/p4x-now-playing.md); until then the sheet does not offer them and PUT /now-playing refuses
+// them.
 [[nodiscard]] constexpr bool now_view_drawn(iclforge::nowview::View view) {
-    return view == iclforge::nowview::View::kSpeakers || view == iclforge::nowview::View::kOff;
+    return view == iclforge::nowview::View::kSpeakers || view == iclforge::nowview::View::kDark ||
+           view == iclforge::nowview::View::kOff;
 }
 
 // Builds the speakers view into `parent`, an empty stage of `width` by `height`, for the room `now`

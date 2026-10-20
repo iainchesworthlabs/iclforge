@@ -22,6 +22,7 @@ enum class View : std::uint8_t {
     kTitle = 1,     // title, artist, album and a progress line (needs the server to send them)
     kClock = 2,     // the time (needs a clock the board has to be given)
     kOff = 3,       // the screen this replaced: one sentence
+    kDark = 4,      // nothing lit: the backlight off while a song has no lyrics, a touch lights the speakers for a while
 };
 
 inline constexpr View kDefaultView = View::kSpeakers;
@@ -34,6 +35,8 @@ inline constexpr View kDefaultView = View::kSpeakers;
             return "clock";
         case View::kOff:
             return "off";
+        case View::kDark:
+            return "dark";
         case View::kSpeakers:
             break;
     }
@@ -54,10 +57,10 @@ namespace detail {
 
 }  // namespace detail
 
-// One of the four words, with or without a line ending after it.
+// One of the five words, with or without a line ending after it.
 [[nodiscard]] constexpr std::optional<View> parse_view(std::string_view text) {
     text = detail::trimmed(text);
-    for (const View view : {View::kSpeakers, View::kTitle, View::kClock, View::kOff}) {
+    for (const View view : {View::kSpeakers, View::kTitle, View::kClock, View::kOff, View::kDark}) {
         if (text == view_name(view)) {
             return view;
         }
@@ -67,7 +70,7 @@ namespace detail {
 
 // A stored number, or nothing for one this build does not know (a partition written by another build).
 [[nodiscard]] constexpr std::optional<View> view_from_stored(std::int32_t value) {
-    if (value >= static_cast<std::int32_t>(View::kSpeakers) && value <= static_cast<std::int32_t>(View::kOff)) {
+    if (value >= static_cast<std::int32_t>(View::kSpeakers) && value <= static_cast<std::int32_t>(View::kDark)) {
         return static_cast<View>(value);
     }
     return std::nullopt;
@@ -110,6 +113,39 @@ inline constexpr int kDefaultDimMinutes = 5;
 [[nodiscard]] constexpr bool dimmed(bool no_lyrics_view_showing, int minutes, std::uint32_t inactive_ms) {
     return no_lyrics_view_showing && minutes > kDimNever &&
            static_cast<std::uint64_t>(inactive_ms) >= static_cast<std::uint64_t>(minutes) * 60'000U;
+}
+
+// --- the dark view ----------------------------------------------------------------------------------------
+
+// How long a touch lights the dark view's screen, with nothing touched since, before it goes dark again.
+inline constexpr std::uint32_t kDarkAwakeMs = 30'000;
+
+// What the no-lyrics screen is doing with the glass.
+enum class Dim : std::uint8_t {
+    kNone,    // lit
+    kDimmed,  // the speakers view, left alone for the dim time: a black cover, the backlight at its floor
+    kDark,    // the dark view, not touched lately: a black cover, the backlight off
+};
+
+// What the screen does now. `showing` is that the no-lyrics view is what the panel is on (the speakers
+// built, or the dark view chosen while a song has no lyrics); `inactive_ms` is the time since anything
+// touched the glass, and `showing_ms` the time since the view began to show.
+//
+// The speakers view dims after `minutes` of both. The dark view is dark from the moment it begins to
+// show, whatever touched the glass before; a touch after that lights it, for kDarkAwakeMs from the last
+// touch. A song that begins on a panel nobody has touched for hours is dark at once in the dark view and
+// is not dimmed at once in the speakers view, which counts from the song too.
+[[nodiscard]] constexpr Dim dim_state(View view, bool showing, int minutes, std::uint32_t inactive_ms,
+                                      std::uint32_t showing_ms) {
+    if (!showing) {
+        return Dim::kNone;
+    }
+    if (view == View::kDark) {
+        const bool touched_since_it_began = inactive_ms < showing_ms;
+        return touched_since_it_began && inactive_ms < kDarkAwakeMs ? Dim::kNone : Dim::kDark;
+    }
+    const std::uint32_t quiet = inactive_ms < showing_ms ? inactive_ms : showing_ms;
+    return dimmed(true, minutes, quiet) ? Dim::kDimmed : Dim::kNone;
 }
 
 // --- what the stream is called ------------------------------------------------------------------------

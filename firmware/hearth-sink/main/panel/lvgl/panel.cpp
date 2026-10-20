@@ -306,6 +306,7 @@ void run(void* /*arg*/) {
             const panel::ScreenStats screen = panel::screen_stats();
             g_stats.screen = screen.name;
             g_stats.dimmed = screen.dimmed;
+            g_stats.backlight = screen.backlight;
             g_stats.rebuilds = screen.rebuilds;
             g_stats.rebuild_us_max = screen.rebuild_us_max;
             g_stats.dev_view = screen.dev_view;
@@ -372,7 +373,7 @@ void run(void* /*arg*/) {
                   "{\"kind\":\"%s\",\"running\":%s,\"width\":%d,\"height\":%d,\"touch\":%s,"
                   "\"touch_reads\":%lu,\"touch_failures\":%lu,\"touch_points\":%lu,"
                   "\"touch_x\":%d,\"touch_y\":%d,\"touch_error\":%d,\"touch_recent\":%s,"
-                  "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"dev_view\":%s,\"dev_refreshes\":%lu,"
+                  "\"screen\":\"%s\",\"view\":\"%s\",\"dimmed\":%s,\"backlight\":%d,\"dev_view\":%s,\"dev_refreshes\":%lu,"
                   "\"dev_refresh_us_last\":%lu,\"dev_refresh_us_max\":%lu,\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
                   "\"render_us_mean\":%lu,\"render_us_max\":%lu,\"rebuilds\":%lu,"
                   "\"rebuild_us_max\":%lu,\"late_cycles\":%lu,\"cycle_us_max\":%lu,"
@@ -384,7 +385,7 @@ void run(void* /*arg*/) {
                   static_cast<unsigned long>(counters.touches.load()), counters.x.load(),
                   counters.y.load(), counters.last_error.load(), recent, stats.screen,
                   iclforge::nowview::view_name(static_cast<iclforge::nowview::View>(g_now_view.load())),
-                  stats.dimmed ? "true" : "false", stats.dev_view ? "true" : "false",
+                  stats.dimmed ? "true" : "false", stats.backlight, stats.dev_view ? "true" : "false",
                   static_cast<unsigned long>(stats.dev_refreshes),
                   static_cast<unsigned long>(stats.dev_refresh_us_last),
                   static_cast<unsigned long>(stats.dev_refresh_us_max), panel::demo_mode(),

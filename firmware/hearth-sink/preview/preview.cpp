@@ -507,6 +507,58 @@ int main(int argc, char** argv) {
         g_settings.dim_after_minutes = 5;
     }
 
+    // S14b: the dark view. Dark from the moment a song with no lyrics begins, however long nothing has
+    // touched the panel; a touch lights the speakers for 30 s from the last touch, and a second touch
+    // moves that on; then it is dark again. Checked as well as drawn, like S14.
+    {
+        g_settings.view = iclforge::nowview::View::kDark;
+        g_now_us += 3600LL * 1'000'000;  // the panel has been left alone for an hour
+        play_room("5.1", kDolbyFiveOne, kFiveOne);
+        pump(6);
+        const auto state = [] { return player::panel::screen_stats(); };
+        const bool dark_at_start = state().dimmed && g_backlight == 0;
+        tap(500, 300);
+        pump(6);
+        const bool woken = !state().dimmed && g_backlight == 80;
+        g_now_us += 28'000'000;
+        pump(6);
+        const bool lit_at_28 = !state().dimmed && g_backlight == 80;
+        g_now_us += 4'000'000;
+        pump(6);
+        const bool dark_at_32 = state().dimmed && g_backlight == 0;
+        // A touch 20 s after the first moves the dark on by as much: lit 28 s after it, dark 32 s after.
+        tap(500, 300);
+        pump(6);
+        g_now_us += 20'000'000;
+        tap(500, 300);
+        pump(6);
+        g_now_us += 28'000'000;
+        pump(6);
+        const bool lit_after_second = !state().dimmed && g_backlight == 80;
+        g_now_us += 4'000'000;
+        pump(6);
+        const bool dark_again = state().dimmed && g_backlight == 0;
+        std::printf("%2d  %-26s dark at the start %s, a touch lights it %s, lit at 28 s %s, dark at 32 s %s, "
+                    "a second touch moves it on %s, dark again %s\n",
+                    ++number, "s14b-dark", dark_at_start ? "yes" : "NO", woken ? "yes" : "NO",
+                    lit_at_28 ? "yes" : "NO", dark_at_32 ? "yes" : "NO", lit_after_second ? "yes" : "NO",
+                    dark_again ? "yes" : "NO");
+        if (!dark_at_start || !woken || !lit_at_28 || !dark_at_32 || !lit_after_second || !dark_again) {
+            return 3;
+        }
+        // The sheet with Dark chosen: the dim row says what a touch does instead of offering dim times.
+        tap(500, 300);
+        pump(6);
+        tap(1024 - 32 - 80, 600 - 64 + 8 + 24);
+        pump(6);
+        write_bmp(out / "s16-controls-dark.bmp");
+        std::printf("%2d  %-26s sheet, dark view chosen\n", ++number, "s16-controls-dark");
+        g_now_us += 9'000'000;  // the sheet puts itself away after eight seconds untouched
+        pump(6);
+        g_settings.view = iclforge::nowview::View::kSpeakers;
+        pump(6);
+    }
+
     // S9: the sheet, over a line being sung.
     hold(auld, 5'750);
     g_now_us += 1'000'000;
