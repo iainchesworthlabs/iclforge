@@ -1106,6 +1106,17 @@ channels. A `>=v3.0` chip's 160 MHz PLL clears this with room to spare; the sink
 design and its clock-source choice (`I2S_CLK_SRC_APLL`, itself needed - the default
 source cannot open TDM at all on this revision) are otherwise unchanged and correct.
 
+**The DMA queue holds the channels, not the frame.** A TDM line on this sink clocks sixteen 32-bit
+slots (512 bits) whatever the layout, so the frame on the wire and the DAC's setup do not change, but
+only the layout's channels are enabled in the slot mask and the I2S driver sizes its buffer by the
+enabled slots: the controller takes one sample per enabled slot and sends zeros in the rest. The queue
+is the same 64 ms (`CONFIG_ICLFORGE_EXAMPLE_I2S_DMA_DESCRIPTORS` x `_FRAMES`) and costs 4 bytes a frame
+for each channel, of internal RAM: 24,576 bytes at 2.0 (standard I2S), 73,728 at 5.1, 98,304 at 7.1 and
+196,608 at 9.1.6. It was 196,608 at every layout from three channels up, which is why a 5.1 play of the
+karaoke programme left 46,443 bytes of internal heap at its least on the v3.2 kit, where a 2.0 play left
+217,547 (`iclforge::dma_slots`, [`sink_plan.hpp`](../../libs/device/include/iclforge/sink_plan.hpp)).
+With the queue sized by the channels the same 5.1 play left 171,151.
+
 ### On a P4 of chip revision v3.x, and a screen
 
 A chip of revision v3.x (v3.1 and newer, the generation with the errata fixes) is a **different
