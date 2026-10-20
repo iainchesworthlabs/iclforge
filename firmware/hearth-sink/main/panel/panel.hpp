@@ -40,6 +40,8 @@ struct PanelStats {
     // times it did.
     std::uint32_t rebuild_us_max = 0;
     std::uint32_t rebuilds = 0;
+    // The developer view (dev_screen.hpp) is open over the screen.
+    bool dev_view = false;
     // The task's own cycles that ran later than its period, and the slowest cycle, microseconds.
     std::uint32_t late_cycles = 0;
     std::uint32_t cycle_us_max = 0;

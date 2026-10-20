@@ -67,6 +67,7 @@
 #include "iclforge/player.hpp"
 
 #include "audio_sink.hpp"
+#include "board_report.hpp"
 #include "byte_source.hpp"
 #include "discovery.hpp"
 #include "network.hpp"
@@ -835,6 +836,34 @@ iclforge::FirmwareConfig firmware_config() {
 }
 
 }  // namespace
+
+namespace player {
+
+// The panel's developer view reads these (board_report.hpp). The figures are the ones GET /status
+// reports from the same stats: the player's own, or those of the last play when it has ended.
+BoardReport board_report() {
+    BoardReport report;
+    report.profile = ICLFORGE_PROFILE_ID;
+    report.profile_hash = ICLFORGE_PROFILE_HASH_TEXT;
+    // A few milliseconds at most: the screen holds its own lock for this, and the audio is not waiting
+    // on it, but a frame of the screen is not worth a play's setup finishing first.
+    if (g_player_mutex == nullptr || xSemaphoreTake(g_player_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {
+        return report;
+    }
+    report.layout = g_layout.text().data();
+    const iclforge::PlayerStats stats = g_player ? g_player->stats() : g_last_stats;
+    xSemaphoreGive(g_player_mutex);
+    if (stats.frames_played > 0) {
+        report.played = true;
+        report.us_per_frame = stats.decode_us / stats.frames_played;
+        report.worst_frame_us = stats.worst_frame_us;
+        report.render_us_per_frame = stats.render_us / stats.frames_played;
+        report.sink_us_per_frame = stats.sink_us / stats.frames_played;
+    }
+    return report;
+}
+
+}  // namespace player
 
 namespace {
 

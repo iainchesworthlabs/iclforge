@@ -20,6 +20,8 @@ struct ScreenStats {
     // Times the rows were rebuilt (a line change, a gap, a new item), and the longest one took.
     std::uint32_t rebuilds = 0;
     std::uint32_t rebuild_us_max = 0;
+    // The developer view (dev_screen.hpp) is open over the screen.
+    bool dev_view = false;
 };
 
 // Builds the screen on `disp`. False, having said why, if the fonts did not come up.

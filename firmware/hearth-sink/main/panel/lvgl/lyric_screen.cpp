@@ -19,11 +19,13 @@
 #include <string_view>
 #include <vector>
 
+#include "iclforge/dev_view.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
 
 #include "../lyrics_reader.hpp"
 #include "board_info.hpp"
+#include "dev_screen.hpp"
 #include "fonts.hpp"
 #include "glyphs.hpp"
 #include "lv_alloc.hpp"
@@ -315,6 +317,8 @@ struct Screen {
     std::uint32_t sheet_shown_ms = 0;
     bool sheet_visible = false;
     bool filling = false;
+    // Three taps on the board's name open the developer view (dev_screen.hpp).
+    iclforge::devview::TapStreak name_taps;
     std::string chip_name_text;
     std::string clock_text;
     std::string line_text;
@@ -499,6 +503,17 @@ void on_button(lv_event_t* event) {
     }
 }
 
+// A tap that ended on the board's name. The third of three close together opens the developer view.
+void on_name_tap(lv_event_t* /*event*/) {
+    lv_point_t at{0, 0};
+    if (lv_indev_t* const indev = lv_indev_active()) {
+        lv_indev_get_point(indev, &at);
+    }
+    if (g.name_taps.tap(at.x, at.y, now_ms())) {
+        dev_open();
+    }
+}
+
 lv_obj_t* make_button(lv_obj_t* parent, const char* text, int w, int h, Button which, bool accent) {
     lv_obj_t* const button = lv_obj_create(parent);
     plain_box(button);
@@ -594,6 +609,13 @@ void build_frame() {
     g.chip_name = make_label(footer, "", g.small, kMuted);
     lv_obj_set_width(g.chip_name, 300);
     lv_obj_set_pos(g.chip_name, kMargin, 18);
+    // The target of the three taps: the footer's whole height (64 px, a finger's, where the label is
+    // 28), from the edge to the next thing, drawing nothing and moving nothing.
+    lv_obj_t* const name_target = make_box(footer);
+    lv_obj_add_flag(name_target, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(name_target, 340, kFooterHeight);
+    lv_obj_set_pos(name_target, 0, 0);
+    lv_obj_add_event_cb(name_target, &on_name_tap, LV_EVENT_CLICKED, nullptr);
     g.chip_line = make_label(footer, "", g.small, kMuted);
     lv_obj_set_width(g.chip_line, 220);
     lv_obj_set_pos(g.chip_line, 360, 18);
@@ -1118,6 +1140,7 @@ bool screen_init(lv_display_t* disp, int width, int height) {
         return false;
     }
     build_frame();
+    dev_init(width, height, DevColours{kBg, kSurface, kSurfaceUp, kText, kAccent, kMuted, kFaint});
     return true;
 }
 
@@ -1192,6 +1215,8 @@ bool screen_update() {
             lv_obj_add_flag(g.sheet, LV_OBJ_FLAG_HIDDEN);
         }
     }
+    // The developer view, when it is asked for, is on top of all this.
+    dev_update(now);
     return g.filling;
 }
 
@@ -1200,6 +1225,7 @@ ScreenStats screen_stats() {
     stats.name = g.name;
     stats.rebuilds = g.rebuilds;
     stats.rebuild_us_max = g.rebuild_us_max;
+    stats.dev_view = dev_is_open();
     return stats;
 }
 

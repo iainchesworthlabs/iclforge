@@ -32,12 +32,14 @@ add_subdirectory("${LVGL_DIR}" lvgl EXCLUDE_FROM_ALL)
 add_executable(panel_preview
     preview.cpp
     "${MAIN}/panel/lvgl/lyric_screen.cpp"
+    "${MAIN}/panel/lvgl/dev_screen.cpp"
     "${MAIN}/panel/lvgl/glyphs.cpp"
     "${REPO}/libs/lyrics/src/lyrics.cpp"
     "${REPO}/libs/lyrics/src/stage.cpp")
 target_compile_features(panel_preview PRIVATE cxx_std_23)
 target_include_directories(panel_preview PRIVATE
     "${MAIN}"
+    "${REPO}/libs/device/include"
     "${REPO}/libs/lyrics/include")
 target_compile_definitions(panel_preview PRIVATE
     "PREVIEW_FONT_DIR=\"${MAIN}/panel/fonts\""
