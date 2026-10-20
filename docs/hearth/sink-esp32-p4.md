@@ -178,6 +178,58 @@ Indic and Thai scripts. **A line in a script the screen cannot draw is replaced 
 "This line is in a script this screen cannot show.", not by the font's missing-glyph boxes; a title
 in one is left out, and a music note (which none of the fonts has) is dropped from a line.
 
+### The developer view
+
+**Three taps on the board's name** (`hearth-e753f9`, at the left of the footer) put a screen of
+developer information over the lyrics; **a tap anywhere else puts it away**. It is on the panel
+image only (it needs the touch screen), the lyric and idle screens are as they were with it shut,
+and it puts itself away after five minutes untouched, so that a panel left on a stand is a lyric
+screen again.
+
+![The developer view: the network, the configuration, the stream and the board's performance in two columns, the network preference as three buttons, and the console's last five lines](screenshots/p4-panel-dev-view.png)
+
+Two columns of 18 px type and the console's last five lines under them, brought up to date twice a
+second. This is a page for someone at arm's length, not the two-metre type of the lyrics.
+
+| Section | What it says |
+|---|---|
+| **Network** | The interface **in use**; for the cable and for the radio its link (the cable's speed and duplex, the radio's network and signal in dBm), its address and its MAC; the board's name and its mDNS name; the address of the web page |
+| **Configuration** | The profile and its hash (`/hardware`), the firmware version and the slot it runs from, the chip and its revision, the ESP-IDF, the cores and the CPU and PSRAM clocks, the output layout, the slots and their width and the sink, how long the board has been up and why it last reset, and whether a core dump is stored |
+| **Streaming** | The server and the connections; whether the clock has converged and its error; the stream; bursts played, underruns, late, dropped, resyncs and invalid chunks; the playout's offset and the burst time, each with its worst; a meter for each output; and the figures of a play from `POST /play` (`us_per_frame`, `worst_frame_us`, `sink_us_per_frame`, `render_us_per_frame`), which are dashes until one has run |
+| **Performance** | The internal heap and the PSRAM, free and at their lowest; the panel's own render time and late cycles; the touch controller's reads, failures and touches |
+| **Console** | The last five lines of the 16 KB ring `GET /log` serves, without their colour codes |
+
+**The accent colour means look here**: a counter that is not zero, a radio signal below -75 dBm, a
+clock that has not converged while something plays, a reset by a panic, a watchdog or a brownout
+(`wdt` is not one: it is how this board restarts), a stored core dump, an internal heap that has
+fallen below 16 KB, and drawing that ran late.
+
+![The same view of a board in trouble: no cable, a weak radio, underruns, late and dropped chunks, a panic reset and a core dump, in the accent colour](screenshots/p4-panel-dev-trouble.png)
+
+**The network preference.** The row of three buttons, Auto, Ethernet and Wi-Fi, is the board's
+[network preference](#the-cable-and-wi-fi), the chosen one in the accent colour. A tap on another one
+**asks first**, so that a stray tap cannot cut the board off the network it is being used over:
+
+![Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address changes to 192.168.1.251. Cancel, Switch](screenshots/p4-panel-dev-confirm.png)
+
+Cancel, a tap anywhere else or eight seconds of nothing changes nothing. A change the board is sure
+to refuse (the interface it names holds no address, or no Wi-Fi network is stored) is said so in the
+accent colour and Switch is dimmed. **Switch** asks for the change as `PUT /network-preference` does
+(the same call; it returns at once and the work is done on a task of its own, verified as the cable
+section says), and the view says "Switching..." until the board keeps the preference, then "Done.",
+or "The board refused the change." if it has not after 45 seconds.
+
+**What it never shows** is the Wi-Fi passphrase or the Sendspin pairing token: the view reads one
+struct of facts that has no field for either, and a console line that names a passphrase, a
+password or a pairing token is replaced by a sentence. **What it does not show** is a ring fill: the
+burst player keeps no such figure (the HTTP source's `ring_low` is in `GET /status` after a
+`POST /play`).
+
+The view's rows are `libs/device/include/iclforge/dev_view.hpp`, which the host tests hold to the
+letter (the triple tap, the numbers, the colours, the confirming step's words, the log's lines),
+and its pictures are drawn by the same code as the board's, by the
+[preview](#developing-the-screen-without-a-panel).
+
 ### Wiring
 
 All of these are Kconfig (`ICLFORGE_EXAMPLE_PANEL_*`), and the defaults are the
@@ -380,7 +432,8 @@ over `POST /play`, the median of six plays alternating the screen idle and the d
 Two tools, neither needing the kit.
 
 **On a computer.** `firmware/hearth-sink/preview` builds the firmware's lyric screen against LVGL's
-software renderer and writes one picture per screen above, in seconds:
+software renderer and writes one picture per screen above, and the [developer view](#the-developer-view)'s
+(opened with three taps on the name, on fixture data), in seconds:
 
 ```bash
 cmake -S firmware/hearth-sink/preview -B build-preview -DLVGL_DIR=<firmware/hearth-sink/managed_components/lvgl__lvgl>
@@ -397,8 +450,8 @@ second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 fo
 | Request | Answer |
 |---|---|
 | `GET /panel.bmp` | the picture, as a 24-bit BMP |
-| `GET /panel` | what drawing has cost: refreshes, microseconds a refresh, the longest rebuild, late cycles, the task's stack left |
-| `POST /panel/tap?x=..&y=..` | a tap, for a board with no touch controller |
+| `GET /panel` | what drawing has cost: refreshes, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; and whether the [developer view](#the-developer-view) is open (`dev_view`) |
+| `POST /panel/tap?x=..&y=..` | a tap, for a board with no touch controller (or to try one: three of them within 600 ms at `x=100&y=568` open the developer view, and a tap on it half a second later closes it) |
 
 The same screen code runs on both and on the glass; what the computer and the board with no panel
 leave out is the glass itself.
