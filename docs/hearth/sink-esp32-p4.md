@@ -169,6 +169,7 @@ apart. The picture above and the others on this page are drawn by the firmware's
 | ![A script the fonts lack](screenshots/p4-panel-script.png) | **A script the fonts cannot draw** (Arabic here). One sentence in the line's place; the title in it is left out; a music note is dropped |
 | ![Plain text](screenshots/p4-panel-plain.png) | **A file with no times.** The text, scrolled by touch, not followed |
 | ![The speakers](screenshots/p4-panel-speakers-5-1.png) | **Playing, and no lyrics are held** ([below](#a-song-with-no-lyrics)). The speakers of the layout in force, each glowing with its own level |
+| ![The title card](screenshots/p4-panel-title-card.png) | **Playing, no lyrics, and the server has said what is playing** (the title card, [below](#a-song-with-no-lyrics)). The title, the artist, the album and year, and the song's time with a progress line |
 | ![No lyrics](screenshots/p4-panel-no-lyrics.png) | **The same with that screen turned off.** The sentence this screen had before |
 | ![The controls](screenshots/p4-panel-controls.png) | **Adjust.** The lyric delay in 50 ms steps, the text size, the screen for a song with no lyrics and when it dims; put away after eight seconds untouched |
 
@@ -197,10 +198,40 @@ the lyric screens and the idle screen do not.
 
 ![The dimmed screen](screenshots/p4-panel-dimmed.png)
 
-Which screen shows is the owner's: `speakers` (the default) or `off`, which is the old sentence;
-`title` (title, artist and a progress line, once the sink asks the server for them) and `clock` (once
-the board has the time) are planned and refused until then
+Which screen shows is the owner's: `speakers` (the default), `title`, or `off`, which is the old
+sentence; `clock` (once the board has the time) is planned and refused until then
 ([planning/p4x-now-playing.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-now-playing.md)).
+
+**The title card.** The board lists `metadata@v1` in its hello, which a board with a screen does and
+one without does not, so a server that has the role tells it what is playing: the title, the artist,
+the album and its year, and where in the song it is. The card is those, and nothing the server did
+not say: the title in 72 down to 34 px by its length (the lyric line's rule, and the same Smaller and
+Larger steps), in two rows at most with three dots after them; the artist under it in 36 px, the album
+and year in 24 px muted; the song's time at the top right and a progress line under the header, as the
+lyric screens have them, where the server gave a progress and the board's clock has converged.
+
+![The title card](screenshots/p4-panel-title-card.png)
+![A long title, cut at two rows](screenshots/p4-panel-title-card-long.png)
+
+**Until a title has come, there is no card.** With `title` chosen and nothing said (a server that
+does not send the role, or has not yet), or with a title in a script the fonts cannot draw, the
+speakers show in its place, and nothing but a title makes a card. Once a title is known the speakers'
+own header says it too: *Title - Artist* at the left, the time at the right and the progress line under
+it, in place of what arrives and what it is played on (which the dark screen still says).
+
+![The speakers with a title in the header](screenshots/p4-panel-speakers-title.png)
+
+The card dims as the speakers do, and its dark screen names the song (*Playing - Blue in Green - Miles
+Davis*). What the store keeps is small and fixed (a title of 256 bytes, an artist or an album of 160,
+cut at a character and not in the middle of one), in strings that keep their capacity, so a server's
+update and the panel's five reads a second allocate nothing from the internal heap an AC-4 decoder
+leaves little of. Two servers say it differently, and the board reads each as it means it
+([planning/hearth-sendspin-extension.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/hearth-sendspin-extension.md),
+C36): the specification's object is the whole state, so what it leaves out is gone (and aiosendspin 10,
+which Music Assistant runs now, sends it so); aiosendspin 9.1.1's carried only what changed, a field it
+cleared given as `null`, so that a pause (a progress and nothing else) leaves the title alone and a track
+with no artist does not keep the last one's. A state stamped in the future (a scheduled change, which
+aiosendspin can send up to 20 s ahead and Music Assistant does not) takes effect when it arrives.
 
 | Route | Takes | Default |
 |---|---|---|
@@ -210,7 +241,9 @@ the board has the time) are planned and refused until then
 Both are stored on the board and take effect at once, with no restart; a board with no panel answers
 404. `GET :8081/panel` says which `view` is chosen and whether the screen is `dimmed`.
 
-**On the kit** (2026-10-21): over Sendspin, a 5.1 E-AC-3 test programme with no lyrics drew exactly this picture; with the speakers showing, a burst took 4,573 µs against 4,555 µs with the view off (three 60 s plays each, no late burst, underrun or resynchronisation, and the same least free heap), and at 2.0 with a stereo music programme 2,099 against 2,114 µs. With `dim-after` at one minute the screen went dark 60.4 s after the speakers began to show, and a tap woke it. The glass's brightness at 4% and a finger's tap in place of an injected one were not looked at; the scan-out is the same whatever is drawn, and dimming leaves it alone.
+**On the kit, the title card** (2026-10-21): `hearth-testserver` said a song over Sendspin (`--title`, `--artist`, `--album`, `--year`, `--track-seconds`, and `--then-after` for a second song with no artist) and the panel's read-back was the card above, then the second song alone with nothing kept from the first, and the speakers again when the play ended; a play that said nothing, with the card chosen, showed the speakers; a 119-character title ended in three dots after two rows, and `0:08 / 24:45` fitted. A 5.1 E-AC-3 programme at layout 5.1 took 5,325 µs a burst with the view off, 5,341 with the speakers (their header the song) and 5,333 with the card (three plays each, none late, no underrun or resynchronisation); at 2.0 with a stereo programme 2,614, 2,628 and 2,633; at 7.1.4 6,475, 6,478 and 6,491. The role itself cost nothing that showed: the image without it took 5,364 µs for the same play. The panel redraws about 5.7 times a second for the song's time and line. The owner's Music Assistant had not reconnected to the kit by then, so what it sends this role is from aiosendspin's source (the whole state each time, as the specification has it) and not yet seen on the board.
+
+**On the kit, the speakers** (2026-10-21): over Sendspin, a 5.1 E-AC-3 test programme with no lyrics drew exactly this picture; with the speakers showing, a burst took 4,573 µs against 4,555 µs with the view off (three 60 s plays each, no late burst, underrun or resynchronisation, and the same least free heap), and at 2.0 with a stereo music programme 2,099 against 2,114 µs. With `dim-after` at one minute the screen went dark 60.4 s after the speakers began to show, and a tap woke it. The glass's brightness at 4% and a finger's tap in place of an injected one were not looked at; the scan-out is the same whatever is drawn, and dimming leaves it alone.
 
 **Fonts.** Archivo, the apps' own, for Latin (Basic, Latin-1 and Extended-A, most of Extended-B and
 the Vietnamese block, and the punctuation and currency signs a lyric uses); Noto Sans behind it for

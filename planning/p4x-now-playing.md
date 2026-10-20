@@ -1,6 +1,6 @@
 # What the P4X's panel shows while a song with no lyrics plays
 
-!!! note "Status as of 2026-10-21: chosen by the owner; stage 1 built; stages 2 and 3 not started"
+!!! note "Status as of 2026-10-21: chosen by the owner; stages 1 and 2 built; stage 3 not started"
     The panel of [the P4X sink](karaoke-p4x-panel.md) draws the lyrics of the item playing, and the
     idle screen when nothing plays. A song with no lyrics (most of what a music server plays, and
     every surround programme that is not karaoke) had one sentence: "No lyrics for this item". The
@@ -12,7 +12,7 @@
     | Stage | What | State |
     |---|---|---|
     | 1 | The setting (`GET` and `PUT /now-playing`, `/dim-after`, the Adjust sheet), the **speakers** view, dimming | Built; run on the kit: see [On the kit](#on-the-kit) |
-    | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Not started; [what it needs](#stage-2-the-title-card) |
+    | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Built; run on the kit: see [Stage 2](#stage-2-the-title-card-as-built) |
     | 3 | The **clock**: the board gets the time and a time zone | Not started; [what it needs](#stage-3-the-clock) |
 
 ## What the board knows while a song plays
@@ -138,20 +138,59 @@ layout text changes.
 ![The Adjust sheet with its third row](../docs/hearth/screenshots/p4-panel-controls.png)
 ![The dark screen](../docs/hearth/screenshots/p4-panel-dimmed.png)
 
-## Stage 2: the title card
+## Stage 2: the title card, as built
 
-The sink lists `metadata@v1` in its hello. The player's session already runs the role for a client
-that lists it (`libs/sendspin/src/player_session.cpp`: the `server/state` object reaches
-`PlayerListener::on_server_state()`), and `kSinkMaxJsonTokens` (512) covers the largest message a
-server sends. What is new on the board is a small store of what it says (title, artist, album,
-progress with the duration) under the player's lock, and the view. The song's position is the
-state's `progress` advanced on the board's own clock (`metadata::position_ms`). Music Assistant sends
-the role to a client that lists it; **the first run with the owner's server decides what it sends**,
-and the view says nothing it was not told. Until the role is listed no server sends anything, so
-the title card would be empty: that is why it waits.
+**The role.** The sink lists `metadata@v1` in its hello, on a board with a screen only (a board with
+none would be sent a message at every track and pause for nothing). The player's session already ran
+the role for a client that lists it (`libs/sendspin/src/player_session.cpp`: the `server/state` object
+reaches `PlayerListener::on_server_state()`); the host now forwards it (`SendspinEvents::on_metadata()`
+and `on_metadata_gone()`, `firmware/esp-idf/iclforge`), and `kSinkMaxJsonTokens` (512) covers the largest
+message a server sends.
 
-When the title is known the speakers view uses it too: the header becomes *Title - Artist* with the
-time at the right and the progress line under it, as the lyric screens' header is.
+**The store** (`libs/device/include/iclforge/title_card.hpp`, 19 host cases): title (256 bytes), artist
+and album (160 each) and year, cut at a character and not in the middle of one, in strings reserved when
+the store is made (in PSRAM where the part has it, `PsramScope`), so that an update and the panel's reads
+allocate nothing from the internal heap; and the progress with the time it was told at. The song's
+position is that progress advanced at its speed on the board's own clock (the role's calculation,
+`metadata::position_ms`, kept with the progress's own timestamp so that an object that names only a title
+does not move the song). It is read five times a second and copied into the screen's buffers only when the
+store's revision moved. A connection that ends, or is displaced, clears it.
+
+**Two servers say the same object two ways** ([planning/hearth-sendspin-extension.md](hearth-sendspin-extension.md),
+C36), and a null and a field left out read alike in `metadata::State`, so the reader now keeps which fields
+were null (`metadata::null_fields`, `ServerState::metadata_nulls`; 3 new checks in `test_messages.cpp`):
+
+| Server | What it sends | The store |
+|---|---|---|
+| The specification, and **aiosendspin 10.x (Music Assistant now)** | The whole state each time, a field it has not got left out, an omitted `progress` clearing the position, a cleared state as an object with only a `timestamp` | Replaces: what the object leaves out is gone |
+| aiosendspin 9.1.1 (C36) | The first object whole, then only what changed, a cleared field as `null` | Merges: left out stays, null clears |
+
+The first row was read from aiosendspin's source on 2026-10-21 (`server/roles/metadata/group.py`:
+`_state_message` sends `Metadata.snapshot_update()`, "the full current state", with `omit_none`; Music Assistant's
+Sendspin provider calls `set_metadata(metadata)` with no timestamp, so a change applies at once) and agrees
+with what the owner's Music Assistant reported on the kit that day: the **specification** dialect. The dialect
+chooses the rule (`TitleUpdate::whole`), and the console says which it used (*metadata (whole state): ...*).
+**Not handled:** a state stamped in the future (aiosendspin can schedule one up to 20 s ahead; Music Assistant
+does not) takes effect when it arrives, not at its time; the console line says how far ahead it was stamped.
+
+**The view.** The title in 72 down to 34 px by its length (the lyric line's `current_size()`, and the same
+Smaller and Larger steps), in two rows at most, cut with three dots; the artist in 36 px muted; the album and
+year in 24 px, a step further back; the block in the middle of the stage; the song's time at the top right
+and the progress line under the header, as the lyric screens have them (tile B of the options picture). The
+title card is the third choice in Adjust, `now_view_drawn(kTitle)` is true and `PUT /now-playing title`
+answers 200. **No title, no card:** with the card chosen and no title said, or one the fonts cannot draw
+(`drawable_title()`), the speakers show in its place, and failing those the sentence; the artist and album go
+with an undrawable title, and one that is undrawable alone is left out. When the title is known the speakers'
+header says *Title - Artist* with the time at the right and the progress line under it. The card dims as the
+speakers do; its dark screen names the song. A title is a rebuild of the card (about 44 ms, once, when it
+changes), the time and the line are two labels.
+
+![The title card](../docs/hearth/screenshots/p4-panel-title-card.png)
+![A long title](../docs/hearth/screenshots/p4-panel-title-card-long.png)
+![The speakers with a title](../docs/hearth/screenshots/p4-panel-speakers-title.png)
+
+Found on the way: the header's clock label was 120 px wide and cut a long piece's time (*23:32 / 24:45* showed
+as *:32 / 24:45*); it is 176 px now, and no other picture changed.
 
 ## Stage 3: the clock
 
@@ -173,6 +212,11 @@ The board has no time. What stage 3 adds, with the defaults I would take and the
   experiment; the kit's AC-4 5.1 glitches are the reason to try it.
 - **Brightness** is still not a setting (plan D6): the sheet has room for a fourth row only by being
   taller again or by a second page.
+- **Music Assistant, live.** It had not reconnected to the kit by 22:00Z on 2026-10-21, an hour after the
+  title-card image went on (the same happened after each earlier reflash), so what the owner's Music Assistant
+  sends this role has been read from aiosendspin's source and not seen on the board. When it connects and plays,
+  `python tools/hearth/bench.py log P4X` shows each object as *sendspin: metadata (whole state): ...* with how
+  far ahead it was stamped.
 
 ## On the kit
 
@@ -223,3 +267,47 @@ backlight is a PWM that no picture shows. A finger's tap on the glass in place o
 same pointer path, and the sheet's buttons were found under a finger on the first day). A glow
 moving with real 5.1 music: the 5.1 programme is a test stream. The scan-out's cost, which is the
 same whatever is drawn and is what dimming leaves alone.
+
+### Stage 2, the title card
+
+**2026-10-21, the kit with its bench lock, over the cable.** The image is `p4-rev3` from this branch
+(commit `a7bfa153a`, profile hash `ff9b27a6c4fd`, 2,567,920 bytes against stage 1's 2,532,784, before main took
+its later changes), sent with
+`ota.py push`, accepted on its 30 s trial. Its slot is the one the clock session's image shared the version
+string with, so the two were told apart by `PUT /now-playing title` (200 here, 409 there).
+
+| Tried | Result |
+|---|---|
+| `PUT /now-playing`: `title`, `clock`, `Title`, `speakers` | 200, **409** (the clock is still not drawn), 400, 200; `GET` followed each; 10 of 10 checks |
+| The Adjust sheet, by injected taps | Adjust, Title, Speakers and Title each set the view and the route read it back; the Title button is the accent in the read-back |
+| `POST /restart` with `title` set | `title` came back |
+| `hearth-testserver` (new `--title`, `--artist`, `--album`, `--year`, `--track-seconds`, and `--then-after` with `--then-title`: a second song with no artist, album or year) over Sendspin to layout 5.1 | **What the server sent**: `metadata (whole state): none` at activation, then `title "Blue in Green" artist "Miles Davis" album "Kind of Blue" year 1959 progress 0/337000 x1000, stamped -2 ms`, then `title "Evening News" progress 0/337000 x1000, stamped -1 ms`, then `none` when the play ended. **What the screen drew** (`GET :8081/panel.bmp`): the card as designed, then the second song alone, no artist and no album kept from the first, the time `0:12 / 5:37` and the line moving, the card rebuilt once at the change (44 ms), and the speakers' screen again when it ended |
+| The card chosen and a play that says nothing | the speakers, with *Dolby Digital Plus 5.1 to 5.1* in the header: no empty card |
+| A 119-character title, a long artist and album, a 24-minute song | two rows ending in three dots, the artist and the album and year one row each, and `0:08 / 24:45` whole |
+| `dim-after 1`, the card, the same play | Dark **60.3 s** after the card began to show; the dark screen said *Playing - Blue in Green - Miles Davis*; a tap woke it (not opening the sheet) and the card was back at `1:05 / 5:37` |
+
+**What the view costs a stream.** The programmes and layouts of stage 1, 60 s each, the view `off`, `speakers`
+(its header now the song) and `title`, in alternating order, `metadata@v1` said in every play so that what the
+role itself costs is in all three; `/status`'s `burst_us`, the board's mean time to decode and render a burst:
+
+| Programme and layout | `off` | `speakers` | `title` | Late, underruns, resyncs |
+|---|---|---|---|---|
+| E-AC-3 5.1 to 5.1 (three plays each) | 5,325 µs (5,318-5,329) | 5,341 µs (5,322-5,354) | 5,333 µs (5,320-5,345) | 0, 0, 0 in all nine |
+| E-AC-3 stereo music to 2.0 (two each) | 2,614 µs (2,606-2,621) | 2,628 µs (2,625-2,630) | 2,633 µs (2,624-2,642) | 0, 0, 0 in all six |
+| E-AC-3 5.1 to 7.1.4 (three off, two speakers, three title) | 6,475 µs (6,469-6,486) | 6,478 µs (6,446-6,509) | 6,491 µs (6,479-6,499) | 0, 0, 0 in all eight |
+
+- **The view costs a burst +3 to +19 µs (0.05 to 0.7%)**, inside the spread of the plays of one view at 7.1.4
+  and at the edge of it elsewhere. The least free internal heap at the end of a play was 98.7 to 101.9 KB at 5.1
+  with any view (24 to 26 KB at 7.1.4; one title play left 20.2 KB, the other two 24.3 and 24.7).
+- **The role costs nothing that shows.** The clock session's image (this tree's base with no `metadata@v1`, run
+  from the other slot by `ota.py rollback`) played the 5.1 programme with the view off at 5,364 µs (5,340-5,376,
+  three plays, 99.2 to 102.2 KB of heap) against 5,325 µs here. The 4,555 µs of stage 1 was measured before main
+  took the later changes; this tree's own base is the comparison.
+- **What it draws is small.** About 5.7 redraws a second (the song's time once a second and the progress line
+  three pixels a second at this length, 384 to 396 a play against 4 with the view off), and 0.5 to 1.1 million
+  more pixels over a 68 s play than with the view off, which is 7,000 to 16,000 a second. The cost is the same
+  for the card and for the speakers' header.
+
+**Not checked.** The owner's Music Assistant (see [Open](#open)); a finger's tap in place of an injected one; a
+title in a script the fonts lack on the board (the preview draws it, `hearth-testserver` takes its arguments in
+the console's code page, which cannot carry one); a scheduled state, which no server here sends.

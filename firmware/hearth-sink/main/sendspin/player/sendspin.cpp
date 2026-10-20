@@ -587,10 +587,10 @@ class Events final : public iclforge::SendspinEvents {
 
     // metadata@v1: what the server says is playing, for the title card (planning/p4x-now-playing.md).
     // The store takes the object as the server's dialect means it (title_card.hpp): the specification's
-    // is the whole state, and aiosendspin 9.1.1's (Music Assistant) only what changed, a cleared field as
-    // null. A field is `kSet` when it came with a value, `kClear` when it came as null and `kLeave` when the
-    // object did not name it. The console says what arrived, since what a server sends this role is the
-    // one thing that had not been seen on a board.
+    // (and aiosendspin 10's, which Music Assistant runs now) is the whole state, and aiosendspin 9.1.1's only
+    // what changed, a cleared field as null. A field is `kSet` when it came with a value, `kClear` when it
+    // came as null and `kLeave` when the object did not name it. The console says what arrived, which is
+    // how the first run with a server shows what it sends this role.
     void on_metadata(const m::ServerState& state, ss::Dialect dialect) override {
         if (!state.metadata) {
             return;
