@@ -127,6 +127,21 @@ struct SinkLineCeiling {
     return (second_line && ceiling.second_line_usable) ? ceiling.slots * 2 : ceiling.slots;
 }
 
+// How many slots one frame of a line's DMA queue holds, which is what the queue's internal RAM
+// is made of (4 bytes a slot at 32 bits, over the descriptors' frames). A standard line holds the
+// slots it clocks. A TDM line on a controller whose driver sizes its buffer by the ACTIVE slots
+// (ESP-IDF's i2s_tdm.c: popcount of the slot mask, with the frame's width in `total_slot` and the
+// skip mask off) holds only the channels it carries and sends zeros in the rest of the frame, so
+// a 5.1 layout in the ESP32-P4's sixteen-slot frame needs 6 slots a frame and not 16. The ESP32-S3
+// and ESP32-C6 sinks (sink/i2s) write the whole frame and do not use this.
+[[nodiscard]] constexpr std::size_t dma_slots(bool tdm, std::size_t slots, std::size_t channels) {
+    return tdm ? channels : slots;
+}
+
+[[nodiscard]] constexpr std::size_t dma_slots(const SinkLinePlan& line) {
+    return dma_slots(line.tdm, line.slots, line.channels);
+}
+
 // Whether a line's frame follows the layout or holds one shape for every
 // layout - see the header comment. An enum rather than a second bool beside
 // plan_sink's `second_line`, so a call site cannot swap the two.

@@ -360,6 +360,40 @@ TEST_CASE("wide frame, fixed frame, one line: every channel count from 1 to sixt
     REQUIRE_FALSE(plan_sink(17, 32, false, kFixed, kP4FrameBits).has_value());
 }
 
+TEST_CASE("wide frame: a TDM line's DMA queue holds its channels, not the sixteen slots it clocks",
+          "[io][sink_plan]") {
+    // The queue the P4's sink asks for: 3,072 frames (12 descriptors of 256 in the profile, 64 ms
+    // at 48 kHz) at 4 bytes a 32-bit slot. Internal RAM: the figures planning/karaoke-p4x-panel.md
+    // quotes for a 2.0, a 5.1 and a 9.1.6 layout.
+    constexpr std::size_t kQueueFrames = 12 * 256;
+    constexpr std::size_t kSlotBytes = 4;
+    const auto queue_bytes = [](std::size_t channels, SinkFrame frame) {
+        const auto plan = plan_sink(channels, 32, false, frame, kP4FrameBits);
+        REQUIRE(plan.has_value());
+        return kQueueFrames * iclforge::dma_slots(plan->line0) * kSlotBytes;
+    };
+    // Standard I2S: the two slots it clocks.
+    CHECK(queue_bytes(2, kFollow) == 24'576);
+    CHECK(queue_bytes(1, kFollow) == 12'288);
+    // TDM: the channels, in a frame that is still sixteen slots wide.
+    CHECK(queue_bytes(6, kFollow) == 73'728);
+    CHECK(queue_bytes(8, kFollow) == 98'304);
+    CHECK(queue_bytes(16, kFollow) == 196'608);
+    for (std::size_t channels = 3; channels <= 16; ++channels) {
+        CAPTURE(channels);
+        const auto plan = plan_sink(channels, 32, false, kFollow, kP4FrameBits);
+        REQUIRE(plan.has_value());
+        CHECK(plan->line0.slots == 16);  // the frame on the wire does not change
+        CHECK(iclforge::dma_slots(plan->line0) == channels);
+    }
+    // A fixed frame carries one channel in it as well as sixteen: the same rule.
+    CHECK(queue_bytes(1, kFixed) == 12'288);
+    CHECK(queue_bytes(16, kFixed) == 196'608);
+    // The helper is constexpr, for a sink to size a buffer from.
+    STATIC_REQUIRE(iclforge::dma_slots(true, 16, 6) == 6);
+    STATIC_REQUIRE(iclforge::dma_slots(false, 2, 2) == 2);
+}
+
 TEST_CASE("wide frame, second line enabled: nothing today asks for it, but the header does not refuse it",
           "[io][sink_plan]") {
     // Confirms "the P4 sink never needs a second line" is that sink's own

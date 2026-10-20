@@ -415,8 +415,11 @@ struct BurstPlayer::Impl {
         delays_ms.fill(0.0);
         std::copy_n(trims.begin(), std::min(trims.size(), trims_db.size()), trims_db.begin());
         std::copy_n(delays.begin(), std::min(delays.size(), delays_ms.size()), delays_ms.begin());
-        open_outputs(false);
+        // Given back before the sink is opened: a layout with more outputs makes the sink's DMA
+        // queue larger (a TDM line's holds the outputs it carries), and an AC-4 decoder keeps
+        // nearly all of internal RAM between plays.
         drop_decoders();  // made with the settings these are
+        open_outputs(false);
         reset_decoding();
     }
 
