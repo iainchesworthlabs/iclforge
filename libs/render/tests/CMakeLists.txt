@@ -4,6 +4,7 @@ iclforge_add_test_binary(iclforge-render-tests PROJECT render SOURCES
     test_object_constraints.cpp
     test_object_lfe_timing.cpp
     test_identify.cpp
+    test_room_plan.cpp
     test_routing.cpp
     test_serving.cpp
     test_trim_delay.cpp

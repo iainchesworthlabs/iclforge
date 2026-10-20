@@ -730,6 +730,28 @@ iclforge::ControlHandlers control_handlers() {
             return player::network_set_preference(preference);
         };
     }
+    // A board with a screen chooses what it shows while a song has no lyrics, and when that dims
+    // (planning/p4x-now-playing.md). Both are stored, and the panel follows at once.
+    if (player::panel_built()) {
+        h.now_playing = []() { return std::string(iclforge::nowview::view_name(player::settings().now_view)); };
+        h.set_now_playing = [](std::string_view word) {
+            const auto view = iclforge::nowview::parse_view(word);
+            // A view this build cannot draw is refused, and not stored for a later image to find.
+            if (!view || !player::panel_has_view(*view) || !player::settings_set_now_view(*view)) {
+                return false;
+            }
+            player::panel_set_view(*view);
+            return true;
+        };
+        h.dim_after = []() { return iclforge::nowview::dim_after_text(player::settings().dim_after_minutes); };
+        h.set_dim_after = [](int minutes) {
+            if (!player::settings_set_dim_after(minutes)) {
+                return false;
+            }
+            player::panel_set_dim_after(minutes);
+            return true;
+        };
+    }
     h.slot_bits = []() { return player::sink_slot_bits(); };
     h.set_slot_bits = [](int bits) {
         xSemaphoreTake(g_player_mutex, portMAX_DELAY);

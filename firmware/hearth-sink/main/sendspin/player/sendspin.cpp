@@ -910,6 +910,51 @@ std::optional<iclforge::ControlSendspin> sendspin_status() {
     return s;
 }
 
+SendspinPlaying sendspin_now_playing() {
+    SendspinPlaying out;
+    const Running* const r = running();
+    if (r == nullptr) {
+        return out;
+    }
+    const iclforge::BurstPlayerStatus play = r->player->status();
+    const std::string_view stream = play.stream != nullptr ? std::string_view(play.stream) : std::string_view();
+    out.active = !stream.empty() && stream != "idle";
+    if (!out.active) {
+        return out;
+    }
+    out.layout = play.layout;
+    out.outputs = std::min(play.outputs, out.peak_db.size());
+    out.have_levels = play.have_levels;
+    for (std::size_t o = 0; o < out.outputs; ++o) {
+        out.peak_db[o] = play.peak_db[o];
+        out.rms_db[o] = play.rms_db[o];
+    }
+    namespace nv = iclforge::nowview;
+    if (stream == "pcm") {
+        out.facts.codec = nv::Codec::kPcm;
+    } else if (play.have_decoder) {
+        switch (play.decoder.data_type) {
+            case ac::DataType::kAc3:
+                out.facts.codec = nv::Codec::kAc3;
+                break;
+            case ac::DataType::kEac3:
+                out.facts.codec = nv::Codec::kEac3;
+                break;
+            case ac::DataType::kAc4:
+                out.facts.codec = nv::Codec::kAc4;
+                break;
+        }
+        out.facts.have_decoder = true;
+        out.facts.acmod = play.decoder.acmod;
+        out.facts.lfe = play.decoder.lfe;
+        out.facts.objects = play.decoder.objects;
+    } else {
+        // A burst stream before its first unit has decoded.
+        out.facts.codec = nv::Codec::kUnknown;
+    }
+    return out;
+}
+
 bool sendspin_read_lyrics(LyricsReader& reader, std::int64_t delay_ms,
                           const iclforge::lyrics::StageOptions& options) {
     // The position is on the server's clock, which the host's time filter gives for the board's

@@ -22,13 +22,16 @@
 #include "iclforge/dev_view.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
+#include "iclforge/now_view.hpp"
 
 #include "../lyrics_reader.hpp"
 #include "board_info.hpp"
 #include "dev_screen.hpp"
+#include "display.hpp"
 #include "fonts.hpp"
 #include "glyphs.hpp"
 #include "lv_alloc.hpp"
+#include "now_screen.hpp"
 
 namespace player::panel {
 
@@ -262,6 +265,9 @@ struct Signature {
     std::array<std::size_t, iclforge::lyrics::kStageMaxContext> after{};
     std::uint32_t generation = 0;
     int scale = 1;
+    // The no-lyrics screen: which view, and the room it draws (a new layout is a rebuild; levels are not).
+    int view = 0;
+    std::uint32_t room_key = 0;
 
     bool operator==(const Signature&) const = default;
 };
@@ -278,7 +284,35 @@ struct WordCell {
     int painted = -1;
 };
 
-enum class Button : int { kAdjust, kDelayLess, kDelayMore, kSmaller, kLarger, kClose };
+enum class Button : int {
+    kAdjust, kDelayLess, kDelayMore, kSmaller, kLarger, kClose,
+    // The no-lyrics screen's view, one a view in the order of View, and when it dims.
+    kViewSpeakers, kViewTitle, kViewClock, kViewOff,
+    kDimNever, kDim5, kDim30
+};
+
+// The views the sheet offers, in the order it shows them: only those this build draws.
+struct ViewChoice {
+    iclforge::nowview::View view;
+    Button button;
+    const char* label;
+};
+constexpr std::array<ViewChoice, 4> kViewChoices{{
+    {iclforge::nowview::View::kSpeakers, Button::kViewSpeakers, "Speakers"},
+    {iclforge::nowview::View::kTitle, Button::kViewTitle, "Title"},
+    {iclforge::nowview::View::kClock, Button::kViewClock, "Clock"},
+    {iclforge::nowview::View::kOff, Button::kViewOff, "Off"},
+}};
+struct DimChoice {
+    int minutes;
+    Button button;
+    const char* label;
+};
+constexpr std::array<DimChoice, 3> kDimChoices{{
+    {iclforge::nowview::kDimNever, Button::kDimNever, "Never"},
+    {5, Button::kDim5, "5 min"},
+    {30, Button::kDim30, "30 min"},
+}};
 
 struct Screen {
     lv_display_t* disp = nullptr;
@@ -300,6 +334,29 @@ struct Screen {
     lv_obj_t* sheet = nullptr;
     lv_obj_t* sheet_delay = nullptr;
     lv_obj_t* sheet_size = nullptr;
+    // The no-lyrics screen's own choices on the sheet, and the buttons that carry them (the chosen one
+    // is the accent).
+    std::array<lv_obj_t*, kViewChoices.size()> view_buttons{};
+    std::array<lv_obj_t*, kDimChoices.size()> dim_buttons{};
+    // What the sheet paints as chosen, -1 before it has painted anything.
+    int shown_view = -1;
+    int shown_dim = -1;
+    // What the no-lyrics screen follows (settings, read every frame), and what the player says is playing
+    // (read five times a second while the speakers show).
+    NowSettings now_set;
+    NowPlaying now;
+    bool now_known = false;
+    std::uint64_t now_read_us = 0;
+    std::uint32_t now_key = 0;
+    // The speakers view is what the stage holds, and since when (the dim time counts from there).
+    bool np_active = false;
+    bool np_was_showing = false;
+    std::uint32_t np_since_ms = 0;
+    // Dimmed: a black cover over everything, the backlight at its floor.
+    bool dimmed = false;
+    lv_obj_t* dim_cover = nullptr;
+    lv_obj_t* dim_text = nullptr;
+    std::string dim_text_shown;
 
     // The rows of the line on the stage.
     std::vector<WordCell> words;
@@ -500,6 +557,25 @@ void on_button(lv_event_t* event) {
         case Button::kClose:
             g.sheet_visible = false;
             break;
+        case Button::kViewSpeakers:
+        case Button::kViewTitle:
+        case Button::kViewClock:
+        case Button::kViewOff:
+            for (const ViewChoice& choice : kViewChoices) {
+                if (choice.button == which) {
+                    choose_now_view(choice.view);
+                }
+            }
+            break;
+        case Button::kDimNever:
+        case Button::kDim5:
+        case Button::kDim30:
+            for (const DimChoice& choice : kDimChoices) {
+                if (choice.button == which) {
+                    choose_dim_after(choice.minutes);
+                }
+            }
+            break;
     }
 }
 
@@ -532,8 +608,9 @@ lv_obj_t* make_button(lv_obj_t* parent, const char* text, int w, int h, Button w
 }
 
 void build_sheet() {
-    // 240 px at the bottom, over the footer and the stage: the targets are 72 px.
-    const int sheet_h = 240;
+    // 352 px at the bottom, over the footer and the stage: the targets are 72 px, in three rows (the lyric
+    // delay and the text size, then the no-lyrics screen's view and when it dims) and the Close button.
+    const int sheet_h = 352;
     g.sheet = make_box(g.root);
     lv_obj_set_size(g.sheet, g.width, sheet_h);
     lv_obj_set_pos(g.sheet, 0, g.height - sheet_h);
@@ -562,13 +639,98 @@ void build_sheet() {
     make_button(g.sheet, "Larger", 150, 72, Button::kLarger, false);
     lv_obj_set_pos(lv_obj_get_child(g.sheet, -1), 560 + 150 + 16, 60);
 
-    make_button(g.sheet, "Close", 160, 56, Button::kClose, true);
-    lv_obj_set_pos(lv_obj_get_child(g.sheet, -1), g.width - kMargin - 160, sheet_h - 56 - 16);
+    // The screen for a song with no lyrics: which view (only the views this build draws), and when it dims.
+    lv_obj_t* const view_title = make_label(g.sheet, "Screen while a song has no lyrics", g.small, kMuted);
+    lv_obj_set_pos(view_title, kMargin, 148);
+    int x = kMargin;
+    for (std::size_t i = 0; i < kViewChoices.size(); ++i) {
+        if (!now_view_drawn(kViewChoices[i].view)) {
+            continue;
+        }
+        g.view_buttons[i] = make_button(g.sheet, kViewChoices[i].label, 128, 72, kViewChoices[i].button, false);
+        lv_obj_set_pos(g.view_buttons[i], x, 190);
+        x += 128 + 8;
+    }
+    lv_obj_t* const dim_title = make_label(g.sheet, "Dim after", g.small, kMuted);
+    lv_obj_set_pos(dim_title, 600, 148);
+    x = 600;
+    for (std::size_t i = 0; i < kDimChoices.size(); ++i) {
+        g.dim_buttons[i] = make_button(g.sheet, kDimChoices[i].label, 112, 72, kDimChoices[i].button, false);
+        lv_obj_set_pos(g.dim_buttons[i], x, 190);
+        x += 112 + 12;
+    }
+    g.shown_view = -1;
+    g.shown_dim = -1;
+
+    lv_obj_t* const close = make_button(g.sheet, "Close", 160, 56, Button::kClose, true);
+    lv_obj_set_pos(close, g.width - kMargin - 160, sheet_h - 56 - 14);
     lv_obj_add_flag(g.sheet, LV_OBJ_FLAG_HIDDEN);
+}
+
+// The chosen view and dim time are the accent; the rest are the sheet's surface. Painted when the
+// setting changes (a tap here, or PUT /now-playing from elsewhere).
+void paint_sheet_choices() {
+    const int view = static_cast<int>(g.now_set.view);
+    if (view != g.shown_view) {
+        g.shown_view = view;
+        for (std::size_t i = 0; i < kViewChoices.size(); ++i) {
+            lv_obj_t* const button = g.view_buttons[i];
+            if (button == nullptr) {
+                continue;
+            }
+            const bool chosen = static_cast<int>(kViewChoices[i].view) == view;
+            lv_obj_set_style_bg_color(button, color(chosen ? kAccent : kSurfaceUp), 0);
+            lv_obj_set_style_text_color(lv_obj_get_child(button, 0), color(chosen ? kBg : kText), 0);
+        }
+    }
+    if (g.now_set.dim_after_minutes != g.shown_dim) {
+        g.shown_dim = g.now_set.dim_after_minutes;
+        for (std::size_t i = 0; i < kDimChoices.size(); ++i) {
+            const bool chosen = kDimChoices[i].minutes == g.shown_dim;
+            lv_obj_set_style_bg_color(g.dim_buttons[i], color(chosen ? kAccent : kSurfaceUp), 0);
+            lv_obj_set_style_text_color(lv_obj_get_child(g.dim_buttons[i], 0), color(chosen ? kBg : kText), 0);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
 // The persistent objects
+
+// What dimming puts over the screen: black, with the one line the dark screen has. It is made last, so
+// that it is the object a touch lands on, and a tap that wakes the screen does not also press the button
+// under it; the touch is activity, so the next frame takes it away.
+void build_dim_cover() {
+    g.dim_cover = make_box(g.root);
+    lv_obj_set_size(g.dim_cover, g.width, g.height);
+    lv_obj_set_pos(g.dim_cover, 0, 0);
+    lv_obj_set_style_bg_opa(g.dim_cover, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(g.dim_cover, color(0x000000), 0);
+    lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_CLICKABLE);
+    g.dim_text = make_label(g.dim_cover, "", g.small, kMuted);
+    lv_obj_set_width(g.dim_text, g.width - 2 * kMargin);
+    lv_obj_set_pos(g.dim_text, kMargin, g.height - kMargin - 24);
+    lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
+}
+
+void set_dimmed(bool dim) {
+    if (dim == g.dimmed) {
+        return;
+    }
+    g.dimmed = dim;
+    if (dim) {
+        const std::string line = g.now.heading.empty() ? std::string("Playing")
+                                                       : "Playing  -  " + std::string(g.now.heading.data(), g.now.heading.size());
+        if (line != g.dim_text_shown) {
+            g.dim_text_shown = line;
+            lv_label_set_text(g.dim_text, line.c_str());
+        }
+        lv_obj_remove_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
+        set_backlight(kBacklightDimPercent);
+    } else {
+        lv_obj_add_flag(g.dim_cover, LV_OBJ_FLAG_HIDDEN);
+        set_backlight(kBacklightNormalPercent);
+    }
+}
 
 void build_frame() {
     g.root = lv_screen_active();
@@ -626,6 +788,7 @@ void build_frame() {
     lv_obj_set_pos(lv_obj_get_child(footer, -1), g.width - kMargin - 160, 8);
 
     build_sheet();
+    build_dim_cover();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -633,6 +796,8 @@ void build_frame() {
 
 void clear_stage() {
     lv_obj_clean(g.stage_box);
+    now_forget();
+    g.np_active = false;
     g.words.clear();
     g.dots.fill(nullptr);
     g.dot_count = 0;
@@ -901,6 +1066,20 @@ void build_plain(int content_w) {
     lv_obj_set_user_data(scroller, reinterpret_cast<void*>(2));  // placed already
 }
 
+// What a song with no lyrics shows (planning/p4x-now-playing.md): the view the board is set to, and where
+// that cannot be drawn (the view is off, or the player has not said what room it plays in) the sentence
+// the screen has always had.
+void build_no_lyrics(int content_w) {
+    if (g.now_set.view == iclforge::nowview::View::kSpeakers && g.now_known) {
+        const NowStyle style{.text = kText, .accent = kAccent, .muted = kMuted, .faint = kFaint, .label = g.small.latin};
+        if (now_build_speakers(g.stage_box, g.width, lv_obj_get_height(g.stage_box), g.now, style)) {
+            g.np_active = true;
+            return;
+        }
+    }
+    build_message("No lyrics for this item", "The server sent none with it.", content_w);
+}
+
 // Lays out what the build made: the centre piece in the middle of the stage, the rows before it
 // above and the rows after it below, as the desktop view does.
 void place_rows(const std::vector<lv_obj_t*>& past, const std::vector<lv_obj_t*>& next, int content_w) {
@@ -940,6 +1119,7 @@ void place_rows(const std::vector<lv_obj_t*>& past, const std::vector<lv_obj_t*>
 void rebuild(const Signature& sig) {
     const std::int64_t started = time_us();
     clear_stage();
+    lv_obj_remove_flag(g.chip_delay, LV_OBJ_FLAG_HIDDEN);
     const Stage& stage = g.snap.stage;
     const int content_w = g.width - 2 * kMargin;
     const bool duet = g.snap.held && (g.snap.first_name.size() + g.snap.second_name.size() > 0 ||
@@ -994,9 +1174,14 @@ void rebuild(const Signature& sig) {
                 break;
             case StageMode::kNoLyrics:
                 g.name = "nolyrics";
-                build_message("No lyrics for this item", "The server sent none with it.", content_w);
+                build_no_lyrics(content_w);
                 break;
         }
+    }
+    // The lyric delay does nothing for a song with no lyrics, and the speakers screen says so by not
+    // showing it.
+    if (g.np_active) {
+        lv_obj_add_flag(g.chip_delay, LV_OBJ_FLAG_HIDDEN);
     }
     if (std::strcmp(g.name, "plain") != 0) {
         place_rows(past, next, content_w);
@@ -1067,6 +1252,10 @@ void update_header_and_footer(const Stage& stage) {
     const std::string artist = drawable_title(g.snap.artist);
     if (!artist.empty()) {
         title += title.empty() ? artist : " - " + artist;
+    }
+    // The speakers screen says what is arriving and what it is played on.
+    if (g.np_active) {
+        title.assign(g.now.heading.data(), g.now.heading.size());
     }
     static std::string shown_title = "\x01";
     if (title != shown_title) {
@@ -1164,6 +1353,22 @@ bool screen_update() {
     // Idle: nothing held, and nothing playing.
     const bool idle = stage.mode == StageMode::kNoLyrics && !playing;
 
+    // The no-lyrics screen (planning/p4x-now-playing.md): the settings it follows, read every frame, and,
+    // while the speakers are what it shows, what the player says about the stream five times a second.
+    g.now_set = read_now_settings();
+    const bool no_lyrics = stage.mode == StageMode::kNoLyrics && playing;
+    if (no_lyrics && g.now_set.view == iclforge::nowview::View::kSpeakers) {
+        if (g.now_read_us == 0 || now_us - g.now_read_us >= 200'000) {
+            g.now_read_us = now_us;
+            g.now_known = read_now_playing(g.now) && !g.now.spots.empty();
+            g.now_key = g.now_known ? now_room_key(g.now) : 0;
+        }
+    } else {
+        g.now_read_us = 0;
+        g.now_known = false;
+        g.now_key = 0;
+    }
+
     Signature sig;
     sig.mode = stage.mode;
     sig.idle = idle;
@@ -1177,6 +1382,8 @@ bool screen_update() {
     sig.after = stage.after;
     sig.generation = g.snap.generation;
     sig.scale = g.scale;
+    sig.view = no_lyrics ? static_cast<int>(g.now_set.view) : 0;
+    sig.room_key = g.now_key;
     // The idle screen says what the board is: a change in it is a rebuild of the idle screen.
     static BoardInfo shown_info;
     const bool info_changed = idle && !(shown_info == g.info);
@@ -1194,6 +1401,8 @@ bool screen_update() {
             update_words(stage);
         } else if (stage.mode == StageMode::kGap) {
             update_dots(stage);
+        } else if (g.np_active && !g.dimmed) {
+            now_update_speakers(g.now, now_us);
         }
     }
     update_header_and_footer(idle ? Stage{} : stage);
@@ -1215,7 +1424,21 @@ bool screen_update() {
             lv_obj_add_flag(g.sheet, LV_OBJ_FLAG_HIDDEN);
         }
     }
-    // The developer view, when it is asked for, is on top of all this.
+    paint_sheet_choices();
+
+    // Dimming: with the speakers showing and nothing touched for the time set, the screen goes dark, and
+    // a touch brings it back. The time counts from when the speakers began to show as well as from the
+    // last touch, so that a song started on a panel nobody has touched for hours does not start dark.
+    const bool showing = g.np_active;
+    if (showing && !g.np_was_showing) {
+        g.np_since_ms = now;
+    }
+    g.np_was_showing = showing;
+    const std::uint32_t quiet =
+        showing ? std::min<std::uint32_t>(lv_display_get_inactive_time(g.disp), now - g.np_since_ms) : 0;
+    set_dimmed(iclforge::nowview::dimmed(showing, g.now_set.dim_after_minutes, quiet));
+    // The developer view, when it is asked for, is on top of all this (a dimmed screen is dark under it
+    // and a touch to open it has woken the screen).
     dev_update(now);
     return g.filling;
 }
@@ -1230,6 +1453,7 @@ ScreenStats screen_stats() {
     stats.dev_refreshes = dev.refreshes;
     stats.dev_refresh_us_last = dev.refresh_us_last;
     stats.dev_refresh_us_max = dev.refresh_us_max;
+    stats.dimmed = g.dimmed;
     return stats;
 }
 

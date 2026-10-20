@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "iclforge/now_view.hpp"
+
 // The board's screen (planning/karaoke-p4x-panel.md): the lyrics of the item playing, drawn with the
 // colour moving as the sound does, and, when nothing is playing, what the board is and what it waits
 // for. A seam CMake resolves, like the sink and the source:
@@ -29,6 +31,8 @@ struct PanelStats {
     bool touch = false;
     // Which screen is showing: "idle", "lyrics", "gap", "waiting", "plain", "nolyrics".
     const char* screen = "";
+    // The no-lyrics screen has dimmed (planning/p4x-now-playing.md): the backlight is at its floor.
+    bool dimmed = false;
     // Updates of the picture that LVGL made, and the pixels they covered.
     std::uint32_t refreshes = 0;
     std::uint64_t pixels = 0;
@@ -55,6 +59,14 @@ struct PanelStats {
 
 // Whether this build has a screen at all.
 [[nodiscard]] bool panel_built();
+
+// The screen for a song with no lyrics (planning/p4x-now-playing.md): which of the four views this build
+// can draw, which one to show, and the minutes of nothing touched after which it dims (0 is never). The
+// board's stored settings (settings.hpp) are the caller's to keep; these change what the screen does, at
+// once and without a restart. Without a panel every one does nothing.
+[[nodiscard]] bool panel_has_view(iclforge::nowview::View view);
+void panel_set_view(iclforge::nowview::View view);
+void panel_set_dim_after(int minutes);
 
 // Starts the panel's task: once, from app_main, after the network and the Sendspin player. True when
 // a panel is running; false (having said why) when there is none or it did not come up.

@@ -26,6 +26,8 @@ constexpr const char* kKeyPassword = "password";
 constexpr const char* kKeySlotBits = "slot_bits";
 constexpr const char* kKeySecondLine = "second_line";
 constexpr const char* kKeyNetworkPreference = "net_pref";
+constexpr const char* kKeyNowView = "np_view";
+constexpr const char* kKeyDimAfter = "np_dim";
 
 Settings g_settings;
 bool g_loaded = false;
@@ -133,6 +135,8 @@ void settings_load() {
     default_name(g_settings.name);
     g_settings.slot_bits = CONFIG_ICLFORGE_EXAMPLE_I2S_SLOT_BITS;
     g_settings.second_line = CONFIG_ICLFORGE_EXAMPLE_I2S_SECOND_LINE != 0;
+    g_settings.now_view = iclforge::nowview::kDefaultView;
+    g_settings.dim_after_minutes = iclforge::nowview::kDefaultDimMinutes;
 
     nvs_handle_t handle = 0;
     if (nvs_open(kNamespace, NVS_READONLY, &handle) != ESP_OK) {
@@ -174,15 +178,35 @@ void settings_load() {
                         static_cast<long>(stored));
         }
     }
+    if (nvs_get_i32(handle, kKeyNowView, &stored) == ESP_OK) {
+        if (const auto view = iclforge::nowview::view_from_stored(stored)) {
+            g_settings.now_view = *view;
+        } else {
+            std::printf("settings: stored screen view %ld is not one this build knows; keeping %s\n",
+                        static_cast<long>(stored), iclforge::nowview::view_name(g_settings.now_view));
+        }
+    }
+    if (nvs_get_i32(handle, kKeyDimAfter, &stored) == ESP_OK) {
+        if (stored >= iclforge::nowview::kDimNever && stored <= iclforge::nowview::kDimMaxMinutes) {
+            g_settings.dim_after_minutes = static_cast<int>(stored);
+        } else {
+            std::printf("settings: stored dim time %ld is not 0 to %d minutes; keeping %d\n",
+                        static_cast<long>(stored), iclforge::nowview::kDimMaxMinutes,
+                        g_settings.dim_after_minutes);
+        }
+    }
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
-    std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s\n",
+    std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s, "
+                "no-lyrics screen %s, dims after %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
                 g_settings.second_line ? "a second" : "no second",
-                network_preference_name(g_settings.network_preference));
+                network_preference_name(g_settings.network_preference),
+                iclforge::nowview::view_name(g_settings.now_view),
+                iclforge::nowview::dim_after_text(g_settings.dim_after_minutes).c_str());
 }
 
 const Settings& settings() { return g_settings; }
@@ -245,6 +269,26 @@ bool settings_set_network_preference(NetworkPreference preference) {
         return false;
     }
     g_settings.network_preference = preference;
+    return true;
+}
+
+bool settings_set_now_view(iclforge::nowview::View view) {
+    if (!write_int(kKeyNowView, static_cast<std::int32_t>(view))) {
+        return false;
+    }
+    g_settings.now_view = view;
+    return true;
+}
+
+bool settings_set_dim_after(int minutes) {
+    if (minutes < iclforge::nowview::kDimNever || minutes > iclforge::nowview::kDimMaxMinutes) {
+        std::printf("settings: %d minutes is not a time to dim after\n", minutes);
+        return false;
+    }
+    if (!write_int(kKeyDimAfter, minutes)) {
+        return false;
+    }
+    g_settings.dim_after_minutes = minutes;
     return true;
 }
 

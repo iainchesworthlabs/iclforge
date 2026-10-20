@@ -1,12 +1,16 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 
 #include "panel/lyrics_reader.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/control.hpp"
+#include "iclforge/now_view.hpp"
 
 // The board as a Sendspin player (planning/hearth-reference-player.md, B3), as
 // a seam CMake resolves, like the source and the sink:
@@ -71,6 +75,26 @@ void sendspin_leave();
 
 // GET /status's "sendspin" object, or nothing without a player.
 [[nodiscard]] std::optional<iclforge::ControlSendspin> sendspin_status();
+
+// What a screen draws while a stream plays (planning/p4x-now-playing.md): the layout in force, the
+// last 100 ms of each output's level, and what the decoder found. One read of the player's own status,
+// with no JSON and none of the server's state, so that a panel can ask five times a second.
+struct SendspinPlaying {
+    // A stream is running.
+    bool active = false;
+    // The layout in force, as text (a name or a speaker list; empty before one is set), and the outputs
+    // it has. A fixed buffer: the panel asks five times a second and the heap it would allocate from
+    // is the one a decoder leaves little of.
+    std::array<char, iclforge::render::OutputLayout::kTextBytes> layout{};
+    std::size_t outputs = 0;
+    // Per output, in dB of full scale (-120 is silence), once the first 100 ms window has closed.
+    bool have_levels = false;
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> peak_db{};
+    std::array<float, iclforge::render::OutputLayout::kMaxSlots> rms_db{};
+    // The codec, and once a unit has decoded the coded layout and the objects.
+    iclforge::nowview::StreamFacts facts;
+};
+[[nodiscard]] SendspinPlaying sendspin_now_playing();
 
 // POST /pairing's actions: "reset", "cancel" or "forget". False for anything
 // else, or without a player.

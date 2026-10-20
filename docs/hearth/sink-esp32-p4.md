@@ -142,7 +142,7 @@ the first slot, and its cause is not known.
 
 ### The screen
 
-![The panel's screens on one sheet: singing, a duet, an instrumental break, a file timed by line, Hebrew, Russian and Greek, a script the fonts lack, idle with no server, with a pairing code and connected, held and not started, no lyrics, plain text, and the controls](screenshots/p4-panel-sheet.png)
+![The panel's screens on one sheet: singing, a duet, an instrumental break, a file timed by line, Hebrew, Russian and Greek, a script the fonts lack, idle with no server, with a pairing code and connected, held and not started, no lyrics with the screen off, plain text, the controls, and the speakers while a song has no lyrics and dimmed](screenshots/p4-panel-sheet.png)
 
 The board shows the lyrics of the item playing, against the sound **the board** is playing: the
 server sends the document and where in it the sound is, and the board follows on its own clock, which
@@ -168,12 +168,49 @@ apart. The picture above and the others on this page are drawn by the firmware's
 | ![Russian and Greek](screenshots/p4-panel-cyrillic-greek.png) | **Cyrillic or Greek.** Drawn as Latin is, in Noto Sans behind Archivo, with the same fill |
 | ![A script the fonts lack](screenshots/p4-panel-script.png) | **A script the fonts cannot draw** (Arabic here). One sentence in the line's place; the title in it is left out; a music note is dropped |
 | ![Plain text](screenshots/p4-panel-plain.png) | **A file with no times.** The text, scrolled by touch, not followed |
-| ![No lyrics](screenshots/p4-panel-no-lyrics.png) | **Playing, and the server sent no lyrics** |
-| ![The controls](screenshots/p4-panel-controls.png) | **Adjust.** The lyric delay in 50 ms steps and the text size; put away after eight seconds untouched |
+| ![The speakers](screenshots/p4-panel-speakers-5-1.png) | **Playing, and no lyrics are held** ([below](#a-song-with-no-lyrics)). The speakers of the layout in force, each glowing with its own level |
+| ![No lyrics](screenshots/p4-panel-no-lyrics.png) | **The same with that screen turned off.** The sentence this screen had before |
+| ![The controls](screenshots/p4-panel-controls.png) | **Adjust.** The lyric delay in 50 ms steps, the text size, the screen for a song with no lyrics and when it dims; put away after eight seconds untouched |
 
 **Controls.** Touch changes only what the board owns: its lyric delay (±1,000 ms), its text size
-(Smaller, Normal or Larger, which the sheet says beside its buttons), and (later) its brightness. Which vocals sound and the reproduction are the server's settings and are
+(Smaller, Normal or Larger, which the sheet says beside its buttons), what its screen shows while a
+song has no lyrics, when that dims, and (later) its brightness. Which vocals sound and the reproduction are the server's settings and are
 shown, not changed, until the role has a way to carry a request back.
+
+#### A song with no lyrics
+
+Most of what is played has none. While a stream plays and the board holds no lyrics, the panel shows
+the **speakers**: the room the layout in force describes, seen from above with the front at the top.
+Ear-level speakers are circles, height speakers rounded squares, the LFE a wide box along the bottom,
+and each speaker glows with its own level, from the board's own measure of the last 100 ms. A
+speaker with nothing on it is a hollow outline, so a dead output can be seen. The line above says
+what arrives and what it is played on (*Dolby Digital Plus 5.1 to 7.1.4*, *PCM to 2.0*).
+
+![The speakers in a 7.1.4 room](screenshots/p4-panel-speakers-7-1-4.png)
+
+It is meant to be left on for hours in a dim room: the glow moves in a few steps, slowly (it rises
+at once and falls at 14 dB a second), and is never brighter than the accent at 55%. **After five
+minutes with nothing touched** (the time is Adjust's, or `PUT /dim-after`: `never`, or whole minutes
+from 1 to 240) the backlight goes to 4% and a black screen with one line is over everything; any tap
+brings the speakers back, and the tap does not also press what is under it. Only this screen dims:
+the lyric screens and the idle screen do not.
+
+![The dimmed screen](screenshots/p4-panel-dimmed.png)
+
+Which screen shows is the owner's: `speakers` (the default) or `off`, which is the old sentence;
+`title` (title, artist and a progress line, once the sink asks the server for them) and `clock` (once
+the board has the time) are planned and refused until then
+([planning/p4x-now-playing.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-now-playing.md)).
+
+| Route | Takes | Default |
+|---|---|---|
+| `GET` and `PUT /now-playing` | `speakers`, `title`, `clock` or `off` | `speakers` |
+| `GET` and `PUT /dim-after` | `never`, or minutes from 1 to 240 | `5` |
+
+Both are stored on the board and take effect at once, with no restart; a board with no panel answers
+404. `GET :8081/panel` says which `view` is chosen and whether the screen is `dimmed`.
+
+**On the kit** (2026-10-21): over Sendspin, a 5.1 E-AC-3 test programme with no lyrics drew exactly this picture; with the speakers showing, a burst took 4,573 µs against 4,555 µs with the view off (three 60 s plays each, no late burst, underrun or resynchronisation, and the same least free heap), and at 2.0 with a stereo music programme 2,099 against 2,114 µs. With `dim-after` at one minute the screen went dark 60.4 s after the speakers began to show, and a tap woke it. The glass's brightness at 4% and a finger's tap in place of an injected one were not looked at; the scan-out is the same whatever is drawn, and dimming leaves it alone.
 
 **Fonts.** Archivo, the apps' own, for Latin (Basic, Latin-1 and Extended-A, most of Extended-B and
 the Vietnamese block, and the punctuation and currency signs a lyric uses); Noto Sans behind it for
@@ -464,7 +501,7 @@ second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 fo
 | Request | Answer |
 |---|---|
 | `GET /panel.bmp` | the picture, as a 24-bit BMP |
-| `GET /panel` | what drawing has cost: refreshes, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; and whether the [developer view](#the-developer-view) is open (`dev_view`) |
+| `GET /panel` | what drawing has cost: refreshes, pixels, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; which no-lyrics `view` is chosen and whether the screen is `dimmed`; and whether the [developer view](#the-developer-view) is open (`dev_view`) and what its refreshes cost |
 | `POST /panel/tap?x=..&y=..` | a tap, for a board with no touch controller (or to try one: three of them within 600 ms at `x=100&y=568` open the developer view, and a tap on it half a second later closes it) |
 
 The same screen code runs on both and on the glass; what the computer and the board with no panel

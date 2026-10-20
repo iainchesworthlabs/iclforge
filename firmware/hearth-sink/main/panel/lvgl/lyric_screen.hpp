@@ -25,6 +25,8 @@ struct ScreenStats {
     std::uint32_t dev_refreshes = 0;
     std::uint32_t dev_refresh_us_last = 0;
     std::uint32_t dev_refresh_us_max = 0;
+    // The no-lyrics screen has dimmed (planning/p4x-now-playing.md).
+    bool dimmed = false;
 };
 
 // Builds the screen on `disp`. False, having said why, if the fonts did not come up.

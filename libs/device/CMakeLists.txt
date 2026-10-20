@@ -4,7 +4,9 @@
 # the unit hold, the DAC queue model, the sink's mode and slot-count planner, the playout model, the
 # Wi-Fi provisioning protocol (Improv), the Sendspin player's pairing records, the console's log
 # ring, the TCP arrival log, the firmware image header, status and trial rules, the hardware
-# report, and the P4X panel's developer view (its triple tap, its rows and its log lines). Header-only and standard library only: none of them includes anything from ESP-IDF, which
+# report, the panel's no-lyrics screen (its setting, its dimming and its wording), and the P4X
+# panel's developer view (its triple tap, its rows and its log lines).
+# Header-only and standard library only: none of them includes anything from ESP-IDF, which
 # is what lets libs/device/tests run them on every host, and is worth keeping true.
 #
 # The headers keep the names the component's users include (iclforge/interleave.hpp and the rest).

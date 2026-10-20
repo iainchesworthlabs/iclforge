@@ -44,6 +44,18 @@ The sections below contain the complete change list and fixes.
 
 ### Added
 
+**What the P4X's panel shows while a song has no lyrics**
+
+- **The speakers of the layout in force, each glowing with its own level**, in place of the sentence "No lyrics for this
+  item": a plan of the room from above (ear-level speakers as circles, height speakers as squares, the LFE as a box, each
+  named), the glow following the board's own peak and RMS over the last 100 ms in a few slow steps, a speaker with nothing on
+  it hollow, and a line saying what arrives and what it is played on (*Dolby Digital Plus 5.1 to 7.1.4*). After five minutes
+  with nothing touched the backlight goes to 4% under a black screen with one line, and any tap wakes it. `GET` and `PUT
+  /now-playing` (`speakers`, `off`; `title` and `clock` are planned) and `GET` and `PUT /dim-after` (`never`, or minutes)
+  set it, as does the Adjust sheet, which is taller and has a third row for them. The plan is
+  `planning/p4x-now-playing.md`; the title card and the clock need the sink to ask the server for metadata and the board to
+  be given the time, and are not built.
+
 **The ESP32-P4X kit's Ethernet port: a sink on PoE, with the Wi-Fi as its way out**
 
 - **The `p4-rev3` Hearth sink uses the kit's RJ45 port as well as its Wi-Fi.** The chip's EMAC and the
