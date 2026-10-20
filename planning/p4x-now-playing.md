@@ -176,4 +176,50 @@ The board has no time. What stage 3 adds, with the defaults I would take and the
 
 ## On the kit
 
-*To be filled with what was run on the kit: see the pull request.*
+**2026-10-21, the kit with its bench lock, over the cable.** The image is `p4-rev3` from this branch
+(profile hash `ff9b27a6c4fd`, 2,532,784 bytes, 40% of the 4 MB slot free), sent with `ota.py push` to
+the cable's address, accepted on its 30 s trial. It was built from the commit before the last one of
+the stage (the difference is the preview's CMake file), and an S3 image of the tree (no panel) builds
+as well.
+
+| Tried | Result |
+|---|---|
+| The two routes: both words, each refusal (`400` for a bad word or time, `409` for `title` and `clock`), and a time of `never`, `1` and `5` | 20 of 20 as the stand-in says; the panel's read-back followed at once (`view`) |
+| `POST /restart` with `off` and `30` set | both back after the restart, then set again |
+| The Adjust sheet, by injected taps (`POST :8081/panel/tap`) | Adjust, Off, Speakers, 30 min, Never, 5 min and Close each did what they say, the routes read the same back, and the chosen buttons were the accent in the read-back |
+| A stream: `hearth-testserver` playing the E-AC-3 5.1 test programme `testdata/external-baseline/eac3-51-256` over Sendspin to layout 5.1, no lyrics | The read-back is the designed picture: *Dolby Digital Plus 5.1 to 5.1*, six speakers lit, the delay chip gone |
+| Dimming: `dim-after 1`, the same play | Dark **60.4 s** after the speakers began to show; a tap woke it and did not open the sheet |
+
+**What the view costs a stream.** The same E-AC-3 5.1 programme over Sendspin, 60 s, layout 5.1, the
+view `speakers` against `off`, in alternating order, three plays each; then a stereo music programme
+(`eac3-music-stereo-96`, layout 2.0), two each, and the 5.1 programme to 7.1.4, one each. The burst is
+the board's mean time to decode and render one, `/status`'s `burst_us`:
+
+| Programme and layout | `off` | `speakers` | Late, underruns, resyncs | Panel refreshes a play (off, speakers) |
+|---|---|---|---|---|
+| E-AC-3 5.1 to 5.1 | 4,555 µs (4,545-4,563) | 4,573 µs (4,571-4,575) | 0, 0, 0 in all six | 4 to 6, 70 to 84 |
+| E-AC-3 stereo music to 2.0 | 2,114 µs (both) | 2,099 µs (2,096-2,102) | 0, 0, 0 in all four | 4 to 5, 18 to 20 |
+| E-AC-3 5.1 to 7.1.4 | 5,696 µs | 5,712 µs | speakers 0, 0, 0; off 5 late (see below) | 4, 81 |
+
+- **The view costs a burst nothing that can be told from the spread**: +18 µs (0.4%) at 5.1, -15 µs
+  at 2.0 and +16 µs at 7.1.4, where the spread of the plays of one view is as large. The least free
+  internal heap at the end of a play was 101.5 to 104.0 KB at 5.1 with either view (the 7.1.4 layout
+  leaves 29 KB, 29,103 with the view off and 28,847 with it on, which is the layout's and not the
+  panel's), and the panel task's late cycles were 2 or 3 a play with either view (a rebuild at the
+  start and the end).
+- **What it draws is small.** A play at 5.1 with the test programme, whose levels hardly move, redrew
+  70 to 84 times, about one a second, and 18 to 20 times with the stereo music in a minute; the
+  pixels LVGL flushed over a play were 3.9 million at most with the speakers and 1.9 to 2.9 million
+  with the view off (which is a few full frames, the stream's start and end), so the speakers' own
+  redraw is on the order of 15,000 pixels a second. The host's count for sample levels moving as music
+  moves them was 45,000 to 81,000, against 192,000 for the lyric screen's song filling.
+- **A play with the view off, at 7.1.4, lost its first second** (5 late bursts, 7,680 frames lost, no
+  underrun): the delay at the start of a stream that the P4X's Sendspin plays have shown, which the
+  lwIP receive mailbox change in PR #1610 is for, with the screen not drawing anything. The first play
+  of the series, at 5.1 with the speakers, had it too (2 late, 3,072 frames lost at the start).
+
+**Not checked.** The brightness of the glass at 4%: the read-back is the frame buffer, and the
+backlight is a PWM that no picture shows. A finger's tap on the glass in place of an injected one (the
+same pointer path, and the sheet's buttons were found under a finger on the first day). A glow
+moving with real 5.1 music: the 5.1 programme is a test stream. The scan-out's cost, which is the
+same whatever is drawn and is what dimming leaves alone.

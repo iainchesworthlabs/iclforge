@@ -203,6 +203,8 @@ the board has the time) are planned and refused until then
 Both are stored on the board and take effect at once, with no restart; a board with no panel answers
 404. `GET :8081/panel` says which `view` is chosen and whether the screen is `dimmed`.
 
+**On the kit** (2026-10-21): over Sendspin, a 5.1 E-AC-3 test programme with no lyrics drew exactly this picture; with the speakers showing, a burst took 4,573 µs against 4,555 µs with the view off (three 60 s plays each, no late burst, underrun or resynchronisation, and the same least free heap), and at 2.0 with a stereo music programme 2,099 against 2,114 µs. With `dim-after` at one minute the screen went dark 60.4 s after the speakers began to show, and a tap woke it. The glass's brightness at 4% and a finger's tap in place of an injected one were not looked at; the scan-out is the same whatever is drawn, and dimming leaves it alone.
+
 **Fonts.** Archivo, the apps' own, for Latin (Basic, Latin-1 and Extended-A, most of Extended-B and
 the Vietnamese block, and the punctuation and currency signs a lyric uses); Noto Sans behind it for
 Greek (modern, with its tonos) and Cyrillic (with its supplement), and Noto Sans Hebrew behind that;
