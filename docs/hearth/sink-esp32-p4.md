@@ -186,6 +186,83 @@ screen has** (it links both an EK73217BCGA and an EK79007AD datasheet; this imag
 driver) and which touch controller (the older board's has a GT911). **Secure Download is not
 supported on a v3.1 chip, and the image never enables it.**
 
+### The cable, and Wi-Fi
+
+The kit's RJ45 port (the chip's own Ethernet MAC and an IP101GR PHY on RMII, 10/100 Mbit/s) is a
+network of the sink as the Wi-Fi is, so the kit can sit on a PoE splitter with no USB cable: the
+splitter's Ethernet leg into the RJ45, its USB-C leg into the kit's **power** input (not the
+connector marked JTAG, which is the console and the flashing port). The image is updated over the
+same network, the way [Sink firmware](sink-firmware.md) describes, and everything that answers on
+Wi-Fi answers on the cable: the control surface and the page on port 80, `GET /log`, `PUT /firmware`,
+mDNS (`_sendspin._tcp` on 8928 and `hearth-<mac tail>.local`), the Sendspin player and its pairing,
+and the idle screen, which shows the address and then `Ethernet` or `Wi-Fi <network>`.
+
+**Which one it uses.** The board takes an address on whichever has a link, by DHCP, under the name
+it is called (`hearth-<mac tail>`). With **auto**, the default, it uses the cable while the cable
+holds an address and the Wi-Fi when only that does, and goes back to the cable when it returns, with
+no restart. Both are up when the cable is in and a Wi-Fi network is stored, the cable's interface
+with the higher route priority (200 against the Wi-Fi's 100; ESP-IDF's own number for Ethernet, 50,
+would have put a board with both on Wi-Fi). A board with the cable in and **no Wi-Fi network
+stored** comes up on the cable alone and needs nothing else. The setting, `network preference`,
+chooses what the board does:
+
+| Preference | The cable | The Wi-Fi station |
+|---|---|---|
+| `auto` | used while it holds an address | joined as the way out if the cable goes; used when only it holds an address |
+| `ethernet` | the only network | switched off: no radio, nothing joined |
+| `wifi` | switched off | the only network |
+
+It is stored in the board's NVS like its name and its Wi-Fi network, so it survives a restart and an
+update, and it is changed over REST, in the style of `PUT /name`:
+
+```bash
+curl http://192.168.1.251/network-preference                     # auto
+curl -X PUT -d ethernet http://192.168.1.251/network-preference  # ok; takes effect at once, ...
+```
+
+A pinned preference leaves the board with one network and nothing to fall back to, so a change made
+while the board runs is checked before it is kept. `ethernet` brings the cable up first (it waits
+for a link and an address) and only then switches the Wi-Fi off; `wifi` joins the stored network
+first and only then stops the cable. A change whose interface does not come up is **undone**: the
+preference goes back to what it was, and the console says so. `PUT /network-preference wifi` with
+no Wi-Fi network stored is refused (`409`). Improv over USB and `PUT /network` still store a Wi-Fi
+network, and a board on the cable alone reports Improv's *ready* state (it has no Wi-Fi), so a
+client still offers its Wi-Fi form.
+
+**What `GET /status` says.** The `network` object keeps its four fields (`kind`, `ssid`,
+`rssi_dbm`, `address`), which now describe the interface **in use** (`kind` is `"ethernet"` or
+`"wifi"`, and while none holds an address it is the one the board is waiting on), and adds
+`preference` and `interfaces`: how each interface stands, and never the passphrase. On a board with
+one network `preference` and `interfaces` are `null`.
+
+```json
+"network": {
+  "kind": "ethernet", "ssid": "", "rssi_dbm": null, "address": "192.168.1.250",
+  "preference": "auto",
+  "interfaces": {
+    "ethernet": {"enabled": true, "link": true, "address": "192.168.1.250",
+                 "mac": "e8:f6:0a:e7:53:fb", "speed_mbps": 100, "full_duplex": true},
+    "wifi":     {"enabled": true, "link": true, "address": "192.168.1.251",
+                 "mac": "...", "configured": true, "ssid": "...", "rssi_dbm": -40}
+  }
+}
+```
+
+`enabled` is "not switched off by the preference", `link` is a cable with a partner on it
+(Ethernet) or an association with the access point (Wi-Fi), `configured` says a Wi-Fi network is
+stored, and `mac` is the interface's own address, for a DHCP reservation. A diagnostics view or a
+control for the preference reads these two routes and nothing else.
+
+!!! warning "Moving a kit to PoE: it is safe once the checklist below is true"
+    Wired up, the kit has no USB console and no USB flashing, so a bad image can only be rescued by
+    the update's own rollback (an image that does not reach the network, the HTTP server and the
+    Sendspin player inside five minutes goes back to the one before it, and so does a panic on its
+    first boot) or by putting the USB cable back. See [What was tested](#what-was-tested-on-the-cable).
+
+#### What was tested on the cable
+
+(Results are filled in below as the tests are run on the kit.)
+
 ### Memory and time
 
 The screen's own memory is in PSRAM, none in the internal RAM the AC-4 decoder leaves 1 to 11 KB

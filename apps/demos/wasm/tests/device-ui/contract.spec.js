@@ -22,6 +22,7 @@ const {
     playingSendspin,
     pairedServer,
     firmwareTrial,
+    cableNetwork,
 } = require('./stub');
 
 const COMPONENT = path.resolve(__dirname, '../../../../../firmware/esp-idf/iclforge');
@@ -290,6 +291,60 @@ test("the stand-in writes GET /hardware's keys in the firmware's order", async (
     try {
         const body = JSON.parse(await (await fetch(`${stub.url}hardware`)).text());
         expect(Object.keys(body)).toEqual(firmware);
+    } finally {
+        await stub.close();
+    }
+});
+
+test("the stand-in writes a cable board's network interfaces in the firmware's order", () => {
+    // append_interface writes both interfaces' keys: the shared ones, then the station's own
+    // (configured, ssid, rssi_dbm) or else the cable's (speed_mbps, full_duplex). on_status
+    // writes the cable's object before the station's.
+    const helper = CONTROL.slice(CONTROL.indexOf('void append_interface'), CONTROL.indexOf("// esp_chip_info()'s model"));
+    const keys = [...helper.matchAll(/append_(?:key|number|bool|signed|string|optional|levels)\(out, "([a-z_]+)"/g)].map(
+        (m) => m[1],
+    );
+    const shared = ['enabled', 'link', 'address', 'mac'];
+    expect(keys).toEqual([...shared, 'configured', 'ssid', 'rssi_dbm', 'speed_mbps', 'full_duplex']);
+    const network = cableNetwork();
+    expect(Object.keys(network)).toEqual(['kind', 'ssid', 'rssi_dbm', 'address', 'preference', 'interfaces']);
+    expect(Object.keys(network.interfaces)).toEqual(['ethernet', 'wifi']);
+    expect(Object.keys(network.interfaces.wifi)).toEqual([...shared, 'configured', 'ssid', 'rssi_dbm']);
+    expect(Object.keys(network.interfaces.ethernet)).toEqual([...shared, 'speed_mbps', 'full_duplex']);
+    const status = CONTROL.slice(CONTROL.indexOf('static esp_err_t on_status'), CONTROL.indexOf('static esp_err_t on_play'));
+    expect(status.indexOf('append_interface(out, "ethernet"')).toBeGreaterThan(0);
+    expect(status.indexOf('append_interface(out, "ethernet"')).toBeLessThan(status.indexOf('append_interface(out, "wifi"'));
+});
+
+test('the stand-in answers /network-preference as the firmware does', async () => {
+    const stub = await startStub();
+    try {
+        // A board with one network has no preference between networks.
+        let reply = await fetch(`${stub.url}network-preference`);
+        expect(reply.status).toBe(404);
+        expect(await reply.text()).toBe(REPLIES.networkPreferenceNone);
+        reply = await fetch(`${stub.url}network-preference`, { method: 'PUT', body: 'ethernet' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.networkPreferenceNone);
+        // One with a cable as well has, and takes three words.
+        stub.device.network = cableNetwork();
+        reply = await fetch(`${stub.url}network-preference`);
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe('auto\n');
+        reply = await fetch(`${stub.url}network-preference`, { method: 'PUT', body: 'cable' });
+        expect(reply.status).toBe(400);
+        expect(await reply.text()).toBe(REPLIES.networkPreferenceBad);
+        reply = await fetch(`${stub.url}network-preference`, { method: 'PUT', body: 'wifi' });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toBe(REPLIES.networkPreferenceOk);
+        const status = JSON.parse(await (await fetch(`${stub.url}status`)).text());
+        expect(status.network.preference).toBe('wifi');
+        expect(status.network.interfaces.ethernet.enabled).toBe(false);
+        // The station alone needs a network to join.
+        stub.device.ssid = '';
+        reply = await fetch(`${stub.url}network-preference`, { method: 'PUT', body: 'wifi' });
+        expect(reply.status).toBe(409);
+        expect(await reply.text()).toBe(REPLIES.networkPreferenceRefused);
     } finally {
         await stub.close();
     }

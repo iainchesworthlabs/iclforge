@@ -47,6 +47,7 @@ const REPLIES = {
         'GET  /slot-width    16 or 32; PUT one to change it at the next play',
         'GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0',
         'PUT  /network       body: an SSID, a newline, a passphrase; next boot',
+        'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /pairing       the servers this board is paired with, as JSON',
         'POST /pairing       body: reset, cancel, forget, or forget and a server_id (Sendspin pairing)',
         'GET  /firmware      both app slots, a trial, an upload and the last update, as JSON',
@@ -82,6 +83,11 @@ const REPLIES = {
     wiringFixed: "this player's wiring is fixed\n",
     wiringNone: 'this player reports no wiring\n',
     networkEmpty: 'PUT /network wants an SSID, a newline, and a passphrase\n',
+    networkPreferenceBad: 'PUT /network-preference wants auto, ethernet or wifi\n',
+    networkPreferenceNone: 'this player has one network, so no preference between networks\n',
+    networkPreferenceRefused:
+        'that preference could not be set: wifi needs a WiFi network stored, and the board may be busy joining one\n',
+    networkPreferenceOk: 'ok; takes effect at once, and is undone if the interface it names does not come up\n',
     nextPlay: 'ok; takes effect at the next play\n',
     nextBoot: 'ok; takes effect at the next boot\n',
     pairingBad: 'POST /pairing wants reset, cancel, forget, or forget and a server_id\n',
@@ -141,6 +147,8 @@ const ROUTES = [
     'GET /slot-width',
     'PUT /slot-width',
     'PUT /network',
+    'GET /network-preference',
+    'PUT /network-preference',
     'GET /pairing',
     'POST /pairing',
     'GET /firmware',
@@ -352,7 +360,39 @@ function playingSendspin() {
 // network_address() report it (firmware/hearth-sink/main/
 // network.hpp).
 function wifiNetwork() {
-    return { kind: 'wifi', ssid: 'kitchen', rssi_dbm: -58, address: '192.168.1.23' };
+    // preference and interfaces are null on a board with one network.
+    return { kind: 'wifi', ssid: 'kitchen', rssi_dbm: -58, address: '192.168.1.23', preference: null, interfaces: null };
+}
+
+// The same board with a cable as well: network_link() on net/dual, which says which of the two it
+// uses and how each stands. The cable is in and holds an address, so it is the one in use.
+function cableNetwork(preference = 'auto') {
+    return {
+        kind: 'ethernet',
+        ssid: '',
+        rssi_dbm: null,
+        address: '192.168.1.24',
+        preference,
+        interfaces: {
+            ethernet: {
+                enabled: preference !== 'wifi',
+                link: true,
+                address: '192.168.1.24',
+                mac: 'e8:f6:0a:e7:53:fb',
+                speed_mbps: 100,
+                full_duplex: true,
+            },
+            wifi: {
+                enabled: preference !== 'ethernet',
+                link: true,
+                address: '192.168.1.23',
+                mac: 'e8:f6:0a:e7:53:fa',
+                configured: true,
+                ssid: 'kitchen',
+                rssi_dbm: -58,
+            },
+        },
+    };
 }
 
 // One of GET /pairing's servers, as on_pairing_get writes it
@@ -813,6 +853,25 @@ async function startStub() {
                 device.password = rest.join('\n');
                 return send(res, 200, REPLIES.nextBoot);
             }
+            case 'GET /network-preference':
+                if (!device.network || !device.network.preference) {
+                    return send(res, 404, REPLIES.networkPreferenceNone);
+                }
+                return send(res, 200, device.network.preference + '\n');
+            case 'PUT /network-preference': {
+                if (!['auto', 'ethernet', 'wifi'].includes(body)) {
+                    return send(res, 400, REPLIES.networkPreferenceBad);
+                }
+                if (!device.network || !device.network.preference) {
+                    return send(res, 409, REPLIES.networkPreferenceNone);
+                }
+                // The station alone needs a network to join.
+                if (body === 'wifi' && !device.ssid) {
+                    return send(res, 409, REPLIES.networkPreferenceRefused);
+                }
+                device.network = cableNetwork(body);
+                return send(res, 200, REPLIES.networkPreferenceOk);
+            }
             case 'GET /pairing':
                 if (!device.sendspin) {
                     return send(res, 404, REPLIES.pairingRefused);
@@ -1039,6 +1098,7 @@ module.exports = {
     playingSendspin,
     pairedServer,
     wifiNetwork,
+    cableNetwork,
     defaultHardware,
     defaultFirmware,
     firmwareSlot,

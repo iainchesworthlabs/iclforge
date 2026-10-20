@@ -126,6 +126,7 @@ BoardInfo read_board_info() {
     info.address = network_address();
     const NetworkLink link = network_link();
     info.network = link.ssid;
+    info.via = link.kind != nullptr ? link.kind : "";
     if (const auto status = sendspin_status()) {
         info.player = true;
         info.server = status->server;

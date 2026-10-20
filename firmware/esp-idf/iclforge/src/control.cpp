@@ -144,6 +144,32 @@ void append_strings(std::string& out, const char* key, const std::vector<std::st
     out += ']';
 }
 
+// One of GET /status's network.ethernet and network.wifi (ControlNetwork::Interface). Here, above
+// both spans, for the reason append_strings gives: contract.spec.js reads the keys of on_status
+// from the text between its name and on_play's, and a nested object's keys written there would
+// read as the board's.
+void append_interface(std::string& out, const char* key, const ControlNetwork::Interface& i) {
+    append_key(out, key);
+    out += '{';
+    append_bool(out, "enabled", i.enabled);
+    append_bool(out, "link", i.link);
+    append_string(out, "address", i.address);
+    append_string(out, "mac", i.mac);
+    if (i.configured) {
+        // The station's: whether it has a network to join, and, while it has one, which.
+        append_bool(out, "configured", *i.configured);
+        append_string(out, "ssid", i.ssid);
+        append_optional(out, "rssi_dbm", i.rssi_dbm ? std::optional<long long>(*i.rssi_dbm) : std::nullopt);
+    } else {
+        // The cable's: what was negotiated, while there is a partner.
+        append_optional(out, "speed_mbps",
+                        i.speed_mbps ? std::optional<long long>(*i.speed_mbps) : std::nullopt);
+        append_key(out, "full_duplex");
+        out += i.full_duplex ? (*i.full_duplex ? "true" : "false") : "null";
+    }
+    out += '}';
+}
+
 // esp_chip_info()'s model, named - provision.cpp's own device_info answer
 // names four of these; this covers every model ESP-IDF v6.1 knows, since a
 // self-report is exactly the place a fifth one should not silently read
@@ -445,6 +471,8 @@ struct Control::Impl {
                          "GET  /slot-width    16 or 32; PUT one to change it at the next play\n"
                          "GET  /wiring        1 when a second I2S line is wired; PUT 1 or 0\n"
                          "PUT  /network       body: an SSID, a newline, a passphrase; next boot\n"
+                         "GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one "
+                         "to change it\n"
                          "GET  /pairing       the servers this board is paired with, as JSON\n"
                          "POST /pairing       body: reset, cancel, forget, or forget and a server_id "
                          "(Sendspin pairing)\n"
@@ -577,6 +605,27 @@ struct Control::Impl {
                 append_optional(out, "rssi_dbm", network->rssi_dbm ? std::optional<long long>(*network->rssi_dbm)
                                                                    : std::nullopt);
                 append_string(out, "address", network->address);
+                // A board with a cable and a station says which it prefers and how each stands;
+                // a board with one network has both null.
+                append_key(out, "preference");
+                if (network->preference.empty()) {
+                    out += "null";
+                } else {
+                    append_json_string(out, network->preference);
+                }
+                append_key(out, "interfaces");
+                if (network->ethernet || network->wifi) {
+                    out += '{';
+                    if (network->ethernet) {
+                        append_interface(out, "ethernet", *network->ethernet);
+                    }
+                    if (network->wifi) {
+                        append_interface(out, "wifi", *network->wifi);
+                    }
+                    out += '}';
+                } else {
+                    out += "null";
+                }
                 out += '}';
             } else {
                 out += "null";
@@ -744,6 +793,42 @@ struct Control::Impl {
                              "longer than the board holds\n");
         }
         return send_text(req, "200 OK", "ok; takes effect at the next boot\n");
+    }
+
+    static esp_err_t on_network_preference_get(httpd_req_t* req) {
+        auto& h = self(req)->handlers;
+        if (!h.network_preference) {
+            return send_text(req, "404 Not Found", "this player has one network, so no preference between networks\n");
+        }
+        std::string text = h.network_preference();
+        text += '\n';
+        return send_text(req, "200 OK", text.c_str());
+    }
+
+    static esp_err_t on_network_preference_put(httpd_req_t* req) {
+        if (refused_in_flash_mode(req)) {
+            return ESP_OK;
+        }
+        auto& h = self(req)->handlers;
+        // One of three words, as a body or with a line ending after it.
+        std::string body = read_body(req);
+        while (!body.empty() && (body.back() == '\n' || body.back() == '\r' || body.back() == ' ')) {
+            body.pop_back();
+        }
+        if (body != "auto" && body != "ethernet" && body != "wifi") {
+            return send_text(req, "400 Bad Request", "PUT /network-preference wants auto, ethernet or wifi\n");
+        }
+        if (!h.set_network_preference) {
+            return send_text(req, "409 Conflict", "this player has one network, so no preference between networks\n");
+        }
+        if (!h.set_network_preference(body)) {
+            return send_text(req, "409 Conflict",
+                             "that preference could not be set: wifi needs a WiFi network stored, "
+                             "and the board may be busy joining one\n");
+        }
+        return send_text(req, "200 OK",
+                         "ok; takes effect at once, and is undone if the interface it names does not "
+                         "come up\n");
     }
 
     // GET /pairing: see ControlPairings. Here, below on_play, for the reason
@@ -945,6 +1030,8 @@ bool Control::start(const ControlHandlers& handlers, std::uint16_t port, std::si
         {.uri = "/wiring", .method = HTTP_GET, .handler = &Impl::on_wiring_get},
         {.uri = "/wiring", .method = HTTP_PUT, .handler = &Impl::on_wiring_put},
         {.uri = "/network", .method = HTTP_PUT, .handler = &Impl::on_network_put},
+        {.uri = "/network-preference", .method = HTTP_GET, .handler = &Impl::on_network_preference_get},
+        {.uri = "/network-preference", .method = HTTP_PUT, .handler = &Impl::on_network_preference_put},
         {.uri = "/pairing", .method = HTTP_GET, .handler = &Impl::on_pairing_get},
         {.uri = "/pairing", .method = HTTP_POST, .handler = &Impl::on_pairing},
         {.uri = "/firmware", .method = HTTP_GET, .handler = &Impl::on_firmware_get},

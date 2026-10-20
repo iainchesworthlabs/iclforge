@@ -514,7 +514,7 @@ configurations set 80; the default is 0, none), the component's
 | --- | --- |
 | `GET /` | a web page that shows what the player is doing and drives it through the routes below and nothing else (below); its script is `GET /ui.js` |
 | `GET /api` | these routes, as text - what `GET /` answered before the page |
-| `GET /status` | what is playing and how it is going, as JSON, and the network the board is on (`network`: its kind, the access point's SSID and signal, and the board's address) |
+| `GET /status` | what is playing and how it is going, as JSON, and the network the board is on (`network`: the interface in use, the access point's SSID and signal, and the board's address; on a board with a cable as well, the `preference` and how each interface stands under `interfaces`) |
 | `GET /hardware` | what the board is, as JSON: `target`, `chip` and `revision`, `cores`, `fpu`, `cpu_freq_mhz`, `psram_bytes`, the sink's `sink_max_slots` and the firmware's `project`, `version` and `idf_version`. Read once at start-up, since none of it changes while the board runs |
 | `POST /play` | body: a URL for the `http` source, a path for `fatfs` or `sd`. `202 Accepted` — the location is handed to the task that owns the player, and `/status` says how the open went. `409` from `partition`, which has one thing in it. |
 | `POST /stop` | |
@@ -526,6 +526,8 @@ configurations set 80; the default is 0, none), the component's
 | `GET /wiring` | `1` if a second I2S line is wired, `0` if not; `404` where there can be no second line - the ESP32-C6, the P4's `i2s_wide`, `capture` and `null` - and `/status` then has no `second_line` |
 | `PUT /wiring` | body: `1` or `0`. Moves the sink's ceiling with it - two lines carry twice one line's slots - and takes effect at the next play. `409` while a play is running, and where there can be no second line. |
 | `PUT /network` | body: an SSID, a newline, then the passphrase. Stored for the next boot; the station stays on the network it is already associated with. Improv over the serial port is the other way in, and the one a board with no network at all needs. |
+| `GET /network-preference` | `auto`, `ethernet` or `wifi`, as text, on a board with a cable and a Wi-Fi station ([Ethernet](#ethernet)); `404` on a board with one network |
+| `PUT /network-preference` | body: `auto`, `ethernet` or `wifi`. Stored, and acted on at once with no restart. `400` for any other word, `409` where there is nothing to choose between, or where `wifi` has no network stored to join. A change to one interface is undone if that interface does not come up |
 | `GET /pairing` | the servers a Sendspin player is paired with, as JSON: each one's `server_id` and name, whether it is connected, and which played last. `404` on a board with no Sendspin player |
 | `POST /pairing` | body: `reset`, `cancel` or `forget`, for a Sendspin player's pairing ([Pairing](#pairing)), or `forget` and a space and a `server_id` from `GET /pairing`, for that server alone. `400` for any other body, `404` for a `server_id` the board has no pairing with, `409` on a board with no Sendspin player. |
 | `GET /slot-width` | the slot width in bits, 16 or 32 |

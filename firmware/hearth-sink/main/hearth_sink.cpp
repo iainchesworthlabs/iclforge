@@ -688,11 +688,47 @@ iclforge::ControlHandlers control_handlers() {
         if (link.kind == nullptr) {
             return std::nullopt;
         }
-        return iclforge::ControlNetwork{.kind = link.kind,
-                                        .ssid = std::move(link.ssid),
-                                        .rssi_dbm = link.rssi_dbm,
-                                        .address = player::network_address()};
+        iclforge::ControlNetwork network;
+        network.kind = link.kind;
+        network.ssid = std::move(link.ssid);
+        network.rssi_dbm = link.rssi_dbm;
+        network.address = player::network_address();
+        // A board with a cable and a station says which it prefers and how each stands.
+        if (link.preference != nullptr) {
+            const auto interface = [](player::InterfaceStatus& from) {
+                iclforge::ControlNetwork::Interface to;
+                to.enabled = from.enabled;
+                to.link = from.link;
+                to.address = std::move(from.address);
+                to.mac = std::move(from.mac);
+                to.ssid = std::move(from.ssid);
+                to.rssi_dbm = from.rssi_dbm;
+                to.speed_mbps = from.speed_mbps;
+                to.full_duplex = from.full_duplex;
+                return to;
+            };
+            network.preference = link.preference;
+            if (link.ethernet.present) {
+                network.ethernet = interface(link.ethernet);
+            }
+            if (link.wifi.present) {
+                network.wifi = interface(link.wifi);
+                network.wifi->configured = link.wifi.configured;
+            }
+        }
+        return network;
     };
+    // The choice between a cable and a station exists on a board with both.
+    if (player::network_has_choice()) {
+        h.network_preference = []() { return std::string(player::network_preference_name(player::settings().network_preference)); };
+        h.set_network_preference = [](std::string_view word) {
+            const player::NetworkPreference preference =
+                word == "ethernet" ? player::NetworkPreference::ethernet
+                : word == "wifi"   ? player::NetworkPreference::wifi
+                                   : player::NetworkPreference::automatic;
+            return player::network_set_preference(preference);
+        };
+    }
     h.slot_bits = []() { return player::sink_slot_bits(); };
     h.set_slot_bits = [](int bits) {
         xSemaphoreTake(g_player_mutex, portMAX_DELAY);

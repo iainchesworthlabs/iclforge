@@ -17,6 +17,9 @@ struct BoardInfo {
     std::string address;
     // The Wi-Fi network's name; empty on Ethernet and while not joined.
     std::string network;
+    // The interface the address is on: "ethernet" or "wifi"; empty where the board does not say
+    // (the preview), which reads as Wi-Fi whenever there is a network name.
+    std::string via;
     // The server the board is connected to, when one is.
     std::string server;
     // The player's stream: "bursts", "pcm" or "idle"; empty with no player.

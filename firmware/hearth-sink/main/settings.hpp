@@ -33,6 +33,26 @@ inline constexpr std::size_t kMaxNameBytes = 32;
 inline constexpr std::size_t kMaxSsidBytes = 32;
 inline constexpr std::size_t kMaxPasswordBytes = 63;
 
+// Which of a board's networks it uses when it has more than one (network.hpp): the cable and
+// the WiFi station, on a board with both. `automatic` is the policy - the cable when it has a link
+// and an address, the station when only that is up, the cable when both are - and the other two
+// pin the board to one interface and leave the other switched off. The stored values are
+// these numbers, so they are never renumbered.
+enum class NetworkPreference : std::uint8_t { automatic = 0, ethernet = 1, wifi = 2 };
+
+// "auto", "ethernet" or "wifi": the words PUT /network-preference takes and GET /status reports.
+[[nodiscard]] constexpr const char* network_preference_name(NetworkPreference preference) {
+    switch (preference) {
+        case NetworkPreference::ethernet:
+            return "ethernet";
+        case NetworkPreference::wifi:
+            return "wifi";
+        case NetworkPreference::automatic:
+            break;
+    }
+    return "auto";
+}
+
 struct Settings {
     // What the board calls itself: the mDNS instance name, the name a server
     // shows in a list of sinks. Defaults to "hearth-xxxxxx" from the low three
@@ -48,6 +68,9 @@ struct Settings {
     // with until someone says otherwise.
     int slot_bits = 32;
     bool second_line = false;
+    // Which network a board with a cable and a station uses. Read by every build and acted on by
+    // the one with both (net/dual/network.cpp).
+    NetworkPreference network_preference = NetworkPreference::automatic;
 };
 
 // Read at boot, before anything else uses them. Initialises NVS if it has to
@@ -75,6 +98,7 @@ void settings_load();
 [[nodiscard]] bool settings_set_network(std::string_view ssid, std::string_view password);
 [[nodiscard]] bool settings_set_slot_bits(int bits);
 [[nodiscard]] bool settings_set_second_line(bool wired);
+[[nodiscard]] bool settings_set_network_preference(NetworkPreference preference);
 
 // Everything back to the image's own defaults, for a board being handed on or
 // a board whose stored network no longer exists. The name goes back to the one

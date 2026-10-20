@@ -25,6 +25,7 @@ constexpr const char* kKeySsid = "ssid";
 constexpr const char* kKeyPassword = "password";
 constexpr const char* kKeySlotBits = "slot_bits";
 constexpr const char* kKeySecondLine = "second_line";
+constexpr const char* kKeyNetworkPreference = "net_pref";
 
 Settings g_settings;
 bool g_loaded = false;
@@ -162,14 +163,26 @@ void settings_load() {
     if (nvs_get_i32(handle, kKeySecondLine, &stored) == ESP_OK) {
         g_settings.second_line = stored != 0;
     }
+    if (nvs_get_i32(handle, kKeyNetworkPreference, &stored) == ESP_OK) {
+        // Said out loud like the slot width: a stored number this build does not know is
+        // a partition written by another build, and the policy stands.
+        if (stored >= 0 && stored <= static_cast<std::int32_t>(NetworkPreference::wifi)) {
+            g_settings.network_preference = static_cast<NetworkPreference>(stored);
+        } else {
+            std::printf("settings: stored network preference %ld is not one this build knows; "
+                        "keeping auto\n",
+                        static_cast<long>(stored));
+        }
+    }
     nvs_close(handle);
 
     // The password is never printed, here or anywhere: a console capture goes
     // into CI artifacts and into this repository's issues.
-    std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line\n",
+    std::printf("settings: name %s, network '%s'%s, %d-bit slots, %s line, network preference %s\n",
                 g_settings.name.data(), g_settings.ssid.data(),
                 g_settings.password[0] != '\0' ? " (password stored)" : "", g_settings.slot_bits,
-                g_settings.second_line ? "a second" : "no second");
+                g_settings.second_line ? "a second" : "no second",
+                network_preference_name(g_settings.network_preference));
 }
 
 const Settings& settings() { return g_settings; }
@@ -224,6 +237,14 @@ bool settings_set_second_line(bool wired) {
         return false;
     }
     g_settings.second_line = wired;
+    return true;
+}
+
+bool settings_set_network_preference(NetworkPreference preference) {
+    if (!write_int(kKeyNetworkPreference, static_cast<std::int32_t>(preference))) {
+        return false;
+    }
+    g_settings.network_preference = preference;
     return true;
 }
 
