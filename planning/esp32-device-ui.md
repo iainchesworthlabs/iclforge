@@ -669,7 +669,7 @@ mark after each handler, then reverted.
 
 | Item | Budget | Measured |
 |---|---|---|
-| Flash: the page and its script together, as stored | 57,344 bytes ([decision 22](#decisions)); 49,152 before the firmware section, 45,056 before the list of paired servers, 28,672 before the redesign, 24,576 before Hearth B3, 20,480 before B2, 16,384 before the output layout | 55,926 (21,265 + 34,661); 55,454 at the firmware section, 45,957 at the list of paired servers, 42,846 at the redesign, 28,317 before it, 25,594 at B3, 20,571 at B2, 19,187 at the output layout, 16,190 before. A host test fails above the budget |
+| Flash: the page and its script together, as stored | 65,536 bytes ([decision 22](#decisions)); 57,344 before the Time section, 49,152 before the firmware section, 45,056 before the list of paired servers, 28,672 before the redesign, 24,576 before Hearth B3, 20,480 before B2, 16,384 before the output layout | 61,830 (22,708 + 39,122); 55,926 before the Time section; 55,454 at the firmware section, 45,957 at the list of paired servers, 42,846 at the redesign, 28,317 before it, 25,594 at B3, 20,571 at B2, 19,187 at the output layout, 16,190 before. A host test fails above the budget |
 | Internal heap held once the server is up: two more route registrations and handler slots | 256 bytes | 76, from the `heap:` line: 290,428 free against the base's 290,504 |
 | Internal heap held while a browser has the page open | - | 376, the keep-alive connection |
 | Internal heap at the peak of one `GET /status` | 3,072 bytes | 4,700 to 7,700 from the page's keep-alive connection; 5,100 from `curl`, a new connection each time |
@@ -848,7 +848,7 @@ below 98% of statements, lines and functions and 90% of branches. The suite reac
 and 94.8 when the page was first built, on 2026-09-11. The branch that loads the page again is
 run by the tests but not counted: a page's coverage is what its last load ran.
 
-**Budget.** A host test sums the two files, fails above 57,344 bytes, and fails on a carriage
+**Budget.** A host test sums the two files, fails above 65,536 bytes, and fails on a carriage
 return.
 
 **On the target.** A step in the ESP32 job, after the HTTP step and without changing it, boots the
@@ -1132,6 +1132,12 @@ run as root, so Playwright can install Chromium's system libraries).
     | CI's HTTP shape | 952,480 bytes | 4 MiB |
 
     The page is 3.8% of the S3 board's image.
+
+    **Raised again 2026-10-21: 65,536 bytes.** The Time section (the time a board keeps, whether it asks a
+    time server, its zone from a list of zones and cities, and its server: [p4x-now-playing.md](p4x-now-playing.md), stage 3; every board with a
+    network has it) took the page to 61,830 (22,708 + 39,122): three settings, a readout, and the script that
+    sends them and fills them from `GET /status`'s `time`. The tightest slot is the C6's on the 4 MB
+    table, which was already 6,128 bytes over on main (1,840,112 bytes in a 1,835,008-byte slot) before this.
 
 23. **The output layout's control.** (a) **the named layouts as a segmented control, those wider
     than the sink disabled, above the field**; (b) the field with its suggestion list, as before;

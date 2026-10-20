@@ -92,7 +92,8 @@ button:hover{border-color:var(--fg)}
 .primary{border-color:var(--accent);background:var(--accent);color:var(--on-accent);font-weight:600}
 .danger{border-color:var(--ink);color:var(--ink)}
 .actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.25rem}
-input[type=text],input[type=password]{min-width:0;min-height:2.75rem;padding:0 .75rem;border:1px solid var(--edge);background:var(--field);color:var(--fg)}
+input[type=text],input[type=password],select{min-width:0;min-height:2.75rem;padding:0 .75rem;border:1px solid var(--edge);background:var(--field);color:var(--fg)}
+select{width:100%;max-width:32rem;margin-bottom:.5rem}
 .inline{display:flex;flex-wrap:wrap;gap:.5rem;max-width:32rem}
 .inline input{flex:1 1 12rem}
 .wide{width:100%;max-width:32rem}
@@ -238,6 +239,27 @@ dialog::backdrop{background:#0009}
 <p id="network-help" class="help">Stored for the next restart; this board stays on the network it is already on. A board with no network at all is told over its USB port instead.</p>
 </div></div>
 </form>
+<div id="time-group" hidden>
+<h3>Time</h3>
+<div class="row"><span class="lbl">Now</span><p id="time-now" class="val"></p></div>
+<div class="row"><span class="lbl">Keep the time</span><div>
+<label class="check"><input id="time-sync" type="checkbox" aria-describedby="time-sync-help">Ask a time server</label>
+<p id="time-sync-help" class="help">The board sets its clock from a time server when it has an address, and again every hour. Off, it contacts none.</p>
+</div></div>
+<form id="zone-form" class="row">
+<label class="lbl" for="zone-select">Time zone</label><div>
+<select id="zone-select" aria-describedby="zone-help"></select>
+<div class="inline"><input id="zone-input" type="text" maxlength="63" autocomplete="off" spellcheck="false" placeholder="UTC" aria-label="Time zone as a POSIX string"><button type="submit" class="primary">Save</button></div>
+<p id="zone-help" class="help">Choose a zone, or type a POSIX time zone such as AEST-10AEDT,M10.1.0,M4.1.0/3 (its offset counts hours west of UTC) and Save. Empty is UTC.</p>
+</div>
+</form>
+<form id="ntp-form" class="row">
+<label class="lbl" for="ntp-input">Time server</label><div>
+<div class="inline"><input id="ntp-input" type="text" maxlength="63" autocomplete="off" spellcheck="false" aria-describedby="ntp-help"><button type="submit" class="primary">Save</button></div>
+<p id="ntp-help" class="help"></p>
+</div>
+</form>
+</div>
 </div>
 </section>
 <section aria-labelledby="timing-heading">

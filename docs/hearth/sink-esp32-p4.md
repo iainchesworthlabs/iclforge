@@ -142,7 +142,7 @@ the first slot, and its cause is not known.
 
 ### The screen
 
-![The panel's screens on one sheet: singing, a duet, an instrumental break, a file timed by line, Hebrew, Russian and Greek, a script the fonts lack, idle with no server, with a pairing code and connected, held and not started, no lyrics with the screen off, plain text, the controls, and the speakers while a song has no lyrics and dimmed](screenshots/p4-panel-sheet.png)
+![The panel's screens on one sheet: singing, a duet, an instrumental break, a file timed by line, Hebrew, Russian and Greek, a script the fonts lack, idle with no server, with a pairing code and connected, held and not started, no lyrics with the screen off, plain text, the controls, and the speakers while a song has no lyrics, dimmed, and the clock](screenshots/p4-panel-sheet.png)
 
 The board shows the lyrics of the item playing, against the sound **the board** is playing: the
 server sends the document and where in it the sound is, and the board follows on its own clock, which
@@ -169,6 +169,7 @@ apart. The picture above and the others on this page are drawn by the firmware's
 | ![A script the fonts lack](screenshots/p4-panel-script.png) | **A script the fonts cannot draw** (Arabic here). One sentence in the line's place; the title in it is left out; a music note is dropped |
 | ![Plain text](screenshots/p4-panel-plain.png) | **A file with no times.** The text, scrolled by touch, not followed |
 | ![The speakers](screenshots/p4-panel-speakers-5-1.png) | **Playing, and no lyrics are held** ([below](#a-song-with-no-lyrics)). The speakers of the layout in force, each glowing with its own level |
+| ![The clock](screenshots/p4-panel-clock.png) | **Playing, no lyrics, and the clock chosen** ([below](#the-clock)). The time, the date and the line over them; nothing until a time server has answered |
 | ![No lyrics](screenshots/p4-panel-no-lyrics.png) | **The same with that screen turned off.** The sentence this screen had before |
 | ![The controls](screenshots/p4-panel-controls.png) | **Adjust.** The lyric delay in 50 ms steps, the text size, the screen for a song with no lyrics and when it dims; put away after eight seconds untouched |
 
@@ -197,9 +198,9 @@ the lyric screens and the idle screen do not.
 
 ![The dimmed screen](screenshots/p4-panel-dimmed.png)
 
-Which screen shows is the owner's: `speakers` (the default), `dark`, or `off`, which is the old
-sentence; `title` (title, artist and a progress line, once the sink asks the server for them) and
-`clock` (once the board has the time) are planned and refused until then
+Which screen shows is the owner's: `speakers` (the default), `clock` ([below](#the-clock)), `dark`, or `off`,
+which is the old sentence; `title` (title, artist and a progress line, once the sink asks the server
+for them) is planned and refused until then
 ([planning/p4x-now-playing.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/p4x-now-playing.md)).
 
 **Dark** is for a listener who wants no light at all while music plays. With it chosen, the backlight
@@ -220,9 +221,41 @@ the idle screen are lit as they always were.
 
 Both are stored on the board and take effect at once, with no restart; a board with no panel answers
 404. `GET :8081/panel` says which `view` is chosen, whether the screen is `dimmed` (a black cover is up,
-dimmed or dark) and the `backlight` in percent: 80 lit, 4 dimmed, 0 dark.
+dimmed or dark) and the `backlight` in percent: 80 lit, 4 dimmed, 0 dark; and the [time of day](#the-time-of-day)'s state.
+
+#### The clock
+
+The time of day, for a room where the sound is the thing and the panel is a glance: **the time in 24
+hours at 200 px, the date under it, and nothing else**, in the muted tone (the time at about 80% of
+it and the date at about 60%, so that neither is the brightest thing in a dim room). It shows no
+seconds, so what the screen redraws is the time's rectangle once a minute (the preview counts 224,000
+pixels, against none for a second that passes), and the line over it still says what the stream is
+(*Dolby Digital Plus 5.1 to 5.1*).
+
+![The clock: 21:47 and Tuesday 20 October](screenshots/p4-panel-clock.png)
+
+The time is [the board's own](#the-time-of-day), kept with a time server, which every board does.
+**Until the first answer the view draws the heading and nothing else, never a time it made up** (and an
+answer from before 2026 is a server with a wrong clock, and is not taken for the time either).
+
+![Before a time server has answered: the line over the screen and nothing in it](screenshots/p4-panel-clock-waiting.png)
+
+**With no time zone set the clock says UTC, and says so:**
+
+![The clock with no time zone set: UTC, and a sentence that says so](screenshots/p4-panel-clock-utc.png)
+
+**A dim leaves the clock on the glass.** Dimming lowers the backlight to its floor, as for the speakers,
+but the clock is what a dark room has the screen for, so no black cover goes over it: a clear one
+catches the tap that wakes the screen, and the time goes on changing under it.
 
 **On the kit** (2026-10-21): over Sendspin, a 5.1 E-AC-3 test programme with no lyrics drew exactly this picture; with the speakers showing, a burst took 4,573 µs against 4,555 µs with the view off (three 60 s plays each, no late burst, underrun or resynchronisation, and the same least free heap), and at 2.0 with a stereo music programme 2,099 against 2,114 µs. With `dim-after` at one minute the screen went dark 60.4 s after the speakers began to show, and a tap woke it. The glass's brightness at 4% and a finger's tap in place of an injected one were not looked at; the scan-out is the same whatever is drawn, and dimming leaves it alone.
+
+**The time and the clock** (2026-10-21, with the time on every board): the clock view drew `09:06 Wednesday 21
+October` against the PC's local `09:06`, and a 5.1 Sendspin play with it chosen took a burst 4,566 µs against
+4,564 µs with the view off (three 60 s plays each, no late burst or underrun). The board asked a time server
+from boot, answered within seconds, stopped asking at once on `PUT /time-sync off` (no request in the next 30 s),
+kept its zone, server and sync through `POST /restart`, and read all 42 zones of the page's list and 15 others as
+written.
 
 **Fonts.** Archivo, the apps' own, for Latin (Basic, Latin-1 and Extended-A, most of Extended-B and
 the Vietnamese block, and the punctuation and currency signs a lyric uses); Noto Sans behind it for
@@ -286,6 +319,62 @@ The view's rows are `libs/device/include/iclforge/dev_view.hpp`, which the host 
 letter (the triple tap, the numbers, the colours, the confirming step's words, the log's lines),
 and its pictures are drawn by the same code as the board's, by the
 [preview](#developing-the-screen-without-a-panel).
+
+### The time of day
+
+**Every ESP board that has a network keeps its time with a time server**, by default, from the
+moment it holds an address: all the hardware (the Wi-Fi boards and the P4X with its cable), where QEMU's
+network has nothing to ask and a build with no network has nothing to ask over, so those keep no
+time (the routes below answer 404). It is lwIP's SNTP client (`firmware/hearth-sink/main/clock/sntp/`).
+The panel's [clock view](#the-clock) draws what it keeps; a board with no screen has it for its page,
+`GET /status` and the console. Nothing listens: SNTP is a request the board sends and the answer comes
+back to it.
+
+**Which server is asked**, in this order:
+
+1. **The one a person named** (`PUT /ntp-server`: a host name or an IPv4 address). Naming a server says
+   where the time comes from, so with one named the board asks it and then the router's, and not the pool.
+2. **The one the router gave over DHCP** (option 42), which is the default: lwIP keeps it when a lease is
+   bound (`net/stack.cpp` turns that on at boot), so it is there from the first lease, and a lease
+   renewed with another replaces it.
+3. **`pool.ntp.org`**, when nobody named a server.
+
+A lease rewrites lwIP's table of servers when it is bound (the router's takes the first slot and the rest
+are emptied), so the board looks at the table once a second and puts it back as it should be; the
+router's server is remembered from the first slot. The first request goes out after a random delay of up to
+five seconds (RFC 4330 asks it of a device that has just started), and then once an hour. A new address
+starts the question again at once if no server has answered yet.
+
+| Route | Takes | Default |
+|---|---|---|
+| `GET` and `PUT /time-sync` | `on` or `off` | `on` |
+| `GET` and `PUT /ntp-server` | a host name or an IPv4 address, or `none` | `none`: the router's, then the pool |
+| `GET` and `PUT /timezone` | a POSIX time zone, or `none` | `none`: UTC |
+
+All three are stored on the board (NVS `time_sync`, `ntp_server`, `time_zone`) and take effect at once,
+with no restart. **They are on the board's own web page too**, in a Time section of Settings: the time
+the board keeps and how it got it, a checkbox for whether to ask a time server, and a list of zones and cities
+(*UTC+10 Melbourne, Sydney, Hobart, Canberra*; 42 of them, each a POSIX string the board's C library is
+held to) with a field for any other, and a field for the server (which says, under it, the servers lwIP is set to ask). `GET /status` has a `time`
+object (`sync`, `asking`, `synced`, `local`, `zone`, `server`, `servers`, `answers`), and the console
+says when the board started asking (*wall clock: asking for the time: 192.168.1.5 (from DHCP),
+pool.ntp.org*), each answer, and when it stopped. **`off` is for a board that must contact no time server:**
+it stops asking and forgets the time (a clock left running with nothing correcting it is a time the board
+made up), and a clock view then shows only its heading.
+
+**The time zone is a POSIX string**, because the firmware has no zone database and a list of names
+would be a table to keep: `PUT /timezone AEST-10AEDT,M10.1.0,M4.1.0/3` is Sydney, Melbourne and
+Hobart. Its offset is the hours *west* of UTC, so an Australian zone has a minus sign; `none` takes
+the zone away. A string that is not a zone, or one with daylight saving and no rules (which the
+board's C library would give its own for, differently from the next one's), is refused with a 400
+that says so; one the grammar accepts is then read by the board's own C library, on a day in January
+and a day in July, and refused with a 409 if the library did not read it as written (a library that
+cannot parse a string falls back to UTC without saying so). With none set the time is UTC.
+
+The grammar and the words (`libs/device/include/iclforge/wall_clock.hpp`) are held to the letter by
+the host tests (`test_wall_clock.cpp`: the zones and the servers taken and the ones refused, the offsets,
+the dates and the words), and the device page's stand-in is held to the same lists
+(`apps/demos/wasm/tests/device-ui/contract.spec.js`).
 
 ### Wiring
 
@@ -513,7 +602,7 @@ second small HTTP server (port 8081, `ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT`, 0 fo
 | Request | Answer |
 |---|---|
 | `GET /panel.bmp` | the picture, as a 24-bit BMP |
-| `GET /panel` | what drawing has cost: refreshes, pixels, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; which no-lyrics `view` is chosen and whether the screen is `dimmed`; and whether the [developer view](#the-developer-view) is open (`dev_view`) and what its refreshes cost |
+| `GET /panel` | what drawing has cost: refreshes, pixels, microseconds a refresh, the longest rebuild, late cycles, the task's stack left; which no-lyrics `view` is chosen and whether the screen is `dimmed`; the [time of day](#the-time-of-day)'s state (`clock_enabled`, `clock_asking`, `clock_synced` and `clock_syncs`); and whether the [developer view](#the-developer-view) is open (`dev_view`) and what its refreshes cost |
 | `POST /panel/tap?x=..&y=..` | a tap, for a board with no touch controller (or to try one: three of them within 600 ms at `x=100&y=568` open the developer view, and a tap on it half a second later closes it) |
 
 The same screen code runs on both and on the glass; what the computer and the board with no panel

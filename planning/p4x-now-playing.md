@@ -1,6 +1,6 @@
 # What the P4X's panel shows while a song with no lyrics plays
 
-!!! note "Status as of 2026-10-21: chosen by the owner; stage 1 built; stages 2 and 3 not started"
+!!! note "Status as of 2026-10-21: chosen by the owner; stages 1 and 3 built; stage 2 in its own branch"
     The panel of [the P4X sink](karaoke-p4x-panel.md) draws the lyrics of the item playing, and the
     idle screen when nothing plays. A song with no lyrics (most of what a music server plays, and
     every surround programme that is not karaoke) had one sentence: "No lyrics for this item". The
@@ -14,7 +14,7 @@
     | 1 | The setting (`GET` and `PUT /now-playing`, `/dim-after`, the Adjust sheet), the **speakers** view, dimming | Built; run on the kit: see [On the kit](#on-the-kit) |
     | 1b | The **dark** view: the backlight off until a touch lights the speakers for 30 s | Built, the rule tested on the host and in the preview tool; see [The dark view](#the-dark-view) for what has run on the kit |
     | 2 | The **title card**: the sink asks the server for `metadata@v1` and draws what it sends | Not started; [what it needs](#stage-2-the-title-card) |
-    | 3 | The **clock**: the board gets the time and a time zone | Not started; [what it needs](#stage-3-the-clock) |
+    | 3 | The **clock**: the board gets the time and a time zone | Built, and widened by the owner to every ESP board; run on the kit: see [Stage 3, as built](#stage-3-the-clock) |
 
 ## What the board knows while a song plays
 
@@ -199,15 +199,53 @@ time at the right and the progress line under it, as the lyric screens' header i
 
 ## Stage 3: the clock
 
-The board has no time. What stage 3 adds, with the defaults I would take and the owner can change:
+The board had no time. The plan proposed SNTP started only while the clock view was chosen, a time zone
+as a POSIX string, and a view that shows nothing until a server has answered. The owner, building it,
+widened the first of those on 2026-10-21 (in chat, while it was being built): *"If we are supporting a
+clock, let's make sure that there's ntp support (via dhcp or manually configured)"*; *"Ntp support should
+be on all esp hardware"*; and, asked whether a board with no screen should ask a time server always, only
+with a clock on show or only on request, **"Always, on every board"**; then *"You can configure it via the
+web server on each board, have sensible defaults, ideally on by default, dhcp can set the default ntp
+server"*. So the time is **not the panel's**: it is a facility of every board that has a network, and the
+clock view reads it.
 
-- **SNTP, started only when the clock view is the one chosen** (the board contacts no time server
-  otherwise), with the servers the router hands out over DHCP and `pool.ntp.org` behind them.
-- **A time zone** as a POSIX string (`AEST-10AEDT,M10.1.0,M4.1.0/3`), stored in NVS and set by
-  `PUT /timezone`; with none set the clock says UTC and says so. IDF has no zone database, and a
-  list of names would be a table to keep.
-- A 24-hour clock and the date, in the muted tone; until the first answer from a time server the
-  view shows nothing but the stream's heading, and never a time it made up.
+**As built** (all in [The time of day](../docs/hearth/sink-esp32-p4.md#the-time-of-day) in the sink's page):
+
+- **The facility** (`firmware/hearth-sink/main/wall_clock.hpp`, a seam like the network beside it):
+  `clock/sntp/` for every build with a Wi-Fi station or a cable (all the hardware: S3, C6, the P4 boards,
+  the P4X) and `clock/none/` for a build with no network and for QEMU's, which has no time server to ask and
+  must not make CI depend on one. lwIP's SNTP client, started when the board holds an address (the address
+  event, and a one-second upkeep as well), an hour apart after the first answer.
+- **Which server:** the one a person named (`PUT /ntp-server`, a host name or an IPv4 address), else the
+  router's over DHCP (option 42: `CONFIG_LWIP_DHCP_GET_NTP_SRV`, and `net/stack.cpp` turns on lwIP's flag so
+  the lease's server is kept from the first lease on), with `pool.ntp.org` behind it **only when nobody named
+  a server** (naming one says where the time comes from, and a LAN with no way out is a reason to). A lease
+  rewrites lwIP's table (the router's server takes slot 0 and the others are emptied), so the board
+  looks at it once a second and puts it back.
+- **Defaults:** on (`PUT /time-sync off` for a board that must contact none), no server named, UTC. The
+  settings are in NVS (`time_sync`, `ntp_server`, `time_zone`), on `GET` and `PUT` routes of the control
+  surface on every board that keeps time (404 on the others), and in a **Time section of each board's own
+  web page** with the time it keeps and how it got it; `GET /status` has a `time` object.
+- **The zone** is a POSIX string (`AEST-10AEDT,M10.1.0,M4.1.0/3`), because IDF has no zone database and a
+  list of names would be a table to keep. `libs/device/include/iclforge/wall_clock.hpp` reads it (a zone with
+  daylight saving must give its rules); the board's own C library must then read it the same way on a day in
+  January and a day in July, or it is refused.
+- **The view:** the time in 24 hours in the 200 px semibold face at about 80% of the muted token, the date
+  at 36 px at about 60%, a sentence saying UTC while no zone is set, and **until the first answer only the
+  stream's heading, never a time it made up** (the facility says no time until a server has answered, forgets
+  it when `time-sync` goes off, and takes none from before 2026). The minute redraws one rectangle (the preview
+  counts 224,000 pixels for a minute and none for a second). A dim leaves it on the glass: the backlight goes to
+  its floor and the cover over it is clear, which still takes the tap that wakes the screen.
+- **Tests:** 17 host cases in `libs/device/tests/test_wall_clock.cpp` (the grammar, the offsets, the servers,
+  the calendar, the words), the device page's stand-in held to the same lists
+  (`apps/demos/wasm/tests/device-ui/contract.spec.js`), the preview's scenarios (the clock with and without a
+  zone, before an answer, a minute and a second, a dim and a tap).
+
+**What the owner did not say, and was decided:** with a server named the pool is not asked (a person who
+names a server is saying where the time comes from; the router's, a local server too, is still second); a
+board that is turned `off` shows no time at all rather than an old one; the page budget went from 57,344 to
+65,536 bytes for the Time section and its list of zones (the image has room); a zone is a string and not a name, so the page offers a list of 42 zones and cities (*UTC+10 Melbourne,
+Sydney, Hobart, Canberra*) that sets the string, and a field for any other, and the 400 says why.
 
 ## Open
 
@@ -270,3 +308,34 @@ backlight is a PWM that no picture shows. A finger's tap on the glass in place o
 same pointer path, and the sheet's buttons were found under a finger on the first day). A glow
 moving with real 5.1 music: the 5.1 programme is a test stream. The scan-out's cost, which is the
 same whatever is drawn and is what dimming leaves alone.
+
+**The time of day and the clock view, 2026-10-21, the kit over the cable.** `p4-rev3` with the time on every
+board (v0.10.0-beta.1-5170-g3b92a7511), sent with `ota.py push`, accepted on its 30 s trial; the kit's name is
+`hearth-e753f9`, its router `192.168.1.5` gives a time server over DHCP (option 42).
+
+| Tried | Result |
+|---|---|
+| Nothing touched: the board has just booted, sync is on by default | asking from boot, `servers` = `192.168.1.5 (from DHCP), pool.ntp.org`, first answer within seconds; the board's `22:04:35` against the PC's `22:04:34` UTC |
+| `PUT /ntp-server 0.au.pool.ntp.org`, then `none` | answered 2.1 s after naming it (the server list became `0.au.pool.ntp.org [162.159.200.123], 192.168.1.5 (from DHCP)`), and 5.3 s after `none`; `pool.ntp.org:123` is a 400 |
+| `PUT /time-sync off`, 30 s, then `on` | `asking` and `synced` false and the time gone at once; **answers 3 and 3 thirty seconds later (no request went out)**; back on, synced in 3.2 s |
+| `PUT /timezone AEST-10AEDT,M10.1.0,M4.1.0/3` | `2026-10-21 09:05:20` against the PC's local `09:05:18`; JST-9, `<+0530>-5:30` and `EST5EDT,...` moved it by the right hours |
+| Every zone the page lists (42), and 15 others (negative daylight saving, quoted names, rule times past a day) | 57 of 57 read by picolibc as written (the January/July check passed); a string that is not a zone, `AEST-10AEDT` without rules and `AEST-25` are 400s |
+| `POST /restart` with the zone set | zone, server and sync came back as stored, and the time again 2.1 s after the board answered |
+| The clock view on the glass, a Sendspin play (`GET :8081/panel.bmp`) | the designed picture with the real time: `09:06 Wednesday 21 October` in AEDT, `21:09 Tuesday 20 October` and the UTC sentence before a zone was set |
+
+**What the clock costs a stream.** The 5.1 E-AC-3 programme over Sendspin, 60 s, layout 5.1, the view
+`clock` against `off` in alternating order, three plays each (time sync on in both, since it is on in all):
+
+| | `clock` | `off` |
+|---|---|---|
+| Burst, `/status`'s `burst_us` | 4,561, 4,573, 4,565 (mean 4,566) | 4,551, 4,577, 4,565 (mean 4,564) |
+| Late, underruns, resyncs, invalid | 0 in all three | 0 in all three |
+| Free internal heap at the end | 99,067, 98,687, 96,419 | 97,231, 96,851, 97,867 |
+
+**The clock view costs a burst 2 µs (0.04%)**, which the spread of the plays of one view (26 µs) hides, with the
+same heap. The test server's sockets while it played: one outbound TCP connection to the board's Sendspin
+port and one unbound-peer UDP socket on an ephemeral port; no listening TCP socket.
+
+**Not checked on the kit.** A finger's tap on the glass in place of an injected one; the dim with the clock
+chosen (the preview checks it: backlight at its floor, the clock still lit, a touch wakes it); the S3, C6 and
+P4 boards of the bench were built (S3 and QEMU's shape fit and hold to their profiles) and not flashed.

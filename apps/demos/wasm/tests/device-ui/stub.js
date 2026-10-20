@@ -50,6 +50,9 @@ const REPLIES = {
         'GET  /network-preference  auto, ethernet or wifi on a board with a cable and WiFi; PUT one to change it',
         'GET  /now-playing   speakers, title, clock or off on a board with a screen; PUT one to change it',
         'GET  /dim-after     never, or minutes until that screen dims, on a board with a screen; PUT one',
+        'GET  /timezone      the POSIX time zone the board\'s time is shown in, or none (UTC); PUT one',
+        'GET  /ntp-server    the time server a person named, or none (the router\'s, then the pool); PUT one',
+        'GET  /time-sync     on or off: whether the board keeps its time with a time server; PUT one',
         'GET  /pairing       the servers this board is paired with, as JSON',
         'POST /pairing       body: reset, cancel, forget, or forget and a server_id (Sendspin pairing)',
         'GET  /firmware      both app slots, a trial, an upload and the last update, as JSON',
@@ -97,6 +100,19 @@ const REPLIES = {
     dimAfterBad: 'PUT /dim-after wants never, or a number of minutes from 1 to 240\n',
     dimAfterRefused: 'that time could not be stored\n',
     dimAfterOk: 'ok; takes effect at once\n',
+    noClock: 'this board keeps no time\n',
+    timeZoneBad:
+        'PUT /timezone wants a POSIX time zone with its daylight saving rules, such as AEST-10AEDT,M10.1.0,M4.1.0/3 (the offset is hours WEST of UTC), or none\n',
+    timeZoneRefused:
+        "that zone could not be taken: this board's C library reads it differently, or it could not be stored\n",
+    timeZoneOk: 'ok; the clock follows at once\n',
+    ntpServerBad:
+        'PUT /ntp-server wants a host name or an IPv4 address, such as pool.ntp.org or 192.168.1.5, or none\n',
+    ntpServerRefused: 'that server could not be stored\n',
+    ntpServerOk: 'ok; the board asks it at once\n',
+    timeSyncBad: 'PUT /time-sync wants on or off\n',
+    timeSyncRefused: 'that setting could not be stored\n',
+    timeSyncOk: 'ok; takes effect at once\n',
     nextPlay: 'ok; takes effect at the next play\n',
     nextBoot: 'ok; takes effect at the next boot\n',
     pairingBad: 'POST /pairing wants reset, cancel, forget, or forget and a server_id\n',
@@ -162,6 +178,12 @@ const ROUTES = [
     'PUT /now-playing',
     'GET /dim-after',
     'PUT /dim-after',
+    'GET /timezone',
+    'PUT /timezone',
+    'GET /ntp-server',
+    'PUT /ntp-server',
+    'GET /time-sync',
+    'PUT /time-sync',
     'GET /pairing',
     'POST /pairing',
     'GET /firmware',
@@ -409,10 +431,158 @@ function cableNetwork(preference = 'auto') {
 }
 
 // The panel of a board with a screen (firmware/hearth-sink/main/panel/): what it shows while a song has
-// no lyrics, which of the four views this build has, and when it dims, in the words GET /now-playing
-// and GET /dim-after use.
+// no lyrics, which of the four views this build has, and when it dims, in the words GET /now-playing and GET
+// /dim-after use. The title card is not built yet, so the build has three of the four views.
 function screenBoard() {
-    return { view: 'speakers', views: ['speakers', 'off'], dimAfter: '5' };
+    return { view: 'speakers', views: ['speakers', 'clock', 'off'], dimAfter: '5' };
+}
+
+// The time of a board that keeps it (firmware/hearth-sink/main/clock/sntp, every board with a network): in the
+// words GET /timezone, /ntp-server and /time-sync use, and the numbers GET /status's "time" has. `zoneRefused`
+// is a board whose C library reads a zone differently from the grammar, which the route says with a 409.
+function timeBoard() {
+    return {
+        sync: 'on',
+        zone: 'none',
+        server: 'none',
+        asking: true,
+        synced: true,
+        local: '2026-10-21 08:09:44',
+        servers: '192.168.1.5 (from DHCP), pool.ntp.org',
+        answers: 1,
+        zoneRefused: false,
+    };
+}
+
+// Whether a string is a time server the firmware takes: libs/device's wall_clock.hpp valid_ntp_server, rule for
+// rule: an IPv4 address (four parts, no leading zero) or a host name (RFC 1123 labels, the last not all digits),
+// at most 63 bytes.
+function validNtpServer(text) {
+    if (text.length === 0 || text.length > 63) {
+        return false;
+    }
+    if (/^[0-9.]+$/.test(text)) {
+        const parts = text.split('.');
+        return parts.length === 4 && parts.every((p) => /^(0|[1-9][0-9]{0,2})$/.test(p) && Number(p) <= 255);
+    }
+    const labels = text.split('.');
+    if (!labels.every((l) => /^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(l))) {
+        return false;
+    }
+    return !/^[0-9]+$/.test(labels[labels.length - 1]);
+}
+
+// Whether a string is a POSIX time zone the firmware takes: libs/device's wall_clock.hpp, rule for rule.
+// `std offset [dst [offset] ,start[/time],end[/time]]`; a zone with daylight saving MUST give its rules, and
+// nothing but printable ASCII is read.
+function validTimeZone(text) {
+    if (text.length === 0 || text.length > 63 || /[^!-~]/.test(text)) {
+        return false;
+    }
+    let at = 0;
+    const peek = () => (at < text.length ? text[at] : '');
+    const take = (c) => {
+        if (peek() === c) {
+            at += 1;
+            return true;
+        }
+        return false;
+    };
+    const digit = (c) => c >= '0' && c <= '9';
+    const alpha = (c) => /^[A-Za-z]$/.test(c);
+    const number = (least, most) => {
+        let value = 0;
+        let count = 0;
+        while (digit(peek()) && count < most) {
+            value = value * 10 + (peek().charCodeAt(0) - 48);
+            at += 1;
+            count += 1;
+        }
+        return count < least ? null : value;
+    };
+    const name = () => {
+        const start = at;
+        if (take('<')) {
+            while (at < text.length && peek() !== '>') {
+                if (!(alpha(peek()) || digit(peek()) || peek() === '+' || peek() === '-')) {
+                    return false;
+                }
+                at += 1;
+            }
+            if (!take('>')) {
+                return false;
+            }
+            const length = at - start - 2;
+            return length >= 3 && length <= 16;
+        }
+        while (alpha(peek())) {
+            at += 1;
+        }
+        const length = at - start;
+        return length >= 3 && length <= 16;
+    };
+    const hms = (maxHours) => {
+        if (!take('-')) {
+            take('+');
+        }
+        const hours = number(1, maxHours >= 100 ? 3 : 2);
+        if (hours === null || hours > maxHours) {
+            return false;
+        }
+        if (take(':')) {
+            const minutes = number(2, 2);
+            if (minutes === null || minutes > 59) {
+                return false;
+            }
+            if (take(':')) {
+                const seconds = number(2, 2);
+                if (seconds === null || seconds > 59) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+    const rule = () => {
+        if (take('J')) {
+            const day = number(1, 3);
+            if (day === null || day < 1 || day > 365) {
+                return false;
+            }
+        } else if (take('M')) {
+            const month = number(1, 2);
+            if (month === null || month < 1 || month > 12 || !take('.')) {
+                return false;
+            }
+            const week = number(1, 1);
+            if (week === null || week < 1 || week > 5 || !take('.')) {
+                return false;
+            }
+            const weekday = number(1, 1);
+            if (weekday === null || weekday > 6) {
+                return false;
+            }
+        } else {
+            const day = number(1, 3);
+            if (day === null || day > 365) {
+                return false;
+            }
+        }
+        return take('/') ? hms(167) : true;
+    };
+    if (!name() || !hms(24)) {
+        return false;
+    }
+    if (at === text.length) {
+        return true;
+    }
+    if (!name()) {
+        return false;
+    }
+    if (peek() !== ',' && !hms(24)) {
+        return false;
+    }
+    return take(',') && rule() && take(',') && rule() && at === text.length;
 }
 
 // One of GET /pairing's servers, as on_pairing_get writes it
@@ -504,6 +674,20 @@ function appImage({ version = 'v0.11.0', project = 'iclforge_hearth_sink', chip 
 // GET /status as control.cpp writes it: the same keys in the same order, the
 // volume to three places, and a newline at the end. `second_line` is left out
 // for a sink with no second line to wire, as the example leaves it.
+// GET /status's "time" object, as on_status writes it.
+function timeStatus(t) {
+    return {
+        sync: t.sync === 'on',
+        asking: t.asking,
+        synced: t.synced,
+        local: t.synced ? t.local : null,
+        zone: t.zone,
+        server: t.server,
+        servers: t.servers,
+        answers: t.answers,
+    };
+}
+
 function statusJson(d) {
     const stream = d.player ? d.player.stream : d.lastStream;
     const stats = d.player ? d.player.stats : d.lastStats;
@@ -528,6 +712,9 @@ function statusJson(d) {
     }
     if (d.network !== undefined) {
         fields.push(['network', JSON.stringify(d.network)]);
+    }
+    if (d.time !== undefined) {
+        fields.push(['time', d.time === null ? 'null' : JSON.stringify(timeStatus(d.time))]);
     }
     return '{' + fields.map(([k, v]) => JSON.stringify(k) + ':' + v).join(',') + '}\n';
 }
@@ -564,6 +751,9 @@ async function startStub() {
         // A board with a screen (a test sets screenBoard()): the view it shows while a song has no
         // lyrics, the views this build has, and when it dims. Null for a board with none.
         screen: null,
+        // What the board says about its time (timeBoard); undefined for a firmware that keeps none (no
+        // network, or QEMU's), whose /status has no "time" key and whose time routes answer 404.
+        time: timeBoard(),
         hardware: defaultHardware(),
         // GET /firmware's body (defaultFirmware), or undefined for a firmware
         // that takes no updates.
@@ -932,6 +1122,59 @@ async function startStub() {
                 device.screen.dimAfter = minutes === 0 ? 'never' : String(minutes);
                 return send(res, 200, REPLIES.dimAfterOk);
             }
+            case 'GET /timezone':
+                if (!device.time) {
+                    return send(res, 404, REPLIES.noClock);
+                }
+                return send(res, 200, device.time.zone + '\n');
+            case 'PUT /timezone': {
+                const word = body.trim();
+                if (word !== 'none' && !validTimeZone(word)) {
+                    return send(res, 400, REPLIES.timeZoneBad);
+                }
+                if (!device.time) {
+                    return send(res, 409, REPLIES.noClock);
+                }
+                if (device.time.zoneRefused) {
+                    return send(res, 409, REPLIES.timeZoneRefused);
+                }
+                device.time.zone = word;
+                return send(res, 200, REPLIES.timeZoneOk);
+            }
+            case 'GET /ntp-server':
+                if (!device.time) {
+                    return send(res, 404, REPLIES.noClock);
+                }
+                return send(res, 200, device.time.server + '\n');
+            case 'PUT /ntp-server': {
+                const word = body.trim();
+                if ((word !== 'none' && !validNtpServer(word)) || (/^none$/i.test(word) && word !== 'none')) {
+                    return send(res, 400, REPLIES.ntpServerBad);
+                }
+                if (!device.time) {
+                    return send(res, 409, REPLIES.noClock);
+                }
+                device.time.server = word;
+                return send(res, 200, REPLIES.ntpServerOk);
+            }
+            case 'GET /time-sync':
+                if (!device.time) {
+                    return send(res, 404, REPLIES.noClock);
+                }
+                return send(res, 200, device.time.sync + '\n');
+            case 'PUT /time-sync': {
+                const word = body.trim();
+                if (word !== 'on' && word !== 'off') {
+                    return send(res, 400, REPLIES.timeSyncBad);
+                }
+                if (!device.time) {
+                    return send(res, 409, REPLIES.noClock);
+                }
+                device.time.sync = word;
+                device.time.asking = word === 'on';
+                device.time.synced = word === 'on' && device.time.synced;
+                return send(res, 200, REPLIES.timeSyncOk);
+            }
             case 'GET /pairing':
                 if (!device.sendspin) {
                     return send(res, 404, REPLIES.pairingRefused);
@@ -1160,6 +1403,7 @@ module.exports = {
     wifiNetwork,
     cableNetwork,
     screenBoard,
+    timeBoard,
     defaultHardware,
     defaultFirmware,
     firmwareSlot,
