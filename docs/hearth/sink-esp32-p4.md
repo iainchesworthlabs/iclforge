@@ -188,8 +188,9 @@ screen again.
 
 ![The developer view: the network, the configuration, the stream and the board's performance in two columns, the network preference as three buttons, and the console's last five lines](screenshots/p4-panel-dev-view.png)
 
-Two columns of 18 px type and the console's last five lines under them, brought up to date twice a
-second. This is a page for someone at arm's length, not the two-metre type of the lyrics.
+Two columns of 18 px type and the console's last five lines under them, brought up to date once a
+second (every two while a stream plays, so that its drawing and its questions of the radio
+leave the audio alone). This is a page for someone at arm's length, not the two-metre type of the lyrics.
 
 | Section | What it says |
 |---|---|
@@ -202,7 +203,7 @@ second. This is a page for someone at arm's length, not the two-metre type of th
 **The accent colour means look here**: a counter that is not zero, a radio signal below -75 dBm, a
 clock that has not converged while something plays, a reset by a panic, a watchdog or a brownout
 (`wdt` is not one: it is how this board restarts), a stored core dump, an internal heap that has
-fallen below 16 KB, and drawing that ran late.
+fallen below 16 KB.
 
 ![The same view of a board in trouble: no cable, a weak radio, underruns, late and dropped chunks, a panic reset and a core dump, in the accent colour](screenshots/p4-panel-dev-trouble.png)
 

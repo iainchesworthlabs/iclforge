@@ -332,7 +332,9 @@ have it otherwise:
   the view says "Switching..." until the board has the preference (a change that does not take is
   called refused after 45 s). Nothing is invented: the REST route, the NVS key and the verification
   (D9) are #1608's.
-- **A refresh twice a second**, and only while the view is open; the facts are read from what the
+- **A refresh once a second** (every two seconds while a stream plays, and the network, whose
+  signal is a call across SDIO to the C6, every two seconds and every ten while one plays), and only
+  while the view is open; the facts are read from what the
   board already keeps (`dev_info.cpp`), the text is `iclforge/dev_view.hpp`'s (libs/device, with host
   tests), and a label's text is set only when it changed, so what is redrawn is the numbers that
   moved. The console is read from a cursor, a few hundred bytes at a time, and not at all while the
@@ -891,6 +893,56 @@ glitched play, not a failure, and it is not the cable's.
 update path above has been run with the cable alone); 10 Mbit/s or half duplex; a static address;
 IPv6; a long soak; a DHCP server that is slow (boot waits 15 s for the cable's address under `auto`
 and then joins the Wi-Fi, the cable going on asking).
+
+### The developer view on the kit (2026-10-21)
+
+[D10](#d10-the-developer-view-2026-10-21) built and run on the kit over the cable (`p4-rev3`, hash
+`ff9b27a6c4fd`, three images OTA-pushed and accepted, the last `v0.10.0-beta.1-5143-g54e3b9ef4`).
+Everything was done with `POST :8081/panel/tap` (three requests, each holding the pointer down 120 ms
+and 60 ms after, so 235 to 265 ms apart) and `GET :8081/panel.bmp`; a finger on the glass is [owed](#the-developer-view-owed).
+
+| Tried | Result |
+|---|---|
+| Three taps at (100, 568) | the view opened (`dev_view` true in `GET :8081/panel`) |
+| A tap at (900, 300) half a second or more later | closed; `screen` and the picture are the idle screen's again |
+| The view's contents against the board | the network (the cable in use, 100 Mb/s full duplex, both addresses and MACs, the SSID and -33 to -36 dBm), the profile and hash, the version and `ota_1`, ESP32-P4 v3.2 at 2 x 400 MHz with 32 MiB of PSRAM, `2.0 - 16 slots x 32 bit - i2s_wide`, uptime, `reset: wdt`, **"core dump stored, 12.7 KiB"** (`ota.py status` says 12,960 bytes: a real one, left by the other session's panic image), the heap (231 to 255 KiB free, block 204 to 232 KiB) and the console's last lines, which were the board's own (`network: preference ethernet asked for, is auto`, the C6's RPC errors when the station stopped) |
+| The preference: Wi-Fi tapped, then Cancel | the confirming step showed ("Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address changes to ..."); Cancel changed nothing (`GET /status` still `auto`) |
+| Ethernet, Switch | `ethernet` kept in under two seconds, the Wi-Fi off ("off (the preference leaves it out)"), the cable's address still answering |
+| Auto, Switch | both interfaces back, "Done." beside NETWORK for six seconds |
+| Wi-Fi from the pin to the cable | **refused by the screen, wrongly**: the first image blocked it because the station was off and held no address. The board brings an interface that is off up first (`apply()`), so only an enabled cable with no link, or no stored network, is blocked now (host tests); not tried again on the board |
+| Cost of opening, first time | the fonts and the first draw took 350 to 430 ms in one cycle (`cycle_us_max`, 4 late cycles); a refresh then costs the task 5 to 7 ms (`dev_refresh_us_last`) and LVGL's render of what changed 55 to 70 ms, the idle screen's own figure |
+
+**Three things the kit showed that the preview could not.** A server's name longer than its row
+(Music Assistant's `Music Assistant (d5369777-music-assistant)`) wrapped over the row under it: LVGL
+puts dots only in a label of fixed height. **Every refresh cycle was late** (55 to 70 ms of render
+and 40 to 50 ms of reading the board) until the Wi-Fi was pinned off, and stopped being late when it
+was: `network_link()` asks the C6 for the signal across SDIO, the idle screen already does that twice
+a second, and the view's own read doubled it. The view now reads the network at most every two
+seconds (every ten while a stream plays), refreshes once a second (every two while a stream
+plays), and the panel's own late cycles are no longer drawn in the accent colour: they are the
+lowest task's. And `lv_mem_monitor` with the PSRAM heap reports all of PSRAM as LVGL's, so no
+figure of LVGL's use is shown.
+
+**R7, tried: the view open during a Sendspin play** (`hearth-testserver` dialling the Wi-Fi
+address, the suite's AC-3 2.0 programme, 30 s, 938 bursts, the view opened by three taps and the play
+started 2.5 s later; plays alternated closed and open). With the first version of the view (a refresh
+twice a second, the network asked every half second): closed 4 plays, all clean; open 4 plays, three
+clean and one with 3 late chunks, an underrun and a resync. With the version in this change: closed 5
+plays, four clean and one with one late chunk (1,536 lost frames); open 5 plays, four clean and one
+with one late chunk. Every glitch is a start (the first chunk late), the shape the other session
+traced to lwIP's 6-entry TCP mailbox filling, and one of the closed plays had it; nine plays each way
+cannot tell a one-in-four from a one-in-five, and **no underrun, resync or late chunk after a
+start was seen with the view open**. The panel's task is below the decoder and the I2S writer and
+holds none of their locks; the view's drawing is PSRAM traffic that the decoder shares (Q5), and
+that, not the task, is what a longer run would have to measure.
+
+#### The developer view: owed
+
+A finger on the glass (the taps above are the read-back route's: they enter at the same pointer,
+but not through the controller). A Wi-Fi pin from the glass with the corrected rule. A play over
+the cable with the view open. The view with AC-4 5.1 playing, where internal RAM is the scarce thing:
+the view reads the console only while the internal heap has a 4 KB block, and its own allocations
+are PSRAM's or a few hundred bytes.
 
 ## Risks and open questions
 

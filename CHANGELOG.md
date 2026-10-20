@@ -85,7 +85,7 @@ The sections below contain the complete change list and fixes.
   clocks, output layout, uptime and reset reason, a stored core dump), the stream (the server, the
   clock, bursts, underruns, late, dropped, resyncs, per-output levels and a play's figures), the
   board's performance (both heaps, the panel's render time, the touch counters) and the console's last
-  five lines, twice a second, with what is wrong in the accent colour. It never shows the Wi-Fi
+  five lines, once a second (every two while a stream plays), with what is wrong in the accent colour. It never shows the Wi-Fi
   passphrase or the Sendspin pairing token.
 - **A control for the network preference, Auto, Ethernet or Wi-Fi**, which asks before it acts
   ("Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address
