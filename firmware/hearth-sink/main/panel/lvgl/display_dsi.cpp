@@ -2,11 +2,12 @@
 // kit"): the 7-inch 1024 by 600 panel of Espressif's ESP32-P4X-Function-EV-Board, an EK79007 on two
 // lanes, with a GT911 touch controller on the I2C bus the board shares with its codec.
 //
-// FIRST RUN, 2026-10-20, on the kit (chip v3.2, planning/karaoke-p4x-panel.md, "First run on the
-// kit"): the bus opens, the EK79007 initialises, the GT911 answers (at 0x14: the vendor's own BSP
-// tries only 0x5D, which is why the factory demo aborts) and an idle frame is drawn into the frame
-// buffer. Not yet looked at on the glass, and touch not yet tapped. Everything below is written
-// against the headers of ESP-IDF v6.1 and the two managed components (espressif/esp_lcd_ek79007 2.0,
+// RUN on the kit, 2026-10-20 (chip v3.2, planning/karaoke-p4x-panel.md, "First run on the kit"):
+// the bus opens, the EK79007 initialises, the GT911 answers (at 0x14: the vendor's own BSP tries
+// only 0x5D, which is why the factory demo aborts), the screen is as designed on the glass, and a
+// tap lands on every button of the controls sheet once the touch layer's axes are mirrored. Not
+// checked: tearing, and what the scan-out costs the decoder. Everything below was written against
+// the headers of ESP-IDF v6.1 and the two managed components (espressif/esp_lcd_ek79007 2.0,
 // espressif/esp_lcd_touch_gt911 1.2), and is built by CI as the `panel-dsi` image. The values that
 // come from a document and not from a measurement are marked.
 //
@@ -84,16 +85,30 @@ void read_pointer(lv_indev_t* /*indev*/, lv_indev_data_t* data) {
     }
     // Polled: the board has no interrupt line to the controller (the BSP header lists it as not
     // connected). A read that fails is no touch.
-    if (esp_lcd_touch_read_data(g_touch) != ESP_OK) {
+    TouchCounters& counters = touch_counters();
+    const esp_err_t read_result = esp_lcd_touch_read_data(g_touch);
+    if (read_result != ESP_OK) {
+        counters.failures.fetch_add(1);
+        counters.last_error.store(static_cast<int>(read_result));
         return;
     }
+    counters.reads.fetch_add(1);
     esp_lcd_touch_point_data_t point{};
     std::uint8_t count = 0;
-    if (esp_lcd_touch_get_data(g_touch, &point, &count, 1) == ESP_OK && count > 0) {
+    static bool was_down = false;
+    const bool down = esp_lcd_touch_get_data(g_touch, &point, &count, 1) == ESP_OK && count > 0;
+    if (down) {
+        counters.touches.fetch_add(1);
+        counters.x.store(point.x);
+        counters.y.store(point.y);
+        if (!was_down) {
+            counters.record_press(point.x, point.y);
+        }
         data->point.x = point.x;
         data->point.y = point.y;
         data->state = LV_INDEV_STATE_PRESSED;
     }
+    was_down = down;
 }
 
 [[nodiscard]] bool open_touch() {
@@ -117,7 +132,7 @@ void read_pointer(lv_indev_t* /*indev*/, lv_indev_data_t* data) {
           static_cast<std::uint32_t>(ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP)}) {
         esp_lcd_panel_io_i2c_config_t io_config{};
         io_config.dev_addr = address;
-        io_config.scl_speed_hz = 100000;
+        io_config.scl_speed_hz = 400000;  // the GT911's ceiling, and the vendor BSP's own speed
         io_config.control_phase_bytes = 1;
         io_config.dc_bit_offset = 0;
         io_config.lcd_cmd_bits = 16;
@@ -131,6 +146,10 @@ void read_pointer(lv_indev_t* /*indev*/, lv_indev_data_t* data) {
         config.y_max = kHeight;
         config.rst_gpio_num = static_cast<gpio_num_t>(CONFIG_ICLFORGE_EXAMPLE_PANEL_TOUCH_RST_GPIO);
         config.int_gpio_num = static_cast<gpio_num_t>(CONFIG_ICLFORGE_EXAMPLE_PANEL_TOUCH_INT_GPIO);
+        // The layer's axes against the display's, which esp_lcd_touch applies to every point.
+        config.flags.swap_xy = CONFIG_ICLFORGE_EXAMPLE_PANEL_TOUCH_SWAP_XY;
+        config.flags.mirror_x = CONFIG_ICLFORGE_EXAMPLE_PANEL_TOUCH_MIRROR_X;
+        config.flags.mirror_y = CONFIG_ICLFORGE_EXAMPLE_PANEL_TOUCH_MIRROR_Y;
         if (esp_lcd_touch_new_i2c_gt911(io, &config, &g_touch) == ESP_OK) {
             std::printf("panel: GT911 touch controller at 0x%02X\n", static_cast<unsigned>(address));
             return true;

@@ -46,6 +46,11 @@ InjectedPointer& injected_pointer() {
     return pointer;
 }
 
+TouchCounters& touch_counters() {
+    static TouchCounters counters;
+    return counters;
+}
+
 namespace {
 
 // The song the demo plays: a word-timed file, looped, with no server and no network. For bringing a
@@ -183,6 +188,30 @@ void on_flush_start(lv_event_t* event) {
     }
 }
 
+// Waits out the rest of a period. LVGL reads the pointer inside lv_timer_handler(), so a tap is
+// seen only when the task calls it, and a finger is down for 50 to 150 ms: called once a period
+// (every 100 ms with nothing filling, and a tick is 10 ms) the task caught about half the taps,
+// and the first run on the kit found a tap that did nothing until it was repeated all over the
+// glass. So with a pointer to read the wait is cut into 20 ms slices, each followed by the call;
+// LVGL draws nothing in it unless something changed, and the read of an idle controller is one
+// I2C byte.
+void rest(std::int64_t rest_us) {
+    constexpr std::int64_t kSliceUs = 20'000;
+    const std::int64_t until = esp_timer_get_time() + rest_us;
+    for (;;) {
+        const std::int64_t left = until - esp_timer_get_time();
+        if (left <= 1000) {
+            return;
+        }
+        const std::int64_t wait = g_display.touch ? std::min(left, kSliceUs) : left;
+        vTaskDelay(std::max<TickType_t>(1, pdMS_TO_TICKS(wait / 1000)));
+        if (g_display.touch && until - esp_timer_get_time() > 1000) {
+            const std::lock_guard lock(g_lock);
+            (void)lv_timer_handler();
+        }
+    }
+}
+
 void run(void* /*arg*/) {
     const std::int64_t fill_period_us = 1'000'000 / std::max(kFps, 1);
     constexpr std::int64_t kRestPeriodUs = 100'000;
@@ -230,8 +259,7 @@ void run(void* /*arg*/) {
         }
 
         const std::int64_t spent = esp_timer_get_time() - started;
-        const std::int64_t rest_us = std::max<std::int64_t>(period_us - spent, 1000);
-        vTaskDelay(std::max<TickType_t>(1, pdMS_TO_TICKS(rest_us / 1000)));
+        rest(std::max<std::int64_t>(period_us - spent, 1000));
     }
 }
 
@@ -239,15 +267,38 @@ void run(void* /*arg*/) {
 
 [[nodiscard]] std::string stats_json() {
     const PanelStats stats = panel_stats();
-    char buffer[640];
+    const panel::TouchCounters& counters = panel::touch_counters();
+    // The last presses' positions, newest first: [[x,y],...].
+    char recent[128] = "[";
+    {
+        const std::uint32_t total = counters.recent_next.load();
+        const std::uint32_t shown = std::min(total, panel::TouchCounters::kRecent);
+        std::size_t used = 1;
+        for (std::uint32_t i = 0; i < shown; ++i) {
+            const std::uint32_t packed =
+                counters.recent[(total - 1 - i) % panel::TouchCounters::kRecent].load();
+            used += static_cast<std::size_t>(std::snprintf(
+                recent + used, sizeof recent - used, "%s[%u,%u]", i == 0 ? "" : ",",
+                static_cast<unsigned>(packed >> 16), static_cast<unsigned>(packed & 0xFFFFu)));
+        }
+        std::snprintf(recent + used, sizeof recent - used, "]");
+    }
+    char buffer[1024];
     std::snprintf(buffer, sizeof buffer,
                   "{\"kind\":\"%s\",\"running\":%s,\"width\":%d,\"height\":%d,\"touch\":%s,"
+                  "\"touch_reads\":%lu,\"touch_failures\":%lu,\"touch_points\":%lu,"
+                  "\"touch_x\":%d,\"touch_y\":%d,\"touch_error\":%d,\"touch_recent\":%s,"
                   "\"screen\":\"%s\",\"demo\":%d,\"refreshes\":%lu,\"pixels\":%llu,\"render_us_last\":%lu,"
                   "\"render_us_mean\":%lu,\"render_us_max\":%lu,\"rebuilds\":%lu,"
                   "\"rebuild_us_max\":%lu,\"late_cycles\":%lu,\"cycle_us_max\":%lu,"
                   "\"stack_free\":%lu}\n",
                   stats.kind, stats.running ? "true" : "false", stats.width, stats.height,
-                  stats.touch ? "true" : "false", stats.screen, panel::demo_mode(),
+                  stats.touch ? "true" : "false",
+                  static_cast<unsigned long>(counters.reads.load()),
+                  static_cast<unsigned long>(counters.failures.load()),
+                  static_cast<unsigned long>(counters.touches.load()), counters.x.load(),
+                  counters.y.load(), counters.last_error.load(), recent, stats.screen,
+                  panel::demo_mode(),
                   static_cast<unsigned long>(stats.refreshes),
                   static_cast<unsigned long long>(stats.pixels),
                   static_cast<unsigned long>(stats.render_us_last),
