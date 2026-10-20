@@ -88,6 +88,17 @@ CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ICLFORGE_EXAMPLE_I2S_DMA_DESCRIPTORS=12
 CONFIG_ICLFORGE_EXAMPLE_I2S_DMA_FRAMES=256
 
+# The TCP receive mailbox. lwIP posts each segment it takes in to a per-socket mailbox and refuses it
+# when the mailbox is full (the help of CONFIG_LWIP_TCP_RECVMBOX_SIZE). The default, 6, is sized for
+# full segments (the window, 5,760 bytes, over the segment size, 1,440, plus two); a sender that
+# writes a WebSocket frame's header and its payload as separate segments (TCP_NODELAY) fills it
+# with small ones, and at the start of a play the chunks arrive faster than the server task reads
+# them. The refused segment comes again 250 ms or more later, and the stream's first chunk with it:
+# on the v3.2 kit 7 plays in 20 over Wi-Fi and 16 in 20 over the cable lost the first part of their
+# first second, and with 32 entries (128 bytes a socket) none of 40 did
+# (planning/karaoke-p4x-panel.md, "What the glitches were").
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
+
 # PSRAM, on: this board has 32 MB of it (docs/platforms/bare-metal/esp32-p4.md),
 # unlike the minimum-footprint bare-metal probe that deliberately leaves it off
 # to measure what fits in internal SRAM alone - hearth_sink has no such goal,
