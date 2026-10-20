@@ -6,14 +6,20 @@ whose TDM frame holds 512 bits, which reaches sixteen 32-bit channels into both 
 planned pair from one line, and, on a board with a panel, it draws the words of a karaoke song as
 they are sung.
 
-!!! note "Status as of 2026-10-20: the v1.x board plays; the v3.x kit shows the screen, takes a tap and plays through 16 TDM slots; the clocks on the pins, a karaoke play and tearing are not yet checked"
+!!! note "Status as of 2026-10-20: the v1.x board plays; the v3.x kit shows the screen, takes a tap, plays through 16 TDM slots, plays a karaoke song with its words and decodes AC-4 5.1; the clocks on the pins are not measured, and the glass costs the heaviest stream a tenth"
     The sink runs on a DFRobot FireBeetle 2 (chip revision v1.3), stereo, over Wi-Fi hosted on its
     onboard ESP32-C6. The v3.x kit arrived on 2026-10-20 and the v3.x image ran on it the same day:
     it boots on a v3.2 chip at 400 MHz, joins Wi-Fi, is found by Music Assistant, draws the idle and
     the lyric screens on the panel, answers a tap on every button of the controls sheet, and plays a
-    5.1 stream through the full sixteen 32-bit TDM slots in real time with no underrun. **Not yet
-    checked on the kit: the TDM clocks on the pins (it needs a scope), a karaoke play with the screen,
-    and tearing.** The board suite is played on it, with a baseline.
+    5.1 stream through the full sixteen 32-bit TDM slots in real time with no underrun. A karaoke
+    song with word-timed lyrics then played for 99 s with no underrun or late chunk, the words
+    following it on the glass, and the owner, who watched and used the Adjust sheet, said it appeared
+    and looked fine. **The glass takes decode time:** its scan-out costs the decoder 1.3% (AC-3), 6%
+    (E-AC-3) and about 10% (AC-4 5.1), and with the song filling the screen the light streams' decode
+    time moves by 5 to 12% (under 1% of a frame); AC-4 5.1 plays clean at layout 2.0 and glitched on
+    5 of 18 plays at layout 5.1 with the glass on, against 1 of 30 without a scan-out.
+    **Not checked on the kit: the TDM clocks on the pins (it needs a scope) and tearing beyond the
+    owner's look.** The board suite is played on it, with a baseline.
     [planning/karaoke-p4x-panel.md](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md)
     has the plan, the first run and the list of what it runs next.
 
@@ -34,7 +40,7 @@ release carries one for each.
 | CPU | 360 MHz (400 MHz asserts in its boot) | 400 MHz |
 | I2S clock source | APLL, 125 MHz at most: **no TDM above two channels** | the 160 MHz PLL: TDM at the full 16 × 32 bits |
 | Screen | none | the 7-inch 1024 by 600 panel, with touch |
-| Verified | on a board | on a board (a v3.2 kit, 2026-10-20): screen, touch, 16-slot TDM in real time; **the clocks on the TDM pins not yet measured** |
+| Verified | on a board | on a board (a v3.2 kit, 2026-10-20): screen, touch, 16-slot TDM in real time, a karaoke play with lyrics, AC-4 5.1 (scratch build); **the clocks on the TDM pins not yet measured** |
 
 `GET /hardware` tells which a board is, and `ota.py` chooses the image from it, so a board updated
 over its network gets the right one ([Sink firmware](sink-firmware.md#which-image)).
@@ -99,7 +105,7 @@ the first slot, and its cause is not known.
 
 ## On the v3.x kit
 
-!!! warning "Run on a v3.2 chip and a panel; the pins' clocks and a karaoke play are not checked yet"
+!!! warning "Run on a v3.2 chip and a panel; the pins' clocks are not measured"
     What follows was built from ESP-IDF's headers, the v3.x user guide and the vendor drivers' own
     values, and the first run on the kit (2026-10-20) corrected it in four places: a crash in the DSI
     code, the touch controller's address (0x14), its axes (turned half a turn from the display's)
@@ -108,8 +114,11 @@ the first slot, and its cause is not known.
 
 ### What changes for the audio
 
-- **400 MHz**, and PSRAM at 200 MHz by ESP-IDF's default for this chip. The decoders scale with the
-  clock almost exactly, so the v1.3 board's timings are a floor.
+- **400 MHz**, and PSRAM at 200 MHz by ESP-IDF's default for this chip. The decoders do not scale
+  with the clock: on the kit, with no panel, the decoder alone takes 10% less time than on the v1.3
+  board for AC-3 and 17% less for AC-4 (11% more clock), but a Sendspin burst takes 13% (AC-4 5.1) to
+  100% (E-AC-3) more (cause not isolated, and not the panel's). The kit's figures are in [Memory and
+  time](#memory-and-time).
 - **TDM opens**: the `i2s_wide` sink takes the 160 MHz PLL (`I2S_CLK_SRC_PLL_160M`) as the clock
   source on this silicon, which the 16 × 32-bit frame needs (a 147 MHz source at least). The source
   is chosen when the image is built, because the two revisions are two images. On the kit, a 5.1
@@ -211,8 +220,34 @@ a run with the screen idle had a smaller disturbance of the same kind. The cause
 the screen is neither shown to be it nor shown not to be
 ([the plan's Measured section](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#measured)).
 **Not in these numbers:** the DSI engine's own reads of PSRAM (74 MB/s at 60 Hz, on the bus the
-decoder fetches its code from), and the AC-4 5.1 streams that fill a frame: both are the kit's first
-measurement.
+decoder fetches its code from), and the AC-4 5.1 streams that fill a frame. Both were measured on the
+kit on 2026-10-20:
+
+**Measured on the v3.2 kit** (400 MHz, the glass; images of one tree, the decoder's time a frame
+over `POST /play`, the median of six plays alternating the screen idle and the demo song filling;
+[the plan has the method and every figure](https://github.com/iainchesworthlabs/iclforge/blob/main/planning/karaoke-p4x-panel.md#the-second-session-on-the-kit)):
+
+| | AC-3 2.0 | E-AC-3 2.0 | AC-4 5.1 (Sendspin burst, layout 2.0) |
+|---|---|---|---|
+| No scan-out: `panel-null`, idle | 1,746 µs | 1,132 µs | 28.72 ms |
+| The glass, idle | 1,768 µs (+1.3%) | 1,199 µs (+5.9%) | 31.7 to 32.0 ms (+10 to +11%) |
+| The glass, the song filling | 1,862 µs (+6.6%) | 1,339 µs (+18.3%) | 32.03 ms (+11.5%) |
+
+- **No underrun or resynchronised byte** in any of the 52 AC-3 and E-AC-3 plays, and no late chunk in a
+  99 s karaoke play with the screen filling and the owner touching the Adjust sheet. The screen
+  task's refresh took 2.3 ms on average over that play (1.6 ms for the demo song alone), a line
+  rebuild up to 48.9 ms (the plan's 30 ms is not met), and the audio had no late chunk beside it.
+- **The scan-out and the drawing split differently by stream.** On the light streams most of the
+  move while the song fills is the drawing (4.6% and 11.7% on `panel-null`, which draws and does
+  not scan out), and on AC-4 5.1 the song filling adds almost nothing (0.1%) to a 10% that is
+  already there with the screen idle. 5% was the plan's pass; the light streams exceed it while the
+  song fills, by 0.3 to 0.65% of a frame, and AC-4 5.1 exceeds it all the time.
+- **AC-4 5.1 on the kit.** The decoder's PCM is the v1.3 board's, bit for bit. A Sendspin burst takes
+  74% of the 42.7 ms frame on the glass at layout 2.0 (66% with no panel) with no glitch in 13 plays,
+  but at layout 5.1 the glass glitched 5 of 18 plays (an underrun and a resynchronisation) against 1
+  of 30 without a scan-out, and the least free internal heap is 10 KB (the v1.3 board: 27.7 KB). A
+  bench-only `p4-rev3-ac4` profile is worth adding to hold these rows; whether the kit should ship
+  AC-4 is the owner's call and these numbers do not make it easy.
 
 ## Developing the screen without a panel
 

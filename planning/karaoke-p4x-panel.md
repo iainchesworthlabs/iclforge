@@ -1,6 +1,6 @@
 # Karaoke on an ESP32-P4 (chip revision v3.x) with a 7-inch panel
 
-!!! note "Status as of 2026-10-20: on the kit, the screen, touch and a 16-slot TDM play work; the clocks on the pins, a karaoke play and tearing are not yet checked"
+!!! note "Status as of 2026-10-20: on the kit, the screen, touch, a 16-slot TDM play, a karaoke play with lyrics and the AC-4 5.1 decode all run; the glass costs the heaviest stream a tenth; the clocks on the pins need a scope and tearing was only looked at"
     This is W12 of [karaoke phase 2](karaoke-phase2.md#w12-the-esp32-p4-with-a-panel), taken
     off the shelf because the owner's development kit was on its way and the firmware could be ready
     for it. The owner's brief, on 2026-10-12: a P4 of chip revision v3.2 or newer ("P4X") at
@@ -21,11 +21,11 @@
     |---|---|
     | W12a `Stage` in `libs/lyrics` | Built, 13 host test cases, mutation-checked |
     | W12b the panel, the screen, the preview tool | Built; the screens are in [the design sheet](../docs/hearth/sink-esp32-p4.md#the-screen), drawn by the firmware's own code on a computer |
-    | W12c the DSI panel and touch | Written against ESP-IDF v6.1 and the vendor drivers' headers and built by CI. **First run on the kit 2026-10-20**: it aborted in `esp_lcd_new_dsi_bus` (fixed); then the bus, the EK79007 and the GT911 (at 0x14) start and an idle frame is drawn into the frame buffer. The glass and a tap are not yet checked |
+    | W12c the DSI panel and touch | Written against ESP-IDF v6.1 and the vendor drivers' headers and built by CI. **First run on the kit 2026-10-20**: it aborted in `esp_lcd_new_dsi_bus` (fixed); then the bus, the EK79007 and the GT911 (at 0x14) start and an idle frame is drawn into the frame buffer. The glass, a tap and a karaoke play are checked ([First run on the kit](#first-run-on-the-kit)); the scan-out costs the AC-4 5.1 decode about 10% ([AC-4 5.1 at 400 MHz](#ac-4-51-at-400-mhz)) |
     | W12d the rev3 image | Built (a local build found and fixed a bootloader 576 bytes over its window: Warn log level, 22,448 bytes); the update chooser picks it by chip revision (tests). **First run on a v3.2 chip 2026-10-20**: boots at 400 MHz, joins Wi-Fi, `/hardware` says revision 3.2; TDM on the pins is not measured |
     | W12e measured on the FireBeetle with no panel | See [Measured](#measured) |
     | W12f docs | [An ESP32-P4 sink](../docs/hearth/sink-esp32-p4.md) |
-    | W12g bring-up on the kit | Started 2026-10-20: steps 1, 4 and 5 of [the list](#bring-up-on-the-kit) have a first result in [First run on the kit](#first-run-on-the-kit); steps 2, 3, 6 and 7 are not run |
+    | W12g bring-up on the kit | Done on 2026-10-20 except the two steps that need hardware that is not here: steps 1, 4, 5 and 6 of [the list](#bring-up-on-the-kit) ran, step 2 is the board suite at 400 MHz including AC-4, step 3 (the clocks on the pins) needs a scope and step 7 (the DACs) is not wired. See [First run on the kit](#first-run-on-the-kit) and [the second session](#the-second-session-on-the-kit) |
 
 ## What exists, and what is missing
 
@@ -345,7 +345,7 @@ cheap enough to be a rounding error on a slower part, which is an upper bound fo
 | Time to render a frame (per word step, per line change) | The panel task times `lv_timer_handler` and the flush; reports min / mean / max | Mean under 8 ms, line change under 30 ms |
 | Cost to the audio | The existing counters: `underruns`, `late_chunks`, `dropped_chunks`, the decode time per frame, with and without the screen | No change beyond noise over a 5-minute play of the karaoke example |
 | Internal RAM | Least free internal heap, as the AC-4 notes measure it | Not more than 2 KB lower than without the screen |
-| PSRAM contention | `panel/null` scan-out emulation on and off | Decode time per frame moves by less than 5 % |
+| PSRAM contention | `panel/null` scan-out emulation on and off | Decode time per frame moves by less than 5 % (**kit, 2026-10-20: not met** by AC-4 5.1, +10%, nor by E-AC-3 while the song fills, +12%; met by the scan-out alone on AC-3, +1.3%; see [the second session](#the-second-session-on-the-kit)) |
 | Does the picture match the design | `GET /panel` returns the frame as a BMP; compared against the sheet by eye and by a few pixel probes in a test | Matches |
 
 ## Measured
@@ -397,6 +397,7 @@ The counters are the board's own (`GET /status`, `sendspin`), polled once a seco
 - **The standard 5.1 AC-4 decode** (the P4's heaviest, about a whole frame) was not run with the
   screen: the live test's stream is a light one, 14 % of a frame. The margin the screen has to fit
   into is the AC-4 5.1 profile's, and its measurement is the kit's first run of the heavy streams.
+  **Run on the kit 2026-10-20**: [AC-4 5.1 at 400 MHz](#ac-4-51-at-400-mhz).
 
 ## Work
 
@@ -406,7 +407,7 @@ The counters are the board's own (`GET /status`, `sendspin`), polled once a seco
 | **W12b** | `panel` seam, `panel/none`, `panel/null` with LVGL, `lyric_screen`, fonts partition, the idle screen, the read-back route | L | W12a |
 | **W12c** | `panel/dsi`: EK79007 + GT911, the board profile, backlight | M | W12b; the kit to *verify* |
 | **W12d** | The rev3 image: `sdkconfig.p4-rev3`, `i2s_wide` PLL source, CI step, release list, update chooser rule, installer entry | M | - |
-| **W12e** | Measurement on the FireBeetle with `panel/null`, results into this page and the docs | S | W12b: **done**, [Measured](#measured); the heavy AC-4 streams and the scan-out are the kit's |
+| **W12e** | Measurement on the FireBeetle with `panel/null`, results into this page and the docs | S | W12b: **done**, [Measured](#measured); the heavy AC-4 streams and the scan-out were run on the kit on 2026-10-20: [the second session](#the-second-session-on-the-kit) |
 | **W12f** | Docs: a P4 sink guide (the S3 and C6 have one), the karaoke guide's board section, matrices, ROADMAP | S | W12b, W12d |
 | **W12g** | Bring-up on the kit ([below](#bring-up-on-the-kit)) | M | the kit |
 
@@ -451,11 +452,11 @@ The 16 MB of flash was read back before anything was written, so the vendor imag
 | Bring-up step ([above](#bring-up-on-the-kit)) | First result |
 |---|---|
 | 1. Flash `hearth-sink-esp32p4-rev3` | Done over USB from main `fd3c51169`, profile `p4-rev3`. The vendor's table sits where Hearth's NVS partition is, so that region was erased first. The chip takes the image: minimum v3.1, chip v3.2, no revision notice; `/hardware` says revision 3.2, 400 MHz, 32 MiB PSRAM, `sink_max_slots_bits` 16 |
-| 2. The probe at 400 MHz | Not run; the board suite's decode figures at 400 MHz are [below](#the-board-suite-on-the-kit) |
+| 2. The probe at 400 MHz | The board suite at 400 MHz, with AC-4 on a scratch image: [below](#the-board-suite-on-the-kit) and [AC-4 5.1 at 400 MHz](#ac-4-51-at-400-mhz) |
 | 3. TDM at 16 x 32 on GPIO 20, 21, 22 | The sink **opens 16 slots of 32 bits (TDM)** and plays a 5.1 stream through them in real time ([TDM](#tdm)). **The clocks on the pins are not measured**: that needs a scope or a logic analyser |
 | 4. The panel | A crash first, then the bus and the EK79007 start. The owner's photos show the screen as designed ([The glass](#the-glass)); tearing is not checked |
 | 5. Touch | The GT911 answers at **0x14**. Its axes were turned half a turn from the display's and it was read too seldom: both fixed, and every button of the controls sheet answers a tap ([Touch](#touch)) |
-| 6. A karaoke play | Not run |
+| 6. A karaoke play | Run (second session): Auld Lang Syne with its word-timed lyrics, 3,096 bursts, no underrun or late chunk, the words on the glass and the Adjust sheet used by the owner, who said it appeared and looked fine ([The karaoke play with the screen](#the-karaoke-play-with-the-screen)) |
 | 7. The ES9080 pair | Not wired |
 
 **The crash.** The image aborted on every boot that was watched, right after the Sendspin player
@@ -488,7 +489,7 @@ is on. Not checked: tearing or flicker (stills do not show it), and the screen w
 The panel's render time with the DSI engine reading the frame buffer out of PSRAM was 1.65 ms on
 average over 3,627 refreshes (`GET :8081/panel`, a demo song filling; the first, whole frame took 60
 ms), against 1.7 ms on the FireBeetle with no panel. The two are not the same chip or clock, and
-nothing yet says what the scan-out costs the decoder.
+the second session's [measurement](#what-the-scan-out-costs-the-decoder) says what the scan-out costs the decoder.
 
 #### Touch
 
@@ -553,12 +554,186 @@ stack 18 KB free:
 
 The kit takes 7 to 8% less time to decode where the clock is 11% higher. Why is not isolated: the
 decoders run their code from PSRAM, which is 200 MHz hex here and does not scale with the clock. The
-Sendspin rows and the AC-4 profile were not played on the kit.
+Sendspin rows and the AC-4 profile were not played in the first session on the kit; the second
+session's are [below](#the-second-session-on-the-kit).
 
 **What the first run answers, and does not.** The display's driver is the EK79007 and its touch
-controller is a GT911 at 0x14 and not 0x5D, turned half a turn from the display (Q1). Not measured:
-the I2S clocks on the pins, the scan-out's cost to the decoder (Q4, Q5), tearing, the AC-4 5.1
-decode, and a karaoke play with the screen.
+controller is a GT911 at 0x14 and not 0x5D, turned half a turn from the display (Q1). Not measured
+in the first session: the I2S clocks on the pins, the scan-out's cost to the decoder (Q4, Q5),
+tearing, the AC-4 5.1 decode, and a karaoke play with the screen. The second session measured all of
+those but the clocks on the pins, which still need a scope.
+
+### The second session on the kit
+
+**2026-10-20, the same day.** Five images of one tree (`b2cff5ee1`), each built into its own
+directory: the kit's image with the glass (profile `p4-rev3`) and with `panel-null` in place of
+`panel-dsi`, and the AC-4 shape of the kit with the glass, with `panel-null` and with no panel; and
+`hearth-testserver` built from the same tree. Every image was flashed over USB to COM7 after a check of the chip's MAC, with the bench lock
+held, and nothing was restarted by HTTP. The PC served the four stream files it needed from a
+folder of its own on one address for the length of the runs, and `hearth-testserver` dialled out to
+the kit; neither is left running.
+
+#### The karaoke play with the screen
+
+The programme is the repository's `examples/karaoke/auld-lang-syne`: an AC-3 3/2 stream of
+`bsmod` 7 (karaoke) at 384 kbit/s, played over and over, with its word-timed `.lrc` (586 bytes)
+sent as the lyrics, and the playhead anchors the server sends every two seconds. The server paired
+with the kit by the code it shows (Music Assistant had been connected to the kit before, and the
+test server's pairing takes the board from a server it is not paired to); the server's own pairing
+record was forgotten at the end of each run.
+
+| | Play 1: layout 2.0, 99 s | Play 2: layout 5.1 sent by the server, 49 s |
+|---|---|---|
+| Bursts played of sent | 3,096 of 3,096 | 1,548 of 1,548 |
+| Underruns, late, dropped, invalid, resynchronisations | 0, 0, 0, 0, 0 | 0, 0, 0, 0, 0 |
+| Worst error of the board's clock against the server's | -310 µs | -364 µs |
+| A burst (decode and render), mean, worst | 4.36 ms, 5.42 ms | 5.17 ms, 7.76 ms |
+| Least internal heap while it played | 217,547 bytes | 46,443 bytes (largest block 28,672) |
+
+- **The words reached the screen.** The board's log shows each line of the document taken in turn
+  (`sendspin: lyrics item 1 line N`) and the panel was on the lyric screen for the whole play and on
+  the idle screen after it.
+- **The layout setting reached the board.** The server logged `took layout 5.1`, the report has six
+  outputs (five with sound, the sixth, the LFE, silent) and the board went back to 2.0 when the
+  server left. The lyric delay on the sheet is the board's own and the server cannot set it;
+  `hearth-testserver` has no option for the output delay either, so **the server's delay setting was
+  not exercised**.
+- **What the screen cost, from `GET :8081/panel` before and after play 1:** 2,319 refreshes in 106.6
+  s (22 a second); 2.3 ms a refresh on average over the play, which includes the owner's taps on the
+  Adjust sheet (the demo song alone drew in 1.6 ms); the slowest refresh 84.7 ms; a line rebuild 48.9
+  ms at most (the plan's 30 ms is not met: it was 38.7 ms in the demo song and 28 to 48 ms on the
+  FireBeetle); 82 cycles longer than their 33 ms period (46 a minute); the panel task's stack 8,968
+  bytes free. The audio had no late chunk beside any of it.
+- **What the owner saw.** The owner watched the glass during play 1 and used the Adjust sheet (the
+  board counted 42 presses during the play, the last eight inside the sheet and the footer), and
+  said the test appeared and looked fine. That is all that was reported: **no one filmed it, and
+  tearing, flicker and a word's timing against the sound were not measured**, only not noticed.
+- **The internal heap at 5.1 is a finding.** The same stream at layout 2.0 left 217,547 bytes at its
+  least; at layout 5.1 it left 46,443. The AC-4 play below leaves about 10 KB at either layout.
+
+#### What the scan-out costs the decoder
+
+Two images of one tree: the glass (`panel-dsi`: the DSI engine reads the frame buffer out of PSRAM
+at 60 Hz, 74 MB/s, and the touch controller is polled 25 times a second) and `panel-null` (the same
+drawing into the frame buffer, no DSI driver and no scan-out). On each, 30 s plays of the board
+suite's two 2.0 streams over `POST /play`, six rounds in an alternating order (idle, filling,
+filling, idle, ...), the screen switched between plays with `POST :8081/panel/demo?mode=0|2` (2 is
+the demo song filling the screen, about 24 refreshes a second), a warm-up play first and dropped.
+The figure is the decoder's time a frame, `/status`'s `us_per_frame` less the sink's wait and the
+renderer's, the board suite's own definition. The median of six, with the least and greatest in
+brackets, in microseconds of a 32 ms frame:
+
+| Stream | `panel-null`, idle | `panel-null`, song filling | Glass, idle | Glass, song filling |
+|---|---|---|---|---|
+| AC-3 2.0, 192 kbit/s | 1,746 [1,743-1,750] | 1,827 [1,823-1,834] | 1,768 [1,766-1,773] | 1,862 [1,857-1,869] |
+| E-AC-3 2.0, 96 kbit/s | 1,132 [1,122-1,135] | 1,265 [1,257-1,272] | 1,199 [1,190-1,209] | 1,339 [1,329-1,353] |
+
+| Cost | AC-3 2.0 | E-AC-3 2.0 |
+|---|---|---|
+| The scan-out and the touch polling alone (glass idle against `panel-null` idle) | +22 µs, +1.3% | +67 µs, +5.9% |
+| The drawing alone (`panel-null` filling against idle) | +81 µs, +4.6% | +133 µs, +11.7% |
+| The song filling on the glass against the glass idle | +94 µs, +5.3% | +140 µs, +11.7% |
+| Both, against a board with the panel off (glass filling against `panel-null` idle) | +116 µs, +6.6% | +207 µs, +18.3% |
+
+- **The spread of six plays is under 1% of a figure, so these moves are real.** None of the 52 plays
+  (48 measured and four warm-ups) had an underrun, a failed allocation or a resynchronised byte,
+  and every one ended with `result=pass`.
+- **Against the plan's pass (a decode time that moves by less than 5%) the answer is "no" for these
+  two streams while the song fills, and "yes" for the scan-out alone on AC-3 and "just over" on
+  E-AC-3.** Most of the move is the drawing and not the scan-out: the drawing alone is about two
+  thirds of the largest figure, the scan-out alone a fifth to a third. The light streams are where a
+  percentage of the decode time is the least telling: the most any of it is, +207 µs, is 0.65% of the 32 ms
+  frame, against a decoder that uses 3.5 to 5.8% of it. The heavy stream, where 5% of the decode
+  time is 30 permille of a frame, is the case that decides it, [below](#ac-4-51-at-400-mhz).
+- **Not isolated:** why E-AC-3 moves twice as much as AC-3 for the same screen (the two decoders'
+  tables sit in different places in PSRAM, which was not looked at), and what the touch polling
+  alone costs (it is in the glass-idle figure, not separated from the scan-out).
+
+#### AC-4 5.1 at 400 MHz
+
+Three scratch images of this tree with the AC-4 decoder on (`sdkconfig.ac4` and the PCM-hash
+`sdkconfig.measure` after the `p4-rev3` fragments and Sendspin): with the glass (`panel-dsi`), with
+`panel-null`, and with no panel at all. The board suite's own `p4-rev1-ac4` rows were played on each
+unchanged, five plays a row, under a scratch profile `p4-rev3-ac4` and a scratch copy of the suite
+file (nothing in the repository was changed, and no such profile was added). The A-CPL and
+companding streams were not played: they were not in the one folder the PC served. The v1.3 column
+is the `p4-rev1-ac4` baseline (`firmware/hearth-sink/baselines/p4-rev1-ac4.json`: P4a, 360 MHz,
+2026-10-12). A frame is 32 ms for AC-3 and E-AC-3 and 42.667 ms for AC-4.
+
+The decoder alone (`POST /play` rows; permille of 32 ms; AC-4's are three frames long, so each is
+good to about 6%):
+
+| Row | v1.3, 360 MHz | Kit, no panel | Kit, `panel-null` | Kit, glass |
+|---|---|---|---|---|
+| AC-3 2.0 | 61 | 55 | 55 | 56 |
+| E-AC-3 2.0 | 40 | 35 | | 38 |
+| AC-4 2.0 music | 240 | 199 | 199 | 215 |
+| AC-4 5.1 music, folded to 2.0 | 619 | 512 | 524 | 572 |
+| AC-4 5.1 music onto `9.1.6`, 16 slots | | 597 | 614 | 669 |
+
+The whole burst over Sendspin (the product's path; the board's mean time for a burst less its wait
+in the sink, with its share of the frame in permille; 20 s of the three-frame AC-4 streams, looped):
+
+| Row | v1.3, 360 MHz | Kit, no panel | Kit, `panel-null` | Kit, glass |
+|---|---|---|---|---|
+| AC-3 2.0 | 2,724 µs (85) | 4,871 µs (152) | 4,906 µs (153) | 5,071 µs (158) |
+| E-AC-3 2.0 | 2,141 µs (67) | 4,299 µs (134) | | 4,489 µs (140) |
+| AC-4 2.0 music | 8,075 µs (189) | 11,674 µs (274) | | 12,668 µs (297) |
+| AC-4 5.1 music (layout 2.0) | 25,176 µs (590) | 28,369 µs (665) | 28,719 µs (673) | 31,669 µs (742) |
+| Least internal heap, AC-4 5.1 | 27,687 bytes | 9,715 | 10,255 | 10,339 |
+| Plays that glitched, of 5 a row, in the order above | 0, 1, 1, 1 | 0, 0, 0, 0 | 0, 0 (two rows run) | 0, 0, 0, 0 |
+
+And the same AC-4 5.1 stream with the server asking for layout **5.1** (six outputs in the 16
+slots), which is what the kit is for, 20 s a play, alternating the screen idle and the demo song
+filling where there is a screen:
+
+| Image | Plays | Glitched (an underrun and a resynchronisation, up to 27 late chunks) | Burst, median |
+|---|---|---|---|
+| No panel | 18 | 1 | 25.96 ms (61% of the frame) |
+| `panel-null`, idle and filling | 6 and 6 | 0 | 26.40 and 26.53 ms |
+| Glass, idle and filling | 9 and 9 | 2 and 3 | 29.26 and 29.57 ms (69%) |
+
+- **The PCM is the v1.3 board's.** The hashes of the 2.0 and the folded 5.1 streams are the same on
+  all three images and equal the baseline's (`f860e51f602ae753`, `7162259f3e596916`); the `9.1.6`
+  row's hash (`6d36d7d2e8a070e9`) is new and equal on the three.
+- **The decoder is faster than the v1.3 board's, the Sendspin path is slower.** With no panel the
+  AC-4 rows decode 17% faster (512 against 619) at 11% more clock, and the AC-3 row 10% faster, but
+  a burst over Sendspin takes 13% longer for AC-4 5.1 (28.4 against 25.2 ms) and 79% longer for
+  AC-3 2.0 (4.87 against 2.72 ms), with a decode that takes 1.75 ms against 1.95. **Not
+  isolated, and not the panel's** (the no-panel image is as slow): the baseline is from 2026-10-12
+  and this tree is some 400 commits on, so it may be the tree and not the silicon; the same tree on
+  the v1.3 board would say, and was not run (only the kit was flashed).
+- **The glass costs the heavy stream a tenth, and the scan-out is nearly all of it.** `panel-null`
+  against no panel is +0.35 ms a burst (+1.2%: LVGL's own presence); the glass against
+  `panel-null` is +2.95 ms (+10.3%): the DSI engine's reads out of PSRAM and the touch polling,
+  which were not separated. The song filling adds almost nothing on the glass (+0.1% at layout 2.0
+  over four plays each, +1% at 5.1, and +0.5% on `panel-null` at 5.1). The decoder's code and tables run out of PSRAM, so the contention
+  that Q5 feared is there, about 10% for AC-4 5.1 and 1 to 6% for AC-3 and E-AC-3. **Against the
+  plan's pass, a decode time that moves by less than 5%, the heavy stream fails it**, with its margin
+  still 26% of the frame at layout 2.0 on the glass.
+- **At layout 5.1 the glass makes the stream glitch.** At layout 2.0 all 13 plays on the glass were
+  clean (five in the suite, eight alternating with the screen filling or not). At 5.1, 5 of 18 plays
+  on the glass glitched (an underrun and a resynchronisation each, one with 27 late chunks and
+  about 1.1 s of lost audio) against 1 of 30 on the two images without a scan-out (Fisher's exact
+  test, p about 0.02; 0.18 against the no-panel image alone). It happened with the screen idle as
+  often as with the song filling (2 of 9 and 3 of 9), so the drawing is not what separates the
+  images; the scan-out is, if the panel is the cause at all. The v1.3 baseline had the same kind of
+  glitch once in five with no panel at layout 2.0, so this is a stream that runs close to its edge on
+  both, and the cause of any of them is not found.
+- **Internal RAM.** The AC-4 5.1 play leaves 9.7 to 10.4 KB at its least on all three images and
+  the v1.3 board left 27.7 KB, so the kit is the tighter of the two; the panel changes that by
+  nothing a play can see (Q3). Under AC-3 and E-AC-3 plays the panel (the screen task, its HTTP
+  server, the drivers) takes 14 to 17 KB of the least-free internal heap (87.4 to 70.3 KB, and 65.7
+  to 48.9 KB), against the plan's pass of 2 KB. At boot (the budget line, one boot of each) the
+  three images read 295,779 to 300,675 bytes free, which is inside the boot-to-boot spread of the
+  baselines, and the glass and `panel-null` a largest block 8,192 bytes smaller than the no-panel
+  image's (270,336 against 278,528).
+- **Is a `p4-rev3-ac4` profile worth adding?** As a bench-only profile with no published image (as
+  `p4-rev1-ac4` is), **yes**: the rows play on the kit, the PCM matches, and its baseline would hold
+  the figures above. Whether the kit should ship AC-4 is a different question and the numbers are
+  mixed: 2.0 and the stereo fold are clean at 74% of a frame, 5.1 to the TDM slots glitches one play
+  in five or six with the glass on and the heap is 10 KB. **No profile was added**; it is the
+  owner's call.
 
 ## Risks and open questions
 
@@ -566,9 +741,9 @@ decode, and a karaoke play with the screen.
 |---|---|---|
 | Q1 | The board's panel controller, touch controller and codec pins | **Mostly answered 2026-10-20.** The board is the ESP32-P4X-Function-EV-Board; its user guide gives the backlight and reset GPIOs and the J1 header, and does not name the display's driver IC (it links EK73217BCGA and EK79007AD), the lane count or the touch controller. The kit's own demo logs the `EK79007` driver, and the GT911 answers at **0x14** on GPIO7 and GPIO8 (not 0x5D). Two lanes at 900 Mbit/s initialise without error; whether the glass is right is not yet seen. The codec's GPIOs are still the older board's BSP values, not read from this kit. The board profile is a Kconfig choice |
 | Q2 | LVGL's right-to-left flex and `lv_label` bidi with Hebrew in a wrapping row | **Answered**: it works, with two things found (the default theme's 10 px gap between flex children, and LVGL mirroring an alignment under an RTL base, which put the fill on the wrong side until the alignment was left to LVGL); the Hebrew picture is the check |
-| Q3 | Internal RAM: LVGL's allocator, the DSI driver's descriptors and the touch driver's buffers against a decoder that leaves 1 to 11 KB | **Half answered**: LVGL's heap is PSRAM (`lv_memory.cpp`), the frame buffer, render buffers, glyph caches and the task's stack are PSRAM, and the panel starts after the player (which came up with 289,687 B of internal heap free). What the panel then takes from internal RAM (its task's control block, the read-back server's 6 KB stack, small structures, the DSI and touch drivers' own) was **not measured**, and nor was the least-free figure during an AC-4 play: that is the next number to take |
-| Q4 | Tearing with one frame buffer | The kit; two buffers cost 1.2 MB of PSRAM |
-| Q5 | PSRAM bandwidth under the decoder's XIP fetches | The scan-out emulation, then the kit |
+| Q3 | Internal RAM: LVGL's allocator, the DSI driver's descriptors and the touch driver's buffers against a decoder that leaves 1 to 11 KB | **Half answered**: LVGL's heap is PSRAM (`lv_memory.cpp`), the frame buffer, render buffers, glyph caches and the task's stack are PSRAM, and the panel starts after the player (which came up with 289,687 B of internal heap free). What the panel then takes from internal RAM (its task's control block, the read-back server's 6 KB stack, small structures, the DSI and touch drivers' own) was not measured on 2026-10-12. **Answered on the kit 2026-10-20**: under an AC-4 5.1 play the least-free internal heap is 9.7 to 10.4 KB with the glass, with `panel-null` and with no panel at all (the v1.3 board left 27.7 KB), so the panel takes nothing a play can see at the decoder's floor; under AC-3 and E-AC-3 plays it takes 14 to 17 KB (the pass was 2 KB); at boot the largest block is 8,192 bytes smaller with the panel ([AC-4 5.1 at 400 MHz](#ac-4-51-at-400-mhz)) |
+| Q4 | Tearing with one frame buffer | The kit; two buffers cost 1.2 MB of PSRAM. **Looked at 2026-10-20**: the owner watched a karaoke play, with the Adjust sheet in use, and said it appeared and looked fine; no tearing was reported, and it was not filmed or measured. Not settled for a fast-moving fill |
+| Q5 | PSRAM bandwidth under the decoder's XIP fetches | **Answered on the kit 2026-10-20**: the glass costs the decoder a standing 1.3% (AC-3), 5.9% (E-AC-3) and about 10% (AC-4 5.1) against `panel-null`, and filling the screen adds drawing cost that is 5 to 12% on the light streams and 0.1 to 1% on AC-4 5.1 ([the second session](#the-second-session-on-the-kit)). At layout 5.1 the AC-4 stream glitched on 5 of 18 plays with the glass against 1 of 30 without a scan-out. Not tried: a slower refresh |
 | Q6 | A touch control for the vocals needs the role to carry a request back to the server | A protocol decision, its own PR |
 | Q7 | Auto-dim and a screensaver for a screen that is on for hours | Product, after the kit; the backlight PWM is there |
 | Q8 | CJK, Arabic and polytonic Greek | A font subset and shaping; not in this work (Greek and Cyrillic are in, 2026-10-12) |
