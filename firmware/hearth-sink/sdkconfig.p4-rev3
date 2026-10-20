@@ -9,9 +9,10 @@
 # else in sdkconfig.p4 (PSRAM, the hosted Wi-Fi buffers, the code in PSRAM, the DMA queue, the
 # low-power SRAM kept out of the heap) is as true of this silicon and is not repeated.
 #
-# NOT RUN ON A v3.x BOARD YET. What this changes was read from ESP-IDF v6.1's Kconfig and the v3.x
-# user guide, not measured; the first thing the kit does is run it
-# (planning/karaoke-p4x-panel.md, "Bring-up on the kit").
+# FIRST RUN 2026-10-20 on a v3.2 kit (planning/karaoke-p4x-panel.md, "First run on the kit"): the
+# image boots at 400 MHz with the PSRAM at 200 MHz, the revision window takes v3.2, and /hardware
+# says revision 3.2. TDM on the pins is NOT measured yet; the I2S clock source below was read from
+# ESP-IDF v6.1's Kconfig and the v3.x user guide.
 
 # Revisions 3.x and not below (ESP-IDF's own default for this switch is off): the minimum is v3.1,
 # ESP-IDF's default, which is the one that fixed the MSPI power-on fault, so the workaround that

@@ -2,11 +2,13 @@
 // kit"): the 7-inch 1024 by 600 panel of Espressif's ESP32-P4X-Function-EV-Board, an EK79007 on two
 // lanes, with a GT911 touch controller on the I2C bus the board shares with its codec.
 //
-// NOT RUN ON A BOARD YET: the kit is on its way. Everything below is written against the headers of
-// ESP-IDF v6.1 and the two managed components (espressif/esp_lcd_ek79007 2.0, espressif/
-// esp_lcd_touch_gt911 1.2), and is built by CI as the `panel-dsi` image; the first thing the kit
-// does is run it (planning/karaoke-p4x-panel.md, "Bring-up on the kit"). The values that come from a
-// document and not from a measurement are marked.
+// FIRST RUN, 2026-10-20, on the kit (chip v3.2, planning/karaoke-p4x-panel.md, "First run on the
+// kit"): the bus opens, the EK79007 initialises, the GT911 answers (at 0x14: the vendor's own BSP
+// tries only 0x5D, which is why the factory demo aborts) and an idle frame is drawn into the frame
+// buffer. Not yet looked at on the glass, and touch not yet tapped. Everything below is written
+// against the headers of ESP-IDF v6.1 and the two managed components (espressif/esp_lcd_ek79007 2.0,
+// espressif/esp_lcd_touch_gt911 1.2), and is built by CI as the `panel-dsi` image. The values that
+// come from a document and not from a measurement are marked.
 //
 // The picture is a frame buffer the DPI engine reads out of PSRAM, RGB565 (the driver allocates it:
 // num_fbs = 1). LVGL renders dirty areas into two small buffers and esp_lcd_panel_draw_bitmap copies
@@ -183,7 +185,10 @@ bool display_open(Display& out) {
     esp_lcd_dsi_bus_config_t bus_config{};
     bus_config.bus_id = 0;
     bus_config.num_data_lanes = 2;
-    bus_config.phy_clk_src = MIPI_DSI_PHY_CLK_SRC_DEFAULT;
+    // phy_clk_src stays 0, which ESP-IDF reads as "the default for this silicon": PLL_F20M below
+    // v3.0 and the crystal from v3.0 on. MIPI_DSI_PHY_CLK_SRC_DEFAULT is the v1.x alias for
+    // PLL_F20M, which a v3.x build's clock-source switch does not list: it aborts in
+    // esp_lcd_new_dsi_bus (first run on the v3.2 kit, 2026-10-20).
     bus_config.lane_bit_rate_mbps = 900;
     esp_lcd_dsi_bus_handle_t bus = nullptr;
     if (esp_lcd_new_dsi_bus(&bus_config, &bus) != ESP_OK) {

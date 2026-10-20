@@ -1,28 +1,31 @@
 # Karaoke on an ESP32-P4 (chip revision v3.x) with a 7-inch panel
 
-!!! note "Status as of 2026-10-12: built and drawn on a computer; the kit has not arrived"
+!!! note "Status as of 2026-10-20: on the kit, the image starts and the panel and touch are found; the glass, a tap and TDM are not yet checked"
     This is W12 of [karaoke phase 2](karaoke-phase2.md#w12-the-esp32-p4-with-a-panel), taken
-    off the shelf because the owner's development kit is on its way and the firmware can be ready
+    off the shelf because the owner's development kit was on its way and the firmware could be ready
     for it. The owner's brief, on 2026-10-12: a P4 of chip revision v3.2 or newer ("P4X") at
     400 MHz with 32 MB of PSRAM, 16 MB of flash and a 7-inch 1024 by 600 capacitive touch panel on
     MIPI DSI (the board is Espressif's ESP32-P4X-Function-EV-Board, whose user guide says chip
     revision **v3.1 or later**; this image's minimum, v3.1, covers it); it receives the multichannel stream and its lyrics, decodes on the chip, writes the
     decoded audio out of I2S in TDM to two DACs that are not connected yet, and draws the lyrics
-    with the colour moving as the song does. Until the kit is here the firmware runs on the
-    owner's FireBeetle 2 boards (revision v1.3, no panel) so that the compute can be measured.
+    with the colour moving as the song does. Until the kit was here the firmware ran on the
+    owner's FireBeetle 2 boards (revision v1.3, no panel) so that the compute could be measured.
 
-    Nothing on this page has run on the kit. What was measured on a v1.3 board says so; what was
-    read from ESP-IDF or a datasheet says so; the rest is a decision or a guess and is marked.
+    The kit arrived on 2026-10-20 and the image ran on it that day ([First run on the
+    kit](#first-run-on-the-kit)): one crash, in this firmware's DSI code, and one fact about the
+    touch controller, were found and are fixed. Only what that section lists has run on the kit.
+    What was measured on a v1.3 board says so; what was read from ESP-IDF or a datasheet says so;
+    the rest is a decision or a guess and is marked.
 
     | Step | State |
     |---|---|
     | W12a `Stage` in `libs/lyrics` | Built, 13 host test cases, mutation-checked |
     | W12b the panel, the screen, the preview tool | Built; the screens are in [the design sheet](../docs/hearth/sink-esp32-p4.md#the-screen), drawn by the firmware's own code on a computer |
-    | W12c the DSI panel and touch | Written against ESP-IDF v6.1 and the vendor drivers' headers and built by CI; **never run** |
-    | W12d the rev3 image | Built (a local build found and fixed a bootloader 576 bytes over its window: Warn log level, 22,448 bytes); the update chooser picks it by chip revision (tests); **never run on a v3.x chip** |
+    | W12c the DSI panel and touch | Written against ESP-IDF v6.1 and the vendor drivers' headers and built by CI. **First run on the kit 2026-10-20**: it aborted in `esp_lcd_new_dsi_bus` (fixed); then the bus, the EK79007 and the GT911 (at 0x14) start and an idle frame is drawn into the frame buffer. The glass and a tap are not yet checked |
+    | W12d the rev3 image | Built (a local build found and fixed a bootloader 576 bytes over its window: Warn log level, 22,448 bytes); the update chooser picks it by chip revision (tests). **First run on a v3.2 chip 2026-10-20**: boots at 400 MHz, joins Wi-Fi, `/hardware` says revision 3.2; TDM on the pins is not measured |
     | W12e measured on the FireBeetle with no panel | See [Measured](#measured) |
     | W12f docs | [An ESP32-P4 sink](../docs/hearth/sink-esp32-p4.md) |
-    | W12g bring-up on the kit | Waits for the kit |
+    | W12g bring-up on the kit | Started 2026-10-20: steps 1, 4 and 5 of [the list](#bring-up-on-the-kit) have a first result in [First run on the kit](#first-run-on-the-kit); steps 2, 3, 6 and 7 are not run |
 
 ## What exists, and what is missing
 
@@ -323,7 +326,7 @@ All of these are Kconfig, in a **board profile** (`CONFIG_ICLFORGE_EXAMPLE_PANEL
 |---|---|---|
 | Backlight (PWM) | GPIO26 | From the P4X user guide (J1 pin 31) |
 | Panel reset | GPIO27 | From the P4X user guide (J1 pin 38) |
-| Touch / I2C SDA, SCL | GPIO7, GPIO8, I2C0 | From the BSP header |
+| Touch / I2C SDA, SCL | GPIO7, GPIO8, I2C0 | From the BSP header; **a GT911 answers on it at 0x14** (first run, 2026-10-20) |
 | Touch INT, RST | not connected on the board | From the BSP header |
 | DSI | 2 lanes, 1024 by 600 at 60 Hz, PHY LDO channel 3 at 2.5 V | From `esp_lcd_ek79007` |
 | TDM BCLK, WS, DOUT | GPIO 20, 21, 22 (the FireBeetle defaults) | **On J1, pins 13, 11 and 12, where the P4X guide's table gives them no other function**; the older BSP header's note of GPIO19/20 as USB does not appear in it. Still to be checked with a meter against the schematic before a DAC is wired; GPIO54 (J1 pin 32) is the C6's reset and is not one to use |
@@ -423,11 +426,67 @@ In this order, each with its own go/no-go; none of it can be done before the kit
 7. The ES9080 pair, when wired: the I2C map and the per-slot levels
    ([sink tiers, criterion 3](esp32-sink-tiers.md#exit-criteria-board)).
 
+### First run on the kit
+
+**2026-10-20, the kit on the bench**, a USB-C cable on the connector marked JTAG (USB-Serial/JTAG, so
+`esptool` and a console need no buttons). What it is, read from the chip and its boot log:
+
+| Fact | Value |
+|---|---|
+| Chip | ESP32-P4 **revision v3.2** (esptool computes it from the eFuses; ROM `esp32p4-eco7-20260109`; the vendor bootloader's `chip revision: v3.2`) |
+| Flash, PSRAM | 16 MB (GigaDevice), 32 MB hex PSRAM; the vendor demo runs it at 250 MHz, this image at 200 MHz |
+| MAC | `e8:f6:0a:e7:53:f9` (it is the USB serial number, so Windows names the port by it) |
+
+esptool's feature line says "400MHz" for every P4: the string is fixed in its source, so it does not
+tell a v1.x chip from a v3.x one. Read the revision from the eFuses or the boot log.
+
+**What it came with.** Espressif's `esp_brookesia_demo` 1.2.0, built with ESP-IDF 5.5.2, with its
+partition table at **0x9000** (Hearth's is at 0x8000). Its log names the display driver, `EK79007`,
+and opens an ES8311 codec over I2C. Then it aborts in `bsp_display_indev_init`: the GT911 does not
+answer at the address the BSP's default configuration uses (0x5D; Hearth's own probe of 0x5D fails
+the same way), and an `ESP_ERROR_CHECK` ends the run. The same log has `ledc: GPIO 26 is not usable,
+maybe conflict with others` for the backlight pin, which is the first thing to check on the glass.
+The 16 MB of flash was read back before anything was written, so the vendor image can be put back.
+
+| Bring-up step ([above](#bring-up-on-the-kit)) | First result |
+|---|---|
+| 1. Flash `hearth-sink-esp32p4-rev3` | Done over USB from main `fd3c51169`, profile `p4-rev3`. The vendor's table sits where Hearth's NVS partition is, so that region was erased first. The chip takes the image: minimum v3.1, chip v3.2, no revision notice; `/hardware` says revision 3.2, 400 MHz, 32 MiB PSRAM, `sink_max_slots_bits` 16 |
+| 2. The probe at 400 MHz | Not run |
+| 3. TDM at 16 x 32 on GPIO 20, 21, 22 | **Not run.** It needs a scope or a logic analyser on the pins; nothing has been measured |
+| 4. The panel | See below: a crash first, then the bus and the EK79007 start. The glass has not been looked at |
+| 5. Touch | The GT911 answers at **0x14** (product ID "911", config version 130). A tap has not been tried |
+| 6. A karaoke play | Not run |
+| 7. The ES9080 pair | Not wired |
+
+**The crash.** The image aborted on every boot that was watched, right after the Sendspin player
+started. The abort was in ESP-IDF's `esp_lcd_new_dsi_bus`, in the switch that picks the DSI PHY's
+reference clock. `display_dsi.cpp` set `phy_clk_src` to `MIPI_DSI_PHY_CLK_SRC_DEFAULT`, which in
+ESP-IDF v6.1 is the alias for the v1.x source (PLL_F20M); the switch a v3.x build compiles lists the
+crystal and the PLLs of the new silicon and has no case for it, so it calls `abort()`. Leaving the
+field at zero makes ESP-IDF choose the default for the chip it was built for (the crystal on v3.x).
+CI could not have found this: it builds the `panel-dsi` image and does not run it.
+
+**After the fix**, the image boots at 400 MHz, joins Wi-Fi, is found by Music Assistant, and idles
+with no underrun, late chunk or crash. The panel opens its bus on two lanes at 900 Mbit/s, the
+EK79007 initialises, the GT911 is found, and `GET :8081/panel.bmp` returns the idle screen as the
+design draws it (name, address, network, the server it is connected to, the firmware version, the
+footer with the delay and *Adjust*). **That read-back is the frame buffer in PSRAM, so it shows what
+was drawn and not what the glass shows.** Orientation, colour, tearing, the backlight and a tap are
+the next checks, and need someone looking at the panel.
+
+A first core dump, from the `ipc0` task (5,888 bytes), was already in flash when the DSI crash wrote
+its own over it; it was not read, and no dump has appeared since the fix, over the few minutes the
+board was watched.
+
+**What the first run answers, and does not.** The display's driver is the EK79007 and its touch
+controller is a GT911, at 0x14 and not 0x5D (Q1). Nothing in this run measured the I2S clocks, the
+decode at 400 MHz or the scan-out's cost to the decoder (Q4, Q5).
+
 ## Risks and open questions
 
 | # | Item | What decides it |
 |---|---|---|
-| Q1 | The board's panel controller, touch controller and codec pins | **Half answered 2026-10-12**: the board is the ESP32-P4X-Function-EV-Board; its user guide gives the backlight and reset GPIOs and the J1 header, and does not name the display's driver IC (it links EK73217BCGA and EK79007AD), the lane count or the touch controller. The first power-on settles them; the board profile is a Kconfig choice |
+| Q1 | The board's panel controller, touch controller and codec pins | **Mostly answered 2026-10-20.** The board is the ESP32-P4X-Function-EV-Board; its user guide gives the backlight and reset GPIOs and the J1 header, and does not name the display's driver IC (it links EK73217BCGA and EK79007AD), the lane count or the touch controller. The kit's own demo logs the `EK79007` driver, and the GT911 answers at **0x14** on GPIO7 and GPIO8 (not 0x5D). Two lanes at 900 Mbit/s initialise without error; whether the glass is right is not yet seen. The codec's GPIOs are still the older board's BSP values, not read from this kit. The board profile is a Kconfig choice |
 | Q2 | LVGL's right-to-left flex and `lv_label` bidi with Hebrew in a wrapping row | **Answered**: it works, with two things found (the default theme's 10 px gap between flex children, and LVGL mirroring an alignment under an RTL base, which put the fill on the wrong side until the alignment was left to LVGL); the Hebrew picture is the check |
 | Q3 | Internal RAM: LVGL's allocator, the DSI driver's descriptors and the touch driver's buffers against a decoder that leaves 1 to 11 KB | **Half answered**: LVGL's heap is PSRAM (`lv_memory.cpp`), the frame buffer, render buffers, glyph caches and the task's stack are PSRAM, and the panel starts after the player (which came up with 289,687 B of internal heap free). What the panel then takes from internal RAM (its task's control block, the read-back server's 6 KB stack, small structures, the DSI and touch drivers' own) was **not measured**, and nor was the least-free figure during an AC-4 play: that is the next number to take |
 | Q4 | Tearing with one frame buffer | The kit; two buffers cost 1.2 MB of PSRAM |

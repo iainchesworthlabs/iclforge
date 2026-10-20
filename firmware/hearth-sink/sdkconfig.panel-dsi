@@ -3,7 +3,8 @@
 # are that board's, from its BSP header (the Kconfig defaults of ICLFORGE_EXAMPLE_PANEL_*): check
 # them against the schematic of the board the image is for.
 #
-# NOT RUN ON A BOARD YET. The read-back route is left on while the panel is brought up (set the port
-# to 0 for a release image).
+# FIRST RUN 2026-10-20 on the kit (planning/karaoke-p4x-panel.md, "First run on the kit"): the bus,
+# the EK79007 and the GT911 start; the glass has not been looked at yet. The read-back route is left
+# on while the panel is brought up (set the port to 0 for a release image).
 CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI=y
 CONFIG_ICLFORGE_EXAMPLE_PANEL_CAPTURE_PORT=8081
