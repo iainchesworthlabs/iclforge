@@ -17,12 +17,14 @@
 
 #include "lvgl.h"
 
+#include "iclforge/dev_view.hpp"
 #include "iclforge/lyrics/lyrics.hpp"
 #include "iclforge/lyrics/stage.hpp"
 #include "iclforge/now_view.hpp"
 #include "iclforge/render/layout.hpp"
 #include "iclforge/render/room_plan.hpp"
 #include "panel/lvgl/board_info.hpp"
+#include "panel/lvgl/dev_info.hpp"
 #include "panel/lvgl/fonts.hpp"
 #include "panel/lvgl/lyric_screen.hpp"
 #include "panel/lyrics_reader.hpp"
@@ -42,6 +44,9 @@ std::optional<std::int64_t> g_position;
 std::int64_t g_item = 1;
 std::int64_t g_now_us = 0;
 player::panel::BoardInfo g_board;
+// What the developer view reads, and the console under it.
+iclforge::devview::Facts g_dev;
+std::string g_log;
 // The no-lyrics screen's data: what the player says is playing, and what the settings say to show.
 player::panel::NowPlaying g_now;
 bool g_now_playing = false;
@@ -205,6 +210,71 @@ struct Scenario {
     std::int64_t settle_us = 1'000'000;
 };
 
+// A P4X kit with its cable in and its radio joined, a stream playing and nothing gone wrong: the
+// developer view's first picture.
+iclforge::devview::Facts healthy_board() {
+    using namespace iclforge::devview;
+    Facts f;
+    f.active = "ethernet";
+    f.preference = "auto";
+    f.ethernet = {.present = true, .enabled = true, .link = true, .address = "192.168.1.163",
+                  .mac = "e8:f6:0a:e7:53:fb", .speed_mbps = 100, .full_duplex = true};
+    f.wifi = {.present = true, .enabled = true, .link = true, .address = "192.168.1.251",
+              .mac = "e8:f6:0a:e7:53:f9", .configured = true, .ssid = "HomeNet", .rssi_dbm = -52};
+    f.name = "hearth-e753f9";
+    f.mdns = "hearth-e753f9.local";
+    f.web_address = "192.168.1.163";
+    f.profile = "p4-rev3";
+    f.profile_hash = "ff9b27a6c4fd";
+    f.firmware = "0.10.0-beta.1-5127-g2337af6d2";
+    f.slot = "ota_0";
+    f.idf = "v6.1.0";
+    f.chip = "ESP32-P4";
+    f.revision_major = 3;
+    f.revision_minor = 2;
+    f.cores = 2;
+    f.cpu_mhz = 400;
+    f.psram_mhz = 200;
+    f.psram_bytes = 32ULL * 1024 * 1024;
+    f.layout = "5.1";
+    f.sink = "i2s-tdm";
+    f.slots = 16;
+    f.slot_bits = 32;
+    f.uptime_ms = (3ULL * 3600 + 12 * 60) * 1000;
+    f.reset_reason = "wdt";
+    f.player = true;
+    f.server = "Hearth on STUDIO-PC";
+    f.connections = 1;
+    f.paired = 2;
+    f.clock_converged = true;
+    f.clock_error_us = 120;
+    f.stream = "bursts";
+    f.bursts = 1234;
+    f.error_us = 400;
+    f.worst_error_us = 2100;
+    f.burst_us = 410;
+    f.worst_burst_us = 1120;
+    f.peak_db = {-9.0F, -11.5F, -30.0F, -18.0F, -80.0F, -16.0F};
+    f.internal_free = 100'762;
+    f.internal_low = 62'464;
+    f.internal_largest = 53'248;
+    f.psram_free = 29'800'000;
+    f.psram_low = 29'000'000;
+    f.refreshes = 4200;
+    f.render_us_mean = 6100;
+    f.render_us_max = 21'000;
+    f.touch_reads = 12'345;
+    f.touch_points = 41;
+    return f;
+}
+
+const char* const kHealthyLog =
+    "I (11210) sendspin: server 'Hearth on STUDIO-PC' admitted, clock converged\n"
+    "I (11420) sendspin: stream started: bursts, 5.1, 48000 Hz\n"
+    "I (21460) panel: lyrics, 2150 refreshes, render 6100 us mean 21000 max, rebuild 3100 us max, 0 late\n"
+    "I (31470) net: ethernet: link up, 100 Mb/s full duplex\n"
+    "I (41480) panel: lyrics, 2290 refreshes, render 6100 us mean 21000 max, rebuild 3100 us max, 0 late\n";
+
 }  // namespace
 
 namespace player::panel {
@@ -219,6 +289,18 @@ bool read_lyrics(LyricsReader& reader, std::int64_t delay_ms,
 }
 
 BoardInfo read_board_info() { return g_board; }
+
+iclforge::devview::Facts read_dev_facts() { return g_dev; }
+
+std::string read_log_tail(std::size_t /*limit*/) { return g_log; }
+
+// The board takes a moment to change; the preview changes at once and says it is done.
+bool request_network_preference(iclforge::devview::Preference preference) {
+    g_dev.preference = iclforge::devview::preference_word(preference);
+    g_dev.net_change = iclforge::devview::NetChange::done;
+    g_dev.net_change_word = g_dev.preference;
+    return true;
+}
 
 bool read_now_playing(NowPlaying& out) {
     if (!g_now_playing) {
@@ -433,5 +515,93 @@ int main(int argc, char** argv) {
     pump(6);
     write_bmp(out / "s9-controls.bmp");
     std::printf("%2d  %-26s sheet\n", ++number, "s9-controls");
+
+    // S13: the developer view, opened as a person opens it: three taps on the board's name.
+    g_dev = healthy_board();
+    g_log = kHealthyLog;
+    g_board.name = g_dev.name;
+    g_now_us += 10'000'000;
+    pump(6);
+    const int name_x = 100;
+    const int name_y = 600 - 32;
+    tap(name_x, name_y);
+    tap(name_x + 6, name_y - 4);
+    tap(name_x - 3, name_y + 5);
+    g_now_us += 1'000'000;
+    pump(6);
+    write_bmp(out / "s15-dev-view.bmp");
+    std::printf("%2d  %-26s developer view %s\n", ++number, "s15-dev-view",
+                player::panel::screen_stats().dev_view ? "open" : "NOT OPEN");
+
+    // A tap on a segment of the preference control asks first.
+    tap(430, 236);  // Wi-Fi
+    g_now_us += 600'000;
+    pump(6);
+    write_bmp(out / "s15-dev-confirm.bmp");
+    std::printf("%2d  %-26s confirming the switch to Wi-Fi\n", ++number, "s15-dev-confirm");
+
+    // Cancelling asks nothing of the board; going on does it and says so.
+    tap(90, 342);  // Cancel
+    g_now_us += 600'000;
+    pump(6);
+    std::printf("%2d  %-26s preference after Cancel: %s\n", ++number, "s13-cancel", g_dev.preference.c_str());
+    tap(430, 236);
+    tap(250, 342);  // Switch
+    g_now_us += 600'000;
+    pump(6);
+    write_bmp(out / "s15-dev-switched.bmp");
+    std::printf("%2d  %-26s preference after Switch: %s\n", ++number, "s15-dev-switched", g_dev.preference.c_str());
+
+    // Nothing playing, no server connected: the stream's rows are quiet and the meters say so.
+    g_dev = healthy_board();
+    g_dev.stream = "idle";
+    g_dev.peak_db.clear();
+    g_dev.server.clear();
+    g_dev.connections = 0;
+    g_dev.clock_converged = false;
+    g_now_us += 600'000;
+    pump(6);
+    write_bmp(out / "s15-dev-idle.bmp");
+    std::printf("%2d  %-26s nothing playing\n", ++number, "s15-dev-idle");
+
+    // The same board with a cable pulled, a weak radio, a stream that has been glitching, a panic
+    // behind it and a core dump in flash.
+    g_dev = healthy_board();
+    g_dev.active = "wifi";
+    g_dev.web_address = g_dev.wifi.address;
+    // A server whose name is longer than its row: Music Assistant gives its id with it.
+    g_dev.server = "Music Assistant (d5369777-music-assistant)";
+    g_dev.ethernet.link = false;
+    g_dev.ethernet.address.clear();
+    g_dev.ethernet.speed_mbps.reset();
+    g_dev.ethernet.full_duplex.reset();
+    g_dev.wifi.rssi_dbm = -79;
+    g_dev.reset_reason = "panic";
+    g_dev.core_dump = true;
+    g_dev.core_dump_bytes = 262'144;
+    g_dev.uptime_ms = 94'000;
+    g_dev.underruns = 3;
+    g_dev.late = 1'200;
+    g_dev.dropped = 2;
+    g_dev.resyncs = 1;
+    g_dev.clock_converged = false;
+    g_dev.internal_low = 9'000;
+    g_dev.late_cycles = 4;
+    g_dev.played = true;
+    g_dev.us_per_frame = 412;
+    g_dev.worst_frame_us = 1'120;
+    g_dev.sink_us_per_frame = 250;
+    g_dev.render_us_per_frame = 80;
+    g_now_us += 600'000;
+    pump(6);
+    write_bmp(out / "s15-dev-trouble.bmp");
+    std::printf("%2d  %-26s cable out, glitches, a panic\n", ++number, "s15-dev-trouble");
+
+    // A tap on the view anywhere else closes it.
+    g_now_us += 2'000'000;
+    tap(900, 300);
+    pump(6);
+    std::printf("%2d  %-26s closed by a tap: %s\n", ++number, "s15-dev-closed",
+                player::panel::screen_stats().dev_view ? "STILL OPEN" : "yes");
     return 0;
 }

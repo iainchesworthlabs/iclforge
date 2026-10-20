@@ -20,6 +20,11 @@ struct ScreenStats {
     // Times the rows were rebuilt (a line change, a gap, a new item), and the longest one took.
     std::uint32_t rebuilds = 0;
     std::uint32_t rebuild_us_max = 0;
+    // The developer view (dev_screen.hpp) is open over the screen, and what its refreshes have cost.
+    bool dev_view = false;
+    std::uint32_t dev_refreshes = 0;
+    std::uint32_t dev_refresh_us_last = 0;
+    std::uint32_t dev_refresh_us_max = 0;
     // The no-lyrics screen has dimmed (planning/p4x-now-playing.md).
     bool dimmed = false;
 };

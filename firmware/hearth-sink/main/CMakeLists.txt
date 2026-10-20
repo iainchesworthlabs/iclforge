@@ -113,6 +113,7 @@ endif()
 # picks panel/none links none of them.
 if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI OR CONFIG_ICLFORGE_EXAMPLE_PANEL_NULL)
     set(ICLFORGE_PANEL_SRCS "panel/lvgl/panel.cpp" "panel/lvgl/lyric_screen.cpp"
+                            "panel/lvgl/dev_screen.cpp" "panel/lvgl/dev_info.cpp"
                             "panel/lvgl/fonts.cpp" "panel/lvgl/glyphs.cpp" "panel/lvgl/now_screen.cpp"
                             "panel/lvgl/lv_memory.cpp")
     if(CONFIG_ICLFORGE_EXAMPLE_PANEL_DSI)
@@ -139,7 +140,7 @@ idf_component_register(
     INCLUDE_DIRS "." "source/http"
     REQUIRES iclforge esp_driver_i2s esp_timer freertos
              esp_system esp_hw_support esp_hal_wdt
-             esp_partition
+             esp_partition esp_psram app_update espcoredump heap
              esp_driver_sdmmc sdmmc fatfs wear_levelling
              esp_wifi esp_eth esp_http_client esp_netif esp_event nvs_flash
              esp_app_format espressif__mdns

@@ -32,6 +32,7 @@ add_subdirectory("${LVGL_DIR}" lvgl EXCLUDE_FROM_ALL)
 add_executable(panel_preview
     preview.cpp
     "${MAIN}/panel/lvgl/lyric_screen.cpp"
+    "${MAIN}/panel/lvgl/dev_screen.cpp"
     "${MAIN}/panel/lvgl/now_screen.cpp"
     "${MAIN}/panel/lvgl/glyphs.cpp"
     "${REPO}/libs/lyrics/src/lyrics.cpp"

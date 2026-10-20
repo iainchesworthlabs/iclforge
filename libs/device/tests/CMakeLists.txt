@@ -6,6 +6,7 @@ iclforge_add_test_binary(iclforge-device-tests PROJECT device SOURCES
     test_ac4_sync_frame.cpp
     test_block_ring.cpp
     test_dac_queue_model.cpp
+    test_dev_view.cpp
     test_firmware_image.cpp
     test_firmware_status.cpp
     test_firmware_trial.cpp

@@ -165,7 +165,7 @@ endif()
 
 # THE HOST-PORTABLE HEADERS. The headers that need no ESP-IDF - interleave.hpp, block_ring.hpp,
 # playout.hpp, sink_plan.hpp, dac_queue_model.hpp, tcp_arrivals.hpp, the firmware image, status and
-# trial rules, improv.hpp, pairing_records.hpp, log_ring.hpp, hardware_info.hpp and unit_hold.hpp -
+# trial rules, improv.hpp, pairing_records.hpp, log_ring.hpp, hardware_info.hpp, dev_view.hpp and unit_hold.hpp -
 # are libs/device's, tested on the host by libs/device/tests. They keep the names a project
 # includes them by, and this component puts the directory on its include path, PUBLIC, because the
 # sinks of a consuming project include them. Packed, libs/device sits under lib/ with the rest

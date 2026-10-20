@@ -273,10 +273,73 @@ cable. The decisions, each one a line to change if the owner would have it other
 - **The profile locks it**: `CONFIG_ICLFORGE_EXAMPLE_NETWORK_ETHERNET=y` in `sdkconfig.p4-rev3` and
   in `p4-rev3`'s locked keys, so the profile's hash moved and its baseline is recorded again on the
   kit. The FireBeetle P4s, the S3s and the C6 do not have the key and their profiles are unchanged.
-- **Not built** (the owner's separate tasks): a diagnostics view opened by three taps on the name,
-  which would show the network and a control for the preference, and a screen for songs with no
-  lyrics. What they read is `GET /status`'s `network.preference` and `network.interfaces`, and what
-  they write is `PUT /network-preference`.
+- **Not built here** (the owner's separate tasks): the diagnostics view that three taps on the name open,
+  which shows the network and has a control for the preference, is [D10](#d10-the-developer-view-2026-10-21);
+  a screen for songs with no lyrics is not built yet. What they read is `GET /status`'s
+  `network.preference` and `network.interfaces`, and what they write is `PUT /network-preference`.
+
+### D10. The developer view (2026-10-21)
+
+The owner's wish: "triple tap on that name of the device and then get a view of ... all the
+developer information that's going on, logging, reporting, whatever: what's my MAC, what am I
+connected to, what's my address, what mode am I being configured for, what is my streaming, have I
+dropped any frames, all the general stats and performance", and, with it, a choice of the network
+when both Ethernet and Wi-Fi are up. The decisions, each one a line to change if the owner would
+have it otherwise:
+
+- **Opened by three taps on the board's name** (the footer's bottom-left label), **closed by a tap
+  anywhere else**. The target is the footer's whole height, 64 px and 340 px wide, drawing nothing
+  and moving nothing; the label is 28 px high. **The streak is the panel's own decision**
+  (`iclforge::devview::TapStreak`, libs/device, tested on the host), not LVGL's: LVGL's counts taps
+  within 400 ms and 10 pixels, which on this glass (0.15 mm a pixel) is a finger that must not move
+  1.5 mm between taps. Ours is three taps, each within 600 ms and 64 px of the one before. A tap on
+  the view that follows within half a second of its opening is ignored, so a fourth tap does not
+  shut it again. A view nobody has touched for five minutes puts itself away: a panel on a stand is a
+  lyric screen, and a developer's view left open would hide the words.
+- **It exists on the panel images only** (`panel/lvgl`, which needs a touch controller or the
+  injected taps of `POST :8081/panel/tap`), and with it shut **the lyric and idle screens are what
+  they were**: the view is an object tree that is built when it opens and deleted when it closes,
+  on top of the screen, and the only change in `lyric_screen.cpp` is the tap target, its handler
+  and one call a frame. Its fonts (Archivo at 18 and 24 px, five tiny_ttf instances) are made the
+  first time it opens.
+- **One page of two columns at 18 px**, the console's last five lines under both. 18 px is not the
+  two-metre type of the lyric screen (R8); it is a developer's page read at arm's length, 7.6 points
+  at this density, and it holds what four pages of 24 px would. Network (each interface's link,
+  address and MAC, the SSID and signal, the board's name and mDNS name, the page's address),
+  Configuration (profile and hash, firmware and slot, chip revision, ESP-IDF, cores, CPU and PSRAM
+  clocks, output layout, slots and sink, uptime and reset reason, whether a core dump is stored),
+  Streaming (the server, the clock and its error, bursts, underruns, late, dropped, resyncs,
+  invalid, the playout's offset, the burst time, per-output meters, and the figures of a play from
+  `POST /play`) and Performance (both heaps' free and low-water, the panel's render time and late
+  cycles, the touch counters). **The accent colour means look here**: a counter that is not zero,
+  a signal below -75 dBm, a clock that has not converged while something plays, a panic or
+  watchdog reset (not `wdt`, which is how this board restarts since #1434), a stored core dump, an
+  internal heap that has been below 16 KB.
+- **Not shown: a ring fill.** The brief asked for one; the burst player keeps none (the status it
+  reports has the counters and the playout's offset, and `PlayerStats::ring_low_water` belongs to
+  the HTTP source's play). Adding one is a change to the player, not to a view.
+- **What it never shows is the Wi-Fi passphrase or the Sendspin pairing token**: `Facts`, the one
+  struct the view reads, has no field for either, and a console line that names a passphrase, a
+  password or a pairing token is replaced by a sentence (the log ring already keeps the token out
+  with `ConsoleOnly`; this is for a line that gets past it).
+- **The preference control is Auto / Ethernet / Wi-Fi, 118 by 64 px**, the chosen one in the accent
+  colour. A tap on another one **asks first**: "Use Wi-Fi only? The cable is switched off. The board
+  is on the cable now: this page's address changes to 192.168.1.251." with Cancel and Switch (64 px).
+  A tap anywhere else, or eight seconds of nothing, cancels it. A change the board is certain to
+  refuse (the interface holds no address, or no Wi-Fi network is stored) is shown in the accent
+  colour with Switch dimmed and dead. Switch calls `network_set_preference()`, the call
+  `PUT /network-preference` makes, which returns at once and does the work on a task of its own, and
+  the view says "Switching..." until the board has the preference (a change that does not take is
+  called refused after 45 s). Nothing is invented: the REST route, the NVS key and the verification
+  (D9) are #1608's.
+- **A refresh once a second** (every two seconds while a stream plays, and the network, whose
+  signal is a call across SDIO to the C6, every two seconds and every ten while one plays), and only
+  while the view is open; the facts are read from what the
+  board already keeps (`dev_info.cpp`), the text is `iclforge/dev_view.hpp`'s (libs/device, with host
+  tests), and a label's text is set only when it changed, so what is redrawn is the numbers that
+  moved. The console is read from a cursor, a few hundred bytes at a time, and not at all while the
+  internal heap has no 4 KB block. R7 holds: the panel task is below the decoder and the I2S writer
+  and holds nothing of theirs.
 
 ## The screen
 
@@ -330,6 +393,7 @@ wrap past two rows, so a long line stays whole rather than scrolling.
 | S8 | **Right to left** | A line whose first strong letter is Hebrew | Right-aligned, words flow right to left, the fill runs right to left within a word |
 | S8b | **A script the fonts lack** | A line with a letter the six font files do not carry (Arabic, CJK, Indic, Thai, polytonic Greek) | One sentence in its place, "This line is in a script this screen cannot show."; the title in it is left out; a music note is dropped |
 | S9 | **Controls sheet** | A tap on the gear | Lyric delay - / +, text size, brightness, next lines; 72 px targets; it hides itself after 8 s |
+| S15 | **Developer view** | Three taps on the board's name in the footer | Network, configuration, streaming and performance as rows, the console's last lines, and the network preference with a confirming step ([D10](#d10-the-developer-view-2026-10-21)); a tap anywhere else closes it |
 
 The pictures are in [the design sheet](../docs/hearth/screenshots/p4-panel-sheet.png) and on
 [the guide's page](../docs/hearth/sink-esp32-p4.md#the-screen). They are not
@@ -995,6 +1059,56 @@ the result; and the same default on the S3 and the C6, which were not played.
 * The slots on the pins, and the I2S clocks, are not looked at: no scope.
 * The 40 Hz scan-out was run for its burst only; **what it does to the picture was not seen.**
 * Skipping the outputs a stream does not fill (176 µs a burst each) was not tried.
+
+### The developer view on the kit (2026-10-21)
+
+[D10](#d10-the-developer-view-2026-10-21) built and run on the kit over the cable (`p4-rev3`, hash
+`ff9b27a6c4fd`, three images OTA-pushed and accepted, the last `v0.10.0-beta.1-5143-g54e3b9ef4`).
+Everything was done with `POST :8081/panel/tap` (three requests, each holding the pointer down 120 ms
+and 60 ms after, so 235 to 265 ms apart) and `GET :8081/panel.bmp`; a finger on the glass is [owed](#the-developer-view-owed).
+
+| Tried | Result |
+|---|---|
+| Three taps at (100, 568) | the view opened (`dev_view` true in `GET :8081/panel`) |
+| A tap at (900, 300) half a second or more later | closed; `screen` and the picture are the idle screen's again |
+| The view's contents against the board | the network (the cable in use, 100 Mb/s full duplex, both addresses and MACs, the SSID and -33 to -36 dBm), the profile and hash, the version and `ota_1`, ESP32-P4 v3.2 at 2 x 400 MHz with 32 MiB of PSRAM, `2.0 - 16 slots x 32 bit - i2s_wide`, uptime, `reset: wdt`, **"core dump stored, 12.7 KiB"** (`ota.py status` says 12,960 bytes: a real one, left by the other session's panic image), the heap (231 to 255 KiB free, block 204 to 232 KiB) and the console's last lines, which were the board's own (`network: preference ethernet asked for, is auto`, the C6's RPC errors when the station stopped) |
+| The preference: Wi-Fi tapped, then Cancel | the confirming step showed ("Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address changes to ..."); Cancel changed nothing (`GET /status` still `auto`) |
+| Ethernet, Switch | `ethernet` kept in under two seconds, the Wi-Fi off ("off (the preference leaves it out)"), the cable's address still answering |
+| Auto, Switch | both interfaces back, "Done." beside NETWORK for six seconds |
+| Wi-Fi from the pin to the cable | **refused by the screen, wrongly**: the first image blocked it because the station was off and held no address. The board brings an interface that is off up first (`apply()`), so only an enabled cable with no link, or no stored network, is blocked now (host tests); not tried again on the board |
+| Cost of opening, first time | the fonts and the first draw took 350 to 430 ms in one cycle (`cycle_us_max`, 4 late cycles); a refresh then costs the task 5 to 7 ms (`dev_refresh_us_last`) and LVGL's render of what changed 55 to 70 ms, the idle screen's own figure |
+
+**Three things the kit showed that the preview could not.** A server's name longer than its row
+(Music Assistant's `Music Assistant (d5369777-music-assistant)`) wrapped over the row under it: LVGL
+puts dots only in a label of fixed height. **Every refresh cycle was late** (55 to 70 ms of render
+and 40 to 50 ms of reading the board) until the Wi-Fi was pinned off, and stopped being late when it
+was: `network_link()` asks the C6 for the signal across SDIO, the idle screen already does that twice
+a second, and the view's own read doubled it. The view now reads the network at most every two
+seconds (every ten while a stream plays), refreshes once a second (every two while a stream
+plays), and the panel's own late cycles are no longer drawn in the accent colour: they are the
+lowest task's. And `lv_mem_monitor` with the PSRAM heap reports all of PSRAM as LVGL's, so no
+figure of LVGL's use is shown.
+
+**R7, tried: the view open during a Sendspin play** (`hearth-testserver` dialling the Wi-Fi
+address, the suite's AC-3 2.0 programme, 30 s, 938 bursts, the view opened by three taps and the play
+started 2.5 s later; plays alternated closed and open). With the first version of the view (a refresh
+twice a second, the network asked every half second): closed 4 plays, all clean; open 4 plays, three
+clean and one with 3 late chunks, an underrun and a resync. With the version in this change: closed 5
+plays, four clean and one with one late chunk (1,536 lost frames); open 5 plays, four clean and one
+with one late chunk. Every glitch is a start (the first chunk late), the shape the other session
+traced to lwIP's 6-entry TCP mailbox filling, and one of the closed plays had it; nine plays each way
+cannot tell a one-in-four from a one-in-five, and **no underrun, resync or late chunk after a
+start was seen with the view open**. The panel's task is below the decoder and the I2S writer and
+holds none of their locks; the view's drawing is PSRAM traffic that the decoder shares (Q5), and
+that, not the task, is what a longer run would have to measure.
+
+#### The developer view: owed
+
+A finger on the glass (the taps above are the read-back route's: they enter at the same pointer,
+but not through the controller). A Wi-Fi pin from the glass with the corrected rule. A play over
+the cable with the view open. The view with AC-4 5.1 playing, where internal RAM is the scarce thing:
+the view reads the console only while the internal heap has a 4 KB block, and its own allocations
+are PSRAM's or a few hundred bytes.
 
 ## Risks and open questions
 

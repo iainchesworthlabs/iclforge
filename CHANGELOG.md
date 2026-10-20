@@ -87,6 +87,24 @@ The sections below contain the complete change list and fixes.
   through a thin adapter, the same code as before.
   ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#the-cable-and-wi-fi), planning/karaoke-p4x-panel.md, D9.)
 
+**The ESP32-P4X panel's developer view**
+
+- **Three taps on the board's name in the footer open a screen of developer information; a tap
+  closes it.** On the `p4-rev3` panel image only (it needs the touch screen), with the lyric and idle
+  screens as they were when it is shut. It shows the network (the interface in use, and for the cable
+  and the radio the link, the address, the MAC, the SSID and the signal; the board's name, its mDNS
+  name and the page's address), the configuration (profile and hash, firmware and slot, chip revision,
+  clocks, output layout, uptime and reset reason, a stored core dump), the stream (the server, the
+  clock, bursts, underruns, late, dropped, resyncs, per-output levels and a play's figures), the
+  board's performance (both heaps, the panel's render time, the touch counters) and the console's last
+  five lines, once a second (every two while a stream plays), with what is wrong in the accent colour. It never shows the Wi-Fi
+  passphrase or the Sendspin pairing token.
+- **A control for the network preference, Auto, Ethernet or Wi-Fi**, which asks before it acts
+  ("Use Wi-Fi only? The cable is switched off. The board is on the cable now: this page's address
+  changes to ...") and changes it with the call `PUT /network-preference` makes, with no restart.
+  `GET :8081/panel` says whether the view is open (`dev_view`).
+  ([An ESP32-P4 sink](docs/hearth/sink-esp32-p4.md#the-developer-view), planning/karaoke-p4x-panel.md, D10.)
+
 **The Forge GUI, Hearth and Crucible open where they were left**
 
 - **Each remembers its window's size, position and whether it was maximised**, in the settings
